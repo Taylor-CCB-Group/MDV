@@ -29,7 +29,7 @@ function useActiveLink<T extends CTypes, M extends boolean>(
             v instanceof RowsAsColsQuery &&
             v.link === link
         ); // && v.subgroup === sg;
-    }, [props.current_value, link, sg]);
+    }, [props.current_value, link]);
     // if we already have a link, we should initialize the maxItems to its current value
     const defaultMaxItems = props.multiple ? 10 : 1;
     // will change when we can actually select different link/sg... but we could just keep one of these around

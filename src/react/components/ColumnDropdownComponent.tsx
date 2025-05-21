@@ -2,9 +2,9 @@ import { columnMatchesType, inferGenericColumnSelectionProps } from "@/lib/colum
 import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { useDataStore } from "../context";
 import type { DataColumn, DataType } from "@/charts/charts";
-import { type HTMLAttributes, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Autocomplete, Box, Button, Checkbox, Chip, Divider, FormControlLabel, Paper, PaperProps } from "@mui/material";
+import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
 import { isArray } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';

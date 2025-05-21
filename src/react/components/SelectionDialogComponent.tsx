@@ -1,15 +1,13 @@
 import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, FormControlLabel, IconButton, Paper, PaperProps, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId, type HTMLAttributes } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
 import CachedIcon from '@mui/icons-material/Cached';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
