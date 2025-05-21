@@ -116,4 +116,11 @@ class ShibbolethProvider(AuthProvider):
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
 
     def sync_users_to_db(self) -> None:
-        logger.info("Dummy sync - skipping user sync.")
+        """
+        Shibboleth doesn't have a centralized user store to sync from like Auth0.
+        Users are provisioned individually upon login.
+        """
+        logger.info(
+            "Shibboleth users are provisioned individually upon login, "
+            "no batch sync performed."
+        )
