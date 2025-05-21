@@ -231,9 +231,9 @@ const LinkMulti = observer(
             return 0;
         });
 
-        const handleLinkChange = (index: number) => {
+        const handleLinkChange = useCallback((index: number) => {
             setActiveLinkIndex(index);
-        };
+        }, []);
         // don't show tab ui if we only have one link
         if (links.length === 1) {
             return <LinkToColumnComponentInit {...props} link={links[0]} />;
@@ -245,6 +245,7 @@ const LinkMulti = observer(
                     {links.map((link, index) => (
                         <button
                             key={link.link.name}
+                            type="button"
                             className={`px-4 py-1 border-b-2 ${
                                 index === activeLinkIndex
                                     ? "font-bold"
