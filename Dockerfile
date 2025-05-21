@@ -75,6 +75,8 @@ RUN useradd -u 1010 -m mdvuser \
 
 # Switch to non-root user
 USER mdvuser
+# apply the same config to the user so that `poetry run` works for tests etc.
+RUN poetry config virtualenvs.create false
 
 # Command to run Gunicorn
 CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]
