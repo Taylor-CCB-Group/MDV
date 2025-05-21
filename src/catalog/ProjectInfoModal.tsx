@@ -12,6 +12,7 @@ import {
     Typography,
 } from "@mui/material";
 import type React from "react";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export interface ProjectInfoModalProps {
     open: boolean;
@@ -46,18 +47,7 @@ const ProjectInfoModal: React.FC<ProjectInfoModalProps> = ({
         >
             <DialogTitle id="project-info-dialog-title">
                 Project Information
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
-                        color: (theme) => theme.palette.grey[500],
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
+                <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
             <DialogContent dividers>
                 <List>

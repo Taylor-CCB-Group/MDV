@@ -52,6 +52,16 @@ const useProjects = () => {
                         : [],
                     numberOfStructures: item.numberOfStructures || "0",
                     numberOfImages: item.numberOfImages || "0",
+                    // Assigning all permissions as true if auth is not enabled
+                    permissions: item?.permissions ? {
+                                read: item.permissions["can_read"],
+                                edit: item.permissions["can_write"],
+                                owner: item.permissions["is_owner"],
+                            } : {
+                                read: true,
+                                edit: true,
+                                owner: true,
+                            },
                     thumbnail: item?.thumbnail,
                 }));
 
@@ -105,6 +115,11 @@ const useProjects = () => {
                     collaborators: [],
                     numberOfStructures: "0",
                     numberOfImages: "0",
+                    permissions: {
+                        read: true,
+                        edit: true,
+                        owner: true,
+                    },
                 };
 
                 setProjects((prevProjects) => [...prevProjects, newProject]);
@@ -297,6 +312,46 @@ const useProjects = () => {
         [handleError],
     );
 
+    // todo: Handle exporting larger files over 500 MB, gives error for now
+    const exportProject = useCallback(
+        async (id: string, name: string) => {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const response = await fetch(`export_project/${id}`);
+                if (response.ok) {
+                    // Fetch blob from response
+                    const blob = await response.blob();
+                    // Create new link to download the file
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `${name}.zip`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const errorResponse = await parseErrorResponse({
+                        response, 
+                        fallbackText: "Error exporting the project. Please try again later."
+                    });
+                    throw errorResponse;
+                }
+            } catch (error) {
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : "Error exporting the project. Please try again later.";
+
+                handleError(errorMessage);
+                console.error("Error exporting the project:", error);
+            } finally {
+                setIsLoading(false);
+            }
+    }, [handleError])
+
     return {
         projects: filteredAndSortedProjects,
         isLoading,
@@ -312,6 +367,7 @@ const useProjects = () => {
         setSortBy,
         setSortOrder,
         sortBy,
+        exportProject,
     };
 };
 

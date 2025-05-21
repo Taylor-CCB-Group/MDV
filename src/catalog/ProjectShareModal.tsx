@@ -24,6 +24,7 @@ import type React from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
 import { useState } from "react";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 import { matchEmail } from "@/lib/utils";
 
 export interface ProjectShareModalProps {
@@ -83,18 +84,7 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
             <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
                 <DialogTitle>
                     Manage Project Sharing
-                    <IconButton
-                        aria-label="close"
-                        onClick={onClose}
-                        sx={{
-                            position: "absolute",
-                            right: 8,
-                            top: 8,
-                            color: (theme) => theme.palette.grey[500],
-                        }}
-                    >
-                        <CloseIcon />
-                    </IconButton>
+                    <DialogCloseIconButton onClose={onClose} />
                 </DialogTitle>
                 <DialogContent dividers>
                     <Box sx={{ mt: 2 }}>

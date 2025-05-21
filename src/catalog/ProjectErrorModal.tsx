@@ -13,6 +13,7 @@ import {
     Typography,
 } from "@mui/material";
 import type React from "react";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export interface ErrorModalProps {
     open: boolean;
@@ -28,18 +29,7 @@ const ErrorModal: React.FC<ErrorModalProps> = ({ open, message, onClose }) => {
                     <ErrorIcon color="error" sx={{ mr: 1 }} />
                     Error
                 </Box>
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
-                        color: (theme) => theme.palette.grey[500],
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
+                <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
             <DialogContent dividers>
                 <Typography variant="body1">{message}</Typography>

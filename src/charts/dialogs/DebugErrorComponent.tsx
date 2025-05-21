@@ -47,7 +47,7 @@ const DebugErrorComponent = ({
     title = "Error Occurred",
     extraMetadata,
 }: DebugErrorComponentProps) => {
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
     const { buildInfo } = useBuildInfo();
@@ -218,8 +218,8 @@ const DebugErrorComponent = ({
                             </AlertTitle>
 
                             <div style={{ marginTop: "12px" }}>
-                                <p
-                                    style={{
+                                <Typography
+                                    sx={{
                                         margin: "0 0 12px 0",
                                         lineHeight: "1.6",
                                         padding: "4px 8px",
@@ -227,9 +227,10 @@ const DebugErrorComponent = ({
                                         whiteSpace: "pre-wrap",
                                         wordBreak: "break-word",
                                     }}
+                                    variant="subtitle1"
                                 >
                                     {error.message}
-                                </p>
+                                </Typography>
 
                                 {metaData && (
                                     <div>

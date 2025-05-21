@@ -1,12 +1,19 @@
+import type { AxiosResponse } from "axios";
+
 export type ParseErrorProps = {
-    response: Response;
+    response: Response | AxiosResponse;
     fallbackText: string;
 }
 
 export const parseErrorResponse = async ({response, fallbackText}: ParseErrorProps) => {
-    const errorData = await response.json().catch(() => ({
-        error: fallbackText,
-    }));
+    let errorData;
+    if (response instanceof Response) {
+        errorData = await response.json().catch(() => ({
+            error: fallbackText,
+        }));
+    } else {
+        errorData = response.data;
+    }
 
     if (response.status === 403) {
         return new Error(errorData?.error || "Forbidden: You are not allowed to perform this action.");

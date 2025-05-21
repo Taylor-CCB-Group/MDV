@@ -5,15 +5,26 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def register_routes(app, ENABLE_AUTH):
-    from flask import abort, request, jsonify, session, redirect, url_for, render_template
+    from flask import abort, request, jsonify, session, redirect, url_for, render_template, send_file
     from mdvtools.auth.authutils import update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache
-    from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
+    from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem, is_valid_mdv_project
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
     from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
     from mdvtools.dbutils.dbmodels import User
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
+    import tempfile
+    import zipfile
+
+    def get_project_thumbnail(project_path):
+        """Extract the first available viewImage from a project's views."""
+        try:
+            mdv_project = MDVProject(project_path)
+            return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
+        except Exception as e:
+            logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
+            return None
 
     """Register routes with the Flask app."""
     logger.info("Registering routes...")
@@ -100,7 +111,8 @@ def register_routes(app, ENABLE_AUTH):
                             "id": p["id"],
                             "name": p["name"],
                             "lastModified": p["lastModified"],
-                            "thumbnail": p["thumbnail"]
+                            "thumbnail": p["thumbnail"],
+                            "permissions": user_projects[p["id"]],
                         }
                         for p in active_projects
                         if p["id"] in allowed_project_ids
@@ -112,7 +124,8 @@ def register_routes(app, ENABLE_AUTH):
                             "id": p["id"],
                             "name": p["name"],
                             "lastModified": p["lastModified"],
-                            "thumbnail": p["thumbnail"]
+                            "thumbnail": p["thumbnail"],
+                            "permissions": None,
                         }
                         for p in active_projects
                     ]
@@ -155,15 +168,6 @@ def register_routes(app, ENABLE_AUTH):
                 except Exception as e:
                     logger.exception(f"In register_routes: Error serving MDVProject: {e}")
                     return jsonify({"error": "Failed to serve MDVProject"}), 500
-
-                def get_project_thumbnail(project_path):
-                    """Extract the first available viewImage from a project's views."""
-                    try:
-                        mdv_project = MDVProject(project_path)
-                        return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
-                    except Exception as e:
-                        logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
-                        return None
                     
                 # Create a new Project record in the database with the path
                 logger.info("Adding new project to the database")
@@ -228,6 +232,198 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify({"error": str(e)}), 500
 
         logger.info("Route registered: /create_project")
+
+        @app.route("/import_project", methods=["POST"])
+        def import_project():
+            try:
+                # Check if the request contains a file
+                if 'file' not in request.files:
+                    logger.error("In register_routes /import_project: Error - No project archive provided")
+                    return jsonify({"error": "No project archive provided"}), 400
+                
+                project_file = request.files['file']
+                project_name = request.form.get('name')
+
+                # Get next available project ID
+                next_id = ProjectService.get_next_project_id()
+                project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
+                os.makedirs(project_path, exist_ok=True)
+                
+                # Using a temp directory for extracting files
+                # todo: extract the file contents to the project folder directly rather than using a temp directory (need to check how to check valid project without extracting)
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    temp_file_path = os.path.join(temp_dir, "project.zip")
+                    project_file.save(temp_file_path)
+
+                    with zipfile.ZipFile(temp_file_path, 'r') as zip_file:
+                        # Reject entries with absolute paths or “..”
+                        for file in zip_file.infolist():
+                            if file.filename.startswith('/') or '..' in file.filename:
+                                logger.error(f"In register_routes /import_project: Unsafe zip entry {file.filename}")
+                                return jsonify({"error": "Invalid ZIP file: unsafe paths detected"}), 400
+                        temp_extract_path = os.path.join(temp_dir, "extracted")
+                        os.makedirs(temp_extract_path, exist_ok=True)
+                        # Extract zip file in temp directory
+                        zip_file.extractall(temp_extract_path)
+
+                        extracted_list = os.listdir(temp_extract_path)
+
+                        extracted_project_path = None
+
+                        # Check if the directory or sub-directory is valid mdv project
+                        if is_valid_mdv_project(temp_extract_path):
+                            extracted_project_path = temp_extract_path
+                        else:
+                            for e in extracted_list:
+                                sub_path = os.path.join(temp_extract_path, e)
+                                if os.path.isdir(sub_path) and is_valid_mdv_project(sub_path):
+                                    extracted_project_path = sub_path
+
+                        # Copy the files to newly created project path, if project is valid
+                        if extracted_project_path is not None:
+                            shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
+                        else:
+                            logger.error("In register_routes /import_project: Error - The uploaded file is not a valid MDV project")
+                            return jsonify({"error": "The uploaded file is not a valid MDV project"}), 400
+
+                # Create a new MDV project out of the new path and files copied
+                p = MDVProject(project_path, backend_db=True)
+                p.set_editable(True)
+                p.serve(app=app, open_browser=False, backend_db=True)
+                
+
+                
+                # Initialize the project and register it using project name if valid
+                if project_name is not None:
+                    new_project = ProjectService.add_new_project(path=project_path, name=project_name)
+                else:
+                    new_project = ProjectService.add_new_project(path=project_path)
+
+                if new_project:
+                    if ENABLE_AUTH:
+                        user_data = session.get("user")
+                        if not user_data:
+                            raise ValueError("User not found in session.")
+                        current_user_id = user_data['id']
+                        # Create a new entry with the new project and the current user
+                        UserProjectService.add_or_update_user_project(
+                            user_id=current_user_id,
+                            project_id=new_project.id,
+                            is_owner=True
+                        )
+
+                        thumbnail = get_project_thumbnail(project_path)
+
+                        # Update cache with the new project data and user id
+                        update_cache(
+                            user_id=current_user_id,
+                            project_id=new_project.id,
+                            permissions={
+                                "can_read": True,
+                                "can_write": True,
+                                "is_owner": True
+                            },
+                            project_data={
+                                "id": new_project.id,
+                                "name": new_project.name,
+                                "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                                "thumbnail": thumbnail
+                            }
+                        )
+                # Return the new project id and name
+                logger.info("Import successfull. Returning the success response.")
+                return jsonify({
+                    "id": new_project.id,
+                    "name": new_project.name,
+                    "status": "success"
+                })
+                
+            except Exception as e:
+                logger.exception(f"In register_routes - /import_project : Error importing project: {e}")
+                logger.info("started rollabck")
+                # Clean up on error
+                project_path = locals().get('project_path')
+                next_id = locals().get('next_id')
+                
+                # Clean up project directory if it was created
+                if project_path and os.path.exists(project_path):
+                    try:
+                        shutil.rmtree(project_path)
+                        logger.info("In register_routes -/import_project : Rolled back project directory creation as db entry is not added")
+                    except Exception as cleanup_error:
+                        logger.exception(f"In register_routes -/import_project : Error during cleanup: {cleanup_error}")
+                
+                # Remove from blueprints if registered
+                if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
+                    try:
+                        del ProjectBlueprint.blueprints[str(next_id)]
+                        logger.info("In register_routes -/import_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
+                    except Exception as blueprint_error:
+                        logger.exception(f"In register_routes -/import_project : Error removing blueprint: {blueprint_error}")
+                return jsonify({"error": str(e)}), 500
+            
+        logger.info("Route registered: /import_project")
+
+        @app.route("/export_project/<int:project_id>", methods=["GET"])
+        def export_project(project_id: int):
+            try:
+
+                # Fetch the project using the provided project id
+                project = ProjectService.get_project_by_id(project_id)
+
+                # No project with the given project id found
+                if project is None:
+                    logger.error(f"In register_routes - /export_project Error: Project with ID {project_id} not found in database")
+                    return jsonify({"error": f"Project with ID {project_id} not found in database"})
+
+                if ENABLE_AUTH:
+                    user = session.get('user')
+                    if not user:
+                        raise ValueError("User not found in session.")
+                    user_id = user["id"]
+                    user_projects = user_project_cache.get(user_id)
+                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
+                        logger.error(f"User does not have ownership of project {project_id}")
+                        return jsonify({"error": "Only the project owner can export the project."}), 403
+                    
+                if project.access_level != 'editable':
+                    logger.error(f"Project with ID {project_id} is not editable.")
+                    return jsonify({"error": "This project is not editable and cannot be exported."}), 403
+                    
+                if project.path is None:
+                    logger.error(f"In register_routes - /export_project Error: Project with ID {project_id} has no path in database")
+                    return jsonify({"error": f"Project with ID {project_id} has no path in the database"})
+                
+                if project.name is None:
+                    project_name = "unnamed_project"
+                else:
+                    project_name = project.name
+                                
+                # Create a temporary directory
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    file_name = f"{project_name}"
+                    file_path = os.path.join(temp_dir, file_name)
+                    
+                    # Create an archive from the project path
+                    zip_path = shutil.make_archive(
+                        file_path,
+                        "zip",
+                        project.path
+                    )
+
+                    # Return the zip file
+                    return send_file(
+                        path_or_file=zip_path,
+                        mimetype="application/zip",
+                        as_attachment=True,
+                        download_name=f"{project_name}.zip"
+                    )
+
+            except Exception as e:
+                logger.exception(f"In register_routes - /export_project : Unexpected error while exporting project with project id - '{project_id}': {e}")
+                return jsonify({"error": str(e)}), 500
+        
+        print("Route registered: /export_project/<project_id>")
 
         @app.route("/delete_project/<int:project_id>", methods=["DELETE"])
         def delete_project(project_id: int):

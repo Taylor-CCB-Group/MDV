@@ -248,6 +248,13 @@ def tables_exist():
         #print(inspector.get_table_names())
         return inspector.get_table_names()
 
+def is_valid_mdv_project(path: str):
+    if not os.path.isdir(path):
+        return False
+    dir_list = os.listdir(path)
+    return "views.json" in dir_list and "state.json" in dir_list and "datasources.json" in dir_list
+        
+
 def serve_projects_from_db(app):
     failed_projects: list[tuple[int, str | Exception]] = []
     try:

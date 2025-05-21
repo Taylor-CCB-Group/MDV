@@ -16,6 +16,7 @@ import {
 import type React from "react";
 import { useState } from "react";
 import type { ProjectAccessType } from "./utils/projectUtils";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export interface ProjectSettingsModalProps {
     id: string;
@@ -70,18 +71,7 @@ const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>
                 Project Settings
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
-                        color: (theme) => theme.palette.grey[500],
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
+                <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
             <DialogContent dividers>
                 <Box sx={{ mb: 2 }}>

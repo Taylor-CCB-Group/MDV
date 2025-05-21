@@ -10,6 +10,7 @@ import {
     Typography,
 } from "@mui/material";
 import type React from "react";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export interface ProjectDeleteModalProps {
     id: string;
@@ -33,18 +34,7 @@ const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>
                 Delete Project
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
-                        color: (theme) => theme.palette.grey[500],
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
+                <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
             <DialogContent dividers>
                 <Typography variant="body1" align="center">
