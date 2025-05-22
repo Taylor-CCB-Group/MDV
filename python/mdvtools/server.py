@@ -16,8 +16,7 @@ import sys
 import re
 from mdvtools.llm.code_manipulation import parse_view_name
 from werkzeug.security import safe_join
-from mdvtools.websocket import mdv_socketio, get_socket_logger
-import logging
+from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import (
     ProjectBlueprint as Blueprint,
