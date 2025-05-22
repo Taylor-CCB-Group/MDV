@@ -334,36 +334,55 @@ def create_regulamentary_project_from_pipeline(
         output,
         config,
         results_folder,
-        atac_bw = None,
-        peaks = "merge",
+        atac_bw=None,
+        peaks="merge",
         genome="hg38",
         openchrom="DNase"
 ):
-    
-    fold = join(results_folder,peaks)
-    marks = ["H3K4me1", "H3K4me3", "H3K27ac", "CTCF","ATAC"]
+    """Creates a regulamentary project from pipeline outputs.
+
+    Args:
+        output (str): Path to the directory which will house the MDV Project
+        config (str): Path to the YAML configuration file.
+        results_folder (str): Base path to the results directory.
+        atac_bw (str, optional): Path to ATAC-seq bigWig file. Defaults to None.
+        peaks (str, optional): Name of the peaks subdirectory. Defaults to "merge".
+        genome (str, optional): Genome assembly version to use. Defaults to "hg38".
+        openchrom (str, optional): Name of the open chromatin mark. Defaults to "DNase".
+
+    Returns:
+        An MDVProject 
+    """
+    fold = join(results_folder, peaks)
+    marks = ["H3K4me1", "H3K4me3", "H3K27ac", "CTCF", "ATAC"]
+
+    # Load configuration YAML
     with open(config, 'r') as file:
         info = yaml.safe_load(file)
-    #get the bed files 
-    beds=  {x:info["union_peaks"].get(f"bed_{x}") for x in marks}
-    #get the bw files
-    bigwigs=  {x:info["compute_matrix_bigwigs"].get(f"bigwig_{x}") for x in marks}
-    bigwigs["ATAC"]=atac_bw
 
-    table= join(fold,"08_REgulamentary", "mlv_REgulamentary.csv")
+    # Get the bed files for each mark
+    beds = {mark: info["union_peaks"].get(f"bed_{mark}") for mark in marks}
 
-    #genome
-    bl =  info.get("remove_blacklist")
-    if bl:
+    # Get the bigWig files for each mark
+    bigwigs = {mark: info["compute_matrix_bigwigs"].get(f"bigwig_{mark}") for mark in marks}
+    bigwigs["ATAC"] = atac_bw  # Override ATAC with provided file if given
+
+    # Set the path to the regulatory table
+    table = join(fold, "08_REgulamentary", "mlv_REgulamentary.csv")
+
+    # Determine genome version, considering blacklist genome override
+    gen = genome
+    bl = info.get("remove_blacklist")
+    if bl and bl.get("genome"):
         gen = bl.get("genome")
-    gen = gen or genome
 
-    #get the matrix data and order
+    # Define matrix data source and region order
     matrix = {
-        "data":join(fold,"09_metaplot","matrix.csv"),
-        "order":join(fold,"04_sort_regions","sort_union.bed"),
-        "marks":["H3K4me1", "H3K4me3", "H3K27ac", "CTCF"]
+        "data": join(fold, "09_metaplot", "matrix.csv"),
+        "order": join(fold, "04_sort_regions", "sort_union.bed"),
+        "marks": ["H3K4me1", "H3K4me3", "H3K27ac", "CTCF"]
     }
+
     return create_regulamentary_project(
         output,
         table,
@@ -381,72 +400,87 @@ def create_regulamentary_project(
     beds,
     matrix=None,
     openchrom="DNase",
-    marks=["ATAC","H3K4me1", "H3K4me3", "H3K27ac", "CTCF"],
-    mark_colors=["#eb9234","#349beb", "#3aeb34", "#c4c41f", "#ab321a"],
+    marks=["ATAC", "H3K4me1", "H3K4me3", "H3K27ac", "CTCF"],
+    mark_colors=["#eb9234", "#349beb", "#3aeb34", "#c4c41f", "#ab321a"],
     genome="hg38"
 ):
-    # get the template dir
+    """
+    Creates a regulatory project visualization from input data sources.
+
+    This method constructs a project using signal and peak files for 
+    various histone marks and chromatin accessibility, adds them as data 
+    sources and tracks, and configures a genome browser and visualization views.
+
+    Args:
+        output (str): Output directory or file for the project.
+        table (str): Path to the CSV table containing regulatory element data.
+        bigwigs (dict): Dictionary mapping mark names to bigWig file paths or URLs.
+        beds (dict): Dictionary mapping mark names to BED file paths.
+        matrix (dict or None, optional): Matrix and order file information for heatmaps, or None.
+        openchrom (str, optional): Name for open chromatin mark. Defaults to "DNase".
+        marks (list of str, optional): List of marks to process. Defaults to `["ATAC", "H3K4me1", "H3K4me3", "H3K27ac", "CTCF"]`.
+        mark_colors (list of str, optional): List of colors for the marks. Defaults to a preset palette.
+        genome (str, optional): Genome assembly to use. Defaults to "hg38".
+
+    Returns:
+        MDVProject: The project object constructed with the given data and views.
+
+    """
+    # Get the template directory
     tdir = join(split(os.path.abspath(__file__))[0], "templates")
-    p = MDVProject(output,delete_existing=True)
+    p = MDVProject(output, delete_existing=True)
+
+    # Load regulatory elements table
     mdv = pd.read_csv(table, sep="\t")
-    columns=[{"name":"start","datatype":"int32"},{"name":"end","datatype":"int32"}]
+    columns = [{"name": "start", "datatype": "int32"}, {"name": "end", "datatype": "int32"}]
     p.add_datasource("elements", mdv, columns)
 
     default_tracks = []
-    for mark,color in zip(marks,mark_colors):
-        name =  mark if mark != 'ATAC' else openchrom
+    for mark, color in zip(marks, mark_colors):
+        name = mark if mark != 'ATAC' else openchrom
         bw = bigwigs.get(mark)
         if bw:
             url = bw
             if not bw.startswith("http"):
                 fname = split(bw)[1]
-                shutil.copy(bw,join(p.trackfolder,fname))
+                shutil.copy(bw, join(p.trackfolder, fname))
                 url = f"./tracks/{fname}"
             default_tracks.append(
                 {
                     "url": url,
                     "short_label": f"{name} cov",
-                    "color":color,
+                    "color": color,
                     "height": 60,
-                    "track_id": f"coverage_{mark}" 
+                    "track_id": f"coverage_{mark}"
                 }
             )
         bed = beds.get(mark)
         if bed:
-            url=bed
+            url = bed
             if not bed.startswith("http"):
                 fname = split(bed)[1]
-                #need to process to get into correct form for browser
+                # Process BED files for browser compatibility
                 if bed.endswith(".bed"):
-                    #bed file processing
+                    # Bed file processing: remove header and keep first 3 columns
                     df = pd.read_csv(bed, sep="\t", header=None)
                     first_row = df.iloc[0]
-                    #crude way to look for header
                     has_header = not first_row[1].lstrip().isdigit()
                     if has_header:
                         df = df.iloc[1:]
-                    #only require chrom,start,enf
                     df = df.iloc[:, :3]
-                    #create temp file in order to gzip and index
-                    t_file = join(p.trackfolder,f"{fname}.temp")
-                    o_file = join(p.trackfolder,fname)
+                    t_file = join(p.trackfolder, f"{fname}.temp")
+                    o_file = join(p.trackfolder, fname)
                     df.to_csv(t_file, sep="\t", header=False, index=False)
-                    #gzip and index
-                    create_bed_gz_file(t_file,o_file)
+                    create_bed_gz_file(t_file, o_file)
                     os.remove(t_file)
                     url = f"./tracks/{fname}.gz"
-                #just copy track as is - assume its in correct format 
                 else:
-                    to_file = join(p.trackfolder,fname)
-                    shutil.copyfile(bed,to_file)
-                    #need to copy the index of tabix files
+                    to_file = join(p.trackfolder, fname)
+                    shutil.copyfile(bed, to_file)
+                    # Copy tabix index if present
                     if bed.endswith(".gz"):
-                        shutil.copyfile(f"{bed}.tbi",f"{to_file}.tbi")
+                        shutil.copyfile(f"{bed}.tbi", f"{to_file}.tbi")
                     url = f".tracks/{fname}"
-
-   
-
-
             default_tracks.append(
                 {
                     "url": url,
@@ -472,9 +506,13 @@ def create_regulamentary_project(
     )
     p.add_refseq_track("elements", genome)
     if matrix:
-        _create_dt_heatmap(p,matrix)
+        _create_dt_heatmap(p, matrix)
 
-    view = json.load(open(join(tdir, "views", "regulamentary.json")))
+    # Load and extend visualization views
+    with open(join(tdir, "views", "regulamentary.json")) as f:
+        view = json.load(f)
+    if not matrix:
+        view = [x for x in view if x["type"] != "deeptools_heatmap"]
     gb = p.get_genome_browser("elements")
     gb.update(
         {
@@ -494,7 +532,6 @@ def create_regulamentary_project(
         },
     )
     return p
-
 
 def _create_dt_heatmap(
         project,
