@@ -18,14 +18,19 @@ const AddViewDialogComponent = (props: {
     const [viewName, setViewName] = useState("");
     const [isCloneView, setIsCloneView] = useState(false);
     const [checkedDs, setCheckedDs] = useState<{ [name: string]: boolean }>({});
+    //must be a better way than using the window object
     const { viewManager, viewData } = window.mdv.chartManager;
-    const dataSources = useMemo(() => Object.keys(viewData.dataSources), [viewData.dataSources]);
+    //we want a choice of all datasources (not just ones on the current view)
+    //not sure how to get all the datasources available - this is just a temporary hack
+    //if we don't use useMemo get constant re-rendering ?
+    const dataSources = useMemo(()=>viewManager.cm.dataSources.map(x=>x.name),[viewManager.cm])
+    const currentDataSources = useMemo(() => Object.keys(viewData.dataSources), [viewData.dataSources]);
 
     useEffect(() => {
         // Initialising the checkedDs with the data sources inside the view
         const tempDs: { [name: string]: boolean } = {};
         dataSources?.forEach?.((ds) => {
-            tempDs[ds] = false;
+            tempDs[ds] =currentDataSources.indexOf(ds) !=-1;
         });
         setCheckedDs(tempDs);
     }, [dataSources]);
@@ -33,7 +38,7 @@ const AddViewDialogComponent = (props: {
     const handleCheckboxChange = (ds: string) => {
         setCheckedDs((prevDs) => ({ ...prevDs, [ds]: !prevDs[ds] }));
     };
-
+    
     const checkInvalidName = (name: string) => {
         return viewManager.all_views.includes(name);
     };

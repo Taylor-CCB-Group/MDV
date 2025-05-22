@@ -195,7 +195,6 @@ class ViewManager {
         try {
             const { viewData, dsIndex, contentDiv } = this.cm;
             this.setAllViews([...this.all_views, viewName]);
-
             // Optionally make it the current view
             this.setView(viewName);
             if (!isCloneView) {
@@ -212,19 +211,14 @@ class ViewManager {
                 const state = this.cm.getState();
                 state.view.initialCharts = {};
                 state.view.dataSources = {};
-                //only one datasource
-                if (Object.keys(viewData.dataSources)?.length === 1) {
-                    const name = Object.keys(viewData.dataSources)?.[0];
-                    state.view.initialCharts[name] = [];
-                    state.view.dataSources[name] = {};
-                } else {
-                    for (const ds in dsIndex) {
-                        if (checkedDs[ds]) {
-                            state.view.initialCharts[ds] = [];
-                            state.view.dataSources[ds] = {};
-                        }
+                //add the required datasources (checkedIds) to the view
+                for (let name in checkedDs){
+                    if (checkedDs[name]){
+                        state.view.initialCharts[name] = [];
+                        state.view.dataSources[name] = {};
                     }
                 }
+              
                 contentDiv.innerHTML = "";
                 await this.cm._init(state.view);
                 await this.saveView();
