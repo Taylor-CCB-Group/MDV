@@ -15,7 +15,8 @@ class TableChart extends BaseChart {
             const { config, dataStore } = this;
             cols = [];
             //add the index column (unless told not to)
-            if (config.include_index !== false)
+            // (include_index could also be undefined)
+            if (config?.include_index)
                 cols = [
                     {
                         field: "__index__",
