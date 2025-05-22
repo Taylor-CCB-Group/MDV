@@ -68,8 +68,8 @@ def main():
 
     stacked_row_color_legend = {"display": True, "pos": [375, 1]}
     
-    stacked_row_xaxis_properties = {"label": "label1", "textSize": 13, "tickfont": 10}
-    stacked_row_yaxis_properties = {"label": "density", "textSize": 13, "tickfont": 10}
+    stacked_row_xaxis_properties = {"label": "Frequency", "textSize": 8, "tickfont": 8, "size": 55}
+    stacked_row_yaxis_properties = {"label": "label1", "textSize": 8, "tickfont": 8, "size": 110}
 
     # Create stacked row plot
     stacked_row_plot = create_stacked_row_plot(

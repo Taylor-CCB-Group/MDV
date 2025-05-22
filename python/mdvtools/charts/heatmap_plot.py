@@ -31,4 +31,7 @@ class HeatmapPlot(BasePlot):
     def set_y_axis(self, axis_labels, axis_title):
         self.plot_data["y_axis"] = {"labels": axis_labels, "title": axis_title}
 
+    def set_axis(self, xtextSize, ytextSize, xsize, ysize, xtickfont, ytickfont):
+        self.plot_data["axis"] = {"x": {"textSize": xtextSize, "size": xsize, "tickfont": xtickfont}, "y": {"textSize": ytextSize, "size": ysize, "tickfont": ytickfont}}
+
     # Any additional methods specific to heatmaps can be added here

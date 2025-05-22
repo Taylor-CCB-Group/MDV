@@ -56,14 +56,16 @@ def main():
     color_legend = {"display" : True,
                     "pos" : [375,1]}         
     
-    xaxis_properties = {"label": "label1", 
-             "textSize": 13, 
-             "tickfont": 10
+    xaxis_properties = {"label": "Frequency", 
+             "textSize": 8, 
+             "tickfont": 8,
+             "size": 55
     }
 
-    yaxis_properties = {"label": "density", 
+    yaxis_properties = {"label": "label1", 
              "textSize": 13, 
-             "tickfont": 10
+             "tickfont": 8,
+             "size": 110
     }
 
     # Create plot

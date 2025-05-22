@@ -52,7 +52,7 @@ def main():
     # DotPlot parameters
     dot_title = "Dot plot example title"
     dot_params = ["param1", f"gs|{param2}(gs)|{param2_index}"]
-    dot_size = [400, 250]
+    dot_size = [800, 250]
     dot_position = [10, 500]
 
     dot_colorscale = {

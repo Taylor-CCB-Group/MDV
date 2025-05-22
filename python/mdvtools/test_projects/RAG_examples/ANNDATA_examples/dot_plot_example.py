@@ -48,7 +48,7 @@ def main():
     # DotPlot parameters
     title = "Example Title"
     params = ["param1", "param2", "param3", "param4", "param5", "param6", "param7", "param8"] # The 'params' list can accept any number of arguments, param1 should be a categorical variable and the rest of params should be numerical variables.
-    size = [792, 472]
+    size = [1000, 472]
     position = [10, 10]
 
     colorscale = {

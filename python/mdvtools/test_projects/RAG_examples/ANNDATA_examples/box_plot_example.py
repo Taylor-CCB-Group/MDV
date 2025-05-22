@@ -46,7 +46,7 @@ def main():
     # BoxPlot parameters
     title = "Example title"
     params = ["param1", "param2"] #param1 should be a categorical variable and param2 should be a numerical variable.
-    size = [792, 472]
+    size = [1092, 472]
     position = [10, 10]
     
     # Create plot

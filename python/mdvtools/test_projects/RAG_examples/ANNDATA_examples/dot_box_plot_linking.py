@@ -114,7 +114,7 @@ def main():
     # DotPlot parameters
     dot_title = "Dot plot example title"
     dot_params = ["param1", f"gs|{param2}(gs)|{param2_index}"]
-    dot_size = [400, 250]
+    dot_size = [1000, 250]
     dot_position = [10, 500]
 
     dot_colorscale = {
@@ -129,7 +129,7 @@ def main():
     param2_index = data_frame_var['name'].tolist().index(param2)
     box_title = "Example title"
     box_params = ["param4", f"gs|{param2}(gs)|{param2_index}"]
-    box_size = [615, 557]
+    box_size = [1015, 557]
     box_position = [500, 500]
     
     # Create box plot
