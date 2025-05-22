@@ -2,7 +2,7 @@ import { createEl } from "../utilities/Elements";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart";
 import { WGL2DI } from "../webgl/WGL2DI";
-
+import {debounce} from "../utilities/Utilities"
 const color_scheme = [
     "#313695",
     "#4575B4",
@@ -241,11 +241,18 @@ class DeepToolsHeatMap extends SVGChart {
     }
 
     getSettings() {
+      
         let settings = super.getSettings();
         const c = this.config;
         const cs = c.color_scale;
         const sortCols = this.dataStore.getColumnList();
         sortCols.push({ name: "Default", field: "__default__" });
+        //need to debounce color change as this is expensive
+        const db = debounce((x)=>{
+            cs.range = [...x];
+            this.updateMap(true);
+
+        },200)
         settings = settings.concat([
             {
                 type: "doubleslider",
@@ -254,10 +261,7 @@ class DeepToolsHeatMap extends SVGChart {
                 doc: this.__doc__,
                 current_value: cs.range,
                 label: "Color Scale",
-                func: (x, y) => {
-                    cs.range = [x, y];
-                    this.updateMap(true);
-                },
+                func: (x) => db(x)
             },
             {
                 type: "dropdown",
