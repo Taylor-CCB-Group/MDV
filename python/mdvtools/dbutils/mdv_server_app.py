@@ -14,6 +14,9 @@ from mdvtools.auth.register_auth_routes import register_auth_routes
 from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.websocket import mdv_socketio
+# this shouldn't be necessary in future
+from psycogreen.gevent import patch_psycopg
+patch_psycopg()
 
 # Setup logging
 logger = logging.getLogger(__name__)
