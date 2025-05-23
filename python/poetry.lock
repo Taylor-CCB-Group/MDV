@@ -3255,6 +3255,17 @@ files = [
 test = ["enum34 ; python_version <= \"3.4\"", "ipaddress ; python_version < \"3.0\"", "mock ; python_version < \"3.0\"", "pywin32 ; sys_platform == \"win32\"", "wmi ; sys_platform == \"win32\""]
 
 [[package]]
+name = "psycogreen"
+version = "1.0.2"
+description = "psycopg2 integration with coroutine libraries"
+optional = false
+python-versions = "*"
+groups = ["backend"]
+files = [
+    {file = "psycogreen-1.0.2.tar.gz", hash = "sha256:c429845a8a49cf2f76b71265008760bcd7c7c77d80b806db4dc81116dbcd130d"},
+]
+
+[[package]]
 name = "psycopg2"
 version = "2.9.9"
 description = "psycopg2 - Python-PostgreSQL Database Adapter"
@@ -5292,4 +5303,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "9515005081559ac9d67af167f2a36ae0b74d982b2ccfa32e8b583a046e820517"
+content-hash = "8c7833ab1795b4fce1ad239e17c254e210502a373d176e5d3d5725ef47857866"
