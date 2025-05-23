@@ -30,7 +30,7 @@ import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.llm.chat_protocol import ProjectChatProtocol, ProjectChat
-
+from mdvtools.llm.chat_server_extension import chat_extension
 routes = set()
 
 
@@ -89,9 +89,12 @@ def create_app(
     project: MDVProject,
     open_browser=True,
     port=5050,
+    # todo: another way of specifying that we are using chat... also, use socket for other things.
     websocket=True, # todo - pass something back to client in `state.json` that indicates whether this is enabled.
     use_reloader=False,
     app: Optional[Flask] = None,
+    # would like to redesign this a bit... this relates mostly to the ProjectBlueprint "_v2" thing
+    # and also some BS about adding headers to cope with server misconfiguration (as I recall).
     backend_db=False,
 ):
     if app is None:
@@ -105,8 +108,10 @@ def create_app(
         multi_project = False
         if websocket:
             # reviewing this... thinking about hooking up to ProjectChat logger...
-            # nb - we're in 'single project' mode here.
-            #! if we only want one SocketIO for the whole app, we probably initialise that elsewhere.
+            #! nb - we're in 'single project' mode here.
+            # thinking about syncronising list of views via SocketIO rather than polling... 
+            # maybe via a smaller PR where I better figure out clean socket implementation.
+            # maybe we have some abstraction around how we create the Flask instance.
             mdv_socketio(app)
     else:
         ## nb - previous use of flask.Blueprint was not allowing new projects at runtime
@@ -125,8 +130,6 @@ def create_app(
             project_bp = Blueprint_v2(project.id, __name__, url_prefix=route)
         else:
             project_bp = Blueprint(project.id, __name__, url_prefix=route)
-        if websocket:
-            print("todo: websocket for multi-project")
 
     # if route in routes:
     #     raise Exception(
@@ -137,46 +140,13 @@ def create_app(
     if websocket:
         """
         current prototype using 'websocket' as a flag that we interpret as 'enable chatMDV' for now.
+        we might avoid having this logic in here, or at least change that semantic.
+        rather than pass in `app: Optional[Flask]`, we could pass in a configuration object
+        that includes that app and any extensions we want to use.
+        for now, the code has been rearranged, but the logic for calling it is similar...
         """
-        bot: Optional[ProjectChatProtocol] = None
-        print(f"websocket/chat enabled for {route}")
-        # what if we make `log` a thing that streams to the client via websocket?
-        @project_bp.route("/chat_init", methods=["POST"])
-        def chat_init():
-            print("chat_init")
-            # logger.info("chat_init")
-            nonlocal bot
-            if bot is None:
-                bot = ProjectChat(project)
-            return {"message": bot.welcome}
-        @project_bp.route("/chat", methods=["POST"])
-        def chat():
-            nonlocal bot
-            if not request.json:
-                return {"error": "No JSON data in request"}, 500
-            message = request.json.get("message")
-            id = request.json.get("id")
-            try:
-                if bot is None:
-                    bot = ProjectChat(project)
-                # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
-                # probably want to change the return type of this function, but for now we do some string parsing here.
-                final_code = bot.ask_question(message, id)
-                try:
-                    # this can give a confusing error if we don't explicitly catch it...
-                    view_name = parse_view_name(final_code)
-                    if view_name is None:
-                        raise Exception(final_code)
-                    bot.log(f"view_name: {view_name}")
-                    return {"message": final_code, "view": view_name, "id": id}
-                except Exception as e:
-                    bot.log(f"final_code returned by bot.ask_question is bad, probably an earlier error: {e}")
-                    # final_code is probably an error message, at this point.
-                    return {"message": final_code}
-            except Exception as e:
-                print(e)
-                return {"message": str(e)}
-            return {"message": f"bleep bloop I'm a robot, you said: {message}"}
+        chat_extension.register_routes(project, project_bp)
+
 
     @project_bp.route("/")
     def project_index():
@@ -217,6 +187,7 @@ def create_app(
             with open(path) as f:
                 try:
                     state = json.load(f)
+                    ## let's do something similar but more explicitly related to chat...
                     state["websocket"] = websocket
                     return state
                 except Exception as e:
