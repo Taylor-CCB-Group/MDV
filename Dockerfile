@@ -82,7 +82,7 @@ RUN poetry config virtualenvs.create false
 # nb -t 0 means no timeout, this is a dev setting, chat requests are long running & should be made async
 # for SocketIO, we also need to run with --worker-class eventlet or gevent https://flask-socketio.readthedocs.io/en/latest/deployment.html
 # adding `-k gevent` for this
-CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.mdv_server_app:app"]
+CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.mdv_server_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 
