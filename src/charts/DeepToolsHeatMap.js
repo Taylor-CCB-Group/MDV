@@ -102,6 +102,11 @@ class DeepToolsHeatMap extends SVGChart {
                 this.dataLength * 3,
             );
 
+            this._debouncedColor = debounce((range) => {
+                this.config.color_scale.range = [...range];
+                this.updateMap(true);
+            }, 200);
+
             //this could done in server side
             let z = 0;
             for (let n = 0; n < len; n++) {
@@ -247,12 +252,6 @@ class DeepToolsHeatMap extends SVGChart {
         const cs = c.color_scale;
         const sortCols = this.dataStore.getColumnList();
         sortCols.push({ name: "Default", field: "__default__" });
-        //need to debounce color change as this is expensive
-        const db = debounce((x)=>{
-            cs.range = [...x];
-            this.updateMap(true);
-
-        },200)
         settings = settings.concat([
             {
                 type: "doubleslider",
@@ -261,7 +260,7 @@ class DeepToolsHeatMap extends SVGChart {
                 doc: this.__doc__,
                 current_value: cs.range,
                 label: "Color Scale",
-                func: (x) => db(x)
+                func: (x) => this._debouncedColor(x)
             },
             {
                 type: "dropdown",

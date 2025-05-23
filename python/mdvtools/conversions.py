@@ -400,8 +400,8 @@ def create_regulamentary_project(
     beds,
     matrix=None,
     openchrom="DNase",
-    marks=["ATAC", "H3K4me1", "H3K4me3", "H3K27ac", "CTCF"],
-    mark_colors=["#eb9234", "#349beb", "#3aeb34", "#c4c41f", "#ab321a"],
+    marks = None,
+    mark_colors = None,
     genome="hg38"
 ):
     """
@@ -426,6 +426,10 @@ def create_regulamentary_project(
         MDVProject: The project object constructed with the given data and views.
 
     """
+    if marks is None:
+        marks = ["ATAC", "H3K4me1", "H3K4me3", "H3K27ac", "CTCF"]
+    if mark_colors is None:
+        mark_colors = ["#eb9234", "#349beb", "#3aeb34", "#c4c41f", "#ab321a"]
     # Get the template directory
     tdir = join(split(os.path.abspath(__file__))[0], "templates")
     p = MDVProject(output, delete_existing=True)
@@ -464,7 +468,8 @@ def create_regulamentary_project(
                     # Bed file processing: remove header and keep first 3 columns
                     df = pd.read_csv(bed, sep="\t", header=None)
                     first_row = df.iloc[0]
-                    has_header = not first_row[1].lstrip().isdigit()
+                    cell_str  = str(first_row[1]).strip()
+                    has_header = not cell_str.isdigit()
                     if has_header:
                         df = df.iloc[1:]
                     df = df.iloc[:, :3]
@@ -537,8 +542,10 @@ def _create_dt_heatmap(
         project,
         matrix,
         ds="elements",
-        ifields=["chromosome", "start", "end"]
+        ifields = None
 ):
+    if ifields == None:
+        ifields = ["chromosome", "start", "end"]
     # get the order of the regions in the matrix
     data = {x:project.get_column(ds,x) for x in ifields}
     mdv_i = pd.DataFrame(data)
