@@ -54,6 +54,7 @@ timing_results.log
 docker-local-chat.yml
 chat_log.json
 chatlog.json
+python/chat_debug.log
 
 # as seen inside devcontainer
 mdv/
