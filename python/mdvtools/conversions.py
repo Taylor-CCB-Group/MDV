@@ -589,7 +589,7 @@ def _create_dt_heatmap(
                 "rows": md["size"],
                 "cols": 800,
                 "groups": matrix["marks"],
-                "max_scale": max,
+                "max_scale": mx,
             }
         }
     }
