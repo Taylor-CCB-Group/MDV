@@ -485,7 +485,7 @@ def create_regulamentary_project(
                     # Copy tabix index if present
                     if bed.endswith(".gz"):
                         shutil.copyfile(f"{bed}.tbi", f"{to_file}.tbi")
-                    url = f".tracks/{fname}"
+                    url = f"./tracks/{fname}"
             default_tracks.append(
                 {
                     "url": url,
@@ -544,7 +544,7 @@ def _create_dt_heatmap(
         ds="elements",
         ifields = None
 ):
-    if ifields == None:
+    if ifields is None:
         ifields = ["chromosome", "start", "end"]
     # get the order of the regions in the matrix
     data = {x:project.get_column(ds,x) for x in ifields}

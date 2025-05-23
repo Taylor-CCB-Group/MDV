@@ -106,7 +106,7 @@ async function loadData() {
     if (config.all_views && view && config.all_views.indexOf(view) !== -1) {
         config["initial_view"] = view;
     }
-    const isStatic = staticFolder?true:config.static
+    const isStatic = staticFolder || config.static || false;
 
     const dataLoader = getDataLoader(isStatic, datasources, views, dir);
 
