@@ -1,3 +1,4 @@
+import io
 from mdvtools.logging_config import get_logger
 logger = get_logger(__name__)
 
@@ -22,6 +23,21 @@ def register_routes(app, ENABLE_AUTH):
         except Exception as e:
             logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
             return None
+        
+    REQUIRED_FILES = {"views.json", "state.json", "datasources.json"}
+
+    def find_root_prefix(names):
+        # Check if all required files are in the root of archive
+        if REQUIRED_FILES.issubset(set(os.path.basename(n) for n in names if "/" not in n)):
+            return ""
+        # Check one level below if required files exist
+        dirs = {n.split("/", 1)[0] for n in names if "/" in n}
+        for d in dirs:
+            files_in_d = {os.path.basename(n) for n in names if n.startswith(f"{d}/")}
+            if REQUIRED_FILES.issubset(files_in_d):
+                return d + "/"
+        return None
+
 
     """Register routes with the Flask app."""
     logger.info("Registering routes...")
@@ -260,44 +276,37 @@ def register_routes(app, ENABLE_AUTH):
                 project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
                 os.makedirs(project_path, exist_ok=True)
                 
-                # Using a temp directory for extracting files
-                # todo: extract the file contents to the project folder directly rather than using a temp directory (need to check how to check valid project without extracting)
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    temp_file_path = os.path.join(temp_dir, "project.zip")
-                    project_file.save(temp_file_path)
+                file_stream = io.BytesIO(project_file.read())
 
-                    with zipfile.ZipFile(temp_file_path, 'r') as zip_file:
-                        # Reject entries with absolute paths or ".."
-                        for file in zip_file.infolist():
-                            if file.filename.startswith('/') or '..' in file.filename:
-                                logger.error(f"In register_routes /import_project: Unsafe zip entry {file.filename}")
-                                return jsonify({"error": "Invalid ZIP file: unsafe paths detected"}), 400
-                        temp_extract_path = os.path.join(temp_dir, "extracted")
-                        os.makedirs(temp_extract_path, exist_ok=True)
-                        # Extract zip file in temp directory
-                        zip_file.extractall(temp_extract_path)
+                with zipfile.ZipFile(file_stream) as zf:
+                    names = zf.namelist()
 
-                        extracted_list = os.listdir(temp_extract_path)
+                    # Reject entries with absolute paths or “..”
+                    bad = [n for n in names if n.startswith(("/", "\\")) or ".." in n]
+                    if bad:
+                        logger.error("In register_routes /import_project: Error - Unsafe entries in ZIP")
+                        return jsonify({"error": "Invalid ZIP file: unsafe paths detected"}), 400
 
-                        extracted_project_path = None
+                    # Find the root directory of the mdv project
+                    root = find_root_prefix(names)
+                    if root is None:
+                        logger.error("In register_routes /import_project: Error - Not a valid MDV project")
+                        return jsonify({"error": "Not a valid MDV project"}), 400
 
-                        # Check if the directory or sub-directory is valid mdv project
-                        if is_valid_mdv_project(temp_extract_path):
-                            extracted_project_path = temp_extract_path
-                        else:
-                            for e in extracted_list:
-                                sub_path = os.path.join(temp_extract_path, e)
-                                if os.path.isdir(sub_path) and is_valid_mdv_project(sub_path):
-                                    extracted_project_path = sub_path
+                    # Select the files based in the mdv project
+                    members = [n for n in names if n.startswith(root)]
 
-                        # Copy the files to newly created project path, if project is valid
-                        if extracted_project_path is not None:
-                            shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
-                        else:
-                            logger.error("In register_routes /import_project: Error - The uploaded file is not a valid MDV project")
-                            return jsonify({"error": "The uploaded file is not a valid MDV project"}), 400
+                    # Extract them to the project path
+                    zf.extractall(path=project_path, members=members)
 
-                # Create a new MDV project out of the new path and files copied
+                # If everything was under a single top-level folder, flatten it
+                if root:
+                    subdir = os.path.join(project_path, root.rstrip("/"))
+                    for item in os.listdir(subdir):
+                        shutil.move(os.path.join(subdir, item), project_path)
+                    os.rmdir(subdir)
+                
+                # # Create a new MDV project out of the new path and files copied
                 p = MDVProject(project_path, backend_db=True)
                 p.set_editable(True)
                 p.serve(app=app, open_browser=False, backend_db=True)
