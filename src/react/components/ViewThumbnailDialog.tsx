@@ -37,7 +37,12 @@ export const ViewImageComponent = ({imgSrc, viewName}: ViewImageComponentProps) 
         <img
             src={imgSrc}
             alt={`${viewName} snapshot`}
-            style={{ objectFit: 'contain', aspectRatio: 3/2 }}
+            style={{ 
+                objectFit: 'contain', 
+                aspectRatio: 3/2,
+                height: "100%",
+                width: "100%",
+            }}
             onError={() => setHasError(true)}
         />
     ) : (
