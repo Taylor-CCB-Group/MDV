@@ -102,10 +102,11 @@ export function getDataLoader(
         }
         return await resp.json();
     }
-    //load arbritray data
+    //load arbitrary data
     async function loadBinaryDataStatic(datasource: string, name: string) {
-        const resp = await fetch(`${root}/binarydata/${datasource}/${name}.b`);
-        return await resp.arrayBuffer();
+        const resp = await fetch(`${root}/binarydata/${datasource}/${name}.gz`);
+        const buff =  await resp.arrayBuffer();
+        return await decompressData(new Uint8Array(buff));
     }
 }
 
