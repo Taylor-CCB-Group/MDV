@@ -574,8 +574,8 @@ def _create_dt_heatmap(
     arr = arr.reshape(-1, 2)
     arr = np.mean(arr, axis=1)
     # normalize and clip to 255 (1 byte per value)
-    max = np.percentile(arr, 99.99)
-    arr = (arr / max) * 255
+    mx = np.percentile(arr, 99.99)
+    arr = (arr / mx) * 255
     arr = np.clip(arr, 0, 255)
     arr = arr.astype(np.uint8)
     hm.write(arr.tobytes())
