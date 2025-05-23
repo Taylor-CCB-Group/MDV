@@ -79,7 +79,7 @@ USER mdvuser
 RUN poetry config virtualenvs.create false
 
 # Command to run Gunicorn
-CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]
+CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 
