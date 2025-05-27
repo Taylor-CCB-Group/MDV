@@ -1388,9 +1388,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                     </FileSummaryText>
                                 </FileSummary>
 
-                                <H5MetadataPreview
+                                {/*<H5MetadataPreview
                                     metadata={state.h5Metadata}
-                                />
+                                /> */}
 
                                 <div className="flex justify-center items-center gap-6 mt-4">
                                     <Button
