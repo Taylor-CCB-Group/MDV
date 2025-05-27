@@ -37,6 +37,7 @@ def main():
     project_path = os.path.expanduser('~/mdv/project')
     data_path = "path_to_data"
     view_name = "default"
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
@@ -48,7 +49,7 @@ def main():
     data_frame['leiden'] = data_frame['leiden'].apply(str)
     
     # Add datasource
-    project.add_datasource(data_path, data_frame)
+    project.add_datasource(datasource_name, data_frame)
     
     # ScatterPlot3D parameters
     title = "Scatter Plot Example"
@@ -71,7 +72,7 @@ def main():
     
     # Convert plot to JSON and set view
     scatter_plot_json = convert_plot_to_json(scatter_plot)
-    scatterplot3D_view = {'initialCharts': {data_path: [scatter_plot_json]}}
+    scatterplot3D_view = {'initialCharts': {datasource_name: [scatter_plot_json]}}
     
     project.set_view(view_name, scatterplot3D_view)
     project.set_editable(True)

@@ -14,6 +14,7 @@ import mimetypes
 import json
 import sys
 import re
+from mdvtools.llm.code_manipulation import parse_view_name
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
@@ -28,6 +29,8 @@ from typing import Optional
 import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
+from mdvtools.llm.chat_protocol import ProjectChatProtocol, ProjectChat
+from mdvtools.llm.chat_server_extension import chat_extension
 routes = set()
 
 
@@ -86,8 +89,12 @@ def create_app(
     project: MDVProject,
     open_browser=True,
     port=5050,
-    websocket=False,
+    # todo: another way of specifying that we are using chat... also, use socket for other things.
+    websocket=True, # todo - pass something back to client in `state.json` that indicates whether this is enabled.
+    use_reloader=False,
     app: Optional[Flask] = None,
+    # would like to redesign this a bit... this relates mostly to the ProjectBlueprint "_v2" thing
+    # and also some BS about adding headers to cope with server misconfiguration (as I recall).
     backend_db=False,
 ):
     if app is None:
@@ -99,10 +106,12 @@ def create_app(
         app.after_request(add_safe_headers)
         project_bp = SingleProjectShim(app)
         multi_project = False
-        # nb, may make this default to False again soon.
-        ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
-        ### but this will be used for local testing in short-term, and potentially other things later.
         if websocket:
+            # reviewing this... thinking about hooking up to ProjectChat logger...
+            #! nb - we're in 'single project' mode here.
+            # thinking about syncronising list of views via SocketIO rather than polling... 
+            # maybe via a smaller PR where I better figure out clean socket implementation.
+            # maybe we have some abstraction around how we create the Flask instance.
             mdv_socketio(app)
     else:
         ## nb - previous use of flask.Blueprint was not allowing new projects at runtime
@@ -127,6 +136,17 @@ def create_app(
     #         "Route already exists - can't have two projects with the same name"
     #     )
     routes.add(route)
+
+    if websocket:
+        """
+        current prototype using 'websocket' as a flag that we interpret as 'enable chatMDV' for now.
+        we might avoid having this logic in here, or at least change that semantic.
+        rather than pass in `app: Optional[Flask]`, we could pass in a configuration object
+        that includes that app and any extensions we want to use.
+        for now, the code has been rearranged, but the logic for calling it is similar...
+        """
+        chat_extension.register_routes(project, project_bp)
+
 
     @project_bp.route("/")
     def project_index():
@@ -158,8 +178,22 @@ def create_app(
         if project.dir is None:
             return "Project directory not found", 404
         path = safe_join(project.dir, file + ".json")
+        # print(f"get_json_file: '{path}' for project {project.id}")
+
+        
         if path is None or not os.path.exists(path):
             return "File not found", 404
+        if file == "state":
+            with open(path) as f:
+                try:
+                    state = json.load(f)
+                    # do we want this to always be true/not a flag we pass?
+                    state["websocket"] = websocket
+                    # in future, we could iterate over a list of extensions.
+                    chat_extension.mutate_state_json(state, project)
+                    return state
+                except Exception as e:
+                    return f"Problem parsing state file: {e}", 500
         return _send_file(path)
 
     # gets the raw byte data and packages it in the correct response
@@ -600,7 +634,10 @@ def create_app(
                 return "File must be a CSV", 400
             file.seek(0)
             # will this work? can we return progress to the client?
-            df = pd.read_csv(file.stream)
+            file_name = project.dir + "/table.csv"
+            file.save(file_name)
+            #df = pd.read_csv(file.stream)
+            df = pd.read_csv(file_name)
             print("In server.py add_datasource- df created")
             print("df is ready, calling project.add_datasource")
             project.add_datasource(
@@ -623,12 +660,20 @@ def create_app(
     if open_browser:
         webbrowser.open(f"http://localhost:{port}/{route}")
 
-    if not multi_project:
-        if not isinstance(app, Flask):
-            raise Exception(
-                "assert: serving single project should have made a Flask app instance by now"
-            )
-        # user_reloader=False, allows the server to work within jupyter
-        app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
+    if multi_project:
+        assert(isinstance(app, Flask))
+        if route in app.blueprints:
+            print(f"there is already a blueprint at {route}")
+        print(f"Adding project {project.id} to existing app")
+        ## nb - uncomment this if not using ProjectBlueprint refactor...
+        # app.register_blueprint(project_bp)
+    else:
+        # user_reloader=False, allows the server to work within jupyter
+
+        # app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
+        ## todo - gevent for mdvlite / non-optional dependency
+        from gevent.pywsgi import WSGIServer
+        http_server = WSGIServer(("127.0.0.1", port), app)
+        http_server.serve_forever()
 
 

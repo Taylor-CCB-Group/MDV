@@ -17,7 +17,8 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
-from mdvtools.charts.view import View
+# from mdvtools.charts.view import View 
+from mdvtools.llm.chatlog import log_chat
 import time
 import copy
 import tempfile
@@ -72,6 +73,7 @@ class MDVProject:
         self.viewsfile = join(dir, "views.json")
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
+        self.chatfile = join(dir, "chat_log.json")
         if not exists(dir):
             os.mkdir(dir)
         if not exists(self.trackfolder):
@@ -86,6 +88,10 @@ class MDVProject:
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": []}))
+        if not exists(self.chatfile):
+            with open(self.chatfile, "w") as o:
+                o.write(json.dumps([]))
+        self.chat_log = get_json(self.chatfile) # could be heavy doing this in the constructor...
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
 
@@ -98,7 +104,7 @@ class MDVProject:
         save_json(self.datasourcesfile, value)
 
     @property
-    def views(self) -> dict[str, View]:
+    def views(self):
         return get_json(self.viewsfile)
 
     @views.setter
@@ -165,8 +171,8 @@ class MDVProject:
     
     def set_interactions(
         self,
-        interaction_ds: str,
-        parent_ds: str,
+        interaction_ds,
+        parent_ds,
         pivot_column="sample_id",
         parent_column="annotation",
         is_single_region=True,
@@ -383,7 +389,7 @@ class MDVProject:
             if existing_datasource:
                 # Overwrite the existing datasource with the backup values
                 existing_datasource.update(datasource_backup)  
-                print(f"Restored datasource '{datasource_backup['name']}' from backup.")
+                print(f"Restored datasource '{datasource_backup['name']}' from backup. ")
 
                 # Save the updated datasources to the JSON file
                 self.datasources = self.datasources  # This will call the setter and save the data
@@ -403,8 +409,8 @@ class MDVProject:
 
             print("In update_datasource_for_tiff")
             print(datasource_name)
-            print(existing_datasource)
-            print(datasource)
+            # print(existing_datasource)
+            # print(datasource)
             #datasources empty template
             # If the datasource doesn't exist, create a new one
             if (existing_datasource is None):
@@ -1221,7 +1227,7 @@ class MDVProject:
         return links
 
     def serve(self, **kwargs):
-        from .server import create_app
+        from mdvtools.server import create_app
 
         create_app(self, **kwargs)
 
@@ -1352,11 +1358,11 @@ class MDVProject:
 
         self.set_datasource_metadata(ds)
 
-    def get_view(self, view: str):
+    def get_view(self, view):
         views = self.views
         return views.get(view)
 
-    def set_view(self, name: str, view: Optional[View | Any], make_default=False):
+    def set_view(self, name: str, view: Optional[Any], make_default=False):
         """Sets the view with the given name to the supplied view data.
         If the view is None, then the view will be deleted.
         """
@@ -1793,6 +1799,49 @@ class MDVProject:
 
         return chart
 
+
+    def log_chat_item(self, output: Any, prompt_template: str, response: str):
+        """
+        Initially the idea was to use a similar structure to "Jobs" in the db
+        Current version is designed to capture similar info to Maria's Google Sheet log
+        # todo refactor logging & probably change the structure of the chat log etc...
+        also maybe restructure more of this class to be more modular
+        send chat logs over websocket, to a database, etc...
+        Args:
+            output: result of invoke 'from langchain.chains import RetrievalQA'
+        """
+        log_chat(output, prompt_template, response)
+        
+        context_information = output['source_documents']#output['context']
+        context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+        context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+        context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
+
+
+        context = str(context_information_metadata_name)
+        query = output['query']
+
+        # context = str(context_information_metadata_url)
+        # query = output['question']
+
+        # this is NOT the format we want to save the chat log in long term
+        self.chat_log.append(
+            {
+                "context": context,
+                "query": query,
+                "prompt_template": prompt_template,
+                "response": response,
+            }
+        )
+        # this version tries to jsonify VectorDatabases & god knows what else
+        # self.chat_log.append(
+        #     {
+        #         "output": json.dumps(output),
+        #         "prompt_template": prompt_template,
+        #         "response": json.dumps(response),
+        #     }
+        # )
+        save_json(join(self.dir, "chat_log.json"), self.chat_log)
 
 def get_json(file):
     return json.loads(open(file).read())

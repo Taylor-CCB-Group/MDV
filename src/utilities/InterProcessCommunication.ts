@@ -26,6 +26,10 @@ type ErrorMessage = {
     type: "error";
     message: string;
 };
+type PingMessage = {
+    type: "ping";
+    message?: string;
+}
 type ChartEventNames =
     | "state_saved"
     | "chart_added"
@@ -44,13 +48,19 @@ type ChartMsgValue<T extends ChartEventNames> = T extends
         ? { state: ChartState }
         : never;
 
-type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage;
+type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage | PingMessage;
 
 /** initial experimental IPC support. As of this writing, will attempt to
- * - connect a 'vuplex' PostMessage interface for embedding in a VR environment in Unity
- * - connect a websocket to a socket.io server that will forward messages to other clients (not used yet)
+ * - connect a 'vuplex' PostMessage interface for embedding in a VR environment in Unity (deprecated/no plans to use)
+ * - connect a websocket to a socket.io server that will forward messages to other clients
+ *    - started to use this for ai chatbot, started using REST but may move back
+ *    - could be useful for other things, like syncing views, or receiving updates from a server
+ *      e.g. about new data (e.g. from some kind of data pipeline), or about new views to load.
  */
 export default async function connectIPC(cm: ChartManager) {
+    // not sure we'd get this from params - needs to match the server's socket.io endpoint
+    // which might need to be not at the root - but also at a higher level than us... 
+    // unless we have separate SocketIO instances for each project - may be reasonable.
     const params = new URLSearchParams(window.location.search);
     const url = params.get("socket") || undefined;
     let initialized = false;
@@ -70,17 +80,17 @@ export default async function connectIPC(cm: ChartManager) {
                     Object.keys(chartManager.charts),
                 );
                 if (!initialized) {
-                    setupVuplex();
+                    // setupVuplex();
                     initialized = true;
                 }
             }
         },
     );
-    //temporarily disable websocket connection
-    const socket = { on: (s: any, f: any) => {} }; //io(url);
+    // const socket = { on: (s: any, f: any) => {}, emit: (...args: any[])=>{} }; //io(url);
+    const socket = io(url);
 
     function sendMessage(msg: MDVMessage) {
-        // socket.emit("message", msg);
+        socket.emit("message", msg);
         if (window.vuplex) window.vuplex.postMessage(msg);
     }
 
@@ -90,7 +100,18 @@ export default async function connectIPC(cm: ChartManager) {
         sendMessage({ type: "popout", chartID: chart.config.id });
     };
 
-    // socket.connect();
+    await new Promise<void>((resolve, reject) => {
+        socket.connect();
+        socket.on("connect", () => {
+            console.log("socket connected");
+            sendMessage({type: 'ping'});
+            // this is probably not the right design - what about disconnects?
+            resolve();
+        });
+    });
+    /** the first prototype feature built with this was making a window popout in response
+     * to a message, so that in a VR environment in Unity we could see the chart in a separate window.
+     */
     function popout(chartID: string) {
         const chart = cm.charts[chartID];
         if (!chart) {
@@ -110,12 +131,14 @@ export default async function connectIPC(cm: ChartManager) {
             cm._popOutChart(chart.chart);
         }
     }
-    // should msg be a string? or a JSON object?
-    socket.on("message", async (msg: string) => {
-        const data = JSON.parse(msg) as MDVMessage;
+    socket.on("message", async (data: MDVMessage) => {
         if (data.type === "popout") {
             const { chartID } = data;
             popout(chartID);
+        }
+        if (data.type === "ping") {
+            console.log("ping received");
+            console.log(data);
         }
     });
     // DataModel: register with all datastore changes & send appropriate updates.
@@ -174,4 +197,5 @@ export default async function connectIPC(cm: ChartManager) {
             });
         }
     }
+    return { socket, sendMessage };
 }

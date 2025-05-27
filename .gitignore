@@ -22,6 +22,9 @@ dist/_avocato
 python/build
 python/data
 python/mdvtools/dbutils/__pycache__
+python/mdvtools/llm/key.json
+python/mdvtools/llm/temp_code_3.py
+python/mdvtools/llm/timing_results.log
 python/mdvtools/tests/temp/*
 python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*
@@ -44,6 +47,15 @@ secrets/
 app_logs/
 docker-secrets-local.yml
 
+LLM/cache
+LLM/key.json
+
+timing_results.log
+docker-local-chat.yml
+chat_log.json
+chatlog.json
+python/chat_debug.log
+chat_debug.log
 
 # as seen inside devcontainer
 mdv/

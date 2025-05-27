@@ -6,6 +6,7 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import functools
+from typing import Protocol
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -15,8 +16,10 @@ logger = logging.getLogger(__name__)
 This should work as a drop-in replacement for `Blueprint` in the context
 of a Flask app that can add (and remove) MDVProjects dynamically at runtime.
 """
-
-class ProjectBlueprint:
+class ProjectBlueprintProtocol(Protocol):
+    def route(self, rule: str, **options: Any) -> Callable:
+        ...
+class ProjectBlueprint(ProjectBlueprintProtocol):
     blueprints: Dict[str, "ProjectBlueprint"] = {}
 
     @staticmethod
@@ -87,7 +90,7 @@ class ProjectBlueprint:
                 return method(*match.groups())
         raise ValueError(f"no matching route for {subpath}")
     
-class ProjectBlueprint_v2:
+class ProjectBlueprint_v2(ProjectBlueprintProtocol):
     blueprints: Dict[str, "ProjectBlueprint_v2"] = {}
     # Class-level constant for the timestamp update interval
     TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
@@ -249,7 +252,7 @@ class ProjectBlueprint_v2:
 
 
 
-class SingleProjectShim:
+class SingleProjectShim(ProjectBlueprintProtocol):
     def __init__(self, app: Flask) -> None:
         self.app = app
 

@@ -15,7 +15,6 @@ import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
-import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
@@ -55,15 +54,12 @@ import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
-import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { createMdvPortal } from "@/react/react_utils";
-import ViewSelector from "@/react/components/ViewSelectorComponent";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
-import ToggleThemeWrapper from "./dialogs/ToggleTheme";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
@@ -143,6 +139,7 @@ export class ChartManager {
      * @param {string} [config.permission] the level of permission the user has. This just makes certain
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
+     * @param {boolean?} [config.chat_enabled] 
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
      * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
      * 
@@ -214,8 +211,6 @@ export class ChartManager {
             theme: observable,
             setTheme: action,
         });
-        //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
-        connectIPC(this);
         this.transactions = {};
 
         // View Manager
@@ -248,6 +243,30 @@ export class ChartManager {
             this.containerDiv,
         );
         this.contentDiv.classList.add("ciview-contentDiv");
+
+        //!!! ChatMDV specific, but we really should be using websocket for other things
+        //let's have a think. we may have websocket, but not chat... 
+        //we *do* anticipate finding out about chat with a similar mechanism (flag as part of state.json)
+        //but websocket should be ubiquitous
+        if (config.websocket) {
+            console.log('websocket is enabled');
+            const fn = async () => {
+                // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity
+                // and we had disabled websocket on server.
+                // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
+                // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
+                // try/catch doesn't help when it gets stuck in await...
+                // console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
+                try {
+                    const { socket, sendMessage } = await connectIPC(this);
+                    console.log('connected to socketio');
+                    this.ipc = { socket, sendMessage };
+                } catch (error) {
+                    console.error('Failed to connect to websocket', error);
+                }
+            };
+            fn();
+        }
 
         /** @type {GridStackManager} */
         this.gridStack = new GridStackManager(this);
@@ -933,7 +952,7 @@ export class ChartManager {
 
     _getColumnsRequiredForChart(config) {
         const set = new Set();
-        const p = config.param;
+        let p = config.param;
 
         if (!p) {
             //no 'parameters',
@@ -941,7 +960,11 @@ export class ChartManager {
             // return [];
         } else if (typeof p === "string") {
             // pretty sure there's nothing in BaseChart.types that would get here - single param is ["string"]
-            throw `Unexpected param string '${config.param}' for ${config.name} - expected array`;
+            // but the LLM might still generate a config with a single string, or an old config might have one
+            console.error(`Unexpected param string '${config.param}' for ${config.name} - expected array`);
+            set.add(p);
+            p = [p];
+            config.param = p;
         } else {
             for (const i of p) {
                 set.add(i);
@@ -1634,6 +1657,10 @@ export class ChartManager {
                 { type: "danger", duration: 2000 },
             );
             throw `Unknown chart type ${config.type}`;
+        }
+        if (typeof config.param === "string") {
+            console.error(`Unexpected param string '${config.param}' for ${config.name} - expected array`);
+            config.param = [config.param];
         }
         //check if columns need loading
         const neededCols = this._getColumnsRequiredForChart(config);

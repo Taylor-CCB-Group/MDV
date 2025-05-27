@@ -328,4 +328,4 @@ p.add_rows_as_columns_subgroup(
 
 p.set_view("default", view_config)
 p.set_editable(True)
-p.serve()
+p.serve(websocket=True)

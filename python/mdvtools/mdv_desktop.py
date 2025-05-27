@@ -13,7 +13,8 @@ Make a Flask app, and open all folders in ~/mdv/ as projects that can be served 
 """
 
 # todo: make this configurable
-project_dir = os.path.join(os.path.expanduser("~"), "mdv")
+# project_dir = os.path.join(os.path.expanduser("~"), "mdv")
+project_dir = "/app/mdv"
 # create the directory if it doesn't exist
 if not os.path.exists(project_dir):
     os.makedirs(project_dir)
@@ -63,8 +64,8 @@ def watch_folder(app: Flask):
             print(f"watcher adding '{p.id}'")
             try:
                 p.serve(open_browser=False, app=app)
-            except Exception:
-                print(f"error serving {p.id}...")
+            except Exception as e:
+                print(f"error serving {p.id}... {str(e)[:100]}")
     print("watcher exiting...")
 
 
@@ -76,8 +77,8 @@ if __name__ == "__main__":
     for p in projects:
         try:
             p.serve(open_browser=False, app=app)
-        except Exception:
-            print(f"error serving {p.id}...")
+        except Exception as e:
+            print(f"error serving {p.id}... {str(e)[:100]}")
 
     @app.route("/")
     def index():
@@ -97,11 +98,33 @@ if __name__ == "__main__":
                 if request.json and "id" in request.json
                 else str("".join(random.choices(string.ascii_letters, k=6)))
             )
+            # creating a project with the same id as an existing project is not allowed
+            assert(project_id not in [p.id for p in projects])
             print(f"creating project '{project_id}'")
-            p = MDVProject(os.path.join(project_dir, project_id), delete_existing=True)
-            p.set_editable(True)
-            projects.append(p)
-            p.serve(app=app, open_browser=False)
+            if "ai_query" in request.json:
+                # very provisional... just to get the idea of how this might work.
+                query = request.json["ai_query"]
+                if query:
+                    from mdvtools.llm.langchain_mdv import project_wizard                    
+                    try:
+                        # print('# test that we can import things as expected')
+                        # exec("from mdvtools.mdvproject import MDVProject\nMDVProject('')")
+                        # expect there to be a project ready to open after this...
+                        project_wizard(query, project_id, log=lambda x: print(f'[llm {project_id}] {x}'))
+                    except Exception as e:
+                        print(f"[llm error] {e}")  # eg "name 'MDVProject' is not defined" when running in `exec()`?
+                        return jsonify({"status": "error", "message": str(e)}), 500
+            p = MDVProject(os.path.join(project_dir, project_id))
+            # in cases such as project_wizard, it's possible the project will already exist in this list
+            # having been picked up by the watcher thread - so we should check for another project with the same id in `projects`
+            if p.id not in [p.id for p in projects]:
+                p.set_editable(True)
+                projects.append(p)
+                p.serve(app=app, open_browser=False)
+            else:
+                # the frontend doesn't care about this, and it's not an error given that 
+                # we assert that the project doesn't already exist at the start of this function
+                print(f"project '{p.id}' is already being served")
             return jsonify({"id": p.id, "name": p.id, "status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500

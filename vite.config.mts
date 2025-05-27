@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type ProxyOptions } from 'vite';
+// import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
@@ -95,7 +96,7 @@ function getRollupOptions(): RollupOptions {
 const proxyOptions = { target: flaskURL, changeOrigin: true };
 // ... and then this is a bit more concise than 
 const proxy = [
-    '^/(get_|images|tracks|save).*', // these routes are proxied to flask server in 'single project' mode
+    '^/(get_|images|tracks|save|chat).*', // these routes are proxied to flask server in 'single project' mode
     '^/project/.*/\?', //this works with ?dir=/project/id/foo...
     //will fail if url has search params <-- ? (what will fail?)
     //will cause problems if we have json files that don't want to be proxied
@@ -105,8 +106,19 @@ const proxy = [
     '/import_project',
     '/export_project',
     '/delete_project',
+    //'/socket.io', //pending...
 // biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config
-].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {});
+].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {}) as Record<string, ProxyOptions>;
+// (failed) attempt to let this proxy without cors_allowed_origins wildcard on server
+// using more specific socketio in python for now
+proxy['/socket.io'] = {
+    target: flaskURL.replace("http:", "ws:"),
+    changeOrigin: true,
+    ws: true,
+    // rewriteWsOrigin: true, // copilot says this is not needed in the current version of socket.io
+    // ^^ not helping either way...
+}
+
 // not sure how we should make the root route work with vite devserver...
 // proxy['/'] = {
 //     target: "/catalog_dev.html"
