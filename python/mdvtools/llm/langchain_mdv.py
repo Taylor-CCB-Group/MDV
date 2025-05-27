@@ -150,7 +150,7 @@ class ProjectChat(ProjectChatProtocol):
         # could come from a config file - was passed as argument previously
         # but I'm reducing how far this prototype reaches into wider code
         self.welcome = (
-            "Hello, I'm an AI assistant that has access to the data in this project"
+            "Hello, I'm an AI assistant that has access to the data in this project "
             "and is designed to help build views for visualising it. What can I help you with?"
         )
 
