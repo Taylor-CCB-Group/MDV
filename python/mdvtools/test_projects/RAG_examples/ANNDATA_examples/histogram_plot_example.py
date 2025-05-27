@@ -31,7 +31,7 @@ def main():
     # Constants
     project_path = os.path.expanduser('~/mdv/project')
     data_path = "path_to_data"
-    view_name = "default"
+    view_name = "Example view name"
     datasource_name = "datasource_name"
     datasource_name_2 = "datasource_name_2"
     
