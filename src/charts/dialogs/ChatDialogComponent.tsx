@@ -8,7 +8,7 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Button } from '@mui/material';
+import { Box, Button, Divider, TextField } from '@mui/material';
 import { useChartManager } from '@/react/hooks';
 import { fetchJsonConfig } from '@/dataloaders/DataLoaderUtil';
 import { useProject } from '@/modules/ProjectContext';
@@ -245,8 +245,8 @@ const Chatbot = () => {
     }, [messages, requestProgress, scrollToBottom]);
     
     return (
-        <div className="flex flex-col h-full mx-auto overflow-hidden">
-            <div className="flex-1 p-1 w-full overflow-y-auto">
+        <Box className="flex flex-col h-full mx-auto overflow-hidden">
+            <Box className="flex-1 p-4 w-full overflow-y-auto">
                 {messages.map((message) => (
                     <Message key={message.id} {...message} />
                 ))}
@@ -254,27 +254,61 @@ const Chatbot = () => {
                 {/* {
                 isSending && 
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
-                <div ref={messagesEndRef} />
-            </div>
-            <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
+                <Box ref={messagesEndRef} />
+            </Box>
+            <Box className='absolute opacity-10 pointer-events-none top-0 right-0'>
                 <RobotPandaSVG />
-            </div>
-            <div className="flex p-4 border-t w-full border-gray-300">
-                <input
+            </Box>
+            <Divider />
+            <Box className="flex p-4 w-full">
+                <TextField
                     type="text"
                     // disabled={isSending} //we can still type while it's processing
                     value={input}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyPress}
                     placeholder="Type a message..."
-                    className="flex-1 p-2 border border-gray-300 rounded-lg mr-2"
+                    fullWidth
+                    sx={{
+                        mr: 2,
+                    }}
                 />
-                <button type="submit" onClick={handleSend} disabled={isSending} 
-                className="p-2 bg-blue-500 text-white rounded-lg">
+                <Button onClick={handleSend} disabled={isSending} 
+                className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
                     Send
-                </button>
-            </div>
-        </div>
+                </Button>
+            </Box>
+        </Box>
+        // <div className="flex flex-col h-full mx-auto overflow-hidden">
+        //     <div className="flex-1 p-1 w-full overflow-y-auto">
+        //         {messages.map((message) => (
+        //             <Message key={message.id} {...message} />
+        //         ))}
+        //         {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
+        //         {/* {
+        //         isSending && 
+        //         (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
+        //         <div ref={messagesEndRef} />
+        //     </div>
+        //     <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
+        //         <RobotPandaSVG />
+        //     </div>
+        //     <div className="flex p-4 border-t w-full border-gray-300">
+        //         <input
+        //             type="text"
+        //             // disabled={isSending} //we can still type while it's processing
+        //             value={input}
+        //             onChange={handleInputChange}
+        //             onKeyDown={handleKeyPress}
+        //             placeholder="Type a message..."
+        //             className="flex-1 p-2 border border-gray-300 rounded-lg mr-2"
+        //         />
+        //         <button type="submit" onClick={handleSend} disabled={isSending} 
+        //         className="p-2 bg-blue-500 text-white rounded-lg">
+        //             Send
+        //         </button>
+        //     </div>
+        // </div>
     );
 };
 
