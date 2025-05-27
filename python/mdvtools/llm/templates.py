@@ -2,7 +2,18 @@ from mdvtools.mdvproject import MDVProject
 
 prompt_data = """
 Your task is to:  
-1. Identify the type of data the user needs (e.g., categorical, numerical, etc.).  
+1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
+   - The column names in df1 are:
+       'sample_id', 'Patient', 'Disease', 'Site', 'Treatment',
+       'Disease_duration', 'Inflammation', 'Age', 'Gender', 'Ethnicity',
+       'Inflammation_score', 'Ileum_vs_Colon', 'LibraryType', 'CellsLoaded',
+       'Match', 'Batch', 'doublet_scores', 'predicted_doublets',
+       'n_genes_by_counts', 'total_counts', 'total_counts_mt', 'pct_counts_mt',
+       'total_counts_rp', 'pct_counts_rp', 'total_counts_hb', 'pct_counts_hb',
+       'total_counts_ig', 'pct_counts_ig', 'S_score', 'G2M_score', 'phase',
+       'cellbarcode', 'diff', 'Cell state', 'minor', 'major', 'sub_bucket',
+       'bucket', 'Remission_status', 'cell_id', 'X_harmony_1', 'X_harmony_2',
+       'X_harmony_3', 'X_pca_1', 'X_pca_2', 'X_pca_3', 'X_umap_1', 'X_umap_2'
 2. Use only the two DataFrames provided:
    - df1: cells (data_frame_obs)
    - df2: genes (data_frame_var)
@@ -226,7 +237,7 @@ All scripts in the context share a common workflow:
 Setup: Define the project path, data path, and view name, the project path should always be: project_path = '"""
         + project.dir
         + """'
-Plot function definition: Define the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) using a function in the same way as the context.
+Plot function definition: Define the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot, selection dialog plot) using a function in the same way as the context.
 Project Creation: Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True).
 Data Loading: Load data from the specified file into a pandas DataFrame using the load_data(data_path) function.
 Data adding: Add the data source to the project using the method: project.add_datasource(datasource_name, data).
@@ -255,6 +266,9 @@ If the question asks for a gene-related query (e.g., gene expression value, most
 1. You load both datasources that are needed, e.g. cells and genes.
 2. If gene expression is required, make sure the gene id, is given as a param in the formatted string literal format: f"gs|{{param}}(gs)|{{param_index}}", with param and param_index given by param = "param"
 and param_index = data_frame_var.index.get_loc(param) respecitvely.
+
+If to answer the question requires a smaller subset of the data, make sure that:
+1. You add a selection dialog plot with all the parameters that were passed on as params.
 
 The data_path are given by this variable `""" + path_to_data + """`
 The datasource_name is given by this variable `""" + datasouce_name + """`
@@ -294,7 +308,7 @@ Each script follows this standard workflow:
         ```
 
 4. Plot Construction:
-    - Use a chart class (e.g., DotPlot, BoxPlot) and set `params = [...]` using selected fields.
+    - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected fields.
         - The fields are given by """+final_answer+"""
     - Convert the chart to JSON using `convert_plot_to_json(plot)`
     - Set the view using `project.set_view(view_name, view_object)`
@@ -315,7 +329,11 @@ Each script follows this standard workflow:
     - Wrap gene names (from `data_frame_var`) using the syntax above.
     - Only wrap genes—do not apply `get_loc()` or `index` on `data_frame_obs` fields.
 
-7. Your Task:
+7. Queries requiring subsetting of the dataset:
+    If to answer the question requires a subset of the data, make sure to:
+    - Add a selection dialog plot with all the parameters that were passed on as params.
+
+8. Your Task:
     - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+"""
     - Use the fields """+final_answer+""" as params appropriately:
         - Wrap only gene names as shown.
@@ -325,7 +343,7 @@ Each script follows this standard workflow:
     - Update these variables with these values:
         - project_path = '"""+project.dir+"""'
         - data_path = '"""+path_to_data+"""'
-        - view_name = a string (e.g., "default")
+        - view_name = a string describing what is being visualized.
         - datasource_name = '"""+datasource_name+"""'
 
 """
