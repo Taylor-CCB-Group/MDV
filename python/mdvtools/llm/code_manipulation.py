@@ -201,6 +201,8 @@ else:
     if modify_existing_project:
         # not at all robust... won't be needed in future
         final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
+        #final_code = final_code.replace("project.add_datasource(datasource_name, data_frame_obs)", "# project.add_datasource(datasource_name, data_frame_obs)")
+        #final_code = final_code.replace("project.add_datasource(datasource_name_2, data_frame_var)", "# project.add_datasource(datasource_name_2, data_frame_var)")
 
         #final_code = final_code.replace("project.add_rows_as_columns_link", "# project.add_rows_as_columns_link")
         #final_code = final_code.replace("project.add_rows_as_columns_subgroup", "# project.add_rows_as_columns_subgroup") 
