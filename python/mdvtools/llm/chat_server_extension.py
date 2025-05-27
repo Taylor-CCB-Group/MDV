@@ -2,7 +2,7 @@ from typing import Optional, Protocol
 from mdvtools.llm.chat_protocol import (
   ProjectChat,
   ProjectChatProtocol, 
-  # chat_enabled
+  chat_enabled
 )
 from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.mdvproject import MDVProject
@@ -12,6 +12,11 @@ from mdvtools.project_router import ProjectBlueprintProtocol
 class MDVProjectServerExtension(Protocol):
     """
     A protocol for server extensions that can be used with MDV projects.
+
+    We might use this for blocks of other functionality that aren't totally core mdv functionality,
+    integrating other services/libraries/functionality.
+    We might also re-arrange so that some things like the add_anndata routes are moved into an extension.
+
     Maybe rather than pass a Flask app to `server.py`, we pass something representing MDV app configuration,
     including a Flask app, these extensions, auth provider etc...
     Flask becomes an implementation detail that we abstract away somewhat.
@@ -19,6 +24,12 @@ class MDVProjectServerExtension(Protocol):
     def register_routes(self, project: MDVProject, blueprint: ProjectBlueprintProtocol):
         """
         Assign any extra `/project/<project_id>/<path>` routes to the blueprint for this project instance.
+        """
+        ...
+    def mutate_state_json(self, state_json: dict, project: MDVProject):
+        """
+        Mutate the state.json before returning it as a request response,
+        e.g. to add information about the extension.
         """
         ...
 
@@ -31,16 +42,13 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         # and an extension can send a message to the client so it knows to update the UI.
         
         bot: Optional[ProjectChatProtocol] = None
-        # what if we make `log` a thing that streams to the client via websocket?
-        @project_bp.route("/chat_init", methods=["POST"])
+        @project_bp.route("/chat_init", access_level='editable', methods=["POST"])
         def chat_init():
-            print("chat_init")
-            # logger.info("chat_init")
             nonlocal bot
             if bot is None:
                 bot = ProjectChat(project)
             return {"message": bot.welcome}
-        @project_bp.route("/chat", methods=["POST"])
+        @project_bp.route("/chat", access_level='editable', methods=["POST"])
         def chat():
             nonlocal bot
             if not request.json:
@@ -68,5 +76,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 print(e)
                 return {"message": str(e)}
             return {"message": f"bleep bloop I'm a robot, you said: {message}"}
+    def mutate_state_json(self, state_json: dict, project: MDVProject):
+        state_json["chat_enabled"] = chat_enabled
 
 chat_extension = MDVProjectChatServerExtension()

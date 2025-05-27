@@ -7,8 +7,10 @@ class ProjectChatProtocol(Protocol):
     def ask_question(self, message: str, id: str) -> str: ...
     welcome: str
 
+chat_enabled = False
 try:
     from mdvtools.llm.langchain_mdv import ProjectChat as _ProjectChat # type: ignore
+    chat_enabled = True
 except Exception as e:
     msg = str(e)
     class _ProjectChat(ProjectChatProtocol):

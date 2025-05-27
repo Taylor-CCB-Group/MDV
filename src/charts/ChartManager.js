@@ -11,13 +11,10 @@ import {
 import BaseChart from "./BaseChart";
 import DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
-import ChatDialog from "./dialogs/ChatDialog";
-import ChatLogDialog from "./dialogs/ChatLogDialog";
 import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
-import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
@@ -57,15 +54,12 @@ import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
-import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { createMdvPortal } from "@/react/react_utils";
-import ViewSelector from "@/react/components/ViewSelectorComponent";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
-import ToggleThemeWrapper from "./dialogs/ToggleTheme";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
@@ -145,6 +139,7 @@ export class ChartManager {
      * @param {string} [config.permission] the level of permission the user has. This just makes certain
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
+     * @param {boolean?} [config.chat_enabled] 
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
      * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
      * 
@@ -250,6 +245,9 @@ export class ChartManager {
         this.contentDiv.classList.add("ciview-contentDiv");
 
         //!!! ChatMDV specific, but we really should be using websocket for other things
+        //let's have a think. we may have websocket, but not chat... 
+        //we *do* anticipate finding out about chat with a similar mechanism (flag as part of state.json)
+        //but websocket should be ubiquitous
         if (config.websocket) {
             console.log('websocket is enabled');
             const fn = async () => {

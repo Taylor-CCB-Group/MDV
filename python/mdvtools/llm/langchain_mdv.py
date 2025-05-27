@@ -155,6 +155,9 @@ class ProjectChat(ProjectChatProtocol):
         )
 
 
+        # how do we keep track of the association between user & this...
+        # do we actually want a whole `ProjectChat` associated with a user/session?
+        # what does that mean in terms of server overhead?
         self.socket_api = ChatSocketAPI(project)
         logger = self.socket_api.logger
         self.langchain_logging_handler = LangchainLoggingHandler(logger)
@@ -223,6 +226,8 @@ class ProjectChat(ProjectChatProtocol):
                         ("system", contextualize_q_system_prompt),
                         ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
                     
+                    # > LangChainDeprecationWarning: The class `LLMChain` was deprecated in LangChain 0.1.17 and will be removed in 1.0. 
+                    # Use RunnableSequence, e.g., `prompt | llm` instead.
                     contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
 
                     # Step 4: Define the Agent Prompt

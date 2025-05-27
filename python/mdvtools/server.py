@@ -187,8 +187,10 @@ def create_app(
             with open(path) as f:
                 try:
                     state = json.load(f)
-                    ## let's do something similar but more explicitly related to chat...
+                    # do we want this to always be true/not a flag we pass?
                     state["websocket"] = websocket
+                    # in future, we could iterate over a list of extensions.
+                    chat_extension.mutate_state_json(state, project)
                     return state
                 except Exception as e:
                     return f"Problem parsing state file: {e}", 500

@@ -27,8 +27,11 @@ import ChatDialog from "@/charts/dialogs/ChatDialog";
 import ChatLogDialog from "@/charts/dialogs/ChatLogDialog";
 import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
 import ChatLogIcon from '@mui/icons-material/WebStories';
+import { useChartManager } from "../hooks";
 
 const ChatButtons = () => {
+    // very basic check to see if chat is enabled
+    const chatEnabled = useChartManager().config.chat_enabled;
     const handleChatButtonClick = () => {
         new ChatDialog();
     };
@@ -36,7 +39,7 @@ const ChatButtons = () => {
     const handleChatLogButtonClick = () => {
         new ChatLogDialog();
     };
-
+    if (!chatEnabled) return null;
     return (
         <>
             <IconWithTooltip tooltipText="Chat" onClick={handleChatButtonClick}>
