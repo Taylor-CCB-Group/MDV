@@ -237,12 +237,12 @@ function makeResizable(el, config = {}) {
     // List of all the resizers based on directions and corresponding css classes
     const directions = [
         // The top resizers are messing with title bar buttons causing bad UX, commenting for now
-        // { dir: "n", className: "resizer-n" },
+        { dir: "n", className: "resizer-n" },
         { dir: "s", className: "resizer-s" },
         { dir: "e", className: "resizer-e" },
         { dir: "w", className: "resizer-w" },
-        // { dir: "ne", className: "resizer-ne" },
-        // { dir: "nw", className: "resizer-nw" },
+        { dir: "ne", className: "resizer-ne" },
+        { dir: "nw", className: "resizer-nw" },
         { dir: "se", className: "resizer-se" },
         { dir: "sw", className: "resizer-sw" },
     ];

@@ -14,8 +14,8 @@ class TableChart extends BaseChart {
         this.mobxAutorun(() => {
             const { config, dataStore } = this;
             cols = [];
-            //add the index column (unless told not to)
-            if (config.include_index !== false)
+            //add the index column (only if include_index is true)
+            if (config?.include_index)
                 cols = [
                     {
                         field: "__index__",

@@ -394,7 +394,11 @@ export default class GridStackManager {
             chart.removeLayout = () => {
                 //remove the chart from the gridstack
                 grid.removeWidget(outer, false);
-                div.style.height = origHeight;
+
+                // assign the height of the chart only if origHeight exists
+                if (origHeight) {
+                    div.style.height = origHeight;
+                }
                 //take the chart out of the containers
                 grid.el.append(div);
                 //destroy the containers
