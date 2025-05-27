@@ -256,9 +256,9 @@ const Chatbot = () => {
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
                 <div ref={messagesEndRef} />
             </div>
-            <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
+            {/* <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
                 <RobotPandaSVG />
-            </div>
+            </div> */}
             <div className="flex p-4 border-t w-full border-gray-300">
                 <input
                     type="text"
