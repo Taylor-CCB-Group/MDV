@@ -7,7 +7,7 @@ import {
     Remove as RemoveIcon,
     CloudUpload as CloudUploadIcon,
     PestControl as PestControlIcon,
-    Chat,
+    Chat as ChatIcon,
 } from "@mui/icons-material";
 import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
 import IconWithTooltip from "./IconWithTooltip";
@@ -32,9 +32,7 @@ import { useChartManager } from "../hooks";
 const ChatButtons = () => {
     // very basic check to see if chat is enabled
     const chatEnabled = useChartManager().config.chat_enabled;
-    const handleChatButtonClick = () => {
-        new ChatDialog();
-    };
+    const [open, setOpen] = useState(false);
 
     const handleChatLogButtonClick = () => {
         new ChatLogDialog();
@@ -42,12 +40,13 @@ const ChatButtons = () => {
     if (!chatEnabled) return null;
     return (
         <>
-            <IconWithTooltip tooltipText="Chat" onClick={handleChatButtonClick}>
+            <IconWithTooltip tooltipText="Chat" onClick={() => setOpen(true)}>
                 <ChatBubbleIcon />
             </IconWithTooltip>
             <IconWithTooltip tooltipText="Chat Log" onClick={handleChatLogButtonClick}>
                 <ChatLogIcon />
             </IconWithTooltip>
+            <ChatDialog open={open} setOpen={setOpen} />
         </>
     );
 }
