@@ -182,9 +182,9 @@ class ProjectChat(ProjectChatProtocol):
             # raise ValueError("test error")
             self.df = project.get_datasource_as_dataframe(self.ds_name)
             with time_block("b6: Initialising LLM for RAG"):
-                self.code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o") #"gpt-4o"
+                self.code_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1") #"gpt-4o"
             with time_block("b7: Initialising LLM for agent"):
-                self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o") #"gpt-4o"
+                self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1") #"gpt-4o"
             with time_block("b8: Pandas agent creating"):
                 #Custom langchain agent:
                 def create_custom_pandas_agent(llm, dfs: dict, prompt_data, verbose=False):
@@ -234,6 +234,8 @@ class ProjectChat(ProjectChatProtocol):
 
                     prompt_data_template = f"""You have access to the following Pandas DataFrames: 
                     {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
+                    Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
+                    Use these to correct the column names mentioned by the user.
                     If you need to check their structure, use `df.info()` or `df.head()`. 
                     Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
@@ -367,7 +369,7 @@ class ProjectChat(ProjectChatProtocol):
 
                 qa_chain = RetrievalQA.from_llm(llm=self.code_llm, prompt=prompt_RAG_template, retriever=retriever,return_source_documents=True,)
                 context = retriever
-                output_qa = qa_chain.invoke({"context": context, "query": response['input']})
+                output_qa = qa_chain.invoke({"query": response['input']}) #+ response['output']}) #"context": context, "query":response['input'] 
                 result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time
