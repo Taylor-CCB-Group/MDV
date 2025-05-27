@@ -659,10 +659,7 @@ def create_app(
         webbrowser.open(f"http://localhost:{port}/{route}")
 
     if multi_project:
-        if not isinstance(app, Flask):
-            raise Exception(
-                "assert: serving single project should have made a Flask app instance by now"
-            )
+        assert(isinstance(app, Flask))
         if route in app.blueprints:
             print(f"there is already a blueprint at {route}")
         print(f"Adding project {project.id} to existing app")
@@ -670,6 +667,11 @@ def create_app(
         # app.register_blueprint(project_bp)
     else:
         # user_reloader=False, allows the server to work within jupyter
-        app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
+
+        # app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
+        ## todo - gevent for mdvlite / non-optional dependency
+        from gevent.pywsgi import WSGIServer
+        http_server = WSGIServer(("127.0.0.1", port), app)
+        http_server.serve_forever()
 
 
