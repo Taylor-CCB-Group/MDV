@@ -178,7 +178,10 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
         prompt_data_template = f"""You have access to the following Pandas DataFrames: 
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
-        If you need to check their structure, use `df.info()` or `df.head()`. 
+        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
+        Use these to correct the column names mentioned by the user.
+        You must check the DataFrames structure, by invoking the PythonAstREPLTool.
+        Use `df.info()` or `df.head()`. 
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
         prompt = ChatPromptTemplate.from_messages([
