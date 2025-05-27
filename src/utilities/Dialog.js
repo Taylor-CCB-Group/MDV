@@ -1,4 +1,4 @@
-import { action, makeAutoObservable } from "mobx";
+import { _allowStateChangesInsideComputed, action, makeAutoObservable } from "mobx";
 import {
     createEl,
     makeResizable,
@@ -114,12 +114,28 @@ class BaseDialog {
         //may need to adjust its position depending on size
         //to avoid it being off screen
         this.getDialogContainer().append(this.outer);
-        const bbox = this.getDialogContainer().getBoundingClientRect();
 
+        // Set the dialog position when constructor is called
+        this._setDialogPosition();
+
+        this._resizeListener = () => this._setDialogPosition();
+
+        // Add an event listener for resize event to resize and position the dialog
+        window.addEventListener('resize', this._resizeListener);
+
+        // provide some observable mobx state for useOuterContainer()
+        this.observable = makeAutoObservable({
+            container: this.getDialogContainer(),
+        });
+    }
+
+    _setDialogPosition() {
+        const bbox = this.getDialogContainer().getBoundingClientRect();
         const dbox = this.outer.getBoundingClientRect();
-        if (config.maxHeight && dbox.height > config.maxHeight) {
-            dbox.height = config.maxHeight;
-            this.outer.style.height = `${config.maxHeight}px`;
+
+        if (this.config.maxHeight && dbox.height > this.config.maxHeight) {
+            dbox.height = this.config.maxHeight;
+            this.outer.style.height = `${this.config.maxHeight}px`;
         }
 
         let pos = this.config.position;
@@ -142,11 +158,6 @@ class BaseDialog {
         }
         this.outer.style.left = `${pos[0]}px`;
         this.outer.style.top = `${pos[1]}px`;
-
-        // provide some observable mobx state for useOuterContainer()
-        this.observable = makeAutoObservable({
-            container: this.getDialogContainer(),
-        });
     }
 
     getDialogContainer() {
@@ -261,6 +272,12 @@ class BaseDialog {
     close() {
         if (this._closed) return;
         this._closed = true;
+
+        // remove resize event listener if it exists
+        if (this._resizeListener) {
+            window.removeEventListener('resize', this._resizeListener);
+        }
+
         if (this.config.onclose) {
             this.config.onclose();
         }
