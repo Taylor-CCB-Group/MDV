@@ -5,6 +5,7 @@ import SelectionDialogComponent from "./SelectionDialogComponent";
 import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
+import { C } from "test_proj/bcells_static/static/assets/Button-B6V-Y5XJ";
 
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
@@ -14,6 +15,7 @@ export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFil
 
 export type SelectionDialogConfig = {
     type: "selection_dialog";
+    noClearFilters?:boolean;
     filters: Record<string, SelectionDialogFilter | null>;
 } & BaseConfig;
 
@@ -44,6 +46,25 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 this.config.filters[key] = null;
             }
         })();
+    }
+
+    getSettings(){
+          const settings = super.getSettings();
+          const c= this.config;
+          return [
+            ...settings,
+            g({
+                //set whether filters are cleared on Reset All
+                type: "check",
+                current_value: c.noClearFilters || false,
+                label: "Filters remain on Reset All",
+                func: (x) => {
+                    action(() => {
+                        c.noClearFilters = x;
+                    })();
+                }
+            })
+          ]
     }
 }
 
