@@ -58,11 +58,6 @@ type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage | PingMessage;
  *      e.g. about new data (e.g. from some kind of data pipeline), or about new views to load.
  */
 export default async function connectIPC(cm: ChartManager) {
-    // not sure we'd get this from params - needs to match the server's socket.io endpoint
-    // which might need to be not at the root - but also at a higher level than us... 
-    // unless we have separate SocketIO instances for each project - may be reasonable.
-    const params = new URLSearchParams(window.location.search);
-    const url = params.get("socket") || undefined;
     let initialized = false;
     cm.addListener(
         "ipc",
@@ -87,7 +82,9 @@ export default async function connectIPC(cm: ChartManager) {
         },
     );
     // const socket = { on: (s: any, f: any) => {}, emit: (...args: any[])=>{} }; //io(url);
-    const socket = io(url);
+    // we should configure this with appropriate auth if needed, a namespace, etc.
+    // const url = `${location.origin}/${location.pathname}`;
+    const socket = io(cm.config.socketio_route || undefined);
 
     function sendMessage(msg: MDVMessage) {
         socket.emit("message", msg);

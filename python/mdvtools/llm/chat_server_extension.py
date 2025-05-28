@@ -8,6 +8,9 @@ from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.mdvproject import MDVProject
 from flask import request
 from mdvtools.project_router import ProjectBlueprintProtocol
+from mdvtools.websocket import socketio
+# from mdvtools.dbutils.config import config
+import os
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -38,7 +41,15 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
-        
+        # @socketio.on("connect", namespace=f"/project/{project.id}")
+        # def chat_connect():
+        #     """
+        #     Handle WebSocket connections for the chat extension.
+        #     This could be used to initialize a chat session or perform other setup tasks.
+        #     We should check authentication here,
+        #     """
+            
+
         bot: Optional[ProjectChatProtocol] = None
         @project_bp.route("/chat_init", access_level='editable', methods=["POST"])
         def chat_init():
@@ -85,5 +96,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         """
         was_enabled = state_json.get("chat_enabled", False)
         state_json["chat_enabled"] = chat_enabled and was_enabled
+        # I think we want to maybe get something from a global config for e.g. server_root="https://server.example/container_path"
+        # for now, we can probably patch this in the front-end code without passing this back.
+        # state_json["chat_route"] = f"/project/{project.id}/chat"
+        # hard-coded default for demo purposes...
+        state_json["socketio_route"] = os.getenv("SOCKETIO_ROUTE", "https://bia.cmd.ox.ac.uk/socket.io")
 
 chat_extension = MDVProjectChatServerExtension()
