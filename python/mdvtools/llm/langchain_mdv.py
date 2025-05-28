@@ -88,6 +88,10 @@ matplotlib.use('Agg') # this should prevent it making any windows etc
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY
 load_dotenv()
+# if it isn't set, we raise an error more explicitly to log it
+if not os.getenv("OPENAI_API_KEY"):
+    print("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
+    raise ValueError("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
 
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):

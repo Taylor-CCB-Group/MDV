@@ -32,3 +32,4 @@ except Exception as e:
 
 # Tell the type checker we’re exposing a ProjectChat conforming to the protocol
 ProjectChat: type[ProjectChatProtocol] = _ProjectChat
+print(f">>> chat_enabled: {chat_enabled}")
