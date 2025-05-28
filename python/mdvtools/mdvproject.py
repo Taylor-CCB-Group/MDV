@@ -1341,7 +1341,18 @@ class MDVProject:
         """Adds a set of images to a datasource. The images should be in a folder, with the same name as the column
         Args:
             datasource (str): The name of the datasource.
-            column (str): The name of the column.
+            column (str): The name of the column describing the images. The folder
+                should contain images with the same name as the values in this column
+                minus the file extension (typically .png or .jpg).
+            type (str, optional): The type of the images. Default is 
+                'png'. Other options are 'jpg', 'jpeg', etc.
+            large (bool, optional): If True, the images will be avialable to the Row Summmary Box
+                where only a single image is shown and can be panned and zoomed
+                if false (default) the images will be available in the Image Table and should
+                be thumbnails of the same size
+            setname (str): The name of the image set. More than one set of images can be associated
+                with a datasource. The name should be unique within the datasource and is used tp 
+                create a folder (with a sanitized name) in the images directory     
             folder (str): The path to the folder containing the images.
         """
         ds = self.get_datasource_metadata(datasource)
