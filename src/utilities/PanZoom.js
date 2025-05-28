@@ -28,16 +28,19 @@ class ImagePanZoom {
     fit() {
         const box = this.container.getBoundingClientRect();
         const ratio =  this.img.naturalWidth / this.img.naturalHeight;
-        this.img.style.height = `${box.height}px`;
-        this.img.style.width = `${this.img.height * ratio}px`;
-        if (this.img.width > box.width) {
+        const fitHeight = box.height;
+        const fitWidth = fitHeight * ratio;
+        this.img.style.height = `${fitHeight}px`;
+        this.img.style.width = `${fitWidth}px`;
+        if (fitWidth > box.width) {
+            const constrainedHeight = box.width / ratio;
             this.img.style.width = `${box.width}px`;
-            this.img.style.height = `${this.img.width / ratio}px`;
-            this.img.style.top = `${(box.height - this.img.height) / 2}px`;
+            this.img.style.height = `${box.width / ratio}px`;
+            this.img.style.top = `${(box.height - constrainedHeight) / 2}px`;
             this.img.style.left = "0px";
         } else {
             this.img.style.top = "0px";
-            this.img.style.left = `${(box.width - this.img.width) / 2}px`;
+            this.img.style.left = `${(box.width - fitWidth) / 2}px`;
         }
     }
 

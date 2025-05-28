@@ -5,7 +5,6 @@ import SelectionDialogComponent from "./SelectionDialogComponent";
 import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
-import { C } from "test_proj/bcells_static/static/assets/Button-B6V-Y5XJ";
 
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };

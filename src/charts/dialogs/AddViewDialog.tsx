@@ -23,7 +23,7 @@ const AddViewDialogComponent = (props: {
     //we want a choice of all datasources (not just ones on the current view)
     //not sure how to get all the datasources available - this is just a temporary hack
     //if we don't use useMemo get constant re-rendering ?
-    const dataSources = useMemo(()=>viewManager.cm.dataSources.map(x=>x.name),[viewManager.cm])
+    const dataSources = useMemo(()=>viewManager.getAllDataSources(),[viewManager])
     const currentDataSources = useMemo(() => Object.keys(viewData.dataSources), [viewData.dataSources]);
 
     useEffect(() => {

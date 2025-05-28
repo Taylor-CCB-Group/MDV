@@ -45,6 +45,10 @@ class ViewManager {
         // }, 1000);
     }
 
+    getAllDataSources() {
+        return this.cm.dataSources.map(x => x.name);
+    }
+
     getCleanPrevState() {
         return removeImageProp(toJS(this.lastSavedState));
     }
