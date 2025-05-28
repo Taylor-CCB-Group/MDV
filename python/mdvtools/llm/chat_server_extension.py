@@ -100,6 +100,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         # for now, we can probably patch this in the front-end code without passing this back.
         # state_json["chat_route"] = f"/project/{project.id}/chat"
         # hard-coded default for demo purposes...
-        state_json["socketio_route"] = os.getenv("SOCKETIO_ROUTE", "https://bia.cmd.ox.ac.uk/socket.io")
+        # state_json["socketio_route"] = os.getenv("SOCKETIO_ROUTE", "https://bia.cmd.ox.ac.uk/socket.io")
+        state_json['socketio_route'] = '/carroll'
 
 chat_extension = MDVProjectChatServerExtension()
