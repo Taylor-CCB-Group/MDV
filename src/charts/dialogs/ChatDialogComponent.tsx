@@ -246,7 +246,7 @@ const Chatbot = () => {
     
     return (
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
-            <Box className="flex-1 p-4 w-full overflow-y-auto">
+            <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
                 {messages.map((message) => (
                     <Message key={message.id} {...message} />
                 ))}
@@ -256,7 +256,7 @@ const Chatbot = () => {
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
                 <Box ref={messagesEndRef} />
             </Box>
-            <Box className='absolute opacity-10 pointer-events-none top-0 right-0'>
+            <Box className='absolute opacity-10 pointer-events-none right-0'>
                 <RobotPandaSVG />
             </Box>
             <Divider />
@@ -279,36 +279,6 @@ const Chatbot = () => {
                 </Button>
             </Box>
         </Box>
-        // <div className="flex flex-col h-full mx-auto overflow-hidden">
-        //     <div className="flex-1 p-1 w-full overflow-y-auto">
-        //         {messages.map((message) => (
-        //             <Message key={message.id} {...message} />
-        //         ))}
-        //         {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
-        //         {/* {
-        //         isSending && 
-        //         (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
-        //         <div ref={messagesEndRef} />
-        //     </div>
-        //     <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
-        //         <RobotPandaSVG />
-        //     </div>
-        //     <div className="flex p-4 border-t w-full border-gray-300">
-        //         <input
-        //             type="text"
-        //             // disabled={isSending} //we can still type while it's processing
-        //             value={input}
-        //             onChange={handleInputChange}
-        //             onKeyDown={handleKeyPress}
-        //             placeholder="Type a message..."
-        //             className="flex-1 p-2 border border-gray-300 rounded-lg mr-2"
-        //         />
-        //         <button type="submit" onClick={handleSend} disabled={isSending} 
-        //         className="p-2 bg-blue-500 text-white rounded-lg">
-        //             Send
-        //         </button>
-        //     </div>
-        // </div>
     );
 };
 

@@ -6,56 +6,90 @@ import {
     DialogTitle,
     Divider,
     Drawer,
-    IconButton,
     InputAdornment,
     List,
     ListItemButton,
     ListItemText,
     TextField,
-    Tooltip,
+    ThemeProvider,
+    Typography,
+    useTheme,
 } from "@mui/material";
 import type React from "react";
 import Chatbot from "./ChatDialogComponent";
 import { useChatLog } from "./ChatAPI";
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
-import { Search, ViewSidebar } from "@mui/icons-material";
-import { useState } from "react";
+import { Close, Launch, Search, ViewSidebar } from "@mui/icons-material";
+import { useMemo, useState } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 
 export type ChatDialogProps = {
     open: boolean;
     setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    fullscreen?: boolean;
 };
 
-const ChatDialog = ({ open, setOpen }: ChatDialogProps) => {
+const ChatDialog = ({ open, setOpen, fullscreen=false }: ChatDialogProps) => {
     const [drawerOpen, setDrawerOpen] = useState(true);
+    const [search, setSearch] = useState("");
+    // const [selectedChatId, setSelectedChatId] = useState();
     const handleClose = () => setOpen(false);
     const { chatLog } = useChatLog();
+    // todo: Move it to a hook
+    const filteredLog = useMemo(
+        () => chatLog.filter((log) => log.query.toLowerCase().includes(search.toLowerCase())),
+        [chatLog, search],
+    );
+    const theme = useTheme();
     return (
-        <Dialog open={open} onClose={handleClose} fullWidth maxWidth={"lg"}>
-            <DialogTitle>
-                <DialogCloseIconButton onClose={handleClose} />
-            </DialogTitle>
-            <DialogContent
-                sx={{
-                    height: "80vh",
-                    padding: 0,
-                }}
-            >
-                <Box sx={{ display: "flex", height: "100%" }}>
+        <Dialog open={open} onClose={handleClose} fullWidth maxWidth={"lg"} fullScreen={fullscreen}>
+            <DialogTitle sx={{ px: 0, bgcolor: "var(--fade_background_color)" }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                    }}
+                >
                     <IconWithTooltip
                         tooltipText={drawerOpen ? "Close Sidebar" : "Open Sidebar"}
                         onClick={() => setDrawerOpen(!drawerOpen)}
                         iconButtonProps={{
                             sx: {
-                                position: "absolute",
-                                top: 8,
-                                left: 8,
+                                marginLeft: 2,
                             },
                         }}
                     >
                         <ViewSidebar />
                     </IconWithTooltip>
+                    <IconWithTooltip tooltipText={"Popout to a new window"} onClick={() => {}}>
+                        <Launch />
+                    </IconWithTooltip>
+                    <Typography variant="h6" sx={{ flexGrow: 1, textAlign: "center" }}>
+                        {/* todo: Change this to the name of selected chat */}
+                        Selected Chat
+                    </Typography>
+
+                    <IconWithTooltip
+                        tooltipText={"Close"}
+                        onClick={handleClose}
+                        iconButtonProps={{
+                            sx: {
+                                marginRight: 2,
+                            },
+                        }}
+                    >
+                        <Close />
+                    </IconWithTooltip>
+                </Box>
+            </DialogTitle>
+            <DialogContent
+                sx={{
+                    height: "80vh",
+                    padding: 0,
+                    bgcolor: "var(--fade_background_color)",
+                }}
+                dividers
+            >
+                <Box sx={{ display: "flex", height: "100%" }}>
                     {drawerOpen && (
                         <Drawer
                             open={drawerOpen}
@@ -80,6 +114,8 @@ const ChatDialog = ({ open, setOpen }: ChatDialogProps) => {
                                 </Box>
                                 <TextField
                                     fullWidth
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search History...."
                                     sx={{
                                         mt: 2,
@@ -98,7 +134,8 @@ const ChatDialog = ({ open, setOpen }: ChatDialogProps) => {
                                 />
                                 <Divider />
                                 <List>
-                                    {chatLog.map((item) => (
+                                    {filteredLog.map((item) => (
+                                        // todo: Add onclick to select chat id
                                         <ListItemButton key={item.query}>
                                             <ListItemText
                                                 primary={item.query}
@@ -114,7 +151,7 @@ const ChatDialog = ({ open, setOpen }: ChatDialogProps) => {
                             </Box>
                         </Drawer>
                     )}
-                    <Box sx={{ flexGrow: 1, overflow: "hidden", pt: 3, pb: 2 }}>
+                    <Box sx={{ flexGrow: 1, overflow: "hidden", pb: 2 }}>
                         <Chatbot />
                     </Box>
                 </Box>

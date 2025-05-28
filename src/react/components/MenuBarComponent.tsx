@@ -1,4 +1,4 @@
-import { AppBar, Box, Toolbar } from "@mui/material";
+import { AppBar, Box, Button, ThemeProvider, Toolbar, useTheme } from "@mui/material";
 import {
     Home as HomeIcon,
     Save as SaveIcon,
@@ -33,6 +33,7 @@ const ChatButtons = () => {
     // very basic check to see if chat is enabled
     const chatEnabled = useChartManager().config.chat_enabled;
     const [open, setOpen] = useState(false);
+    const [popout, setPopout] = useState(false);
 
     const handleChatLogButtonClick = () => {
         new ChatLogDialog();
