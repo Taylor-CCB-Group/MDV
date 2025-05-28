@@ -190,6 +190,7 @@ def create_app(
                     # do we want this to always be true/not a flag we pass?
                     state["websocket"] = websocket
                     # in future, we could iterate over a list of extensions.
+                    # we should alter permissions based on the permission of the user...
                     chat_extension.mutate_state_json(state, project)
                     return state
                 except Exception as e:

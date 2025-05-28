@@ -35,11 +35,9 @@ class MDVProjectServerExtension(Protocol):
 
 
 class MDVProjectChatServerExtension(MDVProjectServerExtension):
+    # as well as registering routes and mutating the state.json,
+    # we might describe websocket routes here, and how we control auth with that
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
-        # as well as registering routes, we might want to add something to be included in state.json?
-        # or maybe we prefer to use websockets for this?
-        # i.e. we always have a websocket connection to the client, 
-        # and an extension can send a message to the client so it knows to update the UI.
         
         bot: Optional[ProjectChatProtocol] = None
         @project_bp.route("/chat_init", access_level='editable', methods=["POST"])
@@ -77,6 +75,15 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 return {"message": str(e)}
             return {"message": f"bleep bloop I'm a robot, you said: {message}"}
     def mutate_state_json(self, state_json: dict, project: MDVProject):
-        state_json["chat_enabled"] = chat_enabled
+        """
+        Mutate the state.json before returning it as a request response,
+        in this case to add information about the chat extension.
+        This should also reflect what the user is authorized to do,
+        e.g. whether they can use the chat functionality or not.
+        Currently, all chat related routes will require the user to have 'editable' access level,
+        although we don't currently signal to the front-end whether the user has this access level or not.
+        """
+        was_enabled = state_json.get("chat_enabled", False)
+        state_json["chat_enabled"] = chat_enabled and was_enabled
 
 chat_extension = MDVProjectChatServerExtension()
