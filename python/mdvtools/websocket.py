@@ -29,8 +29,8 @@ def mdv_socketio(app: Flask):
     """
     global socketio
     # allow cors for localhost:5170-5179
-    cors = [f"http://localhost:{i}" for i in range(5170,5180)]
-    socketio = SocketIO(app, cors_allowed_origins=cors)
+    # cors = [f"http://localhost:{i}" for i in range(5170,5180)]
+    socketio = SocketIO(app, cors_allowed_origins="*")
     log("socketio initialized without cors_allowed_origins wildcard")
 
     async def response(sid, message=""):
