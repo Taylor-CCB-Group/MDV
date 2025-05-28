@@ -21,6 +21,8 @@ import { useChatLog } from "./ChatAPI";
 import { Close, Launch, Search, ViewSidebar } from "@mui/icons-material";
 import { useMemo, useState } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
+import { usePopupWindow } from "./usePopupWindow";
+import PopupChatDialog from "./PopupChatDialog";
 
 export type ChatDialogProps = {
     open: boolean;
@@ -28,7 +30,7 @@ export type ChatDialogProps = {
     fullscreen?: boolean;
 };
 
-const ChatDialog = ({ open, setOpen, fullscreen=false }: ChatDialogProps) => {
+const ChatDialog = ({ open, setOpen, fullscreen = false }: ChatDialogProps) => {
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [search, setSearch] = useState("");
     // const [selectedChatId, setSelectedChatId] = useState();
@@ -37,11 +39,35 @@ const ChatDialog = ({ open, setOpen, fullscreen=false }: ChatDialogProps) => {
     // todo: Move it to a hook
     const filteredLog = useMemo(
         () => chatLog.filter((log) => log.query.toLowerCase().includes(search.toLowerCase())),
-        [chatLog, search],
+        [chatLog, search]
     );
     const theme = useTheme();
+
+    const [isPopupMode, setIsPopupMode] = useState(false);
+    const { openPopup, closePopup } = usePopupWindow({
+      windowName: 'chat-dialog',
+      onClose: () => {
+        setIsPopupMode(false);
+        setOpen(true);
+      }
+    });
+    const handlePopout = () => {
+      const popupContent = (
+        <PopupChatDialog
+          onClose={() => {
+            closePopup();
+            setIsPopupMode(false);
+            setOpen(true);
+          }}
+        />
+      );
+      openPopup(popupContent, theme);
+      setIsPopupMode(true);
+      setOpen(false);
+    };
+
     return (
-        <Dialog open={open} onClose={handleClose} fullWidth maxWidth={"lg"} fullScreen={fullscreen}>
+        <Dialog open={open && !isPopupMode} onClose={handleClose} fullWidth maxWidth={"lg"} fullScreen={fullscreen}>
             <DialogTitle sx={{ px: 0, bgcolor: "var(--fade_background_color)" }}>
                 <Box
                     sx={{
@@ -60,7 +86,7 @@ const ChatDialog = ({ open, setOpen, fullscreen=false }: ChatDialogProps) => {
                     >
                         <ViewSidebar />
                     </IconWithTooltip>
-                    <IconWithTooltip tooltipText={"Popout to a new window"} onClick={() => {}}>
+                    <IconWithTooltip tooltipText={"Popout to a new window"} onClick={handlePopout}>
                         <Launch />
                     </IconWithTooltip>
                     <Typography variant="h6" sx={{ flexGrow: 1, textAlign: "center" }}>
