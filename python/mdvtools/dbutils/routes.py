@@ -12,7 +12,7 @@ def register_routes(app, ENABLE_AUTH):
     import shutil
     from mdvtools.mdvproject import MDVProject
     from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
-    from mdvtools.dbutils.dbmodels import User
+    from mdvtools.dbutils.dbmodels import User, UserProject
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
     import tempfile
     import zipfile
@@ -73,6 +73,16 @@ def register_routes(app, ENABLE_AUTH):
 
             # If everything goes well, redirect to the 'index' page
             return redirect(url_for('index'))
+        
+        def get_project_owners(project_id):
+                    owners = []
+                    for user_id, projects in user_project_cache.items():
+                        perms = projects.get(project_id)
+                        if perms and perms.get("is_owner"):
+                            user_data = next((u for u in all_users_cache if u["id"] == user_id), None)
+                            if user_data:
+                                owners.append(user_data["email"])
+                    return sorted(owners)
 
         @app.route('/projects')
         def get_projects():
@@ -113,6 +123,7 @@ def register_routes(app, ENABLE_AUTH):
                             "lastModified": p["lastModified"],
                             "thumbnail": p["thumbnail"],
                             "permissions": user_projects[p["id"]],
+                            "owners": get_project_owners(p["id"]),
                         }
                         for p in active_projects
                         if p["id"] in allowed_project_ids
@@ -126,6 +137,7 @@ def register_routes(app, ENABLE_AUTH):
                             "lastModified": p["lastModified"],
                             "thumbnail": p["thumbnail"],
                             "permissions": None,
+                            "owners": [],
                         }
                         for p in active_projects
                     ]
