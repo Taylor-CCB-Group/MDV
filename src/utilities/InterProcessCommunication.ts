@@ -84,7 +84,9 @@ export default async function connectIPC(cm: ChartManager) {
     // const socket = { on: (s: any, f: any) => {}, emit: (...args: any[])=>{} }; //io(url);
     // we should configure this with appropriate auth if needed, a namespace, etc.
     // const url = `${location.origin}/${location.pathname}`;
-    const socket = io(undefined, {path: cm.config.socketio_route || "/socket.io"});
+    //! actually the thing that calls itself socketio_route is for now mainApiRoute
+    // should use a better way of joining paths
+    const socket = io(undefined, {path: `${cm.config.socketio_route}socket.io`});
 
     function sendMessage(msg: MDVMessage) {
         socket.emit("message", msg);

@@ -10,7 +10,7 @@ from flask import request
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.websocket import socketio
 # from mdvtools.dbutils.config import config
-import os
+from flask import Flask
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -24,15 +24,17 @@ class MDVProjectServerExtension(Protocol):
     including a Flask app, these extensions, auth provider etc...
     Flask becomes an implementation detail that we abstract away somewhat.
     """
-    def register_routes(self, project: MDVProject, blueprint: ProjectBlueprintProtocol):
+    def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
         """
         Assign any extra `/project/<project_id>/<path>` routes to the blueprint for this project instance.
         """
         ...
-    def mutate_state_json(self, state_json: dict, project: MDVProject):
+    def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
         """
         Mutate the state.json before returning it as a request response,
         e.g. to add information about the extension.
+
+        Don't really want to pass flask app here, doing so for now to allow access to config.
         """
         ...
 
@@ -85,7 +87,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 print(e)
                 return {"message": str(e)}
             return {"message": f"bleep bloop I'm a robot, you said: {message}"}
-    def mutate_state_json(self, state_json: dict, project: MDVProject):
+    def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
         """
         Mutate the state.json before returning it as a request response,
         in this case to add information about the chat extension.
@@ -101,6 +103,14 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         # state_json["chat_route"] = f"/project/{project.id}/chat"
         # hard-coded default for demo purposes...
         # state_json["socketio_route"] = os.getenv("SOCKETIO_ROUTE", "https://bia.cmd.ox.ac.uk/socket.io")
-        state_json['socketio_route'] = '/carroll'
+        
+        # as a proxy for proper configuration, so that we can use localhost and have test dev server under /carroll work
+        # without adding a new environment variable
+        # when doing this properly, we may want this to be api_root which is the root of the API for whole app (not project specific),
+        if app.config.get('ENABLE_AUTH'):
+            state_json['socketio_route'] = '/carroll/'
+        else:
+            state_json['socketio_route'] = '/'
+        
 
 chat_extension = MDVProjectChatServerExtension()
