@@ -96,21 +96,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         Currently, all chat related routes will require the user to have 'editable' access level,
         although we don't currently signal to the front-end whether the user has this access level or not.
         """
-        was_enabled = state_json.get("chat_enabled", False)
+        auth_enabled = app.config.get('ENABLE_AUTH', False)
+        # allow chat functionality by default, unless auth is enabled
+        was_enabled = state_json.get("chat_enabled", not auth_enabled)
         state_json["chat_enabled"] = chat_enabled and was_enabled
-        # I think we want to maybe get something from a global config for e.g. server_root="https://server.example/container_path"
-        # for now, we can probably patch this in the front-end code without passing this back.
-        # state_json["chat_route"] = f"/project/{project.id}/chat"
-        # hard-coded default for demo purposes...
-        # state_json["socketio_route"] = os.getenv("SOCKETIO_ROUTE", "https://bia.cmd.ox.ac.uk/socket.io")
-        
-        # as a proxy for proper configuration, so that we can use localhost and have test dev server under /carroll work
-        # without adding a new environment variable
-        # when doing this properly, we may want this to be api_root which is the root of the API for whole app (not project specific),
-        if app.config.get('ENABLE_AUTH'):
-            state_json['socketio_route'] = '/carroll/'
-        else:
-            state_json['socketio_route'] = '/'
         
 
 chat_extension = MDVProjectChatServerExtension()

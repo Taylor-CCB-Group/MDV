@@ -192,6 +192,8 @@ def create_app(
                     # in future, we could iterate over a list of extensions.
                     # we should alter permissions based on the permission of the user...
                     chat_extension.mutate_state_json(state, project, app)
+                    
+                    state['mdv_api_root'] = os.environ.get('MDV_API_ROOT', '/')
                     return state
                 except Exception as e:
                     return f"Problem parsing state file: {e}", 500

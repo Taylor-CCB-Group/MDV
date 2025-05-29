@@ -14,7 +14,6 @@ export type ProjectInfo = {
     chartManager: ChartManager;
     projectName: string;
     buildInfo: BuildInfo;
-    socketioRoute?: string;
     projectApiRoute: string;
     mainApiRoute: string;
 };
@@ -48,8 +47,10 @@ export function getProjectInfo(): ProjectInfo {
     // this is really projectID in the current implementation - would be good to have name as well (and be able to change it)
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
     const { chartManager } = window.mdv;
-    const socketioRoute = chartManager.config.socketio_route || undefined;
-    const mainApiRoute = socketioRoute ? socketioRoute : "/";
+    //! might need to be a bit careful if we end up using this
+    const mainApiRoute = chartManager.config.mdv_api_root || "/";
+    // const root = mainApiRoute; // todo establish that we have an actual consistent logic for this
+    //! only applies when running with the associated project API routing...
     const projectApiRoute = `${mainApiRoute}/project/${projectName}/`.replace('//', '/');
     const { buildInfo } = useBuildInfo();
     return {
@@ -58,7 +59,6 @@ export function getProjectInfo(): ProjectInfo {
         projectName,
         chartManager,
         buildInfo,
-        socketioRoute,
         mainApiRoute,
         projectApiRoute,
     };   
