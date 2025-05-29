@@ -18,7 +18,7 @@ import BaseChart from "@/charts/BaseChart";
 import { ProjectProvider, useProject } from "@/modules/ProjectContext";
 import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
@@ -38,17 +38,29 @@ export interface PopoutWindowProps {
   export function PopoutWindow({
     children,
     features = "width=600,height=400",
-    title = "",
+    title,
     onClose,
   }: PopoutWindowProps) {
     const containerEl = useRef<HTMLElement>(document.createElement("div"));
     const externalWindow = useRef<Window | null>(null);
+    // had to use these refs as the style changes were not reflecting properly
+    const themeObserver = useRef<MutationObserver>();
+    const observer = useRef<MutationObserver>();
+    const onCloseRef = useRef(onClose);
+
+    // Keep onClose ref updated
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
 
     useEffect(() => {
+        // open a new window
         externalWindow.current = window.open("", "_blank", features);
         if (!externalWindow.current) return;
 
-        externalWindow.current.document.title = "Chat Window";
+        // assign a title to it
+        externalWindow.current.document.title = title || "Chat Window";
+
         // Function to synchronize the theme by syncing the class names
         const syncTheme = () => {
             if (!externalWindow.current) return;
@@ -59,8 +71,8 @@ export interface PopoutWindowProps {
         syncTheme();
 
         // Set up a MutationObserver on the main window
-        const themeObserver = new MutationObserver(syncTheme);
-        themeObserver.observe(document.documentElement, {
+        themeObserver.current = new MutationObserver(syncTheme);
+        themeObserver.current.observe(document.documentElement, {
             attributes: true,
             attributeFilter: ['class'],
         });
@@ -92,7 +104,7 @@ export interface PopoutWindowProps {
         });
 
         // Observe the main window's head for new stylesheets and style elements
-        const observer = new MutationObserver((mutations) => {
+        observer.current = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (
                     mutation.type === "childList" &&
@@ -111,30 +123,37 @@ export interface PopoutWindowProps {
         });
 
         // Start observing the main window's head for changes
-        observer.observe(document.head, {
+        observer.current.observe(document.head, {
             childList: true,
             subtree: true,
         });
 
-
+        // append the container to the window
         externalWindow.current.document.body.appendChild(containerEl.current);
 
+        // call onClose before unload
         const handleUnload = () => {
-            if (observer) observer.disconnect();
-            if (themeObserver) themeObserver.disconnect();
-            if (onClose) onClose();
+            if (onCloseRef.current) onCloseRef.current();
         };
+
         externalWindow.current.addEventListener("beforeunload", handleUnload);
 
         // Cleanup
         return () => {
+            if (observer.current) observer.current.disconnect();
+            if (themeObserver.current) themeObserver.current.disconnect();
             if (externalWindow.current) {
                 externalWindow.current.removeEventListener("beforeunload", handleUnload);
                 externalWindow.current.close();
             }
         };
-    }, [features, title, onClose]);
+    }, [features, title]);
 
+    if (!containerEl.current) {
+        return null;
+    }
+
+    // create a new portal
     return createPortal(children, containerEl.current);
 }
 
@@ -145,15 +164,18 @@ const ChatButtons = () => {
     const [popout, setPopout] = useState(false);
     const theme = useTheme();
     const onClose = () => setOpen(false);
-    const onPopout = () => {
-        setOpen(false);
+    const handleClose = useCallback(() => {
+        setPopout(false);
+    }, []);
+
+    const handlePopout = useCallback(() => {
         setPopout(true);
-    };
+    }, []);
 
     const handleChatLogButtonClick = () => {
         new ChatLogDialog();
     };
-    // if (!chatEnabled) return null;
+    if (!chatEnabled) return null;
     return (
         <>
             <IconWithTooltip tooltipText="Chat" onClick={() => setOpen(true)}>
@@ -162,31 +184,23 @@ const ChatButtons = () => {
             <IconWithTooltip tooltipText="Chat Log" onClick={handleChatLogButtonClick}>
                 <ChatLogIcon />
             </IconWithTooltip>
-            {!popout && <ChatDialog open={open} onClose={onClose} onPopout={onPopout} />}
-            {
-                popout && (
-                    <PopoutWindow
-                        onClose={() => {
-                            onClose();
-                            setPopout(false);
-                        }}
-                    >
-                        <ProjectProvider>
+            {!popout && <ChatDialog open={open} onClose={onClose} onPopout={handlePopout} />}
+            {popout && (
+                <PopoutWindow
+                    onClose={handleClose}
+                >
+                    <ProjectProvider>
                         <ThemeProvider theme={theme}>
                             <ChatDialog
                                 open={true}
-                                onClose={() => {
-                                    onClose();
-                                    setPopout(false);
-                                }}
+                                onClose={handleClose}
                                 isPopout
                                 fullscreen
                             />
                         </ThemeProvider>
                     </ProjectProvider>
-                    </PopoutWindow>
-                )
-            }
+                </PopoutWindow>
+            )}
         </>
     );
 };
