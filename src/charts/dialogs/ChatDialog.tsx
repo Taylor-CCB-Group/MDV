@@ -24,24 +24,31 @@ import IconWithTooltip from "@/react/components/IconWithTooltip";
 
 export type ChatDialogProps = {
     open: boolean;
-    setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    onClose: () => void;
+    onPopout?: () => void;
+    isPopout?: boolean;
     fullscreen?: boolean;
 };
 
-const ChatDialog = ({ open, setOpen, fullscreen=false }: ChatDialogProps) => {
+const ChatDialog = ({ open, onClose, onPopout, isPopout, fullscreen = false }: ChatDialogProps) => {
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [search, setSearch] = useState("");
     // const [selectedChatId, setSelectedChatId] = useState();
-    const handleClose = () => setOpen(false);
     const { chatLog } = useChatLog();
     // todo: Move it to a hook
     const filteredLog = useMemo(
         () => chatLog.filter((log) => log.query.toLowerCase().includes(search.toLowerCase())),
         [chatLog, search],
     );
-    const theme = useTheme();
     return (
-        <Dialog open={open} onClose={handleClose} fullWidth maxWidth={"lg"} fullScreen={fullscreen}>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            fullWidth
+            maxWidth={"lg"}
+            fullScreen={fullscreen}
+            disablePortal={isPopout}
+        >
             <DialogTitle sx={{ px: 0, bgcolor: "var(--fade_background_color)" }}>
                 <Box
                     sx={{
@@ -60,9 +67,11 @@ const ChatDialog = ({ open, setOpen, fullscreen=false }: ChatDialogProps) => {
                     >
                         <ViewSidebar />
                     </IconWithTooltip>
-                    <IconWithTooltip tooltipText={"Popout to a new window"} onClick={() => {}}>
-                        <Launch />
-                    </IconWithTooltip>
+                    {!isPopout && (
+                        <IconWithTooltip tooltipText={"Popout to a new window"} onClick={() => onPopout?.()}>
+                            <Launch />
+                        </IconWithTooltip>
+                    )}
                     <Typography variant="h6" sx={{ flexGrow: 1, textAlign: "center" }}>
                         {/* todo: Change this to the name of selected chat */}
                         Selected Chat
@@ -70,7 +79,7 @@ const ChatDialog = ({ open, setOpen, fullscreen=false }: ChatDialogProps) => {
 
                     <IconWithTooltip
                         tooltipText={"Close"}
-                        onClick={handleClose}
+                        onClick={onClose}
                         iconButtonProps={{
                             sx: {
                                 marginRight: 2,
