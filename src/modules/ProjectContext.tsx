@@ -14,6 +14,9 @@ export type ProjectInfo = {
     chartManager: ChartManager;
     projectName: string;
     buildInfo: BuildInfo;
+    socketioRoute?: string;
+    projectApiRoute: string;
+    mainApiRoute: string;
 };
 
 export type Project = {
@@ -34,6 +37,8 @@ export function getProjectInfo(): ProjectInfo {
     const urlParams = new URLSearchParams(window.location.search);
     const dir = urlParams.get("dir") || flaskURL;
 
+    // let's adjust how we reason about root for main API and project API
+    // also consider 'static' - when we output state.json for that
     const getRoot = (dir: string) => {
         return dir.endsWith("/") ? dir.substring(0, dir.length - 1) : dir;
     };
@@ -43,6 +48,9 @@ export function getProjectInfo(): ProjectInfo {
     // this is really projectID in the current implementation - would be good to have name as well (and be able to change it)
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
     const { chartManager } = window.mdv;
+    const socketioRoute = chartManager.config.socketio_route || undefined;
+    const mainApiRoute = socketioRoute ? socketioRoute : "/";
+    const projectApiRoute = `${mainApiRoute}/project/${projectName}/`.replace('//', '/');
     const { buildInfo } = useBuildInfo();
     return {
         root,
@@ -50,6 +58,9 @@ export function getProjectInfo(): ProjectInfo {
         projectName,
         chartManager,
         buildInfo,
+        socketioRoute,
+        mainApiRoute,
+        projectApiRoute,
     };   
 }
 

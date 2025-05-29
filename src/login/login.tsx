@@ -107,7 +107,7 @@ const Login: React.FC = () => {
                 >
                     Sign in
                 </Button>
-                <Typography
+                {/* <Typography
                     sx={{
                         mt: 6,
                         mb: 1,
@@ -137,7 +137,7 @@ const Login: React.FC = () => {
                         onClick={handleLoginWithSSO}
                     >
                         Sign in with SSO
-                    </Button>
+                    </Button> */}
             </Paper>
         </Box>
     );

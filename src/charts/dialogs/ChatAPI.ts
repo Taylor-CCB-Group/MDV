@@ -102,12 +102,12 @@ const DefaultMessage: ChatMessage = {
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
-    const { projectName } = useProject(); //todo add viewName to ProjectProvider
+    const { projectName, mainApiRoute, projectApiRoute } = useProject(); //todo add viewName to ProjectProvider
+    const route = `${projectApiRoute}chat`;
+    const routeInit = `${projectApiRoute}chat_init`;
     //! still need to consider that some things really are routes while others are just names
-    // and routes will need to be careful if e.g. the app is not at the root of the server
-    const route = `/project/${projectName}/chat`;
     const progressRoute = `/project/${projectName}/chat_progress`;
-    const routeInit = `/project/${projectName}/chat_init`;
+    const verboseRoute = `/project/${projectName}/chat`;
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
     // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
@@ -142,8 +142,8 @@ const useChat = () => {
         // event-name like 'chat', room for project... id associated with original request.
         socket?.on(progressRoute, progressListener);
         const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
-        socket?.on(route, verboseProgress);
-        console.log(`addded listeners for '${progressRoute}' and '${route}'`);
+        socket?.on(verboseRoute, verboseProgress);
+        console.log(`addded listeners for '${progressRoute}' and '${verboseRoute}'`);
         const chatInit = async () => {
             setIsSending(true);
             try {
@@ -161,9 +161,9 @@ const useChat = () => {
         if (!isSending && !isInit) chatInit();
         return () => {
             socket?.off(progressRoute, progressListener);
-            socket?.off(route, verboseProgress);
+            socket?.off(verboseRoute, verboseProgress);
         }
-    }, [isSending, isInit, routeInit, progressRoute, route, progressListener]);
+    }, [isSending, isInit, routeInit, progressRoute, verboseRoute, progressListener]);
     useEffect(() => {
         sessionStorage.setItem('chatMessages', JSON.stringify(messages));
     }, [messages]);
