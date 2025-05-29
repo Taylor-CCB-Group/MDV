@@ -211,9 +211,16 @@ const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
     );
 }
 
+export type ChatBotProps = {
+    messages: ChatMessage[];
+    isSending: boolean;
+    sendAPI: (input: string) => Promise<void>;
+    requestProgress: ChatProgress | null;
+    verboseProgress: string[];
+};
 
-const Chatbot = () => {
-    const { messages, isSending, sendAPI, requestProgress, verboseProgress } = useChat();
+
+const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();

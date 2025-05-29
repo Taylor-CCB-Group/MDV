@@ -11,30 +11,32 @@ import {
     ListItemButton,
     ListItemText,
     TextField,
-    ThemeProvider,
     Typography,
-    useTheme,
 } from "@mui/material";
-import type React from "react";
-import Chatbot from "./ChatDialogComponent";
-import { useChatLog } from "./ChatAPI";
-import { Close, Launch, Search, ViewSidebar } from "@mui/icons-material";
+import Chatbot, { type ChatBotProps } from "./ChatDialogComponent";
+import type { ChatLogItem, ChatMessage, ChatProgress } from "./ChatAPI";
+import { Close as CloseIcon, Launch as LaunchIcon, Search as SearchIcon, ViewSidebar as ViewSidebarIcon } from "@mui/icons-material";
 import { useMemo, useState } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 
 export type ChatDialogProps = {
     open: boolean;
     onClose: () => void;
+    chatLog: ChatLogItem[];
+    messages: ChatMessage[];
+    isSending: boolean;
+    sendAPI: (input: string) => Promise<void>;
+    requestProgress: ChatProgress | null;
+    verboseProgress: string[];
     onPopout?: () => void;
     isPopout?: boolean;
     fullscreen?: boolean;
-};
+}
 
-const ChatDialog = ({ open, onClose, onPopout, isPopout, fullscreen = false }: ChatDialogProps) => {
+const ChatDialog = ({ open, onClose, chatLog, messages, isSending, sendAPI, requestProgress, verboseProgress, onPopout, isPopout, fullscreen = false }: ChatDialogProps) => {
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [search, setSearch] = useState("");
     // const [selectedChatId, setSelectedChatId] = useState();
-    const { chatLog } = useChatLog();
     // todo: Move it to a hook
     const filteredLog = useMemo(
         () => chatLog.filter((log) => log.query.toLowerCase().includes(search.toLowerCase())),
@@ -65,11 +67,11 @@ const ChatDialog = ({ open, onClose, onPopout, isPopout, fullscreen = false }: C
                             },
                         }}
                     >
-                        <ViewSidebar />
+                        <ViewSidebarIcon />
                     </IconWithTooltip>
                     {!isPopout && (
                         <IconWithTooltip tooltipText={"Popout to a new window"} onClick={() => onPopout?.()}>
-                            <Launch />
+                            <LaunchIcon />
                         </IconWithTooltip>
                     )}
                     <Typography variant="h6" sx={{ flexGrow: 1, textAlign: "center" }}>
@@ -86,7 +88,7 @@ const ChatDialog = ({ open, onClose, onPopout, isPopout, fullscreen = false }: C
                             },
                         }}
                     >
-                        <Close />
+                        <CloseIcon />
                     </IconWithTooltip>
                 </Box>
             </DialogTitle>
@@ -135,7 +137,7 @@ const ChatDialog = ({ open, onClose, onPopout, isPopout, fullscreen = false }: C
                                         input: {
                                             startAdornment: (
                                                 <InputAdornment position="start">
-                                                    <Search fontSize="small" />
+                                                    <SearchIcon fontSize="small" />
                                                 </InputAdornment>
                                             ),
                                         },
@@ -161,7 +163,13 @@ const ChatDialog = ({ open, onClose, onPopout, isPopout, fullscreen = false }: C
                         </Drawer>
                     )}
                     <Box sx={{ flexGrow: 1, overflow: "hidden", pb: 2 }}>
-                        <Chatbot />
+                        <Chatbot
+                            messages={messages}
+                            isSending={isSending}
+                            requestProgress={requestProgress}
+                            sendAPI={sendAPI}
+                            verboseProgress={verboseProgress}
+                        />
                     </Box>
                 </Box>
             </DialogContent>

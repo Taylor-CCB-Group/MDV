@@ -117,6 +117,7 @@ const useChat = () => {
     const [isInit, setIsInit] = useState<boolean>(false);
     const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
     const [verboseProgress, setVerboseProgress] = useState([""]);
+    const cm = window.mdv.chartManager;
 
     const progressListener = useCallback((data: any) => {
         console.log('chat message', data);
@@ -137,7 +138,11 @@ const useChat = () => {
     }, [currentRequestId]);
 
     useEffect(() => {
-        const { socket } = window.mdv.chartManager.ipc;
+        // check if ipc is initialised or not before moving forward
+        if (!cm.ipc) {
+            return;
+        }
+        const { socket } = cm.ipc;
 
         // event-name like 'chat', room for project... id associated with original request.
         socket?.on(progressRoute, progressListener);
@@ -163,7 +168,7 @@ const useChat = () => {
             socket?.off(progressRoute, progressListener);
             socket?.off(route, verboseProgress);
         }
-    }, [isSending, isInit, routeInit, progressRoute, route, progressListener]);
+    }, [isSending, isInit, routeInit, progressRoute, route, progressListener, cm.ipc]);
     useEffect(() => {
         sessionStorage.setItem('chatMessages', JSON.stringify(messages));
     }, [messages]);
