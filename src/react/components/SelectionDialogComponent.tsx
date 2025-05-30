@@ -65,7 +65,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     useCloseOnIntersection(ref, () => setOpen(false));
 
     useEffect(() =>{
-        // todo consider having this state per-dimension rather than globally
+        // todo consider having ui for this state per-dimension rather than globally
         dim.setNoClear(conf.noClearFilters);
     },[dim, conf.noClearFilters]);
  

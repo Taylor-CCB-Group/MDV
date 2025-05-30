@@ -2,15 +2,15 @@ import { action } from "mobx";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
-import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
 
+// export type CommonFilter = { noClear?: boolean, invert?: boolean }; //todo - implement these features.
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
 export type RangeFilter = [number, number];
 export type UniqueFilter = string;
-export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter;
+export type SelectionDialogFilter = (CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter);// & CommonFilter;
 
 export type SelectionDialogConfig = {
     type: "selection_dialog";
