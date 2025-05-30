@@ -101,7 +101,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                         <Typography>{project.name}</Typography>
                                     </div>
                                 </TableCell>
-                                <TableCell>{project.owner}</TableCell>
+                                <TableCell>{project.owner ? project.owner.join(', ') : ''}</TableCell>
                                 <TableCell>{project.lastModified}</TableCell>
                                 <TableCell>{project.type}</TableCell>
                                 <TableCell align="right">
