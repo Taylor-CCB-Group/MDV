@@ -12,9 +12,9 @@ onmessage = (e) => {
     //get access to the shared buffers
     const len = dimensions.length;
 
-    const rowPositions = new Uint16Array(data, 0, len);
-    const colPositions = new Uint16Array(data, len * 2, len);
-    const values = new Uint8Array(data, len * 4, len);
+    const rowPositions = new Uint32Array(data, 0, len);
+    const colPositions = new Uint16Array(data, len * 4, len);
+    const values = new Uint8Array(data, len * 6, len);
 
     const x = new Float32Array(displayData, 0, len);
     const y = new Float32Array(displayData, len * 4, len);
