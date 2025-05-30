@@ -1806,7 +1806,7 @@ class MDVProject:
         return chart
 
 
-    def log_chat_item(self, output: Any, prompt_template: str, response: str):
+    def log_chat_item(self, output: Any, prompt_template: str, response: str, conversation_id: str):
         """
         Initially the idea was to use a similar structure to "Jobs" in the db
         Current version is designed to capture similar info to Maria's Google Sheet log
@@ -1815,38 +1815,31 @@ class MDVProject:
         send chat logs over websocket, to a database, etc...
         Args:
             output: result of invoke 'from langchain.chains import RetrievalQA'
+            conversation_id: Optional ID to group messages from the same conversation
         """
         log_chat(output, prompt_template, response)
         
-        context_information = output['source_documents']#output['context']
+        context_information = output['source_documents']
         context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
         context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
         context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
 
-
         context = str(context_information_metadata_name)
         query = output['query']
 
-        # context = str(context_information_metadata_url)
-        # query = output['question']
+        # Create a new chat log entry with conversation ID
+        chat_entry = {
+            "context": context,
+            "query": query,
+            "prompt_template": prompt_template,
+            "response": response,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        
+        if conversation_id:
+            chat_entry["conversation_id"] = conversation_id
 
-        # this is NOT the format we want to save the chat log in long term
-        self.chat_log.append(
-            {
-                "context": context,
-                "query": query,
-                "prompt_template": prompt_template,
-                "response": response,
-            }
-        )
-        # this version tries to jsonify VectorDatabases & god knows what else
-        # self.chat_log.append(
-        #     {
-        #         "output": json.dumps(output),
-        #         "prompt_template": prompt_template,
-        #         "response": json.dumps(response),
-        #     }
-        # )
+        self.chat_log.append(chat_entry)
         save_json(join(self.dir, "chat_log.json"), self.chat_log)
 
 def get_json(file):

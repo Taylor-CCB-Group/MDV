@@ -186,6 +186,7 @@ for question in question_list:
             template=prompt_RAG,
             input_variables=["context", "question"]
         )
+
         qa_chain = RetrievalQA.from_llm(
             llm=code_llm,
             prompt=prompt_RAG_template,
