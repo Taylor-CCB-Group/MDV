@@ -70,14 +70,20 @@ type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 
 export type ChatMessage = {
     text: string;
-    view?: string; //maybe this type should be more assocated with ChatResponse
+    view?: string;
     sender: 'user' | 'bot' | 'system';
     id: string;
+    conversationId: string;
 };
 
 function generateId() {
     return Math.random().toString(36).substring(7);
 }
+
+function generateConversationId() {
+    return 'conv-' + Date.now() + '-' + Math.random().toString(36).substring(7);
+}
+
 /** viewName could be a prop of ProjectProvider, but currently not cleanly reactive */
 function getViewName(): string | null {
     const urlParams = new URLSearchParams(window.location.search);
@@ -85,10 +91,10 @@ function getViewName(): string | null {
 }
 
 
-const sendMessage = async (message: string, id: string, route = '/chat') => {
+const sendMessage = async (message: string, id: string, route = '/chat', conversationId?: string) => {
     // we should send information about the context - in particular, which view we're in
     // could consider a streaming response here rather than socket
-    const response = await axios.post<ChatResponse>(route, { message, id });
+    const response = await axios.post<ChatResponse>(route, { message, id, conversationId });
     const parsed = completedChatResponseSchema.parse(response.data); // may throw an error if the response is not valid
     return parsed;
 };
@@ -97,17 +103,18 @@ const DefaultMessage: ChatMessage = {
     text: 'Hello! How can I help you?',
     sender: 'bot',
     id: generateId(),
+    conversationId: generateConversationId()
 }
 
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
-    const { projectName } = useProject(); //todo add viewName to ProjectProvider
+    const { projectName, mainApiRoute, projectApiRoute } = useProject(); //todo add viewName to ProjectProvider
+    const route = `${projectApiRoute}chat`;
+    const routeInit = `${projectApiRoute}chat_init`;
     //! still need to consider that some things really are routes while others are just names
-    // and routes will need to be careful if e.g. the app is not at the root of the server
-    const route = `/project/${projectName}/chat`;
     const progressRoute = `/project/${projectName}/chat_progress`;
-    const routeInit = `/project/${projectName}/chat_init`;
+    const verboseRoute = `/project/${projectName}/chat`;
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
     // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
@@ -117,6 +124,7 @@ const useChat = () => {
     const [isInit, setIsInit] = useState<boolean>(false);
     const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
     const [verboseProgress, setVerboseProgress] = useState([""]);
+    const [conversationId] = useState<string>(generateConversationId());
 
     const progressListener = useCallback((data: any) => {
         console.log('chat message', data);
@@ -142,15 +150,20 @@ const useChat = () => {
         // event-name like 'chat', room for project... id associated with original request.
         socket?.on(progressRoute, progressListener);
         const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
-        socket?.on(route, verboseProgress);
-        console.log(`addded listeners for '${progressRoute}' and '${route}'`);
+        socket?.on(verboseRoute, verboseProgress);
+        console.log(`addded listeners for '${progressRoute}' and '${verboseRoute}'`);
         const chatInit = async () => {
             setIsSending(true);
             try {
                 const id = generateId();
                 setCurrentRequestId(id);
                 const response = await sendMessage('', id, routeInit);
-                setMessages(messages => messages.length ? messages : [{ text: response.message, sender: 'system', id: generateId() }]);
+                setMessages(messages => messages.length ? messages : [{
+                    text: response.message,
+                    sender: 'system',
+                    id: generateId(),
+                    conversationId
+                }]);
             } catch (error) {
                 console.error('Error sending welcome message', error);
             }
@@ -161,17 +174,23 @@ const useChat = () => {
         if (!isSending && !isInit) chatInit();
         return () => {
             socket?.off(progressRoute, progressListener);
-            socket?.off(route, verboseProgress);
+            socket?.off(verboseRoute, verboseProgress);
         }
-    }, [isSending, isInit, routeInit, progressRoute, route, progressListener]);
+    }, [isSending, isInit, routeInit, progressRoute, verboseRoute, progressListener, conversationId]);
     useEffect(() => {
-        sessionStorage.setItem('chatMessages', JSON.stringify(messages));
-    }, [messages]);
+        sessionStorage.setItem(`chatMessages-${conversationId}`, JSON.stringify(messages));
+    }, [messages, conversationId]);
 
     const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
         //we should be using an id passed as part of the message, not generating one here.
         //also - id as react key if we have an id shared between query and response may be a conflict
-        const msg = { text: message, sender, id: generateId(), view };
+        const msg = {
+            text: message,
+            sender,
+            id: generateId(),
+            view,
+            conversationId
+        };
         setMessages((prevMessages) => [...prevMessages, msg]);
     };
 
@@ -185,13 +204,8 @@ const useChat = () => {
         try {
             setIsSending(true);
             setCurrentRequestId(id);
-            const response = await sendMessage(input, id, route);
-            // we should be appending more stuff, and then rendering appropriately, 
-            // with things like a button to navigate to the view if view property is present.
+            const response = await sendMessage(input, id, route, conversationId);
             appendMessage(response.message, 'bot', response.view);
-            //todo - navigating via button rather than automatically.
-
-            // if (response.view) navigateToView(response.view);
         } catch (error) {
             appendMessage(`Error: ${error}`, 'bot');
         }
@@ -199,7 +213,13 @@ const useChat = () => {
         setRequestProgress(null);
         setIsSending(false);
     };
-    return { messages, isSending, sendAPI, requestProgress, verboseProgress };
+
+    const clearChat = () => {
+        setMessages([]);
+        sessionStorage.removeItem(`chatMessages-${conversationId}`);
+    };
+
+    return { messages, isSending, sendAPI, requestProgress, verboseProgress, clearChat };
 }
 
 /**

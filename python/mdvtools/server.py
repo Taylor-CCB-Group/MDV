@@ -29,7 +29,6 @@ from typing import Optional
 import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
-from mdvtools.llm.chat_protocol import ProjectChatProtocol, ProjectChat
 from mdvtools.llm.chat_server_extension import chat_extension
 routes = set()
 
@@ -42,6 +41,8 @@ def add_safe_headers(resp):
     # headers required if serving endpoints for another server e,g dev server
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    #required for vite dev
+    resp.headers["Cross-Origin-Resource-Policy"] ="cross-origin"
     return resp
 
 
@@ -191,7 +192,9 @@ def create_app(
                     state["websocket"] = websocket
                     # in future, we could iterate over a list of extensions.
                     # we should alter permissions based on the permission of the user...
-                    chat_extension.mutate_state_json(state, project)
+                    chat_extension.mutate_state_json(state, project, app)
+                    
+                    state['mdv_api_root'] = os.environ.get('MDV_API_ROOT', '/')
                     return state
                 except Exception as e:
                     return f"Problem parsing state file: {e}", 500
@@ -218,9 +221,12 @@ def create_app(
     @project_bp.route("/images/<path:path>")
     def images(path):
         try:
-            return _send_file(project.get_image(path))
+            response= make_response(_send_file(project.get_image(path)))
         except Exception:
-            return _send_file(safe_join(project.imagefolder, path))
+            response =  make_response(_send_file(safe_join(project.imagefolder, path)))
+        #make sure images are cached
+        response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
+        return response
 
     # All the project's metadata
     @project_bp.route("/get_configs", methods=["GET", "POST"])
