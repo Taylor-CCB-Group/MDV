@@ -1806,7 +1806,7 @@ class MDVProject:
         return chart
 
 
-    def log_chat_item(self, output: Any, prompt_template: str, response: str, conversation_id: str = None):
+    def log_chat_item(self, output: Any, prompt_template: str, response: str, conversation_id: str):
         """
         Initially the idea was to use a similar structure to "Jobs" in the db
         Current version is designed to capture similar info to Maria's Google Sheet log
