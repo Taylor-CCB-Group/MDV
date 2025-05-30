@@ -30,7 +30,7 @@ const AddViewDialogComponent = (props: {
         // Initialising the checkedDs with the data sources inside the view
         const tempDs: { [name: string]: boolean } = {};
         dataSources?.forEach?.((ds) => {
-            tempDs[ds] =currentDataSources.indexOf(ds) !=-1;
+            tempDs[ds] = currentDataSources.indexOf(ds) !== -1;
         });
         setCheckedDs(tempDs);
     }, [dataSources]);

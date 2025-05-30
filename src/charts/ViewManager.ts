@@ -46,7 +46,7 @@ class ViewManager {
     }
 
     getAllDataSources() {
-        return this.cm.dataSources.map(x => x.name);
+        return this.cm.dataSources.map((x) => x.name);
     }
 
     getCleanPrevState() {
@@ -84,7 +84,7 @@ class ViewManager {
         // if (this.hasUnsavedChanges()) {
         //     this.cm.showSaveViewDialog(() => this.cm.showAddViewDialog());
         // } else {
-            this.cm.showAddViewDialog();
+        this.cm.showAddViewDialog();
         // }
     }
 
@@ -97,7 +97,7 @@ class ViewManager {
         //         this.changeView(view);
         //     });
         // } else {
-            this.changeView(view);
+        this.changeView(view);
         // }
     }
 
@@ -216,13 +216,13 @@ class ViewManager {
                 state.view.initialCharts = {};
                 state.view.dataSources = {};
                 //add the required datasources (checkedIds) to the view
-                for (let name in checkedDs){
-                    if (checkedDs[name]){
+                for (const name in checkedDs) {
+                    if (checkedDs[name]) {
                         state.view.initialCharts[name] = [];
                         state.view.dataSources[name] = {};
                     }
                 }
-              
+
                 contentDiv.innerHTML = "";
                 await this.cm._init(state.view);
                 await this.saveView();

@@ -6,7 +6,7 @@ class Dimension {
     constructor(parent) {
         this.filterBuffer = new SharedArrayBuffer(parent.size);
         this.parent = parent;
-        this.noclear=false;
+        this.noClear = false;
         this.filterArray = new Uint8Array(this.filterBuffer);
         this.filterArguments = null;
         this.filterIndexes = null;
@@ -61,11 +61,11 @@ class Dimension {
     }
     /**
      * 
-     * @param {*} noclear - if true, then the filter will not be cleared 
+     * @param {*} noClear - if true, then the filter will not be cleared 
      * when a removeAllFilters is called on the parent DataStore. Default is false.
      */
-    setNoClear(noclear){
-        this.noclear = noclear;
+    setNoClear(noClear){
+        this.noClear = noClear;
     }
 
     removeFilter(notify = true) {

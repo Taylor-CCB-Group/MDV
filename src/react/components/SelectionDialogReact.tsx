@@ -49,7 +49,7 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
 
     getSettings(){
           const settings = super.getSettings();
-          const c= this.config;
+          const c = this.config;
           return [
             ...settings,
             g({
@@ -58,9 +58,8 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 current_value: c.noClearFilters || false,
                 label: "Filters remain on Reset All",
                 func: (x) => {
-                    action(() => {
-                        c.noClearFilters = x;
-                    })();
+                    // func() is already called in an action, so no need to wrap again
+                    c.noClearFilters = x;
                 }
             })
           ]
