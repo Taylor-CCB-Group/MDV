@@ -75,8 +75,7 @@ const ChatDialog = ({ open, onClose, chatLog, messages, isSending, sendAPI, requ
                         </IconWithTooltip>
                     )}
                     <Typography variant="h6" sx={{ flexGrow: 1, textAlign: "center" }}>
-                        {/* todo: Change this to the name of selected chat */}
-                        Selected Chat
+                        Chat MDV
                     </Typography>
 
                     <IconWithTooltip

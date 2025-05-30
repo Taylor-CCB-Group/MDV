@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useChartManager } from "../hooks";
-import { ThemeProvider, useTheme } from "@mui/material";
+import { CssBaseline, ThemeProvider, useTheme } from "@mui/material";
 import useChat, { useChatLog } from "@/charts/dialogs/ChatAPI";
 import ChatLogDialog from "@/charts/dialogs/ChatLogDialog";
 import IconWithTooltip from "./IconWithTooltip";
@@ -58,6 +58,7 @@ const ChatButtons = () => {
                 <PopoutWindow onClose={handlePopoutClose}>
                     <ProjectProvider>
                         <ThemeProvider theme={theme}>
+                            <CssBaseline />
                             <ChatDialog
                                 open={true}
                                 onClose={handlePopoutClose}
