@@ -18,7 +18,6 @@ from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
 # from mdvtools.charts.view import View 
-from mdvtools.llm.chatlog import log_chat
 import time
 import copy
 import tempfile
@@ -1232,10 +1231,14 @@ class MDVProject:
                     links.append({"datasource": lnkto, "link": lnk})
         return links
 
-    def serve(self, **kwargs):
-        from mdvtools.server import create_app
-
-        create_app(self, **kwargs)
+    def serve(self, port=5050,open_browser=True):
+        from mdvtools.serverlite import create_app
+        import webbrowser
+        if open_browser:
+            webbrowser.open(f"http://localhost:{port}")
+        app = create_app(self)
+        app.run(port=port)
+        
 
     def delete(self):
         # todo - remove from project routes, set a flag indicating it's been deleted
@@ -1816,6 +1819,7 @@ class MDVProject:
         Args:
             output: result of invoke 'from langchain.chains import RetrievalQA'
         """
+        from mdvtools.llm.chatlog import log_chat
         log_chat(output, prompt_template, response)
         
         context_information = output['source_documents']#output['context']

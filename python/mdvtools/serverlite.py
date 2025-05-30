@@ -1,0 +1,134 @@
+from flask import (
+    Flask,
+    render_template,
+    request,
+    make_response,
+    jsonify,
+)
+from mdvtools.mdvproject import MDVProject
+import json
+from werkzeug.security import safe_join
+import os
+
+from mdvtools.server_utils import (
+    send_file,
+    get_range,
+    add_safe_headers,
+)
+
+def create_app(project: MDVProject):
+    app = Flask(__name__)
+    app.after_request(add_safe_headers)
+
+    @app.route("/")
+    def project_index():
+        return render_template("page.html")
+
+    # gets the raw byte data and packages it in the correct response
+    @app.route("/get_data", methods=["POST"])
+    def get_data():
+        try:
+            data = request.json
+            if not data or "columns" not in data or "data_source" not in data:
+                raise Exception(
+                    "Request must contain JSON with 'columns' and 'data_source'"
+                )
+            bytes_ = project.get_byte_data(data["columns"], data["data_source"])
+            response = make_response(bytes_)
+            response.headers.set("Content-Type", "application/octet-stream")
+            return response
+        except Exception as e:
+            print(e)
+            return "Problem handling request", 400
+
+    # images contained in the project
+    @app.route("/images/<path:path>")
+    def images(path):
+        response =  make_response(send_file(safe_join(project.imagefolder, path)))
+        response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
+        return response
+
+    # All the project's metadata
+    # this method is no longer used - configs are referenced quite directly
+    @app.route("/get_configs", methods=["GET", "POST"])
+    def get_configs():
+        return jsonify(project.get_configs())
+    
+    # json files are obtained by url instead  of 
+    @app.route("/<file>.json")
+    def get_json_file(file: str):
+        if project.dir is None:
+            return "Project directory not found", 404
+        path = safe_join(project.dir, file + ".json")
+        if path is None or not os.path.exists(path):
+            return "File not found", 404
+        return send_file(path)
+
+
+    # gets a particular view
+    @app.route("/get_view", methods=["POST"])
+    def get_view():
+        data = request.json
+        if not data or "view" not in data:
+            return "Request must contain JSON with 'view'", 400
+        return jsonify(project.get_view(data["view"]))
+
+    # get any custom row data
+    @app.route("/get_row_data", methods=["POST"])
+    def get_row_data():
+        req = request.json
+        if req is None:
+            return json.dumps({"data": None})
+        path = safe_join(
+            project.dir, "rowdata", req["datasource"], f"{req['index']}.json"
+        )
+        if path is None or not os.path.exists(path):
+            return json.dumps({"data": None})
+        with open(path) as f:
+            if f is None:
+                return json.dumps({"data": None})
+            return f.read()
+
+    # get arbitrary data
+    @app.route("/get_binary_data", methods=["POST"])
+    def get_binary_data():
+        req = request.json
+        try:
+            if req is None or "datasource" not in req or "name" not in req:
+                return "Request must contain JSON with 'datasource' and 'name'", 400
+            if project.dir is None or not os.path.exists(project.dir):
+                return "Project directory not found", 404
+            path = safe_join(
+                project.dir, "binarydata", req["datasource"], f"{req['name']}.gz"
+            )
+            if path is None or not os.path.exists(path):
+                return "Binary data not found", 404
+            with open(path, "rb") as f:
+                data = f.read()
+        except Exception:
+            # data='' # satisfy type checker - was None, haven't tested if this is better or worse.
+            # probably better to return an error.
+            return "Problem getting binary data", 500
+        return data
+
+    # only the specified region of track files (bam,bigbed,tabix)
+    # needs to be returned
+    @app.route("/tracks/<path:path>")
+    def send_track(path):
+        file_name = safe_join(project.trackfolder, path)
+        range_header = request.headers.get("Range", None)
+        if not range_header:
+            return send_file(file_name)
+        return get_range(file_name, range_header)
+
+    @app.route("/save_state", methods=["POST"])
+    def save_data():
+        success = True
+        try:
+            state = request.json
+            project.save_state(state)
+        except Exception:
+            success = False
+        return jsonify({"success": success})
+    
+    return app
