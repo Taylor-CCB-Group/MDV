@@ -50,7 +50,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
-    const filters = useConfig<SelectionDialogConfig>().filters;
+    const conf = useConfig<SelectionDialogConfig>();
     const { values } = column;
     const filter = useFilterConfig(column);
     const value = filter?.category || [];
@@ -58,19 +58,27 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         const newFilter = filter || { category: [] };
         action(() => {
             newFilter.category = newValue;
-            filters[column.field] = newFilter;
+            conf.filters[column.field] = newFilter;
         })();
-    }, [filters, column.field, filter]);
+    }, [conf.filters, column.field, filter]);
 
     useCloseOnIntersection(ref, () => setOpen(false));
-    
+
+    useEffect(() =>{
+        // todo consider having ui for this state per-dimension rather than globally
+        dim.setNoClear(conf.noClearFilters);
+    },[dim, conf.noClearFilters]);
+ 
     // react to changes in value and update the filter
     useEffect(() => {
+        
         // filter could be undefined - but we previously checked for null causing component to crash
         if ((!filter) || (filter.category.length === 0)) {
             dim.removeFilter();
             return;
         }
+        //probably there is better place to set this
+        
         dim.filter("filterCategories", [column.field], value, true);
     }, [dim, column.field, value, filter]);
 
@@ -224,11 +232,11 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
  */
 function useRangeFilter(column: DataColumn<NumberDataType>) {
     const filter = useDimensionFilter(column) as RangeDimension;
-    const filters = useConfig<SelectionDialogConfig>().filters;
+    const conf = useConfig<SelectionDialogConfig>()
     //nb - we may want to allow value to be null, rather than defaulting to minMax
     //relates to e.g. clearBrush function
     // const value = (filters[column.field] || column.minMax) as [number, number];
-    const fVal = filters[column.field] as RangeFilter | null;
+    const fVal = conf.filters[column.field] as RangeFilter | null;
     // if (!isArray(fVal)) throw new Error("Expected range filter to be an array");
     const value = fVal;
     // const value = fVal;
@@ -242,7 +250,9 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         return small < 0.001 ? small/1000 : 0.001;
     }, [isInteger, minMax]);
     const [debouncedValue] = useDebounce(value, 10);
-
+     useEffect(() =>{
+        filter.setNoClear(conf.noClearFilters);
+    },[filter, conf.noClearFilters]);
     // Effect to manage the filter state
     useEffect(() => {
         const value = debouncedValue;
@@ -633,9 +643,9 @@ const ForeignRows = observer(() => {
  */
 function useResetButton() {
     const chart = useChart();
-    const filters = useConfig<SelectionDialogConfig>().filters;
+    const conf = useConfig<SelectionDialogConfig>();
     // todo: what about category filters with empty array?
-    const hasFilter = Object.values(filters).some((f) => f !== null);
+    const hasFilter = Object.values(conf.filters).some((f) => f !== null);
     useEffect(() => {
         console.log("hasFilter changed (in hook): ", hasFilter);
         chart.resetButton.style.display = hasFilter ? "inline" : "none";
@@ -647,15 +657,20 @@ function useResetButton() {
         const k = `SelectionDialog-${id}`;
         const resetAll = (type: string, data: string) => {
             if (type !== "filtered" || data !== "all_removed") return;
-            runInAction(() => {
-                for (const key in filters) {
-                    delete filters[key];
-                }
-            });
+            //actually removeAllFilters already clears all the filters (if they are 
+            //not tagged with noclear in single action for performance
+            //filters will be cleared again here but it is not much of an issue
+            if (!conf.noClearFilters){
+                runInAction(() => {
+                    for (const key in conf.filters) {
+                        delete conf.filters[key];
+                    }
+                });
+            }
         };
         ds.addListener(k, resetAll);
         return () => ds.removeListener(k);
-    }, [ds, id, filters]);
+    }, [ds, id, conf.filters]);
 }
 
 const SelectionDialogComponent = () => {
