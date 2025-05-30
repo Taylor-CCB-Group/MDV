@@ -1,3 +1,4 @@
+import { useDataSources } from "@/react/hooks";
 import {
     Button,
     Checkbox,
@@ -20,20 +21,17 @@ const AddViewDialogComponent = (props: {
     const [checkedDs, setCheckedDs] = useState<{ [name: string]: boolean }>({});
     //must be a better way than using the window object
     const { viewManager, viewData } = window.mdv.chartManager;
-    //we want a choice of all datasources (not just ones on the current view)
-    //not sure how to get all the datasources available - this is just a temporary hack
-    //if we don't use useMemo get constant re-rendering ?
-    const dataSources = useMemo(()=>viewManager.getAllDataSources(),[viewManager])
+    const dataSources = useDataSources();
     const currentDataSources = useMemo(() => Object.keys(viewData.dataSources), [viewData.dataSources]);
 
     useEffect(() => {
         // Initialising the checkedDs with the data sources inside the view
         const tempDs: { [name: string]: boolean } = {};
-        dataSources?.forEach?.((ds) => {
+        dataSources.forEach?.(({name: ds}) => {
             tempDs[ds] = currentDataSources.indexOf(ds) !== -1;
         });
         setCheckedDs(tempDs);
-    }, [dataSources]);
+    }, [dataSources, currentDataSources]);
 
     const handleCheckboxChange = (ds: string) => {
         setCheckedDs((prevDs) => ({ ...prevDs, [ds]: !prevDs[ds] }));
@@ -75,7 +73,7 @@ const AddViewDialogComponent = (props: {
 
                 {dataSources.length > 1 && (
                     <FormGroup sx={{ mt: 2 }}>
-                        {dataSources?.map?.((ds) => (
+                        {dataSources?.map?.(({name: ds}) => (
                             <FormControlLabel
                                 key={ds}
                                 control={
