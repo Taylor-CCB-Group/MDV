@@ -197,7 +197,8 @@ def register_routes(app, ENABLE_AUTH):
                             project_id=new_project.id,
                             is_owner=True
                         )
-
+                        auth_id = user_data["auth_id"]
+                        owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
                         # Generate thumbnail
                         thumbnail = get_project_thumbnail(project_path)
                         
@@ -214,7 +215,8 @@ def register_routes(app, ENABLE_AUTH):
                                 "id": new_project.id,
                                 "name": new_project.name,
                                 "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                                "thumbnail": thumbnail
+                                "thumbnail": thumbnail,
+                                "owners": [owner_email]
                             }
                         )
                         
@@ -323,7 +325,8 @@ def register_routes(app, ENABLE_AUTH):
                             project_id=new_project.id,
                             is_owner=True
                         )
-
+                        auth_id = user_data["auth_id"]
+                        owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
                         thumbnail = get_project_thumbnail(project_path)
 
                         # Update cache with the new project data and user id
@@ -339,7 +342,8 @@ def register_routes(app, ENABLE_AUTH):
                                 "id": new_project.id,
                                 "name": new_project.name,
                                 "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                                "thumbnail": thumbnail
+                                "thumbnail": thumbnail,
+                                "owners": [owner_email]
                             }
                         )
                 # Return the new project id and name
