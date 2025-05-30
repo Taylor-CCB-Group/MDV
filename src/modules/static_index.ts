@@ -106,8 +106,9 @@ async function loadData() {
     if (config.all_views && view && config.all_views.indexOf(view) !== -1) {
         config["initial_view"] = view;
     }
+    const isStatic = staticFolder || config.static || false;
 
-    const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
+    const dataLoader = getDataLoader(isStatic, datasources, views, dir);
 
     const listener = async (type: string, cm: ChartManager, data: any) => {
         if (type === "state_saved") {

@@ -148,7 +148,7 @@ class VivVolume extends BaseChart {
                 max: 1,
                 current_value: this.viv.clipX,
                 continuous: true,
-                func: (min, max) => this.viv.setClipX(min, max),
+                func: (x) => this.viv.setClipX(x[0],x[1]),
             },
             {
                 type: "doubleslider",
@@ -157,7 +157,7 @@ class VivVolume extends BaseChart {
                 max: 1,
                 continuous: true,
                 current_value: this.viv.clipY,
-                func: (min, max) => this.viv.setClipY(min, max),
+                func: (x) => this.viv.setClipY(x[0], x[1]),
             },
             {
                 type: "doubleslider",
@@ -166,7 +166,7 @@ class VivVolume extends BaseChart {
                 max: 1,
                 continuous: true,
                 current_value: this.viv.clipZ,
-                func: (min, max) => this.viv.setClipZ(min, max),
+                func: (x) => this.viv.setClipZ(x[0], x[1]),
             },
             {
                 type: "button",

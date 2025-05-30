@@ -220,9 +220,9 @@ class HistogramChart extends SVGChart {
                      value specified to the first/last bin.`,
                     position: "left",
                 },
-                func: (x, y) => {
-                    c.display_min = x;
-                    c.display_max = y;
+                func: (x) => {
+                    c.display_min = x[0];
+                    c.display_max = x[1];
                     this._calculateFilterBins();
                     this.onDataFiltered();
                 },
