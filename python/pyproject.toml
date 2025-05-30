@@ -27,6 +27,8 @@ pandas = "^2.1.1"
 scanpy = "^1.9.8"
 scipy = "^1.11.3"
 werkzeug = "^3.0.2"
+# previously in backend group - needed for MDVProject.serve() now.
+gevent = "^25.5.1"
 # previously in llm group
 langchain = "^0.2.7"
 langchain-experimental = "^0.0.62"
@@ -73,7 +75,6 @@ optional = true
 flask-sqlalchemy = "^3.1.1"
 psycopg2 = "^2.9.9"
 gunicorn = "^22.0.0"
-gevent = "^25.5.1"
 psycogreen = "^1.0.2"
 
 

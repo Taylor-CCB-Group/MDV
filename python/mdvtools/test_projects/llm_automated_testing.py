@@ -133,6 +133,8 @@ try:
 except Exception as e:
     # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
     # todo keep better track of the state of the agent, what went wrong etc
+    # pjt - is it ok to continue if the agent creation fails? e.g. hit 'possibly unbound code_llm' below
+    raise e
     ok = False
 
 question_file = pd.read_excel(QUESTION_LIST_PATH, sheet_name="Sheet1")
@@ -179,7 +181,7 @@ for question in question_list:
 
         datasource_name = ds_name
 
-        prompt_RAG = get_createproject_prompt_RAG(projectMK, path_to_data, datasource_name, response['output']) #self.ds_name, response['output'])
+        prompt_RAG = get_createproject_prompt_RAG(projectMK, path_to_data, datasource_name, response['output'], question)
         prompt_RAG_template = PromptTemplate(
             template=prompt_RAG,
             input_variables=["context", "question"]

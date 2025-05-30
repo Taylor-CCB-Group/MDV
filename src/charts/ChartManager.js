@@ -140,6 +140,7 @@ export class ChartManager {
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
      * @param {boolean?} [config.chat_enabled] 
+     * @param {string?} [config.mdv_api_root] 
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
      * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
      * 
@@ -243,6 +244,31 @@ export class ChartManager {
             this.containerDiv,
         );
         this.contentDiv.classList.add("ciview-contentDiv");
+        this.config = config;
+
+        //!!! ChatMDV specific, but we really should be using websocket for other things
+        //let's have a think. we may have websocket, but not chat... 
+        //we *do* anticipate finding out about chat with a similar mechanism (flag as part of state.json)
+        //but websocket should be ubiquitous
+        if (config.websocket) {
+            console.log('websocket is enabled');
+            const fn = async () => {
+                // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity
+                // and we had disabled websocket on server.
+                // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
+                // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
+                // try/catch doesn't help when it gets stuck in await...
+                // console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
+                try {
+                    const { socket, sendMessage } = await connectIPC(this);
+                    console.log('connected to socketio');
+                    this.ipc = { socket, sendMessage };
+                } catch (error) {
+                    console.error('Failed to connect to websocket', error);
+                }
+            };
+            fn();
+        }
 
         //!!! ChatMDV specific, but we really should be using websocket for other things
         //let's have a think. we may have websocket, but not chat... 
@@ -278,7 +304,6 @@ export class ChartManager {
         /** @type {{[id: string]: {chart: import("./charts").Chart, win: Window | null, dataSource: import("./charts").DataSource}}} */
         this.charts = {};
 
-        this.config = config;
         const c = this.config;
         c.chart_color = c.chart_color || "white";
 

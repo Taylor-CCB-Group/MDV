@@ -124,6 +124,12 @@ class MDVProject:
         c["permission"] = "edit" if edit else "view"
         self.state = c
 
+    def set_chat_enabled(self, chat_enabled=True):
+        # would prefer not to be adding methods in this file, maybe it could be in chat_server_extension.py
+        c = self.state
+        c["chat_enabled"] = chat_enabled
+        self.state = c
+
     def lock(self, type="read"):
         return self._lock.read_lock() if type == "read" else self._lock.write_lock()
 

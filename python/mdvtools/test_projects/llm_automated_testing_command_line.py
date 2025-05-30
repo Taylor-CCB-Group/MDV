@@ -157,9 +157,10 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         # Step 2: Create the Python REPL Tool
         python_tool = PythonAstREPLTool(locals={}, globals={})#, sanitize_input=True)
 
+        assert(python_tool.globals is not None)
         python_tool.globals.update(dfs)
 
-        python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
+        python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
 
         # Step 3: Define Contextualization Chain
 

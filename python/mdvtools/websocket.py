@@ -2,6 +2,7 @@ from flask import Flask, request
 from flask_socketio import SocketIO
 from datetime import datetime
 # import asyncio
+# from typing import Optional
 from mdvtools.mdvproject import MDVProject
 
 import logging
@@ -11,7 +12,7 @@ def log(msg: str):
     date_str = now.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[[[ socket.io ]]] [{date_str}] - {msg}")
 
-socketio: SocketIO = None
+socketio: SocketIO = None # type: ignore
 
 def mdv_socketio(app: Flask):
     """
@@ -24,10 +25,13 @@ def mdv_socketio(app: Flask):
     - the app not being at the root of the domain
 
     !! What about cors? We had a wildcard for previous experiment - should be reviewed before getting pushed online.
+    ^^^^
     """
     global socketio
+    # allow cors for localhost:5170-5179
+    # cors = [f"http://localhost:{i}" for i in range(5170,5180)]
     socketio = SocketIO(app, cors_allowed_origins="*")
-    log("socketio initialized")
+    log("socketio initialized without cors_allowed_origins wildcard")
 
     async def response(sid, message=""):
         # await asyncio.sleep(1)
@@ -81,6 +85,8 @@ class ChatSocketAPI:
             progress (int): the progress value (%) to update the progress bar with
             delta (int): the expected cost of the current operation (%)
         """
+        # we should descriminate which user to send this to... 
+        # which implies that this instance should be associated...
         self.socketio.emit(self.progress_name, {"message": message, "id": id, "progress": progress, "delta": delta})
 
 class SocketIOHandler(logging.StreamHandler):

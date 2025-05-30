@@ -2,7 +2,6 @@ import time
 import logging
 from contextlib import contextmanager
 import os
-from flask import request
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 # from typing import Callable
@@ -89,6 +88,10 @@ matplotlib.use('Agg') # this should prevent it making any windows etc
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY
 load_dotenv()
+# if it isn't set, we raise an error more explicitly to log it
+if not os.getenv("OPENAI_API_KEY"):
+    print("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
+    raise ValueError("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
 
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):
@@ -148,10 +151,17 @@ mock_agent = False
 class ProjectChat(ProjectChatProtocol):
     def __init__(self, project: MDVProject):
         self.project = project
+        # could come from a config file - was passed as argument previously
+        # but I'm reducing how far this prototype reaches into wider code
         self.welcome = (
             "Hello, I'm an AI assistant that has access to the data in this project"
             "and is designed to help build views for visualising it. What can I help you with?"
         )
+
+
+        # how do we keep track of the association between user & this...
+        # do we actually want a whole `ProjectChat` associated with a user/session?
+        # what does that mean in terms of server overhead?
         self.socket_api = ChatSocketAPI(project)
         logger = self.socket_api.logger
         self.langchain_logging_handler = LangchainLoggingHandler(logger)
@@ -203,7 +213,17 @@ class ProjectChat(ProjectChatProtocol):
                     # Make DataFrames available inside the REPL tool
                     python_tool.globals.update(dfs) 
                     
-                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
+                    # If we keep a reference to the globals dictionary so when we access it in a lambda, we know it's not None now.
+                    # This assumes that any changes to globals will be changes to the same dictionary... probably a safe assumption,
+                    #! but, if it is possible for something else to assign a new dictionary to python_tool.globals
+                    #! then this will break... so maybe this is actually technically less safe... better safe than sorry.
+                    # this would lead to much worse bugs than just a NoneType error
+                    # we should still handle None in the lambdas, though.
+                    # globals = python_tool.globals
+                    # python_tool.globals["list_globals"] = lambda: list(globals.keys()) # concise but less safe rather than more
+
+                    # New fixes:
+                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
 
                     # Step 3: Define Contextualization Chain
                     contextualize_q_system_prompt = """Given a chat history and the latest user question \
@@ -215,6 +235,8 @@ class ProjectChat(ProjectChatProtocol):
                         ("system", contextualize_q_system_prompt),
                         ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
                     
+                    # > LangChainDeprecationWarning: The class `LLMChain` was deprecated in LangChain 0.1.17 and will be removed in 1.0. 
+                    # Use RunnableSequence, e.g., `prompt | llm` instead.
                     contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
 
                     # Step 4: Define the Agent Prompt

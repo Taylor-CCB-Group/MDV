@@ -109,12 +109,12 @@ const DefaultMessage: ChatMessage = {
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
-    const { projectName } = useProject(); //todo add viewName to ProjectProvider
+    const { projectName, mainApiRoute, projectApiRoute } = useProject(); //todo add viewName to ProjectProvider
+    const route = `${projectApiRoute}chat`;
+    const routeInit = `${projectApiRoute}chat_init`;
     //! still need to consider that some things really are routes while others are just names
-    // and routes will need to be careful if e.g. the app is not at the root of the server
-    const route = `/project/${projectName}/chat`;
     const progressRoute = `/project/${projectName}/chat_progress`;
-    const routeInit = `/project/${projectName}/chat_init`;
+    const verboseRoute = `/project/${projectName}/chat`;
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
     // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
@@ -147,45 +147,47 @@ const useChat = () => {
     useEffect(() => {
         const { socket } = window.mdv.chartManager.ipc;
 
+        // event-name like 'chat', room for project... id associated with original request.
         socket?.on(progressRoute, progressListener);
         const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
-        socket?.on(route, verboseProgress);
-        console.log(`addded listeners for '${progressRoute}' and '${route}'`);
+        socket?.on(verboseRoute, verboseProgress);
+        console.log(`addded listeners for '${progressRoute}' and '${verboseRoute}'`);
         const chatInit = async () => {
             setIsSending(true);
             try {
                 const id = generateId();
                 setCurrentRequestId(id);
                 const response = await sendMessage('', id, routeInit);
-                setMessages(messages => messages.length ? messages : [{ 
-                    text: response.message, 
-                    sender: 'system', 
+                setMessages(messages => messages.length ? messages : [{
+                    text: response.message,
+                    sender: 'system',
                     id: generateId(),
-                    conversationId 
+                    conversationId
                 }]);
             } catch (error) {
                 console.error('Error sending welcome message', error);
             }
             setIsSending(false);
-            setCurrentRequestId('');
+            setCurrentRequestId(''); //todo review react query etc
             setIsInit(true);
         };
         if (!isSending && !isInit) chatInit();
         return () => {
             socket?.off(progressRoute, progressListener);
-            socket?.off(route, verboseProgress);
+            socket?.off(verboseRoute, verboseProgress);
         }
-    }, [isSending, isInit, routeInit, progressRoute, route, progressListener, conversationId]);
-    
+    }, [isSending, isInit, routeInit, progressRoute, verboseRoute, progressListener, conversationId]);
     useEffect(() => {
         sessionStorage.setItem(`chatMessages-${conversationId}`, JSON.stringify(messages));
     }, [messages, conversationId]);
 
     const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
-        const msg = { 
-            text: message, 
-            sender, 
-            id: generateId(), 
+        //we should be using an id passed as part of the message, not generating one here.
+        //also - id as react key if we have an id shared between query and response may be a conflict
+        const msg = {
+            text: message,
+            sender,
+            id: generateId(),
             view,
             conversationId
         };
