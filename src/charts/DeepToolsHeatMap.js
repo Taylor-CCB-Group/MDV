@@ -2,7 +2,7 @@ import { createEl } from "../utilities/Elements";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart";
 import { WGL2DI } from "../webgl/WGL2DI";
-
+import {debounce} from "../utilities/Utilities"
 const color_scheme = [
     "#313695",
     "#4575B4",
@@ -76,16 +76,16 @@ class DeepToolsHeatMap extends SVGChart {
                 }
             }
 
-            this.data = new SharedArrayBuffer(this.dataLength * 5);
-            this.rowPositions = new Uint16Array(this.data, 0, this.dataLength);
+            this.data = new SharedArrayBuffer(this.dataLength * 7);
+            this.rowPositions = new Uint32Array(this.data, 0, this.dataLength);
             this.colPositions = new Uint16Array(
                 this.data,
-                this.dataLength * 2,
+                this.dataLength * 4,
                 this.dataLength,
             );
             this.values = new Uint8Array(
                 this.data,
-                this.dataLength * 4,
+                this.dataLength * 6,
                 this.dataLength,
             );
 
@@ -101,6 +101,11 @@ class DeepToolsHeatMap extends SVGChart {
                 this.dataLength * 8,
                 this.dataLength * 3,
             );
+
+            this._debouncedColor = debounce((range) => {
+                this.config.color_scale.range = [...range];
+                this.updateMap(true);
+            }, 200);
 
             //this could done in server side
             let z = 0;
@@ -241,6 +246,7 @@ class DeepToolsHeatMap extends SVGChart {
     }
 
     getSettings() {
+      
         let settings = super.getSettings();
         const c = this.config;
         const cs = c.color_scale;
@@ -254,10 +260,7 @@ class DeepToolsHeatMap extends SVGChart {
                 doc: this.__doc__,
                 current_value: cs.range,
                 label: "Color Scale",
-                func: (x, y) => {
-                    cs.range = [x, y];
-                    this.updateMap(true);
-                },
+                func: (x) => this._debouncedColor(x)
             },
             {
                 type: "dropdown",

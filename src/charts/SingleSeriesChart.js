@@ -128,8 +128,8 @@ class SingleSeriesChart extends SVGChart {
                 doc: this.__doc__,
                 current_value: c.scale,
                 label: "Scale",
-                func: (x, y) => {
-                    c.scale = [x, y];
+                func: (x) => {
+                    c.scale = [...x];
                     this.drawChart();
                 },
             },

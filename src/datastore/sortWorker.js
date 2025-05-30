@@ -34,7 +34,7 @@ onmessage = (e) => {
         }
         return 0;
     });
-    this.postMessage("done");
+    postMessage("done");
 };
 
 function getNumberSort({ data, desc }) {
@@ -58,7 +58,7 @@ function getTextSort({ data, values, desc }) {
 function getUniqueSort({ data, desc, size }) {
     const names = {};
     const tc = new TextDecoder();
-    const mu = order === desc ? -1 : 1;
+    const mu =  desc ? -1 : 1;
     for (let i = 0; i < data.length; i++) {
         const index = data[i];
         names[index] = tc.decode(col.slice(index * size, index * size + size));
