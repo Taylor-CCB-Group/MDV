@@ -61,7 +61,7 @@ export default class GridStackManager {
                     float: true,
                     oneColumnSize: 400,
                     resizable: {
-                        handles: "e,se,s,sw,w",
+                        handles: "e,se,s,sw,w,n,ne,nw",
                     },
                     // now working - as a have inner and outer containers
                      margin: "3px"
