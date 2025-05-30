@@ -3,7 +3,7 @@ name: Build and Deploy to Docker Hub
 on:
   push:
     branches:
-      - auth_rbac_cleaned
+      - oceanustest
     paths-ignore:
       - '**.github/workflows/**' # Ignore changes to workflow files
   workflow_dispatch: # Allows manual trigger for testing
