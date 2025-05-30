@@ -4,7 +4,6 @@ from contextlib import contextmanager
 import os
 
 # Code Generation using Retrieval Augmented Generation + LangChain
-# from typing import Callable
 from mdvtools.llm.chat_protocol import ProjectChatProtocol
 from mdvtools.mdvproject import MDVProject
 
@@ -327,7 +326,7 @@ class ProjectChat(ProjectChatProtocol):
             self.chat_history, self.agent = self.get_or_create_conversation(conversation_id)
             chat_debug_logger.info(f"Switched to conversation {conversation_id} with history length {len(self.chat_history)}")
 
-    def ask_question(self, question: str, id: str, conversation_id: str = None):
+    def ask_question(self, question: str, id: str, conversation_id: str):
         """
         Ask a question, generate code to answer it, execute the code...
         """
@@ -338,6 +337,11 @@ class ProjectChat(ProjectChatProtocol):
             conversation_id = f"default_{id}"
             self.switch_conversation(conversation_id)
 
+        # keep that agent in scope in case some concurrent requests are made
+        # nb, this is still not totally thread-safe, should be fine for now.
+        # to avoid concurrency issues, we may not want a `switch_conversation` method, 
+        # but rather use the result returned by `get_or_create_conversation`
+        agent = self.agent
         progress = 0
         if mock_agent:
             ok, strdout, stderr = execute_code(
@@ -366,7 +370,7 @@ class ProjectChat(ProjectChatProtocol):
                     "Pandas agent invoking...", id, progress, 31
                 )
                 progress += 31
-                response = self.agent(question)#(full_prompt)#(question)
+                response = agent(question)#(full_prompt)#(question)
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time

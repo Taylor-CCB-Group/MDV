@@ -65,12 +65,13 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
             id = request.json.get("id")
+            conversation_id = request.json.get("conversation_id")
             try:
                 if bot is None:
                     bot = ProjectChat(project)
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
-                final_code = bot.ask_question(message, id)
+                final_code = bot.ask_question(message, id, conversation_id)
                 try:
                     # this can give a confusing error if we don't explicitly catch it...
                     view_name = parse_view_name(final_code)
