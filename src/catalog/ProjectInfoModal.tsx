@@ -19,7 +19,7 @@ export interface ProjectInfoModalProps {
     name: string;
     createdAt: string;
     lastModified: string;
-    owner: string;
+    owner: string[];
     collaborators: string[];
     numberOfStructures: string;
     numberOfImages: string;
@@ -72,7 +72,7 @@ const ProjectInfoModal: React.FC<ProjectInfoModalProps> = ({
                     <ListItem>
                         <ListItemText
                             primary="Project Owner"
-                            secondary={owner}
+                            secondary={owner ? owner.join(", ") : ''}
                         />
                     </ListItem>
                     <Divider component="li" />

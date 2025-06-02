@@ -37,7 +37,7 @@ export interface ProjectCardProps {
     type: ProjectAccessType;
     lastModified: string;
     createdAt: string;
-    owner: string;
+    owner: string[];
     collaborators: string[];
     numberOfStructures: string;
     numberOfImages: string;
