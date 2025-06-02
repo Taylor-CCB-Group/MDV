@@ -11,6 +11,9 @@ user_project_cache = {}  # key: user_id -> project permissions
 all_users_cache = []  # list of all user summaries
 active_projects_cache = []
 
+# Cache metadata
+cache_last_updated = None
+CACHE_REFRESH_INTERVAL = 300  # 5 minutes
 
 def get_auth_provider():
     # Try to fetch the authentication method from session first
@@ -61,6 +64,10 @@ def is_authenticated():
     if not ENABLE_AUTH:
         return True
     
+    # Quick check: if user is already in session, they're authenticated
+    if 'user' in session:
+        return True
+    
     try:
         provider = get_auth_provider()
     except Exception as e:
@@ -103,12 +110,23 @@ def register_before_request_auth(app):
 
         return None
 
+def needs_cache_refresh():
+    """Check if cache needs to be refreshed based on time interval."""
+    import time
+    global cache_last_updated
+    
+    if cache_last_updated is None:
+        return True
+    
+    return time.time() - cache_last_updated > CACHE_REFRESH_INTERVAL
 
 def cache_user_projects():
     """
     Caches user details and their associated project permissions in memory.
     """
-
+    global cache_last_updated
+    import time
+    
     from mdvtools.dbutils.dbmodels import User, UserProject
     from mdvtools.dbutils.dbservice import ProjectService
     
@@ -144,6 +162,9 @@ def cache_user_projects():
 
         active_projects = ProjectService.get_active_projects()
         active_projects_cache[:] = active_projects
+        
+        # Update cache timestamp
+        cache_last_updated = time.time()
 
         logger.info("Cached users and their project permissions in memory.")
         return True
