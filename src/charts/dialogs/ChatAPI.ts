@@ -32,7 +32,8 @@ const chatLogItemSchema = z.object({
     query: z.string(),
     prompt_template: z.string(),
     response: z.string(),
-    // id: z.string(),
+    timestamp: z.string(),
+    conversation_id: z.string().optional(),
 });
 const chatLogSchema = z.array(chatLogItemSchema);
 
