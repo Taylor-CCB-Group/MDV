@@ -199,7 +199,8 @@ for question in question_list:
 
         final_code = prepare_code(result, df, projectMK, log, modify_existing_project=True, view_name=question)
 
-        projectMK.log_chat_item(output, prompt_RAG, final_code)
+        # we need to update this so we don't have the method on the project object
+        projectMK.log_chat_item(output, prompt_RAG, final_code, conversation_id="test")
 
         ok, stdout, stderr = execute_code(final_code, open_code=False, log=log)
         final_code_list.append(final_code)
