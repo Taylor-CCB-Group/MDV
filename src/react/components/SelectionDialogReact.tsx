@@ -28,6 +28,12 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 config.filters[col] = null;
             }
         }
+        //for legacy configs, if left undefined makeAutoObservable will 
+        // not work correctly.
+        if (config.noClearFilters === undefined) {
+            config.noClearFilters = false;
+        }
+        
         for (const col of config.param) {
             //@ts-expect-error MultiColumnQuery cannot be used as index
             if (!config.filters[col]) {

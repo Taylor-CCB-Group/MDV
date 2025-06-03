@@ -247,7 +247,7 @@ class DataStore {
         this.filterArray.fill(0);
         const noclear = [];
         for (const dim of this.dimensions) {
-            if (dim.noclear) {
+            if (dim.noClear) {
                 noclear.push(dim);
                 continue;
             }
