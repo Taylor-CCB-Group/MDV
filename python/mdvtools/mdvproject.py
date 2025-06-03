@@ -18,12 +18,12 @@ from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
 # from mdvtools.charts.view import View 
-from mdvtools.llm.chatlog import log_chat
 import time
 import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
+from mdvtools.llm.chat_types import ChatLogger, ChatLogItem
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -91,10 +91,7 @@ class MDVProject:
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": []}))
-        if not exists(self.chatfile):
-            with open(self.chatfile, "w") as o:
-                o.write(json.dumps([]))
-        self.chat_log = get_json(self.chatfile) # could be heavy doing this in the constructor...
+        self.chat_logger = ChatLogger(self.chatfile)
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
 
@@ -1823,17 +1820,14 @@ class MDVProject:
 
     def log_chat_item(self, output: Any, prompt_template: str, response: str, conversation_id: str):
         """
-        Initially the idea was to use a similar structure to "Jobs" in the db
-        Current version is designed to capture similar info to Maria's Google Sheet log
-        # todo refactor logging & probably change the structure of the chat log etc...
-        also maybe restructure more of this class to be more modular
-        send chat logs over websocket, to a database, etc...
-        Args:
-            output: result of invoke 'from langchain.chains import RetrievalQA'
-            conversation_id: Optional ID to group messages from the same conversation
-        """
-        log_chat(output, prompt_template, response)
+        Log a chat interaction to the chat log file.
         
+        Args:
+            output: Result of invoke 'from langchain.chains import RetrievalQA'
+            prompt_template: The template used for the prompt
+            response: The response generated
+            conversation_id: ID to group messages from the same conversation
+        """
         context_information = output['source_documents']
         context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
         context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
@@ -1842,20 +1836,16 @@ class MDVProject:
         context = str(context_information_metadata_name)
         query = output['query']
 
-        # Create a new chat log entry with conversation ID
-        chat_entry = {
-            "context": context,
-            "query": query,
-            "prompt_template": prompt_template,
-            "response": response,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        }
+        chat_item = ChatLogItem(
+            context=context,
+            query=query,
+            prompt_template=prompt_template,
+            response=response,
+            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            conversation_id=conversation_id
+        )
         
-        if conversation_id:
-            chat_entry["conversation_id"] = conversation_id
-
-        self.chat_log.append(chat_entry)
-        save_json(join(self.dir, "chat_log.json"), self.chat_log)
+        self.chat_logger.log_chat(chat_item)
 
 def get_json(file):
     return json.loads(open(file).read())
