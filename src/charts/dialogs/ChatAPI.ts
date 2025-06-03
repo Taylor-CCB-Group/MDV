@@ -82,7 +82,7 @@ function generateId() {
 }
 
 function generateConversationId() {
-    return 'conv-' + Date.now() + '-' + Math.random().toString(36).substring(7);
+    return `conv-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
 
 /** viewName could be a prop of ProjectProvider, but currently not cleanly reactive */
