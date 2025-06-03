@@ -359,13 +359,24 @@ def create_regulamentary_project_from_pipeline(
     # Load configuration YAML
     with open(config, 'r') as file:
         info = yaml.safe_load(file)
-
+    # was this created from bigwigs alone?
+    from_bw = True if info.get("bigwigs") else False
     # Get the bed files for each mark
-    beds = {mark: info["union_peaks"].get(f"bed_{mark}") for mark in marks}
+    # beds have been created in the pipeline
+    if from_bw and info["bigwigs"].get("create_bed_files"):
+        beds= {mark:join(results_folder,"bed_files",f"{mark}.bed") for mark in marks}
+    #beds have been specified in the config
+    else:
+        beds = {mark: info["union_peaks"].get(f"bed_{mark}") for mark in marks}
 
     # Get the bigWig files for each mark
-    bigwigs = {mark: info["compute_matrix_bigwigs"].get(f"bigwig_{mark}") for mark in marks}
-    bigwigs["ATAC"] = atac_bw  # Override ATAC with provided file if given
+    if from_bw:
+        #bigwigs including ATAC bigwig  specified in 'bigwigs' entry
+        bigwigs={mark: info["bigwigs"].get(mark) for mark in marks}
+    else:
+        #otherwise bigwigs are specified in the 'compute_matrix_bigwigs' entry
+        bigwigs = {mark: info["compute_matrix_bigwigs"].get(f"bigwig_{mark}") for mark in marks}
+        bigwigs["ATAC"] = atac_bw  # Override ATAC with provided file if given
 
     # Set the path to the regulatory table
     table = join(fold, "08_REgulamentary", "mlv_REgulamentary.csv")
