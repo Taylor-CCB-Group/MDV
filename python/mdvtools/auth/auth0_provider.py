@@ -12,6 +12,10 @@ from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 from auth0.management import Auth0
 from auth0.authentication import GetToken
 
+# Add JWKS cache
+_jwks_cache = {}
+_jwks_cache_expiry = None
+JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -235,30 +239,35 @@ class Auth0Provider(AuthProvider):
         Validates the provided token by verifying its signature using Auth0's public keys
         and ensuring it's not expired.
         """
+        global _jwks_cache, _jwks_cache_expiry
+        
         try:
             # Step 1: Decode the token header without verification to extract the 'kid'
             unverified_header = jwt.get_unverified_header(token)
             
             if unverified_header is None:
-    
                 logging.error("Invalid token header.")
                 return False
 
-            # Step 2: Get the public key from Auth0's JWKS (JSON Web Key Set) endpoint
+            # Step 2: Get the public key from Auth0's JWKS (JSON Web Key Set) endpoint with caching
             rsa_key = {}
             if 'kid' in unverified_header:
                 try:
-                    # Fetch Auth0 public keys from jwks_uri
-                    response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
-                    if response.status_code != 200:
-                        logging.error(f"Failed to fetch JWKS: {response.status_code}")
+                    # Check if JWKS cache is valid
+                    current_time = time.time()
+                    if _jwks_cache_expiry is None or current_time > _jwks_cache_expiry:
+                        # Fetch Auth0 public keys from jwks_uri
+                        response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
+                        if response.status_code != 200:
+                            logging.error(f"Failed to fetch JWKS: {response.status_code}")
+                            return False
                         
-                        return False
-                    jwks = response.json()
-
-                
-                    # Find the key in the JWKS that matches the 'kid' in the token header
-                    for key in jwks['keys']:
+                        _jwks_cache = response.json()
+                        _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
+                        logging.info("JWKS cache refreshed")
+                    
+                    # Find the key in the cached JWKS that matches the 'kid' in the token header
+                    for key in _jwks_cache['keys']:
                         if key['kid'] == unverified_header['kid']:
                             rsa_key = {
                                 'kty': key['kty'],
