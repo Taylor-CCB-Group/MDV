@@ -123,7 +123,7 @@ def register_routes(app, ENABLE_AUTH):
                             "lastModified": p["lastModified"],
                             "thumbnail": p["thumbnail"],
                             "permissions": user_projects[p["id"]],
-                            "owners": get_project_owners(p["id"]),
+                            "owner": get_project_owners(p["id"]),
                         }
                         for p in active_projects
                         if p["id"] in allowed_project_ids
@@ -137,7 +137,7 @@ def register_routes(app, ENABLE_AUTH):
                             "lastModified": p["lastModified"],
                             "thumbnail": p["thumbnail"],
                             "permissions": None,
-                            "owners": [],
+                            "owner": [],
                         }
                         for p in active_projects
                     ]
@@ -216,7 +216,7 @@ def register_routes(app, ENABLE_AUTH):
                                 "name": new_project.name,
                                 "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                                 "thumbnail": thumbnail,
-                                "owners": [owner_email]
+                                "owner": [owner_email]
                             }
                         )
                         
