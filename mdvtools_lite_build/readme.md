@@ -15,7 +15,7 @@ Then cd to this directory (mdvtools_lite_build) and build:-
 hatch build
 ```
 
-To test run the following script, which will create a virtual environment, install in it the mdv version you have just built and create and serve an mdv project from the scanpy_pbm3k data. Once you stop the server, the virtual environment will be deleted. You will need to change the paths to reflect your set up.
+To test, run the following script, which will create a virtual environment, install in it the environment you have just built and create and serve an mdv project from the scanpy_pbm3k data. Once you stop the server, the virtual environment will be deleted. You will need to change the paths to reflect your set-up.
 ```bash
 python -m venv /path/to/venv
 source /path/to/venv/bin/activate

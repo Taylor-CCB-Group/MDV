@@ -1231,7 +1231,14 @@ class MDVProject:
                     links.append({"datasource": lnkto, "link": lnk})
         return links
 
-    def serve(self, port=5050,open_browser=True):
+    def serve(self, port=5050, open_browser=True):
+        """
+        Start a lightweight Flask server to serve the MDV project.
+        
+        Args:
+            port (int): Port number to run the server on. Default is 5050.
+            open_browser (bool): Whether to automatically open the browser. Default is True.
+        """
         from mdvtools.serverlite import create_app
         import webbrowser
         if open_browser:

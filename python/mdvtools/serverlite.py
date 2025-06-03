@@ -1,3 +1,12 @@
+"""
+Lightweight Flask server for serving MDV project data and metadata.
+
+This module provides a minimal Flask application that exposes endpoints
+for serving project data, images, configurations, and handling file operations
+with support for HTTP range requests and security headers.
+"""
+import json
+import os
 from flask import (
     Flask,
     render_template,
@@ -5,10 +14,9 @@ from flask import (
     make_response,
     jsonify,
 )
-from mdvtools.mdvproject import MDVProject
-import json
+
 from werkzeug.security import safe_join
-import os
+from mdvtools.mdvproject import MDVProject
 
 from mdvtools.server_utils import (
     send_file,
@@ -17,6 +25,15 @@ from mdvtools.server_utils import (
 )
 
 def create_app(project: MDVProject):
+    """
+    Create and configure a Flask application for serving MDV project data.
+
+    Args:
+        project (MDVProject): The MDV project instance to serve
+
+    Returns:
+        Flask: Configured Flask application
+    """
     app = Flask(__name__)
     app.after_request(add_safe_headers)
 
@@ -30,7 +47,7 @@ def create_app(project: MDVProject):
         try:
             data = request.json
             if not data or "columns" not in data or "data_source" not in data:
-                raise Exception(
+                raise ValueError(
                     "Request must contain JSON with 'columns' and 'data_source'"
                 )
             bytes_ = project.get_byte_data(data["columns"], data["data_source"])
@@ -44,7 +61,7 @@ def create_app(project: MDVProject):
     # images contained in the project
     @app.route("/images/<path:path>")
     def images(path):
-        response =  make_response(send_file(safe_join(project.imagefolder, path)))
+        response = make_response(send_file(safe_join(project.imagefolder, path)))
         response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
         return response
 
@@ -84,9 +101,7 @@ def create_app(project: MDVProject):
         )
         if path is None or not os.path.exists(path):
             return json.dumps({"data": None})
-        with open(path) as f:
-            if f is None:
-                return json.dumps({"data": None})
+        with open(path, encoding='utf-8') as f:
             return f.read()
 
     # get arbitrary data
