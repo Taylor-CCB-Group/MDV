@@ -24,7 +24,7 @@ class DotPlot extends SVGChart {
         console.log('setting fields for dot plot', c.param.slice(1));
         //this works ok because the method is decorated... which I think means if there's a query object,
         //`setFields` won't actually be called until the link is properly initialised
-        this.setFields(c.param.slice(1));
+        this.setParams(c.param);
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
         if (!c.color_legend) {
@@ -54,7 +54,7 @@ class DotPlot extends SVGChart {
     }
     @loadColumnData
     setParams(params) {
-        this.config.param = params;
+        // this.config.param = params; // This line is removed/commented as ColumnQueryMapper.setActiveQuery now handles updating the live config.
         this.setFields(params.slice(1));
     }
 
@@ -144,6 +144,7 @@ class DotPlot extends SVGChart {
 
     onDataFiltered(dim) {
         //no need to change anything
+        //(we may want to review what isPinned means in relation to dynamic column selection - would be useful to have a way of pinning that)
         if (this.dim === dim || this.isPinned) {
             return;
         }
@@ -188,6 +189,7 @@ class DotPlot extends SVGChart {
         const cWidth = dim.width / (this.fieldNames.length);
         const fa = this.dim.filterMethod;
         this.setColorFunction();
+        // is this something we need to review to make sure that changing the category column behaves as expected?
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
         const data = this.data.data.filter((x) => x.count !== 0);
         this.y_scale.domain(data.map((x) => vals[x.id]));
