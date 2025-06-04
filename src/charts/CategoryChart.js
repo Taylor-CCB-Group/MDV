@@ -1,4 +1,5 @@
 import SVGChart from "./SVGChart.js";
+import { action } from "mobx";
 
 class CategoryChart extends SVGChart {
     constructor(dataStore, div, config, axisTypes) {
@@ -22,12 +23,15 @@ class CategoryChart extends SVGChart {
         this.mobxAutorun(() => {
             // we need to react to config.param changes and updateData() or similar...
             console.log("config.param changed", this.config.param);
-            this.colors = this.dataStore.getColumnColors(this.config.param[0]);
-            this.onDataFiltered();
-            this.updateData();
-            if (hadDefaultTitle && this.config.title === originalTitle) {
-                this.config.title = dataStore.getColumnName(this.config.param[0]);
-            }
+            setTimeout(action(() => {
+                // colors could probably be `@computed` from dataStore.getColumnColors(this.config.param[0])...
+                this.colors = this.dataStore.getColumnColors(this.config.param[0]);
+                this.onDataFiltered();
+                // this.updateData();
+                if (hadDefaultTitle && this.config.title === originalTitle) {
+                    this.config.title = dataStore.getColumnName(this.config.param[0]);
+                }
+            }), 0);
         });
     }
 
