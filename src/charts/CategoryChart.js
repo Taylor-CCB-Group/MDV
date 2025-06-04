@@ -1,4 +1,5 @@
 import SVGChart from "./SVGChart.js";
+import { action } from "mobx";
 
 class CategoryChart extends SVGChart {
     constructor(dataStore, div, config, axisTypes) {
@@ -9,11 +10,29 @@ class CategoryChart extends SVGChart {
             // is much less than would be needed elsewhere with more generic code.
             config.param = [config.param];
         }
-        config.title = config.title || dataStore.getColumnName(config.param[0]);
+        // would be nice to have a more generic way to handle this...
+        // if we have an explicitly set title, we keep it, otherwise we use the column name & update it if it changes
+        const colName = dataStore.getColumnName(config.param[0]);
+        const hadDefaultTitle = !config.title || config.title === colName;
+        config.title = config.title || colName;
+        const originalTitle = config.title;
         super(dataStore, div, config, axisTypes);
         this.dim = this.dataStore.getDimension("category_dimension");
         this.colors = this.dataStore.getColumnColors(config.param[0]);
         this.filter = [];
+        this.mobxAutorun(() => {
+            // we need to react to config.param changes and updateData() or similar...
+            console.log("config.param changed", this.config.param);
+            setTimeout(action(() => {
+                // colors could probably be `@computed` from dataStore.getColumnColors(this.config.param[0])...
+                this.colors = this.dataStore.getColumnColors(this.config.param[0]);
+                this.onDataFiltered();
+                // this.updateData();
+                if (hadDefaultTitle && this.config.title === originalTitle) {
+                    this.config.title = dataStore.getColumnName(this.config.param[0]);
+                }
+            }), 0);
+        });
     }
 
     remove(notify = true) {
