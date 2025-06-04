@@ -54,7 +54,7 @@ class DotPlot extends SVGChart {
     }
     @loadColumnData
     setParams(params) {
-        // this.config.param = params; // This line is removed/commented as ColumnQueryMapper.setActiveQuery now handles updating the live config.
+        this.config.param = params;
         this.setFields(params.slice(1));
     }
 

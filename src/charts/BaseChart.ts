@@ -697,7 +697,7 @@ class BaseChart<T extends BaseConfig> {
     @loadColumnData
     setParams(params: FieldSpecs) {
         //! now the config will just have string[] - we want to allow things that can understand to have other objects
-        // this.config.param = params; // This line is removed/commented as ColumnQueryMapper.setActiveQuery now handles updating the live config.
+        this.config.param = params;
         // if we keep liveParams around it could be useful when serialising the chart
         // although how can we be sure that the liveParams are up to date?
         // maybe as a rule, this method is the only way to set the params...

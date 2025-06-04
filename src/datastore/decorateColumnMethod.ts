@@ -184,43 +184,8 @@ export class ColumnQueryMapper<T extends BaseConfig> {
             this.reactionDisposers.delete(methodName);
             this.chart.reactionDisposers = this.chart.reactionDisposers.filter(v => v !== disposer);
         }
-        
-        if (!alreadyInSetQuery) {
-            this.userValues[methodName] = userValue;
-
-            // Update the live chart configuration if a mapping exists
-            const configPathKey = this.methodToConfigMap[methodName];
-            if (configPathKey) {
-                action(() => { // Ensure mutations happen within an action
-                    const isArrayPath = isArray(configPathKey);
-                    const path = isArrayPath ? configPathKey[0] : configPathKey;
-                    const parts = path.split('.');
-                    
-                    let currentConfigNode = this.chart.config as any;
-                    for (let i = 0; i < parts.length - 1; i++) {
-                        if (currentConfigNode[parts[i]] === undefined || currentConfigNode[parts[i]] === null) {
-                            currentConfigNode[parts[i]] = {};
-                        }
-                        currentConfigNode = currentConfigNode[parts[i]];
-                    }
-                    
-                    const finalKey = parts[parts.length - 1];
-                    if (isArrayPath) { // e.g., map for 'setParams' is ['param']
-                        currentConfigNode[finalKey] = userValue; // e.g., config.param = [cat, query]
-                    } else { // e.g., map for 'colorByColumn' is 'color_by'
-                        // userValue for single arg methods like colorByColumn(col) is [col]
-                        currentConfigNode[finalKey] = userValue ? userValue[0] : null; // e.g., config.color_by = col
-                    }
-                })();
-            }
-        } else {
-            // If nested, we typically don't want to overwrite the primary userValue
-            // or trigger further config updates based on this inner call.
-            // However, the original logic cleared userValues[methodName] = null here.
-            // For now, let's preserve that specific part if `alreadyInSetQuery` is true.
-             this.userValues[methodName] = null;
-        }
-
+        if (!alreadyInSetQuery) this.userValues[methodName] = userValue;
+        else this.userValues[methodName] = null;
         //using chart.mobxAutorun() to ensure that the reaction is disposed when the chart is disposed
         const disposer = this.chart.mobxAutorun(callback);
         this.reactionDisposers.set(methodName, disposer);
