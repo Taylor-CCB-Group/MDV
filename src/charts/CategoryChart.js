@@ -14,6 +14,13 @@ class CategoryChart extends SVGChart {
         this.dim = this.dataStore.getDimension("category_dimension");
         this.colors = this.dataStore.getColumnColors(config.param[0]);
         this.filter = [];
+        this.mobxAutorun(() => {
+            // we need to react to config.param changes and updateData() or similar...
+            console.log("config.param changed", this.config.param);
+            this.colors = this.dataStore.getColumnColors(this.config.param[0]);
+            this.onDataFiltered();
+            this.updateData();
+        });
     }
 
     remove(notify = true) {
