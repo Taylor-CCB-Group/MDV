@@ -31,11 +31,11 @@ class WGLChart extends SVGChart {
         this.tooltip = createEl(
             "div",
             {
+                classes: ["ciview-tooltip"],
                 styles: {
                     position: "absolute",
                     zIndex: 100,
                     display: "none",
-                    "background-color": "lightgray",
                 },
             },
             this.graphDiv,

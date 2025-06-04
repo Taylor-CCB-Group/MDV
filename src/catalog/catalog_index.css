@@ -21,6 +21,8 @@
         --icon_color_error: #ff4c4c;
         --text_color_error: #5f213b;
         --menu-gradient: linear-gradient(#444, #222);
+        --tooltip_background_color: #f5f5f5;
+        --tooltip_text_color: #222;
     }
 }
 @media (prefers-color-scheme: light) {
@@ -41,6 +43,8 @@
         --icon_color_error: #ff4c4c;
         --text_color_error: #5f213b;
         --menu-gradient: linear-gradient(white, darkgray);
+        --tooltip_background_color: #222;
+        --tooltip_text_color: #f5f5f5;
     }
 }
 
@@ -60,6 +64,8 @@
     --background_color_error: #4f3037;
     --text_color_error: #ff8d91;
     --menu-gradient: linear-gradient(#444, #222);
+    --tooltip_background_color: #f5f5f5;
+    --tooltip_text_color: #222;
 }
 
 .light {
@@ -77,6 +83,8 @@
     --background_color_error: #fdeded;
     --text_color_error: #5f213b;
     --menu-gradient: linear-gradient(white, darkgray);
+    --tooltip_background_color: #222;
+    --tooltip_text_color: #f5f5f5;
 }
 :root {
     font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
