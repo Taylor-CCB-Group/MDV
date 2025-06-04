@@ -22,6 +22,7 @@ dependencies = [
  "Flask>=2.2.0",
  "h5py>=3.5.0",
  "mudata>=0.2.3",
+ "pyyaml>=5.3",
  "numpy>=1.22",
  "pandas>=1.5.0",
  "scanpy>=1.7.2",
