@@ -24,7 +24,7 @@ class DotPlot extends SVGChart {
         console.log('setting fields for dot plot', c.param.slice(1));
         //this works ok because the method is decorated... which I think means if there's a query object,
         //`setFields` won't actually be called until the link is properly initialised
-        this.setParams(c.param);
+        // this.setParams(c.param);
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
         if (!c.color_legend) {
@@ -34,6 +34,9 @@ class DotPlot extends SVGChart {
             c.fraction_legend = { display: true };
         }
         //this.fractionScale = scaleSqrt().domain([0, 100]);
+        this.mobxAutorun(() => {
+            this._setFields(this.config.param.slice(1));
+        });
     }
     
     // removing this decorator as it muddies the waters with setParams.
@@ -41,7 +44,7 @@ class DotPlot extends SVGChart {
     //   as long as we had the workaround in `setParams()` to manually look for activeQuery
     //   but that was itself a hack.
     // @loadColumnData
-    setFields(fieldNames) {
+    _setFields(fieldNames) {
         //! we don't want to mutate the config object... 
         // we want to have a special value which signifies that it should use this behaviour.
         // then when we save state, it will have the appropriate value.
@@ -52,11 +55,12 @@ class DotPlot extends SVGChart {
         this.x_scale.domain(yLabels);
         this.onDataFiltered();
     }
-    @loadColumnData
-    setParams(params) {
-        this.config.param = params;
-        this.setFields(params.slice(1));
-    }
+    // prefering to setFields in an autorun so there's less potential for confusion
+    // @loadColumnData
+    // setParams(params) {
+    //     this.config.param = params;
+    //     this.setFields(params.slice(1));
+    // }
 
     remove(notify = true) {
         this.dim.destroy(notify);

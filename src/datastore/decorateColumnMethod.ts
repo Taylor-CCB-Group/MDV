@@ -1,5 +1,6 @@
 import BaseChart, { type BaseConfig } from "@/charts/BaseChart";
-import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
+// import { deserialiseParam, type SerialisedParams } from "@/charts/chartConfigUtils";
+import { type FieldSpecs, flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
 import { isArray } from "@/lib/utils";
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { action, type IReactionDisposer } from "mobx";
@@ -240,5 +241,36 @@ export class ColumnQueryMapper<T extends BaseConfig> {
         }
 
         return serialized;
+    }
+    //- not implementing for now, 
+    // concentrating on more localised logic for params to reduce testing scope
+    // activeChartConfig() {
+    //     const config = this.chart.getConfig();
+    //     //but deserialised... we don't have a clean method for that, but we can handle param specifically
+    //     const param: SerialisedParams = config.param;
+    //     //!! this is fishy - we don't want new objects, we want to use the activeQueries.userValues
+    //     const processed = param.map(p => deserialiseParam(this.chart.dataStore, p));
+    //     config.param = processed;
+    //     return config;
+    // }
+    /**
+     * Returns the active parameters for the chart.
+     * 
+     * This is the same as the `config.param` property, but it will be the active state of the parameters,
+     * rather than the serialised state (or strings for current fields).
+     * 
+     * This is useful for getting the active state of the parameters, which is needed for things like
+     * the parameter setting dialog.
+     * 
+     * We would prefer to have a method on the chart object that returns the entire active config,
+     * but keeping the implementation focused on params/setParams means that we can be more confident
+     * that the logic is correct.
+     */
+    activeParams() {
+        // if there is some value in activeQueries.userValues['setParams'] that might work...
+        if ('setParams' in this.userValues) {
+            return this.userValues['setParams'] as FieldSpecs;
+        }
+        return this.chart.config.param;
     }
 }
