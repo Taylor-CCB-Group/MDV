@@ -206,8 +206,8 @@ def load_config(app, config_name=None, enable_auth=False):
             if enable_auth:
                 app.config['ENABLE_AUTH'] = True
                 app.config["DEFAULT_AUTH_METHOD"] = os.getenv('DEFAULT_AUTH_METHOD') or config.get('DEFAULT_AUTH_METHOD')
-                app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
-                
+                #app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
+                app.secret_key="abc"
                 # Check if the authentication method is 'auth0'
                 if app.config["DEFAULT_AUTH_METHOD"] == "auth0":
                     auth0_domain = os.getenv('AUTH0_DOMAIN') or config.get('AUTH0_DOMAIN')
