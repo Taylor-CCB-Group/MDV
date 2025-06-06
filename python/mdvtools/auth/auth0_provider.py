@@ -11,11 +11,38 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 from auth0.management import Auth0
 from auth0.authentication import GetToken
+from auth0.exceptions import RateLimitError
+import random
 
 # Add JWKS cache
 _jwks_cache = {}
 _jwks_cache_expiry = None
 JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
+
+# Rate limiting and retry parameters
+MAX_RETRIES = 3
+BASE_DELAY = 1  # Base delay in seconds
+MAX_DELAY = 8  # Maximum delay in seconds
+
+def retry_with_exponential_backoff(func):
+    """Decorator to implement retry logic with exponential backoff."""
+    def wrapper(*args, **kwargs):
+        retry_count = 0
+        while retry_count < MAX_RETRIES:
+            try:
+                return func(*args, **kwargs)
+            except RateLimitError as e:
+                retry_count += 1
+                if retry_count == MAX_RETRIES:
+                    raise e
+                
+                # Calculate delay with jitter
+                delay = min(BASE_DELAY * (2 ** retry_count) + random.uniform(0, 1), MAX_DELAY)
+                logging.warning(f"Rate limit hit. Retrying in {delay:.2f} seconds... (Attempt {retry_count}/{MAX_RETRIES})")
+                time.sleep(delay)
+            except Exception as e:
+                raise e
+    return wrapper
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -362,6 +389,7 @@ class Auth0Provider(AuthProvider):
     def sync_users_to_db(self):
         """
         Syncs users from Auth0 to the application's database using UserService and UserProjectService.
+        Implements rate limiting and retry logic for Auth0 API calls.
         """
         from mdvtools.dbutils.dbservice import UserService, UserProjectService
         from mdvtools.dbutils.dbmodels import db, Project
@@ -379,37 +407,77 @@ class Auth0Provider(AuthProvider):
             mgmt_api_token = get_token.client_credentials(audience=audience)["access_token"]
             auth0 = Auth0(auth0_domain, mgmt_api_token)
 
-            # Fetch users from Auth0 connection
-            users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"', per_page=100)
+            # Fetch users from Auth0 connection with pagination
+            page = 0
+            per_page = 50  # Reduced batch size
+            processed_users = 0
+            
+            while True:
+                try:
+                    users = auth0.users.list(
+                        q=f'identities.connection:"{auth0_db_connection}"',
+                        page=page,
+                        per_page=per_page
+                    )
+                    
+                    if not users['users']:
+                        break
 
-            for user in users['users']:
-                email = user.get('email', '')
-                auth0_id = user['user_id']
+                    for user in users['users']:
+                        email = user.get('email', '')
+                        auth0_id = user['user_id']
 
-                # Use UserService to add or update user
-                db_user = UserService.add_or_update_user(
-                    email=email,
-                    auth_id=auth0_id
-                )
-
-                # Fetch user's roles to determine admin status
-                roles = auth0.users.list_roles(auth0_id)
-                is_admin = any(role['name'] == 'admin' for role in roles['roles'])
-
-                # Update admin status
-                db_user.is_admin = is_admin
-                db.session.commit()
-
-                if is_admin:
-                    # Assign all projects to this user as owner via UserProjectService
-                    for project in Project.query.all():
-                        UserProjectService.add_or_update_user_project(
-                            user_id=db_user.id,
-                            project_id=project.id,
-                            is_owner=True
+                        # Use UserService to add or update user
+                        db_user = UserService.add_or_update_user(
+                            email=email,
+                            auth_id=auth0_id
                         )
 
-            logging.info("Successfully synced users from Auth0 to the database.")
+                        # Add delay between role requests to avoid rate limiting
+                        time.sleep(0.2)  # 200ms delay between requests
+                        
+                        try:
+                            # Fetch user's roles with retry mechanism
+                            @retry_with_exponential_backoff
+                            def get_user_roles():
+                                return auth0.users.list_roles(auth0_id)
+                            
+                            roles = get_user_roles()
+                            is_admin = any(role['name'] == 'admin' for role in roles['roles'])
+
+                            # Update admin status
+                            db_user.is_admin = is_admin
+                            db.session.commit()
+
+                            if is_admin:
+                                # Assign all projects to this user as owner via UserProjectService
+                                for project in Project.query.all():
+                                    UserProjectService.add_or_update_user_project(
+                                        user_id=db_user.id,
+                                        project_id=project.id,
+                                        is_owner=True
+                                    )
+                        
+                            processed_users += 1
+                            if processed_users % 10 == 0:  # Log progress every 10 users
+                                logging.info(f"Processed {processed_users} users")
+                                
+                        except RateLimitError as e:
+                            logging.error(f"Rate limit reached for user {auth0_id}: {str(e)}")
+                            raise
+                        except Exception as e:
+                            logging.error(f"Error processing user {auth0_id}: {str(e)}")
+                            continue
+
+                    page += 1
+                    time.sleep(1)  # Add delay between pagination requests
+                    
+                except RateLimitError as e:
+                    logging.error(f"Rate limit reached during pagination: {str(e)}")
+                    time.sleep(2)  # Wait before retrying the current page
+                    continue
+                
+            logging.info(f"Successfully synced {processed_users} users from Auth0 to the database.")
 
         except Exception as e:
             logging.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
