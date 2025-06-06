@@ -67,8 +67,9 @@ const MaterialWrapper = observer(function MaterialWrapper({
     );
 });
 
-// should we be keeping this local to each react root? - not sure if it matters either way.
-// using coderabbitai suggestion for options - may review if we're using it for other things than histogram.
+// Global QueryClient instance shared across all React portals.
+// Configured to prevent automatic refetching on window focus for better UX
+// (i.e. stop random weird stuff that we probably don't want).
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
