@@ -15,7 +15,12 @@ import {
 } from "@mui/material";
 import Chatbot, { type ChatBotProps } from "./ChatDialogComponent";
 import type { ChatLogItem, ChatMessage, ChatProgress, ConversationLog, ConversationMap } from "./ChatAPI";
-import { Close as CloseIcon, Launch as LaunchIcon, Search as SearchIcon, ViewSidebar as ViewSidebarIcon } from "@mui/icons-material";
+import {
+    Close as CloseIcon,
+    Launch as LaunchIcon,
+    Search as SearchIcon,
+    ViewSidebar as ViewSidebarIcon,
+} from "@mui/icons-material";
 import { useEffect, useMemo, useState } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 
@@ -30,29 +35,45 @@ export type ChatDialogProps = {
     startNewConversation: () => Promise<void>;
     switchConversation: (id: string) => void;
     conversationMap: ConversationMap;
+    conversationId: string;
     onPopout?: () => void;
     isPopout?: boolean;
     fullscreen?: boolean;
     isLoading?: boolean;
-}
+};
 
-const ChatDialog = ({ open, onClose, messages, isSending, sendAPI, requestProgress, verboseProgress, startNewConversation, switchConversation, conversationMap, onPopout, isPopout, fullscreen = false, isLoading = false }: ChatDialogProps) => {
+const ChatDialog = ({
+    open,
+    onClose,
+    messages,
+    isSending,
+    sendAPI,
+    requestProgress,
+    verboseProgress,
+    startNewConversation,
+    switchConversation,
+    conversationMap,
+    conversationId,
+    onPopout,
+    isPopout,
+    fullscreen = false,
+    isLoading = false,
+}: ChatDialogProps) => {
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [search, setSearch] = useState("");
     // todo: Move it to a hook
-    const filteredLog = useMemo(
-        () => {
-            const filteredConversations: ConversationMap = {};
-            Object.entries(conversationMap).reverse().forEach(([convId, conv]) => {
-               const found = conv.logText.toLowerCase().includes(search.toLowerCase());
-               if (found) {
-                filteredConversations[convId] = conv;
-               }
-        })
+    const filteredLog = useMemo(() => {
+        const filteredConversations: ConversationMap = {};
+        Object.entries(conversationMap)
+            .reverse()
+            .forEach(([convId, conv]) => {
+                const found = conv.logText.toLowerCase().includes(search.toLowerCase());
+                if (found) {
+                    filteredConversations[convId] = conv;
+                }
+            });
         return filteredConversations;
-    },
-        [conversationMap, search],
-    );
+    }, [conversationMap, search]);
     return (
         <Dialog
             open={open}
@@ -161,7 +182,11 @@ const ChatDialog = ({ open, onClose, messages, isSending, sendAPI, requestProgre
                                         </ListItemButton>
                                     ) : (
                                         Object.entries(filteredLog).map(([convId, conv], index) => (
-                                            <ListItemButton key={`${conv.logText}-${index}`} onClick={() => switchConversation(convId)}>
+                                            <ListItemButton
+                                                key={`${conv.logText}-${index}`}
+                                                onClick={() => switchConversation(convId)}
+                                                selected={conversationId === convId}
+                                            >
                                                 <ListItemText
                                                     primary={conv.logText}
                                                     secondary={`${conv.logLength} messages`}

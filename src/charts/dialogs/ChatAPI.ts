@@ -1,7 +1,7 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
 import { useCallback, useEffect, useState, useRef } from "react";
-import { map, z } from 'zod';
+import { z } from 'zod';
 import _ from 'lodash';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -158,7 +158,6 @@ const useChat = () => {
     }, [chatLogData, chatLog, isSuccess]);
 
     const progressListener = useCallback((data: any) => {
-        console.log('chat message', data);
         try {
             const parsed = chatProgressSchema.parse(data);
             if (parsed.id === currentRequestId) {
@@ -280,7 +279,6 @@ const useChat = () => {
                     newConversationMap['legacy'].logLength++;
                 }
             })
-            console.log("conv map....", newConversationMap);
             setConversationMap(newConversationMap);
         }
     }, [chatLog]);
@@ -296,26 +294,11 @@ const useChat = () => {
         const id = generateId();
         const viewName = getViewName();
         console.log(`sending chat '${input}' from '${viewName}'`);
-        
-        // setMessages(prev => [...prev, {
-        //     text: input,
-        //     sender: 'user',
-        //     id,
-        //     conversationId
-        // }]);
 
         try {
             setIsSending(true);
             setCurrentRequestId(id);
-            const response = await sendMessage(input, id, route, conversationId);
-            // setMessages(prev => [...prev, {
-            //     text: response.message,
-            //     sender: 'bot',
-            //     id,
-            //     conversationId,
-            //     view: response.view
-            // }]);
-            // console.log("response", response, messages);
+            await sendMessage(input, id, route, conversationId);
             queryClient.invalidateQueries({ queryKey: ['chatLog'] });
         } catch (error) {
             setMessages(prev => [...prev, {
@@ -330,26 +313,22 @@ const useChat = () => {
         setIsSending(false);
     }, [conversationId, route, queryClient]);
 
-    // const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
-    //     //we should be using an id passed as part of the message, not generating one here.
-    //     //also - id as react key if we have an id shared between query and response may be a conflict
-    //     const msg = {
-    //         text: message,
-    //         sender,
-    //         id: generateId(),
-    //         view,
-    //         conversationId
-    //     };
-    //     setMessages((prevMessages) => [...prevMessages, msg]);
-    // };
-
     const startNewConversation = useCallback(async () => {
         const newConversationId = generateConversationId();
         setConversationId(newConversationId);
-        // setIsInit(false);
-        // await chatInit();
-        // setMessages([]);
-    }, []);
+        try {
+            const response = await sendMessage('', generateId(), routeInit, newConversationId);
+            // Only set initial message if we don't have any messages yet
+            setMessages([{
+                text: response.message,
+                sender: 'system',
+                id: generateId(),
+                conversationId: newConversationId
+            }]);
+        } catch (error) {
+            console.log("error: ", error);
+        }
+    }, [routeInit]);
 
     const switchConversation = useCallback((id: string) => {
         setConversationId(id);
@@ -362,6 +341,7 @@ const useChat = () => {
         requestProgress,
         verboseProgress,
         isChatLogLoading,
+        conversationId,
         startNewConversation,
         switchConversation,
         conversationMap,

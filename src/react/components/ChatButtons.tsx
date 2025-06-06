@@ -16,19 +16,18 @@ const ChatButtons = () => {
     const [popout, setPopout] = useState(false);
     const theme = useTheme();
 
-    const { 
-        messages, 
-        isSending, 
-        sendAPI, 
-        requestProgress, 
-        verboseProgress, 
-        // chatLog,
+    const {
+        messages,
+        isSending,
+        sendAPI,
+        requestProgress,
+        verboseProgress,
         isChatLogLoading,
         startNewConversation,
         switchConversation,
         conversationMap,
+        conversationId,
     } = useChat();
-
 
     const onClose = useCallback(() => setOpen(false), []);
     const handlePopoutClose = useCallback(() => {
@@ -55,6 +54,7 @@ const ChatButtons = () => {
         startNewConversation,
         switchConversation,
         conversationMap,
+        conversationId,
     };
 
     return (
@@ -65,14 +65,7 @@ const ChatButtons = () => {
             <IconWithTooltip tooltipText="Chat Log" onClick={handleChatLogButtonClick}>
                 <ChatLogIcon />
             </IconWithTooltip>
-            {!popout && (
-                <ChatDialog
-                    open={open}
-                    onClose={onClose}
-                    onPopout={handlePopoutOpen}
-                    {...chatDialogProps}
-                />
-            )}
+            {!popout && <ChatDialog open={open} onClose={onClose} onPopout={handlePopoutOpen} {...chatDialogProps} />}
             {popout && (
                 <PopoutWindow onClose={handlePopoutClose}>
                     <ProjectProvider>
