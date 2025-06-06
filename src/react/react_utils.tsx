@@ -8,6 +8,17 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 import { createFilterOptions } from "@mui/material";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Create a client
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 5 * 60 * 1000, // 5 minutes
+            refetchOnWindowFocus: false,
+        },
+    },
+});
 
 // todo - think about whether this might lead to unexpected future issues
 // consider virtualization etc
@@ -86,11 +97,13 @@ const createMdvPortal = (
     const root = createRoot(container);
     root.render(
         <StrictMode>
-            <OuterContainerProvider parent={parent}>
-                <MaterialWrapper>
-                    <ProjectProvider>{component}</ProjectProvider>
-                </MaterialWrapper>
-            </OuterContainerProvider>
+            <QueryClientProvider client={queryClient}>
+                <OuterContainerProvider parent={parent}>
+                    <MaterialWrapper>
+                        <ProjectProvider>{component}</ProjectProvider>
+                    </MaterialWrapper>
+                </OuterContainerProvider>
+            </QueryClientProvider>
         </StrictMode>,
     );
     return root;

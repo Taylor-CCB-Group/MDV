@@ -14,33 +14,44 @@ import {
     Typography,
 } from "@mui/material";
 import Chatbot, { type ChatBotProps } from "./ChatDialogComponent";
-import type { ChatLogItem, ChatMessage, ChatProgress } from "./ChatAPI";
+import type { ChatLogItem, ChatMessage, ChatProgress, ConversationLog, ConversationMap } from "./ChatAPI";
 import { Close as CloseIcon, Launch as LaunchIcon, Search as SearchIcon, ViewSidebar as ViewSidebarIcon } from "@mui/icons-material";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 
 export type ChatDialogProps = {
     open: boolean;
     onClose: () => void;
-    chatLog: ChatLogItem[];
     messages: ChatMessage[];
     isSending: boolean;
     sendAPI: (input: string) => Promise<void>;
     requestProgress: ChatProgress | null;
     verboseProgress: string[];
+    startNewConversation: () => Promise<void>;
+    switchConversation: (id: string) => void;
+    conversationMap: ConversationMap;
     onPopout?: () => void;
     isPopout?: boolean;
     fullscreen?: boolean;
+    isLoading?: boolean;
 }
 
-const ChatDialog = ({ open, onClose, chatLog, messages, isSending, sendAPI, requestProgress, verboseProgress, onPopout, isPopout, fullscreen = false }: ChatDialogProps) => {
+const ChatDialog = ({ open, onClose, messages, isSending, sendAPI, requestProgress, verboseProgress, startNewConversation, switchConversation, conversationMap, onPopout, isPopout, fullscreen = false, isLoading = false }: ChatDialogProps) => {
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [search, setSearch] = useState("");
-    // const [selectedChatId, setSelectedChatId] = useState();
     // todo: Move it to a hook
     const filteredLog = useMemo(
-        () => chatLog.filter((log) => log.query.toLowerCase().includes(search.toLowerCase())),
-        [chatLog, search],
+        () => {
+            const filteredConversations: ConversationMap = {};
+            Object.entries(conversationMap).reverse().forEach(([convId, conv]) => {
+               const found = conv.logText.toLowerCase().includes(search.toLowerCase());
+               if (found) {
+                filteredConversations[convId] = conv;
+               }
+        })
+        return filteredConversations;
+    },
+        [conversationMap, search],
     );
     return (
         <Dialog
@@ -118,7 +129,7 @@ const ChatDialog = ({ open, onClose, chatLog, messages, isSending, sendAPI, requ
                         >
                             <Box>
                                 <Box sx={{ mt: 2, px: 1 }}>
-                                    <Button variant="contained" fullWidth>
+                                    <Button variant="contained" fullWidth onClick={startNewConversation}>
                                         New Chat
                                     </Button>
                                 </Box>
@@ -144,19 +155,25 @@ const ChatDialog = ({ open, onClose, chatLog, messages, isSending, sendAPI, requ
                                 />
                                 <Divider />
                                 <List>
-                                    {filteredLog.map((item) => (
-                                        // todo: Add onclick to select chat id
-                                        <ListItemButton key={item.query}>
-                                            <ListItemText
-                                                primary={item.query}
-                                                primaryTypographyProps={{
-                                                    noWrap: true,
-                                                    variant: "body1",
-                                                    fontWeight: "bold",
-                                                }}
-                                            />
+                                    {isLoading ? (
+                                        <ListItemButton>
+                                            <ListItemText primary="Loading chat history..." />
                                         </ListItemButton>
-                                    ))}
+                                    ) : (
+                                        Object.entries(filteredLog).map(([convId, conv], index) => (
+                                            <ListItemButton key={`${conv.logText}-${index}`} onClick={() => switchConversation(convId)}>
+                                                <ListItemText
+                                                    primary={conv.logText}
+                                                    secondary={`${conv.logLength} messages`}
+                                                    primaryTypographyProps={{
+                                                        noWrap: true,
+                                                        variant: "body1",
+                                                        fontWeight: "bold",
+                                                    }}
+                                                />
+                                            </ListItemButton>
+                                        ))
+                                    )}
                                 </List>
                             </Box>
                         </Drawer>

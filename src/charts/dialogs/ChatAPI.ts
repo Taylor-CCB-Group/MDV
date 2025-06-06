@@ -1,7 +1,9 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
-import { useCallback, useEffect, useState } from "react";
-import { z } from 'zod';
+import { useCallback, useEffect, useState, useRef } from "react";
+import { map, z } from 'zod';
+import _ from 'lodash';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const completedChatResponseSchema = z.object({
     message: z.string(),
@@ -33,6 +35,8 @@ const chatLogItemSchema = z.object({
     prompt_template: z.string(),
     response: z.string(),
     // id: z.string(),
+    conversation_id: z.optional(z.string()),
+    timestamp: z.optional(z.string()),
 });
 const chatLogSchema = z.array(chatLogItemSchema);
 
@@ -41,27 +45,15 @@ export type ChatLogItem = z.infer<typeof chatLogItemSchema>;
 export const useChatLog = () => {
     const { root } = useProject();
     const route = `${root}/chat_log.json`;
-    const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    useEffect(() => {
-        const fetchChatLog = async () => {
-            setIsLoading(true);
-            try {
-                const response = await axios.get(route);
-                const parsed = chatLogSchema.parse(response.data);
-                setChatLog(parsed);
-            } catch (error) {
-                console.error('Error fetching chat log', error);
-            }
-            setIsLoading(false);
-        };
-        fetchChatLog();
-        // refresh periodically - there may be a better way (quite possible involving useQuery,
-        // or socketio...).
-        const interval = setInterval(fetchChatLog, 5000);
-        return () => clearInterval(interval);
-    }, [route]);
+    const { data: chatLog = [], isLoading } = useQuery({
+        queryKey: ['chatLog'],
+        queryFn: async () => {
+            const response = await axios.get(route);
+            return chatLogSchema.parse(response.data);
+        },
+        refetchInterval: 5000,
+    });
 
     return { chatLog, isLoading };
 }
@@ -81,7 +73,7 @@ function generateId() {
 }
 
 function generateConversationId() {
-    return 'conv-' + Date.now() + '-' + Math.random().toString(36).substring(7);
+    return `conv-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
 
 /** viewName could be a prop of ProjectProvider, but currently not cleanly reactive */
@@ -94,7 +86,7 @@ function getViewName(): string | null {
 const sendMessage = async (message: string, id: string, route = '/chat', conversationId?: string) => {
     // we should send information about the context - in particular, which view we're in
     // could consider a streaming response here rather than socket
-    const response = await axios.post<ChatResponse>(route, { message, id, conversationId });
+    const response = await axios.post<ChatResponse>(route, { message, id, conversation_id: conversationId });
     const parsed = completedChatResponseSchema.parse(response.data); // may throw an error if the response is not valid
     return parsed;
 };
@@ -105,6 +97,14 @@ const DefaultMessage: ChatMessage = {
     id: generateId(),
     conversationId: generateConversationId()
 }
+
+export type ConversationLog = {
+    logText: string,
+    logLength: number,
+    messages: ChatMessage[],
+}
+
+export type ConversationMap = Record<string, ConversationLog>;
 
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
@@ -125,7 +125,37 @@ const useChat = () => {
     const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
     const [verboseProgress, setVerboseProgress] = useState([""]);
     const cm = window.mdv.chartManager;
-    const [conversationId] = useState<string>(generateConversationId());
+    const [conversationId, setConversationId] = useState<string>(generateConversationId());
+    const [conversationMap, setConversationMap] = useState<ConversationMap>({});
+    const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
+    const queryClient = useQueryClient();
+
+    // Use React Query to manage chat logs
+    const { data: chatLogData = [], isLoading: isChatLogLoading, isSuccess } = useQuery({
+        queryKey: ['chatLog'],
+        queryFn: async () => {
+            const response = await axios.get(`${projectApiRoute}chat_log.json`);
+            const parsedResponse = chatLogSchema.parse(response.data);
+            return parsedResponse;
+        },
+        refetchInterval: 5000, // Refetch every 5 seconds
+    });
+
+    useEffect(() => {
+        if (!chatLogData || !isSuccess) return;
+        
+        // Create a set of stringified items for comparison
+        const currentItems = new Set(chatLog?.map(item => JSON.stringify(item)) || []);
+        const newItems = new Set(chatLogData.map(item => JSON.stringify(item)));
+        
+        // Check if the sets have the same size and all items from newItems are in currentItems
+        const hasChanges = chatLog?.length !== chatLogData.length || 
+            !Array.from(newItems).every(item => currentItems.has(item));
+        
+        if (hasChanges) {
+            setChatLog(chatLogData);
+        }
+    }, [chatLogData, chatLog, isSuccess]);
 
     const progressListener = useCallback((data: any) => {
         console.log('chat message', data);
@@ -145,87 +175,198 @@ const useChat = () => {
         }
     }, [currentRequestId]);
 
-    useEffect(() => {
-        // check if ipc is initialised or not before moving forward
-        if (!cm.ipc) {
-            return;
-        }
-        const { socket } = cm.ipc;
+    const handleVerboseProgress = useCallback((msg: string) => {
+        setVerboseProgress(v => [...v, msg].slice(-5));
+    }, []);
 
-        // event-name like 'chat', room for project... id associated with original request.
-        socket?.on(progressRoute, progressListener);
-        const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
-        socket?.on(verboseRoute, verboseProgress);
-        console.log(`addded listeners for '${progressRoute}' and '${verboseRoute}'`);
-        const chatInit = async () => {
-            setIsSending(true);
-            try {
-                const id = generateId();
-                setCurrentRequestId(id);
-                const response = await sendMessage('', id, routeInit);
-                setMessages(messages => messages.length ? messages : [{
+    const chatInit = useCallback(async () => {
+        if (isSending || isInit) return;
+        
+        setIsSending(true);
+        try {
+            const id = generateId();
+            setCurrentRequestId(id);
+            const response = await sendMessage('', id, routeInit, conversationId);
+            // Only set initial message if we don't have any messages yet
+            if (messages.length === 0) {
+                setMessages([{
                     text: response.message,
                     sender: 'system',
                     id: generateId(),
                     conversationId
                 }]);
-            } catch (error) {
-                console.error('Error sending welcome message', error);
             }
-            setIsSending(false);
-            setCurrentRequestId(''); //todo review react query etc
-            setIsInit(true);
-        };
-        if (!isSending && !isInit) chatInit();
+        } catch (error) {
+            console.error('Error sending welcome message', error);
+        }
+        setIsSending(false);
+        setCurrentRequestId('');
+        setIsInit(true);
+    }, [isSending, isInit, routeInit, conversationId, messages.length]);
+
+    useEffect(() => {
+        if (!cm.ipc) return;
+        
+        const { socket } = cm.ipc;
+        socket?.on(progressRoute, progressListener);
+        socket?.on(verboseRoute, handleVerboseProgress);
+
+        if (!isInit && !isSending) {
+            chatInit();
+        }
+
         return () => {
             socket?.off(progressRoute, progressListener);
-            socket?.off(verboseRoute, verboseProgress);
-        }
-    }, [isSending, isInit, routeInit, progressRoute, verboseRoute, progressListener, conversationId, cm.ipc]);
-    useEffect(() => {
-        sessionStorage.setItem(`chatMessages-${conversationId}`, JSON.stringify(messages));
-    }, [messages, conversationId]);
-
-    const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
-        //we should be using an id passed as part of the message, not generating one here.
-        //also - id as react key if we have an id shared between query and response may be a conflict
-        const msg = {
-            text: message,
-            sender,
-            id: generateId(),
-            view,
-            conversationId
+            socket?.off(verboseRoute, handleVerboseProgress);
         };
-        setMessages((prevMessages) => [...prevMessages, msg]);
-    };
+    }, [cm.ipc, progressRoute, verboseRoute, progressListener, handleVerboseProgress, chatInit, isInit, isSending]);
 
-    const sendAPI = async (input: string) => {
+    
+    useEffect(() => {
+        if (chatLog.length > 0) {
+            const newConversationMap: ConversationMap = {};
+            const newChatLog = chatLog;
+            newChatLog.forEach((log) => {
+                const id = generateId();
+                if (log.conversation_id) {
+
+                    if (!newConversationMap[log.conversation_id]) {
+                        newConversationMap[log.conversation_id] = {
+                            logText: log.query,
+                            logLength: 0,
+                            messages: [],
+                        };
+                    }
+                    const userMessage: ChatMessage = {
+                        conversationId: log.conversation_id,
+                        id,
+                        sender: 'user',
+                        text: log.query,
+                    }
+
+                    const botMessage: ChatMessage = {
+                        conversationId: log.conversation_id,
+                        id,
+                        sender: 'bot',
+                        text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
+                    }
+
+                    newConversationMap[log.conversation_id].messages.push(...[userMessage, botMessage]);
+                    newConversationMap[log.conversation_id].logLength++;
+                } else {
+                    if (!newConversationMap['legacy']) {
+                        newConversationMap['legacy'] = {
+                            logText: `(LEGACY) ${log.query}`,
+                            logLength: 0,
+                            messages: [],
+                        };
+                    }
+                    
+                    const userMessage: ChatMessage = {
+                        conversationId: 'legacy',
+                        id,
+                        sender: 'user',
+                        text: log.query,
+                    }
+                    
+                    const botMessage: ChatMessage = {
+                        conversationId: 'legacy',
+                        id,
+                        sender: 'bot',
+                        text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
+                    }
+                    
+                    newConversationMap['legacy'].messages.push(...[userMessage, botMessage]);
+                    newConversationMap['legacy'].logLength++;
+                }
+            })
+            console.log("conv map....", newConversationMap);
+            setConversationMap(newConversationMap);
+        }
+    }, [chatLog]);
+
+    useEffect(() => {
+        const newMessages: ChatMessage[] = conversationMap[conversationId]?.messages || [];
+        setMessages(newMessages);
+    }, [conversationId, conversationMap]);
+    
+    const sendAPI = useCallback(async (input: string) => {
         if (!input.trim()) return;
+        
         const id = generateId();
         const viewName = getViewName();
-        console.log(`sending chat '${input}' from '${viewName}'`)
-        appendMessage(input, 'user');
+        console.log(`sending chat '${input}' from '${viewName}'`);
+        
+        // setMessages(prev => [...prev, {
+        //     text: input,
+        //     sender: 'user',
+        //     id,
+        //     conversationId
+        // }]);
 
         try {
             setIsSending(true);
             setCurrentRequestId(id);
             const response = await sendMessage(input, id, route, conversationId);
-            appendMessage(response.message, 'bot', response.view);
+            // setMessages(prev => [...prev, {
+            //     text: response.message,
+            //     sender: 'bot',
+            //     id,
+            //     conversationId,
+            //     view: response.view
+            // }]);
+            // console.log("response", response, messages);
+            queryClient.invalidateQueries({ queryKey: ['chatLog'] });
         } catch (error) {
-            appendMessage(`Error: ${error}`, 'bot');
+            setMessages(prev => [...prev, {
+                text: `Error: ${error}`,
+                sender: 'bot',
+                id,
+                conversationId
+            }]);
         }
-        setCurrentRequestId(id);
+        setCurrentRequestId('');
         setRequestProgress(null);
         setIsSending(false);
-    };
+    }, [conversationId, route, queryClient]);
 
-    const clearChat = () => {
-        setMessages([]);
-        sessionStorage.removeItem(`chatMessages-${conversationId}`);
-    };
+    // const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
+    //     //we should be using an id passed as part of the message, not generating one here.
+    //     //also - id as react key if we have an id shared between query and response may be a conflict
+    //     const msg = {
+    //         text: message,
+    //         sender,
+    //         id: generateId(),
+    //         view,
+    //         conversationId
+    //     };
+    //     setMessages((prevMessages) => [...prevMessages, msg]);
+    // };
 
-    return { messages, isSending, sendAPI, requestProgress, verboseProgress, clearChat };
-}
+    const startNewConversation = useCallback(async () => {
+        const newConversationId = generateConversationId();
+        setConversationId(newConversationId);
+        // setIsInit(false);
+        // await chatInit();
+        // setMessages([]);
+    }, []);
+
+    const switchConversation = useCallback((id: string) => {
+        setConversationId(id);
+    }, []);
+
+    return {
+        messages,
+        isSending,
+        sendAPI,
+        requestProgress,
+        verboseProgress,
+        isChatLogLoading,
+        startNewConversation,
+        switchConversation,
+        conversationMap,
+    };
+};
 
 /**
  * This function is used to navigate to a different view.

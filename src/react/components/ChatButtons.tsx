@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useChartManager } from "../hooks";
 import { CssBaseline, ThemeProvider, useTheme } from "@mui/material";
-import useChat, { useChatLog } from "@/charts/dialogs/ChatAPI";
+import useChat from "@/charts/dialogs/ChatAPI";
 import ChatLogDialog from "@/charts/dialogs/ChatLogDialog";
 import IconWithTooltip from "./IconWithTooltip";
 import { ChatBubble as ChatBubbleIcon } from "@mui/icons-material";
@@ -11,16 +11,26 @@ import { ProjectProvider } from "@/modules/ProjectContext";
 import PopoutWindow from "./PopoutWindow";
 
 const ChatButtons = () => {
-    // very basic check to see if chat is enabled
     const chatEnabled = useChartManager().config.chat_enabled;
     const [open, setOpen] = useState(false);
     const [popout, setPopout] = useState(false);
     const theme = useTheme();
 
-    const { chatLog } = useChatLog();
-    const { messages, isSending, sendAPI, requestProgress, verboseProgress } = useChat();
+    const { 
+        messages, 
+        isSending, 
+        sendAPI, 
+        requestProgress, 
+        verboseProgress, 
+        // chatLog,
+        isChatLogLoading,
+        startNewConversation,
+        switchConversation,
+        conversationMap,
+    } = useChat();
 
-    const onClose = () => setOpen(false);
+
+    const onClose = useCallback(() => setOpen(false), []);
     const handlePopoutClose = useCallback(() => {
         setPopout(false);
     }, []);
@@ -29,10 +39,24 @@ const ChatButtons = () => {
         setPopout(true);
     }, []);
 
-    const handleChatLogButtonClick = () => {
+    const handleChatLogButtonClick = useCallback(() => {
         new ChatLogDialog();
-    };
+    }, []);
+
     if (!chatEnabled) return null;
+
+    const chatDialogProps = {
+        messages,
+        isSending,
+        requestProgress,
+        sendAPI,
+        verboseProgress,
+        isLoading: isChatLogLoading,
+        startNewConversation,
+        switchConversation,
+        conversationMap,
+    };
+
     return (
         <>
             <IconWithTooltip tooltipText="Chat" onClick={() => setOpen(true)}>
@@ -46,12 +70,7 @@ const ChatButtons = () => {
                     open={open}
                     onClose={onClose}
                     onPopout={handlePopoutOpen}
-                    chatLog={chatLog}
-                    messages={messages}
-                    isSending={isSending}
-                    requestProgress={requestProgress}
-                    sendAPI={sendAPI}
-                    verboseProgress={verboseProgress}
+                    {...chatDialogProps}
                 />
             )}
             {popout && (
@@ -62,14 +81,9 @@ const ChatButtons = () => {
                             <ChatDialog
                                 open={true}
                                 onClose={handlePopoutClose}
-                                chatLog={chatLog}
-                                messages={messages}
-                                isSending={isSending}
-                                requestProgress={requestProgress}
-                                sendAPI={sendAPI}
-                                verboseProgress={verboseProgress}
                                 isPopout
                                 fullscreen
+                                {...chatDialogProps}
                             />
                         </ThemeProvider>
                     </ProjectProvider>

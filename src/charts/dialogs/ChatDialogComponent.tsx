@@ -67,7 +67,8 @@ const Message = ({ text, sender, view }: ChatMessage) => {
         text = JSON.parse(text);
     } catch (e) {
     }
-    const isError = sender === 'bot' && !view;
+    // todo: handle the scenario when view doesn't exist
+    // const isError = sender === 'bot' && !view;
     return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
         <div className='selectable'>
             {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
@@ -75,7 +76,8 @@ const Message = ({ text, sender, view }: ChatMessage) => {
                 isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
                 }`}>
                 {/* <JsonView src={text} /> */}
-                {isError ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />}
+                {/* {isError ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />} */}
+                <MessageMarkdown text={text} />
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
@@ -245,17 +247,22 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, []);
 
+    // useEffect(() => {
+    //     console.log("chat dialog component");
+    // }, []);
+
     useEffect(() => {
-        messages;
-        requestProgress;
-        scrollToBottom();
-    }, [messages, requestProgress, scrollToBottom]);
+        // Only scroll when there are new messages or progress updates
+        if (messages.length > 0 || requestProgress) {
+            scrollToBottom();
+        }
+    }, [messages.length, requestProgress, scrollToBottom]);
     
     return (
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
             <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
                 {messages.map((message) => (
-                    <Message key={message.id} {...message} />
+                    <Message key={`${message.id}-${message.sender}`} {...message} />
                 ))}
                 {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
                 {/* {
