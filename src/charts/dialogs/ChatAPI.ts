@@ -1,7 +1,7 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 const completedChatResponseSchema = z.object({
     message: z.string(),
@@ -32,7 +32,8 @@ const chatLogItemSchema = z.object({
     query: z.string(),
     prompt_template: z.string(),
     response: z.string(),
-    // id: z.string(),
+    timestamp: z.string().optional(),
+    conversation_id: z.string().optional().default('legacy message without conversation id'),
 });
 const chatLogSchema = z.array(chatLogItemSchema);
 
@@ -81,7 +82,7 @@ function generateId() {
 }
 
 function generateConversationId() {
-    return 'conv-' + Date.now() + '-' + Math.random().toString(36).substring(7);
+    return `conv-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
 
 /** viewName could be a prop of ProjectProvider, but currently not cleanly reactive */
@@ -91,7 +92,7 @@ function getViewName(): string | null {
 }
 
 
-const sendMessage = async (message: string, id: string, route = '/chat', conversationId?: string) => {
+const sendMessage = async (message: string, id: string, route: string, conversationId: string) => {
     // we should send information about the context - in particular, which view we're in
     // could consider a streaming response here rather than socket
     const response = await axios.post<ChatResponse>(route, { message, id, conversationId });
@@ -157,7 +158,7 @@ const useChat = () => {
             try {
                 const id = generateId();
                 setCurrentRequestId(id);
-                const response = await sendMessage('', id, routeInit);
+                const response = await sendMessage('', id, routeInit, conversationId);
                 setMessages(messages => messages.length ? messages : [{
                     text: response.message,
                     sender: 'system',
