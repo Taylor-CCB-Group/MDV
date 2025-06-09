@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Optional, Protocol, cast
 from mdvtools.llm.chat_protocol import (
   ProjectChat,
   ProjectChatProtocol, 
@@ -7,7 +7,6 @@ from mdvtools.llm.chat_protocol import (
 from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
-# from mdvtools.websocket import socketio
 # from mdvtools.dbutils.config import config
 from flask import Flask, request, session, current_app
 
@@ -53,15 +52,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             We should check authentication here,
             **nb the coupling of sockets and "chat" should be removed.**
             """
-            print(f"WebSocket connected to chat for project {project.id}")
-            user_info = session.get("user")
-            app_config = current_app.config
-            auth_enabled = app_config.get('ENABLE_AUTH', False)
-            if auth_enabled and user_info is None:
-                return {"error": "Unauthorized"}, 401
-            # todo - check access level
-            # todo - check if chat is enabled
-            # todo - check if user is in the correct chat room
+            # todo - check access level, whether chat is enabled etc
             
 
         bot: Optional[ProjectChatProtocol] = None
@@ -78,6 +69,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
             id = request.json.get("id")
+            if not message or not id:
+                return {"error": "Missing 'message' or 'id' in request JSON"}, 400
+            # todo - consider having a socket.io event for this, rather than a REST endpoint.
+            # this would mean that we could use request.sid to track the chat session
             conversation_id = request.json.get("conversation_id")
             try:
                 if bot is None:
@@ -99,6 +94,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             except Exception as e:
                 print(e)
                 return {"message": str(e)}
+    
     def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
         """
         Mutate the state.json before returning it as a request response,

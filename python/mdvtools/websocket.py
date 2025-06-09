@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, Request as FlaskRequest
 from flask_socketio import SocketIO
 from datetime import datetime
 # import asyncio
@@ -13,6 +13,20 @@ def log(msg: str):
     print(f"[[[ socket.io ]]] [{date_str}] - {msg}")
 
 socketio: SocketIO = None # type: ignore
+
+# This is a map of chat request IDs to user IDs, used to track which user is associated with which chat session.
+# something of a placeholder
+# chat_sid_map: dict[str, str] = {}
+
+
+class SocketIOContextRequest(FlaskRequest):
+    """
+    Represents the Flask request object when in a Flask-SocketIO event context.
+    This protocol ensures the 'sid' (session ID) attribute is recognized by type checkers.
+    """
+    sid: str
+    # namespace: Optional[str]
+    # event: Optional[str]
 
 def mdv_socketio(app: Flask):
     """
@@ -80,12 +94,21 @@ class ChatSocketAPI:
         """
         # we should descriminate which user to send this to... 
         # which implies that this instance should be associated...
+        # or that we can map the chat request ID to a user ID.
+
+        # I think simplest way to do this will be to use request.sid,
+        # which implies that the `/chat` endpoint should be socket.io rather than REST.
+
+        # to = chat_sid_map.get(id, None)
+        # if to is None:
+        #     log(f"Chat progress update for {id} but no associated user found, skipping.")
+        #     return
         self.socketio.emit(self.progress_name, {
             "message": message, "id": id, "progress": progress, "delta": delta
         }, namespace=self.project_namespace)
 
 class SocketIOHandler(logging.StreamHandler):
-    def __init__(self, socketio, event_name="log"):
+    def __init__(self, socketio: SocketIO, event_name="log"):
         super().__init__()
         log(f"handler initialized for event: {event_name}")
         self.socketio = socketio
@@ -105,6 +128,7 @@ class SocketIOHandler(logging.StreamHandler):
         try:
             msg = self.format(record)
             log(f"[ {self.event_name} ] {msg}")
+            #!!! to=???
             self.socketio.emit(self.event_name, msg)
         except Exception:
             self.handleError(record)
