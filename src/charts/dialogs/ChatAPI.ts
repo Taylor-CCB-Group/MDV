@@ -106,6 +106,16 @@ export type ConversationLog = {
 
 export type ConversationMap = Record<string, ConversationLog>;
 
+// Parsing view name from the message's code
+// todo: Get view name from chat_log.json or use some other logic
+export const parseViewName = (message: string) => {
+    const match = /view_name\s*=\s*"([^"]+)"/.exec(message);
+    if (match) {
+        return match[1];
+    }
+    return undefined;
+};
+
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
@@ -227,8 +237,8 @@ const useChat = () => {
             const newChatLog = chatLog;
             newChatLog.forEach((log) => {
                 const id = generateId();
+                const viewName = parseViewName(log.response);
                 if (log.conversation_id) {
-
                     if (!newConversationMap[log.conversation_id]) {
                         newConversationMap[log.conversation_id] = {
                             logText: log.query,
@@ -248,6 +258,7 @@ const useChat = () => {
                         id,
                         sender: 'bot',
                         text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
+                        view: viewName,
                     }
 
                     newConversationMap[log.conversation_id].messages.push(...[userMessage, botMessage]);
@@ -273,6 +284,7 @@ const useChat = () => {
                         id,
                         sender: 'bot',
                         text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
+                        view: viewName,
                     }
                     
                     newConversationMap['legacy'].messages.push(...[userMessage, botMessage]);
