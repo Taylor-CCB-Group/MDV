@@ -212,6 +212,7 @@ const ChatDialog = ({
                             requestProgress={requestProgress}
                             sendAPI={sendAPI}
                             verboseProgress={verboseProgress}
+                            onClose={onClose}
                         />
                     </Box>
                 </Box>

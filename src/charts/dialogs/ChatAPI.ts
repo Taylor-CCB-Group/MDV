@@ -295,7 +295,7 @@ const useChat = () => {
         } catch (error) {
             // todo: update error handling logic
             setMessages(prev => [...prev, {
-                text: `Error: ${error}`,
+                text: `ERROR: ${error}`,
                 sender: 'bot',
                 id,
                 conversationId
@@ -322,10 +322,10 @@ const useChat = () => {
         } catch (error) {
             // todo: update error handling logic
             setMessages(prev => [...prev, {
-                text: `Error: ${error}`,
+                text: `ERROR: ${error}`,
                 sender: 'bot',
                 id: generateId(),
-                conversationId
+                conversationId: newConversationId,
             }]);
             console.log("Error starting new conversation: ", error);
         }
@@ -359,7 +359,7 @@ const useChat = () => {
  * 
  * ! doesn't belong in this file, I intend to refactor soon, but for quick prototyping it's here
  */
-export async function navigateToView(view: string, needsRefresh = false) {
+export async function navigateToView(view: string, needsRefresh = false, callback?: () => void) {
     if (!needsRefresh) {
         window.mdv.chartManager.changeView(view);
     } else {
@@ -372,6 +372,7 @@ export async function navigateToView(view: string, needsRefresh = false) {
         );
         window.location.reload();
     }
+    callback?.();
 }
 
 export default useChat;

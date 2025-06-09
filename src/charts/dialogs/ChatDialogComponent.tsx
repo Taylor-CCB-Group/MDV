@@ -60,7 +60,7 @@ import ErrorDisplay from './DebugErrorComponent';
 // }
 
 
-const Message = ({ text, sender, view }: ChatMessage) => {
+const Message = ({ text, sender, view, onClose }: ChatMessage & {onClose: () => void}) => {
     const isUser = sender === 'user';
     const pythonSections = extractPythonSections(text);
     try {
@@ -85,7 +85,15 @@ const Message = ({ text, sender, view }: ChatMessage) => {
             
             {/* Uncomment later and add logic for feedback buttons */}
             {/* {(sender === 'bot') && <MessageFeedback />} */}
-            {view && <Button variant="contained" color="primary" onClick={() => navigateToView(view)}>Load view '{view}'...</Button>}
+            {view && 
+                <Button 
+                    variant="contained" 
+                    color="primary" 
+                    onClick={() => navigateToView(view, false, onClose)}
+                >
+                    Load view '{view}'...
+                </Button>
+            }
         </div>
     );
 }
@@ -224,10 +232,11 @@ export type ChatBotProps = {
     sendAPI: (input: string) => Promise<void>;
     requestProgress: ChatProgress | null;
     verboseProgress: string[];
+    onClose: () => void;
 };
 
 
-const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress}: ChatBotProps) => {
+const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();
@@ -264,7 +273,7 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
             <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
                 {messages.map((message) => (
-                    <Message key={`${message.id}-${message.sender}`} {...message} />
+                    <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} />
                 ))}
                 {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
                 {/* {
