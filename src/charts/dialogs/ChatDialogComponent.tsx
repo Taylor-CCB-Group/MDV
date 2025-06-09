@@ -1,7 +1,7 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen } from 'lucide-react';
 import useChat, { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
@@ -82,7 +82,9 @@ const Message = ({ text, sender, view }: ChatMessage) => {
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
             ))} */}
-            {(sender === 'bot') && <MessageFeedback />}
+            
+            {/* Uncomment later and add logic for feedback buttons */}
+            {/* {(sender === 'bot') && <MessageFeedback />} */}
             {view && <Button variant="contained" color="primary" onClick={() => navigateToView(view)}>Load view '{view}'...</Button>}
         </div>
     );
@@ -197,7 +199,10 @@ const MessageMarkdown = ({ text }: { text: string }) => {
 }
 
 const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
-    const verbose = props.verboseProgress.map(s => s.substring(s.length-100)).join('\n');
+    const verbose = useMemo(() => 
+        props.verboseProgress.map(s => s.substring(s.length-100)).join('\n'), 
+    [props.verboseProgress]);
+
     if (props.progress >= 100) return null;
     return (
         <div className="p-4">
@@ -227,29 +232,26 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();
 
-    const handleSend = async () => {
+    const handleSend = useCallback(async () => {
         if (!input.trim()) return;
         setInput('');
         await sendAPI(input);
-    };
+    }, [input, sendAPI]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setInput(e.target.value);
-    };
+    }, []);
 
-    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             handleSend();
         }
-    };
+    }, [handleSend]);
+
     const scrollToBottom = useCallback(() => {
         //! block: 'nearest' seems to solve issue with dialog header disappearing from top
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, []);
-
-    // useEffect(() => {
-    //     console.log("chat dialog component");
-    // }, []);
 
     useEffect(() => {
         // Only scroll when there are new messages or progress updates

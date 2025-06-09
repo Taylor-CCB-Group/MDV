@@ -61,10 +61,11 @@ const ChatDialog = ({
 }: ChatDialogProps) => {
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [search, setSearch] = useState("");
-    // todo: Move it to a hook
+
     const filteredLog = useMemo(() => {
         const filteredConversations: ConversationMap = {};
         Object.entries(conversationMap)
+            .slice()
             .reverse()
             .forEach(([convId, conv]) => {
                 const found = conv.logText.toLowerCase().includes(search.toLowerCase());
@@ -74,6 +75,7 @@ const ChatDialog = ({
             });
         return filteredConversations;
     }, [conversationMap, search]);
+
     return (
         <Dialog
             open={open}
@@ -183,7 +185,7 @@ const ChatDialog = ({
                                     ) : (
                                         Object.entries(filteredLog).map(([convId, conv], index) => (
                                             <ListItemButton
-                                                key={`${conv.logText}-${index}`}
+                                                key={convId}
                                                 onClick={() => switchConversation(convId)}
                                                 selected={conversationId === convId}
                                             >

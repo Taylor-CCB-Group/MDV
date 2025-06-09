@@ -1,9 +1,10 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { z } from 'zod';
 import _ from 'lodash';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useChartManager } from "@/react/hooks";
 
 const completedChatResponseSchema = z.object({
     message: z.string(),
@@ -42,22 +43,6 @@ const chatLogSchema = z.array(chatLogItemSchema);
 
 export type ChatLogItem = z.infer<typeof chatLogItemSchema>;
 
-export const useChatLog = () => {
-    const { root } = useProject();
-    const route = `${root}/chat_log.json`;
-
-    const { data: chatLog = [], isLoading } = useQuery({
-        queryKey: ['chatLog'],
-        queryFn: async () => {
-            const response = await axios.get(route);
-            return chatLogSchema.parse(response.data);
-        },
-        refetchInterval: 5000,
-    });
-
-    return { chatLog, isLoading };
-}
-
 type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 
 export type ChatMessage = {
@@ -67,6 +52,15 @@ export type ChatMessage = {
     id: string;
     conversationId: string;
 };
+
+
+export type ConversationLog = {
+    logText: string,
+    logLength: number,
+    messages: ChatMessage[],
+}
+
+export type ConversationMap = Record<string, ConversationLog>;
 
 function generateId() {
     return Math.random().toString(36).substring(7);
@@ -91,29 +85,54 @@ const sendMessage = async (message: string, id: string, route = '/chat', convers
     return parsed;
 };
 
-const DefaultMessage: ChatMessage = {
-    text: 'Hello! How can I help you?',
-    sender: 'bot',
-    id: generateId(),
-    conversationId: generateConversationId()
-}
-
-export type ConversationLog = {
-    logText: string,
-    logLength: number,
-    messages: ChatMessage[],
-}
-
-export type ConversationMap = Record<string, ConversationLog>;
-
 // Parsing view name from the message's code
 // todo: Get view name from chat_log.json or use some other logic
-export const parseViewName = (message: string) => {
+const parseViewName = (message: string) => {
     const match = /view_name\s*=\s*"([^"]+)"/.exec(message);
     if (match) {
         return match[1];
     }
     return undefined;
+};
+
+// Create conversation entry
+const createConversation = (
+        convMap: ConversationMap, 
+        conversationId: string, 
+        query: string
+    ): ConversationLog => {
+    if (!convMap[conversationId]) {
+        const isLegacy = conversationId === 'legacy';
+        convMap[conversationId] = {
+            logText: isLegacy ? `(LEGACY) ${query}` : query,
+            logLength: 0,
+            messages: [],
+        };
+    }
+    return convMap[conversationId];
+};
+
+// Create message pair
+const createMessagePair = (log: ChatLogItem, conversationId: string) => {
+    const id = generateId();
+    const viewName = parseViewName(log.response);
+    
+    const userMessage: ChatMessage = {
+        conversationId,
+        id,
+        sender: 'user',
+        text: log.query,
+    };
+    
+    const botMessage: ChatMessage = {
+        conversationId,
+        id,
+        sender: 'bot',
+        text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
+        view: viewName,
+    };
+    
+    return [userMessage, botMessage];
 };
 
 const useChat = () => {
@@ -134,7 +153,7 @@ const useChat = () => {
     const [isInit, setIsInit] = useState<boolean>(false);
     const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
     const [verboseProgress, setVerboseProgress] = useState([""]);
-    const cm = window.mdv.chartManager;
+    const cm = useChartManager();
     const [conversationId, setConversationId] = useState<string>(generateConversationId());
     const [conversationMap, setConversationMap] = useState<ConversationMap>({});
     const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
@@ -152,21 +171,12 @@ const useChat = () => {
     });
 
     useEffect(() => {
-        if (!chatLogData || !isSuccess) return;
-        
-        // Create a set of stringified items for comparison
-        const currentItems = new Set(chatLog?.map(item => JSON.stringify(item)) || []);
-        const newItems = new Set(chatLogData.map(item => JSON.stringify(item)));
-        
-        // Check if the sets have the same size and all items from newItems are in currentItems
-        const hasChanges = chatLog?.length !== chatLogData.length || 
-            !Array.from(newItems).every(item => currentItems.has(item));
-        
-        if (hasChanges) {
+        if (chatLogData && isSuccess) {
             setChatLog(chatLogData);
         }
-    }, [chatLogData, chatLog, isSuccess]);
+    }, [chatLogData, isSuccess]);
 
+    // Progress Listener
     const progressListener = useCallback((data: any) => {
         try {
             const parsed = chatProgressSchema.parse(data);
@@ -184,10 +194,12 @@ const useChat = () => {
         }
     }, [currentRequestId]);
 
+    // Verbose Progress
     const handleVerboseProgress = useCallback((msg: string) => {
         setVerboseProgress(v => [...v, msg].slice(-5));
     }, []);
 
+    // Initiate chat function
     const chatInit = useCallback(async () => {
         if (isSending || isInit) return;
         
@@ -213,10 +225,23 @@ const useChat = () => {
         setIsInit(true);
     }, [isSending, isInit, routeInit, conversationId, messages.length]);
 
+    // Socket connection and Init chat
     useEffect(() => {
-        if (!cm.ipc) return;
+        if (!cm.ipc || !cm.ipc.socket) return;
         
         const { socket } = cm.ipc;
+
+        if (!socket.connected) {
+            console.log('Socket not connected, skipping listener registration');
+            return;
+        }
+
+        // todo: Add proper error handling
+        const handleSocketError = (error: any) => {
+            console.error('Socket error in chat:', error);
+        };
+        
+        socket.on('error', handleSocketError);
         socket?.on(progressRoute, progressListener);
         socket?.on(verboseRoute, handleVerboseProgress);
 
@@ -225,73 +250,28 @@ const useChat = () => {
         }
 
         return () => {
+            socket?.off('error', handleSocketError);
             socket?.off(progressRoute, progressListener);
             socket?.off(verboseRoute, handleVerboseProgress);
         };
     }, [cm.ipc, progressRoute, verboseRoute, progressListener, handleVerboseProgress, chatInit, isInit, isSending]);
 
-    
+    // Initialise conversation map
     useEffect(() => {
         if (chatLog.length > 0) {
             const newConversationMap: ConversationMap = {};
-            const newChatLog = chatLog;
-            newChatLog.forEach((log) => {
-                const id = generateId();
-                const viewName = parseViewName(log.response);
-                if (log.conversation_id) {
-                    if (!newConversationMap[log.conversation_id]) {
-                        newConversationMap[log.conversation_id] = {
-                            logText: log.query,
-                            logLength: 0,
-                            messages: [],
-                        };
-                    }
-                    const userMessage: ChatMessage = {
-                        conversationId: log.conversation_id,
-                        id,
-                        sender: 'user',
-                        text: log.query,
-                    }
-
-                    const botMessage: ChatMessage = {
-                        conversationId: log.conversation_id,
-                        id,
-                        sender: 'bot',
-                        text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
-                        view: viewName,
-                    }
-
-                    newConversationMap[log.conversation_id].messages.push(...[userMessage, botMessage]);
-                    newConversationMap[log.conversation_id].logLength++;
-                } else {
-                    if (!newConversationMap['legacy']) {
-                        newConversationMap['legacy'] = {
-                            logText: `(LEGACY) ${log.query}`,
-                            logLength: 0,
-                            messages: [],
-                        };
-                    }
-                    
-                    const userMessage: ChatMessage = {
-                        conversationId: 'legacy',
-                        id,
-                        sender: 'user',
-                        text: log.query,
-                    }
-                    
-                    const botMessage: ChatMessage = {
-                        conversationId: 'legacy',
-                        id,
-                        sender: 'bot',
-                        text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
-                        view: viewName,
-                    }
-                    
-                    newConversationMap['legacy'].messages.push(...[userMessage, botMessage]);
-                    newConversationMap['legacy'].logLength++;
-                }
-            })
-            setConversationMap(newConversationMap);
+        
+        // Process each log entry
+        chatLog.forEach((log) => {
+            const conversationId = log.conversation_id || 'legacy';
+            const conversation = createConversation(newConversationMap, conversationId, log.query);
+            const messages = createMessagePair(log, conversationId);
+            
+            conversation.messages.push(...messages);
+            conversation.logLength++;
+        });
+        
+        setConversationMap(newConversationMap);
         }
     }, [chatLog]);
 
@@ -313,6 +293,7 @@ const useChat = () => {
             await sendMessage(input, id, route, conversationId);
             queryClient.invalidateQueries({ queryKey: ['chatLog'] });
         } catch (error) {
+            // todo: update error handling logic
             setMessages(prev => [...prev, {
                 text: `Error: ${error}`,
                 sender: 'bot',

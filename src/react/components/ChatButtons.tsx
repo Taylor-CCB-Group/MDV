@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useChartManager } from "../hooks";
 import { CssBaseline, ThemeProvider, useTheme } from "@mui/material";
 import useChat from "@/charts/dialogs/ChatAPI";
-import ChatLogDialog from "@/charts/dialogs/ChatLogDialog";
 import IconWithTooltip from "./IconWithTooltip";
 import { ChatBubble as ChatBubbleIcon } from "@mui/icons-material";
-import ChatLogIcon from "@mui/icons-material/WebStories";
 import ChatDialog from "@/charts/dialogs/ChatDialog";
 import { ProjectProvider } from "@/modules/ProjectContext";
 import PopoutWindow from "./PopoutWindow";
@@ -38,10 +36,6 @@ const ChatButtons = () => {
         setPopout(true);
     }, []);
 
-    const handleChatLogButtonClick = useCallback(() => {
-        new ChatLogDialog();
-    }, []);
-
     if (!chatEnabled) return null;
 
     const chatDialogProps = {
@@ -61,9 +55,6 @@ const ChatButtons = () => {
         <>
             <IconWithTooltip tooltipText="Chat" onClick={() => setOpen(true)}>
                 <ChatBubbleIcon />
-            </IconWithTooltip>
-            <IconWithTooltip tooltipText="Chat Log" onClick={handleChatLogButtonClick}>
-                <ChatLogIcon />
             </IconWithTooltip>
             {!popout && <ChatDialog open={open} onClose={onClose} onPopout={handlePopoutOpen} {...chatDialogProps} />}
             {popout && (
