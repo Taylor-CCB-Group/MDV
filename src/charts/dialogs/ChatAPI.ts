@@ -300,6 +300,7 @@ const useChat = () => {
                 id,
                 conversationId
             }]);
+            console.log("Error sending message: ", error);
         }
         setCurrentRequestId('');
         setRequestProgress(null);
@@ -319,7 +320,14 @@ const useChat = () => {
                 conversationId: newConversationId
             }]);
         } catch (error) {
-            console.log("error: ", error);
+            // todo: update error handling logic
+            setMessages(prev => [...prev, {
+                text: `Error: ${error}`,
+                sender: 'bot',
+                id: generateId(),
+                conversationId
+            }]);
+            console.log("Error starting new conversation: ", error);
         }
     }, [routeInit]);
 
