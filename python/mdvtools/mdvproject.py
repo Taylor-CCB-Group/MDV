@@ -58,7 +58,7 @@ class MDVProject:
         dir: str,
         id: Optional[str] = None,
         delete_existing=False,
-        skip_column_clean=True,
+        skip_column_clean=True, # todo - make this False by default, add tests etc
         backend_db = False,
         safe_file_save = True
     ):
@@ -2015,7 +2015,11 @@ def add_column_to_group(
             data
             if skip_column_clean
             #this is pretty fast now
-            else pandas.to_numeric(data,errors="coerce")
+            else
+                pandas.to_numeric(
+                    data.iloc[:, 0] if isinstance(data, pandas.DataFrame) else data,
+                    errors="coerce"
+                )
         )  # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)

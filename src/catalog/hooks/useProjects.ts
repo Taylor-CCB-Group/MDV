@@ -139,6 +139,8 @@ const useProjects = () => {
                     : "Error creating project. Please try again later.";
 
             handleError(errorMessage);
+            // todo: revisit this soon for better error handling
+            throw new Error(errorMessage);
         } finally {
             setIsLoading(false);
         }

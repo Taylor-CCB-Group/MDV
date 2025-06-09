@@ -8,17 +8,7 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 import { createFilterOptions } from "@mui/material";
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-// Create a client
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 5 * 60 * 1000, // 5 minutes
-            refetchOnWindowFocus: false,
-        },
-    },
-});
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // todo - think about whether this might lead to unexpected future issues
 // consider virtualization etc
@@ -77,6 +67,17 @@ const MaterialWrapper = observer(function MaterialWrapper({
     );
 });
 
+// Global QueryClient instance shared across all React portals.
+// Configured to prevent automatic refetching on window focus for better UX
+// (i.e. stop random weird stuff that we probably don't want).
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            refetchOnWindowFocus: false,
+        }
+    }
+});
+
 /**
  * It also makes sure that any common global context, styles etc are applied.
  * todo - this is a placeholder for refactoring so that there is a single react root,
@@ -89,11 +90,7 @@ const MaterialWrapper = observer(function MaterialWrapper({
  * If not provided, the default is document.body.
  * @returns the root element that was created
  */
-const createMdvPortal = (
-    component: JSX.Element,
-    container: HTMLElement,
-    parent?: BaseChart<any> | BaseDialog,
-) => {
+const createMdvPortal = (component: JSX.Element, container: HTMLElement, parent?: BaseChart<any> | BaseDialog) => {
     const root = createRoot(container);
     root.render(
         <StrictMode>

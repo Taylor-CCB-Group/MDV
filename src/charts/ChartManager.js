@@ -2174,6 +2174,11 @@ export class ChartManager {
         this.viewData.links.splice(linkIndex, 1);
     }
 
+    /**
+     * Removes all charts from the ChartManager.
+     * If `dataSources` is provided, only charts associated with those data sources will be removed.
+     * @param {string[]?} [dataSources] - An array of data source names. If provided, only charts associated with these data sources will be removed.
+     */
     removeAllCharts(dataSources) {
         const allCharts = [];
         for (const cn in this.charts) {

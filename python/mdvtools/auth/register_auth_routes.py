@@ -1,4 +1,5 @@
 import logging
+import os  # Add os import for environment variables
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -53,8 +54,15 @@ def register_auth_routes(app):
                     session.clear()
                     return jsonify({"error": "Authentication failed."}), 401
 
-                logger.info("Authentication successful. Redirecting to index.")
-                return redirect(url_for("index")) # Redirect to the home page or any protected page
+                logger.info("Authentication successful. Redirecting based on configuration.")
+                # Check for MDV_API_ROOT environment variable
+                mdv_api_root = os.getenv('MDV_API_ROOT')
+                if mdv_api_root:
+                    logger.info(f"Redirecting to MDV_API_ROOT: {mdv_api_root}")
+                    return redirect(mdv_api_root)
+                else:
+                    logger.info("MDV_API_ROOT not set, redirecting to index")
+                    return redirect(url_for("index"))
             except Exception as e:
                 logger.exception(f"In register_auth_routes : Error during callback: {e}")
                 session.clear()  # Clear session on error

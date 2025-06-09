@@ -29,15 +29,15 @@ const MenuBarComponent = () => {
     const [open, setOpen] = useState(false);
     const cm = window.mdv.chartManager;
     const { viewManager, config, containerDiv } = cm;
-    const { root } = useProject();
+    const { root, mainApiRoute } = useProject();
     const { buildInfo } = useBuildInfo();
 
     const handleHomeButtonClick = () => {
         // todo: uncomment when we fix state issues
         // viewManager.checkUnsavedState(() => {
             window.location.href = import.meta.env.DEV
-                ? `${window.location.origin}/catalog_dev`
-                : `${window.location.origin}/../`;
+                ? `${window.location.origin}/catalog_dev` //todo: sort out routing for dev
+                : mainApiRoute;
         // });
     };
 
