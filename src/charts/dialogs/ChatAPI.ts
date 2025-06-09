@@ -36,8 +36,11 @@ const chatLogItemSchema = z.object({
     prompt_template: z.string(),
     response: z.string(),
     // id: z.string(),
-    conversation_id: z.optional(z.string()),
-    timestamp: z.optional(z.string()),
+    //nullable as well as optional because of some data that had null during development...
+    //the offending code was never merged so that is just for testing
+    //these fields are expected to always be present on actual 
+    conversation_id: z.string().optional().nullable(),
+    timestamp: z.string().optional(),
 });
 const chatLogSchema = z.array(chatLogItemSchema);
 
@@ -164,8 +167,13 @@ const useChat = () => {
         queryKey: ['chatLog'],
         queryFn: async () => {
             const response = await axios.get(`${projectApiRoute}chat_log.json`);
-            const parsedResponse = chatLogSchema.parse(response.data);
-            return parsedResponse;
+            try {
+                const parsedResponse = chatLogSchema.parse(response.data);
+                return parsedResponse;
+            } catch (error) {
+                console.error('Error parsing chat log', error);
+                return [];
+            }
         },
         refetchInterval: 5000, // Refetch every 5 seconds
     });
