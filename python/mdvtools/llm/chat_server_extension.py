@@ -7,9 +7,9 @@ from mdvtools.llm.chat_protocol import (
 from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
-from mdvtools.websocket import socketio
+# from mdvtools.websocket import socketio
 # from mdvtools.dbutils.config import config
-from flask import Flask, request
+from flask import Flask, request, session, current_app
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -42,13 +42,26 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
-        # @socketio.on("connect", namespace=f"/project/{project.id}")
-        # def chat_connect():
-        #     """
-        #     Handle WebSocket connections for the chat extension.
-        #     This could be used to initialize a chat session or perform other setup tasks.
-        #     We should check authentication here,
-        #     """
+        from mdvtools.websocket import socketio
+        if socketio is None:
+            raise Exception("socketio is not initialized")
+        @socketio.on("connect", namespace=f"/project/{project.id}")
+        def chat_connect():
+            """
+            Handle WebSocket connections for the chat extension.
+            This could be used to initialize a chat session or perform other setup tasks.
+            We should check authentication here,
+            **nb the coupling of sockets and "chat" should be removed.**
+            """
+            print(f"WebSocket connected to chat for project {project.id}")
+            user_info = session.get("user")
+            app_config = current_app.config
+            auth_enabled = app_config.get('ENABLE_AUTH', False)
+            if auth_enabled and user_info is None:
+                return {"error": "Unauthorized"}, 401
+            # todo - check access level
+            # todo - check if chat is enabled
+            # todo - check if user is in the correct chat room
             
 
         bot: Optional[ProjectChatProtocol] = None

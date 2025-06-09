@@ -31,33 +31,25 @@ def mdv_socketio(app: Flask):
     # allow cors for localhost:5170-5179
     # cors = [f"http://localhost:{i}" for i in range(5170,5180)]
     socketio = SocketIO(app, cors_allowed_origins="*")
-    log("socketio initialized without cors_allowed_origins wildcard")
+    log("socketio initialized with cors_allowed_origins wildcard")
 
-    async def response(sid, message=""):
-        # await asyncio.sleep(1)
-        socketio.emit("message", {"type": "ping", "message": f"bleep bloop {message} I'm a robot"}, to=sid)
+    # @socketio.on("message")
+    # def message(data):
+    #     # 'hello world'... if we have need for more logic here, we'll probably use a dictionary of functions for each message type.
+    
+    #     if data['type'] == "popout":
+    #         log(f"popout: {data}")
+    #     if data['type'] == "ping":
+    #         log(f"ping: {data}")
 
-    @socketio.on("connect")
-    def test_connect(auth):
-        log(f"WebSocket client connected, args: {request.args}")
-        # socketio.emit('popout', "KNkyOT")
-
-    @socketio.on("message")
-    def message(data):
-        # 'hello world'... if we have need for more logic here, we'll probably use a dictionary of functions for each message type.
-        if data['type'] == "popout":
-            log(f"popout: {data}")
-        if data['type'] == "ping":
-            log(f"ping: {data}")
-
-            # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"})
-            # how about getting it to respond only to the client that sent the message?
-            # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"}, to=request.sid)
-            # ... or maybe I should stick to REST for now.
-            sid = request.args.get("sid")
-            # error asyncio.run() cannot be called from a running event loop
-            # asyncio.run(response(sid, data.get('message')))
-            # response(sid, data.get('message'))
+    #         # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"})
+    #         # how about getting it to respond only to the client that sent the message?
+    #         # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"}, to=request.sid)
+    #         # ... or maybe I should stick to REST for now.
+    #         sid = request.args.get("sid")
+    #         # error asyncio.run() cannot be called from a running event loop
+    #         # asyncio.run(response(sid, data.get('message')))
+    #         # response(sid, data.get('message'))
 
 
 def get_socket_logger(event_name="log"):
@@ -75,6 +67,7 @@ class ChatSocketAPI:
         log_name = f"/project/{project.id}/chat"
         self.progress_name = f"/project/{project.id}/chat_progress"
         self.logger = get_socket_logger(log_name)
+        self.project_namespace = f"/project/{project.id}"
     def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
         """
         Send a message to the chat log and also update the progress bar.
@@ -87,7 +80,9 @@ class ChatSocketAPI:
         """
         # we should descriminate which user to send this to... 
         # which implies that this instance should be associated...
-        self.socketio.emit(self.progress_name, {"message": message, "id": id, "progress": progress, "delta": delta})
+        self.socketio.emit(self.progress_name, {
+            "message": message, "id": id, "progress": progress, "delta": delta
+        }, namespace=self.project_namespace)
 
 class SocketIOHandler(logging.StreamHandler):
     def __init__(self, socketio, event_name="log"):
