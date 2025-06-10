@@ -3,6 +3,7 @@ import sys
 import h5py
 import numpy
 import pandas
+import scipy
 import json
 import gzip
 import shlex
@@ -14,6 +15,7 @@ import random
 import string
 from os.path import join, split, exists
 from pathlib import Path
+import scipy.sparse
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
@@ -1149,7 +1151,7 @@ class MDVProject:
         data,
         name: Optional[str] = None,
         label: Optional[str] = None,
-        sparse=False, # this should be inferred from the data
+        sparse: Optional[bool] = None, # this should be inferred from the data
         chunk_data=False
     ):
         """Add rows as columns in a subgroup."""
@@ -1164,6 +1166,10 @@ class MDVProject:
         
         gr = ds.create_group(name)
         
+        if sparse is None:
+            # Infer if the data is sparse or dense unless specified
+            sparse = scipy.sparse.issparse(data)
+
         if sparse:
             # Handle sparse matrix
             gr.create_dataset(
