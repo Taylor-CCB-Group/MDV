@@ -27,10 +27,6 @@ def load_data(path):
     #Load data from the specified CSV file.
     return pd.read_csv(path, low_memory=False)
 
-def convert_plot_to_json(plot):
-    #Convert plot data to JSON format.
-    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\", ""))
-    
 
 def create_dot_plot(title, params, size, position):
     plot = DotPlot(

@@ -27,10 +27,6 @@ def load_data(path):
     #Load data from the specified CSV file.
     return pd.read_csv(path, low_memory=False)
 
-def convert_plot_to_json(plot):
-    #Convert plot data to JSON format.
-    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\", ""))
-    
 
 def create_scatter_plot(title, params, size, position, x_axis_settings, y_axis_settings):
     plot = ScatterPlot(
@@ -91,7 +87,7 @@ def main():
     
     # Create a link between the two datasets
     project.add_rows_as_columns_link("cells", "genes", "gene_id", "Gene Expression")
-    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X.toarray())
+    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X)
     
     # ScatterPlot parameters
     scatter_title = "UMAP Scatter Plot"
