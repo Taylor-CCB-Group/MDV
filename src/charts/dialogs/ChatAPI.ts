@@ -138,6 +138,7 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
     return [userMessage, botMessage];
 };
 
+// todo: The architecture of this hook is a bit poor, there is no single source of truth, we can have both messages and chatLog which could make it out of sync
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
@@ -209,7 +210,7 @@ const useChat = () => {
 
     // Initiate chat function
     const chatInit = useCallback(async () => {
-        if (isSending || isInit) return;
+        if (isSending || isInit || isChatLogLoading) return;
         
         setIsSending(true);
         try {
@@ -231,7 +232,7 @@ const useChat = () => {
         setIsSending(false);
         setCurrentRequestId('');
         setIsInit(true);
-    }, [isSending, isInit, routeInit, conversationId, messages.length]);
+    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading]);
 
     // Socket connection and Init chat
     useEffect(() => {
