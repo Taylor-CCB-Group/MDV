@@ -284,8 +284,10 @@ const useChat = () => {
     }, [chatLog]);
 
     useEffect(() => {
-        const newMessages: ChatMessage[] = conversationMap[conversationId]?.messages || [];
-        setMessages(newMessages);
+        if (conversationMap[conversationId]?.messages?.length > 0) {
+            const newMessages: ChatMessage[] = conversationMap[conversationId]?.messages || [];
+            setMessages(newMessages);
+        }
     }, [conversationId, conversationMap]);
     
     const sendAPI = useCallback(async (input: string) => {

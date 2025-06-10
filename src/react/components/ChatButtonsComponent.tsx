@@ -8,9 +8,10 @@ import { ProjectProvider } from "@/modules/ProjectContext";
 export type ChatButtonsComponentProps = {
     open: boolean,
     setOpen: Dispatch<SetStateAction<boolean>>;
+    onClose: () => void;
 };
 
-const ChatButtonsComponent = ({open, setOpen}: ChatButtonsComponentProps) => {
+const ChatButtonsComponent = ({open, setOpen, onClose}: ChatButtonsComponentProps) => {
     const [popout, setPopout] = useState(false);
     const theme = useTheme();
 
@@ -27,7 +28,6 @@ const ChatButtonsComponent = ({open, setOpen}: ChatButtonsComponentProps) => {
         conversationId,
     } = useChat();
 
-    const onClose = useCallback(() => setOpen(false), [setOpen]);
     const handlePopoutClose = useCallback(() => {
         setPopout(false);
     }, []);
@@ -48,9 +48,15 @@ const ChatButtonsComponent = ({open, setOpen}: ChatButtonsComponentProps) => {
         conversationMap,
         conversationId,
     };
+
     return (
         <>
-        {!popout && <ChatDialog open={open} onClose={onClose} onPopout={handlePopoutOpen} {...chatDialogProps} />}
+            {!popout && <ChatDialog 
+                open={open} 
+                onClose={onClose} 
+                onPopout={handlePopoutOpen} 
+                {...chatDialogProps}
+            />}
             {popout && (
                 <PopoutWindow onClose={handlePopoutClose}>
                     <ProjectProvider>
