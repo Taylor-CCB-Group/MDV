@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from mdvtools.dbutils.dbmodels import db, User, Project, UserProject
 from mdvtools.dbutils.dbservice import UserProjectService
 from mdvtools.auth.authutils import cache_user_projects
+from mdvtools.dbutils.safe_mdv_app import app  # Import the Flask app
 
 def get_user_by_email(email: str) -> Union[User, None]:
     """Get user by email."""
@@ -121,18 +122,20 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == 'assign':
-        success = assign_permissions(args.email, args.project, args.permission)
-    elif args.command == 'batch':
-        success = batch_assign_from_file(args.file)
-    else:
-        parser.print_help()
-        sys.exit(1)
+    # Create application context
+    with app.app_context():
+        if args.command == 'assign':
+            success = assign_permissions(args.email, args.project, args.permission)
+        elif args.command == 'batch':
+            success = batch_assign_from_file(args.file)
+        else:
+            parser.print_help()
+            sys.exit(1)
 
-    # Update cache after changes
-    if success:
-        cache_user_projects()
-        print("Successfully updated user-project cache")
+        # Update cache after changes
+        if success:
+            cache_user_projects()
+            print("Successfully updated user-project cache")
     
     sys.exit(0 if success else 1)
 
