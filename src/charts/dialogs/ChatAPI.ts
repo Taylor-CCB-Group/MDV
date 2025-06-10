@@ -80,7 +80,7 @@ function getViewName(): string | null {
 }
 
 
-const sendMessage = async (message: string, id: string, route = '/chat', conversationId?: string) => {
+const sendMessage = async (message: string, id: string, route: string, conversationId: string) => {
     // we should send information about the context - in particular, which view we're in
     // could consider a streaming response here rather than socket
     const response = await axios.post<ChatResponse>(route, { message, id, conversation_id: conversationId });

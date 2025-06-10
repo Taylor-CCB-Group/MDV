@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, Request as FlaskRequest
 from flask_socketio import SocketIO
 from datetime import datetime
 # import asyncio
@@ -13,6 +13,20 @@ def log(msg: str):
     print(f"[[[ socket.io ]]] [{date_str}] - {msg}")
 
 socketio: SocketIO = None # type: ignore
+
+# This is a map of chat request IDs to user IDs, used to track which user is associated with which chat session.
+# something of a placeholder
+# chat_sid_map: dict[str, str] = {}
+
+
+class SocketIOContextRequest(FlaskRequest):
+    """
+    Represents the Flask request object when in a Flask-SocketIO event context.
+    This protocol ensures the 'sid' (session ID) attribute is recognized by type checkers.
+    """
+    sid: str
+    # namespace: Optional[str]
+    # event: Optional[str]
 
 def mdv_socketio(app: Flask):
     """
@@ -31,33 +45,25 @@ def mdv_socketio(app: Flask):
     # allow cors for localhost:5170-5179
     # cors = [f"http://localhost:{i}" for i in range(5170,5180)]
     socketio = SocketIO(app, cors_allowed_origins="*")
-    log("socketio initialized without cors_allowed_origins wildcard")
+    log("socketio initialized with cors_allowed_origins wildcard")
 
-    async def response(sid, message=""):
-        # await asyncio.sleep(1)
-        socketio.emit("message", {"type": "ping", "message": f"bleep bloop {message} I'm a robot"}, to=sid)
+    # @socketio.on("message")
+    # def message(data):
+    #     # 'hello world'... if we have need for more logic here, we'll probably use a dictionary of functions for each message type.
+    
+    #     if data['type'] == "popout":
+    #         log(f"popout: {data}")
+    #     if data['type'] == "ping":
+    #         log(f"ping: {data}")
 
-    @socketio.on("connect")
-    def test_connect(auth):
-        log(f"WebSocket client connected, args: {request.args}")
-        # socketio.emit('popout', "KNkyOT")
-
-    @socketio.on("message")
-    def message(data):
-        # 'hello world'... if we have need for more logic here, we'll probably use a dictionary of functions for each message type.
-        if data['type'] == "popout":
-            log(f"popout: {data}")
-        if data['type'] == "ping":
-            log(f"ping: {data}")
-
-            # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"})
-            # how about getting it to respond only to the client that sent the message?
-            # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"}, to=request.sid)
-            # ... or maybe I should stick to REST for now.
-            sid = request.args.get("sid")
-            # error asyncio.run() cannot be called from a running event loop
-            # asyncio.run(response(sid, data.get('message')))
-            # response(sid, data.get('message'))
+    #         # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"})
+    #         # how about getting it to respond only to the client that sent the message?
+    #         # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"}, to=request.sid)
+    #         # ... or maybe I should stick to REST for now.
+    #         sid = request.args.get("sid")
+    #         # error asyncio.run() cannot be called from a running event loop
+    #         # asyncio.run(response(sid, data.get('message')))
+    #         # response(sid, data.get('message'))
 
 
 def get_socket_logger(event_name="log"):
@@ -75,6 +81,7 @@ class ChatSocketAPI:
         log_name = f"/project/{project.id}/chat"
         self.progress_name = f"/project/{project.id}/chat_progress"
         self.logger = get_socket_logger(log_name)
+        self.project_namespace = f"/project/{project.id}"
     def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
         """
         Send a message to the chat log and also update the progress bar.
@@ -87,10 +94,21 @@ class ChatSocketAPI:
         """
         # we should descriminate which user to send this to... 
         # which implies that this instance should be associated...
-        self.socketio.emit(self.progress_name, {"message": message, "id": id, "progress": progress, "delta": delta})
+        # or that we can map the chat request ID to a user ID.
+
+        # I think simplest way to do this will be to use request.sid,
+        # which implies that the `/chat` endpoint should be socket.io rather than REST.
+
+        # to = chat_sid_map.get(id, None)
+        # if to is None:
+        #     log(f"Chat progress update for {id} but no associated user found, skipping.")
+        #     return
+        self.socketio.emit(self.progress_name, {
+            "message": message, "id": id, "progress": progress, "delta": delta
+        }, namespace=self.project_namespace)
 
 class SocketIOHandler(logging.StreamHandler):
-    def __init__(self, socketio, event_name="log"):
+    def __init__(self, socketio: SocketIO, event_name="log"):
         super().__init__()
         log(f"handler initialized for event: {event_name}")
         self.socketio = socketio
@@ -110,6 +128,7 @@ class SocketIOHandler(logging.StreamHandler):
         try:
             msg = self.format(record)
             log(f"[ {self.event_name} ] {msg}")
+            #!!! to=???
             self.socketio.emit(self.event_name, msg)
         except Exception:
             self.handleError(record)

@@ -460,7 +460,7 @@ class ProjectChat(ProjectChatProtocol):
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return f"I ran some code for you:\n\n```python\n{final_code}```"
+                return f"I ran some code for you:\n\n```python\n{final_code}\n```"
         except Exception as e:
             self.socket_api.update_chat_progress(
                 f"Error: {str(e)[:500]}", id, 100, 0

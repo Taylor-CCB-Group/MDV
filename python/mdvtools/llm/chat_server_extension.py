@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Optional, Protocol, cast
 from mdvtools.llm.chat_protocol import (
   ProjectChat,
   ProjectChatProtocol, 
@@ -7,9 +7,8 @@ from mdvtools.llm.chat_protocol import (
 from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
-from mdvtools.websocket import socketio
 # from mdvtools.dbutils.config import config
-from flask import Flask, request
+from flask import Flask, request, session, current_app
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -42,13 +41,18 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
-        # @socketio.on("connect", namespace=f"/project/{project.id}")
-        # def chat_connect():
-        #     """
-        #     Handle WebSocket connections for the chat extension.
-        #     This could be used to initialize a chat session or perform other setup tasks.
-        #     We should check authentication here,
-        #     """
+        from mdvtools.websocket import socketio
+        if socketio is None:
+            raise Exception("socketio is not initialized")
+        @socketio.on("connect", namespace=f"/project/{project.id}")
+        def chat_connect():
+            """
+            Handle WebSocket connections for the chat extension.
+            This could be used to initialize a chat session or perform other setup tasks.
+            We should check authentication here,
+            **nb the coupling of sockets and "chat" should be removed.**
+            """
+            # todo - check access level, whether chat is enabled etc
             
 
         bot: Optional[ProjectChatProtocol] = None
@@ -65,6 +69,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
             id = request.json.get("id")
+            if not message or not id:
+                return {"error": "Missing 'message' or 'id' in request JSON"}, 400
+            # todo - consider having a socket.io event for this, rather than a REST endpoint.
+            # this would mean that we could use request.sid to track the chat session
             conversation_id = request.json.get("conversation_id")
             try:
                 if bot is None:
@@ -86,6 +94,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             except Exception as e:
                 print(e)
                 return {"message": str(e)}
+    
     def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
         """
         Mutate the state.json before returning it as a request response,

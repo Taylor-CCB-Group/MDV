@@ -1,5 +1,6 @@
 from flask import Flask
 import logging
+import os
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -16,6 +17,44 @@ except Exception as e:
 
 # Keep the existing __main__ block for direct execution
 if __name__ == '__main__':
+    """
+    Running the app in local debugger with a path prefix
+    This can be usefull for testing behaviour app running on a sub-path
+    """
+    
+    # https://stackoverflow.com/a/36033627/279703
+    class PrefixMiddleware(object):
+
+        def __init__(self, app, prefix=''):
+            self.app = app
+            self.prefix = prefix
+
+        def __call__(self, environ, start_response):
+            if environ['PATH_INFO'].startswith(self.prefix):
+                environ['PATH_INFO'] = environ['PATH_INFO'][len(self.prefix):]
+                environ['SCRIPT_NAME'] = self.prefix
+                return self.app(environ, start_response)
+            else:
+                # It's good practice to ensure the Content-Length header is set.
+                # The Werkzeug BaseResponse object (which Flask uses) handles this automatically
+                # if the response is a string or a list of strings, but here we are returning a list of bytes.
+                response_body = b"This url does not belong to the app."
+                headers = [('Content-Type', 'text/plain'), ('Content-Length', str(len(response_body)))]
+                start_response('404 Not Found', headers)
+                return [response_body]
+    
     logging.basicConfig(level=logging.INFO)
     logger.info("running as __main__")
-    app.run(host='0.0.0.0', debug=False, port=5055)
+    os.environ['MDV_API_ROOT'] = '/test/'
+
+    # Get the prefix from the environment variable
+    prefix = os.environ.get('MDV_API_ROOT', '')
+    # Remove trailing slash from prefix if it exists, as PATH_INFO usually starts with a slash
+    if prefix.endswith('/'):
+        prefix = prefix[:-1]
+
+    if prefix:
+        logger.info(f"Applying PrefixMiddleware with prefix: {prefix}")
+        app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix=prefix)
+
+    app.run(host='0.0.0.0', debug=False, port=5056)

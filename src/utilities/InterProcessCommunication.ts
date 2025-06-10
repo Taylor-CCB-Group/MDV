@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 import type ChartManager from "../charts/ChartManager";
 import { DataModel } from "../table/DataModel";
+import { getProjectInfo } from "@/modules/ProjectContext";
 
 type VuplexCallback = (event: { data: MDVMessage }) => void;
 
@@ -81,11 +82,16 @@ export default async function connectIPC(cm: ChartManager) {
             }
         },
     );
-    // const socket = { on: (s: any, f: any) => {}, emit: (...args: any[])=>{} }; //io(url);
-    // we should configure this with appropriate auth if needed, a namespace, etc.
-    // const url = `${location.origin}/${location.pathname}`;
-    // should use a better way of joining paths
-    const socket = io(undefined, {path: `${cm.config.mdv_api_root}socket.io`});
+    const { projectName, mainApiRoute } = getProjectInfo();
+    const projectNamespace = `/project/${projectName}`;
+    const socketPath = `${mainApiRoute}socket.io`;
+
+    console.log(`Attempting to connect to Socket.IO namespace: ${projectNamespace} at path: ${socketPath}`);
+
+    const socket = io(projectNamespace, {
+        path: socketPath,
+        // auth: { token: "your_auth_token" } // Example for token-based auth if you implement it
+    });
 
     function sendMessage(msg: MDVMessage) {
         socket.emit("message", msg);
