@@ -186,6 +186,9 @@ def prepare_code(result: str, data: str | pd.DataFrame, project: MDVProject, log
         captured_lines = "\n".join(lines[start_index:])
     else:
         log("Pattern not found")
+        # this seems like it may actually be an error - and maybe not recoverable at this point
+        # I am adding this line to placate pyright which is complaining about `captured_lines` being possibly unbound
+        captured_lines = "# WARNING:::: No code captured from the response when calling prepare_code().\n"
 
     # Log the prompt and the output of the LLM to the google sheets
     # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)

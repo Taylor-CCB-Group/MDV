@@ -109,7 +109,7 @@ projectMK.add_datasource(datasource_name, cells_df)
 logger= logging.Logger(__name__)
 langchain_logging_handler = LangchainLoggingHandler(logger)
 log = logger.info
-
+df1 = None
 if len(projectMK.datasources) == 0:
     raise ValueError("The project does not have any datasources")
 elif len(projectMK.datasources) > 1:
@@ -126,6 +126,7 @@ try:
             # handle_parsing_errors="Error in pandas agent"
         )
     elif len(projectMK.datasources) == 2:
+        assert(df1 is not None), "The second datasource dataframe is None"
         agent = lp.create_pandas_dataframe_agent(
             dataframe_llm, [df, df1], verbose=True, allow_dangerous_code=True,
             # handle_parsing_errors="Error in pandas agent"
