@@ -7,7 +7,6 @@ import {
     Remove as RemoveIcon,
     CloudUpload as CloudUploadIcon,
     PestControl as PestControlIcon,
-    Chat,
 } from "@mui/icons-material";
 import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
 import IconWithTooltip from "./IconWithTooltip";
@@ -23,34 +22,7 @@ import { useState } from "react";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
-import ChatDialog from "@/charts/dialogs/ChatDialog";
-import ChatLogDialog from "@/charts/dialogs/ChatLogDialog";
-import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
-import ChatLogIcon from '@mui/icons-material/WebStories';
-import { useChartManager } from "../hooks";
-
-const ChatButtons = () => {
-    // very basic check to see if chat is enabled
-    const chatEnabled = useChartManager().config.chat_enabled;
-    const handleChatButtonClick = () => {
-        new ChatDialog();
-    };
-
-    const handleChatLogButtonClick = () => {
-        new ChatLogDialog();
-    };
-    if (!chatEnabled) return null;
-    return (
-        <>
-            <IconWithTooltip tooltipText="Chat" onClick={handleChatButtonClick}>
-                <ChatBubbleIcon />
-            </IconWithTooltip>
-            <IconWithTooltip tooltipText="Chat Log" onClick={handleChatLogButtonClick}>
-                <ChatLogIcon />
-            </IconWithTooltip>
-        </>
-    );
-}
+import ChatButtons from "./ChatButtons";
 
 const MenuBarComponent = () => {
     const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
