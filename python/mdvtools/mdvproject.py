@@ -17,6 +17,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
+from pandas.api.types import is_bool_dtype
 # from mdvtools.charts.view import View 
 import time
 import copy
@@ -935,7 +936,7 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | str,
+        dataframe: pandas.DataFrame | pandas.Series | str,
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
@@ -1148,7 +1149,7 @@ class MDVProject:
         data,
         name: Optional[str] = None,
         label: Optional[str] = None,
-        sparse=False,
+        sparse=False, # this should be inferred from the data
         chunk_data=False
     ):
         """Add rows as columns in a subgroup."""
@@ -1928,12 +1929,12 @@ def add_column_to_group(
     ):
         #in pandas missing values are represented by NaN
         #which cause problems when co-ercing into text, therefore replace with ND
-        if data.dtype == "category": # type: ignore not sure what's best here
+        if isinstance(data, pandas.CategoricalDtype):
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
-        #no boolean datatype at the moment have to co-erce to text
-        elif data.dtype== "boolean":
-            data= data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+        #no boolean datatype in MDV at the moment, have to co-erce to text
+        elif is_bool_dtype(data):
+            data = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
         else:
             # may need to double-check this...
             data = data.fillna("ND")
