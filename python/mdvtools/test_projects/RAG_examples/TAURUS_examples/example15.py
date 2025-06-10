@@ -40,9 +40,9 @@ def main():
     genes_df['gene_id'] = genes_df.index
 
     # Find the gene with the lowest expression
-    gene_expression_means = adata.X.mean(axis=0)
+    gene_expression_means = adata.X.mean(axis=0) # type: ignore
     lowest_expression_index = np.argmin(gene_expression_means)
-    lowest_expression_gene = genes_df.index[lowest_expression_index]
+    lowest_expression_gene = genes_df.index[lowest_expression_index] # type: ignore
 
    # Create project
     project = MDVProject(project_path, delete_existing=True)
@@ -53,7 +53,7 @@ def main():
     
     # Create a link between the two datasets
     project.add_rows_as_columns_link("cells", "genes", "gene_id", "Gene Expression")
-    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X.toarray())
+    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X)
     
     # DotPlot parameters for the gene with the lowest expression
     dot_title = f"Gene expression for {lowest_expression_gene} per cell state"
