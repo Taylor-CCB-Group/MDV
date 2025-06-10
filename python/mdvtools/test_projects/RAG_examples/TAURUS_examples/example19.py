@@ -62,11 +62,11 @@ def main():
     t_cells_df = cells_df[cells_df['major'] == 'T cells']
     
     # Find the top marker gene for T cells
-    gene_expression_matrix = adata.X.toarray()
+    gene_expression_matrix = adata.X.toarray() # type: ignore
     t_cells_expression = gene_expression_matrix[t_cells_df.index, :]
     gene_sums = t_cells_expression.sum(axis=0)
     top_marker_gene_index = np.argmax(gene_sums)
-    top_marker_gene_name = genes_df.index[top_marker_gene_index]
+    top_marker_gene_name = genes_df.index[top_marker_gene_index] # type: ignore
     print(f"Top marker gene for T cells: {top_marker_gene_name}")
     
     # Create project

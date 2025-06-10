@@ -1016,7 +1016,7 @@ class MDVProject:
             for col in columns:
                 try:
                     print(f"- adding column '{col['field']}' to datasource '{name}'")
-                    add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean)
+                    add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean) # type: ignore
                 except Exception as e:
                     print(f" ++++++ DODGY COLUMN: {col['field']}")
                     dodgy_columns.append(col["field"])
