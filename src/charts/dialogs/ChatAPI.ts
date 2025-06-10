@@ -301,6 +301,12 @@ const useChat = () => {
         try {
             setIsSending(true);
             setCurrentRequestId(id);
+            setMessages(prev => [...prev, {
+                text: input,
+                sender: 'user',
+                id: generateId(),
+                conversationId,
+            }])
             await sendMessage(input, id, route, conversationId);
             queryClient.invalidateQueries({ queryKey: ['chatLog'] });
         } catch (error) {
@@ -308,7 +314,7 @@ const useChat = () => {
             setMessages(prev => [...prev, {
                 text: `ERROR: ${error}`,
                 sender: 'bot',
-                id,
+                id: generateId(),
                 conversationId
             }]);
             console.log("Error sending message: ", error);
