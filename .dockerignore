@@ -2,6 +2,7 @@ __pycache__
 .git
 node_modules
 venv
+.venv
 docsenv
 # subject to review
 # docs/jsdocs/build
