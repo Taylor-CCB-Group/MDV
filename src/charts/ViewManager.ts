@@ -271,12 +271,17 @@ class ViewManager {
     async saveAsView(viewName: string) {
         try {
             const { viewData, dsIndex, contentDiv } = this.cm;
-            // Add and set the new view
-            this.setAllViews([...this.all_views, viewName]);
+            // Add and set the new view only if it doesn't already exist
+            if (!this.all_views.includes(viewName)) {
+                this.setAllViews([...this.all_views, viewName]);
+            }
             this.setView(viewName);
 
             // Get current state before clearing
             const state = this.cm.getState();
+            
+            // Update the view name in the state
+            state.view.name = viewName;
             
             // Clear existing gridstack instances
             for (const ds in viewData.dataSources) {
