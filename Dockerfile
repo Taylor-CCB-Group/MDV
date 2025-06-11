@@ -44,10 +44,7 @@ WORKDIR /app
 # - Mixing concerns: system packages and project packages in same namespace
 # 
 # DECISION: Using virtual environments for security and permission isolation,
-# despite the convenience tradeoff. For terminal use inside container:
-# - Use `poetry shell` to activate the environment
-# - Or prefix commands with `poetry run`
-# - Or add alias in bashrc: alias python='poetry run python'
+# `.bashrc` is used to activate the virtual environment automatically.
 RUN poetry config virtualenvs.in-project true
 
 # Install Python dependencies using Poetry
@@ -97,15 +94,9 @@ EXPOSE 5055
 # something changed causing npm to need this in order for `source` to work in npm scripts
 RUN npm config set script-shell "/bin/bash"
 
-# Add convenience aliases for terminal use with virtual environments
-# This makes it easier to work in the container terminal without remembering poetry run
-RUN echo 'alias python="poetry run python"' >> ~/.bashrc && \
-    echo 'alias pip="poetry run pip"' >> ~/.bashrc && \
-    echo 'alias pytest="poetry run pytest"' >> ~/.bashrc && \
-    echo 'alias flask="poetry run flask"' >> ~/.bashrc && \
-    echo 'alias gunicorn="poetry run gunicorn"' >> ~/.bashrc && \
-    echo 'alias mdv="poetry run python -m mdvtools"' >> ~/.bashrc && \
-    echo 'echo "💡 Tip: Virtual environment is active. Use poetry shell for full activation or commands are aliased."' >> ~/.bashrc
+# Add automatic poetry shell activation for terminal use
+RUN echo 'cd /app/python && $(poetry env activate)' >> ~/.bashrc && \
+    echo 'cd /app' >> ~/.bashrc
 
 # Command to run Gunicorn
 CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "200", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]
