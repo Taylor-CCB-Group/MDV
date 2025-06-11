@@ -21,7 +21,18 @@ class TextBoxChart extends BaseChart {
         //decreases size of entry module
         import("../utilities/MarkdownText").then(({ default: renderText }) => {
             this.render = renderText;
-            this.para.innerHTML = this.render(c.text);
+            const textContainer = createEl(
+                "div",
+                {},
+                this.para,
+            )
+            const textEl = this.render(c.text);
+            textContainer.innerHTML = textEl;
+            textContainer.firstChild.style.userSelect = "text";
+            textContainer.firstChild.style["-webkit-user-select"] = "text";
+            textContainer.firstChild.style["-moz-user-select"] = "text";
+            textContainer.firstChild.style["-ms-user-select"] = "text";
+
         });
     }
 
