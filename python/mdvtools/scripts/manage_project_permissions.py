@@ -22,15 +22,11 @@ def get_project_by_name(name: str) -> Union[Project, None]:
     return Project.query.filter_by(name=name, is_deleted=False).first()
 
 def parse_permission(permission: str) -> Dict[str, bool]:
-    """Parse permission string into a dictionary of boolean flags."""
-    permission = permission.lower()
-    if permission not in ['view', 'edit', 'owner']:
-        raise ValueError("Permission must be one of: view, edit, owner")
-    
+    """Parse permission string into a dict of boolean flags."""
     return {
         'is_owner': permission == 'owner',
         'can_write': permission in ['edit', 'owner'],
-        'can_read': True  # Always true if user has access to project
+        'can_read': True  # Always true if added to a project
     }
 
 def assign_permissions(user_email: str, project_name: str, permission: str):
@@ -47,12 +43,17 @@ def assign_permissions(user_email: str, project_name: str, permission: str):
 
     perm = parse_permission(permission)
     try:
+        # Update database
         UserProjectService.add_or_update_user_project(
             user_id=user.id,
             project_id=project.id,
             is_owner=perm['is_owner'],
             can_write=perm['can_write']
         )
+
+        # Refresh all caches
+        cache_user_projects()
+
         print(f"Successfully assigned {permission} permission to {user_email} for project {project_name}")
         return True
     except Exception as e:
@@ -131,11 +132,6 @@ def main():
         else:
             parser.print_help()
             sys.exit(1)
-
-        # Update cache after changes
-        if success:
-            cache_user_projects()
-            print("Successfully updated user-project cache")
     
     sys.exit(0 if success else 1)
 
