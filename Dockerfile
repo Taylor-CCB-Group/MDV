@@ -72,15 +72,23 @@ COPY --chown=pn:pn package*.json ./
 ## Install npm dependencies
 RUN npm install
 
-# Copy the entire project to the working directory (with correct ownership)
-COPY --chown=pn:pn . .
-
-# & start dev server (should only happen in dev - but other yml configs won't expose the port)
-# RUN npm run dev # run manually in container
+# Copy only frontend-related files needed for the build
+# This ensures the frontend build cache only invalidates when frontend files change
+COPY --chown=pn:pn src/ ./src/
+COPY --chown=pn:pn vite.config.mts ./
+COPY --chown=pn:pn tsconfig.json ./
+COPY --chown=pn:pn index.html ./
+COPY --chown=pn:pn public/ ./public/
+COPY --chown=pn:pn tailwind.config.js ./
+COPY --chown=pn:pn postcss.config.js ./
+COPY --chown=pn:pn biome.jsonc ./
 
 ## Run the npm build script for Flask and Vite
-# this will often change, so it's good to have it last... doesn't seem to be cached
+# This step will be cached unless frontend-related files change
 RUN npm run build-flask-dockerjs
+
+# Copy the complete project again to ensure all directories exist in final container
+COPY --chown=pn:pn . .
 
 WORKDIR /app/python
 # installing again so we have mdvtools as a module, on top of the previous install layer with dependencies

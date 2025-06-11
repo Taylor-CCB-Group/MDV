@@ -2,7 +2,7 @@ __pycache__
 .git
 node_modules
 venv
-.venv
+python/.venv
 docsenv
 # subject to review
 # docs/jsdocs/build
@@ -12,3 +12,40 @@ docsenv
 dist
 python/mdvtools/static
 .env
+
+# Editor and IDE files
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Development and runtime files
+*.log
+logs/
+app_logs/
+*.pid
+*.seed
+*.cover
+.nyc_output
+coverage/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
