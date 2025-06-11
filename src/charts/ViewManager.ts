@@ -269,7 +269,32 @@ class ViewManager {
 
     @action
     async saveAsView(viewName: string) {
-        await this.addView(viewName, {}, true);
+        try {
+            const { viewData, dsIndex, contentDiv } = this.cm;
+            // Add and set the new view
+            this.setAllViews([...this.all_views, viewName]);
+            this.setView(viewName);
+
+            // Get current state before clearing
+            const state = this.cm.getState();
+            
+            // Clear existing gridstack instances
+            for (const ds in viewData.dataSources) {
+                if (viewData.dataSources[ds].layout === "gridstack") {
+                    const d = dsIndex[ds];
+                    if (!d) continue;
+                    this.cm.gridStack.destroy(d);
+                }
+            }
+            
+            // Clear content and reinitialize
+            contentDiv.innerHTML = "";
+            await this.cm._init(state.view);
+            // Save the new view
+            await this.saveView();
+        } catch (error) {
+            console.error("error in save as view", error);
+        }
     }
 
     checkUnsavedState(action: () => void) {
