@@ -1127,13 +1127,7 @@ export class ChartManager {
         // const twidth = this.contentDiv.offsetWidth;
         for (const ds of this.dataSources) {
             if (ds.contentDiv) {
-                // Preserve chart configs for gridstack layouts
-                if (this.viewData.dataSources[ds.name]?.layout === "gridstack" && this.gridStack?.getCurrentCharts) {
-                    initialCharts[ds.name] = this.gridStack.getCurrentCharts(ds);
-                } else {
-                    // For other layouts, fallback to previous logic or empty array
-                    initialCharts[ds.name] = [];
-                }
+                initialCharts[ds.name] = [];
                 const w = this.dsPanes[ds.name].style.width;
                 const re2 = /calc\((.+)\%.+/;
                 this.viewData.dataSources[ds.name].panelWidth =

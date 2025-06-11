@@ -34,36 +34,6 @@ export type GridInstance = {
 };
 
 export default class GridStackManager {
-    /**
-     * Returns the current chart configurations for a given data source in gridstack layout.
-     * This is used to preserve chart layout when saving or cloning a view.
-     */
-    /**
-     * Returns the current chart configurations for a given data source in gridstack layout.
-     * Accepts either a DataSource object or a string (data source name).
-     * This is used to preserve chart layout when saving or cloning a view.
-     */
-    getCurrentCharts(dsOrName: DataSource | string) {
-        let dsObj: DataSource | undefined = undefined;
-        if (typeof dsOrName === "string") {
-            // Try to find the DataSource object by name
-            for (const ds of this.grids?.keys?.() ?? []) {
-                if (ds.name === dsOrName) {
-                    dsObj = ds;
-                    break;
-                }
-            }
-        } else {
-            dsObj = dsOrName;
-        }
-        const gridInstance = dsObj ? this.grids?.get?.(dsObj) : undefined;
-        if (!gridInstance || !gridInstance.charts) return [];
-        // Each ManagedChart should have a .config describing its state
-        return Array.from(gridInstance.charts).map((chart: any) => {
-            // Deep clone to avoid mutation issues
-            return chart.config ? JSON.parse(JSON.stringify(chart.config)) : null;
-        }).filter(Boolean);
-    }
     cellHeight = 150;
     cellApproxWidth = 300;
     grids: Map<DataSource, GridInstance>;
