@@ -134,12 +134,44 @@ def wait_for_database():
     """Wait for the database to be ready before proceeding."""
     max_retries = 30
     delay = 5  # seconds
+    db_name = os.getenv('DB_NAME')
+    
+    if not db_name:
+        error_message = "Error: DB_NAME environment variable is not set"
+        logger.error(error_message)
+        raise ValueError(error_message)
 
     for attempt in range(max_retries):
         try:
             # Test database connection using engine.connect()
             with db.engine.connect() as connection:
                 connection.execute(text('SELECT 1'))
+                
+                # Check if the database exists
+                result = connection.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": db_name})
+                exists = result.scalar()
+                
+                if not exists:
+                    # Create the database if it doesn't exist
+                    # We need to close the current connection before creating a new database
+                    connection.execute(text('COMMIT'))  # Commit any pending transaction
+                    connection.close()
+                    
+                    # Create a new connection to the default database
+                    engine = db.create_engine('postgresql://{}:{}@{}/postgres'.format(
+                        os.getenv('DB_USER'),
+                        os.getenv('DB_PASSWORD'),
+                        os.getenv('DB_HOST')
+                    ))
+                    
+                    with engine.connect() as new_conn:
+                        # CONNECTION CANNOT BE USED FOR OTHER QUERIES AFTER CREATE DATABASE
+                        new_conn.execute(text("COMMIT"))
+                        new_conn.execute(text(f"CREATE DATABASE {db_name}"))
+                        logger.info(f"Created database: {db_name}")
+                else:
+                    logger.info(f"Database {db_name} already exists")
+                    
             logger.info("Database is ready!")
             return
         except OperationalError as oe:
@@ -148,7 +180,6 @@ def wait_for_database():
         except Exception as e:
             logger.exception(f"An unexpected error occurred while waiting for the database: {e}")
             raise  # Re-raise the exception to be handled by the parent
-            # ^^ should this be `raise e` instead?
 
     # If the loop completes without a successful connection
     error_message = "Error: Database did not become available in time."
