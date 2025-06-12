@@ -42,7 +42,10 @@ class ChatLogger:
     """Handles chat logging functionality"""
     def __init__(self, log_file_path: str):
         self.log_file_path = Path(log_file_path)
-        self._ensure_log_file_exists()
+        # note - not calling _ensure_log_file_exists here, 
+        # it will currently be called when logging or reading logs
+        # this is not necessarily the best design, but should avoid some current issues
+        # and also I don't think we should be so eager to create the log file anyway.
 
     def _ensure_log_file_exists(self):
         """Ensure the log file exists and is properly initialized"""
@@ -50,10 +53,10 @@ class ChatLogger:
             self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.log_file_path, 'w') as f:
                 json.dump([], f)
-
     def log_chat(self, item: ChatLogItem):
         """Log a chat item to the JSON file"""
         try:
+            self._ensure_log_file_exists()
             # Read existing logs
             with open(self.log_file_path, 'r') as f:
                 logs = json.load(f)
@@ -70,6 +73,7 @@ class ChatLogger:
     def get_logs(self) -> List[ChatLogItem]:
         """Get all chat logs"""
         try:
+            self._ensure_log_file_exists()
             with open(self.log_file_path, 'r') as f:
                 logs = json.load(f)
             return [ChatLogItem.from_dict(log) for log in logs]
