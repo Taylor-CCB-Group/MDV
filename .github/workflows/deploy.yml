@@ -50,6 +50,8 @@ jobs:
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
             --push .
+        env:
+          NEW_VERSION: ${{ env.NEW_VERSION }}
 
 
       - name: Commit and push new version
@@ -61,3 +63,4 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ env.NEW_VERSION }}
