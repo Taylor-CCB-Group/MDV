@@ -173,12 +173,15 @@ def wait_for_database():
                 db_name
             )
             
-            # Update the engine to use our target database
-            db.engine = db.create_engine(target_uri)
+            # Create a new engine for our target database
+            target_engine = db.create_engine(target_uri)
             
             # Test the connection to our target database
-            with db.engine.connect() as connection:
+            with target_engine.connect() as connection:
                 connection.execute(text('SELECT 1'))
+            
+            # Initialize the database with the new engine
+            db.init_app(db.app, engine=target_engine)
             
             logger.info("Database is ready!")
             return
