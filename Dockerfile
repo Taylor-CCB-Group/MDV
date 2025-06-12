@@ -83,6 +83,7 @@ COPY --chown=pn:pn tailwind.config.js ./
 COPY --chown=pn:pn postcss.config.js ./
 COPY --chown=pn:pn biome.jsonc ./
 
+RUN mkdir dist
 ## Run the npm build script for Flask and Vite
 # This step will be cached unless frontend-related files change
 RUN npm run build-flask-dockerjs
