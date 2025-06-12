@@ -140,6 +140,11 @@ RUN npm config set script-shell "/bin/bash"
 RUN echo 'cd /app/python && $(poetry env activate)' >> ~/.bashrc && \
     echo 'cd /app' >> ~/.bashrc
 
+COPY --chown=pn:pn docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
 # Command to run Gunicorn
 CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "200", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
