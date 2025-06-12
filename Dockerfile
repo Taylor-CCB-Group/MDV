@@ -4,6 +4,21 @@
 # not sure if there's a way of pinning a more specific build of the base image. May want to see if we can reproduce this issue outside of docker.
 FROM nikolaik/python-nodejs:python3.12-nodejs20 AS frontend-builder
 
+# ARG and ENV for build information, to be passed in from the CI pipeline
+ARG GIT_COMMIT_DATE="unknown"
+ARG GIT_BRANCH_NAME="unknown"
+ARG GIT_COMMIT_HASH="unknown"
+ARG GIT_LAST_COMMIT_MESSAGE="unknown"
+ARG BUILD_DATE="unknown"
+ARG GIT_DIRTY="false"
+
+ENV VITE_GIT_COMMIT_DATE=$GIT_COMMIT_DATE
+ENV VITE_GIT_BRANCH_NAME=$GIT_BRANCH_NAME
+ENV VITE_GIT_COMMIT_HASH=$GIT_COMMIT_HASH
+ENV VITE_GIT_LAST_COMMIT_MESSAGE=$GIT_LAST_COMMIT_MESSAGE
+ENV VITE_BUILD_DATE=$BUILD_DATE
+ENV VITE_GIT_DIRTY=$GIT_DIRTY
+
 # Install system packages as root (these require root privileges)
 # this layer will change less frequently than the others, so it's good to have it first
 # Install HDF5 library, for some reason poetry can't install it in this context as of now

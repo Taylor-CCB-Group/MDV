@@ -60,15 +60,15 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Increment version
-        id: increment_version
+      - name: Generate build metadata
+        id: build_metadata
         run: |
-          VERSION=$(cat version.txt)
-          echo "Current version: $VERSION"
-          NEW_VERSION=$(awk -F. '{print $1"."($2+1)}' version.txt)
-          echo "New version: $NEW_VERSION"
-          echo $NEW_VERSION > version.txt
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit_date=$(git log -1 --format=%cI)" >> $GITHUB_OUTPUT
+          echo "git_branch_name=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          echo "git_commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "git_last_commit_message=$(git show -s --format=%s | sed 's/"/\\"/g')" >> $GITHUB_OUTPUT
+          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "git_dirty=false" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: release_notes
@@ -86,19 +86,17 @@ jobs:
         run: |
           echo "Building and pushing image..."
           docker buildx build --platform linux/amd64 \
-            --label "org.opencontainers.image.version=${{ steps.increment_version.outputs.new_version }}" \
-            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --build-arg GIT_COMMIT_DATE="'${{ steps.build_metadata.outputs.git_commit_date }}'" \
+            --build-arg GIT_BRANCH_NAME="'${{ steps.build_metadata.outputs.git_branch_name }}'" \
+            --build-arg GIT_COMMIT_HASH="'${{ steps.build_metadata.outputs.git_commit_hash }}'" \
+            --build-arg GIT_LAST_COMMIT_MESSAGE="'${{ steps.build_metadata.outputs.git_last_commit_message }}'" \
+            --build-arg BUILD_DATE="'${{ steps.build_metadata.outputs.build_date }}'" \
+            --build-arg GIT_DIRTY="'${{ steps.build_metadata.outputs.git_dirty }}'" \
+            --label "org.opencontainers.image.version=${{ steps.build_metadata.outputs.git_commit_hash }}" \
+            --label "org.opencontainers.image.revision=${{ steps.build_metadata.outputs.git_commit_hash }}" \
+            --label "org.opencontainers.image.created=${{ steps.build_metadata.outputs.build_date }}" \
+            --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
             --label "org.opencontainers.image.description=${{ steps.release_notes.outputs.release_notes }}" \
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ steps.increment_version.outputs.new_version }} \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ steps.build_metadata.outputs.git_commit_hash }} \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
-            --push .
-
-      - name: Commit and push new version
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.txt
-          git commit -m "Increment version to ${{ steps.increment_version.outputs.new_version }} [skip ci]"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+            --push . 
