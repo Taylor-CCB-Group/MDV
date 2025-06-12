@@ -209,7 +209,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
             return response
         
         # Attach the memory object to the agent so it can be cleared externally
-        agent_with_contextualization.memory = memory
+        agent_with_contextualization.memory = memory # type: ignore not sure why pyright complains about this
 
         return agent_with_contextualization
 
@@ -263,7 +263,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
         # Reset the agent's conversation memory after RESET_THRESHOLD requests.
         if request_counter % RESET_THRESHOLD == 0:
-            agent.memory.clear()  # Clear the conversation history.
+            agent.memory.clear()  # Clear the conversation history. # type: ignore
             logger.info(f"Agent memory has been reset after {request_counter} requests.")
     
     result_df = pd.DataFrame(results)

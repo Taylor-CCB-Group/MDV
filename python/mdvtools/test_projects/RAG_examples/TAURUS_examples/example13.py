@@ -72,7 +72,7 @@ def main():
     
     # Creating the link between the two datasets so that selecting a subset of genes to add the expression in cells is enabled
     project.add_rows_as_columns_link("cells", "genes", "gene_id", "Gene expression")
-    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X.toarray()) # add the gene expression
+    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X) # add the gene expression
     
     project.set_view(view_name, view_config)
     project.set_editable(True)

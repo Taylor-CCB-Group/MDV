@@ -40,8 +40,8 @@ def main():
     # Calculate the percentage of cells expressing TNF
     gene_name = "TNF"
     gene_index = genes_df.index.get_loc(gene_name)
-    gene_expression_matrix = adata.X.toarray()
-    tnf_expression = gene_expression_matrix[:, gene_index]
+    gene_expression_matrix = adata.X
+    tnf_expression = gene_expression_matrix[:, gene_index] # type: ignore
     cells_expressing_tnf = (tnf_expression > 0).sum()
     total_cells = len(cells_df)
     percentage_expressing_tnf = (cells_expressing_tnf / total_cells) * 100

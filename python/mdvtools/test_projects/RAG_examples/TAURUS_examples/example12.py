@@ -56,7 +56,7 @@ def main():
     
     # Create a link between the two datasets
     project.add_rows_as_columns_link("cells", "genes", "gene_id", "Gene Expression")
-    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X.toarray())
+    project.add_rows_as_columns_subgroup("cells", "genes", "Gene expression", adata.X)
     
     # BoxPlot parameters for the specific gene "MIR1302-2HG"
     gene_name = "MIR1302-2HG"
