@@ -14,14 +14,6 @@ python/mdvtools/static
 .env
 
 # Editor and IDE files
-.vscode/
-.cursor/
-.idea/
-*.swp
-*.swo
-*~
-.project
-.settings/
 
 # OS generated files
 .DS_Store
