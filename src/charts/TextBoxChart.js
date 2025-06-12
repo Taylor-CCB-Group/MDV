@@ -1,6 +1,13 @@
 import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 
+const applySelectableTextStyle = (element) => {
+    element.style.userSelect = "text";
+    element.style["-webkit-user-select"] = "text";
+    element.style["-moz-user-select"] = "text";
+    element.style["-ms-user-select"] = "text";
+};
+
 class TextBoxChart extends BaseChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
@@ -21,7 +28,15 @@ class TextBoxChart extends BaseChart {
         //decreases size of entry module
         import("../utilities/MarkdownText").then(({ default: renderText }) => {
             this.render = renderText;
-            this.para.innerHTML = this.render(c.text);
+            this.textContainer = createEl(
+                "div",
+                {},
+                this.para,
+            )
+            if (!this.textContainer) return;
+            this.textContainer.innerHTML = this.render(c.text);
+            applySelectableTextStyle(this.textContainer.firstChild);
+
         });
     }
 
