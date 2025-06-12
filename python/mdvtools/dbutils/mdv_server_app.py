@@ -141,45 +141,54 @@ def wait_for_database():
         logger.error(error_message)
         raise ValueError(error_message)
 
+    # First connect to postgres database to check/create our target database
+    postgres_uri = 'postgresql://{}:{}@{}/postgres'.format(
+        os.getenv('DB_USER'),
+        os.getenv('DB_PASSWORD'),
+        os.getenv('DB_HOST')
+    )
+    
     for attempt in range(max_retries):
         try:
-            # Test database connection using engine.connect()
-            with db.engine.connect() as connection:
-                connection.execute(text('SELECT 1'))
-                
-                # Check if the database exists
+            # First connect to postgres database
+            engine = db.create_engine(postgres_uri)
+            with engine.connect() as connection:
+                # Check if our target database exists
                 result = connection.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": db_name})
                 exists = result.scalar()
                 
                 if not exists:
                     # Create the database if it doesn't exist
-                    # We need to close the current connection before creating a new database
-                    connection.execute(text('COMMIT'))  # Commit any pending transaction
-                    connection.close()
-                    
-                    # Create a new connection to the default database
-                    engine = db.create_engine('postgresql://{}:{}@{}/postgres'.format(
-                        os.getenv('DB_USER'),
-                        os.getenv('DB_PASSWORD'),
-                        os.getenv('DB_HOST')
-                    ))
-                    
-                    with engine.connect() as new_conn:
-                        # CONNECTION CANNOT BE USED FOR OTHER QUERIES AFTER CREATE DATABASE
-                        new_conn.execute(text("COMMIT"))
-                        new_conn.execute(text(f"CREATE DATABASE {db_name}"))
-                        logger.info(f"Created database: {db_name}")
+                    connection.execute(text("COMMIT"))
+                    connection.execute(text(f"CREATE DATABASE {db_name}"))
+                    logger.info(f"Created database: {db_name}")
                 else:
                     logger.info(f"Database {db_name} already exists")
-                    
+            
+            # Now try to connect to our target database
+            target_uri = 'postgresql://{}:{}@{}/{}'.format(
+                os.getenv('DB_USER'),
+                os.getenv('DB_PASSWORD'),
+                os.getenv('DB_HOST'),
+                db_name
+            )
+            
+            # Update the engine to use our target database
+            db.engine = db.create_engine(target_uri)
+            
+            # Test the connection to our target database
+            with db.engine.connect() as connection:
+                connection.execute(text('SELECT 1'))
+            
             logger.info("Database is ready!")
             return
+            
         except OperationalError as oe:
             logger.exception(f"OperationalError: {oe}. Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
             time.sleep(delay)
         except Exception as e:
             logger.exception(f"An unexpected error occurred while waiting for the database: {e}")
-            raise  # Re-raise the exception to be handled by the parent
+            raise
 
     # If the loop completes without a successful connection
     error_message = "Error: Database did not become available in time."
