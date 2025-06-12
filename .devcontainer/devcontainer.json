@@ -32,7 +32,7 @@
             ],
             "settings": {
                 "python.analysis.typeCheckingMode": "basic",
-                "python.defaultInterpreterPath": "/app/python/.venv/python",
+                "python.defaultInterpreterPath": "/app/python/.venv/bin/python",
                 "typescript.tsdk": "/app/node_modules/typescript/lib"
             }
         }
