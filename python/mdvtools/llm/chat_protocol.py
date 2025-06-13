@@ -3,8 +3,8 @@ from mdvtools.mdvproject import MDVProject
 
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
-    def log(self, msg: str, *args: Any, **kwargs: Any) -> None: ...
-    def ask_question(self, message: str, id: str) -> str: ...
+    def log(self, msg: str, *args: Any) -> None: ...
+    def ask_question(self, question: str, id: str, conversation_id: str) -> str: ...
     welcome: str
 
 chat_enabled = False
@@ -21,10 +21,10 @@ except Exception as e:
                 f"{msg}"
             )
 
-        def log(self, msg, *args, **kwargs):
+        def log(self, msg, *args):
             print("[dummy bot]: " + (msg % args if args else msg))
 
-        def ask_question(self, message, id):
+        def ask_question(self, question, id, conversation_id):
             return (
                 "Sorry, I can't help you right now\n\n"
                 f"{msg}"

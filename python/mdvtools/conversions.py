@@ -17,7 +17,9 @@ def convert_scanpy_to_mdv(
     max_dims: int = 3, 
     delete_existing: bool = False, 
     label: str = "",
-    chunk_data: bool = False
+    chunk_data: bool = False,
+    add_layer_data = True,
+    gene_identifier_column = None
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -35,7 +37,13 @@ def convert_scanpy_to_mdv(
             If False, merges with existing data. Defaults to False.
         label (str, optional): Prefix to add to datasource names and metadata columns
             when merging with existing data. Defaults to "".
-
+        chunk_data (bool, optional): For dense marixes, transposing and flattening
+            will be performed in chunks. Saves memory but takes longer. Default is False.
+        add_layer_data (bool, optional): If True (default) then the layer data (log values etc.)
+            will be added, otherwise just the X object will be used
+        gene_identifier_column: (str, optional) This is the gene column that the user will use to
+            identify the gene. If not specified (default) than a column 'name' will be added that is
+            created from the index (which is usaully the unique gene name)
     Returns:
         MDVProject: The configured MDV project object with the converted data
 
@@ -83,7 +91,7 @@ def convert_scanpy_to_mdv(
     # add any dimension reduction to the dataframe
     cell_table = _add_dims(cell_table, scanpy_object.obsm, max_dims)
 
-    # cell_is is the unique barcode and should of type unique
+    # cell_id is the unique barcode and should of type unique
     # (will be text16 by default if number of values are below 65536)
     # hopefully other columns will be of the correct format
     columns=[{
@@ -96,8 +104,13 @@ def convert_scanpy_to_mdv(
     gene_table = scanpy_object.var
     #need a way of detecting which column is the common gene name
     #most times it is the index but sometimes this is just the gene code or an
-    #incremental number. 
-    gene_table[f"{label}name"] = gene_table.index
+    #incremental number.
+    if gene_identifier_column and not gene_identifier_column in gene_table.columns:
+        print(f"gene identifier column {gene_identifier_column} not found, using index")
+        gene_identifier_column= None
+    if not gene_identifier_column:
+        gene_identifier_column= f"{label}name"
+        gene_table[gene_identifier_column] = gene_table.index
     gene_table = _add_dims(gene_table, scanpy_object.varm, max_dims)
 
     #originally column had to be unique - but now is just text
@@ -106,7 +119,7 @@ def convert_scanpy_to_mdv(
     mdv.add_datasource(f"{label}genes", gene_table)
 
     # link the two datasets
-    mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", f"{label}name", "Gene Expr")
+    mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", gene_identifier_column, "Gene Expr")
 
     #get the matrix in the correct format
     matrix,sparse= get_matrix(scanpy_object.X)
@@ -120,11 +133,12 @@ def convert_scanpy_to_mdv(
         )
 
     #now add layers
-    for layer,matrix in scanpy_object.layers.items():
-        matrix,sparse = get_matrix(matrix)
-        mdv.add_rows_as_columns_subgroup(
-            f"{label}cells", f"{label}genes", matrix, layer, sparse=sparse, chunk_data=chunk_data
-        )     
+    if add_layer_data:
+        for layer,matrix in scanpy_object.layers.items():
+            matrix,sparse = get_matrix(matrix)
+            mdv.add_rows_as_columns_subgroup(
+                f"{label}cells", f"{label}genes", matrix, layer, sparse=sparse, chunk_data=chunk_data
+            )
 
     if delete_existing:
         # If we're deleting existing, create new default view

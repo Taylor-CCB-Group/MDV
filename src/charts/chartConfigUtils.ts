@@ -40,7 +40,7 @@ import type { TooltipConfig } from "@/react/scatter_state";
 // possibly including things like multi-text columns that automatically mutate over time...
 // - maybe serialised if it's loaded from a file, but internally do we allow it to be a live RowAsColsQuery?
 type SerialisedColumnParam = (FieldName | RowsAsColsQuerySerialized);
-type SerialisedParams = SerialisedColumnParam[];
+export type SerialisedParams = SerialisedColumnParam[];
 export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     //! should we consider making this whole thing async so that we can know that whatever is needed is loaded?
     // this may not be the best place to do that, but it's a thought...

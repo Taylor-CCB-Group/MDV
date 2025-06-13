@@ -80,7 +80,7 @@ class ViewManager {
         // if (this.hasUnsavedChanges()) {
         //     this.cm.showSaveViewDialog(() => this.cm.showAddViewDialog());
         // } else {
-            this.cm.showAddViewDialog();
+        this.cm.showAddViewDialog();
         // }
     }
 
@@ -93,7 +93,7 @@ class ViewManager {
         //         this.changeView(view);
         //     });
         // } else {
-            this.changeView(view);
+        this.changeView(view);
         // }
     }
 
@@ -194,9 +194,10 @@ class ViewManager {
     async addView(viewName: string, checkedDs: { [name: string]: boolean }, isCloneView: boolean) {
         try {
             const { viewData, dsIndex, contentDiv } = this.cm;
-            this.setAllViews([...this.all_views, viewName]);
-
-            // Optionally make it the current view
+            // Add and set the new view only if it doesn't already exist
+            if (!this.all_views.includes(viewName)) {
+                this.setAllViews([...this.all_views, viewName]);
+            }
             this.setView(viewName);
             if (!isCloneView) {
                 //remove all charts and links
@@ -212,26 +213,37 @@ class ViewManager {
                 const state = this.cm.getState();
                 state.view.initialCharts = {};
                 state.view.dataSources = {};
-                //only one datasource
-                if (Object.keys(viewData.dataSources)?.length === 1) {
-                    const name = Object.keys(viewData.dataSources)?.[0];
-                    state.view.initialCharts[name] = [];
-                    state.view.dataSources[name] = {};
-                } else {
-                    for (const ds in dsIndex) {
-                        if (checkedDs[ds]) {
-                            state.view.initialCharts[ds] = [];
-                            state.view.dataSources[ds] = {};
-                        }
+                //add the required datasources (checkedIds) to the view
+                for (const name in checkedDs) {
+                    if (checkedDs[name]) {
+                        state.view.initialCharts[name] = [];
+                        state.view.dataSources[name] = {};
                     }
                 }
+
                 contentDiv.innerHTML = "";
                 await this.cm._init(state.view);
                 await this.saveView();
             } else {
+                // Get current state before clearing
                 const state = this.cm.getState();
+                
+                // Update the view name in the state
+                state.view.name = viewName;
+                
+                // Clear existing gridstack instances
+                for (const ds in viewData.dataSources) {
+                    if (viewData.dataSources[ds].layout === "gridstack") {
+                        const d = dsIndex[ds];
+                        if (!d) continue;
+                        this.cm.gridStack.destroy(d);
+                    }
+                }
+                
+                // Clear content and reinitialize
                 contentDiv.innerHTML = "";
                 await this.cm._init(state.view);
+                // Save the view
                 await this.saveView();
             }
         } catch (error) {

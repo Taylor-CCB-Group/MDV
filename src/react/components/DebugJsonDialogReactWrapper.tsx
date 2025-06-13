@@ -4,10 +4,16 @@ import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./DebugJsonDialogComponent";
 import type BaseChart from "../../charts/BaseChart";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 const DebugChart = observer(
     ({ chart, header }: { chart: any; header?: string }) => {
-        return <Gui json={chart} header={header} />;
+        return (
+            <>
+                <Gui json={chart} header={header} />
+                <ReactQueryDevtools initialIsOpen={false}  />
+            </>
+        );
     },
 );
 

@@ -46,7 +46,7 @@ const useProjects = () => {
                     type: item.type === "Read-Only" ? "Read-Only" : "Editable",
                     lastModified: item.lastModified || "",
                     createdAt: item.createdAt || "",
-                    owner: item.owner || "",
+                    owner: item.owner || [],
                     collaborators: Array.isArray(item.collaborators)
                         ? item.collaborators
                         : [],
@@ -111,7 +111,7 @@ const useProjects = () => {
                     type: "Editable" as const,
                     lastModified: "",
                     createdAt: "",
-                    owner: "",
+                    owner: [],
                     collaborators: [],
                     numberOfStructures: "0",
                     numberOfImages: "0",
@@ -139,6 +139,8 @@ const useProjects = () => {
                     : "Error creating project. Please try again later.";
 
             handleError(errorMessage);
+            // todo: revisit this soon for better error handling
+            throw new Error(errorMessage);
         } finally {
             setIsLoading(false);
         }

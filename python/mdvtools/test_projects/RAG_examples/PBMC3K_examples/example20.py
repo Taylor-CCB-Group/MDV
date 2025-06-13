@@ -28,9 +28,6 @@ def create_scatter_plot(title, params, size, position, color, x_axis_settings, y
     plot.set_axis_properties("y", y_axis_settings)
     return plot
 
-def convert_plot_to_json(plot):
-    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\", ""))
-
 def main():
     project_path = os.path.expanduser('~/mdv/project')
     view_name = "default"

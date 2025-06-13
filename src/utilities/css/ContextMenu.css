@@ -92,7 +92,8 @@
   position:absolute;
   border-radius:6px;
   padding:4px;
-  background:var(--background_color);
+  background-color:var(--tooltip_background_color);
+  color:var(--tooltip_text_color);
   z-index:5;
 
 }
@@ -158,10 +159,10 @@
        cursor:pointer
    }
    .ciview-ctm-selected{
-       background-color:lightgray;
+       background-color: var(--border_menu_bar_color);
    }
    .ciview-ctm-active:hover{
-       background-color:lightgray;
+       background-color: var(--border_menu_bar_color);
    }
    .ciview-ctm-item{
        padding:4px;

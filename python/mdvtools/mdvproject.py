@@ -3,6 +3,7 @@ import sys
 import h5py
 import numpy
 import pandas
+import scipy
 import json
 import gzip
 import shlex
@@ -14,15 +15,18 @@ import random
 import string
 from os.path import join, split, exists
 from pathlib import Path
+import scipy.sparse
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
+from pandas.api.types import is_bool_dtype
 # from mdvtools.charts.view import View 
 import time
 import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
+from mdvtools.llm.chat_types import ChatLogger, ChatLogItem
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -37,6 +41,7 @@ datatype_mappings = {
     "category": "text",
     "bool": "text",
     "int32": "double",
+    "boolean":"text"
 }
 
 numpy_dtypes = {
@@ -56,12 +61,14 @@ class MDVProject:
         dir: str,
         id: Optional[str] = None,
         delete_existing=False,
-        skip_column_clean=True,
-        backend_db = False
+        skip_column_clean=True, # todo - make this False by default, add tests etc
+        backend_db = False,
+        safe_file_save = True
     ):
         self.skip_column_clean = (
             skip_column_clean  # signficant speedup for large datasets
         )
+        self.safe_file_save = safe_file_save
         self.dir = dir
         self.id = id if id else os.path.basename(dir)
         if delete_existing and exists(dir):
@@ -87,10 +94,7 @@ class MDVProject:
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": []}))
-        if not exists(self.chatfile):
-            with open(self.chatfile, "w") as o:
-                o.write(json.dumps([]))
-        self.chat_log = get_json(self.chatfile) # could be heavy doing this in the constructor...
+        self.chat_logger = ChatLogger(self.chatfile)
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
 
@@ -100,7 +104,7 @@ class MDVProject:
 
     @datasources.setter
     def datasources(self, value):
-        save_json(self.datasourcesfile, value)
+        save_json(self.datasourcesfile, value, self.safe_file_save)
 
     @property
     def views(self):
@@ -108,7 +112,7 @@ class MDVProject:
 
     @views.setter
     def views(self, value):
-        save_json(self.viewsfile, value)
+        save_json(self.viewsfile, value, self.safe_file_save)
 
     @property
     def state(self):
@@ -116,7 +120,7 @@ class MDVProject:
 
     @state.setter
     def state(self, value):
-        save_json(self.statefile, value)
+        save_json(self.statefile, value ,self.safe_file_save)
 
     def set_editable(self, edit):
         c = self.state
@@ -934,7 +938,7 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | str,
+        dataframe: pandas.DataFrame | pandas.Series | str,
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
@@ -1012,7 +1016,7 @@ class MDVProject:
             for col in columns:
                 try:
                     print(f"- adding column '{col['field']}' to datasource '{name}'")
-                    add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean)
+                    add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean) # type: ignore
                 except Exception as e:
                     print(f" ++++++ DODGY COLUMN: {col['field']}")
                     dodgy_columns.append(col["field"])
@@ -1022,11 +1026,11 @@ class MDVProject:
             
             h5.close()  # Close HDF5 file
             columns = [x for x in columns if x["field"] not in dodgy_columns]
-            print(f" - non-dodgy columns: {columns}")
+            #print(f" - non-dodgy columns: {columns}")
             
             # Update datasource metadata
             ds = {"name": name, "columns": columns, "size": len(dataframe)}
-            print(f'--- setting datasource metadata: {ds}')
+            #print(f'--- setting datasource metadata: {ds}')
             self.set_datasource_metadata(ds)
             
             print("Updated datasource metadata")
@@ -1147,7 +1151,7 @@ class MDVProject:
         data,
         name: Optional[str] = None,
         label: Optional[str] = None,
-        sparse=False,
+        sparse: Optional[bool] = None, # this should be inferred from the data
         chunk_data=False
     ):
         """Add rows as columns in a subgroup."""
@@ -1162,6 +1166,10 @@ class MDVProject:
         
         gr = ds.create_group(name)
         
+        if sparse is None:
+            # Infer if the data is sparse or dense unless specified
+            sparse = scipy.sparse.issparse(data)
+
         if sparse:
             # Handle sparse matrix
             gr.create_dataset(
@@ -1292,7 +1300,7 @@ class MDVProject:
         conf["static"] = True
         # throttle the dataloading so don't get network errors
         conf["dataloading"] = {"split": 5, "threads": 2}
-        save_json(join(outdir, "state.json"), conf)
+        save_json(join(outdir, "state.json"), conf,self.safe_file_save)
         # add service worker for cross origin headers
         if include_sab_headers:
             page = page.replace("<!--sw-->", '<script src="serviceworker.js"></script>')
@@ -1344,11 +1352,22 @@ class MDVProject:
                     datasource[param] = md[ds][param]
                 self.set_datasource_metadata(datasource)
 
-    def add_image_set(self, datasource, setname, column, folder, type="png"):
+    def add_image_set(self, datasource, setname, column, folder, type="png",large=False):
         """Adds a set of images to a datasource. The images should be in a folder, with the same name as the column
         Args:
             datasource (str): The name of the datasource.
-            column (str): The name of the column.
+            column (str): The name of the column describing the images. The folder
+                should contain images with the same name as the values in this column
+                minus the file extension (typically .png or .jpg).
+            type (str, optional): The type of the images. Default is 
+                'png'. Other options are 'jpg', 'jpeg', etc.
+            large (bool, optional): If True, the images will be avialable to the Row Summmary Box
+                where only a single image is shown and can be panned and zoomed
+                if false (default) the images will be available in the Image Table and should
+                be thumbnails of the same size
+            setname (str): The name of the image set. More than one set of images can be associated
+                with a datasource. The name should be unique within the datasource and is used tp 
+                create a folder (with a sanitized name) in the images directory     
             folder (str): The path to the folder containing the images.
         """
         ds = self.get_datasource_metadata(datasource)
@@ -1364,9 +1383,10 @@ class MDVProject:
         for im in images:
             copyfile(join(folder, im), join(imdir, im))
         # update the metadata
-        if not ds.get("images"):
-            ds["images"] = {}
-        ds["images"][setname] = {
+        imt = "large_images" if large else "images"
+        if not ds.get(imt):
+            ds[imt] = {}
+        ds[imt][setname] = {
             "key_column": column,
             "type": type,
             "base_url": f"./images/{fname}/",
@@ -1816,15 +1836,15 @@ class MDVProject:
         return chart
 
 
-    def log_chat_item(self, output: Any, prompt_template: str, response: str):
+    def log_chat_item(self, output: Any, prompt_template: str, response: str, conversation_id: str):
         """
-        Initially the idea was to use a similar structure to "Jobs" in the db
-        Current version is designed to capture similar info to Maria's Google Sheet log
-        # todo refactor logging & probably change the structure of the chat log etc...
-        also maybe restructure more of this class to be more modular
-        send chat logs over websocket, to a database, etc...
+        Log a chat interaction to the chat log file.
+        
         Args:
-            output: result of invoke 'from langchain.chains import RetrievalQA'
+            output: Result of invoke 'from langchain.chains import RetrievalQA'
+            prompt_template: The template used for the prompt
+            response: The response generated
+            conversation_id: ID to group messages from the same conversation
         """
         from mdvtools.llm.chatlog import log_chat
         log_chat(output, prompt_template, response)
@@ -1834,39 +1854,31 @@ class MDVProject:
         context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
         context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
 
-
         context = str(context_information_metadata_name)
         query = output['query']
 
-        # context = str(context_information_metadata_url)
-        # query = output['question']
-
-        # this is NOT the format we want to save the chat log in long term
-        self.chat_log.append(
-            {
-                "context": context,
-                "query": query,
-                "prompt_template": prompt_template,
-                "response": response,
-            }
+        chat_item = ChatLogItem(
+            context=context,
+            query=query,
+            prompt_template=prompt_template,
+            response=response,
+            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            conversation_id=conversation_id
         )
-        # this version tries to jsonify VectorDatabases & god knows what else
-        # self.chat_log.append(
-        #     {
-        #         "output": json.dumps(output),
-        #         "prompt_template": prompt_template,
-        #         "response": json.dumps(response),
-        #     }
-        # )
-        save_json(join(self.dir, "chat_log.json"), self.chat_log)
+        
+        self.chat_logger.log_chat(chat_item)
 
 def get_json(file):
     return json.loads(open(file).read())
 
 
-def save_json(file, data):
+def save_json(file, data, safe= True):
     try:
-        save_json_atomic(file, data)
+        if safe:
+            save_json_atomic(file, data)
+        else:
+            with open(file,"w") as f:
+                json.dump(data,f,indent=2,allow_nan=False)
     except Exception as e:
         print(
             f"Error saving json to '{file}': some data cleaning may be necessary... project likely to be in a bad state."
@@ -1887,9 +1899,12 @@ def save_json_atomic(path, data):
         temp_name = tmp.name
     # potential issues particularly in Docker where the files are on a different volume
     # safest option is to sync like this before and after, but may be overkill
+    # 'sync' will fail silently on windows
     os.system("sync")
     os.replace(temp_name, path)  # Atomic move on most OSes
     os.system("sync")
+    #file is saved with restictive permissions (this may be intentional)
+    #
     # this method is lower overhead than os.system("sync") 
     # but stress testing indicates it is less robust
     # dir_fd = os.open(dir_name, os.O_DIRECTORY)
@@ -1932,13 +1947,17 @@ def add_column_to_group(
         or col["datatype"] == "unique"
         or col["datatype"] == "text16"
     ):
-        
-        if data.dtype == "category": # type: ignore not sure what's best here
+        #in pandas missing values are represented by NaN
+        #which cause problems when co-ercing into text, therefore replace with ND
+        if isinstance(data, pandas.CategoricalDtype):
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
+        #no boolean datatype in MDV at the moment, have to co-erce to text
+        elif is_bool_dtype(data):
+            data = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
         else:
             # may need to double-check this...
-            data = data.fillna("NaN")
+            data = data.fillna("ND")
         values = data.value_counts()
 
         if len(values) < 65537 and col["datatype"] != "unique":
@@ -2006,7 +2025,12 @@ def add_column_to_group(
         clean = (
             data
             if skip_column_clean
-            else data.apply(pandas.to_numeric, errors="coerce")
+            #this is pretty fast now
+            else
+                pandas.to_numeric(
+                    data.iloc[:, 0] if isinstance(data, pandas.DataFrame) else data,
+                    errors="coerce"
+                )
         )  # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)

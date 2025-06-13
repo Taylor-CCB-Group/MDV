@@ -109,7 +109,7 @@ projectMK.add_datasource(datasource_name, cells_df)
 logger= logging.Logger(__name__)
 langchain_logging_handler = LangchainLoggingHandler(logger)
 log = logger.info
-
+df1 = None
 if len(projectMK.datasources) == 0:
     raise ValueError("The project does not have any datasources")
 elif len(projectMK.datasources) > 1:
@@ -126,6 +126,7 @@ try:
             # handle_parsing_errors="Error in pandas agent"
         )
     elif len(projectMK.datasources) == 2:
+        assert(df1 is not None), "The second datasource dataframe is None"
         agent = lp.create_pandas_dataframe_agent(
             dataframe_llm, [df, df1], verbose=True, allow_dangerous_code=True,
             # handle_parsing_errors="Error in pandas agent"
@@ -186,6 +187,7 @@ for question in question_list:
             template=prompt_RAG,
             input_variables=["context", "question"]
         )
+
         qa_chain = RetrievalQA.from_llm(
             llm=code_llm,
             prompt=prompt_RAG_template,
@@ -198,7 +200,8 @@ for question in question_list:
 
         final_code = prepare_code(result, df, projectMK, log, modify_existing_project=True, view_name=question)
 
-        projectMK.log_chat_item(output, prompt_RAG, final_code)
+        # we need to update this so we don't have the method on the project object
+        projectMK.log_chat_item(output, prompt_RAG, final_code, conversation_id="test")
 
         ok, stdout, stderr = execute_code(final_code, open_code=False, log=log)
         final_code_list.append(final_code)

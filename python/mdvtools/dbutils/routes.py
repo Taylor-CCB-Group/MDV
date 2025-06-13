@@ -12,7 +12,7 @@ def register_routes(app, ENABLE_AUTH):
     import shutil
     from mdvtools.mdvproject import MDVProject
     from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
-    from mdvtools.dbutils.dbmodels import User
+    from mdvtools.dbutils.dbmodels import User, UserProject
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
     import tempfile
     import zipfile
@@ -73,6 +73,16 @@ def register_routes(app, ENABLE_AUTH):
 
             # If everything goes well, redirect to the 'index' page
             return redirect(url_for('index'))
+        
+        def get_project_owners(project_id):
+                    owners = []
+                    for user_id, projects in user_project_cache.items():
+                        perms = projects.get(project_id)
+                        if perms and perms.get("is_owner"):
+                            user_data = next((u for u in all_users_cache if u["id"] == user_id), None)
+                            if user_data:
+                                owners.append(user_data["email"])
+                    return sorted(owners)
 
         @app.route('/projects')
         def get_projects():
@@ -113,6 +123,7 @@ def register_routes(app, ENABLE_AUTH):
                             "lastModified": p["lastModified"],
                             "thumbnail": p["thumbnail"],
                             "permissions": user_projects[p["id"]],
+                            "owner": get_project_owners(p["id"]),
                         }
                         for p in active_projects
                         if p["id"] in allowed_project_ids
@@ -126,6 +137,7 @@ def register_routes(app, ENABLE_AUTH):
                             "lastModified": p["lastModified"],
                             "thumbnail": p["thumbnail"],
                             "permissions": None,
+                            "owner": [],
                         }
                         for p in active_projects
                     ]
@@ -185,7 +197,8 @@ def register_routes(app, ENABLE_AUTH):
                             project_id=new_project.id,
                             is_owner=True
                         )
-
+                        auth_id = user_data["auth_id"]
+                        owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
                         # Generate thumbnail
                         thumbnail = get_project_thumbnail(project_path)
                         
@@ -202,7 +215,8 @@ def register_routes(app, ENABLE_AUTH):
                                 "id": new_project.id,
                                 "name": new_project.name,
                                 "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                                "thumbnail": thumbnail
+                                "thumbnail": thumbnail,
+                                "owner": [owner_email]
                             }
                         )
                         
@@ -311,7 +325,8 @@ def register_routes(app, ENABLE_AUTH):
                             project_id=new_project.id,
                             is_owner=True
                         )
-
+                        auth_id = user_data["auth_id"]
+                        owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
                         thumbnail = get_project_thumbnail(project_path)
 
                         # Update cache with the new project data and user id
@@ -327,7 +342,8 @@ def register_routes(app, ENABLE_AUTH):
                                 "id": new_project.id,
                                 "name": new_project.name,
                                 "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                                "thumbnail": thumbnail
+                                "thumbnail": thumbnail,
+                                "owners": [owner_email]
                             }
                         )
                 # Return the new project id and name

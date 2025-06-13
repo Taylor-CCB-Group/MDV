@@ -2,18 +2,19 @@ import { action } from "mobx";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
-import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
 
+// export type CommonFilter = { noClear?: boolean, invert?: boolean }; //todo - implement these features.
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
 export type RangeFilter = [number, number];
 export type UniqueFilter = string;
-export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter;
+export type SelectionDialogFilter = (CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter);// & CommonFilter;
 
 export type SelectionDialogConfig = {
     type: "selection_dialog";
+    noClearFilters?:boolean;
     filters: Record<string, SelectionDialogFilter | null>;
 } & BaseConfig;
 
@@ -27,6 +28,12 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 config.filters[col] = null;
             }
         }
+        //for legacy configs, if left undefined makeAutoObservable will 
+        // not work correctly.
+        if (config.noClearFilters === undefined) {
+            config.noClearFilters = false;
+        }
+        
         for (const col of config.param) {
             //@ts-expect-error MultiColumnQuery cannot be used as index
             if (!config.filters[col]) {
@@ -44,6 +51,24 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 this.config.filters[key] = null;
             }
         })();
+    }
+
+    getSettings(){
+          const settings = super.getSettings();
+          const c = this.config;
+          return [
+            ...settings,
+            g({
+                //set whether filters are cleared on Reset All
+                type: "check",
+                current_value: c.noClearFilters || false,
+                label: "Filters remain on Reset All",
+                func: (x) => {
+                    // func() is already called in an action, so no need to wrap again
+                    c.noClearFilters = x;
+                }
+            })
+          ]
     }
 }
 

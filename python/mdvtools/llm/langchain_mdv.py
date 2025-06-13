@@ -4,7 +4,6 @@ from contextlib import contextmanager
 import os
 
 # Code Generation using Retrieval Augmented Generation + LangChain
-# from typing import Callable
 from mdvtools.llm.chat_protocol import ProjectChatProtocol
 from mdvtools.mdvproject import MDVProject
 
@@ -154,7 +153,7 @@ class ProjectChat(ProjectChatProtocol):
         # could come from a config file - was passed as argument previously
         # but I'm reducing how far this prototype reaches into wider code
         self.welcome = (
-            "Hello, I'm an AI assistant that has access to the data in this project"
+            "Hello, I'm an AI assistant that has access to the data in this project "
             "and is designed to help build views for visualising it. What can I help you with?"
         )
 
@@ -166,14 +165,20 @@ class ProjectChat(ProjectChatProtocol):
         logger = self.socket_api.logger
         self.langchain_logging_handler = LangchainLoggingHandler(logger)
         self.config = {"callbacks": [self.langchain_logging_handler]}
-        log = self.log = logger.info
+        self.log = logger.info
+        
+        # Store histories and agents for each conversation
+        self.conversation_histories = {}  # Dict to store RAG histories
+        self.conversation_agents = {}  # Dict to store agents for each conversation
+        self._current_conversation_id = None
+        
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
         elif len(project.datasources) > 1: # remove? or make it == 1 ?
             # tempting to think we should just give the agent all of the datasources here
-            log("The project has more than one datasource, only the first one will be used")
-            self.ds_name1 = project.datasources[1]['name'] # maybe comment this out?
-            self.df1 = project.get_datasource_as_dataframe(self.ds_name1) # and maybe comment this out?
+            self.log("The project has more than one datasource, only the first one will be used")
+            self.ds_name1 = project.datasources[1]['name'] # maybe comment this out?
+            self.df1 = project.get_datasource_as_dataframe(self.ds_name1) # and maybe comment this out?
 
         if len(project.datasources) >= 2:
             df_list = [project.get_datasource_as_dataframe(ds['name']) for ds in project.datasources[:2]]
@@ -197,7 +202,7 @@ class ProjectChat(ProjectChatProtocol):
                     """
                     # Step 1: Initialize Memory with Chat History
                     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
+                    
                     # Step 2: Create the Python REPL Tool
                     python_tool = PythonAstREPLTool()
                     
@@ -220,7 +225,6 @@ class ProjectChat(ProjectChatProtocol):
                     python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
 
                     # Step 3: Define Contextualization Chain
-
                     contextualize_q_system_prompt = """Given a chat history and the latest user question \
                     which might reference context in the chat history, formulate a standalone question \
                     which can be understood without the chat history. Do NOT answer the question, \
@@ -235,7 +239,6 @@ class ProjectChat(ProjectChatProtocol):
                     contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
 
                     # Step 4: Define the Agent Prompt
-
                     prompt_data_template = f"""You have access to the following Pandas DataFrames: 
                     {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
                     Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
@@ -270,28 +273,75 @@ class ProjectChat(ProjectChatProtocol):
                         memory.save_context({"input": question}, {"output": response.get("output", str(response))})
                         return response
 
-                    return agent_with_contextualization
+                    return agent_with_contextualization, memory
 
-                self.agent = create_custom_pandas_agent(self.dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
+                # Store the create_custom_pandas_agent function for later use
+                self.create_agent_fn = create_custom_pandas_agent
+                # Create initial agent
+                agent, memory = create_custom_pandas_agent(self.dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
+                self.agent = agent
     
             self.init_error = None
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:500]}")
-            log(f"An error occurred while trying to create the agent: {str(e)[:500]}")
+            self.log(f"An error occurred while trying to create the agent: {str(e)[:500]}")
             
             self.welcome = str(e)
             self.init_error = e
 
-    def ask_question(self, question: str, id: str):  # async?
+    def get_or_create_conversation(self, conversation_id: str):
+        """Get or create conversation components for a specific conversation"""
+        if conversation_id not in self.conversation_histories:
+            self.conversation_histories[conversation_id] = []
+            
+        if conversation_id not in self.conversation_agents:
+            # Create a new agent for this conversation
+            agent, memory = self.create_agent_fn(
+                self.dataframe_llm, 
+                {"df1": self.project.get_datasource_as_dataframe(self.project.datasources[0]['name']), 
+                 "df2": self.project.get_datasource_as_dataframe(self.project.datasources[1]['name']) if len(self.project.datasources) > 1 else None}, 
+                prompt_data, 
+                verbose=True
+            )
+            self.conversation_agents[conversation_id] = agent
+            
+        return self.conversation_histories[conversation_id], self.conversation_agents[conversation_id]
+
+    def clear_conversation(self, conversation_id: str):
+        """Clear the chat history for a specific conversation"""
+        if conversation_id in self.conversation_histories:
+            self.conversation_histories[conversation_id] = []
+        if conversation_id in self.conversation_agents:
+            # Remove the old agent and create a fresh one
+            del self.conversation_agents[conversation_id]
+            self.get_or_create_conversation(conversation_id)
+        chat_debug_logger.info(f"Cleared conversation history for conversation {conversation_id}")
+
+    def switch_conversation(self, conversation_id: str):
+        """Switch to a different conversation context"""
+        if conversation_id != self._current_conversation_id:
+            chat_debug_logger.info(f"Switching from conversation {self._current_conversation_id} to {conversation_id}")
+            self._current_conversation_id = conversation_id
+            # Get or create conversation components for this conversation
+            self.chat_history, self.agent = self.get_or_create_conversation(conversation_id)
+            chat_debug_logger.info(f"Switched to conversation {conversation_id} with history length {len(self.chat_history)}")
+
+    def ask_question(self, question: str, id: str, conversation_id: str):
         """
         Ask a question, generate code to answer it, execute the code...
-
-        How should we stream updates on the progress of the code execution back to the user?
-        We have a log, connected to a websocket... but perhaps it would make sense to yield the output of the code execution
-        and feed that back to the http response as it comes in?
-
-        Then in the front-end, we can have a view of the verbose logging stuff, but not necessarily
         """
+        if conversation_id:
+            self.switch_conversation(conversation_id)
+        elif not self._current_conversation_id:
+            # If no conversation_id provided and no current conversation, create a new one
+            conversation_id = f"default_{id}"
+            self.switch_conversation(conversation_id)
+
+        # keep that agent in scope in case some concurrent requests are made
+        # nb, this is still not totally thread-safe, should be fine for now.
+        # to avoid concurrency issues, we may not want a `switch_conversation` method, 
+        # but rather use the result returned by `get_or_create_conversation`
+        agent = self.agent
         progress = 0
         if mock_agent:
             ok, strdout, stderr = execute_code(
@@ -320,7 +370,7 @@ class ProjectChat(ProjectChatProtocol):
                     "Pandas agent invoking...", id, progress, 31
                 )
                 progress += 31
-                response = self.agent(question)#(full_prompt)#(question)
+                response = agent(question)#(full_prompt)#(question)
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
@@ -389,7 +439,7 @@ class ProjectChat(ProjectChatProtocol):
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
             with time_block("b14: Chat logging by MDV"):  # <0.1% of time
-                self.project.log_chat_item(output_qa, prompt_RAG, final_code)
+                self.project.log_chat_item(output_qa, prompt_RAG, final_code, conversation_id)
             with time_block("b15: Execute code"):  # ~9% of time
                 self.socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9
@@ -410,7 +460,7 @@ class ProjectChat(ProjectChatProtocol):
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return f"I ran some code for you:\n\n```python\n{final_code}```"
+                return f"I ran some code for you:\n\n```python\n{final_code}\n```"
         except Exception as e:
             self.socket_api.update_chat_progress(
                 f"Error: {str(e)[:500]}", id, 100, 0

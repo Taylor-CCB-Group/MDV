@@ -3,6 +3,23 @@
     "dockerComposeFile": "../docker-secrets.yml",
     "service": "mdv_app",
     "workspaceFolder": "/app",
+    "initializeCommand": "export GIT_COMMIT_DATE=$(git log -1 --format=%cI) && export GIT_BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) && export GIT_COMMIT_HASH=$(git rev-parse HEAD) && export GIT_LAST_COMMIT_MESSAGE=$(git show -s --format=%s) && export BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') && export GIT_DIRTY=$([ -z \"$(git status --porcelain)\" ] && echo false || echo true)",
+    "containerEnv": {
+        "GIT_COMMIT_DATE": "${localEnv:GIT_COMMIT_DATE}",
+        "GIT_BRANCH_NAME": "${localEnv:GIT_BRANCH_NAME}",
+        "GIT_COMMIT_HASH": "${localEnv:GIT_COMMIT_HASH}",
+        "GIT_LAST_COMMIT_MESSAGE": "${localEnv:GIT_LAST_COMMIT_MESSAGE}",
+        "BUILD_DATE": "${localEnv:BUILD_DATE}",
+        "GIT_DIRTY": "${localEnv:GIT_DIRTY}"
+    },
+    "remoteEnv": {
+        "GIT_COMMIT_DATE": "${containerEnv:GIT_COMMIT_DATE}",
+        "GIT_BRANCH_NAME": "${containerEnv:GIT_BRANCH_NAME}",
+        "GIT_COMMIT_HASH": "${containerEnv:GIT_COMMIT_HASH}",
+        "GIT_LAST_COMMIT_MESSAGE": "${containerEnv:GIT_LAST_COMMIT_MESSAGE}",
+        "BUILD_DATE": "${containerEnv:BUILD_DATE}",
+        "GIT_DIRTY": "${containerEnv:GIT_DIRTY}"
+    },
     "customizations": {
         "vscode": {
             "extensions": [
@@ -15,7 +32,7 @@
             ],
             "settings": {
                 "python.analysis.typeCheckingMode": "basic",
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.defaultInterpreterPath": "/app/python/.venv/bin/python",
                 "typescript.tsdk": "/app/node_modules/typescript/lib"
             }
         }

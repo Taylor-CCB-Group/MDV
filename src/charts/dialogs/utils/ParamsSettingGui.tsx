@@ -2,50 +2,10 @@ import BaseChart, { type BaseConfig } from "@/charts/BaseChart";
 import { type FieldSpec, type FieldSpecs, isMultiColumn } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
 
-/**
- * Helper method to go figure out which entries in a config.param array correspond
- * to a given parameter at index i in the chart type's params array.
- * There is no perfect way to do this - but we should be able to rely on knowing
- * that there is at most one multi-column parameter.
- */
-function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
-    const { config } = chart;
-    const chartType = BaseChart.types[config.type];
-    const { params } = chartType;
-    // we only call this in the context of a chart type that has params
-    if (!params) throw new Error("No params for chart type");
-    const isMultiType = isMultiColumn(params[i].type);
-    
-    // const currentParams = config.param;
-    const currentParams = chart.activeQueries.userValues['setParams'] || config.param;
-    const n = currentParams.length;
-    const hasMulti = params.some(p => isMultiColumn(p.type));
-    if (isMultiType) {
-        //! as far as we know, we only ever see params ordered like [_multi] or [single, _multi]
-        const nOthers = params.length - 1;
-        if (i === 0) {
-            // we want the head of the array... the length minus however many other params there are
-            const end = currentParams.length - nOthers;
-            return currentParams.slice(0, end);
-        }
-        // If param type is _multi but it's not the first element of params array
-        // we want the tail of the array, starting from where the nOthers single params end
-        return currentParams.slice(nOthers);
-    }
-    if (hasMulti) {
-        // there is a multi-column parameter, and this is not it.
-        // we already handled the case where we are the multi-column parameter
-        // that means we should be either first or last in the array.
-        if (i === 0) {
-            return currentParams[0];
-        }
-        return currentParams[n - 1];
-    }
-    // there is no multi-column parameter; happy days
-    return currentParams[i];
-}
 
 function updateMultiParam<T extends BaseConfig>(chart: BaseChart<T>, i: number, value: FieldSpecs) {
+    // const config = chart.getConfig(); //we don't want serialised config here
+    // and we are currently avoiding implementing a version of getConfig() that returns the active config
     const { config } = chart;
     const chartType = BaseChart.types[config.type];
     const { params } = chartType;
@@ -57,7 +17,7 @@ function updateMultiParam<T extends BaseConfig>(chart: BaseChart<T>, i: number, 
         chart.setParams(value);
         return;
     }
-    const currentParams = config.param;
+    const currentParams = chart.activeQueries.activeParams(); //config.param;
     // we know that there is only one multi-column parameter, either at start or end of array
     const nOthers = nParams - 1;
     if (i === 0) {
@@ -71,11 +31,18 @@ function updateMultiParam<T extends BaseConfig>(chart: BaseChart<T>, i: number, 
     chart.setParams(newParams);
 }
 function updateSingleParam<T extends BaseConfig>(chart: BaseChart<T>, i: number, value: FieldSpec) {
-    const chartType = BaseChart.types[chart.config.type];
+    // calling getConfig() here will mean that we have the config in the *serialised* form, not the active-state form.
+    // perhaps if we have a `getActiveConfig()` then that might be reasonably safe.
+    // Essentially, we need some way that ColumnQueryMapper can be used to get the active config.
+    // we shouldn't interface with that class directly - `BaseChart` should have abstract that.
+    const { config } = chart;
+    const chartType = BaseChart.types[config.type];
     const { params } = chartType;
     if (!params) throw new Error("No params for chart type");
     const hasMulti = params.some(p => isMultiColumn(p.type));
-    const currentParams = chart.config.param;
+    // there should be an obvious canonical way to get the active state of a chart's config
+    // and use of chart.activeQueries - which is something of an internal monkeypatch - is something
+    const currentParams = chart.activeQueries.activeParams(); //config.param;
     const n = currentParams.length;
     if (hasMulti) {
         const multiIndex = params.findIndex(p => isMultiColumn(p.type));
@@ -83,10 +50,10 @@ function updateSingleParam<T extends BaseConfig>(chart: BaseChart<T>, i: number,
         const nAfter = n - nBefore - 1;
         const newParams = currentParams.slice(0, nBefore).concat(value).concat(currentParams.slice(n - nAfter));
         chart.setParams(newParams);
-        // chart.config.param = newParams;
+        // config.param = newParams;
     } else {
-        chart.config.param[i] = value;
-        chart.setParams(chart.config.param);
+        config.param[i] = value;
+        chart.setParams(config.param);
     }
 }
 
@@ -105,9 +72,10 @@ export default function getParamsGuiSpec<T extends BaseConfig>(chart: BaseChart<
     if (!params) return null;
     const multiCount = params.reduce((acc, p) => acc + (isMultiColumn(p.type) ? 1 : 0), 0);
     if (multiCount > 1) throw new Error("More than one multi-column parameter, abandon hope");
+    const currentParams = chart.activeQueries.activeParams();
     const p = params.map((param, i) => {
         const isMultiType = isMultiColumn(param.type);
-        const current_value = getCurrentParam(chart, i);
+        const current_value = currentParams[i];
         return g({
             type: isMultiType ? "multicolumn" : "column",
             label: param.name,

@@ -30,7 +30,6 @@ from typing import Optional
 import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
-#from mdvtools.llm.chat_protocol import ProjectChatProtocol, ProjectChat
 from mdvtools.llm.chat_server_extension import chat_extension
 routes = set()
 

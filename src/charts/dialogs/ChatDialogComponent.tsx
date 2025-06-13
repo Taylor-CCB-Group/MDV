@@ -1,14 +1,14 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen } from 'lucide-react';
 import useChat, { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Button } from '@mui/material';
+import { Box, Button, Divider, TextField } from '@mui/material';
 import { useChartManager } from '@/react/hooks';
 import { fetchJsonConfig } from '@/dataloaders/DataLoaderUtil';
 import { useProject } from '@/modules/ProjectContext';
@@ -60,14 +60,15 @@ import ErrorDisplay from './DebugErrorComponent';
 // }
 
 
-const Message = ({ text, sender, view }: ChatMessage) => {
+const Message = ({ text, sender, view, onClose }: ChatMessage & {onClose: () => void}) => {
     const isUser = sender === 'user';
     const pythonSections = extractPythonSections(text);
     try {
         text = JSON.parse(text);
     } catch (e) {
     }
-    const isError = sender === 'bot' && !view;
+    // todo: handle the scenario when view doesn't exist
+    // const isError = sender === 'bot' && !view;
     return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
         <div className='selectable'>
             {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
@@ -75,13 +76,24 @@ const Message = ({ text, sender, view }: ChatMessage) => {
                 isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
                 }`}>
                 {/* <JsonView src={text} /> */}
-                {isError ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />}
+                {/* {isError ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />} */}
+                <MessageMarkdown text={text} />
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
             ))} */}
-            {(sender === 'bot') && <MessageFeedback />}
-            {view && <Button variant="contained" color="primary" onClick={() => navigateToView(view)}>Load view '{view}'...</Button>}
+            
+            {/* Uncomment later and add logic for feedback buttons */}
+            {/* {(sender === 'bot') && <MessageFeedback />} */}
+            {view && 
+                <Button 
+                    variant="contained" 
+                    color="primary" 
+                    onClick={() => navigateToView(view, false, onClose)}
+                >
+                    Load view '{view}'...
+                </Button>
+            }
         </div>
     );
 }
@@ -195,7 +207,10 @@ const MessageMarkdown = ({ text }: { text: string }) => {
 }
 
 const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
-    const verbose = props.verboseProgress.map(s => s.substring(s.length-100)).join('\n');
+    const verbose = useMemo(() => 
+        props.verboseProgress.map(s => s.substring(s.length-100)).join('\n'), 
+    [props.verboseProgress]);
+
     if (props.progress >= 100) return null;
     return (
         <div className="p-4">
@@ -211,70 +226,84 @@ const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
     );
 }
 
+export type ChatBotProps = {
+    messages: ChatMessage[];
+    isSending: boolean;
+    sendAPI: (input: string) => Promise<void>;
+    requestProgress: ChatProgress | null;
+    verboseProgress: string[];
+    onClose: () => void;
+};
 
-const Chatbot = () => {
-    const { messages, isSending, sendAPI, requestProgress, verboseProgress } = useChat();
+
+const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();
 
-    const handleSend = async () => {
+    const handleSend = useCallback(async () => {
         if (!input.trim()) return;
         setInput('');
         await sendAPI(input);
-    };
+    }, [input, sendAPI]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setInput(e.target.value);
-    };
+    }, []);
 
-    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             handleSend();
         }
-    };
+    }, [handleSend]);
+
     const scrollToBottom = useCallback(() => {
         //! block: 'nearest' seems to solve issue with dialog header disappearing from top
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, []);
 
     useEffect(() => {
-        messages;
-        requestProgress;
-        scrollToBottom();
-    }, [messages, requestProgress, scrollToBottom]);
+        // Only scroll when there are new messages or progress updates
+        if (messages.length > 0 || requestProgress) {
+            scrollToBottom();
+        }
+    }, [messages.length, requestProgress, scrollToBottom]);
     
     return (
-        <div className="flex flex-col h-full mx-auto overflow-hidden">
-            <div className="flex-1 p-1 w-full overflow-y-auto">
+        <Box className="flex flex-col h-full mx-auto overflow-hidden">
+            <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
                 {messages.map((message) => (
-                    <Message key={message.id} {...message} />
+                    <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} />
                 ))}
                 {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
                 {/* {
                 isSending && 
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
-                <div ref={messagesEndRef} />
-            </div>
-            <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
+                <Box ref={messagesEndRef} />
+            </Box>
+            <Box className='absolute opacity-10 pointer-events-none right-0'>
                 <RobotPandaSVG />
-            </div>
-            <div className="flex p-4 border-t w-full border-gray-300">
-                <input
+            </Box>
+            <Divider />
+            <Box className="flex p-4 w-full">
+                <TextField
                     type="text"
                     // disabled={isSending} //we can still type while it's processing
                     value={input}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyPress}
                     placeholder="Type a message..."
-                    className="flex-1 p-2 border border-gray-300 rounded-lg mr-2"
+                    fullWidth
+                    sx={{
+                        mr: 2,
+                    }}
                 />
-                <button type="submit" onClick={handleSend} disabled={isSending} 
-                className="p-2 bg-blue-500 text-white rounded-lg">
+                <Button onClick={handleSend} disabled={isSending} 
+                className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
                     Send
-                </button>
-            </div>
-        </div>
+                </Button>
+            </Box>
+        </Box>
     );
 };
 

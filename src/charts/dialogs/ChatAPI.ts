@@ -2,6 +2,9 @@ import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
 import { z } from 'zod';
+import _ from 'lodash';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useChartManager } from "@/react/hooks";
 
 const completedChatResponseSchema = z.object({
     message: z.string(),
@@ -33,51 +36,43 @@ const chatLogItemSchema = z.object({
     prompt_template: z.string(),
     response: z.string(),
     // id: z.string(),
+    //nullable as well as optional because of some data that had null during development...
+    //the offending code was never merged so that is just for testing
+    //these fields are expected to always be present on actual 
+    conversation_id: z.string().optional().nullable(),
+    timestamp: z.string().optional(),
 });
 const chatLogSchema = z.array(chatLogItemSchema);
 
 export type ChatLogItem = z.infer<typeof chatLogItemSchema>;
 
-export const useChatLog = () => {
-    const { root } = useProject();
-    const route = `${root}/chat_log.json`;
-    const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
-
-    useEffect(() => {
-        const fetchChatLog = async () => {
-            setIsLoading(true);
-            try {
-                const response = await axios.get(route);
-                const parsed = chatLogSchema.parse(response.data);
-                setChatLog(parsed);
-            } catch (error) {
-                console.error('Error fetching chat log', error);
-            }
-            setIsLoading(false);
-        };
-        fetchChatLog();
-        // refresh periodically - there may be a better way (quite possible involving useQuery,
-        // or socketio...).
-        const interval = setInterval(fetchChatLog, 5000);
-        return () => clearInterval(interval);
-    }, [route]);
-
-    return { chatLog, isLoading };
-}
-
 type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 
 export type ChatMessage = {
     text: string;
-    view?: string; //maybe this type should be more assocated with ChatResponse
+    view?: string;
     sender: 'user' | 'bot' | 'system';
     id: string;
+    conversationId: string;
 };
+
+
+export type ConversationLog = {
+    logText: string,
+    logLength: number,
+    messages: ChatMessage[],
+}
+
+export type ConversationMap = Record<string, ConversationLog>;
 
 function generateId() {
     return Math.random().toString(36).substring(7);
 }
+
+function generateConversationId() {
+    return `conv-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+}
+
 /** viewName could be a prop of ProjectProvider, but currently not cleanly reactive */
 function getViewName(): string | null {
     const urlParams = new URLSearchParams(window.location.search);
@@ -85,20 +80,65 @@ function getViewName(): string | null {
 }
 
 
-const sendMessage = async (message: string, id: string, route = '/chat') => {
+const sendMessage = async (message: string, id: string, route: string, conversationId: string) => {
     // we should send information about the context - in particular, which view we're in
     // could consider a streaming response here rather than socket
-    const response = await axios.post<ChatResponse>(route, { message, id });
+    const response = await axios.post<ChatResponse>(route, { message, id, conversation_id: conversationId });
     const parsed = completedChatResponseSchema.parse(response.data); // may throw an error if the response is not valid
     return parsed;
 };
 
-const DefaultMessage: ChatMessage = {
-    text: 'Hello! How can I help you?',
-    sender: 'bot',
-    id: generateId(),
-}
+// Parsing view name from the message's code
+// todo: Get view name from chat_log.json or use some other logic
+const parseViewName = (message: string) => {
+    const match = /view_name\s*=\s*"([^"]+)"/.exec(message);
+    if (match) {
+        return match[1];
+    }
+    return undefined;
+};
 
+// Create conversation entry
+const createConversation = (
+        convMap: ConversationMap, 
+        conversationId: string, 
+        query: string
+    ): ConversationLog => {
+    if (!convMap[conversationId]) {
+        const isLegacy = conversationId === 'legacy';
+        convMap[conversationId] = {
+            logText: isLegacy ? `(LEGACY) ${query}` : query,
+            logLength: 0,
+            messages: [],
+        };
+    }
+    return convMap[conversationId];
+};
+
+// Create message pair
+const createMessagePair = (log: ChatLogItem, conversationId: string) => {
+    const id = generateId();
+    const viewName = parseViewName(log.response);
+    
+    const userMessage: ChatMessage = {
+        conversationId,
+        id,
+        sender: 'user',
+        text: log.query,
+    };
+    
+    const botMessage: ChatMessage = {
+        conversationId,
+        id,
+        sender: 'bot',
+        text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
+        view: viewName,
+    };
+    
+    return [userMessage, botMessage];
+};
+
+// todo: The architecture of this hook is a bit poor, there is no single source of truth, we can have both messages and chatLog which could make it out of sync
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
@@ -117,9 +157,36 @@ const useChat = () => {
     const [isInit, setIsInit] = useState<boolean>(false);
     const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
     const [verboseProgress, setVerboseProgress] = useState([""]);
+    const cm = useChartManager();
+    const [conversationId, setConversationId] = useState<string>(generateConversationId());
+    const [conversationMap, setConversationMap] = useState<ConversationMap>({});
+    const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
+    const queryClient = useQueryClient();
 
+    // Use React Query to manage chat logs
+    const { data: chatLogData = [], isLoading: isChatLogLoading, isSuccess } = useQuery({
+        queryKey: ['chatLog'],
+        queryFn: async () => {
+            const response = await axios.get(`${projectApiRoute}chat_log.json`);
+            try {
+                const parsedResponse = chatLogSchema.parse(response.data);
+                return parsedResponse;
+            } catch (error) {
+                console.error('Error parsing chat log', error);
+                return [];
+            }
+        },
+        refetchInterval: 5000, // Refetch every 5 seconds
+    });
+
+    useEffect(() => {
+        if (chatLogData && isSuccess) {
+            setChatLog(chatLogData);
+        }
+    }, [chatLogData, isSuccess]);
+
+    // Progress Listener
     const progressListener = useCallback((data: any) => {
-        console.log('chat message', data);
         try {
             const parsed = chatProgressSchema.parse(data);
             if (parsed.id === currentRequestId) {
@@ -136,71 +203,168 @@ const useChat = () => {
         }
     }, [currentRequestId]);
 
-    useEffect(() => {
-        const { socket } = window.mdv.chartManager.ipc;
+    // Verbose Progress
+    const handleVerboseProgress = useCallback((msg: string) => {
+        setVerboseProgress(v => [...v, msg].slice(-5));
+    }, []);
 
-        // event-name like 'chat', room for project... id associated with original request.
-        socket?.on(progressRoute, progressListener);
-        const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
-        socket?.on(verboseRoute, verboseProgress);
-        console.log(`addded listeners for '${progressRoute}' and '${verboseRoute}'`);
-        const chatInit = async () => {
-            setIsSending(true);
-            try {
-                const id = generateId();
-                setCurrentRequestId(id);
-                const response = await sendMessage('', id, routeInit);
-                setMessages(messages => messages.length ? messages : [{ text: response.message, sender: 'system', id: generateId() }]);
-            } catch (error) {
-                console.error('Error sending welcome message', error);
+    // Initiate chat function
+    const chatInit = useCallback(async () => {
+        if (isSending || isInit || isChatLogLoading) return;
+        
+        setIsSending(true);
+        try {
+            const id = generateId();
+            setCurrentRequestId(id);
+            const response = await sendMessage('', id, routeInit, conversationId);
+            // Only set initial message if we don't have any messages yet
+            if (messages.length === 0) {
+                setMessages([{
+                    text: response.message,
+                    sender: 'system',
+                    id: generateId(),
+                    conversationId
+                }]);
             }
-            setIsSending(false);
-            setCurrentRequestId(''); //todo review react query etc
-            setIsInit(true);
-        };
-        if (!isSending && !isInit) chatInit();
-        return () => {
-            socket?.off(progressRoute, progressListener);
-            socket?.off(verboseRoute, verboseProgress);
+        } catch (error) {
+            console.error('Error sending welcome message', error);
         }
-    }, [isSending, isInit, routeInit, progressRoute, verboseRoute, progressListener]);
+        setIsSending(false);
+        setCurrentRequestId('');
+        setIsInit(true);
+    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading]);
+
+    // Socket connection and Init chat
     useEffect(() => {
-        sessionStorage.setItem('chatMessages', JSON.stringify(messages));
-    }, [messages]);
+        if (!cm.ipc || !cm.ipc.socket) return;
+        
+        const { socket } = cm.ipc;
 
-    const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
-        //we should be using an id passed as part of the message, not generating one here.
-        //also - id as react key if we have an id shared between query and response may be a conflict
-        const msg = { text: message, sender, id: generateId(), view };
-        setMessages((prevMessages) => [...prevMessages, msg]);
-    };
+        if (!socket.connected) {
+            console.log('Socket not connected, skipping listener registration');
+            return;
+        }
 
-    const sendAPI = async (input: string) => {
+        // todo: Add proper error handling
+        const handleSocketError = (error: any) => {
+            console.error('Socket error in chat:', error);
+        };
+        
+        socket.on('error', handleSocketError);
+        socket?.on(progressRoute, progressListener);
+        socket?.on(verboseRoute, handleVerboseProgress);
+
+        if (!isInit && !isSending) {
+            chatInit();
+        }
+
+        return () => {
+            socket?.off('error', handleSocketError);
+            socket?.off(progressRoute, progressListener);
+            socket?.off(verboseRoute, handleVerboseProgress);
+        };
+    }, [cm.ipc, progressRoute, verboseRoute, progressListener, handleVerboseProgress, chatInit, isInit, isSending]);
+
+    // Initialise conversation map
+    useEffect(() => {
+        if (chatLog.length > 0) {
+            const newConversationMap: ConversationMap = {};
+        
+        // Process each log entry
+        chatLog.forEach((log) => {
+            const conversationId = log.conversation_id || 'legacy';
+            const conversation = createConversation(newConversationMap, conversationId, log.query);
+            const messages = createMessagePair(log, conversationId);
+            
+            conversation.messages.push(...messages);
+            conversation.logLength++;
+        });
+        
+        setConversationMap(newConversationMap);
+        }
+    }, [chatLog]);
+
+    useEffect(() => {
+        if (conversationMap[conversationId]?.messages?.length > 0) {
+            const newMessages: ChatMessage[] = conversationMap[conversationId]?.messages || [];
+            setMessages(newMessages);
+        }
+    }, [conversationId, conversationMap]);
+    
+    const sendAPI = useCallback(async (input: string) => {
         if (!input.trim()) return;
+        
         const id = generateId();
         const viewName = getViewName();
-        console.log(`sending chat '${input}' from '${viewName}'`)
-        appendMessage(input, 'user');
+        console.log(`sending chat '${input}' from '${viewName}'`);
 
         try {
             setIsSending(true);
             setCurrentRequestId(id);
-            const response = await sendMessage(input, id, route);
-            // we should be appending more stuff, and then rendering appropriately, 
-            // with things like a button to navigate to the view if view property is present.
-            appendMessage(response.message, 'bot', response.view);
-            //todo - navigating via button rather than automatically.
-
-            // if (response.view) navigateToView(response.view);
+            setMessages(prev => [...prev, {
+                text: input,
+                sender: 'user',
+                id: generateId(),
+                conversationId,
+            }])
+            await sendMessage(input, id, route, conversationId);
+            queryClient.invalidateQueries({ queryKey: ['chatLog'] });
         } catch (error) {
-            appendMessage(`Error: ${error}`, 'bot');
+            // todo: update error handling logic
+            setMessages(prev => [...prev, {
+                text: `ERROR: ${error}`,
+                sender: 'bot',
+                id: generateId(),
+                conversationId
+            }]);
+            console.log("Error sending message: ", error);
         }
-        setCurrentRequestId(id);
+        setCurrentRequestId('');
         setRequestProgress(null);
         setIsSending(false);
+    }, [conversationId, route, queryClient]);
+
+    const startNewConversation = useCallback(async () => {
+        const newConversationId = generateConversationId();
+        setConversationId(newConversationId);
+        try {
+            const response = await sendMessage('', generateId(), routeInit, newConversationId);
+            // Only set initial message if we don't have any messages yet
+            setMessages([{
+                text: response.message,
+                sender: 'system',
+                id: generateId(),
+                conversationId: newConversationId
+            }]);
+        } catch (error) {
+            // todo: update error handling logic
+            setMessages(prev => [...prev, {
+                text: `ERROR: ${error}`,
+                sender: 'bot',
+                id: generateId(),
+                conversationId: newConversationId,
+            }]);
+            console.log("Error starting new conversation: ", error);
+        }
+    }, [routeInit]);
+
+    const switchConversation = useCallback((id: string) => {
+        setConversationId(id);
+    }, []);
+
+    return {
+        messages,
+        isSending,
+        sendAPI,
+        requestProgress,
+        verboseProgress,
+        isChatLogLoading,
+        conversationId,
+        startNewConversation,
+        switchConversation,
+        conversationMap,
     };
-    return { messages, isSending, sendAPI, requestProgress, verboseProgress };
-}
+};
 
 /**
  * This function is used to navigate to a different view.
@@ -212,7 +376,7 @@ const useChat = () => {
  * 
  * ! doesn't belong in this file, I intend to refactor soon, but for quick prototyping it's here
  */
-export async function navigateToView(view: string, needsRefresh = false) {
+export async function navigateToView(view: string, needsRefresh = false, callback?: () => void) {
     if (!needsRefresh) {
         window.mdv.chartManager.changeView(view);
     } else {
@@ -225,6 +389,7 @@ export async function navigateToView(view: string, needsRefresh = false) {
         );
         window.location.reload();
     }
+    callback?.();
 }
 
 export default useChat;

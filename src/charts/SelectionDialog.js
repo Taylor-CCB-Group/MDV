@@ -133,7 +133,7 @@ class SelectionDialog extends BaseChart {
 
         const c = this.config;
         const dim = this.dataStore.getDimension("range_dimension");
-        dim.noclear = true;
+        dim.noClear = true;
         this.dims[col.field] = dim;
         const mm = this.dataStore.getMinMaxForColumn(col.field);
 
@@ -252,7 +252,7 @@ class SelectionDialog extends BaseChart {
         //div.style.whiteSpace="nowrap";
         const c = this.config;
         const dim = this.dataStore.getDimension("category_dimension");
-        dim.noclear = true;
+        dim.noClear = true;
         this.dims[col.field] = dim;
         let fil = c.filters[col.field];
         if (!fil) {

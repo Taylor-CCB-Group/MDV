@@ -1,5 +1,5 @@
 from mdvtools.mdvproject import MDVProject
-
+from typing import Any
 prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
@@ -148,7 +148,7 @@ import sys
 #     return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
 
-def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasouce_name: any, final_answer: str, question: str) -> str:
+def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasouce_name: Any, final_answer: str, question: str) -> str:
     """
     Returns the prompt for the create project RAG.
     
@@ -213,7 +213,7 @@ The datasource_name is given by this variable `""" + datasouce_name + """`
 # The data should be loaded in the same way as in the examples.
 
 
-def get_createproject_prompt_RAG_attempt1(project: MDVProject, path_to_data: str, datasouce_name: any, final_answer: str, question: str) -> str:
+def get_createproject_prompt_RAG_attempt1(project: MDVProject, path_to_data: str, datasouce_name: Any, final_answer: str, question: str) -> str:
     """
     Returns the prompt for the create project RAG.
     

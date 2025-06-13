@@ -66,7 +66,7 @@ def main():
     project = MDVProject(project_path, delete_existing=True)
     
     # Load data
-    adata = sc.read_h5ad(data_path)
+    adata = sc.read_h5ad(data_path, backed='r')
     data_frame_obs = pd.DataFrame(adata.obs)
 
     data_frame_var = pd.DataFrame(adata.var)

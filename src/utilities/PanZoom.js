@@ -6,13 +6,9 @@ class ImagePanZoom {
         this.img = new Image();
 
         this.img.style.position = "absolute";
+        this.img.style.maxWidth= 'none'
 
         this.img.onload = (e) => {
-            this.orig_dim = [
-                this.img.naturalWidth,
-                this.img.naturalHeight,
-                this.img.naturalWidth / this.img.naturalHeight,
-            ];
             this.container.append(this.img);
             this.fit();
         };
@@ -31,16 +27,20 @@ class ImagePanZoom {
 
     fit() {
         const box = this.container.getBoundingClientRect();
-        this.img.height = box.height;
-        this.img.width = this.img.height * this.orig_dim[2];
-        if (this.img.width > box.width) {
-            this.img.width = box.width;
-            this.img.height = this.img.width / this.orig_dim[2];
-            this.img.style.top = `${(box.height - this.img.height) / 2}px`;
+        const ratio =  this.img.naturalWidth / this.img.naturalHeight;
+        const fitHeight = box.height;
+        const fitWidth = fitHeight * ratio;
+        this.img.style.height = `${fitHeight}px`;
+        this.img.style.width = `${fitWidth}px`;
+        if (fitWidth > box.width) {
+            const constrainedHeight = box.width / ratio;
+            this.img.style.width = `${box.width}px`;
+            this.img.style.height = `${box.width / ratio}px`;
+            this.img.style.top = `${(box.height - constrainedHeight) / 2}px`;
             this.img.style.left = "0px";
         } else {
             this.img.style.top = "0px";
-            this.img.style.left = `${(box.width - this.img.width) / 2}px`;
+            this.img.style.left = `${(box.width - fitWidth) / 2}px`;
         }
     }
 
@@ -53,8 +53,8 @@ class ImagePanZoom {
         const dy =
             (event.clientY - cbox.top - this.img.offsetTop) * (amount - 1);
 
-        this.img.width = ibox.width * amount;
-        this.img.height = ibox.height * amount;
+        this.img.style.width = `${ibox.width * amount}px`;
+        this.img.style.height = `${ibox.height * amount}px`;
         this.img.style.left = `${this.img.offsetLeft - dx}px`;
         this.img.style.top = `${this.img.offsetTop - dy}px`;
     }

@@ -101,19 +101,6 @@ if __name__ == "__main__":
             # creating a project with the same id as an existing project is not allowed
             assert(project_id not in [p.id for p in projects])
             print(f"creating project '{project_id}'")
-            if "ai_query" in request.json:
-                # very provisional... just to get the idea of how this might work.
-                query = request.json["ai_query"]
-                if query:
-                    from mdvtools.llm.langchain_mdv import project_wizard                    
-                    try:
-                        # print('# test that we can import things as expected')
-                        # exec("from mdvtools.mdvproject import MDVProject\nMDVProject('')")
-                        # expect there to be a project ready to open after this...
-                        project_wizard(query, project_id, log=lambda x: print(f'[llm {project_id}] {x}'))
-                    except Exception as e:
-                        print(f"[llm error] {e}")  # eg "name 'MDVProject' is not defined" when running in `exec()`?
-                        return jsonify({"status": "error", "message": str(e)}), 500
             p = MDVProject(os.path.join(project_dir, project_id))
             # in cases such as project_wizard, it's possible the project will already exist in this list
             # having been picked up by the watcher thread - so we should check for another project with the same id in `projects`
