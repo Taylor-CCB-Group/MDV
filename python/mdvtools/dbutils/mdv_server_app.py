@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 #Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
-logger.info(f" Authentication enabled: {ENABLE_AUTH}")
+logger.info(f"Authentication enabled: {ENABLE_AUTH}")
 oauth = None
 if ENABLE_AUTH:
     
