@@ -82,7 +82,7 @@ jobs:
           echo "release_notes=$RELEASE_NOTES" >> $GITHUB_OUTPUT
           echo "Release notes: $RELEASE_NOTES"
 
-      - name: Build and push multi-architecture image
+      - name: Build and push linux/amd64 image
         run: |
           echo "Building and pushing image..."
           docker buildx build --platform linux/amd64 \
