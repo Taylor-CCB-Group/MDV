@@ -152,7 +152,9 @@ def wait_for_database(app):
         try:
             # First connect to postgres database
             engine = db.create_engine(postgres_uri)
-            with engine.connect() as connection:
+            connection = None
+            try:
+                connection = engine.connect()
                 # Check if our target database exists
                 result = connection.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": db_name})
                 exists = result.scalar()
@@ -164,6 +166,9 @@ def wait_for_database(app):
                     logger.info(f"Created database: {db_name}")
                 else:
                     logger.info(f"Database {db_name} already exists")
+            finally:
+                if connection:
+                    connection.close()
             
             # Now try to connect to our target database
             target_uri = 'postgresql://{}:{}@{}/{}'.format(
@@ -173,15 +178,21 @@ def wait_for_database(app):
                 db_name
             )
             
-            # Create a new engine for our target database
-            target_engine = db.create_engine(target_uri)
+            # Set the database URI in the app config
+            app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
+            
+            # Initialize the database with the app
+            db.init_app(app)
             
             # Test the connection to our target database
-            with target_engine.connect() as connection:
-                connection.execute(text('SELECT 1'))
-            
-            # Initialize the database with the new engine
-            db.init_app(app, engine=target_engine)
+            test_connection = None
+            try:
+                test_connection = db.engine.connect()
+                test_connection.execute(text('SELECT 1'))
+                logger.info("Successfully connected to target database")
+            finally:
+                if test_connection:
+                    test_connection.close()
             
             logger.info("Database is ready!")
             return
