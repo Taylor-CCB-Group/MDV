@@ -354,10 +354,11 @@ export const DropdownAutocompleteComponent = observer(({
                                         if (items.length > 0) {
                                             if (!multiple) {
                                                     // using the first item always
-                                                    const item = items[0];
-                                                    const matched = options.find(option => 
-                                                        matchString(option.label.toLowerCase().split(" "), item.toLowerCase())
-                                                    );
+                                                    const itemLower = items[0]?.toLowerCase();
+                                                    const matched = options.find(option => {
+                                                        const optionLower = option.label.toLowerCase().split(" ");
+                                                        return matchString(optionLower, itemLower);
+                                                    });
                                                     if (matched) {
                                                         e.preventDefault();
                                                         const matchedValue = val(matched);
@@ -366,15 +367,21 @@ export const DropdownAutocompleteComponent = observer(({
                                                     }
                                             }
                                             else {
-                                                    // Only select those that exist in values
-                                                    const matched = options.filter(option => items.some(item => 
-                                                        matchString(option.label.toLowerCase().split(" "), item.toLowerCase()))
-                                                    );
+                                                // Only select those that exist in values
+                                                    const itemLower = items.map(i => i.toLowerCase());
+                                                    const matched = options.filter(option => 
+                                                        itemLower.some(item => {
+                                                            const optionLower = option.label.toLowerCase().split(" ");
+                                                            return matchString(optionLower, item);
+                                                    }));
                                                     if (matched.length > 0) {
                                                         // Prevent default paste
                                                         e.preventDefault(); 
                                                         const matchedValues = matched.map(val);
-                                                        const uniqueMatched = Array.from(new Set([...matchedValues, ...props.current_value]));
+                                                        // create a set for unique values
+                                                        const uniqueMatched = Array.from(
+                                                            new Set([...matchedValues, ...props.current_value])
+                                                        );
                                                         props.current_value = uniqueMatched;
                                                         if (props.func) props.func(uniqueMatched);
                                                     }

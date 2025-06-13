@@ -159,9 +159,11 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                             if (items.length > 0) {
                                                 if (!isMultiType) {
                                                         // using the first item always
-                                                        const item = items[0];
-                                                        const matched = columns.find(column => 
-                                                            matchString(column.name.toLowerCase().split(" "), item.toLowerCase()));
+                                                        const itemLower = items[0]?.toLowerCase();
+                                                        const matched = columns.find(column => {
+                                                            const columnLower = column.name.toLowerCase().split(" ");
+                                                            return matchString(columnLower, itemLower);
+                                                        });
                                                         if (matched) {
                                                             // Prevent default paste
                                                             e.preventDefault();
@@ -169,13 +171,22 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                                         }
                                                 }
                                                 else {
-                                                        // Only select those that exist in values
+                                                        // Convert to lowercase
+                                                        const itemsLower = items.map(i => i.toLowerCase());
                                                         const matched = columns.filter(column => 
-                                                            items.some(item => matchString(column.name.toLowerCase().split(" "), item.toLowerCase())));
+                                                            itemsLower.some(item => {
+                                                                const columnLower = column.name.toLowerCase().split(" ");
+                                                                // Match the pasted item with column name
+                                                                return matchString(columnLower, item);
+                                                            })
+                                                        );
                                                         if (matched.length > 0) {
                                                             // Prevent default paste
-                                                            e.preventDefault(); 
-                                                            const uniqueMatched = Array.from(new Set([...matched, ...value as DataColumn<DataType>[]]));
+                                                            e.preventDefault();
+                                                            // create a set for unique values
+                                                            const uniqueMatched = Array.from(
+                                                                new Set([...matched, ...value as DataColumn<DataType>[]])
+                                                            );
                                                             (setValue as (v: DataColumn<DataType>[]) => void)(uniqueMatched);
                                                         }
                                                 }

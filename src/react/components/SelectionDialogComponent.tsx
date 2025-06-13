@@ -133,11 +133,16 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                                     const items = parseDelimitedString(pasted);
                                     if (items.length > 0) {
                                         // Only select those that exist in values
+                                        const itemsLower = items.map(i => i.toLowerCase());
                                         const matched = values.filter(v => 
-                                            items.some(item => matchString(v.toLowerCase().split(" "), item.toLowerCase())));
+                                            itemsLower.some(item => {
+                                                const vLower = v.toLowerCase().split(" ");
+                                                return matchString(vLower, item);
+                                            }));
                                         if (matched.length > 0) {
                                             // Prevent default paste
                                             e.preventDefault(); 
+                                            // create a set for unique values
                                             setValue(Array.from(new Set([...value, ...matched])));
                                         }
                                     }
