@@ -25,7 +25,7 @@ BASE_DELAY = 1  # Base delay in seconds
 MAX_DELAY = 8  # Maximum delay in seconds
 
 def retry_with_exponential_backoff(func):
-    """Decorator to implement retry logic with exponential backoff."""
+    """ Decorator to implement retry logic with exponential backoff."""
     def wrapper(*args, **kwargs):
         retry_count = 0
         while retry_count < MAX_RETRIES:
