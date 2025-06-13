@@ -86,12 +86,12 @@ jobs:
         run: |
           echo "Building and pushing image..."
           docker buildx build --platform linux/amd64 \
-            --build-arg GIT_COMMIT_DATE="'${{ steps.build_metadata.outputs.git_commit_date }}'" \
-            --build-arg GIT_BRANCH_NAME="'${{ steps.build_metadata.outputs.git_branch_name }}'" \
-            --build-arg GIT_COMMIT_HASH="'${{ steps.build_metadata.outputs.git_commit_hash }}'" \
-            --build-arg GIT_LAST_COMMIT_MESSAGE="'${{ steps.build_metadata.outputs.git_last_commit_message }}'" \
-            --build-arg BUILD_DATE="'${{ steps.build_metadata.outputs.build_date }}'" \
-            --build-arg GIT_DIRTY="'${{ steps.build_metadata.outputs.git_dirty }}'" \
+            --build-arg GIT_COMMIT_DATE="${{ steps.build_metadata.outputs.git_commit_date }}" \
+            --build-arg GIT_BRANCH_NAME="${{ steps.build_metadata.outputs.git_branch_name }}" \
+            --build-arg GIT_COMMIT_HASH="${{ steps.build_metadata.outputs.git_commit_hash }}" \
+            --build-arg GIT_LAST_COMMIT_MESSAGE="${{ steps.build_metadata.outputs.git_last_commit_message }}" \
+            --build-arg BUILD_DATE="${{ steps.build_metadata.outputs.build_date }}" \
+            --build-arg GIT_DIRTY="${{ steps.build_metadata.outputs.git_dirty }}" \
             --label "org.opencontainers.image.version=${{ steps.build_metadata.outputs.git_commit_hash }}" \
             --label "org.opencontainers.image.revision=${{ steps.build_metadata.outputs.git_commit_hash }}" \
             --label "org.opencontainers.image.created=${{ steps.build_metadata.outputs.build_date }}" \
