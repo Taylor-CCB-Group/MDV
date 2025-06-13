@@ -178,11 +178,8 @@ def wait_for_database(app):
                 db_name
             )
             
-            # Set the database URI in the app config
+            # Update the database URI in the app config
             app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
-            
-            # Initialize the database with the app
-            db.init_app(app)
             
             # Test the connection to our target database
             test_connection = None
