@@ -71,7 +71,7 @@ def create_flask_app(config_name=None):
         logger.info("Creating tables")
         with app.app_context():
             logger.info("Waiting for DB to set up")
-            wait_for_database()
+            wait_for_database(app)
             if not tables_exist():
                 logger.info("Creating database tables")
                 db.create_all()
@@ -130,7 +130,7 @@ def create_flask_app(config_name=None):
     return app
 
 
-def wait_for_database():
+def wait_for_database(app):
     """Wait for the database to be ready before proceeding."""
     max_retries = 30
     delay = 5  # seconds
@@ -181,7 +181,7 @@ def wait_for_database():
                 connection.execute(text('SELECT 1'))
             
             # Initialize the database with the new engine
-            db.init_app(db.app, engine=target_engine)
+            db.init_app(app, engine=target_engine)
             
             logger.info("Database is ready!")
             return
