@@ -3,17 +3,6 @@ from typing import Any
 prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
-   - The column names in df1 are:
-       'sample_id', 'Patient', 'Disease', 'Site', 'Treatment',
-       'Disease_duration', 'Inflammation', 'Age', 'Gender', 'Ethnicity',
-       'Inflammation_score', 'Ileum_vs_Colon', 'LibraryType', 'CellsLoaded',
-       'Match', 'Batch', 'doublet_scores', 'predicted_doublets',
-       'n_genes_by_counts', 'total_counts', 'total_counts_mt', 'pct_counts_mt',
-       'total_counts_rp', 'pct_counts_rp', 'total_counts_hb', 'pct_counts_hb',
-       'total_counts_ig', 'pct_counts_ig', 'S_score', 'G2M_score', 'phase',
-       'cellbarcode', 'diff', 'Cell state', 'minor', 'major', 'sub_bucket',
-       'bucket', 'Remission_status', 'cell_id', 'X_harmony_1', 'X_harmony_2',
-       'X_harmony_3', 'X_pca_1', 'X_pca_2', 'X_pca_3', 'X_umap_1', 'X_umap_2'
 2. Use only the two DataFrames provided:
    - df1: cells (data_frame_obs)
    - df2: genes (data_frame_var)
@@ -349,3 +338,16 @@ Each script follows this standard workflow:
 """
     )
     return prompt_RAG
+
+
+#   - The column names in df1 are:
+#       'sample_id', 'Patient', 'Disease', 'Site', 'Treatment',
+#       'Disease_duration', 'Inflammation', 'Age', 'Gender', 'Ethnicity',
+#       'Inflammation_score', 'Ileum_vs_Colon', 'LibraryType', 'CellsLoaded',
+#       'Match', 'Batch', 'doublet_scores', 'predicted_doublets',
+#       'n_genes_by_counts', 'total_counts', 'total_counts_mt', 'pct_counts_mt',
+#       'total_counts_rp', 'pct_counts_rp', 'total_counts_hb', 'pct_counts_hb',
+#       'total_counts_ig', 'pct_counts_ig', 'S_score', 'G2M_score', 'phase',
+#       'cellbarcode', 'diff', 'Cell state', 'minor', 'major', 'sub_bucket',
+#       'bucket', 'Remission_status', 'cell_id', 'X_harmony_1', 'X_harmony_2',
+#       'X_harmony_3', 'X_pca_1', 'X_pca_2', 'X_pca_3', 'X_umap_1', 'X_umap_2'
