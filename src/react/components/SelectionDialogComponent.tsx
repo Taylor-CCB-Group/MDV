@@ -21,7 +21,7 @@ import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
-import { isArray } from "@/lib/utils";
+import { isArray, matchString, parseDelimitedString } from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
@@ -118,11 +118,34 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             onClose={() => setOpen(false)}
             ref={ref}
             renderInput={(props) => {
-                const { key, ...p } = props as typeof props & {
+                const { key, InputProps, ...p } = props as typeof props & {
                     key: string;
                 }; //questionable mui types?
                 return <>
-                    <TextFieldExtended key={key} {...p} />
+                    <TextFieldExtended
+                        key={key}
+                        {...p}
+                        slotProps={{
+                            input: {
+                                ...InputProps,
+                                onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
+                                    const pasted = e.clipboardData.getData('text');
+                                    const items = parseDelimitedString(pasted);
+                                    if (items.length > 0) {
+                                        // Only select those that exist in values
+                                        const matched = values.filter(v => 
+                                            items.some(item => matchString(v.toLowerCase().split(" "), item.toLowerCase())));
+                                        if (matched.length > 0) {
+                                            // Prevent default paste
+                                            e.preventDefault(); 
+                                            setValue(Array.from(new Set([...value, ...matched])));
+                                        }
+                                    }
+                                    // Nothing matched, proceed as normal
+                                },
+                            }
+                        }}
+                    />
                 </>
             }}
             renderOption={(props, option) => {

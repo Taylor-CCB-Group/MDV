@@ -5,7 +5,7 @@ import type { DataColumn, DataType } from "@/charts/charts";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
-import { isArray } from "@/lib/utils";
+import { isArray, matchString, parseDelimitedString } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
@@ -71,7 +71,7 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
             return (v: DataColumn<DataType>) => {
                 if (isMultiType) throw new Error("Unexpected single column value for multi column dropdown");
                 //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
-                setSelectedColumn(v.field);
+                setSelectedColumn(v?.field);
             }
         }
     }, [setSelectedColumn, isMultiType]);
@@ -142,7 +142,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                     }}
                     getOptionLabel={(column) => column.name}
                     renderInput={(params) => {
-                        const { key, ...p } = params as typeof params & {
+                        const { key, InputProps, ...p } = params as typeof params & {
                             key: string;
                         };
                         return (
@@ -150,8 +150,43 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                 key={key}
                                 {...p}
                                 placeholder={placeholder}
+                                slotProps={{
+                                    input: {
+                                        ...InputProps,
+                                        onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
+                                            const pasted = e.clipboardData.getData('text');
+                                            const items = parseDelimitedString(pasted);
+                                            if (items.length > 0) {
+                                                if (!isMultiType) {
+                                                        // using the first item always
+                                                        const item = items[0];
+                                                        const matched = columns.find(column => 
+                                                            matchString(column.name.toLowerCase().split(" "), item.toLowerCase()));
+                                                        if (matched) {
+                                                            // Prevent default paste
+                                                            e.preventDefault();
+                                                            (setValue as (v: DataColumn<DataType>) => void)(matched);
+                                                        }
+                                                }
+                                                else {
+                                                        // Only select those that exist in values
+                                                        const matched = columns.filter(column => 
+                                                            items.some(item => matchString(column.name.toLowerCase().split(" "), item.toLowerCase())));
+                                                        if (matched.length > 0) {
+                                                            // Prevent default paste
+                                                            e.preventDefault(); 
+                                                            const uniqueMatched = Array.from(new Set([...matched, ...value as DataColumn<DataType>[]]));
+                                                            (setValue as (v: DataColumn<DataType>[]) => void)(uniqueMatched);
+                                                        }
+                                                }
+                                            }
+                                            // Nothing matched, proceed as normal
+                                        },
+                                    }
+                                }}
                             />
                         );
+                        
                     }}
                     renderTags={(value, getTagProps) => {
                         // custom logic to limit the tags, this is required because we are overriding the way tags are rendered

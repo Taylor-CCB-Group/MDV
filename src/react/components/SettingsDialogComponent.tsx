@@ -19,7 +19,7 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { isArray, notEmpty } from "@/lib/utils";
+import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
@@ -340,13 +340,55 @@ export const DropdownAutocompleteComponent = observer(({
                         />
                     ));
                 }}
-                renderInput={(params) => (
-                    <TextField
-                        {...params}
-                    // label="Checkboxes"
-                    // placeholder={props.label}
-                    />
-                )}
+                renderInput={(params) => {
+                    const { InputProps } = params;
+                    return (
+                        <TextField
+                            {...params}
+                            slotProps={{
+                                input: {
+                                    ...InputProps,
+                                    onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
+                                        const pasted = e.clipboardData.getData('text');
+                                        const items = parseDelimitedString(pasted);
+                                        if (items.length > 0) {
+                                            if (!multiple) {
+                                                    // using the first item always
+                                                    const item = items[0];
+                                                    const matched = options.find(option => 
+                                                        matchString(option.label.toLowerCase().split(" "), item.toLowerCase())
+                                                    );
+                                                    if (matched) {
+                                                        e.preventDefault();
+                                                        const matchedValue = val(matched);
+                                                        props.current_value = matchedValue;
+                                                        if (props.func) props.func(matchedValue);
+                                                    }
+                                            }
+                                            else {
+                                                    // Only select those that exist in values
+                                                    const matched = options.filter(option => items.some(item => 
+                                                        matchString(option.label.toLowerCase().split(" "), item.toLowerCase()))
+                                                    );
+                                                    if (matched.length > 0) {
+                                                        // Prevent default paste
+                                                        e.preventDefault(); 
+                                                        const matchedValues = matched.map(val);
+                                                        const uniqueMatched = Array.from(new Set([...matchedValues, ...props.current_value]));
+                                                        props.current_value = uniqueMatched;
+                                                        if (props.func) props.func(uniqueMatched);
+                                                    }
+                                            }
+                                        }
+                                        // Nothing matched, proceed as normal
+                                    },
+                                }
+                            }}
+                            // label="Checkboxes"
+                            // placeholder={props.label}
+                        />
+                    )
+                }}
             />
         </>
     );
