@@ -750,11 +750,27 @@ const SelectionDialogComponent = () => {
         // active - dragged item, over - dropped item
         const { active, over } = event;
 
-        // Check if dragged and dropped item are different
-        if (active.id !== over?.id) {
+        // Check if dragged and dropped item are different and other sanity checks
+        if (active && over && active.id !== over?.id && isArray(config.param)) {
             // Find the indices of the dragged and the dropped items
-            const oldIndex = cols.findIndex(col => col.field === active.id);
-            const newIndex = cols.findIndex(col => col.field === over?.id);
+            // Use config.param directly instead of cols to avoid stale data issues
+            // The issue occurs when parameter types change (e.g. from Column to Link mode)
+            const oldIndex = config.param.findIndex(param => {
+                // Handle both string parameters and MultiColumnQuery objects
+                if (typeof param === 'string') {
+                    return param === active.id;
+                } else {
+                    // For MultiColumnQuery objects, check if any of their fields match
+                    return param.fields.includes(active.id as string);
+                }
+            });
+            const newIndex = config.param.findIndex(param => {
+                if (typeof param === 'string') {
+                    return param === over?.id;
+                } else {
+                    return param.fields.includes(over?.id as string);
+                }
+            });
 
             // Check if the indices are valid
             if (oldIndex !== -1 && newIndex !== -1) {
@@ -765,7 +781,7 @@ const SelectionDialogComponent = () => {
                 });
             }
         }
-    }, [cols, config]);
+    }, [config]);
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             <DndContext
