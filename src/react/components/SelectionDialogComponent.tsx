@@ -9,6 +9,7 @@ import CachedIcon from '@mui/icons-material/Cached';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
@@ -23,6 +24,23 @@ import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
 import { isArray } from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -504,6 +522,21 @@ const Components: {
 }
 
 const AbstractComponent = observer(function AbstractComponent<K extends DataType>({ column }: Props<K>) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: column.field });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
     const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& invert / active toggle?) for each filter
     const config = useConfig<SelectionDialogConfig>();
@@ -533,6 +566,8 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         <Accordion defaultExpanded={true}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            style={style}
+            ref={setNodeRef}
         >
             <AccordionSummary
                 expandIcon={<ArrowDropDownIcon />}
@@ -555,7 +590,25 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                 >
                     <HighlightOffIcon />
                 </IconButton>
-                <div className="flex items-center h-4">
+                <div className="flex items-center h-4 w-full">
+                    <IconButton
+                        {...attributes}
+                        {...listeners}
+                        size="small"
+                        sx={{
+                            opacity: isHovered ? 0.7 : 0.3,
+                            transition: 'opacity 0.3s',
+                            cursor: 'grab',
+                            '&:active': {
+                                cursor: 'grabbing',
+                            },
+                            '&:hover': {
+                                opacity: 1,
+                            },
+                        }}
+                    >
+                        <DragIndicatorIcon fontSize="small" />
+                    </IconButton>
                     <Typography variant="subtitle1">{column.name}
                         {hasFilter && <IconButton onClick={clearFilter}>
                             <CachedIcon fontSize="small" />
@@ -680,11 +733,53 @@ const SelectionDialogComponent = () => {
     //! since this is outside the ErrorBoundary, problems in this hook are not well handled
     //we could consider returning some kind of `Result` object from this hook...
     const cols = useParamColumnsExperimental();
+    const config = useConfig<SelectionDialogConfig>();
     useResetButton();
     const showAddRow = false;
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                // Need 8px of movement to start dragging
+                distance: 8,
+            }
+        })
+    );
+
+    const onDragEnd = useCallback((event: DragEndEvent) => {
+        // active - dragged item, over - dropped item
+        const { active, over } = event;
+
+        // Check if dragged and dropped item are different
+        if (active.id !== over?.id) {
+            // Find the indices of the dragged and the dropped items
+            const oldIndex = cols.findIndex(col => col.field === active.id);
+            const newIndex = cols.findIndex(col => col.field === over?.id);
+
+            // Check if the indices are valid
+            if (oldIndex !== -1 && newIndex !== -1) {
+                runInAction(() => {
+                    // Update the param array using dnd's arrayMove function for new placement
+                    const newParam = arrayMove(config.param, oldIndex, newIndex);
+                    config.param = newParam;
+                });
+            }
+        }
+    }, [cols, config]);
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
-            {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
+            >
+                <SortableContext 
+                    items={cols.map(col => col.field)}
+                    strategy={verticalListSortingStrategy}
+                >
+                    {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
+                </SortableContext>
+            </DndContext>
             {showAddRow && <ErrorBoundary FallbackComponent={
                 ({ error }) => 
                     (
