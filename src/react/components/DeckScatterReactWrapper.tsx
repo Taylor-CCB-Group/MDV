@@ -29,7 +29,6 @@ const defaultViewState = {
 }
 
 function adaptConfig(originalConfig: DeckScatterConfig) {
-    const axisDefaults = originalConfig.dimension !== "3d" ? { axis: scatterAxisDefaults } : {};
     if (originalConfig.type === "wgl_3d_scatter_plot") {
         //! charts loaded from other configs may not have a dimension set
         originalConfig.dimension = "3d";
@@ -41,8 +40,8 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     // there is probably a less confusing way of writing this...
     //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
     // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
-    const defaults = originalConfig.dimension !== "3d" ? {axis: scatterAxisDefaults} : {};
-    const config = { ...scatterDefaults, ...axisDefaults, ...defaults, ...defaultViewState, ...originalConfig };
+    const defaults = originalConfig.dimension !== "3d" ? { axis: scatterAxisDefaults } : {};
+    const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
     if (!config.contourParameter) {
         config.contourParameter = config.param[2];
     }
@@ -231,6 +230,11 @@ BaseChart.types["DeckDensity"] = {
             name: "density fields"
         }
     ],
+    // todo
+    // extra_controls: (ds) => (g({
+    //     type: "multicolumn",
+    //     label: "density fields",
+    // }))
 };
 BaseChart.types["DeckScatter3D"] = {
     name: "3D Scatter Plot (new)",

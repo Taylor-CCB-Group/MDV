@@ -6,6 +6,7 @@ import {
     useFilteredIndices,
     useFieldSpec,
     useParamColumns,
+    useFieldSpecs,
 } from "./hooks";
 import { useDataStore } from "./context";
 import { useDebounce } from "use-debounce";
@@ -14,7 +15,7 @@ import { g, isArray, toArray } from "@/lib/utils";
 import { observable } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
-import type { FieldSpec } from "@/lib/columnTypeHelpers";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { oklch2rgb } from "@/utilities/oklch2rgb";
 
 /** need to be clearer on which prop types are for which parts of layer spec...
@@ -39,7 +40,7 @@ export type FieldContourProps = {
     bandwidth: number;
     intensity: number;
     opacity: number;
-    fields: LoadedDataColumn<"double">[];
+    fields?: LoadedDataColumn<"double">[];
 }
 function rgb(
     r: number,
@@ -179,6 +180,7 @@ export function useFieldContour(props: FieldContourProps) {
     const [debounceZoom] = useDebounce(zoom, 500);
 
     return useMemo(() => {
+        if (!fields) return [];
         //If I return a layer here rather than props, will it behave as expected?
         //not really - we want to pass this into getSublayerProps() so the id is used correctly
         const radiusPixels = 30 * bandwidth * 2 ** debounceZoom;
@@ -226,7 +228,7 @@ export function useFieldContour(props: FieldContourProps) {
             transitions: {
                 getWeight: {
                     duration: 1000,
-                    easing: t => t,
+                    // easing: t => t,
                 },
             },
             updateTriggers: {
@@ -262,6 +264,7 @@ export type DualContourLegacyConfig = {
     contourParameter?: FieldSpec; //this is param[2] in the original code
     category1?: string | string[];
     category2?: string | string[];
+    densityFields?: FieldSpecs; // don't have a way of specifying datatype here
 } & ContourVisualConfig;
 
 export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
@@ -326,6 +329,16 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                             c.category2 = x;
                         },
                     }),
+                    g({
+                        type: "multicolumn",
+                        label: "Density Fields",
+                        //@ts-expect-error - pending optional columns
+                        current_value: c.densityFields,
+                        columnType: "double",
+                        func: (x) => {
+                            c.densityFields = x;
+                        },
+                    })
                 ],
             }),
             ...getContourVisualSettings(c)
@@ -403,12 +416,11 @@ export function useLegacyDualContour(): ContourLayerProps[] {
         intensity: config.contour_intensity || 0.1,
         opacity: config.contour_opacity || 0.2,
     };
-    const [cx, cy, ...fields] = useParamColumns() as LoadedDataColumn<"double">[];
+    const fields = useFieldSpecs(config.densityFields);
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        // the spread above is wrong particularly when param[2] is categorical
-        fields: fields.filter(field => field.datatype === "double")
+        fields: fields.filter(field => field.datatype === "double") as LoadedDataColumn<"double">[],
     });
     //@ts-expect-error Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer'?
     if (!config.contourParameter) return fieldContours;
