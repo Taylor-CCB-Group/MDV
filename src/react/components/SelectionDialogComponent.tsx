@@ -540,6 +540,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& invert / active toggle?) for each filter
     const config = useConfig<SelectionDialogConfig>();
+    const chart = useChart();
     const { filters } = config;
     const f = filters[column.field];
     // todo: what about category filters with empty array?
@@ -558,10 +559,10 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         runInAction(() => {
             delete filters[column.field];
             if (!isArray(config.param)) throw new Error("expected param array");
-            config.param = config.param.filter((p) => p !== column.field);
+            chart.setParams(config.param.filter((p) => p !== column.field));
         });
         console.log('Delete item');
-    }, [filters, column.field, config]);
+    }, [filters, column.field, config, chart.setParams]);
     return (
         <Accordion defaultExpanded={true}
             onMouseEnter={() => setIsHovered(true)}
@@ -734,6 +735,7 @@ const SelectionDialogComponent = () => {
     //we could consider returning some kind of `Result` object from this hook...
     const cols = useParamColumnsExperimental();
     const config = useConfig<SelectionDialogConfig>();
+    const chart = useChart();
     useResetButton();
     const showAddRow = false;
 
@@ -777,11 +779,11 @@ const SelectionDialogComponent = () => {
                 runInAction(() => {
                     // Update the param array using dnd's arrayMove function for new placement
                     const newParam = arrayMove(config.param, oldIndex, newIndex);
-                    config.param = newParam;
+                    chart.setParams(newParam);
                 });
             }
         }
-    }, [config]);
+    }, [config, chart.setParams]);
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             <DndContext
