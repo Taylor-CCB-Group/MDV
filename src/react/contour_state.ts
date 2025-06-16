@@ -15,6 +15,7 @@ import { observable } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec } from "@/lib/columnTypeHelpers";
+import { oklch2rgb } from "@/utilities/oklch2rgb";
 
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
@@ -184,9 +185,11 @@ export function useFieldContour(props: FieldContourProps) {
         // console.log('radiusPixels', radiusPixels);
         // there is an issue of the scaling of these layers e.g. with images that have been resized...
         // what is different about how we scale these layers vs other scatterplot layer?
-        return fields.map(({ name, data: fieldData, minMax }) => ({
+        const n = fields.length;
+        //const fieldStats = fields.reduce((field) => { ... });
+        return fields.map(({ name, data: fieldData, minMax }, index) => ({
             id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
-            data,
+            data, //todo filter sparse data
             opacity: fill ? intensity : 0,
             contourOpacity: opacity,
             getPosition: (
@@ -211,11 +214,21 @@ export function useFieldContour(props: FieldContourProps) {
                 const normalizedValue = (value - min) / range;
                 return normalizedValue;
             },
-            colorRange,
-            radiusPixels,
+            // todo different modes for analogous vs other color ranges...
+            // split complementary etc...
+            // really need (interactive) legend for this
+            colorRange: [oklch2rgb([200, 220, 360 * index/n])],
+            //! this scale does not adapt well to the data, and it would be nice to have meaningful units
+            radiusPixels: radiusPixels/100,
             debounce: 1000,
-            weightsTextureSize: 512, //there could be a performance related parameter to tweak
+            weightsTextureSize: 256, //there could be a performance related parameter to tweak
             pickable: false,
+            transitions: {
+                getWeight: {
+                    duration: 1000,
+                    easing: t => t,
+                },
+            },
             updateTriggers: {
                 getWeight: [fieldData],
             }
@@ -226,7 +239,6 @@ export function useFieldContour(props: FieldContourProps) {
         intensity,
         cx,
         cy,
-        colorRange,
         debounceZoom,
         bandwidth,
         fill,
