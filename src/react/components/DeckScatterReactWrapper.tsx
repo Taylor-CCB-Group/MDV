@@ -28,6 +28,27 @@ const defaultViewState = {
     }
 }
 
+function adaptConfig(originalConfig: DeckScatterConfig) {
+    const axisDefaults = originalConfig.dimension !== "3d" ? { axis: scatterAxisDefaults } : {};
+    if (originalConfig.type === "wgl_3d_scatter_plot") {
+        //! charts loaded from other configs may not have a dimension set
+        originalConfig.dimension = "3d";
+        if (originalConfig.course_radius === undefined) {
+            originalConfig.course_radius = 10;
+        }
+    }
+
+    // there is probably a less confusing way of writing this...
+    //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
+    // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
+    const defaults = originalConfig.dimension !== "3d" ? {axis: scatterAxisDefaults} : {};
+    const config = { ...scatterDefaults, ...axisDefaults, ...defaults, ...defaultViewState, ...originalConfig };
+    if (!config.contourParameter) {
+        config.contourParameter = config.param[2];
+    }
+    return config;
+}
+
 class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
@@ -37,19 +58,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         div: HTMLDivElement,
         originalConfig: DeckScatterConfig,
     ) {
-        // config.tooltip = config.tooltip || { show: false, column: config.param[0] }; //todo fix this
-        // there is probably a less confusing way of writing this...
-        //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
-        // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
-        if (originalConfig.type === "wgl_3d_scatter_plot") {
-            //! charts loaded from other configs may not have a dimension set
-            originalConfig.dimension = "3d";
-            if (originalConfig.course_radius === undefined) {
-                originalConfig.course_radius = 10;
-            }
-        }
-        const axisDefaults = originalConfig.dimension !== "3d" ? {axis: scatterAxisDefaults} : {};
-        const config = { ...scatterDefaults, ...axisDefaults, ...defaultViewState, ...originalConfig };
+        const config = adaptConfig(originalConfig);
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
         //@ts-expect-error - pending colorBy type fix
@@ -100,6 +109,10 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const c = this.config;
         const settings = super.getSettings();
 
+        if (c.type.includes("Density")) {
+            // weird things happening with parameter & category settings?
+            settings.push(getDensitySettings(c, this))
+        }
         if (c.dimension === "2d") {
             const axisSettings = getAxisGuiSpec(c);
             settings.push(axisSettings);
@@ -177,14 +190,31 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                     this.pendingRecenter = true;
                 },
             }),
-            // consider making this only appear for "density" chart
-            getDensitySettings(c, this)
         ]);
     }
 }
 
 BaseChart.types["DeckScatter"] = {
     name: "2D Scatter Plot (new)",
+    class: DeckScatterReact,
+    allow_user_add: false,
+    params: [
+        {
+            type: "number",
+            name: "x axis",
+        },
+        {
+            type: "number",
+            name: "y axis",
+        },
+        // {
+        //     type: "_multi_column:number",
+        //     name: "density fields"
+        // }
+    ],
+};
+BaseChart.types["DeckDensity"] = {
+    name: "Density Plot (new)",
     class: DeckScatterReact,
     allow_user_add: false,
     params: [
