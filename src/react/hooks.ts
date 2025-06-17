@@ -491,27 +491,27 @@ export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClos
     }, [ref.current, onClose]);
 };
 
-export type PasteHandlerType<T> = {
+export type PasteHandlerType<T, V = T> = {
     options: T[];
     getLabel: (option: T) => string;
-    getValue: (option: T) => T;
+    getValue: (option: T) => V;
     multiple: boolean;
-    currentValue: T | T[] | null;
-    setValue: (v: T | T[] | null) => void;
+    currentValue: V | V[] | null;
+    setValue: (v: V | V[] | null) => void;
 };
 
 /**
  * Hook that provides onPaste handler for Autocomplete components.
  * Handles parsing delimited strings and matching them against available options.
  */
-export const usePasteHandler = <T>({
+export const usePasteHandler = <T, V = T>({
     options,
     multiple,
     currentValue,
     setValue,
     getLabel,
     getValue,
-}: PasteHandlerType<T>) => {
+}: PasteHandlerType<T, V>) => {
     return useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
         const text = e.clipboardData.getData("text");
         // Parse the string to extract the pasted items
@@ -530,8 +530,8 @@ export const usePasteHandler = <T>({
             if (matched) {
                 // Preventing default paste behaviour
                 e.preventDefault();
-                // Set the value with matched value
-                setValue(matched);
+                // Set the value with extracted value from matched option
+                setValue(getValue(matched));
             }
         } else {
             const itemLower = items.map((item) => item.toLowerCase());
