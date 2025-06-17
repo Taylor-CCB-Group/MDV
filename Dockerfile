@@ -4,6 +4,39 @@
 # not sure if there's a way of pinning a more specific build of the base image. May want to see if we can reproduce this issue outside of docker.
 FROM nikolaik/python-nodejs:python3.12-nodejs20 AS frontend-builder
 
+# ARG and ENV for build information, to be passed in from the CI pipeline
+ARG GIT_COMMIT_DATE="unknown"
+ARG GIT_BRANCH_NAME="unknown"
+ARG GIT_COMMIT_HASH="unknown"
+ARG GIT_LAST_COMMIT_MESSAGE="unknown"
+ARG BUILD_DATE="unknown"
+ARG GIT_DIRTY="false"
+
+# Debug output to verify build args
+RUN echo "Build args received:" && \
+    echo "GIT_COMMIT_DATE: $GIT_COMMIT_DATE" && \
+    echo "GIT_BRANCH_NAME: $GIT_BRANCH_NAME" && \
+    echo "GIT_COMMIT_HASH: $GIT_COMMIT_HASH" && \
+    echo "GIT_LAST_COMMIT_MESSAGE: $GIT_LAST_COMMIT_MESSAGE" && \
+    echo "BUILD_DATE: $BUILD_DATE" && \
+    echo "GIT_DIRTY: $GIT_DIRTY"
+
+ENV VITE_GIT_COMMIT_DATE=$GIT_COMMIT_DATE
+ENV VITE_GIT_BRANCH_NAME=$GIT_BRANCH_NAME
+ENV VITE_GIT_COMMIT_HASH=$GIT_COMMIT_HASH
+ENV VITE_GIT_LAST_COMMIT_MESSAGE=$GIT_LAST_COMMIT_MESSAGE
+ENV VITE_BUILD_DATE=$BUILD_DATE
+ENV VITE_GIT_DIRTY=$GIT_DIRTY
+
+# Debug output to verify environment variables
+RUN echo "Environment variables set:" && \
+    echo "VITE_GIT_COMMIT_DATE: $VITE_GIT_COMMIT_DATE" && \
+    echo "VITE_GIT_BRANCH_NAME: $VITE_GIT_BRANCH_NAME" && \
+    echo "VITE_GIT_COMMIT_HASH: $VITE_GIT_COMMIT_HASH" && \
+    echo "VITE_GIT_LAST_COMMIT_MESSAGE: $VITE_GIT_LAST_COMMIT_MESSAGE" && \
+    echo "VITE_BUILD_DATE: $VITE_BUILD_DATE" && \
+    echo "VITE_GIT_DIRTY: $VITE_GIT_DIRTY"
+
 # Install system packages as root (these require root privileges)
 # this layer will change less frequently than the others, so it's good to have it first
 # Install HDF5 library, for some reason poetry can't install it in this context as of now
@@ -83,6 +116,7 @@ COPY --chown=pn:pn tailwind.config.js ./
 COPY --chown=pn:pn postcss.config.js ./
 COPY --chown=pn:pn biome.jsonc ./
 
+RUN mkdir -p dist
 ## Run the npm build script for Flask and Vite
 # This step will be cached unless frontend-related files change
 RUN npm run build-flask-dockerjs

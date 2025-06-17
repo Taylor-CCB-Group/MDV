@@ -37,10 +37,10 @@ def main():
     genes_df['gene_id'] = genes_df.index
     
     # Find the gene with the highest expression
-    gene_expression_matrix = adata.X.toarray()
-    gene_sums = gene_expression_matrix.sum(axis=0)
+    gene_expression_matrix = adata.X
+    gene_sums = gene_expression_matrix.sum(axis=0) # type: ignore todo
     highest_expression_gene_index = np.argmax(gene_sums)
-    highest_expression_gene_name = genes_df.index[highest_expression_gene_index]
+    highest_expression_gene_name = genes_df.index[highest_expression_gene_index] # type: ignore todo
     print(f"Highest expression gene: {highest_expression_gene_name}")
     
     # Create project

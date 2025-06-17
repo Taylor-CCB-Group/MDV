@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
+import * as fs from 'node:fs';
 
 const flaskURL = "http://127.0.0.1:5055";
 const port = 5170;
@@ -125,23 +126,25 @@ proxy['/socket.io'] = {
 // };
 
 export default defineConfig(env => {
-    // apparently even with try/catch this is failing in CI action
-    // try {
-    //     // throw 'death is not the end'; // at least, not on my machine...
-    //     const commitDate = execSync('git log -1 --format=%cI').toString().trimEnd();
-    //     const branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trimEnd();
-    //     const commitHash = execSync('git rev-parse HEAD').toString().trimEnd();
-    //     const lastCommitMessage = execSync('git show -s --format=%s').toString().trimEnd();
-    
-    //     process.env.VITE_GIT_COMMIT_DATE = commitDate;
-    //     process.env.VITE_GIT_BRANCH_NAME = branchName;
-    //     process.env.VITE_GIT_COMMIT_HASH = commitHash;
-    //     process.env.VITE_GIT_LAST_COMMIT_MESSAGE = lastCommitMessage;
-    //     process.env.VITE_GIT_DIRTY = execSync('git diff --quiet || echo "dirty"').toString().trimEnd();
-    // } catch (e) {
-    //     // need to fix this to work in container (perhaps also in netlify)
-    //     console.error('Failed to get git info:', e);
-    // }
+    // For local development, try to get Git info. This is guarded by a check for the .git directory
+    // to prevent errors in environments where git is not available (like during Docker build, where
+    // even in dev environment, the build happens before .git is copied in, for cache purposes).
+    if (fs.existsSync('.git')) {
+        try {
+            const commitDate = execSync('git log -1 --format=%cI').toString().trimEnd();
+            const branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trimEnd();
+            const commitHash = execSync('git rev-parse HEAD').toString().trimEnd();
+            const lastCommitMessage = execSync('git show -s --format=%s').toString().trimEnd();
+        
+            process.env.VITE_GIT_COMMIT_DATE = commitDate;
+            process.env.VITE_GIT_BRANCH_NAME = branchName;
+            process.env.VITE_GIT_COMMIT_HASH = commitHash;
+            process.env.VITE_GIT_LAST_COMMIT_MESSAGE = lastCommitMessage;
+            process.env.VITE_GIT_DIRTY = execSync('git diff --quiet || echo "dirty"').toString().trimEnd();
+        } catch (e) {
+            console.error('Failed to get git info:', e);
+        }
+    }
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
     return ({

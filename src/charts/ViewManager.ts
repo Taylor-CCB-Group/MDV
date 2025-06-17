@@ -194,8 +194,10 @@ class ViewManager {
     async addView(viewName: string, checkedDs: { [name: string]: boolean }, isCloneView: boolean) {
         try {
             const { viewData, dsIndex, contentDiv } = this.cm;
-            this.setAllViews([...this.all_views, viewName]);
-            // Optionally make it the current view
+            // Add and set the new view only if it doesn't already exist
+            if (!this.all_views.includes(viewName)) {
+                this.setAllViews([...this.all_views, viewName]);
+            }
             this.setView(viewName);
             if (!isCloneView) {
                 //remove all charts and links
@@ -223,9 +225,25 @@ class ViewManager {
                 await this.cm._init(state.view);
                 await this.saveView();
             } else {
+                // Get current state before clearing
                 const state = this.cm.getState();
+                
+                // Update the view name in the state
+                state.view.name = viewName;
+                
+                // Clear existing gridstack instances
+                for (const ds in viewData.dataSources) {
+                    if (viewData.dataSources[ds].layout === "gridstack") {
+                        const d = dsIndex[ds];
+                        if (!d) continue;
+                        this.cm.gridStack.destroy(d);
+                    }
+                }
+                
+                // Clear content and reinitialize
                 contentDiv.innerHTML = "";
                 await this.cm._init(state.view);
+                // Save the view
                 await this.saveView();
             }
         } catch (error) {
