@@ -72,7 +72,7 @@ function useColorRange(
     const ds = useDataStore();
     const columnColors = useMemo(
         () =>
-            contourParameter ? ds.getColumnColors(contourParameter.name, {
+            contourParameter ? ds.getColumnColors(contourParameter.field, {
                 asArray: true,
                 useValue: true,
             }) : viridis,
