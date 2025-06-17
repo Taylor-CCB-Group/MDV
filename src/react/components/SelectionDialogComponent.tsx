@@ -1,4 +1,4 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental, usePasteHandler } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
@@ -100,6 +100,25 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         }
     }, [selectAll, setValue, values]);
 
+    const handleValueChange = useCallback((newValue: string | string[] | null) => {
+        // If newValue is null, set value to empty array
+        if (!newValue) {
+            setValue([]);
+        } else {
+            const valueArray = Array.isArray(newValue) ? newValue : [newValue];
+            setValue(valueArray);
+        }
+    }, [setValue]);
+
+    const handlePaste = usePasteHandler({
+        options: values,
+        multiple: true,
+        currentValue: value,
+        setValue: handleValueChange,
+        getLabel: (option: string) => option,
+        getValue: (option: string) => option,
+    });
+
     return (
         <Autocomplete
             multiple
@@ -128,26 +147,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                         slotProps={{
                             input: {
                                 ...InputProps,
-                                onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
-                                    const pasted = e.clipboardData.getData('text');
-                                    const items = parseDelimitedString(pasted);
-                                    if (items.length > 0) {
-                                        // Only select those that exist in values
-                                        const itemsLower = items.map(i => i.toLowerCase());
-                                        const matched = values.filter(v => 
-                                            itemsLower.some(item => {
-                                                const vLower = v.toLowerCase().split(" ");
-                                                return matchString(vLower, item);
-                                            }));
-                                        if (matched.length > 0) {
-                                            // Prevent default paste
-                                            e.preventDefault(); 
-                                            // create a set for unique values
-                                            setValue(Array.from(new Set([...value, ...matched])));
-                                        }
-                                    }
-                                    // Nothing matched, proceed as normal
-                                },
+                                onPaste: handlePaste,
                             }
                         }}
                     />

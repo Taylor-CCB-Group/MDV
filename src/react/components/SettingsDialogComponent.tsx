@@ -23,7 +23,7 @@ import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/util
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import { useCloseOnIntersection } from "../hooks";
+import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -266,6 +266,32 @@ export const DropdownAutocompleteComponent = observer(({
     type Option = typeof options[number]; // hopefully we can improve `{ original: any }`
     // still not entirely sure about the type for onChange...
     type OVal = Option | Option[] | (Option | Option[])[] | null;
+
+    const handleValueChange = useCallback((newValue: Option | Option[] | null) => {
+        if (multiple) {
+            const valueArray = Array.isArray(newValue) ? newValue : (newValue ? [newValue] : []);
+            const valueStrings = valueArray.map(val);
+            props.current_value = valueStrings;
+            props.func?.(valueStrings);
+        } else {
+            const valueSingle = Array.isArray(newValue) ? newValue[0] : newValue;
+            if (valueSingle) {
+                const valueString = val(valueSingle);
+                props.current_value = valueString;
+                props.func?.(valueString);
+            }
+        }
+    }, [multiple, props, val]);
+
+    const handlePaste = usePasteHandler({
+        options,
+        currentValue: okOption.filter((option): option is Option => option !== undefined),
+        setValue: handleValueChange,
+        multiple,
+        getValue: (option: Option) => option,
+        getLabel: (option: Option) => label(option),
+    });
+
     return (
         <>
             <MLabel htmlFor={id} props={props} />
@@ -348,47 +374,7 @@ export const DropdownAutocompleteComponent = observer(({
                             slotProps={{
                                 input: {
                                     ...InputProps,
-                                    onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
-                                        const pasted = e.clipboardData.getData('text');
-                                        const items = parseDelimitedString(pasted);
-                                        if (items.length > 0) {
-                                            if (!multiple) {
-                                                    // using the first item always
-                                                    const itemLower = items[0]?.toLowerCase();
-                                                    const matched = options.find(option => {
-                                                        const optionLower = option.label.toLowerCase().split(" ");
-                                                        return matchString(optionLower, itemLower);
-                                                    });
-                                                    if (matched) {
-                                                        e.preventDefault();
-                                                        const matchedValue = val(matched);
-                                                        props.current_value = matchedValue;
-                                                        if (props.func) props.func(matchedValue);
-                                                    }
-                                            }
-                                            else {
-                                                // Only select those that exist in values
-                                                    const itemLower = items.map(i => i.toLowerCase());
-                                                    const matched = options.filter(option => 
-                                                        itemLower.some(item => {
-                                                            const optionLower = option.label.toLowerCase().split(" ");
-                                                            return matchString(optionLower, item);
-                                                    }));
-                                                    if (matched.length > 0) {
-                                                        // Prevent default paste
-                                                        e.preventDefault(); 
-                                                        const matchedValues = matched.map(val);
-                                                        // create a set for unique values
-                                                        const uniqueMatched = Array.from(
-                                                            new Set([...matchedValues, ...props.current_value])
-                                                        );
-                                                        props.current_value = uniqueMatched;
-                                                        if (props.func) props.func(uniqueMatched);
-                                                    }
-                                            }
-                                        }
-                                        // Nothing matched, proceed as normal
-                                    },
+                                    onPaste: handlePaste,
                                 }
                             }}
                             // label="Checkboxes"

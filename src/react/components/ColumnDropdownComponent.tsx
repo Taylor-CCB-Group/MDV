@@ -10,7 +10,7 @@ import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import { useCloseOnIntersection } from "../hooks";
+import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -114,6 +114,25 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
             setSelectAll(true);
         }
     }, [selectAll, setValue, columns, isMultiType]);
+
+    const handleValueChange = useCallback((newValue: DataColumn<DataType> | DataColumn<DataType>[] | null) => {
+        if (!newValue) return;
+        if (isMultiType) {
+            (setValue as (v: DataColumn<DataType>[]) => void)(newValue as DataColumn<DataType>[]);
+        } else {
+            (setValue as (v: DataColumn<DataType>) => void)(newValue as DataColumn<DataType>)
+        }
+    }, [isMultiType, setValue]);
+
+    // Paste handler
+    const handlePaste = usePasteHandler({
+        options: columns,
+        multiple: isMultiType,
+        currentValue: value || null,
+        setValue: handleValueChange,
+        getLabel: (column: DataColumn<DataType>) => column.name,
+        getValue: (column: DataColumn<DataType>) => column,
+    });
     
     return (
         <Grid className="w-full items-center" container>
@@ -153,46 +172,8 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                 slotProps={{
                                     input: {
                                         ...InputProps,
-                                        onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
-                                            const pasted = e.clipboardData.getData('text');
-                                            const items = parseDelimitedString(pasted);
-                                            if (items.length > 0) {
-                                                if (!isMultiType) {
-                                                        // using the first item always
-                                                        const itemLower = items[0]?.toLowerCase();
-                                                        const matched = columns.find(column => {
-                                                            const columnLower = column.name.toLowerCase().split(" ");
-                                                            return matchString(columnLower, itemLower);
-                                                        });
-                                                        if (matched) {
-                                                            // Prevent default paste
-                                                            e.preventDefault();
-                                                            (setValue as (v: DataColumn<DataType>) => void)(matched);
-                                                        }
-                                                }
-                                                else {
-                                                        // Convert to lowercase
-                                                        const itemsLower = items.map(i => i.toLowerCase());
-                                                        const matched = columns.filter(column => 
-                                                            itemsLower.some(item => {
-                                                                const columnLower = column.name.toLowerCase().split(" ");
-                                                                // Match the pasted item with column name
-                                                                return matchString(columnLower, item);
-                                                            })
-                                                        );
-                                                        if (matched.length > 0) {
-                                                            // Prevent default paste
-                                                            e.preventDefault();
-                                                            // create a set for unique values
-                                                            const uniqueMatched = Array.from(
-                                                                new Set([...matched, ...value as DataColumn<DataType>[]])
-                                                            );
-                                                            (setValue as (v: DataColumn<DataType>[]) => void)(uniqueMatched);
-                                                        }
-                                                }
-                                            }
-                                            // Nothing matched, proceed as normal
-                                        },
+                                        
+                                        onPaste: handlePaste,
                                     }
                                 }}
                             />
