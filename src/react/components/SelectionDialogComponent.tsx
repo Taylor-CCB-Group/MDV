@@ -1,4 +1,4 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental, usePasteHandler } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
@@ -21,7 +21,7 @@ import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
-import { isArray } from "@/lib/utils";
+import { isArray, matchString, parseDelimitedString } from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
@@ -100,6 +100,25 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         }
     }, [selectAll, setValue, values]);
 
+    const handleValueChange = useCallback((newValue: string | string[] | null) => {
+        // If newValue is null, set value to empty array
+        if (!newValue) {
+            setValue([]);
+        } else {
+            const valueArray = Array.isArray(newValue) ? newValue : [newValue];
+            setValue(valueArray);
+        }
+    }, [setValue]);
+
+    const handlePaste = usePasteHandler({
+        options: values,
+        multiple: true,
+        currentValue: value,
+        setValue: handleValueChange,
+        getLabel: (option: string) => option,
+        getValue: (option: string) => option,
+    });
+
     return (
         <Autocomplete
             multiple
@@ -118,11 +137,20 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             onClose={() => setOpen(false)}
             ref={ref}
             renderInput={(props) => {
-                const { key, ...p } = props as typeof props & {
+                const { key, InputProps, ...p } = props as typeof props & {
                     key: string;
                 }; //questionable mui types?
                 return <>
-                    <TextFieldExtended key={key} {...p} />
+                    <TextFieldExtended
+                        key={key}
+                        {...p}
+                        slotProps={{
+                            input: {
+                                ...InputProps,
+                                onPaste: handlePaste,
+                            }
+                        }}
+                    />
                 </>
             }}
             renderOption={(props, option) => {
