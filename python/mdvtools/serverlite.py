@@ -7,6 +7,7 @@ with support for HTTP range requests and security headers.
 """
 import json
 import os
+import sys
 from flask import (
     Flask,
     render_template,
@@ -147,3 +148,38 @@ def create_app(project: MDVProject):
         return jsonify({"success": success})
     
     return app
+
+
+def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bool = True ):
+    """Serve an MDV project using a lightweight Flask server. 
+    Args:
+        project (MDVProject | str): The MDV project instance or path to the project directory.
+        port (int): The port to run the server on. Defaults to 5000.
+        open_browser (bool): Whether to open the browser automatically. Defaults to True.
+    """
+    if isinstance(project, str):
+        project = MDVProject(project)
+    app = create_app(project)
+    app.run(port=port)
+    if open_browser:
+        import webbrowser
+        webbrowser.open(f"http://localhost:{port}/")
+
+
+
+if __name__ == "__main__":
+    try:
+        if len(sys.argv) > 1:
+            path = sys.argv[1]
+        else:
+            raise ValueError("No project path provided as a command-line argument.")
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"{path} not found")
+        ds_path = os.path.join(path, "datasources.json")
+        if not os.path.exists(ds_path):
+            raise FileNotFoundError(f"{path} does not contain a valid MDV project.")
+        serve_project(MDVProject(path))
+
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)

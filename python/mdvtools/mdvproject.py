@@ -26,7 +26,7 @@ import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
-from mdvtools.llm.chat_types import ChatLogger, ChatLogItem
+
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -94,7 +94,12 @@ class MDVProject:
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": []}))
-        self.chat_logger = ChatLogger(self.chatfile)
+        try:
+            from mdvtools.llm.chat_types import ChatLogger
+            self.chat_logger = ChatLogger(self.chatfile)
+        except Exception as e:
+            print("Chat logger not available")
+            self.chat_logger = None
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
 
@@ -1239,20 +1244,10 @@ class MDVProject:
                     links.append({"datasource": lnkto, "link": lnk})
         return links
 
-    def serve(self, port=5050, open_browser=True):
-        """
-        Start a lightweight Flask server to serve the MDV project.
-        
-        Args:
-            port (int): Port number to run the server on. Default is 5050.
-            open_browser (bool): Whether to automatically open the browser. Default is True.
-        """
-        from mdvtools.serverlite import create_app
-        import webbrowser
-        if open_browser:
-            webbrowser.open(f"http://localhost:{port}")
-        app = create_app(self)
-        app.run(port=port)
+    def serve(self, **kwargs):
+        from mdvtools.server import create_app
+
+        create_app(self, **kwargs)
         
 
     def delete(self):
@@ -1847,6 +1842,7 @@ class MDVProject:
             conversation_id: ID to group messages from the same conversation
         """
         from mdvtools.llm.chatlog import log_chat
+        from mdvtools.llm.chat_types import ChatLogItem
         log_chat(output, prompt_template, response)
         
         context_information = output['source_documents']#output['context']
