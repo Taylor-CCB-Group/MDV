@@ -1841,6 +1841,10 @@ class MDVProject:
             response: The response generated
             conversation_id: ID to group messages from the same conversation
         """
+        if self.chat_logger is None:
+           print("Chat logging is not available")
+           return
+
         from mdvtools.llm.chatlog import log_chat
         from mdvtools.llm.chat_types import ChatLogItem
         log_chat(output, prompt_template, response)

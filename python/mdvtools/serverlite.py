@@ -154,17 +154,16 @@ def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bo
     """Serve an MDV project using a lightweight Flask server. 
     Args:
         project (MDVProject | str): The MDV project instance or path to the project directory.
-        port (int): The port to run the server on. Defaults to 5000.
+        port (int): The port to run the server on. Defaults to 5050.
         open_browser (bool): Whether to open the browser automatically. Defaults to True.
     """
     if isinstance(project, str):
         project = MDVProject(project)
     app = create_app(project)
-    app.run(port=port)
     if open_browser:
         import webbrowser
         webbrowser.open(f"http://localhost:{port}/")
-
+    app.run(port=port)
 
 
 if __name__ == "__main__":
