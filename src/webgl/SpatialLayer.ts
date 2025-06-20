@@ -81,12 +81,13 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
         // order matters here, we should make a ui where we can easily control it
         const { contourLayers } = this.props;
-        const densityLayers = contourLayers.map((layer) => {
-            const { extensions, ...p } = this.getSubLayerProps(layer);
-            return new DensityLayer({
-                ...p,
-            });
-        });
+        // future work:
+        // const densityLayers = contourLayers.map((layer) => {
+        //     const { extensions, ...p } = this.getSubLayerProps(layer);
+        //     return new DensityLayer({
+        //         ...p,
+        //     });
+        // });
         return [
             // add 'grey-out' layer here... that implies a different type of data being passed.
             // it might want to know about background_filter...
