@@ -273,6 +273,7 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
     // empty array will be replaced with the new values
     const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
     // this autorun will be disposed when the chart is disposed... really it should be tied to the settings dialog
+    // it will leak if we open the settings dialog multiple times...
     chart.mobxAutorun(() => {
         if (typeof c.contourParameter !== "string") {
             // as of now, categorical parameter like this is expected to be a string here
@@ -281,6 +282,8 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
             console.error("unexpected type for contourParameter");
             return;
         }
+        // getColumnValues() may throw or return undefined, especially with linked data...
+        // actually, there is another issue when we don't really have a categorical column...
         const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
         const cats = ocats.map((x) => ({ t: x }));
         catsValues[0] = cats;

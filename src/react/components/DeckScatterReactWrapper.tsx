@@ -215,7 +215,7 @@ BaseChart.types["DeckScatter"] = {
 BaseChart.types["DeckDensity"] = {
     name: "Density Plot (new)",
     class: DeckScatterReact,
-    allow_user_add: false,
+    allow_user_add: true,
     params: [
         {
             type: "number",

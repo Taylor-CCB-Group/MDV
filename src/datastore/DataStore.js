@@ -1812,7 +1812,14 @@ class DataStore {
      * @returns {string[]} - the column's values
      */
     getColumnValues(column, format = null) {
-        const v = this.columnIndex[column].values;
+        // if the column is not categorical, it will return undefined - that may be ok
+        // if the column is a linked field, there is a chance that it won't be in the columnIndex
+        // that is a problem because then we throw an error here.
+        const v = this.columnIndex[column]?.values;
+        if (!v) {
+            console.error(`no values for column '${column}' in ds '${this.name}'`);
+            return [];
+        }
         if (format === "name_value") {
             const ls = Array.from(v, (x) => ({ name: x, value: x })).sort(
                 (a, b) => a.name.localeCompare(b.name),
