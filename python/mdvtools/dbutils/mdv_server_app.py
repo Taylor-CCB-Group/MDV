@@ -31,6 +31,9 @@ if ENABLE_AUTH:
     oauth = OAuth()  #Initialize OAuth only if auth is enabled
     
 
+# Add these constants near the top of the file
+ALLOWED_FILES = {'views.json', 'datasources.json', 'datafile.h5', 'state.json'}
+
 def create_flask_app(config_name=None):
     """ Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
@@ -263,12 +266,10 @@ def is_valid_mdv_project(path: str):
 def serve_projects_from_db(app):
     failed_projects: list[tuple[int, str | Exception]] = []
     try:
-        # Get all projects from the database
         logger.info("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
         projects = Project.query.all()
 
         for project in projects:
-            
             if project.is_deleted:
                 logger.info(f"Project with ID {project.id} is soft deleted.")
                 continue
@@ -277,46 +278,34 @@ def serve_projects_from_db(app):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
                     p.set_editable(True)
-                    # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(app=app, open_browser=False, backend_db=True)
                     logger.info(f"Serving project: {project.path}")
 
-                    # Update or add files in the database to reflect the actual files in the filesystem
                     for root, dirs, files in os.walk(project.path):
                         for file_name in files:
+                            if file_name not in ALLOWED_FILES:
+                                logger.info(f"Skipping file not in allowed list: {file_name}")
+                                continue
                             full_file_path = os.path.join(root, file_name)
-
-                            # Use the utility function to add or update the file in the database
                             try:
-                                # Attempt to add or update the file in the database
                                 FileService.add_or_update_file_in_project(
                                     file_name=file_name,
                                     file_path=full_file_path,
                                     project_id=project.id
                                 )
-                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
-
-                            except RuntimeError as file_error:
-                                logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
-
-
+                            except Exception as file_error:
+                                logger.warning(f"Skipping file {file_name} due to error: {file_error}")
                 except Exception as e:
                     logger.exception(f"Error serving project #{project.id}'{project.path}': {e}")
-                    # don't `raise` here; continue serving other projects
-                    # but keep track of failed projects & associated errors
-                    # nb keeping track via project.id rather than instance of Project, because ORM seems to make that not work
                     failed_projects.append((project.id, e))
             else:
                 e = f"Error serving project #{project.id}: path '{project.path}' does not exist."
                 logger.error(e)
                 failed_projects.append((project.id, e))
-               
     except Exception as e:
         logger.exception(f"Error serving projects from database: {e}")
         raise
     logger.info(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
-    # nb using extend rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
-    # so we really only expect this to run once, and the list to be empty
     ProjectService.failed_projects.extend(failed_projects)
 
 def serve_projects_from_filesystem(app, base_dir):
@@ -324,27 +313,20 @@ def serve_projects_from_filesystem(app, base_dir):
         logger.info("Serving the projects present in filesystem but missing in database")
         logger.info(f"Scanning base directory: {base_dir}")
 
-        # Get all project paths from the database
         projects_in_db = {project.path for project in Project.query.with_entities(Project.path).all()}
         logger.info(f"Project paths in DB: {projects_in_db}")
 
-        # Get all project directories in the filesystem
         project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))}
         logger.info(f"Project paths in filesystem: {project_paths_in_fs}")
 
-        # Determine which project paths are in the filesystem but not in the database
         missing_project_paths = project_paths_in_fs - projects_in_db
         logger.info(f"Missing project paths: {missing_project_paths}")
 
-        # Iterate over missing project paths to create and serve them
         for project_path in missing_project_paths:
             logger.info(f"Processing project path: {project_path}")
-            
             if os.path.exists(project_path):
                 try:
                     project_name = os.path.basename(project_path)
-
-                    # Get the next ID from the database
                     next_id = db.session.query(db.func.max(Project.id)).scalar()
                     if next_id is None:
                         next_id = 1
@@ -356,71 +338,53 @@ def serve_projects_from_filesystem(app, base_dir):
                     p.serve(app=app, open_browser=False, backend_db=True) 
                     logger.info(f"Serving project: {project_path}")
 
-                    # Create a new Project record in the database with the default name
                     new_project = ProjectService.add_new_project(name=project_name, path=project_path)
                     if new_project is None:
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
-                    
                     logger.info(f"Added project to DB: {new_project}")
 
-                    # Rename directory to use project ID as folder name
                     project_id_str = str(new_project.id)
                     desired_path = os.path.join(app.config["projects_base_dir"], project_id_str)
 
                     if project_path != desired_path:
                         try:
-                            # Rename the directory
                             os.rename(project_path, desired_path)
                             logger.info(f"Renamed project folder from {project_path} to {desired_path}")
-
-                            # Update project path in DB
                             new_project.path = desired_path
                             db.session.commit()
                             logger.info(f"Updated project path in DB for project ID {new_project.id}")
-
-                            # Also update local reference for downstream operations (like file sync)
                             project_path = desired_path
-
                         except Exception as rename_error:
                             logger.exception(f"Failed to rename project directory or update DB for project ID {new_project.id}: {rename_error}")
 
-                    # Auth-related setup
                     if ENABLE_AUTH:
                         try:
                             auth_provider = get_auth_provider()
-                            auth_provider.sync_users_to_db()  # Sync users and assign permissions
+                            auth_provider.sync_users_to_db()
                             logger.info("Synced Auth users after adding project.")
-
-                            cache_user_projects() #update the cache
+                            cache_user_projects()
                         except Exception as auth_e:
                             logger.exception(f"Error syncing users or caching for {project_name}: {auth_e}")
 
-                    
-                    # Add files from the project directory to the database
                     for root, dirs, files in os.walk(project_path):
                         for file_name in files:
-                            # Construct the full file path
+                            if file_name not in ALLOWED_FILES:
+                                logger.info(f"Skipping file not in allowed list: {file_name}")
+                                continue
                             full_file_path = os.path.join(root, file_name)
-                            
-                            # Use the full file path when adding or updating the file in the database
-                            # Use the utility function to add or update the file in the database
                             try:
-                                # Attempt to add or update the file in the database
                                 FileService.add_or_update_file_in_project(
                                     file_name=file_name,
                                     file_path=full_file_path,
                                     project_id=new_project.id
                                 )
-                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
-
-                            except RuntimeError as file_error:
-                                logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                            except Exception as file_error:
+                                logger.warning(f"Skipping file {file_name} due to error: {file_error}")
                 except Exception as e:
                     logger.exception(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
                     raise
             else:
                 logger.error(f"In create_projects_from_filesystem: Error - Project path '{project_path}' does not exist.")
-                
     except Exception as e:
         logger.exception(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
         raise
