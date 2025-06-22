@@ -28,6 +28,10 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 config.filters[col] = null;
             }
         }
+
+        if (!config.order) {
+            config.order = {};
+        }
         //for legacy configs, if left undefined makeAutoObservable will 
         // not work correctly.
         if (config.noClearFilters === undefined) {

@@ -185,8 +185,20 @@ export class ColumnQueryMapper<T extends BaseConfig> {
             this.reactionDisposers.delete(methodName);
             this.chart.reactionDisposers = this.chart.reactionDisposers.filter(v => v !== disposer);
         }
-        if (!alreadyInSetQuery) this.userValues[methodName] = userValue;
-        else this.userValues[methodName] = null;
+        if (!alreadyInSetQuery) {
+            // Only store if userValue contains a RowsAsColsQuery (active link)
+            if (this.chart.config.type === 'selection_dialog') {
+                if (Array.isArray(userValue) && userValue.some(v => v instanceof RowsAsColsQuery)) {
+                    this.userValues[methodName] = userValue;
+                } else {
+                    delete this.userValues[methodName];
+                }
+            } else {
+                this.userValues[methodName] = userValue;
+            }
+        } else {
+            this.userValues[methodName] = null;
+        }
         //using chart.mobxAutorun() to ensure that the reaction is disposed when the chart is disposed
         const disposer = this.chart.mobxAutorun(callback);
         this.reactionDisposers.set(methodName, disposer);

@@ -25,6 +25,7 @@ export type BaseConfig = {
     type: string;
     param: FieldSpecs;
     title_color?: string;
+    order?: Record<string, number>;
 } & ColorConfig;
 /**
  * All chart config types include a color configuration, (although not all charts use it).

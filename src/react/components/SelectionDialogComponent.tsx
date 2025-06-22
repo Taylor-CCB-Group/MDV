@@ -1,4 +1,4 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
@@ -12,7 +12,7 @@ import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
-import { action, runInAction } from "mobx";
+import { action, autorun, runInAction } from "mobx";
 import { useChart, useDataStore } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
@@ -41,6 +41,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { RowsAsColsQuery } from "@/links/link_utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -540,7 +541,6 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& invert / active toggle?) for each filter
     const config = useConfig<SelectionDialogConfig>();
-    const chart = useChart();
     const { filters } = config;
     const f = filters[column.field];
     // todo: what about category filters with empty array?
@@ -557,12 +557,30 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const deleteFilter = useCallback((e: MouseEvent) => {
         e.stopPropagation();
         runInAction(() => {
-            delete filters[column.field];
             if (!isArray(config.param)) throw new Error("expected param array");
-            chart.setParams(config.param.filter((p) => p !== column.field));
+            
+            // Filter the config.param by removing the column
+            const newParam = config.param.filter(p => {
+                if (typeof p === "string") {
+                    return p !== column.field;
+                }
+                if (p instanceof RowsAsColsQuery) {
+                    return false;
+                }
+                return true;
+            });
+            
+            // Update the config.param with new array
+            config.param = newParam;
+            
+            // Delete the column field in config.filters
+            delete config.filters[column.field];
+            if (config.order) {
+                // Delete the column field in config.order
+                delete config.order[column.field];
+            }
         });
-        console.log('Delete item');
-    }, [filters, column.field, config, chart.setParams]);
+    }, [config, column]);
     return (
         <Accordion defaultExpanded={true}
             onMouseEnter={() => setIsHovered(true)}
@@ -733,9 +751,8 @@ const SelectionDialogComponent = () => {
     //if we wrap this, then any change causes whole page to reload)
     //! since this is outside the ErrorBoundary, problems in this hook are not well handled
     //we could consider returning some kind of `Result` object from this hook...
-    const cols = useParamColumnsExperimental();
+    const orderedParams = useOrderedParamColumns();
     const config = useConfig<SelectionDialogConfig>();
-    const chart = useChart();
     useResetButton();
     const showAddRow = false;
 
@@ -753,37 +770,24 @@ const SelectionDialogComponent = () => {
         const { active, over } = event;
 
         // Check if dragged and dropped item are different and other sanity checks
-        if (active && over && active.id !== over?.id && isArray(config.param)) {
-            // Find the indices of the dragged and the dropped items
-            // Use config.param directly instead of cols to avoid stale data issues
-            // The issue occurs when parameter types change (e.g. from Column to Link mode)
-            const oldIndex = config.param.findIndex(param => {
-                // Handle both string parameters and MultiColumnQuery objects
-                if (typeof param === 'string') {
-                    return param === active.id;
-                } else {
-                    // For MultiColumnQuery objects, check if any of their fields match
-                    return param.fields.includes(active.id as string);
-                }
-            });
-            const newIndex = config.param.findIndex(param => {
-                if (typeof param === 'string') {
-                    return param === over?.id;
-                } else {
-                    return param.fields.includes(over?.id as string);
-                }
-            });
+        if (active && over && active.id !== over?.id) {
+            const oldIndex = orderedParams.findIndex(p => p.field === active.id);
+            const newIndex = orderedParams.findIndex(p => p.field === over.id);
 
-            // Check if the indices are valid
             if (oldIndex !== -1 && newIndex !== -1) {
+                // Update the config.order with the new order
+                const newOrderedFields = arrayMove(orderedParams.map(p => p.field), oldIndex, newIndex);
+                const newOrder: Record<string, number> = {};
+                newOrderedFields.forEach((field, index) => {
+                    newOrder[field] = index;
+                });
+                
                 runInAction(() => {
-                    // Update the param array using dnd's arrayMove function for new placement
-                    const newParam = arrayMove(config.param, oldIndex, newIndex);
-                    chart.setParams(newParam);
+                    config.order = newOrder;
                 });
             }
         }
-    }, [config, chart.setParams]);
+    }, [config, orderedParams]);
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             <DndContext
@@ -792,10 +796,10 @@ const SelectionDialogComponent = () => {
                 onDragEnd={onDragEnd}
             >
                 <SortableContext 
-                    items={cols.map(col => col.field)}
+                    items={orderedParams.map(col => col.field)}
                     strategy={verticalListSortingStrategy}
                 >
-                    {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
+                    {orderedParams.map((col) => <AbstractComponent key={col.field} column={col} />)}
                 </SortableContext>
             </DndContext>
             {showAddRow && <ErrorBoundary FallbackComponent={
