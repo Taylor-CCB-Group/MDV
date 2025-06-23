@@ -1,5 +1,5 @@
 import type React from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
@@ -8,7 +8,7 @@ import type { CategoricalDataType, DataColumn, DataType, FieldName, LoadedDataCo
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
-import { isArray, notEmpty } from "@/lib/utils";
+import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
@@ -541,3 +541,73 @@ export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClos
         }
     }, [ref.current, onClose]);
 };
+
+export type PasteHandlerType<T, V = T> = {
+    options: T[];
+    getLabel: (option: T) => string;
+    getValue: (option: T) => V;
+    multiple: boolean;
+    currentValue: V | V[] | null;
+    setValue: (v: V | V[] | null) => void;
+};
+
+/**
+ * Hook that provides onPaste handler for Autocomplete components.
+ * Handles parsing delimited strings and matching them against available options.
+ */
+export const usePasteHandler = <T, V = T>({
+    options,
+    multiple,
+    currentValue,
+    setValue,
+    getLabel,
+    getValue,
+}: PasteHandlerType<T, V>) => {
+    return useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
+        const text = e.clipboardData.getData("text");
+        // Parse the string to extract the pasted items
+        const items = parseDelimitedString(text);
+        if (items.length === 0) return;
+        
+        if (!multiple) {
+            const itemLower = items[0]?.toLowerCase();
+
+            // Find the option which matches the pasted text
+            const matched = options.find((option) => {
+                const optionLower = getLabel(option).toLowerCase().split(" ");
+                return matchString(optionLower, itemLower);
+            });
+
+            if (matched) {
+                // Preventing default paste behaviour
+                e.preventDefault();
+                // Set the value with extracted value from matched option
+                setValue(getValue(matched));
+            }
+        } else {
+            const itemLower = items.map((item) => item.toLowerCase());
+            // Filters the options to get the options which match the pasted text
+            const matched = options.filter((option) => 
+                itemLower.some((item) => {
+                    const optionLower = getLabel(option).toLowerCase().split(" ");
+                    return matchString(optionLower, item);
+                })
+            );
+
+            if (matched.length > 0) {
+                // Preventing default paste behaviour
+                e.preventDefault();
+                const matchedValues = matched.map(getValue);
+                const currentValues = Array.isArray(currentValue) ? currentValue : [];
+                // Create a set for unique values
+                const uniqueMatched = Array.from(
+                    new Set([...matchedValues, ...currentValues])
+                );
+                // Update the value with the unique values
+                setValue(uniqueMatched);
+            }
+            // Nothing matched, proceed as normal
+        }
+    }, [multiple, getLabel, options, setValue, getValue, currentValue]);
+};
+

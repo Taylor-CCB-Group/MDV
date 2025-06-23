@@ -5,12 +5,12 @@ import type { DataColumn, DataType } from "@/charts/charts";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
-import { isArray } from "@/lib/utils";
+import { isArray, matchString, parseDelimitedString } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import { useCloseOnIntersection } from "../hooks";
+import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -71,7 +71,7 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
             return (v: DataColumn<DataType>) => {
                 if (isMultiType) throw new Error("Unexpected single column value for multi column dropdown");
                 //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
-                setSelectedColumn(v.field);
+                setSelectedColumn(v?.field);
             }
         }
     }, [setSelectedColumn, isMultiType]);
@@ -114,6 +114,25 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
             setSelectAll(true);
         }
     }, [selectAll, setValue, columns, isMultiType]);
+
+    const handleValueChange = useCallback((newValue: DataColumn<DataType> | DataColumn<DataType>[] | null) => {
+        if (!newValue) return;
+        if (isMultiType) {
+            (setValue as (v: DataColumn<DataType>[]) => void)(newValue as DataColumn<DataType>[]);
+        } else {
+            (setValue as (v: DataColumn<DataType>) => void)(newValue as DataColumn<DataType>)
+        }
+    }, [isMultiType, setValue]);
+
+    // Paste handler
+    const handlePaste = usePasteHandler({
+        options: columns,
+        multiple: isMultiType,
+        currentValue: value || null,
+        setValue: handleValueChange,
+        getLabel: (column: DataColumn<DataType>) => column.name,
+        getValue: (column: DataColumn<DataType>) => column,
+    });
     
     return (
         <Grid className="w-full items-center" container>
@@ -142,7 +161,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                     }}
                     getOptionLabel={(column) => column.name}
                     renderInput={(params) => {
-                        const { key, ...p } = params as typeof params & {
+                        const { key, InputProps, ...p } = params as typeof params & {
                             key: string;
                         };
                         return (
@@ -150,8 +169,16 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                 key={key}
                                 {...p}
                                 placeholder={placeholder}
+                                slotProps={{
+                                    input: {
+                                        ...InputProps,
+                                        
+                                        onPaste: handlePaste,
+                                    }
+                                }}
                             />
                         );
+                        
                     }}
                     renderTags={(value, getTagProps) => {
                         // custom logic to limit the tags, this is required because we are overriding the way tags are rendered

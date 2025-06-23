@@ -19,11 +19,11 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { isArray, notEmpty } from "@/lib/utils";
+import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import { useCloseOnIntersection } from "../hooks";
+import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -266,6 +266,32 @@ export const DropdownAutocompleteComponent = observer(({
     type Option = typeof options[number]; // hopefully we can improve `{ original: any }`
     // still not entirely sure about the type for onChange...
     type OVal = Option | Option[] | (Option | Option[])[] | null;
+
+    const handleValueChange = useCallback((newValue: Option | Option[] | null) => {
+        if (multiple) {
+            const valueArray = Array.isArray(newValue) ? newValue : (newValue ? [newValue] : []);
+            const valueStrings = valueArray.map(val);
+            props.current_value = valueStrings;
+            props.func?.(valueStrings);
+        } else {
+            const valueSingle = Array.isArray(newValue) ? newValue[0] : newValue;
+            if (valueSingle) {
+                const valueString = val(valueSingle);
+                props.current_value = valueString;
+                props.func?.(valueString);
+            }
+        }
+    }, [multiple, props, val]);
+
+    const handlePaste = usePasteHandler({
+        options,
+        currentValue: okOption.filter((option): option is Option => option !== undefined),
+        setValue: handleValueChange,
+        multiple,
+        getValue: (option: Option) => option,
+        getLabel: (option: Option) => label(option),
+    });
+
     return (
         <>
             <MLabel htmlFor={id} props={props} />
@@ -340,13 +366,22 @@ export const DropdownAutocompleteComponent = observer(({
                         />
                     ));
                 }}
-                renderInput={(params) => (
-                    <TextField
-                        {...params}
-                    // label="Checkboxes"
-                    // placeholder={props.label}
-                    />
-                )}
+                renderInput={(params) => {
+                    const { InputProps } = params;
+                    return (
+                        <TextField
+                            {...params}
+                            slotProps={{
+                                input: {
+                                    ...InputProps,
+                                    onPaste: handlePaste,
+                                }
+                            }}
+                            // label="Checkboxes"
+                            // placeholder={props.label}
+                        />
+                    )
+                }}
             />
         </>
     );
