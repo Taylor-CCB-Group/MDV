@@ -1,6 +1,6 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from 'zod';
 import _ from 'lodash';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -80,13 +80,28 @@ function getViewName(): string | null {
 }
 
 
-const sendMessage = async (message: string, id: string, route: string, conversationId: string) => {
+const sendMessageHttp = async (message: string, id: string, route: string, conversationId: string) => {
     // we should send information about the context - in particular, which view we're in
     // could consider a streaming response here rather than socket
     const response = await axios.post<ChatResponse>(route, { message, id, conversation_id: conversationId });
     const parsed = completedChatResponseSchema.parse(response.data); // may throw an error if the response is not valid
     return parsed;
 };
+
+const sendMessageSocket = async (message: string, id: string, _routeUnused: string, conversationId: string) => {
+    const socket = window.mdv.chartManager.ipc?.socket;
+    if (!socket) return;
+    socket.emit('chat_request', { message, id, conversation_id: conversationId });
+    const response = await new Promise<ChatResponse>((resolve, reject) => {
+        const onChatResponse = (data: any) => {
+            const parsed = completedChatResponseSchema.parse(data);
+            socket.off('chat_response', onChatResponse);
+            resolve(parsed);
+        }
+        socket.on('chat_response', onChatResponse);
+    });
+    return response;
+}
 
 // Parsing view name from the message's code
 // todo: Get view name from chat_log.json or use some other logic
@@ -143,11 +158,11 @@ const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
     const { projectName, mainApiRoute, projectApiRoute } = useProject(); //todo add viewName to ProjectProvider
-    const route = `${projectApiRoute}chat`;
+    // const route = `${projectApiRoute}chat`;
     const routeInit = `${projectApiRoute}chat_init`;
     //! still need to consider that some things really are routes while others are just names
-    const progressRoute = 'chat_progress';
-    const verboseRoute = 'chat';
+    const chatProgressEvent = 'chat_progress';
+    const chatlogEvent = 'chat';
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
     // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
@@ -216,7 +231,8 @@ const useChat = () => {
         try {
             const id = generateId();
             setCurrentRequestId(id);
-            const response = await sendMessage('', id, routeInit, conversationId);
+            const response = await sendMessageSocket('', id, routeInit, conversationId);
+            if (!response) return;
             // Only set initial message if we don't have any messages yet
             if (messages.length === 0) {
                 setMessages([{
@@ -234,12 +250,14 @@ const useChat = () => {
         setIsInit(true);
     }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading]);
 
+    const socket = useMemo(() => {
+        if (!cm.ipc || !cm.ipc.socket) return null;
+        return cm.ipc.socket;
+    }, [cm.ipc]);
+
     // Socket connection and Init chat
     useEffect(() => {
-        if (!cm.ipc || !cm.ipc.socket) return;
-        
-        const { socket } = cm.ipc;
-
+        if (!socket) return;
         if (!socket.connected) {
             console.log('Socket not connected, skipping listener registration');
             return;
@@ -251,8 +269,8 @@ const useChat = () => {
         };
         
         socket.on('error', handleSocketError);
-        socket?.on(progressRoute, progressListener);
-        socket?.on(verboseRoute, handleVerboseProgress);
+        socket.on(chatProgressEvent, progressListener);
+        socket.on(chatlogEvent, handleVerboseProgress);
 
         if (!isInit && !isSending) {
             chatInit();
@@ -260,27 +278,27 @@ const useChat = () => {
 
         return () => {
             socket?.off('error', handleSocketError);
-            socket?.off(progressRoute, progressListener);
-            socket?.off(verboseRoute, handleVerboseProgress);
+            socket?.off(chatProgressEvent, progressListener);
+            socket?.off(chatlogEvent, handleVerboseProgress);
         };
-    }, [cm.ipc, progressRoute, verboseRoute, progressListener, handleVerboseProgress, chatInit, isInit, isSending]);
+    }, [socket, progressListener, handleVerboseProgress, chatInit, isInit, isSending]);
 
     // Initialise conversation map
     useEffect(() => {
         if (chatLog.length > 0) {
             const newConversationMap: ConversationMap = {};
         
-        // Process each log entry
-        chatLog.forEach((log) => {
-            const conversationId = log.conversation_id || 'legacy';
-            const conversation = createConversation(newConversationMap, conversationId, log.query);
-            const messages = createMessagePair(log, conversationId);
+            // Process each log entry
+            chatLog.forEach((log) => {
+                const conversationId = log.conversation_id || 'legacy';
+                const conversation = createConversation(newConversationMap, conversationId, log.query);
+                const messages = createMessagePair(log, conversationId);
+                
+                conversation.messages.push(...messages);
+                conversation.logLength++;
+            });
             
-            conversation.messages.push(...messages);
-            conversation.logLength++;
-        });
-        
-        setConversationMap(newConversationMap);
+            setConversationMap(newConversationMap);
         }
     }, [chatLog]);
 
@@ -293,7 +311,7 @@ const useChat = () => {
     
     const sendAPI = useCallback(async (input: string) => {
         if (!input.trim()) return;
-        
+        if (!socket) return;
         const id = generateId();
         const viewName = getViewName();
         console.log(`sending chat '${input}' from '${viewName}'`);
@@ -307,10 +325,17 @@ const useChat = () => {
                 id: generateId(),
                 conversationId,
             }])
-            await sendMessage(input, id, route, conversationId);
+            
+            // await sendMessageHttp(input, id, route, conversationId);
+            socket.emit('chat_request', { message: input, id, conversation_id: conversationId });
+            await new Promise(resolve => {
+                socket.on('chat_response', (data: any) => {
+                    resolve(data);
+                });
+            })
             queryClient.invalidateQueries({ queryKey: ['chatLog'] });
         } catch (error) {
-            // todo: update error handling logic
+            // todo: update error handling logic, particularly for socket...
             setMessages(prev => [...prev, {
                 text: `ERROR: ${error}`,
                 sender: 'bot',
@@ -322,13 +347,14 @@ const useChat = () => {
         setCurrentRequestId('');
         setRequestProgress(null);
         setIsSending(false);
-    }, [conversationId, route, queryClient]);
+    }, [conversationId, queryClient, socket]);
 
     const startNewConversation = useCallback(async () => {
         const newConversationId = generateConversationId();
         setConversationId(newConversationId);
         try {
-            const response = await sendMessage('', generateId(), routeInit, newConversationId);
+            const response = await sendMessageSocket('', generateId(), routeInit, newConversationId);
+            if (!response) return;
             // Only set initial message if we don't have any messages yet
             setMessages([{
                 text: response.message,

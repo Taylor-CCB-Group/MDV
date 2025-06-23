@@ -160,11 +160,16 @@ class ProjectChat(ProjectChatProtocol):
 
         # how do we keep track of the association between user & this...
         # do we actually want a whole `ProjectChat` associated with a user/session?
-        # what does that mean in terms of server overhead?
-        self.socket_api = ChatSocketAPI(project)
-        logger = self.socket_api.logger
-        self.langchain_logging_handler = LangchainLoggingHandler(logger)
-        self.config = {"callbacks": [self.langchain_logging_handler]}
+        # what does that mean in terms of server overhead (likely not much)?
+        # self.socket_api = ChatSocketAPI(project)
+        # change to have a logger per chat id
+        # logger = socket_api.logger
+        # LangchainLoggingHandler was unused at the time of writing,
+        # self.langchain_logging_handler = LangchainLoggingHandler(logger)
+        # self.config = {"callbacks": [self.langchain_logging_handler]}
+        
+        # rather than assign socket_api.logger to self.log, we can distinguish this global logger
+        # from the one used during a chat request.
         self.log = logger.info
         
         # Store histories and agents for each conversation
@@ -326,10 +331,14 @@ class ProjectChat(ProjectChatProtocol):
             self.chat_history, self.agent = self.get_or_create_conversation(conversation_id)
             chat_debug_logger.info(f"Switched to conversation {conversation_id} with history length {len(self.chat_history)}")
 
-    def ask_question(self, question: str, id: str, conversation_id: str):
+    def ask_question(self, question: str, id: str, conversation_id: str, room: str):
         """
         Ask a question, generate code to answer it, execute the code...
         """
+        # having this scoped here should mean that the logger is GCed when the request is finished
+        # also avoid any threading issues... 
+        # an instance of this class now exists to provide async stream of updates to a particular chat request.
+        socket_api = ChatSocketAPI(self.project, id, room)
         if conversation_id:
             self.switch_conversation(conversation_id)
         elif not self._current_conversation_id:
@@ -349,15 +358,15 @@ class ProjectChat(ProjectChatProtocol):
             )
             return f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}"
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
-            self.socket_api.update_chat_progress(
+            socket_api.update_chat_progress(
                 "Agent invoking", id, progress, 0
             )
             # shortly after this...
             # Error in StdOutCallbackHandler.on_chain_start callback: AttributeError("'NoneType' object has no attribute 'get'")
-            self.log(f"Asking the LLM: '{question}'")
+            socket_api.log(f"Asking the LLM: '{question}'")
             if self.init_error:
                 # let's think about doing something better here.
-                self.socket_api.update_chat_progress(
+                socket_api.update_chat_progress(
                     f"Agent initialisation error: {str(self.init_error)}", id, 100, 0
                 )
                 return f"The agent had an error during initialisation: \n\n{str(self.init_error)[:500]}"
@@ -366,7 +375,7 @@ class ProjectChat(ProjectChatProtocol):
             logger.info(f"Question asked by user: {question}")
         try:
             with time_block("b10b: Pandas agent invoking"):  # ~31.4% of time
-                self.socket_api.update_chat_progress(
+                socket_api.update_chat_progress(
                     "Pandas agent invoking...", id, progress, 31
                 )
                 progress += 31
@@ -374,7 +383,7 @@ class ProjectChat(ProjectChatProtocol):
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
-                self.socket_api.update_chat_progress(
+                socket_api.update_chat_progress(
                     "RAG prompt preparation...", id, progress, 1
                 )
                 # List all files in the directory
@@ -416,7 +425,7 @@ class ProjectChat(ProjectChatProtocol):
 
 
             with time_block("b12: RAG chain"):  # ~60% of time
-                self.socket_api.update_chat_progress(
+                socket_api.update_chat_progress(
                     "Invoking RAG chain...", id, progress, 60
                 )
                 progress += 60
@@ -431,7 +440,7 @@ class ProjectChat(ProjectChatProtocol):
                     result,
                     self.df,
                     self.project,
-                    self.log,
+                    socket_api.log,
                     modify_existing_project=True,
                     view_name=question,
                 )
@@ -441,12 +450,12 @@ class ProjectChat(ProjectChatProtocol):
             with time_block("b14: Chat logging by MDV"):  # <0.1% of time
                 self.project.log_chat_item(output_qa, prompt_RAG, final_code, conversation_id)
             with time_block("b15: Execute code"):  # ~9% of time
-                self.socket_api.update_chat_progress(
+                socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9
                 )
                 progress += 9
                 ok, stdout, stderr = execute_code(
-                    final_code, open_code=False, log=self.log
+                    final_code, open_code=False, log=socket_api.log
                 )
                 chat_debug_logger.info(f"Code Execution Result - OK: {ok}")
                 chat_debug_logger.info(f"Code Execution STDOUT:\n{stdout}")
@@ -455,14 +464,14 @@ class ProjectChat(ProjectChatProtocol):
             if not ok:
                 return f"# Error: code execution failed\n> {stderr}"
             else:
-                self.log(final_code)
-                self.socket_api.update_chat_progress(
+                socket_api.log(final_code)
+                socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
                 return f"I ran some code for you:\n\n```python\n{final_code}\n```"
         except Exception as e:
-            self.socket_api.update_chat_progress(
+            socket_api.update_chat_progress(
                 f"Error: {str(e)[:500]}", id, 100, 0
             )
             return f"Error: {str(e)[:500]}"

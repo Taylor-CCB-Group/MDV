@@ -67,19 +67,36 @@ def mdv_socketio(app: Flask):
 
 
 class ChatSocketAPI:
-    def __init__(self, project: MDVProject):
+    def __init__(self, project: MDVProject, id: str, room: str):
+        """
+        An instance of this class is created for each chat request.
+        It will instantiate a Logger instance & SocketIOHandler which should be GCed when the request is finished.
+        """
         self.project = project
         self.socketio = socketio
         # todo refactor event/room/namespace names 
         log_name = "chat"
         self.progress_name = "chat_progress"
         # we need to reevaluate so that 'logging' isn't sent to all clients.
-        logger = logging.getLogger(log_name)
+        logger = logging.Logger(f"{log_name}_{project.id}_{id}")
+        logger.propagate = False # avoid unintentional memory retention
         logger.setLevel(logging.INFO)
         self.project_namespace = f"/project/{project.id}"
-        handler = SocketIOHandler(socketio, log_name, self.project_namespace)
+        self.room = room
+        handler = ChatSocketIOHandler(socketio, log_name, self.project_namespace, id, room)
+        # todo - move more of this to another file, also add a handler to output to a file in project directory
+        # probably don't need to have separate class for ChatSocketIOHandler, we could make this inherit logging.StreamHandler
+        # would that be better, worse, or indifferent?
         logger.addHandler(handler)
         self.logger = logger
+        # self.log(f"ChatSocketAPI initialized for request {id} in room {room}")
+        # self.update_chat_progress("ChatSocketAPI initialized", id, 0, 0)
+        # from time import sleep
+        # sleep(1)
+
+    def log(self, msg: str):
+        self.logger.info(msg)
+    
     def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
         """
         Send a message to the chat log and also update the progress bar.
@@ -103,21 +120,22 @@ class ChatSocketAPI:
         #     return
         self.socketio.emit(self.progress_name, {
             "message": message, "id": id, "progress": progress, "delta": delta
-        }, namespace=self.project_namespace)
+        }, namespace=self.project_namespace, to=self.room)
 
-class SocketIOHandler(logging.StreamHandler):
-    def __init__(self, socketio: SocketIO, event_name: str, namespace: str):
+class ChatSocketIOHandler(logging.StreamHandler):
+    def __init__(self, socketio: SocketIO, event_name: str, namespace: str, id: str, room: str):
         super().__init__()
         log(f"handler initialized for event: {event_name}")
         self.socketio = socketio
         # todo - event_name vs namespace vs room refactor
         self.event_name = event_name
         self.namespace = namespace
-        def my_function_handler(data):
-            log(f"{namespace}/{event_name}: {data}")
-        # log(f"socketio.on_event({event_name}, my_function_handler)")
-        socketio.on_event(event_name, my_function_handler, namespace=namespace)
-        # socketio.on(event_name, )
+        self.id = id
+        self.room = room
+        # def my_function_handler(data):
+        #     log(f"{namespace}/{event_name}: {data}")
+        # we could handle a cancel event handler here?
+        # socketio.on_event(event_name, my_function_handler, namespace=namespace)
 
     def emit(self, record):
         """
@@ -126,8 +144,8 @@ class SocketIOHandler(logging.StreamHandler):
         """
         try:
             msg = self.format(record)
-            log(f"[ {self.event_name} ] {msg}")
-            #!!! to=???
-            self.socketio.emit(self.event_name, msg, namespace=self.namespace)
+            log(f"[ {self.event_name} #{self.id} ] {msg}")
+            #!!! to=self.id?
+            self.socketio.emit(self.event_name, msg, namespace=self.namespace, to=self.room)
         except Exception:
             self.handleError(record)
