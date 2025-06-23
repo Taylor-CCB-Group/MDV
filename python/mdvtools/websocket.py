@@ -66,22 +66,20 @@ def mdv_socketio(app: Flask):
     #         # response(sid, data.get('message'))
 
 
-def get_socket_logger(event_name="log"):
-    logger = logging.getLogger(event_name)
-    logger.setLevel(logging.INFO)
-    handler = SocketIOHandler(socketio, event_name)
-    logger.addHandler(handler)
-    return logger
-
 class ChatSocketAPI:
     def __init__(self, project: MDVProject):
         self.project = project
         self.socketio = socketio
         # todo refactor event/room/namespace names 
-        log_name = f"/project/{project.id}/chat"
-        self.progress_name = f"/project/{project.id}/chat_progress"
-        self.logger = get_socket_logger(log_name)
+        log_name = "chat"
+        self.progress_name = "chat_progress"
+        # we need to reevaluate so that 'logging' isn't sent to all clients.
+        logger = logging.getLogger(log_name)
+        logger.setLevel(logging.INFO)
         self.project_namespace = f"/project/{project.id}"
+        handler = SocketIOHandler(socketio, log_name, self.project_namespace)
+        logger.addHandler(handler)
+        self.logger = logger
     def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
         """
         Send a message to the chat log and also update the progress bar.
@@ -108,16 +106,17 @@ class ChatSocketAPI:
         }, namespace=self.project_namespace)
 
 class SocketIOHandler(logging.StreamHandler):
-    def __init__(self, socketio: SocketIO, event_name="log"):
+    def __init__(self, socketio: SocketIO, event_name: str, namespace: str):
         super().__init__()
         log(f"handler initialized for event: {event_name}")
         self.socketio = socketio
         # todo - event_name vs namespace vs room refactor
         self.event_name = event_name
+        self.namespace = namespace
         def my_function_handler(data):
-            log(f"{event_name}: {data}")
+            log(f"{namespace}/{event_name}: {data}")
         # log(f"socketio.on_event({event_name}, my_function_handler)")
-        socketio.on_event(event_name, my_function_handler)
+        socketio.on_event(event_name, my_function_handler, namespace=namespace)
         # socketio.on(event_name, )
 
     def emit(self, record):
@@ -129,6 +128,6 @@ class SocketIOHandler(logging.StreamHandler):
             msg = self.format(record)
             log(f"[ {self.event_name} ] {msg}")
             #!!! to=???
-            self.socketio.emit(self.event_name, msg)
+            self.socketio.emit(self.event_name, msg, namespace=self.namespace)
         except Exception:
             self.handleError(record)

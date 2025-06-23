@@ -146,8 +146,8 @@ const useChat = () => {
     const route = `${projectApiRoute}chat`;
     const routeInit = `${projectApiRoute}chat_init`;
     //! still need to consider that some things really are routes while others are just names
-    const progressRoute = `/project/${projectName}/chat_progress`;
-    const verboseRoute = `/project/${projectName}/chat`;
+    const progressRoute = 'chat_progress';
+    const verboseRoute = 'chat';
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
     // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
