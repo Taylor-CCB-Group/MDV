@@ -114,9 +114,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     # oops - this log is no longer the right thing to do...
                     bot.log(f"final_code returned by bot.ask_question is bad, probably an earlier error: {e}")
                     send_error(str(e))
-                    leave_room(room)
                     # final_code is probably an error message, at this point.
                     return
+                finally:
+                    leave_room(room)
             except Exception as e:
                 print(e)
                 send_error(str(e))
