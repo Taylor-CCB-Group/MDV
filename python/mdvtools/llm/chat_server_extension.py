@@ -91,11 +91,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 send_error("Missing 'message' or 'id' in request JSON")
                 leave_room(room)
                 return
-            # todo - consider having a socket.io event for this, rather than a REST endpoint.
-            # this would mean that we could use request.sid to track the chat session
             conversation_id = data.get("conversation_id")
             try:
                 if bot is None:
+                    # todo - allow this to be freed at some point if we're not using it anymore.
                     bot = ProjectChat(project)
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
