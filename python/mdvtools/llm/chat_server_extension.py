@@ -72,14 +72,14 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):
             nonlocal bot
-            sid = request.sid # type: ignore
-            # todo - auth
+            sid = request.sid # type: ignore - flask_socketio.request.sid
+            # todo - auth (via custom decorator? see comments above)
 
             message = data.get("message")
             id = data.get("id")
             room = f"{sid}_{id}"
             join_room(room)
-            def send_error(error: str):
+            def handle_error(error: str):
                 #! todo - frontend should handle this, and show an error message to the user.
                 # also, this method may be augmented so that it also logs to the chat log,
                 # and pass this handler to the bot.ask_question method.
@@ -90,7 +90,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     to=room
                 )
             if not message or not id:
-                send_error("Missing 'message' or 'id' in request JSON")
+                handle_error("Missing 'message' or 'id' in request JSON")
                 leave_room(room)
                 return
             conversation_id = data.get("conversation_id")
@@ -106,21 +106,19 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     view_name = parse_view_name(final_code)
                     if view_name is None:
                         raise Exception(final_code)
-                    # oops - this log is no longer the right thing to do...
-                    bot.log(f"view_name: {view_name}")
-                    socketio.emit("chat_response", {"message": final_code, "view": view_name, "id": id}, namespace=f"/project/{project.id}", to=sid)
-                    # return {"message": final_code, "view": view_name, "id": id}
+                    # bot.log(f"view_name: {view_name}")
+                    socketio.emit("chat_response", {"message": final_code, "view": view_name, "id": id}, namespace=f"/project/{project.id}", to=room)
                 except Exception as e:
-                    # oops - this log is no longer the right thing to do...
-                    bot.log(f"final_code returned by bot.ask_question is bad, probably an earlier error: {e}")
-                    send_error(str(e))
+                    # we should add whatever logging is relevant in handle_error
+                    # bot.log(f"final_code returned by bot.ask_question is bad, probably an earlier error: {e}")
+                    handle_error(str(e))
                     # final_code is probably an error message, at this point.
                     return
                 finally:
                     leave_room(room)
             except Exception as e:
                 print(e)
-                send_error(str(e))
+                handle_error(str(e))
                 leave_room(room)
                 return
     
