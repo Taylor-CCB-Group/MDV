@@ -352,13 +352,7 @@ const useChat = () => {
                 conversationId,
             }])
             
-            // await sendMessageHttp(input, id, route, conversationId);
-            socket.emit('chat_request', { message: input, id, conversation_id: conversationId });
-            await new Promise(resolve => {
-                socket.on('chat_response', (data: any) => {
-                    resolve(data);
-                });
-            })
+            await sendMessageSocket(input, id, "", conversationId);
             queryClient.invalidateQueries({ queryKey: ['chatLog'] });
         } catch (error) {
             // todo: update error handling logic, particularly for socket...
@@ -401,6 +395,7 @@ const useChat = () => {
     }, [routeInit]);
 
     const switchConversation = useCallback((id: string) => {
+        console.log(`switching conversation to ${id}`);
         setConversationId(id);
     }, []);
 
