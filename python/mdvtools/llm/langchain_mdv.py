@@ -33,8 +33,6 @@ from .chatlog import LangchainLoggingHandler
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.memory import ConversationBufferMemory
-from langchain.schema import HumanMessage, AIMessage
-from langchain.chains.combine_documents import create_stuff_documents_chain
 
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
@@ -419,7 +417,7 @@ class ProjectChat(ProjectChatProtocol):
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
             with time_block("b14: Chat logging by MDV"):  # <0.1% of time
-                self.project.log_chat_item(question, prompt_RAG, final_code, conversation_id)
+                self.project.log_chat_item(output_qa, prompt_RAG, final_code, conversation_id)
             
             with time_block("b15: Execute code"):  # ~9% of time
                 socket_api.update_chat_progress(
