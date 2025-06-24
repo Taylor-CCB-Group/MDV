@@ -1,18 +1,14 @@
 from flask import Flask, Request as FlaskRequest
 from flask_socketio import SocketIO
 from datetime import datetime
-# import asyncio
-# from typing import Optional
-from mdvtools.mdvproject import MDVProject
-
-import logging
+from typing import Optional
 
 def log(msg: str):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[[[ socket.io ]]] [{date_str}] - {msg}")
 
-socketio: SocketIO = None # type: ignore
+socketio: Optional[SocketIO] = None
 
 # This is a map of chat request IDs to user IDs, used to track which user is associated with which chat session.
 # something of a placeholder
@@ -64,88 +60,3 @@ def mdv_socketio(app: Flask):
     #         # error asyncio.run() cannot be called from a running event loop
     #         # asyncio.run(response(sid, data.get('message')))
     #         # response(sid, data.get('message'))
-
-
-class ChatSocketAPI:
-    def __init__(self, project: MDVProject, id: str, room: str):
-        """
-        An instance of this class is created for each chat request.
-        It will instantiate a Logger instance & SocketIOHandler which should be GCed when the request is finished.
-        """
-        self.project = project
-        self.socketio = socketio
-        # todo refactor event/room/namespace names 
-        log_name = "chat"
-        self.progress_name = "chat_progress"
-        # we need to reevaluate so that 'logging' isn't sent to all clients.
-        logger = logging.Logger(f"{log_name}_{project.id}_{id}")
-        logger.propagate = False # avoid unintentional memory retention
-        logger.setLevel(logging.INFO)
-        self.project_namespace = f"/project/{project.id}"
-        self.room = room
-        handler = ChatSocketIOHandler(socketio, log_name, self.project_namespace, id, room)
-        # todo - move more of this to another file, also add a handler to output to a file in project directory
-        # probably don't need to have separate class for ChatSocketIOHandler, we could make this inherit logging.StreamHandler
-        # would that be better, worse, or indifferent?
-        logger.addHandler(handler)
-        self.logger = logger
-        # self.log(f"ChatSocketAPI initialized for request {id} in room {room}")
-        # self.update_chat_progress("ChatSocketAPI initialized", id, 0, 0)
-        # from time import sleep
-        # sleep(1)
-
-    def log(self, msg: str):
-        self.logger.info(msg)
-    
-    def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
-        """
-        Send a message to the chat log and also update the progress bar.
-        
-        Args:
-            message (str): the message to send to the chat log
-            id (str): the id of the associated chat request
-            progress (int): the progress value (%) to update the progress bar with
-            delta (int): the expected cost of the current operation (%)
-        """
-        # we should descriminate which user to send this to... 
-        # which implies that this instance should be associated...
-        # or that we can map the chat request ID to a user ID.
-
-        # I think simplest way to do this will be to use request.sid,
-        # which implies that the `/chat` endpoint should be socket.io rather than REST.
-
-        # to = chat_sid_map.get(id, None)
-        # if to is None:
-        #     log(f"Chat progress update for {id} but no associated user found, skipping.")
-        #     return
-        self.socketio.emit(self.progress_name, {
-            "message": message, "id": id, "progress": progress, "delta": delta
-        }, namespace=self.project_namespace, to=self.room)
-
-class ChatSocketIOHandler(logging.StreamHandler):
-    def __init__(self, socketio: SocketIO, event_name: str, namespace: str, id: str, room: str):
-        super().__init__()
-        log(f"handler initialized for event: {event_name}")
-        self.socketio = socketio
-        # todo - event_name vs namespace vs room refactor
-        self.event_name = event_name
-        self.namespace = namespace
-        self.id = id
-        self.room = room
-        # def my_function_handler(data):
-        #     log(f"{namespace}/{event_name}: {data}")
-        # we could handle a cancel event handler here?
-        # socketio.on_event(event_name, my_function_handler, namespace=namespace)
-
-    def emit(self, record):
-        """
-        Emit a record - send it via socketio & also print it to the console.
-        subject to change.
-        """
-        try:
-            msg = self.format(record)
-            log(f"[ {self.event_name} #{self.id} ] {msg}")
-            #!!! to=self.id?
-            self.socketio.emit(self.event_name, msg, namespace=self.namespace, to=self.room)
-        except Exception:
-            self.handleError(record)

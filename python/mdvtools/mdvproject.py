@@ -26,7 +26,7 @@ import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
-from mdvtools.llm.chat_types import ChatLogger, ChatLogItem
+from mdvtools.llm.chatlog import ChatLogger, ChatLogItem
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -116,6 +116,7 @@ class MDVProject:
 
     @property
     def state(self):
+        # check this - seeing errors in the logs?
         return get_json(self.statefile)
 
     @state.setter

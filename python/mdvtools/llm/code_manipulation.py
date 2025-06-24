@@ -1,8 +1,13 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import pandas as pd
 import regex as re
 from .templates import packages_functions
-from mdvtools.mdvproject import MDVProject
 import json
+
+if TYPE_CHECKING:
+    from mdvtools.mdvproject import MDVProject
+
 
 def extract_code_from_response(response: str):
     """Extracts Python code from a markdown string response."""

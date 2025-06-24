@@ -17,7 +17,7 @@ from langchain.text_splitter import Language
 # from langchain.prompts import PromptTemplate
 
 from dotenv import load_dotenv
-from mdvtools.websocket import ChatSocketAPI
+from mdvtools.llm.chatlog import ChatSocketAPI
 
 # packages for custom langchain agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -338,7 +338,9 @@ class ProjectChat(ProjectChatProtocol):
         # having this scoped here should mean that the logger is GCed when the request is finished
         # also avoid any threading issues... 
         # an instance of this class now exists to provide async stream of updates to a particular chat request.
+        # we could pass conversation_id & use it to log each to a different file...
         socket_api = ChatSocketAPI(self.project, id, room)
+        socket_api.log(f"Asking question: {question}")
         if conversation_id:
             self.switch_conversation(conversation_id)
         elif not self._current_conversation_id:
@@ -448,7 +450,7 @@ class ProjectChat(ProjectChatProtocol):
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
             with time_block("b14: Chat logging by MDV"):  # <0.1% of time
-                self.project.log_chat_item(output_qa, prompt_RAG, final_code, conversation_id)
+                self.project.log_chat_item(question, prompt_RAG, final_code, conversation_id)
             with time_block("b15: Execute code"):  # ~9% of time
                 socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9
