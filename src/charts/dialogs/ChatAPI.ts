@@ -120,6 +120,7 @@ const sendMessageSocket = async (message: string, id: string, _routeUnused: stri
         const onError = (error: any) => {
             clearTimeout(timeout);
             socket.off('chat_response', onChatResponse);
+            socket.off('chat_error', onError);
             reject(error);
         };
 

@@ -340,7 +340,6 @@ class ProjectChat(ProjectChatProtocol):
                     f"Agent initialisation error: {str(self.init_error)}", id, 100, 0
                 )
                 return f"The agent had an error during initialisation: \n\n{str(self.init_error)[:500]}"
-            full_prompt = prompt_data + "\nQuestion: " + question
             logger.info(f"Question asked by user: {question}")
         
         try:
@@ -400,7 +399,6 @@ class ProjectChat(ProjectChatProtocol):
                     retriever=retriever,
                     return_source_documents=True,
                 )
-                context = retriever
                 output_qa = qa_chain.invoke({"query": response['input']})
                 result = output_qa["result"]
 

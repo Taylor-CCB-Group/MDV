@@ -81,9 +81,11 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             join_room(room)
             def send_error(error: str):
                 #! todo - frontend should handle this, and show an error message to the user.
+                # also, this method may be augmented so that it also logs to the chat log,
+                # and pass this handler to the bot.ask_question method.
                 socketio.emit(
                     "chat_error",
-                    {"error": error},
+                    {"message": error},
                     namespace=f"/project/{project.id}",
                     to=room
                 )

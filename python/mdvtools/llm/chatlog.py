@@ -127,6 +127,7 @@ class ChatSocketAPI:
         log_dir = os.path.join(project.dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
         file_handler = logging.FileHandler(os.path.join(project.dir, f"logs/chat_{project.id}_{id}.log"))
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         file_handler.setLevel(logging.INFO)
         logger.addHandler(file_handler)
         self.logger = logger
