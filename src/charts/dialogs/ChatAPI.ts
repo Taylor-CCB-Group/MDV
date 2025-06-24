@@ -208,12 +208,12 @@ const useChat = () => {
     const { data: chatLogData = [], isLoading: isChatLogLoading, isSuccess } = useQuery({
         queryKey: ['chatLog'],
         queryFn: async () => {
-            const response = await axios.get(`${projectApiRoute}chat_log.json`);
             try {
+                const response = await axios.get(`${projectApiRoute}chat_log.json`);
                 const parsedResponse = chatLogSchema.parse(response.data);
                 return parsedResponse;
             } catch (error) {
-                console.error('Error parsing chat log', error);
+                // console.error('Error parsing chat log', error);
                 return [];
             }
         },
