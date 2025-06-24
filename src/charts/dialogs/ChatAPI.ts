@@ -257,14 +257,15 @@ const useChat = () => {
         try {
             const id = generateId();
             setCurrentRequestId(id);
-            const response = await sendMessageSocket('', id, routeInit, conversationId);
+            //! todo - we might use socket here, in which case we need to have a different routeInit
+            const response = await sendMessageHttp('', id, routeInit, conversationId);
             if (!response) return;
             // Only set initial message if we don't have any messages yet
             if (messages.length === 0) {
                 setMessages([{
                     text: response.message,
                     sender: 'system',
-                    id: generateId(),
+                    id,
                     conversationId
                 }]);
             }
@@ -396,6 +397,9 @@ const useChat = () => {
 
     const switchConversation = useCallback((id: string) => {
         console.log(`switching conversation to ${id}`);
+        setCurrentRequestId("");
+        setIsSending(false);
+        setRequestProgress(null);
         setConversationId(id);
     }, []);
 
