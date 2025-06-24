@@ -124,7 +124,7 @@ const sendMessageSocket = async (message: string, id: string, _routeUnused: stri
         };
 
         socket.on('chat_response', onChatResponse);
-        socket.on('error', onError);
+        socket.on('chat_error', onError);
     });
 
     return response;
