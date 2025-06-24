@@ -157,25 +157,12 @@ class ProjectChat(ProjectChatProtocol):
             "and is designed to help build views for visualising it. What can I help you with?"
         )
 
-
-        # how do we keep track of the association between user & this...
-        # do we actually want a whole `ProjectChat` associated with a user/session?
-        # what does that mean in terms of server overhead (likely not much)?
-        # self.socket_api = ChatSocketAPI(project)
-        # change to have a logger per chat id
-        # logger = socket_api.logger
-        # LangchainLoggingHandler was unused at the time of writing,
-        # self.langchain_logging_handler = LangchainLoggingHandler(logger)
-        # self.config = {"callbacks": [self.langchain_logging_handler]}
-        
         # rather than assign socket_api.logger to self.log, we can distinguish this global logger
         # from the one used during a chat request.
         self.log = logger.info
         
-        # Store histories and agents for each conversation
-        self.conversation_histories = {}  # Dict to store RAG histories
-        self.conversation_agents = {}  # Dict to store agents for each conversation
-        self._current_conversation_id = None
+        # Store conversation memories for persistence across requests
+        self.conversation_memories = {}  # Dict to store ConversationBufferMemory for each conversation
         
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
@@ -194,98 +181,14 @@ class ProjectChat(ProjectChatProtocol):
         self.ds_name = project.datasources[0]['name']
         try:
             # raise ValueError("test error")
-            self.df = project.get_datasource_as_dataframe(self.ds_name)
-            with time_block("b6: Initialising LLM for RAG"):
-                self.code_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1") #"gpt-4o"
-            with time_block("b7: Initialising LLM for agent"):
-                self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1") #"gpt-4o"
-            with time_block("b8: Pandas agent creating"):
-                #Custom langchain agent:
-                def create_custom_pandas_agent(llm, dfs: dict, prompt_data, verbose=False):
-                    """
-                    Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
-                    """
-                    # Step 1: Initialize Memory with Chat History
-                    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-                    
-                    # Step 2: Create the Python REPL Tool
-                    python_tool = PythonAstREPLTool()
-                    
-                    if python_tool.globals is None:
-                        python_tool.globals = {}  # Ensure it's a dictionary
-                    
-                    # Make DataFrames available inside the REPL tool
-                    python_tool.globals.update(dfs) 
-                    
-                    # If we keep a reference to the globals dictionary so when we access it in a lambda, we know it's not None now.
-                    # This assumes that any changes to globals will be changes to the same dictionary... probably a safe assumption,
-                    #! but, if it is possible for something else to assign a new dictionary to python_tool.globals
-                    #! then this will break... so maybe this is actually technically less safe... better safe than sorry.
-                    # this would lead to much worse bugs than just a NoneType error
-                    # we should still handle None in the lambdas, though.
-                    # globals = python_tool.globals
-                    # python_tool.globals["list_globals"] = lambda: list(globals.keys()) # concise but less safe rather than more
+            # self.df = project.get_datasource_as_dataframe(self.ds_name) # not used
+            self.df = None
+            # Prepare dataframes for the agent
+            if len(self.project.datasources) >= 2:
+                self.df_list = [self.project.get_datasource_as_dataframe(ds['name']) for ds in self.project.datasources[:2]]
+            else:
+                self.df_list = [self.project.get_datasource_as_dataframe(self.project.datasources[0]['name'])]
 
-                    # New fixes:
-                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
-
-                    # Step 3: Define Contextualization Chain
-                    contextualize_q_system_prompt = """Given a chat history and the latest user question \
-                    which might reference context in the chat history, formulate a standalone question \
-                    which can be understood without the chat history. Do NOT answer the question, \
-                    just reformulate it if needed and otherwise return it as is."""
-
-                    contextualize_prompt = ChatPromptTemplate.from_messages([
-                        ("system", contextualize_q_system_prompt),
-                        ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
-                    
-                    # > LangChainDeprecationWarning: The class `LLMChain` was deprecated in LangChain 0.1.17 and will be removed in 1.0. 
-                    # Use RunnableSequence, e.g., `prompt | llm` instead.
-                    contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
-
-                    # Step 4: Define the Agent Prompt
-                    prompt_data_template = f"""You have access to the following Pandas DataFrames: 
-                    {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
-                    Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
-                    Use these to correct the column names mentioned by the user.
-                    If you need to check their structure, use `df.info()` or `df.head()`. 
-                    Before running any code, check available variables using `list_globals()`.""" + prompt_data
-
-                    prompt = ChatPromptTemplate.from_messages([
-                        ("system", prompt_data_template),
-                        MessagesPlaceholder(variable_name="chat_history"),
-                        ("human", prompt_data_template + "{input}"),
-                        ("ai", "{agent_scratchpad}"),
-                    ])
-
-                    # Step 5: Create the Agent
-                    agent = create_openai_functions_agent(llm, [python_tool], prompt)
-
-                    # Step 6: Wrap in an Agent Executor (Finalized Agent)
-                    agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose, return_intermediate_steps=True)
-
-                    # Step 7: Wrapper Function to Use Contextualization and Preserve Memory
-                    def agent_with_contextualization(question):
-                        standalone_question = contextualize_chain.run(input=question)
-                        # Point 1: Log reformulation
-                        chat_debug_logger.info(f"Original Question: {question}")
-                        chat_debug_logger.info(f"Standalone Reformulated Question: {standalone_question}")
-                        # Point 2: Log what you're sending to the agent
-                        chat_debug_logger.info(f"Sending to agent_executor with input: {standalone_question}")
-                        response = agent_executor.invoke({"input": standalone_question})
-                        # Point 3: Log agent output
-                        chat_debug_logger.info(f"Agent Raw Response: {response}")
-                        memory.save_context({"input": question}, {"output": response.get("output", str(response))})
-                        return response
-
-                    return agent_with_contextualization, memory
-
-                # Store the create_custom_pandas_agent function for later use
-                self.create_agent_fn = create_custom_pandas_agent
-                # Create initial agent
-                agent, memory = create_custom_pandas_agent(self.dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
-                self.agent = agent
-    
             self.init_error = None
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:500]}")
@@ -294,96 +197,163 @@ class ProjectChat(ProjectChatProtocol):
             self.welcome = str(e)
             self.init_error = e
 
-    def get_or_create_conversation(self, conversation_id: str):
-        """Get or create conversation components for a specific conversation"""
-        if conversation_id not in self.conversation_histories:
-            self.conversation_histories[conversation_id] = []
-            
-        if conversation_id not in self.conversation_agents:
-            # Create a new agent for this conversation
-            agent, memory = self.create_agent_fn(
-                self.dataframe_llm, 
-                {"df1": self.project.get_datasource_as_dataframe(self.project.datasources[0]['name']), 
-                 "df2": self.project.get_datasource_as_dataframe(self.project.datasources[1]['name']) if len(self.project.datasources) > 1 else None}, 
-                prompt_data, 
-                verbose=True
+    def get_or_create_memory(self, conversation_id: str):
+        """Get or create conversation memory for a specific conversation"""
+        if conversation_id not in self.conversation_memories:
+            self.conversation_memories[conversation_id] = ConversationBufferMemory(
+                memory_key="chat_history", 
+                return_messages=True
             )
-            self.conversation_agents[conversation_id] = agent
-            
-        return self.conversation_histories[conversation_id], self.conversation_agents[conversation_id]
+        return self.conversation_memories[conversation_id]
 
     def clear_conversation(self, conversation_id: str):
         """Clear the chat history for a specific conversation"""
-        if conversation_id in self.conversation_histories:
-            self.conversation_histories[conversation_id] = []
-        if conversation_id in self.conversation_agents:
-            # Remove the old agent and create a fresh one
-            del self.conversation_agents[conversation_id]
-            self.get_or_create_conversation(conversation_id)
+        if conversation_id in self.conversation_memories:
+            del self.conversation_memories[conversation_id]
         chat_debug_logger.info(f"Cleared conversation history for conversation {conversation_id}")
 
-    def switch_conversation(self, conversation_id: str):
-        """Switch to a different conversation context"""
-        if conversation_id != self._current_conversation_id:
-            chat_debug_logger.info(f"Switching from conversation {self._current_conversation_id} to {conversation_id}")
-            self._current_conversation_id = conversation_id
-            # Get or create conversation components for this conversation
-            self.chat_history, self.agent = self.get_or_create_conversation(conversation_id)
-            chat_debug_logger.info(f"Switched to conversation {conversation_id} with history length {len(self.chat_history)}")
+    def create_custom_pandas_agent(self, llm, dfs: dict, prompt_data, memory, verbose=False):
+        """
+        Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
+        """
+        # Step 1: Create the Python REPL Tool
+        python_tool = PythonAstREPLTool()
+        
+        if python_tool.globals is None:
+            python_tool.globals = {}  # Ensure it's a dictionary
+        
+        # Make DataFrames available inside the REPL tool
+        python_tool.globals.update(dfs) 
+        
+        # New fixes:
+        python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
+
+        # Step 2: Define Contextualization Chain
+        contextualize_q_system_prompt = """Given a chat history and the latest user question \
+        which might reference context in the chat history, formulate a standalone question \
+        which can be understood without the chat history. Do NOT answer the question, \
+        just reformulate it if needed and otherwise return it as is."""
+
+        contextualize_prompt = ChatPromptTemplate.from_messages([
+            ("system", contextualize_q_system_prompt),
+            ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
+        
+        # > LangChainDeprecationWarning: The class `LLMChain` was deprecated in LangChain 0.1.17 and will be removed in 1.0. 
+        # Use RunnableSequence, e.g., `prompt | llm` instead.
+        contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
+
+        # Step 3: Define the Agent Prompt
+        prompt_data_template = f"""You have access to the following Pandas DataFrames: 
+        {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
+        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
+        Use these to correct the column names mentioned by the user.
+        If you need to check their structure, use `df.info()` or `df.head()`. 
+        Before running any code, check available variables using `list_globals()`.""" + prompt_data
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", prompt_data_template),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", prompt_data_template + "{input}"),
+            ("ai", "{agent_scratchpad}"),
+        ])
+
+        # Step 4: Create the Agent
+        agent = create_openai_functions_agent(llm, [python_tool], prompt)
+
+        # Step 5: Wrap in an Agent Executor (Finalized Agent)
+        agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose, return_intermediate_steps=True)
+
+        # Step 6: Wrapper Function to Use Contextualization and Preserve Memory
+        def agent_with_contextualization(question):
+            standalone_question = contextualize_chain.run(input=question)
+            # Point 1: Log reformulation
+            chat_debug_logger.info(f"Original Question: {question}")
+            chat_debug_logger.info(f"Standalone Reformulated Question: {standalone_question}")
+            # Point 2: Log what you're sending to the agent
+            chat_debug_logger.info(f"Sending to agent_executor with input: {standalone_question}")
+            response = agent_executor.invoke({"input": standalone_question})
+            # Point 3: Log agent output
+            chat_debug_logger.info(f"Agent Raw Response: {response}")
+            memory.save_context({"input": question}, {"output": response.get("output", str(response))})
+            return response
+
+        return agent_with_contextualization
 
     def ask_question(self, question: str, id: str, conversation_id: str, room: str):
         """
         Ask a question, generate code to answer it, execute the code...
         """
-        # having this scoped here should mean that the logger is GCed when the request is finished
-        # also avoid any threading issues... 
-        # an instance of this class now exists to provide async stream of updates to a particular chat request.
-        # we could pass conversation_id & use it to log each to a different file...
+        # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room)
-        socket_api.log(f"Asking question: {question}")
-        if conversation_id:
-            self.switch_conversation(conversation_id)
-        elif not self._current_conversation_id:
-            # If no conversation_id provided and no current conversation, create a new one
+        log = socket_api.log
+        log(f"Asking question: {question}")
+        
+        # Ensure we have a conversation_id
+        if not conversation_id:
             conversation_id = f"default_{id}"
-            self.switch_conversation(conversation_id)
-
-        # keep that agent in scope in case some concurrent requests are made
-        # nb, this is still not totally thread-safe, should be fine for now.
-        # to avoid concurrency issues, we may not want a `switch_conversation` method, 
-        # but rather use the result returned by `get_or_create_conversation`
-        agent = self.agent
+        
+        # Get or create memory for this conversation
+        memory = self.get_or_create_memory(conversation_id)
+        
+        # Create local LLM instances with local callbacks for logging
+        langchain_logging_handler = LangchainLoggingHandler(socket_api.logger)
+        
+        with time_block("b6: Initialising LLM for RAG"):
+            code_llm = ChatOpenAI(
+                temperature=0.1, 
+                model="gpt-4.1",
+                callbacks=[langchain_logging_handler]
+            )
+        
+        with time_block("b7: Initialising LLM for agent"):
+            dataframe_llm = ChatOpenAI(
+                temperature=0.1, 
+                model="gpt-4.1",
+                callbacks=[langchain_logging_handler]
+            )
+        # there is a risk that these are out of date by the time we get here...
+        # but it's a bit of an expensive operation, so avoiding it for now (in most cases we shouldn't need to refer to them)
+        df_list = self.df_list
+        
+        # Create agent with local LLM and memory
+        with time_block("b8: Pandas agent creating"):
+            agent = self.create_custom_pandas_agent(
+                dataframe_llm, 
+                {"df1": df_list[0], "df2": df_list[1] if len(df_list) > 1 else df_list[0]}, 
+                prompt_data, 
+                memory,
+                verbose=True
+            )
+        
         progress = 0
         if mock_agent:
             ok, strdout, stderr = execute_code(
                 'import mdvtools\nprint("mdvtools import ok")'
             )
             return f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}"
+        
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
             socket_api.update_chat_progress(
                 "Agent invoking", id, progress, 0
             )
-            # shortly after this...
-            # Error in StdOutCallbackHandler.on_chain_start callback: AttributeError("'NoneType' object has no attribute 'get'")
-            socket_api.log(f"Asking the LLM: '{question}'")
+            log(f"Asking the LLM: '{question}'")
             if self.init_error:
-                # let's think about doing something better here.
                 socket_api.update_chat_progress(
                     f"Agent initialisation error: {str(self.init_error)}", id, 100, 0
                 )
                 return f"The agent had an error during initialisation: \n\n{str(self.init_error)[:500]}"
             full_prompt = prompt_data + "\nQuestion: " + question
-            # provide an update to the user that we're working on it, using provided id.
             logger.info(f"Question asked by user: {question}")
+        
         try:
             with time_block("b10b: Pandas agent invoking"):  # ~31.4% of time
                 socket_api.update_chat_progress(
                     "Pandas agent invoking...", id, progress, 31
                 )
                 progress += 31
-                response = agent(question)#(full_prompt)#(question)
+                response = agent(question)
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
-                # assert "output" in response  # there are situations where this will cause unnecessary errors
+            
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 socket_api.update_chat_progress(
                     "RAG prompt preparation...", id, progress, 1
@@ -413,18 +383,12 @@ class ProjectChat(ProjectChatProtocol):
 
                 datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
 
-                #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
-                # we pass a reference to the actual project object and let figuring out the path be an internal implementation detail...
-                # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
-                # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
-                # and the assert in the function is being triggered even though it should be fine
-                prompt_RAG = get_createproject_prompt_RAG_copy(self.project, path_to_data, datasource_names[0], response['output'], response['input']) #self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG_copy(self.project, path_to_data, datasource_names[0], response['output'], response['input'])
                 chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
 
                 prompt_RAG_template = PromptTemplate(
                      template=prompt_RAG,
                      input_variables=["context", "question"])
-
 
             with time_block("b12: RAG chain"):  # ~60% of time
                 socket_api.update_chat_progress(
@@ -432,9 +396,14 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 progress += 60
 
-                qa_chain = RetrievalQA.from_llm(llm=self.code_llm, prompt=prompt_RAG_template, retriever=retriever,return_source_documents=True,)
+                qa_chain = RetrievalQA.from_llm(
+                    llm=code_llm, 
+                    prompt=prompt_RAG_template, 
+                    retriever=retriever,
+                    return_source_documents=True,
+                )
                 context = retriever
-                output_qa = qa_chain.invoke({"query": response['input']}) #+ response['output']}) #"context": context, "query":response['input'] 
+                output_qa = qa_chain.invoke({"query": response['input']})
                 result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time
@@ -442,7 +411,7 @@ class ProjectChat(ProjectChatProtocol):
                     result,
                     self.df,
                     self.project,
-                    socket_api.log,
+                    log,
                     modify_existing_project=True,
                     view_name=question,
                 )
@@ -451,13 +420,14 @@ class ProjectChat(ProjectChatProtocol):
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
             with time_block("b14: Chat logging by MDV"):  # <0.1% of time
                 self.project.log_chat_item(question, prompt_RAG, final_code, conversation_id)
+            
             with time_block("b15: Execute code"):  # ~9% of time
                 socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9
                 )
                 progress += 9
                 ok, stdout, stderr = execute_code(
-                    final_code, open_code=False, log=socket_api.log
+                    final_code, open_code=False, log=log
                 )
                 chat_debug_logger.info(f"Code Execution Result - OK: {ok}")
                 chat_debug_logger.info(f"Code Execution STDOUT:\n{stdout}")
@@ -466,7 +436,7 @@ class ProjectChat(ProjectChatProtocol):
             if not ok:
                 return f"# Error: code execution failed\n> {stderr}"
             else:
-                socket_api.log(final_code)
+                log(final_code)
                 socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0
                 )
