@@ -42,6 +42,10 @@ const chatLogItemSchema = z.object({
     conversation_id: z.string().optional().nullable(),
     timestamp: z.string().optional(),
 });
+// this is possible - may consider it at some point.
+// .transform((data) => ({
+//     convesationId: data.conversation_id,
+// }));
 const chatLogSchema = z.array(chatLogItemSchema);
 
 export type ChatLogItem = z.infer<typeof chatLogItemSchema>;
@@ -89,20 +93,42 @@ const sendMessageHttp = async (message: string, id: string, route: string, conve
 };
 
 const sendMessageSocket = async (message: string, id: string, _routeUnused: string, conversationId: string) => {
+    // consider refactoring to be a generator function, so that we can yield progress updates
     const socket = window.mdv.chartManager.ipc?.socket;
     if (!socket) return;
+
     socket.emit('chat_request', { message, id, conversation_id: conversationId });
     const response = await new Promise<ChatResponse>((resolve, reject) => {
-        const onChatResponse = (data: any) => {
-            const parsed = completedChatResponseSchema.parse(data);
+        // 5-minute timeout - because in reality it does often take quite a while to run.
+        // we may consider something like re-querying, requesting status, or something like that?
+        const timeout = setTimeout(() => {
             socket.off('chat_response', onChatResponse);
-            resolve(parsed);
-        }
+            reject(new Error('Socket request timeout'));
+        }, 300000);
+
+        const onChatResponse = (data: any) => {
+            clearTimeout(timeout);
+            try {
+                const parsed = completedChatResponseSchema.parse(data);
+                socket.off('chat_response', onChatResponse);
+                resolve(parsed);
+            } catch (error) {
+                reject(error);
+            }
+        };
+
+        const onError = (error: any) => {
+            clearTimeout(timeout);
+            socket.off('chat_response', onChatResponse);
+            reject(error);
+        };
+
         socket.on('chat_response', onChatResponse);
+        socket.on('error', onError);
     });
+
     return response;
 }
-
 // Parsing view name from the message's code
 // todo: Get view name from chat_log.json or use some other logic
 const parseViewName = (message: string) => {
