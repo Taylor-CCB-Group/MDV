@@ -356,15 +356,18 @@ const useChat = () => {
             
             await sendMessageSocket(input, id, "", conversationId);
             queryClient.invalidateQueries({ queryKey: ['chatLog'] });
-        } catch (error) {
+        } catch (error: any) {
+            const errorMessage =  error?.message ? 
+                error.message : 
+                (typeof error === "string" ? error : "An unknown error occurred. Please try again later.")
             // todo: update error handling logic, particularly for socket...
             setMessages(prev => [...prev, {
-                text: `ERROR: ${error}`,
+                text: `ERROR: ${errorMessage}`,
                 sender: 'bot',
                 id: generateId(),
                 conversationId
             }]);
-            console.log("Error sending message: ", error);
+            console.log("Error sending message: ", errorMessage);
         }
         setCurrentRequestId('');
         setRequestProgress(null);
@@ -375,7 +378,7 @@ const useChat = () => {
         const newConversationId = generateConversationId();
         setConversationId(newConversationId);
         try {
-            const response = await sendMessageSocket('', generateId(), routeInit, newConversationId);
+            const response = await sendMessageHttp('', generateId(), routeInit, newConversationId);
             if (!response) return;
             // Only set initial message if we don't have any messages yet
             setMessages([{
@@ -384,15 +387,18 @@ const useChat = () => {
                 id: generateId(),
                 conversationId: newConversationId
             }]);
-        } catch (error) {
+        } catch (error: any) {
+            const errorMessage =  error?.message ? 
+                error.message : 
+                (typeof error === "string" ? error : "An unknown error occurred. Please try again later.")
             // todo: update error handling logic
             setMessages(prev => [...prev, {
-                text: `ERROR: ${error}`,
+                text: `ERROR: ${errorMessage}`,
                 sender: 'bot',
                 id: generateId(),
                 conversationId: newConversationId,
             }]);
-            console.log("Error starting new conversation: ", error);
+            console.log("Error starting new conversation: ", errorMessage);
         }
     }, [routeInit]);
 
