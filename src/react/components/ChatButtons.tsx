@@ -7,7 +7,7 @@ import useChat from "@/charts/dialogs/ChatAPI";
 import ChatDialog from "@/charts/dialogs/ChatDialog";
 import PopoutWindow from "./PopoutWindow";
 import { ProjectProvider } from "@/modules/ProjectContext";
-import React from 'react';
+import type React from 'react';
 
 interface ChatProviderProps {
     open: boolean;
@@ -53,32 +53,30 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
         conversationId,
     };
 
+    const dialog = (
+        <ChatDialog
+            open={popout ? true : open}
+            onClose={popout ? onPopoutClose : onClose}
+            onPopout={!popout ? onPopout : undefined}
+            fullscreen={popout}
+            isPopout={popout}
+            {...chatDialogProps}
+        />
+    );
+
     return (
         <>
-            {!popout && (
-                <ChatDialog
-                    open={open}
-                    onClose={onClose}
-                    onPopout={onPopout}
-                    {...chatDialogProps}
-                />
-            )}
-            {popout && (
+            {popout ? (
                 <PopoutWindow onClose={onPopoutClose}>
                     <ProjectProvider>
                         <ThemeProvider theme={theme}>
                             <CssBaseline />
-                            <ChatDialog
-                                open={true}
-                                onClose={onPopoutClose}
-                                isPopout
-                                fullscreen
-                                {...chatDialogProps}
-                            />
+                            {dialog}
                         </ThemeProvider>
                     </ProjectProvider>
                 </PopoutWindow>
-            )}
+                ) : dialog
+            }
         </>
     );
 };
