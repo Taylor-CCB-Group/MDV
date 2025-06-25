@@ -5,6 +5,9 @@ import regex as re
 from mdvtools.llm.templates import packages_functions
 import json
 import ast
+import subprocess
+import tempfile
+import os
 
 if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
@@ -87,6 +90,9 @@ else:
         # so we have a sticking plaster solution for this...
         final_code = patch_viewname(final_code, project)
         
+        # Lint the code with ruff
+        final_code = _lint_code_with_ruff(final_code, log)
+        
     try:
         compile(final_code, "<string>", "exec") # will raise an exception if there is a syntax error
     except Exception as e:
@@ -94,6 +100,39 @@ else:
         log(final_code)
         # let it return anyway...
     return final_code
+
+def _lint_code_with_ruff(code: str, log=print):
+    """Formats the given code using ruff."""
+    temp_file_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.py', encoding='utf-8') as temp_file:
+            temp_file.write(code)
+            temp_file_path = temp_file.name
+
+        log("# Running ruff linting and fixing...")
+        # Use --exit-zero to avoid raising an error if there are unfixable lint issues.
+        ruff_result = subprocess.run(
+            ['ruff', 'check', temp_file_path, '--fix', '--exit-zero'],
+            capture_output=True, text=True
+        )
+
+        if ruff_result.stderr:
+                log(f"# Ruff stderr:\n{ruff_result.stderr}")
+
+        with open(temp_file_path, 'r', encoding='utf-8') as temp_file:
+            linted_code = temp_file.read()
+        log("# Ruff pass complete.")
+        return linted_code
+
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        log(f"# Ruff pass failed: {e}")
+        if isinstance(e, subprocess.CalledProcessError):
+            log(f"Ruff stderr: {e.stderr}")
+        # continue with the un-linted code
+        return code
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 def patch_viewname(code: str, project: MDVProject):
     """Given a code string, replace the view_name with a unique name, 
