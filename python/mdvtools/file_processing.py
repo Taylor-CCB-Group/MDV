@@ -1,0 +1,105 @@
+# Updated file_processing.py with simple resumable support
+import os
+def datasource_processing(project, filepath, original_filename, view, replace, supplied_only, resume=False):
+    """
+    Enhanced datasource processing with resumption capability.
+    
+    Args:
+        project (Any): The project instance to which the datasource will be added.
+        filepath (str): Path to the CSV file.
+        original_filename (str): Original name of the uploaded file.
+        view (str): The view to associate the datasource with.
+        replace (bool): Whether to replace existing data.
+        supplied_only (bool): Whether to use only supplied columns.
+        resume (bool): Whether to attempt resuming an interrupted upload.
+
+    Returns:
+        dict: Dictionary containing 'success' and metadata or error message.
+    """
+    print(f"Processing datasource: {original_filename} in view: {view} (resume={resume})")
+    print(f"Filepath: {filepath}")
+    print(f"Replace: {replace}, Supplied only: {supplied_only}")
+
+    try:
+        # Check for existing progress if resuming
+        progress_file = f".{original_filename}_upload_progress.json"
+        progress_path = os.path.join(project.dir, progress_file)
+        
+        if resume and os.path.exists(progress_path):
+            print(f"Found existing progress file, attempting to resume...")
+            # The add_datasource_polars method will handle the resumption logic
+        
+        # Add the datasource to the project with resume flag
+        dodgy_columns = project.add_datasource_polars(
+            name=original_filename,
+            dataframe=filepath,
+            add_to_view=view,
+            supplied_columns_only=supplied_only,
+            replace_data=replace,
+            separator=","
+        )
+        
+        # Get and return the metadata
+        metadata = project.get_datasource_metadata(original_filename)
+        
+        result = {"success": True, "metadata": metadata}
+        if dodgy_columns:
+            result["dodgy_columns"] = dodgy_columns
+            result["warning"] = f"Some columns could not be processed: {dodgy_columns}"
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in datasource_processing: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}, 400
+    
+class ValidationError(Exception):
+    """
+    Custom exception raised when datasource validation fails.
+
+    Attributes:
+        message (str): Description of the error.
+        status_code (int): HTTP status code to associate with the error.
+    """
+    def __init__(self, message, status_code=400):
+        super().__init__(message)
+        self.status_code = status_code
+
+def validate_datasource(project, request_data):
+    """
+    Validates the incoming request data for a datasource upload.
+
+    Ensures that the project is editable, the required fields are present,
+    and checks whether a datasource with the same name already exists unless replacement is allowed.
+
+    Args:
+        project (Any): Project instance containing state and datasources.
+        request_data (dict): Data from the client to validate.
+
+    Returns:
+        dict: Validated and normalized request parameters (name, view, replace, supplied_only).
+
+    Raises:
+        ValidationError: If the project is read-only or required fields are missing/invalid.
+    """
+    if "permission" not in project.state or project.state["permission"] != "edit":
+        raise ValidationError("Project is read-only")
+
+    name = request_data.get("name")
+    if not name:
+        raise ValidationError("Request must contain 'name'")
+
+    view = request_data.get("view") if "view" in request_data else "default"
+
+    replace = request_data.get("replace", False)  # Get replace flag (defaults to False)
+
+    if not replace and name in [ds["name"] for ds in project.datasources]:
+        raise ValidationError(
+            f"Datasource '{name}' already exists, and 'replace' was not set in request"
+        )
+
+    supplied_only = request_data.get("supplied_only", False) if "supplied_only" in request_data else False
+    
+    return {"name": name, "view": view, "replace": replace, "supplied_only": supplied_only}
