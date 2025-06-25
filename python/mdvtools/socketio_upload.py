@@ -1,20 +1,3 @@
-"""
-SocketIO File Upload Module with Resumability Support
-
-This module provides file upload capabilities using Flask-SocketIO with support for:
-- Chunked uploads with resumability
-- Background processing
-- File validation and cleanup
-- Project-based namespacing
-
-Usage:
-    from socketio_upload import initialize_upload_system, register_project_for_upload
-    
-    # In your Flask app setup:
-    upload_manager = initialize_upload_system(app, socketio)
-    register_project_for_upload("project_id", project_instance)
-"""
-
 import os
 import json
 import uuid
@@ -75,7 +58,7 @@ class FileUploadManager:
         """Constructs a secure directory path for storing file uploads."""
         safe_file_id = secure_filename(file_id)
         if safe_file_id != file_id:
-             raise ValueError(f"Invalid file_id format: {file_id}")
+            raise ValueError(f"Invalid file_id format: {file_id}")
         return os.path.join(self.base_temp_dir, safe_file_id)
 
     def _get_state_filepath(self, file_id: str) -> str:
@@ -90,8 +73,8 @@ class FileUploadManager:
                 with open(state_filepath, 'r') as f:
                     state = json.load(f)
                     if 'last_activity_time' in state and state['last_activity_time'] is not None:
-                         state['last_activity_time_iso'] = state['last_activity_time'] 
-                         state['last_activity_time'] = datetime.fromisoformat(state['last_activity_time'])
+                        state['last_activity_time_iso'] = state['last_activity_time'] 
+                        state['last_activity_time'] = datetime.fromisoformat(state['last_activity_time'])
                     return state
         except (json.JSONDecodeError, OSError, TypeError) as e:
             upload_log(f"Error loading state for file_id {file_id}: {e}")
@@ -106,7 +89,7 @@ class FileUploadManager:
             os.makedirs(upload_dir, exist_ok=True) 
             state_copy = state.copy() 
             if 'last_activity_time' in state_copy and isinstance(state_copy['last_activity_time'], datetime):
-                 state_copy['last_activity_time'] = state_copy['last_activity_time'].isoformat()
+                state_copy['last_activity_time'] = state_copy['last_activity_time'].isoformat()
             with open(temp_state_filepath, 'w') as f:
                 json.dump(state_copy, f, indent=4)
                 f.flush()  
@@ -378,8 +361,8 @@ class FileUploadManager:
                             try:
                                 dir_mod_time = datetime.fromtimestamp(os.path.getmtime(item_path), timezone.utc)
                                 if now - dir_mod_time > self.upload_ttl:
-                                     upload_log(f"Cleaning up orphaned directory: {item_path}")
-                                     shutil.rmtree(item_path) 
+                                    upload_log(f"Cleaning up orphaned directory: {item_path}")
+                                    shutil.rmtree(item_path) 
                             except OSError:
                                 pass
             except Exception as e:
