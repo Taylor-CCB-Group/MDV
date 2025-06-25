@@ -117,17 +117,15 @@ def _lint_code_with_ruff(code: str, log=print):
         )
 
         if ruff_result.stderr:
-                log(f"# Ruff stderr:\n{ruff_result.stderr}")
+            log(f"# Ruff stderr:\n{ruff_result.stderr}")
 
         with open(temp_file_path, 'r', encoding='utf-8') as temp_file:
             linted_code = temp_file.read()
         log("# Ruff pass complete.")
         return linted_code
 
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+    except FileNotFoundError as e:
         log(f"# Ruff pass failed: {e}")
-        if isinstance(e, subprocess.CalledProcessError):
-            log(f"Ruff stderr: {e.stderr}")
         # continue with the un-linted code
         return code
     finally:
