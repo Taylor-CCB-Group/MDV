@@ -2,7 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 import pandas as pd
 import regex as re
-from .templates import packages_functions
+-from .templates import packages_functions
++from mdvtools.llm.templates import packages_functions
 import json
 import ast
 
