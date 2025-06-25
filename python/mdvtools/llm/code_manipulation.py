@@ -140,15 +140,12 @@ def parse_view_name(code: str):
                     # The value should be a string literal
                     if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str): # Python 3.8+
                         view_name = node.value.value
-                        print(f"test: {view_name}")
                         return view_name
                     elif isinstance(node.value, ast.Str): # Python < 3.8
                         view_name = node.value.s
-                        print(f"test: {view_name}")
                         return view_name
     except SyntaxError:
-        print("Failed to parse code with AST. It might contain a syntax error.")
+        # print("Failed to parse code with AST. It might contain a syntax error.")
+        pass
 
-    print("View name assignment not found in code.")
-    print(code)
     return None
