@@ -4,6 +4,7 @@ import pandas as pd
 import regex as re
 from .templates import packages_functions
 import json
+import ast
 
 if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
@@ -127,19 +128,27 @@ def patch_viewname(code: str, project: MDVProject):
     #return code.replace(view_name, new_view_name)
 
 def parse_view_name(code: str):
-    """Given a code string, extract the view_name from it.
-    This doesn't have any side-effects, but it's probably not very robust.
+    """Given a code string, extract the view_name from it using AST.
+    This is more robust than using regex.
     """
-    # when it it parses this - it should be greedy about matching to the last \" in the line...
-    #name_match = re.search(r"view_name = \"(.+)\"", code)
-    name_match = re.search(r'view_name\s*=\s*"([^"]+)"', code)
-    if name_match:
-        view_name = name_match.group(1)
-        print(f"test: {view_name}")
-        # try to escape e.g. any quotes or other special characters in the view_name...
-        # this seems to be a somewhat accepted method (at least, for this particular local problem)
-        # view_name = json.dumps(view_name) # this will be done in the patch_viewname function
-        return view_name
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                # We are looking for a simple assignment, e.g. view_name = "..."
+                if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'view_name':
+                    # The value should be a string literal
+                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str): # Python 3.8+
+                        view_name = node.value.value
+                        print(f"test: {view_name}")
+                        return view_name
+                    elif isinstance(node.value, ast.Str): # Python < 3.8
+                        view_name = node.value.s
+                        print(f"test: {view_name}")
+                        return view_name
+    except SyntaxError:
+        print("Failed to parse code with AST. It might contain a syntax error.")
+
     print("View name assignment not found in code.")
     print(code)
     return None
