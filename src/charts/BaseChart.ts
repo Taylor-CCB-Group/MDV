@@ -25,6 +25,7 @@ export type BaseConfig = {
     type: string;
     param: FieldSpecs;
     title_color?: string;
+    //todo: This is not really a good place to have this order here, as it's specific to SelectionDialog, move it to SelectionDialogReact.
     order?: Record<string, number>;
 } & ColorConfig;
 /**
