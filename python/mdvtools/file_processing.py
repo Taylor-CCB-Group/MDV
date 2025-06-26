@@ -1,5 +1,5 @@
-# Updated file_processing.py with simple resumable support
 import os
+
 def datasource_processing(project, filepath, original_filename, view, replace, supplied_only, resume=False):
     """
     Enhanced datasource processing with resumption capability.
@@ -14,7 +14,11 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
         resume (bool): Whether to attempt resuming an interrupted upload.
 
     Returns:
-        dict: Dictionary containing 'success' and metadata or error message.
+        dict: A dictionary containing 'success' and metadata on success.
+        
+    Raises:
+        ValidationError: If any exception occurs during the processing, encapsulating
+                         the error message with a 400 status code.
     """
     print(f"Processing datasource: {original_filename} in view: {view} (resume={resume})")
     print(f"Filepath: {filepath}")
@@ -51,9 +55,7 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
         
     except Exception as e:
         print(f"Error in datasource_processing: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {"success": False, "error": str(e)}, 400
+        raise ValidationError(str(e), status_code=400)
     
 class ValidationError(Exception):
     """
