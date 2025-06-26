@@ -99,7 +99,7 @@ def create_app(
     #     )
 
         # SocketIO upload initialization
-        socketio_manager = initialize_socketio_upload(app)
+        initialize_socketio_upload(app)
         register_project_for_upload(project.id, project)
 
 
