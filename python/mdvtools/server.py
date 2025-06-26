@@ -30,6 +30,7 @@ from typing import Optional
 import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
+from mdvtools.socketio_upload import initialize_socketio_upload, register_project_for_upload
 from mdvtools.server_extension import MDVServerOptions
 from mdvtools.logging_config import get_logger
 
@@ -45,7 +46,6 @@ def log(*args, **kwargs):
     logger.info(msg)
 
 routes = set()
-from mdvtools.socketio_upload import initialize_socketio_upload, register_project_for_upload
 
 
 
