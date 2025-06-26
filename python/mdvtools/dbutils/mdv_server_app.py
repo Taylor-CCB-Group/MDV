@@ -2,7 +2,7 @@ import os
 import time
 import json
 import logging
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
@@ -151,7 +151,12 @@ def wait_for_database(app):
     for attempt in range(max_retries):
         try:
             # First connect to postgres database
-            engine = db.create_engine(postgres_uri)
+            # db.create_engine does work, but not as well-typed, 
+            # importing create_engine seems to be the standard way to do it
+            # if not hasattr(db, 'create_engine'):
+            #     raise Exception("db.create_engine not found")            
+            # engine = db.create_engine(postgres_uri)
+            engine = create_engine(postgres_uri)
             connection = None
             try:
                 connection = engine.connect()
