@@ -156,25 +156,27 @@ def wait_for_database(app):
             # if not hasattr(db, 'create_engine'):
             #     raise Exception("db.create_engine not found")            
             # engine = db.create_engine(postgres_uri)
-            engine = create_engine(postgres_uri)
+            engine = create_engine(postgres_uri, isolation_level="AUTOCOMMIT")
             connection = None
             try:
                 connection = engine.connect()
                 # Check if our target database exists
-                result = connection.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": db_name})
+                result = connection.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                    {"db_name": db_name}
+                )
                 exists = result.scalar()
                 
                 if not exists:
                     # Create the database if it doesn't exist
-                    connection.execute(text("COMMIT"))
-                    connection.execute(text(f"CREATE DATABASE {db_name}"))
+                    connection.execute(text(f'CREATE DATABASE "{db_name}"'))
                     logger.info(f"Created database: {db_name}")
                 else:
                     logger.info(f"Database {db_name} already exists")
-            finally:
                 if connection:
                     connection.close()
-            
+            finally:
+                engine.dispose()
             # Now try to connect to our target database
             target_uri = 'postgresql://{}:{}@{}/{}'.format(
                 os.getenv('DB_USER'),
