@@ -423,7 +423,7 @@ class ProjectChat(ProjectChatProtocol):
 
                 qa_chain = RetrievalQA.from_llm(llm=self.code_llm, prompt=prompt_RAG_template, retriever=retriever,return_source_documents=True,)
                 context = retriever
-                output_qa = qa_chain.invoke({"query": response['input']}) #+ response['output']}) #"context": context, "query":response['input'] 
+                output_qa = qa_chain.invoke({"query": response['input']+ response['output']}) #"context": context, "query":response['input'] 
                 result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time
