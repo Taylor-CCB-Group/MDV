@@ -1192,7 +1192,7 @@ class MDVProject:
             if add_to_view:
                 # TablePlot parameters
                 title = name
-                params = dataframe.columns  # .columns is available on both DataFrame and LazyFrame
+                params = dataframe.collect_schema().names() 
                 size = [792, 472]
                 position = [10, 10]
             
@@ -2381,7 +2381,7 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
         # Get column info from polars dataframe or lazyframe
         cols = []
         # .schema works on both DataFrame and LazyFrame without loading data
-        for col_name, polars_dtype in dataframe.schema.items():
+        for col_name, polars_dtype in dataframe.collect_schema().items():
             mdv_dtype = map_polars_to_mdv_type(polars_dtype)
             
             # Check if this should be unique based on cardinality
