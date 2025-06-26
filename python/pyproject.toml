@@ -43,7 +43,7 @@ nbformat = "^5.10.4"
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-pyright = "^1.1.358"
+pyright = "^1.1.402"
 pytest = "^8.1.1"
 ruff = "^0.3.7"
 ome-types = "^0.5.0"
