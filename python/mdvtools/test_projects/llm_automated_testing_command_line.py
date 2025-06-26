@@ -26,7 +26,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent
 
 from mdvtools.llm.local_files_utils import extract_python_code_from_py, extract_python_code_from_ipynb
-from mdvtools.llm.templates import get_createproject_prompt_RAG_copy, prompt_data
+from mdvtools.llm.templates import get_createproject_prompt_RAG_copy, prompt_data # type: ignore - spurious CI error
 from mdvtools.llm.code_manipulation import prepare_code
 from mdvtools.llm.code_execution import execute_code
 
