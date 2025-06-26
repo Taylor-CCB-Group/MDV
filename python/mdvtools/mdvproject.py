@@ -1150,7 +1150,7 @@ class MDVProject:
                 
                 gr = h5.create_group(name)
             except Exception as e:
-                raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}")
+                raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}") from e
             
             print("created h5 group without error")
             
