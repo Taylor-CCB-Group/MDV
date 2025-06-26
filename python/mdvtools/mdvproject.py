@@ -1072,7 +1072,7 @@ class MDVProject:
     def add_datasource_polars(
         self,
         name: str,
-        dataframe: pl.DataFrame | str,
+        dataframe: pl.DataFrame | pl.LazyFrame | str,
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
