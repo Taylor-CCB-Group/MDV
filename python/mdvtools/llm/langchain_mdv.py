@@ -25,7 +25,7 @@ from langchain_experimental.tools.python.tool import PythonAstREPLTool
 from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
-from .templates import get_createproject_prompt_RAG_copy, prompt_data
+from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
@@ -407,7 +407,7 @@ class ProjectChat(ProjectChatProtocol):
                 # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
-                prompt_RAG = get_createproject_prompt_RAG_copy(self.project, path_to_data, datasource_names[0], response['output'], response['input']) #self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], response['input']) #self.ds_name, response['output'])
                 chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
 
                 prompt_RAG_template = PromptTemplate(
