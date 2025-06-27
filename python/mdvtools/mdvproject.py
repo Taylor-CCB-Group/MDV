@@ -161,7 +161,7 @@ class MDVProject:
         df = pandas.DataFrame()
         for c in ds["columns"]:
             data = self.get_column(datasource, c["field"])
-            df[c["name"]] = data
+            df[c["field"]] = data
         return df
 
     def check_columns_exist(self, datasource, columns):
@@ -1838,7 +1838,7 @@ class MDVProject:
         context_information = output['source_documents']
         context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
         context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-        context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
+        context_information_metadata_name = [s for s in context_information_metadata_url]#[s[82:] for s in context_information_metadata_url]
 
         context = str(context_information_metadata_name)
         query = output['query']

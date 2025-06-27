@@ -1,8 +1,9 @@
 import os
+import sys
 import time
 import json
 import logging
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
@@ -71,7 +72,8 @@ def create_flask_app(config_name=None):
         logger.info("Creating tables")
         with app.app_context():
             logger.info("Waiting for DB to set up")
-            wait_for_database()
+            if config_name != 'test':
+                wait_for_database(app)
             if not tables_exist():
                 logger.info("Creating database tables")
                 db.create_all()
@@ -130,25 +132,85 @@ def create_flask_app(config_name=None):
     return app
 
 
-def wait_for_database():
+def wait_for_database(app):
     """Wait for the database to be ready before proceeding."""
     max_retries = 30
     delay = 5  # seconds
+    db_name = os.getenv('DB_NAME')
+    
+    if not db_name:
+        error_message = "Error: DB_NAME environment variable is not set"
+        logger.error(error_message)
+        raise ValueError(error_message)
 
+    # First connect to postgres database to check/create our target database
+    postgres_uri = 'postgresql://{}:{}@{}/postgres'.format(
+        os.getenv('DB_USER'),
+        os.getenv('DB_PASSWORD'),
+        os.getenv('DB_HOST')
+    )
+    
+    # Construct target URI once since environment variables don't change
+    target_uri = 'postgresql://{}:{}@{}/{}'.format(
+        os.getenv('DB_USER'),
+        os.getenv('DB_PASSWORD'),
+        os.getenv('DB_HOST'),
+        db_name
+    )
+    
+    # Update the database URI in the app config (this is the same as the initial URI from load_config)
+    app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
+    
     for attempt in range(max_retries):
         try:
-            # Test database connection using engine.connect()
-            with db.engine.connect() as connection:
-                connection.execute(text('SELECT 1'))
+            # First connect to postgres database
+            # db.create_engine does work, but not as well-typed, 
+            # importing create_engine seems to be the standard way to do it
+            # if not hasattr(db, 'create_engine'):
+            #     raise Exception("db.create_engine not found")            
+            # engine = db.create_engine(postgres_uri)
+            engine = create_engine(postgres_uri, isolation_level="AUTOCOMMIT")
+            connection = None
+            try:
+                connection = engine.connect()
+                # Check if our target database exists
+                result = connection.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                    {"db_name": db_name}
+                )
+                exists = result.scalar()
+                
+                if not exists:
+                    # Create the database if it doesn't exist
+                    connection.execute(text(f'CREATE DATABASE "{db_name}"'))
+                    logger.info(f"Created database: {db_name}")
+                else:
+                    logger.info(f"Database {db_name} already exists")
+                if connection:
+                    connection.close()
+            finally:
+                engine.dispose()
+            
+            # Test the connection to our target database
+            # The engine should already be valid since the URI hasn't changed
+            test_connection = None
+            try:
+                test_connection = db.engine.connect()
+                test_connection.execute(text('SELECT 1'))
+                logger.info("Successfully connected to target database")
+            finally:
+                if test_connection:
+                    test_connection.close()
+            
             logger.info("Database is ready!")
             return
+            
         except OperationalError as oe:
             logger.exception(f"OperationalError: {oe}. Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
             time.sleep(delay)
         except Exception as e:
             logger.exception(f"An unexpected error occurred while waiting for the database: {e}")
-            raise  # Re-raise the exception to be handled by the parent
-            # ^^ should this be `raise e` instead?
+            raise
 
     # If the loop completes without a successful connection
     error_message = "Error: Database did not become available in time."
@@ -427,17 +489,25 @@ def serve_projects_from_filesystem(app, base_dir):
 
 
 # Create the app object at the module level
-app = create_flask_app()
-
-with app.app_context():
-    logger.info("Serving projects from database")
-    serve_projects_from_db(app)
-    logger.info("Starting - create_projects_from_filesystem")
-    serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+try:
+    app = create_flask_app()
+    
+    with app.app_context():
+        logger.info("Serving projects from database")
+        serve_projects_from_db(app)
+        logger.info("Starting - create_projects_from_filesystem")
+        serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+except Exception as e:
+    logger.exception(f"Error during app initialization: {e}")
+    app = None
 
 if __name__ == '__main__':
     logger.info("Inside main..")
     #wait_for_database()
     logging.basicConfig(level=logging.INFO)
+
+    if app is None:
+        logger.error("App initialization failed, cannot start server")
+        sys.exit(1)
 
     app.run(host='0.0.0.0', debug=False, port=5055)
