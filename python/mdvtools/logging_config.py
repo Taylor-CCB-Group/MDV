@@ -31,9 +31,6 @@ def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         # Add the handler to the logger
         logger.addHandler(console_handler)
         logger.setLevel(level)
-        
-        # Prevent propagation to avoid duplicate messages
-        logger.propagate = False
     
     return logger
 
