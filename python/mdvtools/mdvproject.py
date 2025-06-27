@@ -1825,36 +1825,6 @@ class MDVProject:
 
         return chart
 
-
-    def log_chat_item(self, output: Any, prompt_template: str, response: str, conversation_id: str):
-        """
-        Log a chat interaction to the chat log file.
-        
-        Args:
-            output: Result of invoke 'from langchain.chains import RetrievalQA'
-            prompt_template: The template used for the prompt
-            response: The response generated
-            conversation_id: ID to group messages from the same conversation
-        """
-        context_information = output['source_documents']
-        context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
-        context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-        context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
-
-        context = str(context_information_metadata_name)
-        query = output['query']
-
-        chat_item = ChatLogItem(
-            context=context,
-            query=query,
-            prompt_template=prompt_template,
-            response=response,
-            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
-            conversation_id=conversation_id
-        )
-        
-        self.chat_logger.log_chat(chat_item)
-
 def get_json(file):
     return json.loads(open(file).read())
 

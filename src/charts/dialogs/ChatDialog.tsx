@@ -24,6 +24,7 @@ import {
 import { useEffect, useMemo, useState, useRef } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 import { useResizeDrawer } from "@/react/hooks";
+import { Loader } from "@/react/components/ImportProjectDialog";
 
 export type ChatDialogProps = {
     open: boolean;
@@ -41,6 +42,7 @@ export type ChatDialogProps = {
     isPopout?: boolean;
     fullscreen?: boolean;
     isLoading?: boolean;
+    isLoadingInit?: boolean;
 };
 
 const ChatDialog = ({
@@ -59,6 +61,7 @@ const ChatDialog = ({
     isPopout,
     fullscreen = false,
     isLoading = false,
+    isLoadingInit,
 }: ChatDialogProps) => {
     const defaultDrawerWidth = 250;
     const minDrawerWidth = 180;
@@ -238,14 +241,17 @@ const ChatDialog = ({
                         </Drawer>
                     )}
                     <Box sx={{ flexGrow: 1, overflow: "hidden", pb: 2 }}>
-                        <Chatbot
-                            messages={messages}
-                            isSending={isSending}
-                            requestProgress={requestProgress}
-                            sendAPI={sendAPI}
-                            verboseProgress={verboseProgress}
-                            onClose={onClose}
-                        />
+                        {isLoadingInit ? 
+                            (<Loader />) : 
+                            (<Chatbot
+                                messages={messages}
+                                isSending={isSending}
+                                requestProgress={requestProgress}
+                                sendAPI={sendAPI}
+                                verboseProgress={verboseProgress}
+                                onClose={onClose}
+                            />)
+                            }
                     </Box>
                 </Box>
             </DialogContent>

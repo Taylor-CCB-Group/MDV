@@ -1,11 +1,27 @@
-from typing import Protocol, Any
+from typing import Callable, Optional, Protocol, Any, TypedDict
 from mdvtools.mdvproject import MDVProject
+
+class AskQuestionResult(TypedDict):
+    code: Optional[str]
+    view_name: Optional[str]
+    error: bool
+    message: str
+
 
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
     def log(self, msg: str, *args: Any) -> None: ...
-    def ask_question(self, question: str, id: str, conversation_id: str, room: str) -> str: ...
+    def ask_question(
+            self, 
+            question: str, 
+            id: str, 
+            conversation_id: str, 
+            room: str,
+            handle_error: Callable[[str], None],
+            ) -> AskQuestionResult: ...
     welcome: str
+    init_error: Optional[bool]
+    error_message: Optional[str]
 
 chat_enabled = False
 try:

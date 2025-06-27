@@ -27,6 +27,9 @@ class ChatLogItem:
     response: str
     timestamp: str
     conversation_id: Optional[str] = None
+    view_name: Optional[str] = None
+    error: Optional[bool] = None
+    
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -36,7 +39,9 @@ class ChatLogItem:
             "prompt_template": self.prompt_template,
             "response": self.response,
             "timestamp": self.timestamp,
-            "conversation_id": self.conversation_id
+            "conversation_id": self.conversation_id,
+            "view_name": self.view_name,
+            "error": self.error,
         }
 
     @classmethod
@@ -48,7 +53,9 @@ class ChatLogItem:
             prompt_template=data["prompt_template"],
             response=data["response"],
             timestamp=data["timestamp"],
-            conversation_id=data.get("conversation_id")
+            conversation_id=data.get("conversation_id"),
+            view_name=data.get("view_name"),
+            error=data.get("error"),
         )
 
 class ChatLogger:
@@ -271,3 +278,37 @@ class LangchainLoggingHandler(BaseCallbackHandler):
 
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
         self.log(f"Chain ended, outputs: {outputs}")
+
+def log_chat_item(project, question, output, prompt_template, response, conversation_id, view_name: str | None, error: bool = False):
+    """
+    Log a chat interaction to the chat log file.
+    Args:
+        project: The MDVProject instance (must have .chat_logger)
+        output: Result of invoke 'from langchain.chains import RetrievalQA' (can be None for errors)
+        prompt_template: The template used for the prompt (can be empty for errors)
+        response: The response generated (error message if error)
+        conversation_id: ID to group messages from the same conversation
+        error: Whether this log is for an error
+    """
+    if error or output is None:
+        context = "[]"
+        view_name = None
+        prompt_template = prompt_template or ""
+    else:
+        context_information = output['source_documents']
+        context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+        context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+        context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
+        context = str(context_information_metadata_name)
+
+    chat_item = ChatLogItem(
+        context=context,
+        query=question,
+        prompt_template=prompt_template,
+        response=response,
+        timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        conversation_id=conversation_id,
+        view_name=view_name,
+        error=error
+    )
+    project.chat_logger.log_chat(chat_item)
