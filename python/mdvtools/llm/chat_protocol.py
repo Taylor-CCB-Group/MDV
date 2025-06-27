@@ -1,6 +1,7 @@
 from typing import Callable, Optional, Protocol, Any, TypedDict
 from mdvtools.mdvproject import MDVProject
 
+
 class AskQuestionResult(TypedDict):
     code: Optional[str]
     view_name: Optional[str]
@@ -11,6 +12,7 @@ class AskQuestionResult(TypedDict):
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
     def log(self, msg: str, *args: Any) -> None: ...
+    
     def ask_question(
             self, 
             question: str, 

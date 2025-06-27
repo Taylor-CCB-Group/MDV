@@ -279,6 +279,7 @@ class LangchainLoggingHandler(BaseCallbackHandler):
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
         self.log(f"Chain ended, outputs: {outputs}")
 
+
 def log_chat_item(project, question, output, prompt_template, response, conversation_id, view_name: str | None, error: bool = False):
     """
     Log a chat interaction to the chat log file.
