@@ -153,6 +153,7 @@ const ChatDialog = ({
             >
                 <Box sx={{ display: "flex", height: "100%" }}>
                     {drawerOpen && (
+                        <>
                         <Drawer
                             open={drawerOpen}
                             variant="persistent"
@@ -223,22 +224,23 @@ const ChatDialog = ({
                                         ))
                                     )}
                                 </List>
-                                <Box
-                                    sx={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        right: 0,
-                                        width: 8,
-                                        height: '100%',
-                                        cursor: 'ew-resize',
-                                        zIndex: 10,
-                                        background: 'rgba(0,0,0,0.05)',
-                                        '&:hover': { background: 'rgba(0,0,0,0.15)' },
-                                    }}
-                                    onMouseDown={onMouseDown}
-                                />
                             </Box>
                         </Drawer>
+                        <Box
+                            sx={{
+                                // position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: 8,
+                                height: '100%',
+                                cursor: 'ew-resize',
+                                zIndex: 10,
+                                background: 'rgba(0,0,0,0.05)',
+                                '&:hover': { background: 'rgba(0,0,0,0.15)' },
+                            }}
+                            onMouseDown={onMouseDown}
+                        />
+                        </>
                     )}
                     <Box sx={{ flexGrow: 1, overflow: "hidden", pb: 2 }}>
                         {isLoadingInit ? 
