@@ -19,10 +19,11 @@ from mdvtools.websocket import mdv_socketio
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
 
-# Setup logging
-logger = logging.getLogger(__name__)
+# Setup logging using the centralized logging module
+from mdvtools.logging_config import get_logger
+logger = get_logger(__name__)
 
-#Read environment flag for authentication
+# Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
 oauth = None
@@ -504,7 +505,6 @@ except Exception as e:
 if __name__ == '__main__':
     logger.info("Inside main..")
     #wait_for_database()
-    logging.basicConfig(level=logging.INFO)
 
     if app is None:
         logger.error("App initialization failed, cannot start server")

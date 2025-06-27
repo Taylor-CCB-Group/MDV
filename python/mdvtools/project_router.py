@@ -7,10 +7,9 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import functools
 from typing import Protocol
+from mdvtools.logging_config import get_logger
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 """
 This should work as a drop-in replacement for `Blueprint` in the context
