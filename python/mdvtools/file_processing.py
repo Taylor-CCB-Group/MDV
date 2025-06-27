@@ -1,4 +1,6 @@
 import os
+import scanpy as sc
+from mdvtools.conversions import convert_scanpy_to_mdv
 
 def datasource_processing(project, filepath, original_filename, view, replace, supplied_only, resume=False):
     """
@@ -56,6 +58,39 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
     except Exception as e:
         print(f"Error in datasource_processing: {str(e)}")
         raise ValidationError(str(e), status_code=400)
+
+def anndata_processing(project, filepath, original_filename):
+    """
+    Process an AnnData file (.h5ad) for the project.
+    
+    Args:
+        project (Any): The project instance to which the AnnData will be added.
+        filepath (str): Path to the .h5ad file.
+        original_filename (str): Original name of the uploaded file.
+
+    Returns:
+        dict: A dictionary containing 'success' and message on success.
+        
+    Raises:
+        ValidationError: If any exception occurs during the processing, encapsulating
+                         the error message with a 400 status code.
+    """
+    print(f"Processing AnnData file: {original_filename}")
+    print(f"Filepath: {filepath}")
+
+    try:
+        # Read the AnnData file
+        anndata = sc.read(filepath)
+        
+        # Convert to MDV format
+        convert_scanpy_to_mdv(project.dir, anndata)
+        
+        result = {"success": True, "message": "AnnData processed successfully"}
+        return result
+        
+    except Exception as e:
+        print(f"Error in anndata_processing: {str(e)}")
+        raise ValidationError(str(e), status_code=400)
     
 class ValidationError(Exception):
     """
@@ -105,3 +140,24 @@ def validate_datasource(project, request_data):
     supplied_only = request_data.get("supplied_only", False) if "supplied_only" in request_data else False
     
     return {"name": name, "view": view, "replace": replace, "supplied_only": supplied_only}
+
+def validate_anndata(project, request_data):
+    """
+    Validates the incoming request data for an AnnData upload.
+
+    Ensures that the project is editable.
+
+    Args:
+        project (Any): Project instance containing state.
+        request_data (dict): Data from the client to validate.
+
+    Returns:
+        dict: Validated and normalized request parameters.
+
+    Raises:
+        ValidationError: If the project is read-only.
+    """
+    if "permission" not in project.state or project.state["permission"] != "edit":
+        raise ValidationError("Project is read-only")
+    
+    return {}
