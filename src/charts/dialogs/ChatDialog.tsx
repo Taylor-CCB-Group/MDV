@@ -13,15 +13,15 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import Chatbot, { type ChatBotProps } from "./ChatDialogComponent";
-import type { ChatLogItem, ChatMessage, ChatProgress, ConversationLog, ConversationMap } from "./ChatAPI";
+import Chatbot from "./ChatDialogComponent";
+import type { ChatMessage, ChatProgress, ConversationMap } from "./ChatAPI";
 import {
     Close as CloseIcon,
     Launch as LaunchIcon,
     Search as SearchIcon,
     ViewSidebar as ViewSidebarIcon,
 } from "@mui/icons-material";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 import { useResizeDrawer } from "@/react/hooks";
 import { Loader } from "@/react/components/ImportProjectDialog";

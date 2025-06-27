@@ -1,10 +1,10 @@
 import type React from "react";
-import { ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
-import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action, autorun } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType, FieldName, LoadedDataColumn, NumberDataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";

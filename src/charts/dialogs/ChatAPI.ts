@@ -2,7 +2,6 @@ import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from 'zod';
-import _ from 'lodash';
 import { useQuery } from '@tanstack/react-query';
 import { useChartManager, useViewManager } from "@/react/hooks";
 
