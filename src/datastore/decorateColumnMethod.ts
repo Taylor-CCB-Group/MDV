@@ -187,6 +187,9 @@ export class ColumnQueryMapper<T extends BaseConfig> {
         }
         if (!alreadyInSetQuery) {
             // Only store if userValue contains a RowsAsColsQuery (active link)
+            // it would be better to avoid chart-specific logic here 
+            // - and the selection dialog, as a react chart, should be able to avoid this monkey patching
+            // but the way it uses params would probably need more of a refactor to avoid this
             if (this.chart.config.type === 'selection_dialog') {
                 if (Array.isArray(userValue) && userValue.some(v => v instanceof RowsAsColsQuery)) {
                     this.userValues[methodName] = userValue;
