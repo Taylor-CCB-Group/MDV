@@ -281,11 +281,15 @@ class ProjectChat(ProjectChatProtocol):
     def ask_question(self, question: str, id: str, conversation_id: str, room: str, handle_error: Callable[[str], None]) -> AskQuestionResult:
         """
         Ask a question, generate code to answer it, execute the code...
+        If the question is "test error", we raise an error to test the error handling.
         """
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room)
         log = socket_api.log
         log(f"Asking question: {question}")
+
+        if question == "test error":
+            raise Exception("testing error response as requested")
         
         # Ensure we have a conversation_id
         if not conversation_id:

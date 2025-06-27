@@ -1,6 +1,7 @@
 from typing import Callable, Optional, Protocol, Any, TypedDict
 from mdvtools.mdvproject import MDVProject
 
+
 class AskQuestionResult(TypedDict):
     code: Optional[str]
     view_name: Optional[str]
@@ -11,6 +12,7 @@ class AskQuestionResult(TypedDict):
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
     def log(self, msg: str, *args: Any) -> None: ...
+
     def ask_question(
             self, 
             question: str, 
@@ -40,10 +42,13 @@ except Exception as e:
         def log(self, msg, *args):
             print("[dummy bot]: " + (msg % args if args else msg))
 
-        def ask_question(self, question, id, conversation_id, room):
-            return (
-                "Sorry, I can't help you right now\n\n"
-                f"{msg}"
+        def ask_question(self, question, id, conversation_id, room, handle_error):
+            handle_error(f"Sorry, I can't help you right now\n\n{msg}")
+            return AskQuestionResult(
+                code=None,
+                view_name=None,
+                error=True,
+                message=f"Sorry, I can't help you right now\n\n{msg}"
             )
 
 # Tell the type checker we’re exposing a ProjectChat conforming to the protocol

@@ -283,13 +283,17 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
     """
     Log a chat interaction to the chat log file.
     Args:
-        project: The MDVProject instance (must have .chat_logger)
+        project: The MDVProject instance
         output: Result of invoke 'from langchain.chains import RetrievalQA' (can be None for errors)
         prompt_template: The template used for the prompt (can be empty for errors)
         response: The response generated (error message if error)
         conversation_id: ID to group messages from the same conversation
         error: Whether this log is for an error
     """
+    # Create a ChatLogger instance for this project
+    chat_file = os.path.join(project.dir, "chat_log.json")
+    chat_logger = ChatLogger(chat_file)
+    
     if error or output is None:
         context = "[]"
         view_name = None
@@ -311,4 +315,4 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         view_name=view_name,
         error=error
     )
-    project.chat_logger.log_chat(chat_item)
+    chat_logger.log_chat(chat_item)
