@@ -1,10 +1,7 @@
-import logging
-import os  # Add os import for environment variables
+import os
+from mdvtools.logging_config import get_logger
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 def register_auth_routes(app):
 

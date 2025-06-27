@@ -1,9 +1,9 @@
 from flask import Flask
-import logging
 import os
+from mdvtools.logging_config import get_logger
 
 # Setup logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 logger.info("safe_mdv_app.py starting")
 
@@ -45,7 +45,6 @@ if __name__ == '__main__':
                 start_response('404 Not Found', headers)
                 return [response_body]
     
-    logging.basicConfig(level=logging.INFO)
     logger.info("running as __main__")
     os.environ['MDV_API_ROOT'] = '/test/'
 
