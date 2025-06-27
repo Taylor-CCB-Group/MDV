@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 from typing import Dict, Optional, Any, List
 
 from mdvtools.mdvproject import MDVProject
-from mdvtools.file_processing import datasource_processing, validate_datasource
+from mdvtools.file_processing import datasource_processing, validate_datasource, anndata_processing, validate_anndata
 
 # Upload configuration
 UPLOAD_TTL = timedelta(hours=24)
@@ -304,7 +304,9 @@ class FileUploadManager:
 
                 try:
                     response_data = {}
-                    if state.get('content_type') == "text/csv":
+                    content_type = state.get('content_type')
+                    
+                    if content_type == "text/csv":
                         with self.app.app_context():
                             result = datasource_processing(
                                 project, 
@@ -315,8 +317,17 @@ class FileUploadManager:
                                 state.get('supplied_only', False)
                             )
                         response_data = {'result': result}
+                    elif content_type == "application/x-hdf" or state['original_filename'].endswith('.h5ad'):
+                        # Process AnnData file
+                        with self.app.app_context():
+                            result = anndata_processing(
+                                project,
+                                state['data_filepath'],
+                                state['original_filename']
+                            )
+                        response_data = {'result': result}
                     else:
-                        response_data = {'warning': f'No processor for {state.get("content_type")}'}
+                        response_data = {'warning': f'No processor for {content_type}'}
                     
                     self._notify_client(sid, namespace, 'upload_success', {
                         'file_id': file_id,
@@ -438,6 +449,8 @@ class UploadSocketAPI:
                 content_type = data.get('content_type', 'application/octet-stream')
                 
                 extra_data = {}
+                
+                # Validation based on content type
                 if content_type == "text/csv":
                     try:
                         validation_params = {k: data.get(k) for k in ["name", "view", "replace", "supplied_only"]}
@@ -448,6 +461,19 @@ class UploadSocketAPI:
                     except Exception as val_err:
                         emit('upload_error', {
                             'file_id': file_id, 
+                            'message': f"Validation Error: {getattr(val_err, 'message', str(val_err))}"
+                        })
+                        return
+                elif content_type == "application/x-hdf" or filename.endswith('.h5ad'):
+                    # Validate AnnData file
+                    try:
+                        validation_params = {}  # No specific params needed for AnnData
+                        with self.upload_manager.app.app_context():
+                            validated_data = validate_anndata(self.project, validation_params)
+                        extra_data.update(validated_data)
+                    except Exception as val_err:
+                        emit('upload_error', {
+                            'file_id': file_id,
                             'message': f"Validation Error: {getattr(val_err, 'message', str(val_err))}"
                         })
                         return
