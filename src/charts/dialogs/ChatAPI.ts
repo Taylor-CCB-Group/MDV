@@ -2,9 +2,8 @@ import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from 'zod';
-import _ from 'lodash';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useChartManager } from "@/react/hooks";
+import { useQuery } from '@tanstack/react-query';
+import { useChartManager, useViewManager } from "@/react/hooks";
 
 const completedChatResponseSchema = z.object({
     message: z.string(),
@@ -13,6 +12,7 @@ const completedChatResponseSchema = z.object({
      */
     view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
     // timestamp: z.string(),
+    error: z.boolean().optional(),
 });
 
 const chatProgressSchema = z.object({
@@ -41,6 +41,8 @@ const chatLogItemSchema = z.object({
     //these fields are expected to always be present on actual 
     conversation_id: z.string().optional().nullable(),
     timestamp: z.string().optional(),
+    view_name: z.string().optional().nullable(),
+    error: z.boolean().optional(),
 });
 // this is possible - may consider it at some point.
 // .transform((data) => ({
@@ -58,6 +60,7 @@ export type ChatMessage = {
     sender: 'user' | 'bot' | 'system';
     id: string;
     conversationId: string;
+    error?: boolean;
 };
 
 
@@ -160,7 +163,7 @@ const createConversation = (
 // Create message pair
 const createMessagePair = (log: ChatLogItem, conversationId: string) => {
     const id = generateId();
-    const viewName = parseViewName(log.response);
+    const viewName = log?.view_name || parseViewName(log.response);
     
     const userMessage: ChatMessage = {
         conversationId,
@@ -173,8 +176,9 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
         conversationId,
         id,
         sender: 'bot',
-        text: `I ran some code for you:\n\n\`\`\`python\n${log.response}\n\`\`\``,
+        text: log.response,
         view: viewName,
+        error: log?.error,
     };
     
     return [userMessage, botMessage];
@@ -195,6 +199,7 @@ const useChat = () => {
     // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isSending, setIsSending] = useState<boolean>(false);
+    const [isLoadingInit, setIsLoadingInit] = useState<boolean>(false);
     const [currentRequestId, setCurrentRequestId] = useState<string>("");
     const [isInit, setIsInit] = useState<boolean>(false);
     const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
@@ -203,7 +208,10 @@ const useChat = () => {
     const [conversationId, setConversationId] = useState<string>(generateConversationId());
     const [conversationMap, setConversationMap] = useState<ConversationMap>({});
     const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
-    const queryClient = useQueryClient();
+    const socket = useMemo(() => {
+        if (!cm.ipc || !cm.ipc.socket) return null;
+        return cm.ipc.socket;
+    }, [cm.ipc]);
 
     // Use React Query to manage chat logs
     const { data: chatLogData = [], isLoading: isChatLogLoading, isSuccess } = useQuery({
@@ -214,18 +222,46 @@ const useChat = () => {
                 const parsedResponse = chatLogSchema.parse(response.data);
                 return parsedResponse;
             } catch (error) {
-                // console.error('Error parsing chat log', error);
                 return [];
             }
         },
         refetchInterval: 5000, // Refetch every 5 seconds
     });
 
+    // Update chatLog state
     useEffect(() => {
         if (chatLogData && isSuccess) {
             setChatLog(chatLogData);
         }
     }, [chatLogData, isSuccess]);
+
+    // Initialise conversation map
+    useEffect(() => {
+        if (chatLog.length > 0) {
+            const newConversationMap: ConversationMap = {};
+        
+            // Process each log entry
+            chatLog.forEach((log) => {
+                const conversationId = log.conversation_id || 'legacy';
+                const conversation = createConversation(newConversationMap, conversationId, log.query);
+                const messages = createMessagePair(log, conversationId);
+                
+                conversation.messages.push(...messages);
+                conversation.logLength++;
+            });
+            
+            setConversationMap(newConversationMap);
+        }
+    }, [chatLog]);
+
+    // Update messages when conversation id changes
+    // biome-ignore lint/correctness/useExhaustiveDependencies: We only need to change messages when conversationId changes, not everytime the conversationMap changes
+    useEffect(() => {
+        if (conversationMap && conversationMap[conversationId]?.messages?.length > 0) {
+            const newMessages: ChatMessage[] = conversationMap[conversationId]?.messages || [];
+            setMessages(newMessages);
+        }
+    }, [conversationId]);
 
     // Progress Listener
     const progressListener = useCallback((data: any) => {
@@ -254,34 +290,45 @@ const useChat = () => {
     const chatInit = useCallback(async () => {
         if (isSending || isInit || isChatLogLoading) return;
         
-        setIsSending(true);
         try {
+            setIsSending(true);
+            setIsLoadingInit(true);
             const id = generateId();
             setCurrentRequestId(id);
             //! todo - we might use socket here, in which case we need to have a different routeInit
             const response = await sendMessageHttp('', id, routeInit, conversationId);
             if (!response) return;
+            if (response?.error) throw response.message;
             // Only set initial message if we don't have any messages yet
             if (messages.length === 0) {
                 setMessages([{
                     text: response.message,
                     sender: 'system',
-                    id,
-                    conversationId
+                    id: generateId(),
+                    conversationId,
                 }]);
             }
-        } catch (error) {
-            console.error('Error sending welcome message', error);
+        } catch (error: any) {
+            const errorMessage =  error?.message ? 
+                error.message : 
+                (typeof error === "string" ? error : "ERROR: An unknown error occurred. Please try again later.")
+            console.error('Error sending welcome message: ', errorMessage);
+            if (messages.length === 0) {
+                setMessages([{
+                    text: errorMessage,
+                    sender: 'system',
+                    id: generateId(),
+                    conversationId,
+                    error: true,
+                }]);
+            }
+        } finally {
+            setIsSending(false);
+            setCurrentRequestId('');
+            setIsInit(true);
+            setIsLoadingInit(false);
         }
-        setIsSending(false);
-        setCurrentRequestId('');
-        setIsInit(true);
     }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading]);
-
-    const socket = useMemo(() => {
-        if (!cm.ipc || !cm.ipc.socket) return null;
-        return cm.ipc.socket;
-    }, [cm.ipc]);
 
     // Socket connection and Init chat
     useEffect(() => {
@@ -310,33 +357,8 @@ const useChat = () => {
             socket?.off(chatlogEvent, handleVerboseProgress);
         };
     }, [socket, progressListener, handleVerboseProgress, chatInit, isInit, isSending]);
-
-    // Initialise conversation map
-    useEffect(() => {
-        if (chatLog.length > 0) {
-            const newConversationMap: ConversationMap = {};
-        
-            // Process each log entry
-            chatLog.forEach((log) => {
-                const conversationId = log.conversation_id || 'legacy';
-                const conversation = createConversation(newConversationMap, conversationId, log.query);
-                const messages = createMessagePair(log, conversationId);
-                
-                conversation.messages.push(...messages);
-                conversation.logLength++;
-            });
-            
-            setConversationMap(newConversationMap);
-        }
-    }, [chatLog]);
-
-    useEffect(() => {
-        if (conversationMap[conversationId]?.messages?.length > 0) {
-            const newMessages: ChatMessage[] = conversationMap[conversationId]?.messages || [];
-            setMessages(newMessages);
-        }
-    }, [conversationId, conversationMap]);
     
+    // Send Message API
     const sendAPI = useCallback(async (input: string) => {
         if (!input.trim()) return;
         if (!socket) return;
@@ -354,29 +376,58 @@ const useChat = () => {
                 conversationId,
             }])
             
-            await sendMessageSocket(input, id, "", conversationId);
-            queryClient.invalidateQueries({ queryKey: ['chatLog'] });
-        } catch (error) {
-            // todo: update error handling logic, particularly for socket...
+            const response = await sendMessageSocket(input, id, "", conversationId);
+
+            if (response) {
+                const viewManager = useViewManager();
+                const allViews = viewManager.all_views;
+                // Add new view if it doesn't exist
+                const viewName = response?.view ?? parseViewName(response.message);
+                if (viewName && !allViews.includes(viewName)) {
+                    viewManager.setAllViews([...allViews, viewName])
+                }
+                setMessages(prev => [...prev, {
+                    text: response.message,
+                    sender: 'bot',
+                    id: generateId(),
+                    conversationId,
+                    view: response?.view,
+                }])
+            }
+        } catch (error: any) {
+            const errorMessage =  error?.message ? 
+                error.message : 
+                (typeof error === "string" ? error : "ERROR: An unknown error occurred. Please try again later.")
             setMessages(prev => [...prev, {
-                text: `ERROR: ${error}`,
+                text: errorMessage,
                 sender: 'bot',
                 id: generateId(),
-                conversationId
+                conversationId,
+                error: true,
             }]);
-            console.log("Error sending message: ", error);
+            console.error("Error sending message: ", errorMessage);
+        } finally {
+            // queryClient.invalidateQueries({ queryKey: ['chatLog'] });
+            setIsSending(false);
+            setCurrentRequestId('');
+            setRequestProgress(null);
         }
-        setCurrentRequestId('');
-        setRequestProgress(null);
-        setIsSending(false);
-    }, [conversationId, queryClient, socket]);
+    }, [conversationId, socket]);
 
+
+    // Start New Conversation
     const startNewConversation = useCallback(async () => {
         const newConversationId = generateConversationId();
-        setConversationId(newConversationId);
+        const id = generateId();
         try {
-            const response = await sendMessageSocket('', generateId(), routeInit, newConversationId);
+            setConversationId(newConversationId);
+            setIsLoadingInit(true);
+            setCurrentRequestId(id);
+            setIsSending(true);
+            const response = await sendMessageHttp('', id, routeInit, newConversationId);
             if (!response) return;
+
+            if (response?.error) throw response.message;
             // Only set initial message if we don't have any messages yet
             setMessages([{
                 text: response.message,
@@ -384,18 +435,26 @@ const useChat = () => {
                 id: generateId(),
                 conversationId: newConversationId
             }]);
-        } catch (error) {
-            // todo: update error handling logic
-            setMessages(prev => [...prev, {
-                text: `ERROR: ${error}`,
-                sender: 'bot',
+        } catch (error: any) {
+            const errorMessage =  error?.message ? 
+                error.message : 
+                (typeof error === "string" ? error : "ERROR: An unknown error occurred. Please try again later.")
+            setMessages([{
+                text: errorMessage,
+                sender: 'system',
                 id: generateId(),
                 conversationId: newConversationId,
+                error: true,
             }]);
-            console.log("Error starting new conversation: ", error);
+            console.error("Error starting new conversation: ", errorMessage);
+        } finally {
+            setIsLoadingInit(false);
+            setCurrentRequestId("");
+            setIsSending(false);
         }
     }, [routeInit]);
 
+    // Switch conversation
     const switchConversation = useCallback((id: string) => {
         console.log(`switching conversation to ${id}`);
         setCurrentRequestId("");
@@ -415,6 +474,7 @@ const useChat = () => {
         startNewConversation,
         switchConversation,
         conversationMap,
+        isLoadingInit,
     };
 };
 

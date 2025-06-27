@@ -1,10 +1,10 @@
 import type React from "react";
-import { ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
-import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action, autorun } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType, FieldName, LoadedDataColumn, NumberDataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
@@ -560,3 +560,55 @@ export const usePasteHandler = <T, V = T>({
     }, [multiple, getLabel, options, setValue, getValue, currentValue]);
 };
 
+/**
+ * Hook that provides the resize logic for a drawer
+ */
+export const useResizeDrawer = (
+    dialogRef: React.RefObject<HTMLDivElement>, 
+    defaultDrawerWidth: number, 
+    minDrawerWidth: number, 
+    maxDrawerWidth: number
+) => {
+    
+    const [drawerWidth, setDrawerWidth] = useState(defaultDrawerWidth);
+    const [resizing, setResizing] = useState(false);
+    const initialMouseX = useRef(0);
+    const initialDrawerWidth = useRef(defaultDrawerWidth);
+
+    // Calculate the new width of the drawer when resizing
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        const offset = e.clientX - initialMouseX.current;
+        const newWidth = Math.max(minDrawerWidth, Math.min(initialDrawerWidth.current + offset, maxDrawerWidth));
+        setDrawerWidth(newWidth);
+    }, [maxDrawerWidth, minDrawerWidth]);
+
+    // Setting resize to false after releasing the mouse
+    const handleMouseUp = useCallback(() => {
+        setResizing(false);
+    }, []);
+
+    // Store the initial width and clientX and setResizing to true
+    const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        setResizing(true);
+        initialMouseX.current = e.clientX;
+        initialDrawerWidth.current = drawerWidth;
+    }, [drawerWidth]);
+
+    useEffect(() => {
+        // Use the owner document if it exists (valid when the dialog is popped out)
+        const doc = dialogRef.current?.ownerDocument ?? document;
+
+        if (!resizing) return;
+        
+        doc.addEventListener("mousemove", handleMouseMove);
+        doc.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            doc.removeEventListener("mousemove", handleMouseMove);
+            doc.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [resizing, dialogRef.current, handleMouseMove, handleMouseUp]);
+
+    return {
+        drawerWidth, onMouseDown
+    }
+};

@@ -1,7 +1,7 @@
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { observer } from "mobx-react-lite";
-import { createContext, useContext, useId } from "react";
+import { createContext, useContext } from "react";
 import type { createMdvPortal } from "./react_utils";
 import createCache, { type EmotionCache } from "@emotion/cache";
 import { CacheProvider } from "@emotion/react";

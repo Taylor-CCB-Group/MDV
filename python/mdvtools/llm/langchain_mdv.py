@@ -2,9 +2,10 @@ import time
 import logging
 from contextlib import contextmanager
 import os
+from typing import Callable
 
 # Code Generation using Retrieval Augmented Generation + LangChain
-from mdvtools.llm.chat_protocol import ProjectChatProtocol
+from mdvtools.llm.chat_protocol import AskQuestionResult, ProjectChatProtocol
 from mdvtools.mdvproject import MDVProject
 
 from langchain_openai import ChatOpenAI
@@ -17,7 +18,7 @@ from langchain.text_splitter import Language
 # from langchain.prompts import PromptTemplate
 
 from dotenv import load_dotenv
-from mdvtools.llm.chatlog import ChatSocketAPI
+from mdvtools.llm.chatlog import ChatSocketAPI, LangchainLoggingHandler, log_chat_item
 
 # packages for custom langchain agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -26,7 +27,7 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG_copy, prompt_data
-from .code_manipulation import prepare_code
+from .code_manipulation import parse_view_name, prepare_code
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
@@ -187,13 +188,13 @@ class ProjectChat(ProjectChatProtocol):
             else:
                 self.df_list = [self.project.get_datasource_as_dataframe(self.project.datasources[0]['name'])]
 
-            self.init_error = None
+            self.init_error = False
         except Exception as e:
-            # raise ValueError(f"An error occurred while trying to create the agent: {e[:500]}")
-            self.log(f"An error occurred while trying to create the agent: {str(e)[:500]}")
+            error_message = f"{str(e)[:500]}"
+            self.log(error_message)
             
-            self.welcome = str(e)
-            self.init_error = e
+            self.error_message = error_message
+            self.init_error = True
 
     def get_or_create_memory(self, conversation_id: str):
         """Get or create conversation memory for a specific conversation"""
@@ -277,14 +278,18 @@ class ProjectChat(ProjectChatProtocol):
 
         return agent_with_contextualization
 
-    def ask_question(self, question: str, id: str, conversation_id: str, room: str):
+    def ask_question(self, question: str, id: str, conversation_id: str, room: str, handle_error: Callable[[str], None]) -> AskQuestionResult:
         """
         Ask a question, generate code to answer it, execute the code...
+        If the question is "test error", we raise an error to test the error handling.
         """
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room)
         log = socket_api.log
         log(f"Asking question: {question}")
+
+        if question == "test error":
+            raise Exception("testing error response as requested")
         
         # Ensure we have a conversation_id
         if not conversation_id:
@@ -328,7 +333,7 @@ class ProjectChat(ProjectChatProtocol):
             ok, strdout, stderr = execute_code(
                 'import mdvtools\nprint("mdvtools import ok")'
             )
-            return f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}"
+            return {"code": f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}", "view_name": None, "error": False, "message": "Success"}
         
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
             socket_api.update_chat_progress(
@@ -337,11 +342,10 @@ class ProjectChat(ProjectChatProtocol):
             log(f"Asking the LLM: '{question}'")
             if self.init_error:
                 socket_api.update_chat_progress(
-                    f"Agent initialisation error: {str(self.init_error)}", id, 100, 0
+                    f"Agent initialisation error: {str(self.error_message)}", id, 100, 0
                 )
-                return f"The agent had an error during initialisation: \n\n{str(self.init_error)[:500]}"
+                raise Exception(f"{str(self.error_message)[:500]}")
             logger.info(f"Question asked by user: {question}")
-        
         try:
             with time_block("b10b: Pandas agent invoking"):  # ~31.4% of time
                 socket_api.update_chat_progress(
@@ -414,10 +418,7 @@ class ProjectChat(ProjectChatProtocol):
 
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
-            with time_block("b14: Chat logging by MDV"):  # <0.1% of time
-                self.project.log_chat_item(output_qa, prompt_RAG, final_code, conversation_id)
-            
-            with time_block("b15: Execute code"):  # ~9% of time
+            with time_block("b14: Execute code"):  # ~9% of time
                 socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9
                 )
@@ -430,16 +431,30 @@ class ProjectChat(ProjectChatProtocol):
                 chat_debug_logger.info(f"Code Execution STDERR:\n{stderr}")
 
             if not ok:
-                return f"# Error: code execution failed\n> {stderr}"
-            else:
-                log(final_code)
+                # Log code execution error
+                raise Exception(f"Code execution failed: \n{stderr}")
+            
+            with time_block("b15: Parse view name"):
+                # Parse view name from the code
+                view_name = parse_view_name(final_code)
+                if view_name is None:
+                    raise Exception("Parsing view name failed")
+                log(f"view_name: {view_name}")
+                
+            with time_block("b16: Log chat item"):
+                final_code_updated = f"I ran some code for you:\n\n```python\n{final_code}\n```"
+                # Log successful code execution
+                log_chat_item(self.project, question, output_qa, prompt_RAG, final_code_updated, conversation_id, view_name)
+                log(final_code_updated)
                 socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return f"I ran some code for you:\n\n```python\n{final_code}\n```"
+                return {"code": final_code_updated, "view_name": view_name, "error": False, "message": "Success"}
         except Exception as e:
+            # Log general error
             socket_api.update_chat_progress(
                 f"Error: {str(e)[:500]}", id, 100, 0
             )
-            return f"Error: {str(e)[:500]}"
+            handle_error(f"ERROR: {str(e)[:500]}")
+            return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {str(e)[:500]}"}
