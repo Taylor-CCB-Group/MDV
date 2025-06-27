@@ -1,4 +1,4 @@
-from typing import Optional, Protocol, cast
+from typing import Optional, Protocol
 from mdvtools.llm.chat_protocol import (
   ProjectChat,
   ProjectChatProtocol, 
@@ -8,7 +8,11 @@ from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 # from mdvtools.dbutils.config import config
-from flask import Flask, request, session, current_app
+from flask import Flask, request
+from mdvtools.logging_config import get_logger
+
+logger = get_logger(__name__)
+logger.info("chat server extension loading...")
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -92,7 +96,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     # final_code is probably an error message, at this point.
                     return {"message": final_code}
             except Exception as e:
-                print(e)
+                logger.error(f"Error in chat: {e}")
                 return {"message": str(e)}
     
     def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
