@@ -3,8 +3,8 @@ import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from 'zod';
 import _ from 'lodash';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useChartManager } from "@/react/hooks";
+import { useQuery } from '@tanstack/react-query';
+import { useChartManager, useViewManager } from "@/react/hooks";
 
 const completedChatResponseSchema = z.object({
     message: z.string(),
@@ -380,6 +380,13 @@ const useChat = () => {
             const response = await sendMessageSocket(input, id, "", conversationId);
 
             if (response) {
+                const viewManager = useViewManager();
+                const allViews = viewManager.all_views;
+                // Add new view if it doesn't exist
+                const viewName = response?.view ?? parseViewName(response.message);
+                if (viewName && !allViews.includes(viewName)) {
+                    viewManager.setAllViews([...allViews, viewName])
+                }
                 setMessages(prev => [...prev, {
                     text: response.message,
                     sender: 'bot',

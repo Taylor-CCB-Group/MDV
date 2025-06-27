@@ -1,6 +1,6 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
-import useChat, { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
+import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
@@ -9,12 +9,7 @@ import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
 import { Box, Button, Divider, TextField } from '@mui/material';
-import { useChartManager } from '@/react/hooks';
-import { fetchJsonConfig } from '@/dataloaders/DataLoaderUtil';
-import { useProject } from '@/modules/ProjectContext';
-import type { DataSource } from '../charts';
 import _ from 'lodash';
-import ErrorDisplay from './DebugErrorComponent';
 
 
 /**
