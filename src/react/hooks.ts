@@ -12,6 +12,7 @@ import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/util
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
+import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
 
 
 /**
@@ -194,6 +195,56 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
         });
     }, [chart.config.param, columnIndex, chart.dataStore]);
     return columns;
+}
+
+/**
+ * version of {@link useParamColumns} which returns a sorted column array based on config.order
+ */
+export function useOrderedParamColumns(): LoadedDataColumn<DataType>[] {
+    const chart = useChart();
+    const { columnIndex } = chart.dataStore;
+    const config = useConfig<SelectionDialogConfig>();
+    const [orderedParams, setOrderedParams] = useState<LoadedDataColumn<DataType>[]>([]);
+
+    useEffect(() => {
+        const disposer = autorun(() => {
+            const param = config.param;
+            if (!isArray(param)) throw "config.param should always be an array";
+            const cm = window.mdv.chartManager;
+            const dsName = chart.dataStore.name;
+            if (!param || param.length === 0) {
+                setOrderedParams([]);
+                return;
+            }
+            const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
+            cm.loadColumnSet(renderedParam, dsName, () => {
+                // Get the loaded columns
+                const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
+                if (!allColumnsLoaded(cols)) throw "bad column state";
+                
+                // Sort the columns based on config.order if it exists
+                const orderMap = config.order;
+                if (orderMap) {
+                    const sortedCols = [...cols].sort((a, b) => {
+                        const orderA = orderMap[a.field];
+                        const orderB = orderMap[b.field];
+                        const valA = orderA === undefined ? Number.MAX_SAFE_INTEGER : orderA;
+                        const valB = orderB === undefined ? Number.MAX_SAFE_INTEGER : orderB;
+                        return valA - valB;
+                    });
+                    setOrderedParams(sortedCols);
+                } else {
+                    setOrderedParams(cols);
+                }
+            });
+            return;
+        });
+
+        // Cleanup the disposer
+        return () => disposer();
+    }, [config.param, config.order, columnIndex, chart.dataStore]);
+
+    return orderedParams;
 }
 
 
