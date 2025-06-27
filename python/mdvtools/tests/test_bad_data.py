@@ -2,8 +2,9 @@ import pandas as pd
 from mdvtools.mdvproject import MDVProject
 import os
 import json
+import pytest
 
-
+@pytest.mark.filterwarnings("ignore:Failed to add column")
 def test_bad_data():
     """
     Test what happens with NaN, Infinity...
