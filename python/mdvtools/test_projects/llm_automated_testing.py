@@ -27,9 +27,9 @@ from dotenv import load_dotenv
 
 from mdvtools.llm.local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from mdvtools.llm.templates import get_createproject_prompt_RAG, prompt_data
-from mdvtools.llm.code_manipulation import prepare_code
+from mdvtools.llm.code_manipulation import parse_view_name, prepare_code
 from mdvtools.llm.code_execution import execute_code
-from mdvtools.llm.chatlog import LangchainLoggingHandler
+from mdvtools.llm.chatlog import LangchainLoggingHandler, log_chat_item
 
 import matplotlib
 
@@ -200,8 +200,6 @@ for question in question_list:
 
         final_code = prepare_code(result, df, projectMK, log, modify_existing_project=True, view_name=question)
 
-        # we need to update this so we don't have the method on the project object
-        projectMK.log_chat_item(output, prompt_RAG, final_code, conversation_id="test")
 
         ok, stdout, stderr = execute_code(final_code, open_code=False, log=log)
         final_code_list.append(final_code)
@@ -212,6 +210,11 @@ for question in question_list:
             print(f"# Error: code execution failed\n> {stderr}")
         else:
             print(final_code)
+            # we need to update this so we don't have the method on the project object
+            view_name = parse_view_name(final_code)
+            if view_name is None:
+                raise Exception("Parsing view name failed")
+            log_chat_item(projectMK, question, output, prompt_RAG, final_code, conversation_id="test", view_name=view_name)
 
             # we want to know the view_name to navigate to as well... for now we do that in the calling code
             #return f"I ran some code for you:\n\n```python\n{final_code}```"

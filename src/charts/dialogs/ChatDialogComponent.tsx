@@ -1,5 +1,5 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
-import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen } from 'lucide-react';
+import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
 import useChat, { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
@@ -60,24 +60,33 @@ import ErrorDisplay from './DebugErrorComponent';
 // }
 
 
-const Message = ({ text, sender, view, onClose }: ChatMessage & {onClose: () => void}) => {
+const Message = ({ text, sender, view, onClose, error }: ChatMessage & {onClose: () => void}) => {
     const isUser = sender === 'user';
     const pythonSections = extractPythonSections(text);
     try {
         text = JSON.parse(text);
     } catch (e) {
     }
+
+    const messageStyle = isUser ? 
+        'bg-teal-200 self-end dark:bg-teal-900' :
+        (error ?
+            'bg-slate-200 dark:bg-slate-800 self-start text-red-500 border border-red-900':
+            'bg-slate-200 dark:bg-slate-800 self-start'
+        )
+    
+    const messageIcon = error ?
+            <CircleAlert color='red' /> :
+            isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />;
     // todo: handle the scenario when view doesn't exist
     // const isError = sender === 'bot' && !view;
     return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
-        <div className='selectable'>
-            {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
-            <div className={`mb-2 p-4 rounded-lg ${
-                isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
-                }`}>
+        <div className='selectable mt-4'>
+            <div>{messageIcon}</div>
+            <div className={`mb-2 p-4 rounded-lg ${messageStyle}`}>
                 {/* <JsonView src={text} /> */}
-                {/* {isError ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />} */}
-                <MessageMarkdown text={text} />
+                {/* {error ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />}  */}
+                <div><MessageMarkdown text={text} /></div>
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />

@@ -27,7 +27,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
-const Loader = () => {
+export const Loader = () => {
     return (
         <Box
             sx={{

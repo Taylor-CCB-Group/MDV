@@ -4,12 +4,12 @@ from mdvtools.llm.chat_protocol import (
   ProjectChatProtocol, 
   chat_enabled
 )
-from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
-# from mdvtools.dbutils.config import config
 from flask import Flask, request
 from flask_socketio import join_room, leave_room
+
+from mdvtools.llm.chatlog import log_chat_item
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -66,7 +66,16 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         def chat_init():
             nonlocal bot
             if bot is None:
-                bot = ProjectChat(project)
+                try:
+                    bot = ProjectChat(project)
+                except Exception as e:
+                    print(f"ERROR: {str(e)[:500]}")
+                    return {"message": f"ERROR: {str(e)[:500]}", "error": True}
+            if bot.init_error:
+                # Log and return the error
+                error_msg = bot.error_message or "An unknown error occurred"
+                bot.log(f"ERROR: {error_msg}")
+                return {"message": f"ERROR: {error_msg}", "error": True}
             return {"message": bot.welcome}
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
@@ -83,6 +92,8 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 #! todo - frontend should handle this, and show an error message to the user.
                 # also, this method may be augmented so that it also logs to the chat log,
                 # and pass this handler to the bot.ask_question method.
+                # Log error to chat_log.json
+                log_chat_item(project, message or '', None, '', error, conversation_id, None, error=True)
                 socketio.emit(
                     "chat_error",
                     {"message": error},
@@ -100,25 +111,31 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     bot = ProjectChat(project)
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
-                final_code = bot.ask_question(message, id, conversation_id, room)
-                try:
-                    # this can give a confusing error if we don't explicitly catch it...
-                    view_name = parse_view_name(final_code)
-                    if view_name is None:
-                        raise Exception(final_code)
-                    # bot.log(f"view_name: {view_name}")
-                    socketio.emit("chat_response", {"message": final_code, "view": view_name, "id": id}, namespace=f"/project/{project.id}", to=room)
-                except Exception as e:
-                    # we should add whatever logging is relevant in handle_error
-                    # bot.log(f"final_code returned by bot.ask_question is bad, probably an earlier error: {e}")
-                    handle_error(str(e))
-                    # final_code is probably an error message, at this point.
-                    return
-                finally:
+                result = bot.ask_question(message, id, conversation_id, room, handle_error)
+
+                if result["error"]:
+                    socketio.emit(
+                        "chat_error", 
+                        {"message": result["message"], "error": True, "id": id}, 
+                        namespace=f"/project/{project.id}", 
+                        to=room
+                    )
                     leave_room(room)
+                    return
+                else:
+                    socketio.emit(
+                        "chat_response", 
+                        {"message": result["code"], "view": result["view_name"], "id": id}, 
+                        namespace=f"/project/{project.id}", 
+                        to=room
+                    )
+                    leave_room(room)
+                    return
+
             except Exception as e:
-                print(e)
-                handle_error(str(e))
+                # Log error to chat_log.json
+                print(f"ERROR: {str(e)[:500]}")
+                handle_error(f"ERROR: {str(e)[:500]}")
                 leave_room(room)
                 return
     
