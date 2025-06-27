@@ -286,6 +286,9 @@ class ProjectChat(ProjectChatProtocol):
         socket_api = ChatSocketAPI(self.project, id, room)
         log = socket_api.log
         log(f"Asking question: {question}")
+
+        if question == "test error":
+            raise Exception("testing error response as requested")
         
         # Ensure we have a conversation_id
         if not conversation_id:
