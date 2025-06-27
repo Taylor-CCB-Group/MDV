@@ -10,7 +10,9 @@ logger.info("safe_mdv_app.py starting")
 # Import the app at the module level (outside any conditionals)
 try:
     from mdvtools.dbutils.mdv_server_app import app
-    logger.info("imported mdv_app at module level")
+    if app is None:
+        logger.error("app from mdv_server_app is None - using fallback")
+        app = Flask(__name__)
 except Exception as e:
     logger.exception(f'Error importing mdv_app: {e}')
     app = Flask(__name__)

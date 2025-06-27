@@ -71,7 +71,8 @@ def create_flask_app(config_name=None):
         logger.info("Creating tables")
         with app.app_context():
             logger.info("Waiting for DB to set up")
-            wait_for_database(app)
+            if config_name != 'test':
+                wait_for_database(app)
             if not tables_exist():
                 logger.info("Creating database tables")
                 db.create_all()
@@ -148,6 +149,17 @@ def wait_for_database(app):
         os.getenv('DB_HOST')
     )
     
+    # Construct target URI once since environment variables don't change
+    target_uri = 'postgresql://{}:{}@{}/{}'.format(
+        os.getenv('DB_USER'),
+        os.getenv('DB_PASSWORD'),
+        os.getenv('DB_HOST'),
+        db_name
+    )
+    
+    # Update the database URI in the app config (this is the same as the initial URI from load_config)
+    app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
+    
     for attempt in range(max_retries):
         try:
             # First connect to postgres database
@@ -177,18 +189,9 @@ def wait_for_database(app):
                     connection.close()
             finally:
                 engine.dispose()
-            # Now try to connect to our target database
-            target_uri = 'postgresql://{}:{}@{}/{}'.format(
-                os.getenv('DB_USER'),
-                os.getenv('DB_PASSWORD'),
-                os.getenv('DB_HOST'),
-                db_name
-            )
-            
-            # Update the database URI in the app config
-            app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
             
             # Test the connection to our target database
+            # The engine should already be valid since the URI hasn't changed
             test_connection = None
             try:
                 test_connection = db.engine.connect()
@@ -485,17 +488,25 @@ def serve_projects_from_filesystem(app, base_dir):
 
 
 # Create the app object at the module level
-app = create_flask_app()
-
-with app.app_context():
-    logger.info("Serving projects from database")
-    serve_projects_from_db(app)
-    logger.info("Starting - create_projects_from_filesystem")
-    serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+try:
+    app = create_flask_app()
+    
+    with app.app_context():
+        logger.info("Serving projects from database")
+        serve_projects_from_db(app)
+        logger.info("Starting - create_projects_from_filesystem")
+        serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+except Exception as e:
+    logger.exception(f"Error during app initialization: {e}")
+    app = None
 
 if __name__ == '__main__':
     logger.info("Inside main..")
     #wait_for_database()
     logging.basicConfig(level=logging.INFO)
+
+    if app is None:
+        logger.error("App initialization failed, cannot start server")
+        exit(1)
 
     app.run(host='0.0.0.0', debug=False, port=5055)
