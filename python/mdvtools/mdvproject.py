@@ -26,7 +26,6 @@ import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
-from mdvtools.llm.chatlog import ChatLogger, ChatLogItem
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -79,7 +78,6 @@ class MDVProject:
         self.viewsfile = join(dir, "views.json")
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
-        self.chatfile = join(dir, "chat_log.json")
         if not exists(dir):
             os.mkdir(dir)
         if not exists(self.trackfolder):
@@ -94,7 +92,6 @@ class MDVProject:
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": []}))
-        self.chat_logger = ChatLogger(self.chatfile)
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
 
