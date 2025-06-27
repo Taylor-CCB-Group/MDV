@@ -28,11 +28,13 @@ def retry_with_exponential_backoff(func):
     """ Decorator to implement retry logic with exponential backoff."""
     def wrapper(*args, **kwargs):
         retry_count = 0
+        last_exception = None
         while retry_count < MAX_RETRIES:
             try:
                 return func(*args, **kwargs)
             except RateLimitError as e:
                 retry_count += 1
+                last_exception = e
                 if retry_count == MAX_RETRIES:
                     raise e
                 
@@ -42,6 +44,9 @@ def retry_with_exponential_backoff(func):
                 time.sleep(delay)
             except Exception as e:
                 raise e
+        # If we got here, we've tried MAX_RETRIES times and failed.
+        if last_exception:
+            raise last_exception
     return wrapper
 
 class Auth0Provider(AuthProvider):
