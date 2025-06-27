@@ -1,4 +1,4 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, useParamColumnsExperimental, usePasteHandler } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
@@ -12,7 +12,7 @@ import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
-import { action, autorun, runInAction } from "mobx";
+import { action, runInAction } from "mobx";
 import { useChart, useDataStore } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
@@ -22,7 +22,7 @@ import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
-import { isArray, matchString, parseDelimitedString } from "@/lib/utils";
+import { isArray } from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import {
     DndContext,
