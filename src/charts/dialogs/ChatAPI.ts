@@ -205,6 +205,7 @@ const useChat = () => {
     const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
     const [verboseProgress, setVerboseProgress] = useState([""]);
     const cm = useChartManager();
+    const viewManager = useViewManager();
     const [conversationId, setConversationId] = useState<string>(generateConversationId());
     const [conversationMap, setConversationMap] = useState<ConversationMap>({});
     const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
@@ -379,7 +380,6 @@ const useChat = () => {
             const response = await sendMessageSocket(input, id, "", conversationId);
 
             if (response) {
-                const viewManager = useViewManager();
                 const allViews = viewManager.all_views;
                 // Add new view if it doesn't exist
                 const viewName = response?.view ?? parseViewName(response.message);
@@ -412,7 +412,7 @@ const useChat = () => {
             setCurrentRequestId('');
             setRequestProgress(null);
         }
-    }, [conversationId, socket]);
+    }, [conversationId, socket, viewManager]);
 
 
     // Start New Conversation
