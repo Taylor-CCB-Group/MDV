@@ -8,8 +8,10 @@ This test verifies that categorical columns are properly converted and preserved
 which always returned False because `data` is a pandas Series, not a dtype object.
 
 `is_categorical_dtype(data)` properly detects categorical Series - but is deprecated for some reason
-and the documentation suggested using `isinstance(data, pandas.CategoricalDtype)` instead.
+and the documentation suggested using `isinstance(dtype, pandas.CategoricalDtype)` instead.
 https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_categorical_dtype.html
+
+The problem was that it was checking `data` rather than `data.dtype`.
 
 There may be scenarios in which the original `data.dtype == "category"` approach would fail,
 perhaps not likely in practice, but this test aims to cover all edge cases and verify that the
