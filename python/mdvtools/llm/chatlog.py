@@ -249,6 +249,8 @@ def log_chat(output: Any, prompt_template: str, response: str):
     context_information = output['source_documents']#output['context']
     context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
     context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+    # NOTE: Maria had added this in MDVProject.log_chat_item, need to review how it relates to refactored code.
+    # context_information_metadata_name = [s for s in context_information_metadata_url]#[s[82:] for s in context_information_metadata_url]
 
     if file is not None:
         try:

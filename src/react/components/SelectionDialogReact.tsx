@@ -16,6 +16,7 @@ export type SelectionDialogConfig = {
     type: "selection_dialog";
     noClearFilters?:boolean;
     filters: Record<string, SelectionDialogFilter | null>;
+    order?: Record<string, number>;
 } & BaseConfig;
 
 class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
@@ -27,6 +28,10 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 //@ts-expect-error MultiColumnQuery cannot be used as index
                 config.filters[col] = null;
             }
+        }
+
+        if (!config.order) {
+            config.order = {};
         }
         //for legacy configs, if left undefined makeAutoObservable will 
         // not work correctly.

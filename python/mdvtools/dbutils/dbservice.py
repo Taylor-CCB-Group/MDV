@@ -4,11 +4,9 @@ from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
 from typing import Optional
-import logging
+from mdvtools.logging_config import get_logger
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class ProjectService:
     # list of tuples containing failed project IDs and associated error messages/exceptions

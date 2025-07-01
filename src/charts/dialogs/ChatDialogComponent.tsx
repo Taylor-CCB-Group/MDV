@@ -285,9 +285,9 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
                 <Box ref={messagesEndRef} />
             </Box>
-            <Box className='absolute opacity-10 pointer-events-none right-0'>
+             {/*<Box className='absolute opacity-10 pointer-events-none right-0'>
                 <RobotPandaSVG />
-            </Box>
+            </Box> */}
             <Divider />
             <Box className="flex p-4 w-full">
                 <TextField

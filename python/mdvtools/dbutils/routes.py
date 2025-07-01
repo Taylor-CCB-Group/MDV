@@ -1,8 +1,5 @@
-import logging
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from mdvtools.logging_config import get_logger
+logger = get_logger(__name__)
 
 def register_routes(app, ENABLE_AUTH):
     from flask import abort, request, jsonify, session, redirect, url_for, render_template, send_file
@@ -270,7 +267,7 @@ def register_routes(app, ENABLE_AUTH):
                     project_file.save(temp_file_path)
 
                     with zipfile.ZipFile(temp_file_path, 'r') as zip_file:
-                        # Reject entries with absolute paths or “..”
+                        # Reject entries with absolute paths or ".."
                         for file in zip_file.infolist():
                             if file.filename.startswith('/') or '..' in file.filename:
                                 logger.error(f"In register_routes /import_project: Unsafe zip entry {file.filename}")

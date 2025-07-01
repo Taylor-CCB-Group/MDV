@@ -1,9 +1,8 @@
-import logging
 from flask import session, request,redirect, current_app, has_request_context
+from mdvtools.logging_config import get_logger
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # in_memory_cache.py
 user_cache = {}  # key: auth_id -> user details

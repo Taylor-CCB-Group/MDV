@@ -159,7 +159,7 @@ class MDVProject:
         df = pandas.DataFrame()
         for c in ds["columns"]:
             data = self.get_column(datasource, c["field"])
-            df[c["name"]] = data
+            df[c["field"]] = data
         return df
 
     def check_columns_exist(self, datasource, columns):

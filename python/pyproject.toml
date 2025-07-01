@@ -44,7 +44,7 @@ ruff = "^0.3.7"
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-pyright = "^1.1.358"
+pyright = "^1.1.402"
 pytest = "^8.1.1"
 ome-types = "^0.5.0"
 jupyterlab = "^4.1.8"

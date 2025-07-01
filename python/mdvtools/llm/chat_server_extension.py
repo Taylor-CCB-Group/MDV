@@ -1,4 +1,4 @@
-from typing import Optional, Protocol, cast
+from typing import Optional, Protocol
 from mdvtools.llm.chat_protocol import (
   ProjectChat,
   ProjectChatProtocol, 
@@ -6,10 +6,15 @@ from mdvtools.llm.chat_protocol import (
 )
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
+# from mdvtools.dbutils.config import config
 from flask import Flask, request
 from flask_socketio import join_room, leave_room
-
+from mdvtools.logging_config import get_logger
 from mdvtools.llm.chatlog import log_chat_item
+
+logger = get_logger(__name__)
+logger.info("chat server extension loading...")
+
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -134,7 +139,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
             except Exception as e:
                 # Log error to chat_log.json
-                print(f"ERROR: {str(e)[:500]}")
+                # print(f"ERROR: {str(e)[:500]}")
                 handle_error(f"ERROR: {str(e)[:500]}")
                 leave_room(room)
                 return
