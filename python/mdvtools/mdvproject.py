@@ -1903,8 +1903,10 @@ def add_column_to_group(
     ):
         #in pandas missing values are represented by NaN
         #which cause problems when co-ercing into text, therefore replace with ND
-        if isinstance(data, pandas.CategoricalDtype):
-            data = data.cat.add_categories("ND")
+        if hasattr(data, 'cat') and hasattr(data.cat, 'categories'):
+            # Handle pandas Categorical data
+            if "ND" not in data.cat.categories:
+                data = data.cat.add_categories("ND")
             data = data.fillna("ND")
         #no boolean datatype in MDV at the moment, have to co-erce to text
         elif is_bool_dtype(data):
