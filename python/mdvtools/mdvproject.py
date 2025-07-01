@@ -26,7 +26,6 @@ import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
-from mdvtools.llm.chat_types import ChatLogger, ChatLogItem
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -79,7 +78,6 @@ class MDVProject:
         self.viewsfile = join(dir, "views.json")
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
-        self.chatfile = join(dir, "chat_log.json")
         if not exists(dir):
             os.mkdir(dir)
         if not exists(self.trackfolder):
@@ -94,7 +92,6 @@ class MDVProject:
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": []}))
-        self.chat_logger = ChatLogger(self.chatfile)
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
 
@@ -116,6 +113,7 @@ class MDVProject:
 
     @property
     def state(self):
+        # check this - seeing errors in the logs?
         return get_json(self.statefile)
 
     @state.setter
@@ -1823,36 +1821,6 @@ class MDVProject:
             chart["background_image"] = r_info["images"][background_image]
 
         return chart
-
-
-    def log_chat_item(self, output: Any, prompt_template: str, response: str, conversation_id: str):
-        """
-        Log a chat interaction to the chat log file.
-        
-        Args:
-            output: Result of invoke 'from langchain.chains import RetrievalQA'
-            prompt_template: The template used for the prompt
-            response: The response generated
-            conversation_id: ID to group messages from the same conversation
-        """
-        context_information = output['source_documents']
-        context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
-        context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-        context_information_metadata_name = [s for s in context_information_metadata_url]#[s[82:] for s in context_information_metadata_url]
-
-        context = str(context_information_metadata_name)
-        query = output['query']
-
-        chat_item = ChatLogItem(
-            context=context,
-            query=query,
-            prompt_template=prompt_template,
-            response=response,
-            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
-            conversation_id=conversation_id
-        )
-        
-        self.chat_logger.log_chat(chat_item)
 
 def get_json(file):
     return json.loads(open(file).read())

@@ -13,16 +13,18 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import Chatbot, { type ChatBotProps } from "./ChatDialogComponent";
-import type { ChatLogItem, ChatMessage, ChatProgress, ConversationLog, ConversationMap } from "./ChatAPI";
+import Chatbot from "./ChatDialogComponent";
+import type { ChatMessage, ChatProgress, ConversationMap } from "./ChatAPI";
 import {
     Close as CloseIcon,
     Launch as LaunchIcon,
     Search as SearchIcon,
     ViewSidebar as ViewSidebarIcon,
 } from "@mui/icons-material";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
+import { useResizeDrawer } from "@/react/hooks";
+import { Loader } from "@/react/components/ImportProjectDialog";
 
 export type ChatDialogProps = {
     open: boolean;
@@ -40,6 +42,7 @@ export type ChatDialogProps = {
     isPopout?: boolean;
     fullscreen?: boolean;
     isLoading?: boolean;
+    isLoadingInit?: boolean;
 };
 
 const ChatDialog = ({
@@ -58,9 +61,23 @@ const ChatDialog = ({
     isPopout,
     fullscreen = false,
     isLoading = false,
+    isLoadingInit,
 }: ChatDialogProps) => {
+    const defaultDrawerWidth = 250;
+    const minDrawerWidth = 180;
+    const maxDrawerWidth = fullscreen ? 1000 : 600;
     const [drawerOpen, setDrawerOpen] = useState(true);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState("")
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const { 
+        drawerWidth,
+        onMouseDown,
+    } = useResizeDrawer(
+        dialogRef, 
+        defaultDrawerWidth, 
+        minDrawerWidth, 
+        maxDrawerWidth
+    );
 
     const filteredLog = useMemo(() => {
         const filteredConversations: ConversationMap = {};
@@ -84,6 +101,7 @@ const ChatDialog = ({
             maxWidth={"lg"}
             fullScreen={fullscreen}
             disablePortal={isPopout}
+            ref={dialogRef}
         >
             <DialogTitle sx={{ px: 0, bgcolor: "var(--fade_background_color)" }}>
                 <Box
@@ -135,6 +153,7 @@ const ChatDialog = ({
             >
                 <Box sx={{ display: "flex", height: "100%" }}>
                     {drawerOpen && (
+                        <>
                         <Drawer
                             open={drawerOpen}
                             variant="persistent"
@@ -143,14 +162,17 @@ const ChatDialog = ({
                                 sx: {
                                     position: "relative",
                                     bgcolor: "unset",
+                                    width: drawerWidth,
+                                    minWidth: minDrawerWidth,
+                                    maxWidth: maxDrawerWidth,
                                 },
                             }}
                             sx={{
-                                width: 250,
+                                width: drawerWidth,
                                 height: "100%",
                             }}
                         >
-                            <Box>
+                            <Box sx={{ position: 'relative', height: '100%' }}>
                                 <Box sx={{ mt: 2, px: 1 }}>
                                     <Button variant="contained" fullWidth onClick={startNewConversation}>
                                         New Chat
@@ -202,18 +224,50 @@ const ChatDialog = ({
                                         ))
                                     )}
                                 </List>
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        right: 0,
+                                        width: 8,
+                                        height: '100%',
+                                        cursor: 'ew-resize',
+                                        zIndex: 10,
+                                        background: 'rgba(0,0,0,0.05)',
+                                        '&:hover': { background: 'rgba(0,0,0,0.15)' },
+                                    }}
+                                    onMouseDown={onMouseDown}
+                                />
                             </Box>
                         </Drawer>
+                        <Box
+                            sx={{
+                                // position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: 8,
+                                height: '100%',
+                                cursor: 'ew-resize',
+                                zIndex: 10,
+                                background: 'rgba(0,0,0,0.05)',
+                                '&:hover': { background: 'rgba(0,0,0,0.15)' },
+                            }}
+                            onMouseDown={onMouseDown}
+                        />
+                        </>
                     )}
                     <Box sx={{ flexGrow: 1, overflow: "hidden", pb: 2 }}>
-                        <Chatbot
-                            messages={messages}
-                            isSending={isSending}
-                            requestProgress={requestProgress}
-                            sendAPI={sendAPI}
-                            verboseProgress={verboseProgress}
-                            onClose={onClose}
-                        />
+                        {isLoadingInit ? 
+                            (<Loader />) : 
+                            (<Chatbot
+                                messages={messages}
+                                isSending={isSending}
+                                requestProgress={requestProgress}
+                                sendAPI={sendAPI}
+                                verboseProgress={verboseProgress}
+                                onClose={onClose}
+                            />)
+                            }
                     </Box>
                 </Box>
             </DialogContent>
