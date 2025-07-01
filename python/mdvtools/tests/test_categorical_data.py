@@ -13,11 +13,8 @@ https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_categorical_dty
 
 The problem was that it was checking `data` rather than `data.dtype`.
 
-There may be scenarios in which the original `data.dtype == "category"` approach would fail,
-perhaps not likely in practice, but this test aims to cover all edge cases and verify that the
-current implementation is robust and any regressions are caught.
-
-This has mostly been written in Cursor - rather more verbose than it needs to be.
+The test_category_detection_edge_cases() function demonstrates the issue where df.dtype == "category" would fail
+with an AttributeError because DataFrames don't have a dtype attribute, but Series do.
 
 Note that apparently `data = data.fillna("ND")` could also go wrong if the `ND` category is not added to the categories first.
 So we also include tests to justify the assertion that this could have caused hypothetical problems before.
