@@ -1,5 +1,6 @@
 from typing import Optional, Protocol
 from mdvtools.llm.chat_protocol import (
+  ChatRequest,
   ProjectChat,
   ProjectChatProtocol, 
   chat_enabled
@@ -110,13 +111,20 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 leave_room(room)
                 return
             conversation_id = data.get("conversation_id")
+            chat_request = ChatRequest(
+                message=message,
+                id=id,
+                conversation_id=conversation_id,
+                room=room,
+                handle_error=handle_error
+            )
             try:
                 if bot is None:
                     # todo - allow this to be freed at some point if we're not using it anymore.
                     bot = ProjectChat(project)
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
-                result = bot.ask_question(message, id, conversation_id, room, handle_error)
+                result = bot.ask_question(chat_request)
 
                 if result["error"]:
                     socketio.emit(
