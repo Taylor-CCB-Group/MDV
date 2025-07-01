@@ -5,6 +5,8 @@ import os
 import json
 from pathlib import Path
 import logging
+from mdvtools.logging_config import get_logger
+
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -12,11 +14,16 @@ from langchain_core.messages import BaseMessage
 from langchain_core.outputs import LLMResult
 
 from dataclasses import dataclass
-from mdvtools.websocket import log
+# from mdvtools.websocket import log
 from flask_socketio import SocketIO
 
 if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
+
+
+# all getting a bit messy and confusing in here - will likely be further refactored
+logger = get_logger(__name__)
+log = logger.info
 
 @dataclass
 class ChatLogItem:
@@ -241,25 +248,6 @@ try:
 except Exception as e:
     print(f"Error checking log file exists: {e}")
 
-def log_chat(output: Any, prompt_template: str, response: str):
-    """
-    output: result of invoke 'from langchain.chains import RetrievalQA'
-    """
-    print("Logging to json file...")
-    context_information = output['source_documents']#output['context']
-    context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
-    context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-    # NOTE: Maria had added this in MDVProject.log_chat_item, need to review how it relates to refactored code.
-    # context_information_metadata_name = [s for s in context_information_metadata_url]#[s[82:] for s in context_information_metadata_url]
-
-    if file is not None:
-        try:
-            log_to_json(context_information_metadata_url, output['query'], prompt_template, response)#output['input'], prompt_template, response)
-        except Exception as e:
-            print(f"Error logging to json file: {e}")
-    else:
-        print("Json file does not exist. Skipping logging...")
-
 class LangchainLoggingHandler(BaseCallbackHandler):
     def __init__(self, logger: logging.Logger):
         self.logger = logger
@@ -304,7 +292,7 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         context_information = output['source_documents']
         context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
         context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-        context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
+        context_information_metadata_name = [s for s in context_information_metadata_url]
         context = str(context_information_metadata_name)
 
     chat_item = ChatLogItem(
