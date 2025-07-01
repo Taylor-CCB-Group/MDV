@@ -14,11 +14,17 @@ https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_categorical_dty
 There may be scenarios in which the original `data.dtype == "category"` approach would fail,
 perhaps not likely in practice, but this test aims to cover all edge cases and verify that the
 current implementation is robust and any regressions are caught.
+
+This has mostly been written in Cursor - rather more verbose than it needs to be.
+
+Note that apparently `data = data.fillna("ND")` could also go wrong if the `ND` category is not added to the categories first.
+So we also include tests to justify the assertion that this could have caused hypothetical problems before.
 """
 
 import os
 import tempfile
 import shutil
+import warnings
 import pandas as pd
 import numpy as np
 import scanpy as sc
@@ -48,7 +54,7 @@ def create_test_anndata():
         'is_mitochondrial': pd.Categorical(['Yes', 'No'] * 12 + ['No'])  # 25 elements
     })
     
-    # Create expression matrix
+    # Expression matrix
     X = np.random.negative_binomial(5, 0.3, (n_cells, n_genes))
     
     return sc.AnnData(X=X, obs=obs_data, var=var_data)
@@ -60,8 +66,10 @@ def test_categorical_data_conversion():
     test_project_dir = tempfile.mkdtemp()
     
     try:
-        # Convert to MDV format
-        mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
+        # Convert to MDV format - suppress expected AnnData warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Transforming to str index", category=UserWarning)
+            mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
         
         # Basic assertions
         assert isinstance(mdv, MDVProject)
@@ -170,8 +178,10 @@ def test_categorical_missing_values():
     test_project_dir = tempfile.mkdtemp()
     
     try:
-        # Convert to MDV format - this should work without errors
-        mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
+        # Convert to MDV format - suppress expected AnnData warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Transforming to str index", category=UserWarning)
+            mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
         
         # Verify the conversion succeeded
         assert isinstance(mdv, MDVProject)
@@ -271,6 +281,157 @@ def test_categorical_missing_values_edge_cases():
     assert len(s3) == 0
 
 
+def test_boolean_dtype_handling():
+    """Test that boolean dtype data is handled correctly without category issues."""
+    # Create test data with boolean columns
+    n_cells = 20
+    
+    # Use object dtype to allow NaN values in boolean columns
+    obs_data = pd.DataFrame({
+        'is_high_quality': pd.Series([True, False, True, False, True] * 4, dtype='object'),
+        'is_doublet': pd.Series([False, True, False, False, True] * 4, dtype='object'),
+        'has_mitochondrial_genes': pd.Series([True, True, False, True, False] * 4, dtype='object'),
+        'quality_score': np.random.normal(0, 1, n_cells)  # numeric column
+    })
+    
+    # Introduce missing values in boolean columns
+    obs_data.loc[2, 'is_high_quality'] = np.nan
+    obs_data.loc[5, 'is_doublet'] = np.nan
+    obs_data.loc[8, 'has_mitochondrial_genes'] = np.nan
+    
+    # Create gene data with boolean columns
+    var_data = pd.DataFrame({
+        'is_mitochondrial': pd.Series([False, False, True, False, False] * 5, dtype='object'),
+        'is_ribosomal': pd.Series([True, False, False, True, False] * 5, dtype='object'),
+        'is_highly_variable': pd.Series([True, False, True, False, True] * 5, dtype='object'),
+        'mean_expression': np.random.exponential(1, 25)  # numeric column
+    })
+    
+    # Introduce missing values in gene boolean columns
+    var_data.loc[3, 'is_mitochondrial'] = np.nan
+    var_data.loc[7, 'is_ribosomal'] = np.nan
+    var_data.loc[10, 'is_highly_variable'] = np.nan  # Add missing value to this column too
+    
+    # Create expression matrix
+    X = np.random.negative_binomial(5, 0.3, (n_cells, 25))
+    
+    # Create AnnData object
+    adata = sc.AnnData(X=X, obs=obs_data, var=var_data)
+    
+    test_project_dir = tempfile.mkdtemp()
+    
+    try:
+        # Convert to MDV format - suppress expected AnnData warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Transforming to str index", category=UserWarning)
+            mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
+        
+        # Verify the conversion succeeded
+        assert isinstance(mdv, MDVProject)
+        assert "cells" in mdv.get_datasource_names()
+        assert "genes" in mdv.get_datasource_names()
+        
+        # Get datasource metadata
+        cell_datasource = mdv.get_datasource_metadata("cells")
+        gene_datasource = mdv.get_datasource_metadata("genes")
+        
+        # Check that boolean columns are handled correctly
+        cell_columns = {col['field']: col for col in cell_datasource['columns']}
+        gene_columns = {col['field']: col for col in gene_datasource['columns']}
+        
+        # Test boolean columns in cells
+        boolean_cell_cols = ['is_high_quality', 'is_doublet', 'has_mitochondrial_genes']
+        for col_name in boolean_cell_cols:
+            assert col_name in cell_columns
+            col_meta = cell_columns[col_name]
+            assert col_meta['datatype'] in ['text', 'text16']
+            assert 'values' in col_meta and len(col_meta['values']) > 0
+            # Check that boolean values are properly converted to strings
+            assert "True" in col_meta['values'], f"'True' should be in values for {col_name}"
+            assert "False" in col_meta['values'], f"'False' should be in values for {col_name}"
+            # Check that "ND" is included for missing values
+            assert "ND" in col_meta['values'], f"'ND' should be in values for {col_name}"
+        
+        # Test boolean columns in genes
+        boolean_gene_cols = ['is_mitochondrial', 'is_ribosomal', 'is_highly_variable']
+        for col_name in boolean_gene_cols:
+            assert col_name in gene_columns
+            col_meta = gene_columns[col_name]
+            assert col_meta['datatype'] in ['text', 'text16']
+            assert 'values' in col_meta and len(col_meta['values']) > 0
+            # Check that boolean values are properly converted to strings
+            assert "True" in col_meta['values'], f"'True' should be in values for {col_name}"
+            assert "False" in col_meta['values'], f"'False' should be in values for {col_name}"
+            # Check that "ND" is included for missing values
+            assert "ND" in col_meta['values'], f"'ND' should be in values for {col_name}"
+        
+        # Test data retrieval and verify boolean values are properly handled
+        for col_name in boolean_cell_cols:
+            retrieved_data = mdv.get_column("cells", col_name)
+            assert len(retrieved_data) == n_cells
+            assert all(isinstance(val, str) for val in retrieved_data)
+            
+            # Check that boolean values are properly converted
+            assert "True" in retrieved_data, f"'True' should be present in retrieved data for {col_name}"
+            assert "False" in retrieved_data, f"'False' should be present in retrieved data for {col_name}"
+            assert "ND" in retrieved_data, f"'ND' should be present in retrieved data for {col_name}"
+            
+            # Verify the conversion logic works correctly
+            true_count = sum(1 for val in retrieved_data if val == "True")
+            false_count = sum(1 for val in retrieved_data if val == "False")
+            nd_count = sum(1 for val in retrieved_data if val == "ND")
+            
+            # Should have some of each type
+            assert true_count > 0, f"Should have some 'True' values in {col_name}"
+            assert false_count > 0, f"Should have some 'False' values in {col_name}"
+            assert nd_count > 0, f"Should have some 'ND' values in {col_name}"
+        
+    finally:
+        if os.path.exists(test_project_dir):
+            shutil.rmtree(test_project_dir)
+
+
+def test_boolean_dtype_edge_cases():
+    """Test edge cases for boolean dtype handling."""
+    # Test case 1: Boolean series with missing values (using object dtype)
+    s = pd.Series([True, False, True, np.nan, False], dtype='object')
+    
+    # The current implementation should handle this correctly
+    # by converting to strings and handling NaN as "ND"
+    result = s.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+    
+    # Verify the result
+    assert result[0] == "True"
+    assert result[1] == "False"
+    assert result[2] == "True"
+    assert result[3] == "ND"
+    assert result[4] == "False"
+    
+    # Test case 2: All missing boolean values
+    s2 = pd.Series([np.nan, np.nan, np.nan], dtype='object')
+    result2 = s2.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+    
+    # Verify the result
+    assert all(val == "ND" for val in result2)
+    
+    # Test case 3: Empty boolean series
+    s3 = pd.Series([], dtype='object')
+    result3 = s3.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+    
+    # Verify the result
+    assert len(result3) == 0
+    
+    # Test case 4: Pure boolean series (no missing values)
+    s4 = pd.Series([True, False, True, False], dtype='bool')
+    result4 = s4.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+    
+    # Verify the result
+    assert result4[0] == "True"
+    assert result4[1] == "False"
+    assert result4[2] == "True"
+    assert result4[3] == "False"
+
+
 def test_categorical_missing_values_conversion_integration():
     """Test that the missing value handling works in the full conversion pipeline."""
     # Create a minimal test case that would fail without the add_categories logic
@@ -305,8 +466,10 @@ def test_categorical_missing_values_conversion_integration():
     test_project_dir = tempfile.mkdtemp()
     
     try:
-        # This conversion should succeed without errors
-        mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
+        # This conversion should succeed without errors - suppress expected AnnData warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Transforming to str index", category=UserWarning)
+            mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
         
         # Verify conversion succeeded
         assert isinstance(mdv, MDVProject)
