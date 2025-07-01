@@ -95,7 +95,7 @@ class ChatLogger:
             with open(self.log_file_path, 'w') as f:
                 json.dump(logs, f, indent=4)
         except Exception as e:
-            print(f"Error logging chat: {e}")
+            logging.error(f"Error logging chat: {e}")
 
     def get_logs(self) -> List[ChatLogItem]:
         """Get all chat logs"""
@@ -105,7 +105,7 @@ class ChatLogger:
                 logs = json.load(f)
             return [ChatLogItem.from_dict(log) for log in logs]
         except Exception as e:
-            print(f"Error reading chat logs: {e}")
+            logging.error(f"Error reading chat logs: {e}")
             return []
 
     def get_conversation_logs(self, conversation_id: str) -> List[ChatLogItem]:
@@ -246,7 +246,7 @@ def log_to_json(context, prompt, prompt_template, response):
 try:
     file = Path(json_keyfile_path).exists()
 except Exception as e:
-    print(f"Error checking log file exists: {e}")
+    logging.error(f"Error checking log file exists: {e}")
 
 class LangchainLoggingHandler(BaseCallbackHandler):
     def __init__(self, logger: logging.Logger):
