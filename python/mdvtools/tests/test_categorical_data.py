@@ -11,10 +11,11 @@ which always returned False because `data` is a pandas Series, not a dtype objec
 and the documentation suggested using `isinstance(dtype, pandas.CategoricalDtype)` instead.
 https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_categorical_dtype.html
 
-The problem was that it was checking `data` rather than `data.dtype`.
+The basic problem that caused the regression was checking `data` rather than `data.dtype`.
 
-The test_category_detection_edge_cases() function demonstrates the issue where df.dtype == "category" would fail
-with an AttributeError because DataFrames don't have a dtype attribute, but Series do.
+The motivation for the change was a type error which was caused by a pre-existing problem with the type annotation allowing for `DataFrame`.
+The type of `data` passed to `add_column_to_group` should indeed always be a `Series` - but internally `add_annotations` didn't have enough
+information to infer this. We now assert that internally.
 
 Note that apparently `data = data.fillna("ND")` could also go wrong if the `ND` category is not added to the categories first.
 So we also include tests to justify the assertion that this could have caused hypothetical problems before.
@@ -134,7 +135,9 @@ def test_categorical_data_conversion():
 
 
 def test_category_detection_edge_cases():
-    """Test the original problem: DataFrame vs Series dtype access."""
+    """Test the original problem: DataFrame vs Series dtype access.
+    Note that this wasn't really a problem - the annotation should have been a Series.
+    """
     # This demonstrates the original bug: DataFrame has no dtype attribute
     df = pd.DataFrame({'a': pd.Series(['A', 'B', 'C'], dtype='category')})
     with pytest.raises(AttributeError):
@@ -146,6 +149,74 @@ def test_category_detection_edge_cases():
     
     # Current implementation should work
     assert hasattr(s, 'cat') and hasattr(s.cat, 'categories')
+
+
+def test_add_annotations_series_type_assertion():
+    """Test that add_annotations properly asserts Series type for individual columns."""
+    # Create a minimal MDV project
+    with temp_mdv_project() as test_dir:
+        mdv = MDVProject(test_dir, delete_existing=True)
+        
+        # Create a simple datasource first
+        df = pd.DataFrame({
+            'id': range(5),
+            'value': [1, 2, 3, 4, 5]
+        })
+        mdv.add_datasource("test", df)
+        
+        # Test that passing a DataFrame with proper structure works
+        # The method expects a DataFrame with an index column and annotation columns
+        annotation_df = pd.DataFrame({
+            'id': [0, 1, 2, 3, 4],  # This should match the 'id' column in the datasource
+            'annotation': ['A', 'B', 'C', 'D', 'E']
+        })
+        
+        # This should work without raising an AssertionError
+        mdv.add_annotations("test", annotation_df)
+        
+        # Verify the annotation was added
+        metadata = mdv.get_datasource_metadata("test")
+        columns = {col['field']: col for col in metadata['columns']}
+        assert 'annotation' in columns, "Annotation column should be added"
+        
+        # Test that the data can be retrieved
+        annotation_data = mdv.get_column("test", "annotation")
+        assert len(annotation_data) == 5
+        assert annotation_data[0] == 'A'
+        assert annotation_data[1] == 'B'
+
+
+def test_add_annotations_missing_values():
+    """Test that add_annotations handles missing values correctly with the Series assert."""
+    # Create a minimal MDV project
+    with temp_mdv_project() as test_dir:
+        mdv = MDVProject(test_dir, delete_existing=True)
+        
+        # Create a datasource with more rows than the annotation data
+        df = pd.DataFrame({
+            'id': range(10),  # 10 rows
+            'value': list(range(10))
+        })
+        mdv.add_datasource("test", df)
+        
+        # Create annotation data with only some of the IDs (missing some)
+        annotation_df = pd.DataFrame({
+            'id': [0, 2, 4, 6, 8],  # Only even IDs
+            'annotation': ['A', 'B', 'C', 'D', 'E']
+        })
+        
+        # This should work and use the missing_value for IDs not in the annotation data
+        mdv.add_annotations("test", annotation_df, missing_value="MISSING")
+        
+        # Verify the annotation was added
+        annotation_data = mdv.get_column("test", "annotation")
+        assert len(annotation_data) == 10
+        
+        # Check that existing IDs get their values, missing ones get the default
+        assert annotation_data[0] == 'A'  # ID 0 exists
+        assert annotation_data[1] == 'MISSING'  # ID 1 missing
+        assert annotation_data[2] == 'B'  # ID 2 exists
+        assert annotation_data[3] == 'MISSING'  # ID 3 missing
 
 
 def test_categorical_missing_values():
