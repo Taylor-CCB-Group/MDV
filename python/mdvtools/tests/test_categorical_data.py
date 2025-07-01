@@ -48,7 +48,7 @@ def create_test_anndata():
         'is_mitochondrial': pd.Categorical(['Yes', 'No'] * 12 + ['No'])  # 25 elements
     })
     
-    # Expression matrix
+    # Create expression matrix
     X = np.random.negative_binomial(5, 0.3, (n_cells, n_genes))
     
     return sc.AnnData(X=X, obs=obs_data, var=var_data)
@@ -129,6 +129,212 @@ def test_category_detection_edge_cases():
     
     # Test current implementation is robust
     assert hasattr(s, 'cat') and hasattr(s.cat, 'categories')
+
+
+def test_categorical_missing_values():
+    """Test that categorical data with missing values is handled correctly."""
+    # Create test data with missing values
+    n_cells = 20
+    
+    # Test case 1: Categorical data with NaN values
+    obs_data = pd.DataFrame({
+        'cell_type': pd.Categorical(['T-cell', 'B-cell', 'NK-cell', 'T-cell', 'B-cell'] * 4),
+        'condition': pd.Categorical(['Control', 'Treatment', 'Control', 'Treatment', 'Control'] * 4),
+        'quality_score': np.random.normal(0, 1, n_cells),
+        'is_high_quality': pd.Categorical(['Yes', 'No', 'Yes', 'No', 'Yes'] * 4)
+    })
+    
+    # Introduce missing values
+    obs_data.loc[2, 'cell_type'] = np.nan
+    obs_data.loc[5, 'condition'] = np.nan
+    obs_data.loc[8, 'is_high_quality'] = np.nan
+    
+    # Create gene data with missing values
+    var_data = pd.DataFrame({
+        'gene_type': pd.Categorical(['protein_coding', 'lncRNA', 'pseudogene'] * 8 + ['miRNA']),
+        'chromosome': pd.Categorical(['chr1', 'chr2', 'chrX'] * 8 + ['chrY']),
+        'mean_expression': np.random.exponential(1, 25),
+        'is_mitochondrial': pd.Categorical(['Yes', 'No'] * 12 + ['No'])
+    })
+    
+    # Introduce missing values in gene data
+    var_data.loc[3, 'gene_type'] = np.nan
+    var_data.loc[7, 'chromosome'] = np.nan
+    
+    # Create expression matrix
+    X = np.random.negative_binomial(5, 0.3, (n_cells, 25))
+    
+    # Create AnnData object
+    adata = sc.AnnData(X=X, obs=obs_data, var=var_data)
+    
+    test_project_dir = tempfile.mkdtemp()
+    
+    try:
+        # Convert to MDV format - this should work without errors
+        mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
+        
+        # Verify the conversion succeeded
+        assert isinstance(mdv, MDVProject)
+        assert "cells" in mdv.get_datasource_names()
+        assert "genes" in mdv.get_datasource_names()
+        
+        # Get datasource metadata
+        cell_datasource = mdv.get_datasource_metadata("cells")
+        gene_datasource = mdv.get_datasource_metadata("genes")
+        
+        # Check that categorical columns with missing values are handled
+        cell_columns = {col['field']: col for col in cell_datasource['columns']}
+        gene_columns = {col['field']: col for col in gene_datasource['columns']}
+        
+        # Test that "ND" is in the values list for columns with missing data
+        categorical_cell_cols_with_missing = ['cell_type', 'condition', 'is_high_quality']
+        for col_name in categorical_cell_cols_with_missing:
+            assert col_name in cell_columns
+            col_meta = cell_columns[col_name]
+            assert col_meta['datatype'] in ['text', 'text16']
+            assert 'values' in col_meta and len(col_meta['values']) > 0
+            # Check that "ND" is included in the values (for missing data handling)
+            assert "ND" in col_meta['values'], f"'ND' should be in values for {col_name}"
+        
+        # Test that "ND" is in the values list for gene columns with missing data
+        categorical_gene_cols_with_missing = ['gene_type', 'chromosome']
+        for col_name in categorical_gene_cols_with_missing:
+            assert col_name in gene_columns
+            col_meta = gene_columns[col_name]
+            assert col_meta['datatype'] in ['text', 'text16']
+            assert 'values' in col_meta and len(col_meta['values']) > 0
+            # Check that "ND" is included in the values (for missing data handling)
+            assert "ND" in col_meta['values'], f"'ND' should be in values for {col_name}"
+        
+        # Test data retrieval and verify missing values are properly handled
+        for col_name in categorical_cell_cols_with_missing:
+            retrieved_data = mdv.get_column("cells", col_name)
+            assert len(retrieved_data) == n_cells
+            assert all(isinstance(val, str) for val in retrieved_data)
+            
+            # Check that "ND" values are present in the retrieved data
+            assert "ND" in retrieved_data, f"'ND' should be present in retrieved data for {col_name}"
+            
+            # Check that original values are preserved
+            original_unique = set(adata.obs[col_name].cat.categories)
+            retrieved_unique = set(retrieved_data)
+            assert original_unique.issubset(retrieved_unique)
+        
+    finally:
+        if os.path.exists(test_project_dir):
+            shutil.rmtree(test_project_dir)
+
+
+def test_categorical_missing_values_edge_cases():
+    """Test edge cases for categorical missing value handling."""
+    # Test case 1: Verify that fillna("ND") fails without add_categories("ND")
+    s = pd.Series(['A', 'B', 'C', np.nan, 'A'], dtype='category')
+    
+    # This should raise a TypeError because "ND" is not in the categories
+    with pytest.raises(TypeError, match="Cannot setitem on a Categorical with a new category"):
+        s.fillna("ND")
+    
+    # This should work (simulating the current implementation)
+    if "ND" not in s.cat.categories:
+        s = s.cat.add_categories("ND")
+    s = s.fillna("ND")
+    
+    # Verify the result
+    assert "ND" in s.cat.categories
+    assert s.isna().sum() == 0  # No more NaN values
+    assert (s == "ND").sum() == 1  # One "ND" value
+    
+    # Test case 2: All missing values
+    s2 = pd.Series([np.nan, np.nan, np.nan], dtype='category')
+    
+    # This should also fail without add_categories
+    with pytest.raises(TypeError, match="Cannot setitem on a Categorical with a new category"):
+        s2.fillna("ND")
+    
+    # This should work
+    if "ND" not in s2.cat.categories:
+        s2 = s2.cat.add_categories("ND")
+    s2 = s2.fillna("ND")
+    
+    # Verify the result
+    assert "ND" in s2.cat.categories
+    assert s2.isna().sum() == 0
+    assert (s2 == "ND").sum() == 3  # All values are "ND"
+    
+    # Test case 3: Empty categorical with missing values
+    s3 = pd.Series([], dtype='category')
+    s3 = s3.cat.add_categories("ND")
+    s3 = s3.fillna("ND")
+    
+    # Verify the result
+    assert "ND" in s3.cat.categories
+    assert len(s3) == 0
+
+
+def test_categorical_missing_values_conversion_integration():
+    """Test that the missing value handling works in the full conversion pipeline."""
+    # Create a minimal test case that would fail without the add_categories logic
+    n_cells = 10
+    
+    # Create data with missing values in categorical columns
+    obs_data = pd.DataFrame({
+        'cell_type': pd.Categorical(['T-cell', 'B-cell', 'NK-cell', 'T-cell', 'B-cell'] * 2),
+        'condition': pd.Categorical(['Control', 'Treatment'] * 5)
+    })
+    
+    # Introduce missing values
+    obs_data.loc[2, 'cell_type'] = np.nan
+    obs_data.loc[5, 'condition'] = np.nan
+    
+    # Create minimal gene data
+    var_data = pd.DataFrame({
+        'gene_type': pd.Categorical(['protein_coding', 'lncRNA', 'pseudogene', 'miRNA', 'protein_coding'] * 5),
+        'chromosome': pd.Categorical(['chr1', 'chr2', 'chrX', 'chrY', 'chr1'] * 5)
+    })
+    
+    # Introduce missing values in gene data
+    var_data.loc[3, 'gene_type'] = np.nan
+    var_data.loc[7, 'chromosome'] = np.nan
+    
+    # Create minimal expression matrix
+    X = np.random.negative_binomial(5, 0.3, (n_cells, 25))
+    
+    # Create AnnData object
+    adata = sc.AnnData(X=X, obs=obs_data, var=var_data)
+    
+    test_project_dir = tempfile.mkdtemp()
+    
+    try:
+        # This conversion should succeed without errors
+        mdv = convert_scanpy_to_mdv(test_project_dir, adata, delete_existing=True)
+        
+        # Verify conversion succeeded
+        assert isinstance(mdv, MDVProject)
+        
+        # Test that we can retrieve data with missing values
+        cell_type_data = mdv.get_column("cells", "cell_type")
+        condition_data = mdv.get_column("cells", "condition")
+        
+        # Check that "ND" values are present where we had NaN
+        assert cell_type_data[2] == "ND", "Missing value at index 2 should be 'ND'"
+        assert condition_data[5] == "ND", "Missing value at index 5 should be 'ND'"
+        
+        # Check that non-missing values are preserved
+        assert cell_type_data[0] == "T-cell"
+        assert cell_type_data[1] == "B-cell"
+        assert condition_data[0] == "Control"
+        assert condition_data[1] == "Treatment"
+        
+        # Test gene data as well
+        gene_type_data = mdv.get_column("genes", "gene_type")
+        chromosome_data = mdv.get_column("genes", "chromosome")
+        
+        assert gene_type_data[3] == "ND", "Missing value at index 3 should be 'ND'"
+        assert chromosome_data[7] == "ND", "Missing value at index 7 should be 'ND'"
+        
+    finally:
+        if os.path.exists(test_project_dir):
+            shutil.rmtree(test_project_dir)
 
 
 if __name__ == "__main__":
