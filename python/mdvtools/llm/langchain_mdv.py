@@ -284,7 +284,7 @@ class ProjectChat(ProjectChatProtocol):
         If the question is "test error", we raise an error to test the error handling.
         """
         # Create socket API for this request
-        socket_api = ChatSocketAPI(self.project, id, room)
+        socket_api = ChatSocketAPI(self.project, id, room, conversation_id)
         log = socket_api.log
         log(f"Asking question: {question}")
 

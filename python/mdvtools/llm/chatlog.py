@@ -117,7 +117,7 @@ class ChatSocketAPI:
     An instance of this class is created for each chat request.
     It will instantiate a Logger instance & SocketIOHandler which should be GCed when the request is finished.
     """
-    def __init__(self, project: MDVProject, id: str, room: str):
+    def __init__(self, project: MDVProject, id: str, room: str, conversation_id: str):
         self.project = project
         from mdvtools.websocket import socketio
         if socketio is None:
@@ -140,7 +140,7 @@ class ChatSocketAPI:
         logger.addHandler(handler)
         log_dir = os.path.join(project.dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
-        file_handler = logging.FileHandler(os.path.join(project.dir, f"logs/chat_{project.id}_{id}.log"))
+        file_handler = logging.FileHandler(os.path.join(project.dir, f"logs/chat__{conversation_id}.log"))
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         file_handler.setLevel(logging.INFO)
         logger.addHandler(file_handler)
