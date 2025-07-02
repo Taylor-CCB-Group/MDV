@@ -50,6 +50,7 @@ def temp_mdv_project():
 class TestStressTesting:
     """Test class for stress testing the MDV conversion pipeline."""
     
+    @pytest.mark.performance
     def test_large_dataset_conversion(self):
         """Test conversion of large datasets (20k cells, 3k genes)."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -84,6 +85,7 @@ class TestStressTesting:
         assert conversion_time < 120, f"Conversion took too long: {conversion_time:.2f}s"
         assert conversion_memory['rss'] < 4000, f"Memory usage too high: {conversion_memory['rss']:.1f}MB"
     
+    @pytest.mark.performance
     def test_very_large_dataset_conversion(self):
         """Test conversion of very large datasets (50k cells, 5k genes)."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -115,6 +117,7 @@ class TestStressTesting:
         # Check performance metrics
         assert conversion_time < 180, f"Conversion took too long: {conversion_time:.2f}s"
     
+    @pytest.mark.performance
     def test_massive_dataset_conversion(self):
         """Test conversion of massive datasets (100k cells, 8k genes)."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -146,6 +149,7 @@ class TestStressTesting:
         # Check performance metrics
         assert conversion_time < 300, f"Conversion took too long: {conversion_time:.2f}s"
     
+    @pytest.mark.performance
     def test_memory_efficiency(self):
         """Test memory efficiency during conversion."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -174,6 +178,7 @@ class TestStressTesting:
         # Check memory efficiency (should not increase by more than 1GB)
         assert memory_increase < 1000, f"Memory increase too high: {memory_increase:.1f}MB"
     
+    @pytest.mark.performance
     def test_multiple_conversions_same_session(self):
         """Test multiple conversions in the same session to check for memory leaks."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -202,6 +207,7 @@ class TestStressTesting:
         # Check for memory leaks (should not increase by more than 500MB over 3 iterations)
         assert memory_increase < 500, f"Potential memory leak: {memory_increase:.1f}MB increase over 3 iterations"
     
+    @pytest.mark.performance
     def test_chunked_normalization_performance(self):
         """Test performance of chunked normalization vs traditional approach."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -244,6 +250,7 @@ class TestStressTesting:
 class TestEdgeCaseStressTesting:
     """Test class for edge case stress testing."""
     
+    @pytest.mark.performance
     def test_edge_case_conversion(self):
         """Test conversion of edge case data."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -259,6 +266,7 @@ class TestEdgeCaseStressTesting:
         assert "cells" in mdv.get_datasource_names()
         assert "genes" in mdv.get_datasource_names()
     
+    @pytest.mark.performance
     def test_mixed_data_types(self):
         """Test conversion with mixed data types."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -283,6 +291,7 @@ class TestEdgeCaseStressTesting:
         assert "cells" in mdv.get_datasource_names()
         assert "genes" in mdv.get_datasource_names()
     
+    @pytest.mark.performance
     def test_extreme_categorical_values(self):
         """Test conversion with extreme categorical values."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -307,6 +316,7 @@ class TestEdgeCaseStressTesting:
 class TestPerformanceBenchmarks:
     """Test class for performance benchmarking."""
     
+    @pytest.mark.performance
     def test_conversion_speed_benchmark(self):
         """Benchmark conversion speed for different dataset sizes."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -359,6 +369,7 @@ class TestPerformanceBenchmarks:
             assert metrics['conversion_time'] > 0, f"Conversion failed for {n_cells:,}x{n_genes:,}"
             assert metrics['cells_per_second'] > 0, f"Invalid conversion rate for {n_cells:,}x{n_genes:,}"
     
+    @pytest.mark.performance
     def test_memory_usage_benchmark(self):
         """Benchmark memory usage for different dataset sizes."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -408,6 +419,7 @@ class TestPerformanceBenchmarks:
             assert metrics['memory_increase'] >= 0, f"Negative memory increase for {n_cells:,}x{n_genes:,}"
             assert metrics['memory_per_cell'] < 0.1, f"Too much memory per cell for {n_cells:,}x{n_genes:,}"
 
+    @pytest.mark.performance
     def test_memory_improvements_verification(self):
         """Test that memory improvements work without MDV project structure issues."""
         factory = MockAnnDataFactory(random_seed=42)

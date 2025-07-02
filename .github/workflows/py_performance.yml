@@ -1,0 +1,63 @@
+name: Python Performance Tests
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'python/**'
+  pull_request:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'python/**'
+  workflow_dispatch:
+    inputs:
+      run_performance_tests:
+        description: 'Run performance tests'
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  performance-tests:
+    # Only run if commit message contains [perf-test] or workflow is manually dispatched
+    if: |
+      contains(github.event.head_commit.message, '[perf-test]') ||
+      contains(github.event.pull_request.title, '[perf-test]') ||
+      github.event_name == 'workflow_dispatch'
+    defaults:
+      run:
+        working-directory: python
+    strategy:
+      matrix:
+        python-version: [ 3.12 ]
+        poetry-version: [ 1.7.1 ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: pipx install poetry
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'poetry'
+
+      - run: poetry install --with dev,backend,auth
+      - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
+
+      - name: Run performance tests
+        run: make test-performance
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-test-results
+          path: python/test-results/
+          retention-days: 7 
