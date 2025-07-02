@@ -427,12 +427,13 @@ def register_routes(app, ENABLE_AUTH):
                     file_path = os.path.join(temp_dir, file_name)
                     
                     # Create an archive from the project path
+                    logger.info(f"Creating archive for project {project_name} at path: {project.path}...")
                     zip_path = shutil.make_archive(
                         file_path,
                         "zip",
                         project.path
                     )
-
+                    logger.info(f"Archive created at: {zip_path}")
                     # Return the zip file
                     return send_file(
                         path_or_file=zip_path,
