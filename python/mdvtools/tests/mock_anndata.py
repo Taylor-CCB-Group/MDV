@@ -25,6 +25,80 @@ def suppress_anndata_warnings():
         yield
 
 
+def chunked_log1p_normalization(sparse_matrix, chunk_size=1000):
+    """Perform log1p normalization in chunks to avoid dense matrices."""
+    if not scipy.sparse.issparse(sparse_matrix):
+        # For dense matrices, just apply log1p directly
+        return np.log1p(sparse_matrix)
+    n_cells, n_genes = sparse_matrix.shape
+    if n_cells <= chunk_size:
+        return scipy.sparse.csc_matrix(np.log1p(sparse_matrix.toarray()))
+    # For large matrices, process in chunks and vstack
+    chunks = []
+    for chunk_start in range(0, n_cells, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, n_cells)
+        chunk = sparse_matrix[chunk_start:chunk_end, :].toarray()
+        chunk_log = np.log1p(chunk)
+        chunk_sparse = scipy.sparse.csr_matrix(chunk_log)
+        chunks.append(chunk_sparse)
+    return scipy.sparse.vstack(chunks, format='csr')
+
+
+def chunked_zscore_normalization(sparse_matrix, chunk_size=1000):
+    """Perform z-score normalization in chunks to avoid dense matrices."""
+    if not scipy.sparse.issparse(sparse_matrix):
+        X_dense = np.asarray(sparse_matrix)
+        return (X_dense - X_dense.mean(axis=0)) / (X_dense.std(axis=0) + 1e-8)
+    n_cells, n_genes = sparse_matrix.shape
+    if n_cells <= chunk_size:
+        X_dense = sparse_matrix.toarray()
+        return (X_dense - X_dense.mean(axis=0)) / (X_dense.std(axis=0) + 1e-8)
+    # Compute mean and std across all rows
+    total_sum = np.zeros(n_genes)
+    total_sum_sq = np.zeros(n_genes)
+    for chunk_start in range(0, n_cells, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, n_cells)
+        chunk = sparse_matrix[chunk_start:chunk_end, :].toarray()
+        total_sum += chunk.sum(axis=0)
+        total_sum_sq += (chunk ** 2).sum(axis=0)
+    mean_vals = total_sum / n_cells
+    var_vals = (total_sum_sq / n_cells) - (mean_vals ** 2)
+    std_vals = np.sqrt(var_vals + 1e-8)
+    # Now apply normalization in chunks and vstack
+    chunks = []
+    for chunk_start in range(0, n_cells, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, n_cells)
+        chunk = sparse_matrix[chunk_start:chunk_end, :].toarray()
+        chunk_normalized = (chunk - mean_vals) / std_vals
+        chunk_sparse = scipy.sparse.csr_matrix(chunk_normalized)
+        chunks.append(chunk_sparse)
+    return scipy.sparse.vstack(chunks, format='csr')
+
+
+def estimate_memory_usage(n_cells, n_genes, sparse=True):
+    """Estimate memory usage for a dataset.
+    
+    Args:
+        n_cells: Number of cells
+        n_genes: Number of genes
+        sparse: Whether the matrix is sparse
+        
+    Returns:
+        Estimated memory usage in MB
+    """
+    if sparse:
+        # Estimate 10% sparsity for typical single-cell data
+        sparsity = 0.1
+        nnz = int(n_cells * n_genes * sparsity)
+        # 8 bytes per value + 4 bytes per index + 4 bytes per indptr
+        memory_bytes = nnz * 16 + n_cells * 4
+    else:
+        # Dense matrix: 8 bytes per element
+        memory_bytes = n_cells * n_genes * 8
+    
+    return memory_bytes / (1024 * 1024)  # Convert to MB
+
+
 class MockAnnDataFactory:
     """Factory class for creating mock AnnData objects with various configurations."""
     
@@ -70,6 +144,44 @@ class MockAnnDataFactory:
             sparse_matrix=True
         )
     
+    def create_memory_efficient_large(self, n_cells: int = 10000, n_genes: int = 5000,
+                                    add_missing: bool = True) -> sc.AnnData:
+        """Create a large AnnData object optimized for memory efficiency.
+        
+        This method creates large datasets without dense layers to avoid
+        excessive memory consumption during stress testing.
+        """
+        return self._create_anndata(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            add_missing=add_missing,
+            add_dim_reductions=False,  # Skip dense dimensionality reductions
+            add_layers=False,          # Skip dense layers
+            add_uns=True,
+            sparse_matrix=True
+        )
+    
+    def create_massive_dataset(self, n_cells: int = 100000, n_genes: int = 10000,
+                             add_missing: bool = True) -> sc.AnnData:
+        """Create a massive dataset (100k+ cells) for extreme stress testing.
+        
+        This method uses chunked operations and memory-efficient approaches
+        to handle datasets that would otherwise cause memory issues.
+        """
+        print(f"Creating massive dataset: {n_cells:,} cells x {n_genes:,} genes")
+        print(f"Estimated memory usage: {estimate_memory_usage(n_cells, n_genes, sparse=True):.1f}MB (sparse)")
+        
+        return self._create_anndata(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            add_missing=add_missing,
+            add_dim_reductions=False,  # Skip dense dimensionality reductions
+            add_layers=True,           # Use chunked layers
+            add_uns=True,
+            sparse_matrix=True,
+            use_chunked_layers=True    # Enable chunked layer processing
+        )
+    
     def create_edge_cases(self) -> sc.AnnData:
         """Create an AnnData object with various edge cases and problematic data."""
         return self._create_edge_case_anndata()
@@ -99,7 +211,8 @@ class MockAnnDataFactory:
                        sparse_matrix: bool = False,
                        cell_types: Optional[List[str]] = None,
                        conditions: Optional[List[str]] = None,
-                       gene_types: Optional[List[str]] = None) -> sc.AnnData:
+                       gene_types: Optional[List[str]] = None,
+                       use_chunked_layers: bool = False) -> sc.AnnData:
         """Internal method to create AnnData with specified features."""
         
         # Default categorical values
@@ -132,7 +245,7 @@ class MockAnnDataFactory:
         
         # Add layers
         if add_layers:
-            self._add_layers(adata)
+            self._add_layers(adata, use_chunked_layers)
         
         # Add unstructured data
         if add_uns:
@@ -266,7 +379,7 @@ class MockAnnDataFactory:
         pca_genes = np.random.normal(0, 1, (n_genes, n_pcs))
         adata.varm['PCs'] = pca_genes
     
-    def _add_layers(self, adata: sc.AnnData):
+    def _add_layers(self, adata: sc.AnnData, use_chunked_layers: bool):
         """Add expression layers to the AnnData object."""
         # Ensure adata.X is valid
         assert adata.X is not None, "adata.X cannot be None"
@@ -281,20 +394,42 @@ class MockAnnDataFactory:
             # For dense arrays, use numpy copy
             adata.layers['counts'] = np.array(adata.X, copy=True)
         
-        # Log-normalized data - convert to dense for log1p operation
-        # Note: log1p and subsequent scaling operations typically produce dense results
-        # even from sparse inputs, so we convert to dense here
-        if scipy.sparse.issparse(adata.X):
-            # Type: ignore because linter doesn't understand sparse matrix methods
-            X_dense = adata.X.toarray() # type: ignore
+        # Log-normalized data - use chunked normalization for large datasets
+        if use_chunked_layers and scipy.sparse.issparse(adata.X):
+            # Use chunked normalization directly on sparse matrix
+            log_data = chunked_log1p_normalization(adata.X)
         else:
-            X_dense = np.asarray(adata.X)  # Ensure it's a numpy array
-        log_data = np.log1p(X_dense)
-        adata.layers['log1p'] = log_data
+            # For smaller datasets or when chunking is disabled, use traditional approach
+            if scipy.sparse.issparse(adata.X):
+                # Type: ignore because linter doesn't understand sparse matrix methods
+                X_dense = adata.X.toarray() # type: ignore
+            else:
+                X_dense = np.asarray(adata.X)  # Ensure it's a numpy array
+            
+            if use_chunked_layers:
+                log_data = chunked_log1p_normalization(X_dense)
+            else:
+                log_data = np.log1p(X_dense)
         
-        # Scaled data - also dense (z-score normalization)
-        scaled_data = (log_data - log_data.mean(axis=0)) / (log_data.std(axis=0) + 1e-8)
-        adata.layers['scaled'] = scaled_data
+        adata.layers['log1p'] = log_data # type: ignore
+        
+        # Scaled data - use chunked normalization for large datasets
+        if use_chunked_layers and scipy.sparse.issparse(log_data):
+            # Use chunked normalization directly on sparse matrix
+            scaled_data = chunked_zscore_normalization(log_data)
+        else:
+            # For smaller datasets or when chunking is disabled, use traditional approach
+            if scipy.sparse.issparse(log_data):
+                log_dense = log_data.toarray()  # type: ignore
+            else:
+                log_dense = np.asarray(log_data)
+            
+            if use_chunked_layers:
+                scaled_data = chunked_zscore_normalization(log_dense)
+            else:
+                scaled_data = (log_dense - log_dense.mean(axis=0)) / (log_dense.std(axis=0) + 1e-8) # type: ignore
+        
+        adata.layers['scaled'] = scaled_data # type: ignore
     
     def _add_unstructured_data(self, adata: sc.AnnData):
         """Add unstructured data to the AnnData object."""
@@ -415,6 +550,28 @@ def create_large_anndata(n_cells: int = 10000, n_genes: int = 5000,
     """Create large AnnData object for stress testing."""
     factory = MockAnnDataFactory()
     return factory.create_large(n_cells, n_genes, add_missing)
+
+
+def create_memory_efficient_large_anndata(n_cells: int = 10000, n_genes: int = 5000,
+                                         add_missing: bool = True) -> sc.AnnData:
+    """Create memory-efficient large AnnData object for stress testing.
+    
+    This function creates large datasets without dense layers to avoid
+    excessive memory consumption during stress testing.
+    """
+    factory = MockAnnDataFactory()
+    return factory.create_memory_efficient_large(n_cells, n_genes, add_missing)
+
+
+def create_massive_anndata(n_cells: int = 100000, n_genes: int = 10000,
+                          add_missing: bool = True) -> sc.AnnData:
+    """Create massive AnnData object for extreme stress testing.
+    
+    This function creates datasets with 100k+ cells using chunked operations
+    to handle memory efficiently. Suitable for testing with real-world scale data.
+    """
+    factory = MockAnnDataFactory()
+    return factory.create_massive_dataset(n_cells, n_genes, add_missing)
 
 
 def create_edge_case_anndata() -> sc.AnnData:
