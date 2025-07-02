@@ -732,6 +732,7 @@ class MDVProject:
             # v slow - needs improving
             # py-right: `Argument of type "Series | Unknown | DataFrame" cannot be assigned to parameter "data" of type "Series"`
             ncol = newdf.apply(lambda row: d.get(row[0], missing_value), axis=1)
+            assert isinstance(ncol, pandas.Series)
             add_column_to_group(c, ncol, gr, len(ncol), self.skip_column_clean)
             ds["columns"].append(c)
         self.set_datasource_metadata(ds)
@@ -1884,7 +1885,7 @@ def get_subgroup_bytes(grp, index, sparse=False):
 
 def add_column_to_group(
     col: dict,
-    data: pandas.Series | pandas.DataFrame,
+    data: pandas.Series,
     group: h5py.Group,
     length: int,
     skip_column_clean: bool,
@@ -1903,12 +1904,17 @@ def add_column_to_group(
     ):
         #in pandas missing values are represented by NaN
         #which cause problems when co-ercing into text, therefore replace with ND
-        if isinstance(data, pandas.CategoricalDtype):
-            data = data.cat.add_categories("ND")
+        if isinstance(data.dtype, pandas.CategoricalDtype):
+            # Handle pandas Categorical data
+            if "ND" not in data.cat.categories:
+                # see test_categorical_missing_values_edge_cases()
+                data = data.cat.add_categories("ND")
             data = data.fillna("ND")
         #no boolean datatype in MDV at the moment, have to co-erce to text
         elif is_bool_dtype(data):
-            data = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+            cat = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+            assert isinstance(cat, pandas.Series)
+            data = cat
         else:
             # may need to double-check this...
             data = data.fillna("ND")

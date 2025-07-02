@@ -37,7 +37,7 @@ def convert_scanpy_to_mdv(
             If False, merges with existing data. Defaults to False.
         label (str, optional): Prefix to add to datasource names and metadata columns
             when merging with existing data. Defaults to "".
-        chunk_data (bool, optional): For dense marixes, transposing and flattening
+        chunk_data (bool, optional): For dense matrices, transposing and flattening
             will be performed in chunks. Saves memory but takes longer. Default is False.
         add_layer_data (bool, optional): If True (default) then the layer data (log values etc.)
             will be added, otherwise just the X object will be used
@@ -76,6 +76,10 @@ def convert_scanpy_to_mdv(
         IOError: If there are issues with file operations in the target folder
         Exception: For other unexpected errors during conversion
     """
+    # Validate input AnnData
+    if scanpy_object.n_obs == 0 or scanpy_object.n_vars == 0:
+        raise ValueError("Cannot convert empty AnnData object (0 cells or 0 genes)")
+    
     mdv = MDVProject(folder, delete_existing=delete_existing)
 
     # If not deleting existing, preserve current views
@@ -137,7 +141,7 @@ def convert_scanpy_to_mdv(
         for layer,matrix in scanpy_object.layers.items():
             matrix,sparse = get_matrix(matrix)
             mdv.add_rows_as_columns_subgroup(
-                f"{label}cells", f"{label}genes", matrix, layer, sparse=sparse, chunk_data=chunk_data
+                f"{label}cells", f"{label}genes", layer, matrix, sparse=sparse, chunk_data=chunk_data
             )
 
     if delete_existing:

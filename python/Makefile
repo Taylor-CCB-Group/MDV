@@ -1,5 +1,8 @@
 test:
-	poetry run pytest mdvtools/
+	poetry run pytest mdvtools/ -m "not performance"
+
+test-performance:
+	poetry run pytest mdvtools/tests/test_stress_performance.py -v
 
 type:
 	poetry run pyright

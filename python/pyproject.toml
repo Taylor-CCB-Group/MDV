@@ -107,3 +107,20 @@ typeCheckingMode = "standard"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+markers = [
+    "performance: marks tests as performance tests (deselect with '-m \"not performance\"')",
+    "slow: marks tests as slow running",
+    "integration: marks tests as integration tests"
+]
+
+testpaths = ["mdvtools/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers"
+]
