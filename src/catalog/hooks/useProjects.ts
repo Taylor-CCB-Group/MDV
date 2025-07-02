@@ -329,7 +329,7 @@ const useProjects = () => {
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement("a");
                     link.href = url;
-                    link.download = `${name}.zip`;
+                    link.download = `${name}.mdv.zip`;
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);

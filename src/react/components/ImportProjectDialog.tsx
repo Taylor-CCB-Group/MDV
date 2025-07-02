@@ -60,7 +60,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles[0]) {
             setFile(acceptedFiles[0]);
-            const name = acceptedFiles[0].name.split(".")[0];
+            const name = acceptedFiles[0].name.match(/^(.+?)(?:\.mdv)?\.zip$/)?.[1];
             setProjectName(name ?? "");
         }
     }, []);
@@ -73,12 +73,16 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         },
         // todo: update later for larger files support
         maxSize: 2000 * 1024 * 1024, // 2 GB
+        validator: (file) => {
+            // todo: check if the file resembles a valid MDV project archive
+            return null;
+        },
     });
 
     const rejectionMessage =
         fileRejections.length > 0
             ? "Only ZIP files are allowed under 2 GB. Please try again."
-            : "Drag and drop a file here or click the button below (only *.zip files are allowed)";
+            : "Drag and drop a file here or click the button below (only MDV project archive *.zip files are allowed)";
 
     const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
 
@@ -161,7 +165,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                                         <DynamicText text={"Drop files here..."} className="text-sm" />
                                     ) : (
                                         <DynamicText
-                                            text={file ? `Selected file: ${file.name}` : rejectionMessage}
+                                            text={file ? `Selected file: ${file.name} (${projectName})` : rejectionMessage}
                                             className={`${rejectionMessageStyle} text-sm`}
                                         />
                                     )}

@@ -438,7 +438,7 @@ def register_routes(app, ENABLE_AUTH):
                         path_or_file=zip_path,
                         mimetype="application/zip",
                         as_attachment=True,
-                        download_name=f"{project_name}.zip"
+                        download_name=f"{project_name}.mdv.zip"
                     )
 
             except Exception as e:
