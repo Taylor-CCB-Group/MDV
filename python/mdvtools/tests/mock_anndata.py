@@ -394,22 +394,16 @@ class MockAnnDataFactory:
             # For dense arrays, use numpy copy
             adata.layers['counts'] = np.array(adata.X, copy=True)
         
-        # Log-normalized data - use chunked normalization for large datasets
-        if use_chunked_layers and scipy.sparse.issparse(adata.X):
-            # Use chunked normalization directly on sparse matrix
+        # Log-normalized data - use chunked normalization if requested
+        if use_chunked_layers:
             log_data = chunked_log1p_normalization(adata.X)
         else:
-            # For smaller datasets or when chunking is disabled, use traditional approach
             if scipy.sparse.issparse(adata.X):
-                # Type: ignore because linter doesn't understand sparse matrix methods
-                X_dense = adata.X.toarray() # type: ignore
+                # preserve sparsity
+                log_data = scipy.sparse.csc_matrix(adata.X)
+                log_data.data = np.log1p(log_data.data)
             else:
-                X_dense = np.asarray(adata.X)  # Ensure it's a numpy array
-            
-            if use_chunked_layers:
-                log_data = chunked_log1p_normalization(X_dense)
-            else:
-                log_data = np.log1p(X_dense)
+                log_data = np.log1p(np.asarray(adata.X))
         
         adata.layers['log1p'] = log_data # type: ignore
         
