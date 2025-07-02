@@ -2,6 +2,7 @@ import time
 import logging
 from contextlib import contextmanager
 import os
+import traceback
 from typing import Callable
 
 # Code Generation using Retrieval Augmented Generation + LangChain
@@ -190,7 +191,7 @@ class ProjectChat(ProjectChatProtocol):
 
             self.init_error = False
         except Exception as e:
-            error_message = f"{str(e)[:500]}"
+            error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
             self.log(error_message)
             
             self.error_message = error_message
@@ -464,8 +465,10 @@ class ProjectChat(ProjectChatProtocol):
                 return {"code": final_code_updated, "view_name": view_name, "error": False, "message": "Success"}
         except Exception as e:
             # Log general error
+            error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
+            print(f"{error_message}")
             socket_api.update_chat_progress(
-                f"Error: {str(e)[:500]}", id, 100, 0
+                f"Error: {error_message}", id, 100, 0
             )
-            handle_error(f"ERROR: {str(e)[:500]}")
-            return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {str(e)[:500]}"}
+            handle_error(f"ERROR: {error_message}")
+            return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {error_message}"}

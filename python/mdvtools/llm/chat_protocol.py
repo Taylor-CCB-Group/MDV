@@ -27,6 +27,7 @@ class ProjectChatProtocol(Protocol):
     welcome: str
     init_error: Optional[bool]
     error_message: Optional[str]
+    ds_name: str
 
 chat_enabled = False
 try:

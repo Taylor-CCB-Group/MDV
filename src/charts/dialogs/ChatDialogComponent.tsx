@@ -8,8 +8,11 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Box, Button, Divider, TextField } from '@mui/material';
+import { Box, Button, Divider, IconButton, TextField } from '@mui/material';
 import _ from 'lodash';
+import { Check, ContentCopy } from '@mui/icons-material';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 
 /**
@@ -57,6 +60,7 @@ import _ from 'lodash';
 
 const Message = ({ text, sender, view, onClose, error }: ChatMessage & {onClose: () => void}) => {
     const isUser = sender === 'user';
+    const [copied, setCopied] = useState(false);
     const pythonSections = extractPythonSections(text);
     try {
         text = JSON.parse(text);
@@ -66,22 +70,54 @@ const Message = ({ text, sender, view, onClose, error }: ChatMessage & {onClose:
     const messageStyle = isUser ? 
         'bg-teal-200 self-end dark:bg-teal-900' :
         (error ?
-            'bg-slate-200 dark:bg-slate-800 self-start text-red-500 border border-red-900':
+            'bg-slate-200 dark:bg-slate-800 self-start border border-red-900':
             'bg-slate-200 dark:bg-slate-800 self-start'
         )
     
     const messageIcon = error ?
             <CircleAlert color='red' /> :
             isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />;
-    // todo: handle the scenario when view doesn't exist
-    // const isError = sender === 'bot' && !view;
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(typeof text === 'string' ? text : JSON.stringify(text, null, 2));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error("Failed to copy error details:", err);
+        }
+    };
+
     return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
         <div className='selectable mt-4'>
             <div>{messageIcon}</div>
-            <div className={`mb-2 p-4 rounded-lg ${messageStyle}`}>
+            <div className={`mb-2 p-4 rounded-lg ${messageStyle} relative markdown-body`}>
                 {/* <JsonView src={text} /> */}
-                {/* {error ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />}  */}
-                <div><MessageMarkdown text={text} /></div>
+                {(sender === "bot" || error) && (
+                    <IconButton
+                        size="small"
+                        aria-label="Copy button"
+                        onClick={handleCopy}
+                        sx={{ position: 'absolute', top: 2, right: 2 }}
+                    >
+                        {copied ? (
+                            <Check fontSize='small' />
+                        ) : (
+                            <ContentCopy fontSize='small' />
+                        )}
+                    </IconButton>
+                )}
+                {error ? (
+                    <pre 
+                        style={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word"
+                        }}
+                    >
+                        {text}
+                    </pre>
+                ): (
+                    <MessageMarkdown text={text} />
+                )}
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
@@ -182,6 +218,8 @@ const MessageMarkdown = ({ text }: { text: string }) => {
         <ReactMarkdown
             // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-markdown, not our code
             children={markdown}
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
             components={{
                 code({ node, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '')

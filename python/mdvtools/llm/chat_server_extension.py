@@ -1,3 +1,4 @@
+import traceback
 from typing import Optional, Protocol
 from mdvtools.llm.chat_protocol import (
   ChatRequest,
@@ -47,6 +48,16 @@ class MDVProjectServerExtension(Protocol):
 class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
+    def create_column_markdown(self, cols: list[str]): 
+        if cols:
+            markdown = "Below is the list of columns for this project:<br><br>"
+            markdown += "\n| |\n|---|\n"
+            for col in cols:
+                markdown += f"| {col} |\n"
+        else:
+            markdown = "No columns found."
+        return "<br><br><br>" + markdown
+
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
         from mdvtools.websocket import socketio
         if socketio is None:
@@ -75,14 +86,23 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 try:
                     bot = ProjectChat(project)
                 except Exception as e:
-                    print(f"ERROR: {str(e)[:500]}")
-                    return {"message": f"ERROR: {str(e)[:500]}", "error": True}
+                    error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
+                    print(f"ERROR: {error_message}")
+                    return {"message": f"ERROR: {error_message}", "error": True}
             if bot.init_error:
                 # Log and return the error
                 error_msg = bot.error_message or "An unknown error occurred"
                 bot.log(f"ERROR: {error_msg}")
                 return {"message": f"ERROR: {error_msg}", "error": True}
-            return {"message": bot.welcome}
+            
+            ds = project.get_datasource_as_dataframe(bot.ds_name)
+            cols = list(ds.columns)
+
+            markdown = self.create_column_markdown(cols)
+                
+            bot.log(f"Markdown: {markdown}")
+            detailed_message = bot.welcome + markdown
+            return {"message": detailed_message}
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):
@@ -147,11 +167,12 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
             except Exception as e:
                 # Log error to chat_log.json
-                # print(f"ERROR: {str(e)[:500]}")
-                handle_error(f"ERROR: {str(e)[:500]}")
+                error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
+                print(f"ERROR: {error_message}")
+                handle_error(f"ERROR: {error_message}")
                 leave_room(room)
                 return
-    
+            
     def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
         """
         Mutate the state.json before returning it as a request response,

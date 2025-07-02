@@ -224,20 +224,6 @@ const ChatDialog = ({
                                         ))
                                     )}
                                 </List>
-                                <Box
-                                    sx={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        right: 0,
-                                        width: 8,
-                                        height: '100%',
-                                        cursor: 'ew-resize',
-                                        zIndex: 10,
-                                        background: 'rgba(0,0,0,0.05)',
-                                        '&:hover': { background: 'rgba(0,0,0,0.15)' },
-                                    }}
-                                    onMouseDown={onMouseDown}
-                                />
                             </Box>
                         </Drawer>
                         <Box
@@ -249,7 +235,7 @@ const ChatDialog = ({
                                 height: '100%',
                                 cursor: 'ew-resize',
                                 zIndex: 10,
-                                background: 'rgba(0,0,0,0.05)',
+                                backgroundColor: 'rgba(0,0,0,0.05)',
                                 '&:hover': { background: 'rgba(0,0,0,0.15)' },
                             }}
                             onMouseDown={onMouseDown}
