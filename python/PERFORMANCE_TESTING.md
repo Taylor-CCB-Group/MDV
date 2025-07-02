@@ -30,6 +30,7 @@ Performance tests are resource-intensive and are separated from regular CI to co
 ### Performance CI (`py_performance.yml`)
 - Runs only when triggered
 - Works on all branches (not just dev/main)
+- Runs on any file changes (not just python/**)
 - Includes all performance tests
 - Uploads test results as artifacts
 
@@ -131,8 +132,8 @@ If performance tests are not running despite having `[perf-test]` in your commit
 
 1. **Check your branch**: The workflow now runs on all branches (not just dev/main)
 2. **Verify commit message**: Make sure `[perf-test]` is exactly as shown (case-sensitive)
-3. **Check file changes**: The workflow only runs if files in `python/**` were changed
-4. **Use the test script**: Run `python test_workflow_trigger.py` to debug locally
+3. **Check file changes**: The workflow runs on any file changes (not just python files)
+4. **Debug locally**: Check the workflow logs for debugging information
 
 ### Tests Getting Killed
 If performance tests are killed due to memory:

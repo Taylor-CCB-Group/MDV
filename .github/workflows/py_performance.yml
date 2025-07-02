@@ -1,11 +1,7 @@
 name: Python Performance Tests
 on:
   push:
-    paths:
-      - 'python/**'
   pull_request:
-    paths:
-      - 'python/**'
   workflow_dispatch:
     inputs:
       run_performance_tests:
