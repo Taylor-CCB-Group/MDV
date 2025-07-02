@@ -137,7 +137,7 @@ def convert_scanpy_to_mdv(
         for layer,matrix in scanpy_object.layers.items():
             matrix,sparse = get_matrix(matrix)
             mdv.add_rows_as_columns_subgroup(
-                f"{label}cells", f"{label}genes", matrix, layer, sparse=sparse, chunk_data=chunk_data
+                f"{label}cells", f"{label}genes", layer, matrix, sparse=sparse, chunk_data=chunk_data
             )
 
     if delete_existing:
