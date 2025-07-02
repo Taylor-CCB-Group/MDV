@@ -37,7 +37,7 @@ def convert_scanpy_to_mdv(
             If False, merges with existing data. Defaults to False.
         label (str, optional): Prefix to add to datasource names and metadata columns
             when merging with existing data. Defaults to "".
-        chunk_data (bool, optional): For dense marixes, transposing and flattening
+        chunk_data (bool, optional): For dense matrices, transposing and flattening
             will be performed in chunks. Saves memory but takes longer. Default is False.
         add_layer_data (bool, optional): If True (default) then the layer data (log values etc.)
             will be added, otherwise just the X object will be used
