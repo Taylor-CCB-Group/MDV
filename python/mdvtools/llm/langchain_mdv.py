@@ -5,7 +5,7 @@ import os
 from typing import Callable
 
 # Code Generation using Retrieval Augmented Generation + LangChain
-from mdvtools.llm.chat_protocol import AskQuestionResult, ProjectChatProtocol
+from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
 from mdvtools.mdvproject import MDVProject
 
 from langchain_openai import ChatOpenAI
@@ -278,11 +278,17 @@ class ProjectChat(ProjectChatProtocol):
 
         return agent_with_contextualization
 
-    def ask_question(self, question: str, id: str, conversation_id: str, room: str, handle_error: Callable[[str], None]) -> AskQuestionResult:
+    def ask_question(self, chat_request: ChatRequest) -> AskQuestionResult:
         """
         Ask a question, generate code to answer it, execute the code...
         If the question is "test error", we raise an error to test the error handling.
         """
+        id = chat_request["id"]
+        room = chat_request["room"]
+        conversation_id = chat_request["conversation_id"]
+        question = chat_request["message"]
+        handle_error = chat_request["handle_error"]
+        
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room, conversation_id)
         log = socket_api.log
