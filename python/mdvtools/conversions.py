@@ -76,6 +76,10 @@ def convert_scanpy_to_mdv(
         IOError: If there are issues with file operations in the target folder
         Exception: For other unexpected errors during conversion
     """
+    # Validate input AnnData
+    if scanpy_object.n_obs == 0 or scanpy_object.n_vars == 0:
+        raise ValueError("Cannot convert empty AnnData object (0 cells or 0 genes)")
+    
     mdv = MDVProject(folder, delete_existing=delete_existing)
 
     # If not deleting existing, preserve current views
