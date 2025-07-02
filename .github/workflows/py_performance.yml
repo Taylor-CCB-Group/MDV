@@ -34,10 +34,10 @@ jobs:
 
       - name: Debug workflow trigger
         env:
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          BRANCH: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
+          PR_TITLE: ${{ github.event.pull_request.title || '' }}
+          BRANCH: ${{ github.ref_name || '' }}
+          EVENT_NAME: ${{ github.event_name || '' }}
         run: |
           echo "Event name: $EVENT_NAME"
           echo "Commit message: $COMMIT_MESSAGE"
