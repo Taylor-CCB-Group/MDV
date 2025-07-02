@@ -1,15 +1,9 @@
 name: Python Performance Tests
 on:
   push:
-    branches:
-      - dev
-      - main
     paths:
       - 'python/**'
   pull_request:
-    branches:
-      - dev
-      - main
     paths:
       - 'python/**'
   workflow_dispatch:
@@ -28,8 +22,8 @@ jobs:
   performance-tests:
     # Only run if commit message contains [perf-test] or workflow is manually dispatched
     if: |
-      contains(github.event.head_commit.message, '[perf-test]') ||
-      contains(github.event.pull_request.title, '[perf-test]') ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[perf-test]')) ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[perf-test]')) ||
       github.event_name == 'workflow_dispatch'
     defaults:
       run:
@@ -41,6 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Debug workflow trigger
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Commit message: ${{ github.event.head_commit.message }}"
+          echo "PR title: ${{ github.event.pull_request.title }}"
+          echo "Branch: ${{ github.ref_name }}"
 
       - run: pipx install poetry
       - uses: actions/setup-python@v5
