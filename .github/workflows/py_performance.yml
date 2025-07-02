@@ -37,12 +37,12 @@ jobs:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           BRANCH: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "Event name: ${{ github.event_name }}"
+          echo "Event name: $EVENT_NAME"
           echo "Commit message: $COMMIT_MESSAGE"
           echo "PR title: $PR_TITLE"
           echo "Branch: $BRANCH"
-
       - run: pipx install poetry
       - uses: actions/setup-python@v5
         with:
