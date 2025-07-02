@@ -66,7 +66,7 @@ jobs:
           echo "git_commit_date=$(git log -1 --format=%cI)" >> $GITHUB_OUTPUT
           echo "git_branch_name=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
           echo "git_commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-          echo "git_last_commit_message=$(git show -s --format=%s | sed 's/"/\\"/g')" >> $GITHUB_OUTPUT
+          echo "git_last_commit_message=$(git show -s --format=%s | sed 's/"/\\"/g' | tr -d '\n' | sed 's/[^[:print:]]//g')" >> $GITHUB_OUTPUT
           echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
           echo "git_dirty=false" >> $GITHUB_OUTPUT
 
