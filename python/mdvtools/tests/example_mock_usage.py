@@ -202,7 +202,7 @@ def example_stress_testing():
             cells_metadata = mdv.get_datasource_metadata("cells")
             genes_metadata = mdv.get_datasource_metadata("genes")
             
-            print(f"   Conversion successful")
+            print("   Conversion successful")
             print(f"   Cells columns: {len(cells_metadata['columns'])}")
             print(f"   Genes columns: {len(genes_metadata['columns'])}")
 

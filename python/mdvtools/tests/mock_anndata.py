@@ -12,7 +12,7 @@ import pandas as pd
 import scanpy as sc
 import scipy
 import scipy.sparse
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Union, Any
 import warnings
 from contextlib import contextmanager
 

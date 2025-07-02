@@ -9,7 +9,6 @@ edge cases, ensuring that adata.X is properly handled and validated.
 import os
 import tempfile
 import shutil
-import warnings
 import pytest
 import numpy as np
 import pandas as pd
@@ -84,7 +83,7 @@ class TestAnnDataXValidation:
             assert actual_shape == expected_shape, \
                 f"Shape mismatch: expected {expected_shape}, got {actual_shape}"
             assert adata.X.shape == (adata.n_obs, adata.n_vars), \
-                f"adata.X shape doesn't match AnnData dimensions"
+                "adata.X shape doesn't match AnnData dimensions"
 
 
 class TestConversionWithEdgeCases:
@@ -256,7 +255,7 @@ class TestConversionErrorHandling:
         
         # This should raise an error during AnnData creation
         with pytest.raises(ValueError):
-            adata = sc.AnnData(X=X, obs=obs_data, var=var_data)
+            sc.AnnData(X=X, obs=obs_data, var=var_data)
     
     def test_conversion_with_empty_adata(self):
         """Test conversion with empty AnnData."""

@@ -57,7 +57,7 @@ class TestStressTesting:
         
         # Create large dataset
         start_time = time.time()
-        start_memory = get_memory_usage()
+        # start_memory = get_memory_usage()
         
         adata = factory.create_large(20000, 3000)
         
@@ -193,7 +193,7 @@ class TestStressTesting:
             
             with temp_mdv_project() as test_dir:
                 with suppress_anndata_warnings():
-                    mdv = convert_scanpy_to_mdv(test_dir, adata, delete_existing=True)
+                    convert_scanpy_to_mdv(test_dir, adata, delete_existing=True)
             
             # Force garbage collection
             gc.collect()
@@ -219,7 +219,7 @@ class TestStressTesting:
         
         # Test memory-efficient approach
         start_time = time.time()
-        start_memory = get_memory_usage()
+        # start_memory = get_memory_usage()
         
         adata_chunked = factory.create_massive_dataset(n_cells, n_genes)
         
@@ -343,7 +343,7 @@ class TestPerformanceBenchmarks:
             with temp_mdv_project() as test_dir:
                 with suppress_anndata_warnings():
                     conversion_start = time.time()
-                    mdv = convert_scanpy_to_mdv(test_dir, adata, delete_existing=True, chunk_data=True)
+                    convert_scanpy_to_mdv(test_dir, adata, delete_existing=True, chunk_data=True)
                     conversion_time = time.time() - conversion_start
             
             # Calculate metrics
@@ -394,7 +394,7 @@ class TestPerformanceBenchmarks:
             
             with temp_mdv_project() as test_dir:
                 with suppress_anndata_warnings():
-                    mdv = convert_scanpy_to_mdv(test_dir, adata, delete_existing=True, chunk_data=True)
+                    convert_scanpy_to_mdv(test_dir, adata, delete_existing=True, chunk_data=True)
             
             # Force garbage collection
             gc.collect()

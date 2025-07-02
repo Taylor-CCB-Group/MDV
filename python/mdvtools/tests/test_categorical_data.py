@@ -24,7 +24,6 @@ So we also include tests to justify the assertion that this could have caused hy
 import os
 import tempfile
 import shutil
-import warnings
 import pandas as pd
 import numpy as np
 import scanpy as sc
@@ -35,9 +34,6 @@ from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
 from .mock_anndata import (
     create_minimal_anndata, 
-    create_realistic_anndata,
-    create_large_anndata,
-    create_edge_case_anndata,
     MockAnnDataFactory,
     suppress_anndata_warnings,
     get_anndata_summary,

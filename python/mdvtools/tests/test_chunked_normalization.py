@@ -184,6 +184,7 @@ class TestChunkedNormalization:
         assert dense_memory > 0
         assert dense_memory > sparse_memory  # Dense should use more memory
     
+    @pytest.mark.performance
     def test_chunked_vs_traditional_performance(self):
         """Compare performance of chunked vs traditional normalization."""
         # Create moderately large matrix
@@ -191,7 +192,7 @@ class TestChunkedNormalization:
         sparsity = 0.95
         nnz = int(n_cells * n_genes * (1 - sparsity))
         
-        print(f"\nComparing chunked vs traditional normalization")
+        print("\nComparing chunked vs traditional normalization")
         print(f"Matrix size: {n_cells:,} cells x {n_genes:,} genes")
         
         # Generate random data
