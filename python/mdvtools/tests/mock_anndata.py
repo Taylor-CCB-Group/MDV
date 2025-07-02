@@ -32,7 +32,10 @@ def chunked_log1p_normalization(sparse_matrix, chunk_size=1000):
         return np.log1p(sparse_matrix)
     n_cells, n_genes = sparse_matrix.shape
     if n_cells <= chunk_size:
-        return scipy.sparse.csc_matrix(np.log1p(sparse_matrix.toarray()))
+        # preserve sparsity
+        result = sparse_matrix.copy()
+        result.data = np.log1p(result.data)
+        return result
     # For large matrices, process in chunks and vstack
     chunks = []
     for chunk_start in range(0, n_cells, chunk_size):
@@ -400,7 +403,7 @@ class MockAnnDataFactory:
         else:
             if scipy.sparse.issparse(adata.X):
                 # preserve sparsity
-                log_data = scipy.sparse.csc_matrix(adata.X)
+                log_data = scipy.sparse.csc_matrix(adata.X.copy()) # type: ignore
                 log_data.data = np.log1p(log_data.data)
             else:
                 log_data = np.log1p(np.asarray(adata.X))
