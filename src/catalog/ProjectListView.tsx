@@ -152,7 +152,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                     <ListItemIcon>
                         <UploadIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText>Export Project (as *.zip)</ListItemText>
+                    <ListItemText>Export Project (as *.mdv.zip)</ListItemText>
                 </MenuItem>
                 <MenuItem 
                     onClick={() => handleModalOpen(setIsShareModalOpen)} 
