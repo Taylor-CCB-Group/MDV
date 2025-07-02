@@ -33,6 +33,16 @@ from contextlib import contextmanager
 
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
+from .mock_anndata import (
+    create_minimal_anndata, 
+    create_realistic_anndata,
+    create_large_anndata,
+    create_edge_case_anndata,
+    MockAnnDataFactory,
+    suppress_anndata_warnings,
+    get_anndata_summary,
+    validate_anndata
+)
 
 
 @contextmanager
@@ -46,40 +56,8 @@ def temp_mdv_project():
             shutil.rmtree(test_dir)
 
 
-@contextmanager
-def suppress_anndata_warnings():
-    """Context manager to suppress expected AnnData warnings."""
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="Transforming to str index", category=UserWarning)
-        yield
-
-
-def create_minimal_anndata(n_cells=10, n_genes=5, add_missing=False):
-    """Create minimal AnnData object for testing."""
-    # Cell metadata
-    obs_data = pd.DataFrame({
-        'cell_type': pd.Categorical(['T-cell', 'B-cell'] * (n_cells // 2)),
-        'condition': pd.Categorical(['Control', 'Treatment'] * (n_cells // 2)),
-        'quality_score': np.random.normal(0, 1, n_cells)
-    })
-    
-    # Gene metadata  
-    var_data = pd.DataFrame({
-        'gene_type': pd.Categorical(['protein_coding', 'lncRNA'] * (n_genes // 2) + ['miRNA']),
-        'chromosome': pd.Categorical(['chr1', 'chr2'] * (n_genes // 2) + ['chrX']),
-        'mean_expression': np.random.exponential(1, n_genes)
-    })
-    
-    # Add missing values if requested
-    if add_missing:
-        obs_data.loc[2, 'cell_type'] = np.nan
-        obs_data.loc[5, 'condition'] = np.nan
-        var_data.loc[3, 'gene_type'] = np.nan
-    
-    # Expression matrix
-    X = np.random.negative_binomial(5, 0.3, (n_cells, n_genes))
-    
-    return sc.AnnData(X=X, obs=obs_data, var=var_data)
+# The create_minimal_anndata function and suppress_anndata_warnings context manager
+# are now imported from the mock_anndata module
 
 
 def assert_categorical_column_metadata(mdv, datasource, column_name, expect_nd=False):
@@ -333,5 +311,125 @@ def test_categorical_missing_values_conversion_integration():
         assert gene_type_data[0] == "protein_coding"
 
 
+def test_mock_anndata_factory():
+    """Test the MockAnnDataFactory class functionality."""
+    factory = MockAnnDataFactory(random_seed=42)
+    
+    # Test minimal creation
+    adata_minimal = factory.create_minimal(20, 10)
+    assert adata_minimal.n_obs == 20
+    assert adata_minimal.n_vars == 10
+    assert not hasattr(adata_minimal, 'obsm') or len(adata_minimal.obsm) == 0
+    
+    # Test realistic creation
+    adata_realistic = factory.create_realistic(100, 200)
+    assert adata_realistic.n_obs == 100
+    assert adata_realistic.n_vars == 200
+    assert 'X_pca' in adata_realistic.obsm
+    assert 'X_umap' in adata_realistic.obsm
+    assert 'counts' in adata_realistic.layers
+    assert 'neighbors' in adata_realistic.uns
+    
+    # Test large creation with sparse matrix
+    adata_large = factory.create_large(1000, 500)
+    assert adata_large.n_obs == 1000
+    assert adata_large.n_vars == 500
+    assert hasattr(adata_large.X, 'toarray')  # Should be sparse
+    
+    # Test edge cases
+    adata_edge = factory.create_edge_cases()
+    assert adata_edge.n_obs == 50
+    assert adata_edge.n_vars == 100
+    assert 'empty_string' in adata_edge.obs.columns
+    assert 'all_nan' in adata_edge.obs.columns
+
+
+def test_mock_anndata_with_specific_features():
+    """Test creating AnnData with specific categorical features."""
+    factory = MockAnnDataFactory(random_seed=42)
+    
+    custom_cell_types = ['Neuron', 'Astrocyte', 'Oligodendrocyte']
+    custom_conditions = ['Healthy', 'Alzheimer', 'Parkinson']
+    custom_gene_types = ['synaptic', 'metabolic', 'structural']
+    
+    adata = factory.create_with_specific_features(
+        cell_types=custom_cell_types,
+        conditions=custom_conditions,
+        gene_types=custom_gene_types,
+        n_cells=50,
+        n_genes=100
+    )
+    
+    # Check that custom categories are used
+    assert set(adata.obs['cell_type'].cat.categories) == set(custom_cell_types)
+    assert set(adata.obs['condition'].cat.categories) == set(custom_conditions)
+    assert set(adata.var['gene_type'].cat.categories) == set(custom_gene_types)
+
+
+def test_anndata_validation_and_summary():
+    """Test the validation and summary utility functions."""
+    factory = MockAnnDataFactory(random_seed=42)
+    
+    # Test with valid AnnData
+    adata = factory.create_realistic(100, 200)
+    assert validate_anndata(adata)
+    
+    summary = get_anndata_summary(adata)
+    assert summary['n_cells'] == 100
+    assert summary['n_genes'] == 200
+    assert 'cell_type' in summary['categorical_obs']
+    assert 'gene_type' in summary['categorical_var']
+    assert 'X_pca' in summary['obsm_keys']
+    assert 'counts' in summary['layers_keys']
+    
+    # Test with edge case AnnData
+    adata_edge = factory.create_edge_cases()
+    assert validate_anndata(adata_edge)
+    summary_edge = get_anndata_summary(adata_edge)
+    assert summary_edge['has_missing_obs']
+    assert summary_edge['has_missing_var']
+
+
+def test_stress_testing_large_datasets():
+    """Test conversion with large datasets to ensure performance."""
+    factory = MockAnnDataFactory(random_seed=42)
+    
+    # Create a moderately large dataset for testing
+    adata_large = factory.create_large(5000, 2000)
+    
+    with temp_mdv_project() as test_dir:
+        with suppress_anndata_warnings():
+            mdv = convert_scanpy_to_mdv(test_dir, adata_large, delete_existing=True)
+        
+        # Verify conversion worked
+        assert isinstance(mdv, MDVProject)
+        assert "cells" in mdv.get_datasource_names()
+        assert "genes" in mdv.get_datasource_names()
+        
+        # Check that all data was converted
+        cells_metadata = mdv.get_datasource_metadata("cells")
+        genes_metadata = mdv.get_datasource_metadata("genes")
+        
+        assert len(cells_metadata['columns']) > 0
+        assert len(genes_metadata['columns']) > 0
+
+
+def test_edge_case_handling():
+    """Test conversion with edge case data to ensure robustness."""
+    factory = MockAnnDataFactory(random_seed=42)
+    
+    adata_edge = factory.create_edge_cases()
+    
+    with temp_mdv_project() as test_dir:
+        with suppress_anndata_warnings():
+            # This should handle edge cases gracefully
+            mdv = convert_scanpy_to_mdv(test_dir, adata_edge, delete_existing=True)
+        
+        # Verify conversion worked despite edge cases
+        assert isinstance(mdv, MDVProject)
+        assert "cells" in mdv.get_datasource_names()
+        assert "genes" in mdv.get_datasource_names()
+
+
 if __name__ == "__main__":
-    pytest.main([__file__]) 
+    pytest.main([__file__])
