@@ -38,6 +38,7 @@ except Exception as e:
     class _ProjectChat(ProjectChatProtocol):
         def __init__(self, project: MDVProject):
             self.project = project
+            self.ds_name = "dummy"
             self.welcome = (
                 "There was a problem initializing the chatbot\n\n"
                 f"{msg}"
