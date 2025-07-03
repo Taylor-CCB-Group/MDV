@@ -75,11 +75,11 @@ class TestStressTesting:
                 
                 conversion_memory = get_memory_usage()
                 print(f"Conversion time: {conversion_time:.2f}s, Memory: {conversion_memory['rss']:.1f}MB")
-        
-        # Verify results
-        assert isinstance(mdv, MDVProject)
-        assert "cells" in mdv.get_datasource_names()
-        assert "genes" in mdv.get_datasource_names()
+                
+                # Verify results BEFORE the context manager cleans up
+                assert isinstance(mdv, MDVProject)
+                assert "cells" in mdv.get_datasource_names()
+                assert "genes" in mdv.get_datasource_names()
         
         # Check performance metrics
         assert conversion_time < 120, f"Conversion took too long: {conversion_time:.2f}s"
@@ -108,11 +108,11 @@ class TestStressTesting:
                 conversion_time = time.time() - conversion_start
                 
                 print(f"Very large conversion time: {conversion_time:.2f}s")
-        
-        # Verify results
-        assert isinstance(mdv, MDVProject)
-        assert "cells" in mdv.get_datasource_names()
-        assert "genes" in mdv.get_datasource_names()
+                
+                # Verify results BEFORE the context manager cleans up
+                assert isinstance(mdv, MDVProject)
+                assert "cells" in mdv.get_datasource_names()
+                assert "genes" in mdv.get_datasource_names()
         
         # Check performance metrics
         assert conversion_time < 180, f"Conversion took too long: {conversion_time:.2f}s"
@@ -140,11 +140,11 @@ class TestStressTesting:
                 conversion_time = time.time() - conversion_start
                 
                 print(f"Massive conversion time: {conversion_time:.2f}s")
-        
-        # Verify results
-        assert isinstance(mdv, MDVProject)
-        assert "cells" in mdv.get_datasource_names()
-        assert "genes" in mdv.get_datasource_names()
+                
+                # Verify results BEFORE the context manager cleans up
+                assert isinstance(mdv, MDVProject)
+                assert "cells" in mdv.get_datasource_names()
+                assert "genes" in mdv.get_datasource_names()
         
         # Check performance metrics
         assert conversion_time < 300, f"Conversion took too long: {conversion_time:.2f}s"
