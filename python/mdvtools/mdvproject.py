@@ -287,7 +287,7 @@ class MDVProject:
             "key_column": key_column,
             "type": image_type,
         }
-        print(f"Added image set {name} to {ds} datasource")
+        logger.info(f"Added image set {name} to {ds} datasource")
         self.set_datasource_metadata(ds_metadata)
 
     def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file):
@@ -338,28 +338,28 @@ class MDVProject:
                 
                 ProjectService.set_project_update_timestamp(self.id)
             # Print success message
-            print(f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully.")
+            logger.info(f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully.")
 
         except Exception as e:
-            print(f"Error in MDVProject.add_or_update_image_datasource: {e}")
+            logger.error(f"Error in MDVProject.add_or_update_image_datasource: {e}")
             
             # Attempt rollback actions
             try:
                 # Rollback the file upload
                 if os.path.exists(upload_file_path):  # Check the existence of the file at the upload path
-                    print("Reverting file upload...")
+                    logger.info("Reverting file upload...")
                     self.delete_uploaded_image(upload_file_path) 
                 
                 # Rollback datasource creation if it was new
                 if is_new_datasource and any(ds['name'] == datasource_name for ds in self.datasources):
-                    print("Reverting new datasource creation...")
+                    logger.info("Reverting new datasource creation...")
                     self.datasources = [x for x in self.datasources if x["name"] != datasource_name]
                     #self.delete_datasource(datasource_name, False)
                 elif datasource:
-                    print("Reverting datasource update...")
+                    logger.info("Reverting datasource update...")
                     self.restore_datasource(datasource_backup)  # This method may need to be implemented for updates
             except Exception as rollback_error:
-                print(f"Error during rollback in MDVProject.add_or_update_image_datasource: {rollback_error}")
+                logger.error(f"Error during rollback in MDVProject.add_or_update_image_datasource: {rollback_error}")
             
             # Re-raise the original exception for the caller to handle
             raise
@@ -369,10 +369,10 @@ class MDVProject:
         try:
             # Save the file to the /images/avivator folder
             file.save(upload_file_path)
-            print(f"File uploaded successfully to {upload_file_path}")
+            logger.info(f"File uploaded successfully to {upload_file_path}")
 
         except Exception as e:
-            print(f"Error in MDVProject.upload_image_file: Failed to upload file to '{upload_file_path}': {e}")
+            logger.error(f"Error in MDVProject.upload_image_file: Failed to upload file to '{upload_file_path}': {e}")
             raise
     
     def delete_uploaded_image(self, file_path):
@@ -380,11 +380,11 @@ class MDVProject:
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
-                print(f"Deleted uploaded image at: {file_path}")
+                logger.info(f"Deleted uploaded image at: {file_path}")
             else:
-                print(f"File does not exist at: {file_path}")
+                logger.info(f"File does not exist at: {file_path}")
         except Exception as e:
-            print(f"Error in MDVProject.delete_uploaded_image: Error deleting file at {file_path}: {e}")
+            logger.error(f"Error in MDVProject.delete_uploaded_image: Error deleting file at {file_path}: {e}")
             raise 
     
     def restore_datasource(self, datasource_backup):
@@ -399,15 +399,15 @@ class MDVProject:
             if existing_datasource:
                 # Overwrite the existing datasource with the backup values
                 existing_datasource.update(datasource_backup)  
-                print(f"Restored datasource '{datasource_backup['name']}' from backup. ")
+                logger.info(f"Restored datasource '{datasource_backup['name']}' from backup. ")
 
                 # Save the updated datasources to the JSON file
                 self.datasources = self.datasources  # This will call the setter and save the data
             else:
-                print(f"Warning: Could not find datasource '{datasource_backup['name']}' to restore.")
+                logger.warning(f"Warning: Could not find datasource '{datasource_backup['name']}' to restore.")
         
         except Exception as e:
-            print(f"Error in MDVProject.restore_datasource: {str(e)}")
+            logger.error(f"Error in MDVProject.restore_datasource: {str(e)}")
             raise
     
 
@@ -417,17 +417,17 @@ class MDVProject:
             # Find the existing datasource by name
             existing_datasource = next((ds for ds in self.datasources if ds["name"] == datasource_name), None)
 
-            print("In update_datasource_for_tiff")
-            print(datasource_name)
+            logger.info("In update_datasource_for_tiff")
+            logger.info(datasource_name)
             # print(existing_datasource)
             # print(datasource)
             #datasources empty template
             # If the datasource doesn't exist, create a new one
             if (existing_datasource is None):
-                print("In update_datasource_for_tiff: existing_datasource is None")
+                logger.info("In update_datasource_for_tiff: existing_datasource is None")
                 datasource = self.create_datasource_template(datasource_name)
                 self.datasources.append(datasource)  # Add the new datasource to the list
-                print(f"In MDVProject.update_datasource: Created new datasource template for '{datasource_name}'.")
+                logger.info(f"In MDVProject.update_datasource: Created new datasource template for '{datasource_name}'.")
                 
                 #adding default columns for new empty ds
                 filename = 'mdvtools/dbutils/emptyds.csv'
@@ -497,14 +497,14 @@ class MDVProject:
             #else:
             #    view_name = "default"
             view_name = region_name
-            print(view_name)
+            logger.info(view_name)
             self.set_view(view_name, region_view_json)
             
             #self.add_viv_images(region_name, image_metadata, link_images=True)
             return view_name
         
         except Exception as e:
-            print(f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource_name}': {e}")
+            logger.error(f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource_name}': {e}")
             raise
     
     def create_datasource_template(self, datasource_name: str) -> dict:
@@ -517,11 +517,11 @@ class MDVProject:
                 "regions": {},            # Initialize regions as an empty dictionary,
                 "columnGroups": []
             }
-            print(f"Created new datasource template '{datasource_name}'.")
+            logger.info(f"Created new datasource template '{datasource_name}'.")
             return template
         
         except Exception as e:
-            print(f"In MDVProject.create_datasource_template: Error creating datasource template '{datasource_name}': {e}")
+            logger.error(f"In MDVProject.create_datasource_template: Error creating datasource template '{datasource_name}': {e}")
             raise  # Re-raises the caught exception
 
     def ensure_regions_fields(self, 
@@ -555,7 +555,7 @@ class MDVProject:
             return regions
         
         except Exception as e:
-            print(f"In MDVProject.ensure_regions_fields: Error in ensure_regions_fields: {e}")
+            logger.error(f"In MDVProject.ensure_regions_fields: Error in ensure_regions_fields: {e}")
             raise  # Re-raises the caught exception
 
     
@@ -584,7 +584,7 @@ class MDVProject:
             # (although if they're trying to write, who knows what bad things may happen to the project in general)
             time.sleep(0.1)
             attempt += 1
-            print(f"error opening h5 file, attempt {attempt}...")
+            logger.error(f"error opening h5 file, attempt {attempt}...")
             return self._get_h5_handle(read_only, attempt)
 
     def get_column(self, datasource: str, column, raw=False):
@@ -1381,9 +1381,6 @@ class MDVProject:
         """Sets the view with the given name to the supplied view data.
         If the view is None, then the view will be deleted.
         """
-        print("In set_view")
-        print(name)
-        
         views = self.views
         # update or add the view
         if view:
@@ -1551,7 +1548,7 @@ class MDVProject:
                         shutil.copyfile(f, rel)
                         all_regions[k]["json"] = join("json", name)
                     except Exception as e:
-                        print(
+                        logger.warning(
                             f"Skipping json for region {k} because of error copying {f} to {rel}\n{repr(e)}"
                         )
                 else:
@@ -1635,7 +1632,7 @@ class MDVProject:
             self.set_datasource_metadata(md)
 
         except Exception as e:
-            print(f"Error in MDVProject.add_viv_viewer: {e}")
+            logger.error(f"Error in MDVProject.add_viv_viewer: {e}")
             raise  # Re-raise the exception after logging
 
 
@@ -1681,7 +1678,7 @@ class MDVProject:
                                 join(imdir, os.path.basename(v["path"])),
                             )
                     except Exception as e:
-                        print(
+                        logger.error(
                             f"Cannot link viv image '{v['path']}' to '{datasource}'\n{repr(e)}"
                         )
                     region["viv_image"] = {
@@ -1826,7 +1823,7 @@ def save_json(file, data, safe= True):
             with open(file,"w") as f:
                 json.dump(data,f,indent=2,allow_nan=False)
     except Exception as e:
-        print(
+        logger.error(
             f"Error saving json to '{file}': some data cleaning may be necessary... project likely to be in a bad state."
         )
         raise (e)
