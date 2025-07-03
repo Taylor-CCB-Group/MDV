@@ -26,6 +26,9 @@ import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
+from mdvtools.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -962,7 +965,6 @@ class MDVProject:
         h5 = None
         
         try:
-            print("starting add_datasource")
             if isinstance(dataframe, str):
                 dataframe = pandas.read_csv(dataframe, sep=separator)
             
@@ -975,8 +977,6 @@ class MDVProject:
             except Exception:
                 ds = None
 
-            print(f"is ds None? {ds}")
-
             if ds:
                 # Delete the existing datasource if replace_data is True
                 if replace_data:
@@ -986,26 +986,20 @@ class MDVProject:
                         f"Attempt to create datasource '{name}' failed because it already exists."
                     )
             
-            print("got passed the ds check")
             # Open HDF5 file and handle group creation
             try:
                 h5 = self._get_h5_handle()
                 
-                # Print current groups for visibility
-                for group_name in h5.keys():
-                    print(group_name)
-                    
                 # Check for and delete existing group with this name
                 if name in h5:
                     del h5[name]
-                    print(f"Deleted existing group '{name}' in HDF5 file.")
+                    logger.warning(f"Deleted existing group '{name}' in HDF5 file.")
                 
                 
                 gr = h5.create_group(name)
             except Exception as e:
                 raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}")
             
-            print("created h5 group without error")
             # Verify columns are provided
             if not columns:
                 raise AttributeError("No columns to add. Please provide valid columns metadata.")
@@ -1014,12 +1008,10 @@ class MDVProject:
             dodgy_columns = []
             for col in columns:
                 try:
-                    print(f"- adding column '{col['field']}' to datasource '{name}'")
                     add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean) # type: ignore
                 except Exception as e:
-                    print(f" ++++++ DODGY COLUMN: {col['field']}")
                     dodgy_columns.append(col["field"])
-                    warnings.warn(
+                    logger.warning(
                         f"Failed to add column '{col['field']}' to datasource '{name}': {repr(e)}"
                     )
             
@@ -1032,7 +1024,6 @@ class MDVProject:
             #print(f'--- setting datasource metadata: {ds}')
             self.set_datasource_metadata(ds)
             
-            print("Updated datasource metadata")
             # Add to view if specified
             if add_to_view:
                 # TablePlot parameters
@@ -1069,11 +1060,11 @@ class MDVProject:
                 ProjectService.set_project_update_timestamp(self.id)
             
             
-            print(f"In MDVProject.add_datasource: Added datasource successfully '{name}'")
+            logger.info(f"add_datasource: Added datasource successfully '{name}'")
             return dodgy_columns
 
         except Exception as e:
-            print(f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}")
+            logger.error(f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}")
             raise  # Re-raise the exception to propagate it to the caller
 
     def create_table_plot(self, title, params, size, position):
