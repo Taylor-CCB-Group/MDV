@@ -8,12 +8,18 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Box, Button, Divider, IconButton, TextField } from '@mui/material';
+import { Box, Button, Divider, IconButton, InputAdornment, TextField } from '@mui/material';
 import _ from 'lodash';
-import { Check, ContentCopy } from '@mui/icons-material';
+import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 
+
+export type MessageType = {
+    onClose: () => void;
+    updateInput: (text: string) => void;
+    suggestedQuestions: string[];
+}
 
 /**
  * prototype for new ways of handling project state...
@@ -57,8 +63,25 @@ import rehypeRaw from 'rehype-raw';
 //     }, [cm, root]);
 // }
 
+const SuggestedQuestions = ({ onSelect, suggestedQuestions }: { onSelect: (q: string) => void, suggestedQuestions: string[] }) => (
+    <div className="flex flex-wrap gap-2 mt-4 mb-4 flex-col">
+        <div className='font-bold'>Suggested Questions:</div>
+        <div className='flex flex-wrap gap-2 mt-2'>{suggestedQuestions.map((q) => (
+            <Button
+                key={q}
+                variant="outlined"
+                onClick={() => onSelect(q)}
+                size='large'
+                sx={{ textTransform: 'none', borderRadius: 2, color: "inherit" }}
+            >
+                {q}
+            </Button>
+        ))}
+        </div>
+    </div>
+);
 
-const Message = ({ text, sender, view, onClose, error }: ChatMessage & {onClose: () => void}) => {
+const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQuestions }: ChatMessage & MessageType) => {
     const isUser = sender === 'user';
     const [copied, setCopied] = useState(false);
     const pythonSections = extractPythonSections(text);
@@ -122,6 +145,11 @@ const Message = ({ text, sender, view, onClose, error }: ChatMessage & {onClose:
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
             ))} */}
+
+            {/* Show suggested questions only for the welcome message (sender: 'system') */}
+            {sender === 'system' && (
+                <SuggestedQuestions suggestedQuestions={suggestedQuestions} onSelect={updateInput} />
+            )}
             
             {/* Uncomment later and add logic for feedback buttons */}
             {/* {(sender === 'bot') && <MessageFeedback />} */}
@@ -275,10 +303,11 @@ export type ChatBotProps = {
     requestProgress: ChatProgress | null;
     verboseProgress: string[];
     onClose: () => void;
+    suggestedQuestions: string[];
 };
 
 
-const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose}: ChatBotProps) => {
+const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose, suggestedQuestions}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();
@@ -293,11 +322,19 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         setInput(e.target.value);
     }, []);
 
+    const updateInput = useCallback((text: string) => {
+        setInput(text);
+    }, []);
+
     const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             handleSend();
         }
     }, [handleSend]);
+
+    const handleClearInput = useCallback(() => {
+        setInput("");
+    }, []);
 
     const scrollToBottom = useCallback(() => {
         //! block: 'nearest' seems to solve issue with dialog header disappearing from top
@@ -315,7 +352,7 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
             <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
                 {messages.map((message) => (
-                    <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} />
+                    <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} updateInput={updateInput} suggestedQuestions={suggestedQuestions} />
                 ))}
                 {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
                 {/* {
@@ -339,8 +376,19 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                     sx={{
                         mr: 2,
                     }}
+                    slotProps={{
+                        input: {
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton onClick={handleClearInput}>
+                                        <ClearIcon fontSize="small" />
+                                    </IconButton>
+                                </InputAdornment>
+                            )
+                        }
+                    }}
                 />
-                <Button onClick={handleSend} disabled={isSending} 
+                <Button onClick={handleSend} disabled={isSending || !input} 
                 className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
                     Send
                 </Button>

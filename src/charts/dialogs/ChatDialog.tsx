@@ -21,7 +21,7 @@ import {
     Search as SearchIcon,
     ViewSidebar as ViewSidebarIcon,
 } from "@mui/icons-material";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 import { useResizeDrawer } from "@/react/hooks";
 import { Loader } from "@/react/components/ImportProjectDialog";
@@ -38,6 +38,7 @@ export type ChatDialogProps = {
     switchConversation: (id: string) => void;
     conversationMap: ConversationMap;
     conversationId: string;
+    suggestedQuestions: string[];
     onPopout?: () => void;
     isPopout?: boolean;
     fullscreen?: boolean;
@@ -57,6 +58,7 @@ const ChatDialog = ({
     switchConversation,
     conversationMap,
     conversationId,
+    suggestedQuestions,
     onPopout,
     isPopout,
     fullscreen = false,
@@ -252,6 +254,7 @@ const ChatDialog = ({
                                 sendAPI={sendAPI}
                                 verboseProgress={verboseProgress}
                                 onClose={onClose}
+                                suggestedQuestions={suggestedQuestions}
                             />)
                             }
                     </Box>
