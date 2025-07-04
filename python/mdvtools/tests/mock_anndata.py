@@ -135,7 +135,7 @@ class MockAnnDataFactory:
         )
     
     def create_large(self, n_cells: int = 10000, n_genes: int = 5000,
-                    add_missing: bool = True) -> sc.AnnData:
+                    add_missing: bool = True, density: float = 0.1) -> sc.AnnData:
         """Create a large AnnData object for stress testing."""
         return self._create_anndata(
             n_cells=n_cells,
@@ -144,11 +144,12 @@ class MockAnnDataFactory:
             add_dim_reductions=True,
             add_layers=True,
             add_uns=True,
-            sparse_matrix=True
+            sparse_matrix=True,
+            density=density
         )
     
     def create_memory_efficient_large(self, n_cells: int = 10000, n_genes: int = 5000,
-                                    add_missing: bool = True) -> sc.AnnData:
+                                    add_missing: bool = True, density: float = 0.1) -> sc.AnnData:
         """Create a large AnnData object optimized for memory efficiency.
         
         This method creates large datasets without dense layers to avoid
@@ -160,29 +161,77 @@ class MockAnnDataFactory:
             add_missing=add_missing,
             add_dim_reductions=False,  # Skip dense dimensionality reductions
             add_layers=False,          # Skip dense layers
-            add_uns=True,
-            sparse_matrix=True
+            add_uns=False,             # Skip unstructured data for memory efficiency
+            sparse_matrix=True,
+            density=density,
+            minimal_metadata=True      # Use minimal metadata for large datasets
         )
     
     def create_massive_dataset(self, n_cells: int = 100000, n_genes: int = 10000,
-                             add_missing: bool = True) -> sc.AnnData:
+                             add_missing: bool = True, density: float = 0.1,
+                             chunk_size: int = 10000, mode: str = 'realistic') -> sc.AnnData:
         """Create a massive dataset (100k+ cells) for extreme stress testing.
         
         This method uses chunked operations and memory-efficient approaches
         to handle datasets that would otherwise cause memory issues.
+        
+        Args:
+            n_cells: Number of cells
+            n_genes: Number of genes
+            add_missing: Whether to add missing values
+            density: Density of non-zero elements
+            chunk_size: Size of chunks for matrix generation
+            mode: Generation mode - 'realistic', 'fast', or 'skeleton'
         """
         print(f"Creating massive dataset: {n_cells:,} cells x {n_genes:,} genes")
         print(f"Estimated memory usage: {estimate_memory_usage(n_cells, n_genes, sparse=True):.1f}MB (sparse)")
+        print(f"Mode: {mode}, Chunk size: {chunk_size:,}")
         
         return self._create_anndata(
             n_cells=n_cells,
             n_genes=n_genes,
             add_missing=add_missing,
             add_dim_reductions=False,  # Skip dense dimensionality reductions
-            add_layers=True,           # Use chunked layers
-            add_uns=True,
+            add_layers=False,          # Skip layers for maximum memory efficiency
+            add_uns=False,             # Skip unstructured data for memory efficiency
             sparse_matrix=True,
-            use_chunked_layers=True    # Enable chunked layer processing
+            density=density,
+            chunk_size=chunk_size,
+            mode=mode,
+            use_chunked_layers=False,  # Disable chunked layer processing
+            minimal_metadata=True      # Use minimal metadata for large datasets
+        )
+    
+    def create_extreme_dataset(self, n_cells: int = 1000000, n_genes: int = 5000,
+                             density: float = 0.001, chunk_size: int = 50000,
+                             mode: str = 'fast') -> sc.AnnData:
+        """Create an extreme dataset (1M+ cells) for ultimate stress testing.
+        
+        This method is optimized for generating very large datasets efficiently.
+        Use 'fast' or 'skeleton' mode for best performance.
+        
+        Args:
+            n_cells: Number of cells (default: 1M)
+            n_genes: Number of genes (default: 5K)
+            density: Density of non-zero elements (default: 0.1%)
+            chunk_size: Size of chunks for matrix generation
+            mode: Generation mode - 'fast' or 'skeleton' recommended for large datasets
+        """
+        print(f"Creating extreme dataset: {n_cells:,} cells x {n_genes:,} genes")
+        print(f"Mode: {mode}, Density: {density:.4f}")
+        print(f"Estimated memory usage: {estimate_memory_usage(n_cells, n_genes, sparse=True):.1f}MB (sparse)")
+        
+        return self._create_anndata(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            add_missing=False,         # Skip missing values for speed
+            add_dim_reductions=False,  # Skip dimensionality reductions
+            add_layers=False,          # Skip layers for speed
+            add_uns=False,             # Skip unstructured data
+            sparse_matrix=True,
+            density=density,
+            chunk_size=chunk_size,
+            mode=mode
         )
     
     def create_edge_cases(self) -> sc.AnnData:
@@ -212,10 +261,14 @@ class MockAnnDataFactory:
                        add_layers: bool = False,
                        add_uns: bool = False,
                        sparse_matrix: bool = False,
+                       density: float = 0.1,
+                       chunk_size: int = 10000,
+                       mode: str = 'realistic',
                        cell_types: Optional[List[str]] = None,
                        conditions: Optional[List[str]] = None,
                        gene_types: Optional[List[str]] = None,
-                       use_chunked_layers: bool = False) -> sc.AnnData:
+                       use_chunked_layers: bool = False,
+                       minimal_metadata: bool = False) -> sc.AnnData:
         """Internal method to create AnnData with specified features."""
         
         # Default categorical values
@@ -228,16 +281,16 @@ class MockAnnDataFactory:
         
         # Create cell metadata (obs)
         obs_data = self._create_obs_data(
-            n_cells, cell_types, conditions, add_missing
+            n_cells, cell_types, conditions, add_missing, minimal_metadata
         )
         
         # Create gene metadata (var)
         var_data = self._create_var_data(
-            n_genes, gene_types, add_missing
+            n_genes, gene_types, add_missing, minimal_metadata
         )
         
         # Create expression matrix
-        X = self._create_expression_matrix(n_cells, n_genes, sparse_matrix)
+        X = self._create_expression_matrix(n_cells, n_genes, sparse_matrix, density, chunk_size, mode)
         
         # Create AnnData object
         adata = sc.AnnData(X=X, obs=obs_data, var=var_data)
@@ -257,108 +310,423 @@ class MockAnnDataFactory:
         return adata
     
     def _create_obs_data(self, n_cells: int, cell_types: List[str], 
-                        conditions: List[str], add_missing: bool) -> pd.DataFrame:
+                        conditions: List[str], add_missing: bool, minimal_metadata: bool = False) -> pd.DataFrame:
         """Create cell metadata DataFrame."""
-        # Generate probability arrays that match the number of categories
-        cell_type_probs = [1.0 / len(cell_types)] * len(cell_types)
-        condition_probs = [1.0 / len(conditions)] * len(conditions)
-        
-        obs_data = pd.DataFrame({
-            'cell_type': pd.Categorical(
-                np.random.choice(cell_types, n_cells, p=cell_type_probs)
-            ),
-            'condition': pd.Categorical(
-                np.random.choice(conditions, n_cells, p=condition_probs)
-            ),
-            'quality_score': np.random.normal(0, 1, n_cells),
-            'total_counts': np.random.exponential(1000, n_cells),
-            'n_genes_by_counts': np.random.poisson(2000, n_cells),
-            'pct_counts_mt': np.random.beta(2, 20, n_cells) * 10,
-            'is_high_quality': pd.Series(
-                np.random.choice([True, False], n_cells, p=[0.8, 0.2]), 
-                dtype='object'
-            ),
-            'is_doublet': pd.Series(
-                np.random.choice([True, False], n_cells, p=[0.1, 0.9]), 
-                dtype='object'
-            ),
-            'patient_id': pd.Categorical(
-                [f'P{i:03d}' for i in np.random.randint(1, 21, n_cells)]
-            ),
-            'batch': pd.Categorical(
-                [f'batch_{i}' for i in np.random.randint(1, 6, n_cells)]
-            )
-        })
-        
-        # Add missing values if requested
-        if add_missing:
-            missing_indices = np.random.choice(n_cells, size=n_cells//10, replace=False)
-            for idx in missing_indices:
-                col = np.random.choice(['cell_type', 'condition', 'is_high_quality', 'is_doublet'])
-                obs_data.loc[idx, col] = np.nan
+        if minimal_metadata:
+            # For large datasets, use minimal metadata to save memory
+            obs_data = pd.DataFrame({
+                'cell_type': pd.Categorical(
+                    np.random.choice(cell_types, n_cells)
+                ),
+                'condition': pd.Categorical(
+                    np.random.choice(conditions, n_cells)
+                ),
+                'quality_score': np.random.normal(0, 1, n_cells)
+            })
+        else:
+            # Generate probability arrays that match the number of categories
+            cell_type_probs = [1.0 / len(cell_types)] * len(cell_types)
+            condition_probs = [1.0 / len(conditions)] * len(conditions)
+            
+            obs_data = pd.DataFrame({
+                'cell_type': pd.Categorical(
+                    np.random.choice(cell_types, n_cells, p=cell_type_probs)
+                ),
+                'condition': pd.Categorical(
+                    np.random.choice(conditions, n_cells, p=condition_probs)
+                ),
+                'quality_score': np.random.normal(0, 1, n_cells),
+                'total_counts': np.random.exponential(1000, n_cells),
+                'n_genes_by_counts': np.random.poisson(2000, n_cells),
+                'pct_counts_mt': np.random.beta(2, 20, n_cells) * 10,
+                'is_high_quality': pd.Series(
+                    np.random.choice([True, False], n_cells, p=[0.8, 0.2]), 
+                    dtype='object'
+                ),
+                'is_doublet': pd.Series(
+                    np.random.choice([True, False], n_cells, p=[0.1, 0.9]), 
+                    dtype='object'
+                ),
+                'patient_id': pd.Categorical(
+                    [f'P{i:03d}' for i in np.random.randint(1, 21, n_cells)]
+                ),
+                'batch': pd.Categorical(
+                    [f'batch_{i}' for i in np.random.randint(1, 6, n_cells)]
+                )
+            })
+            
+            # Add missing values if requested
+            if add_missing:
+                missing_indices = np.random.choice(n_cells, size=n_cells//10, replace=False)
+                for idx in missing_indices:
+                    col = np.random.choice(['cell_type', 'condition', 'is_high_quality', 'is_doublet'])
+                    obs_data.loc[idx, col] = np.nan
         
         return obs_data
     
     def _create_var_data(self, n_genes: int, gene_types: List[str], 
-                        add_missing: bool) -> pd.DataFrame:
+                        add_missing: bool, minimal_metadata: bool = False) -> pd.DataFrame:
         """Create gene metadata DataFrame."""
-        # Generate probability arrays that match the number of categories
-        gene_type_probs = [1.0 / len(gene_types)] * len(gene_types)
-        
-        var_data = pd.DataFrame({
-            'gene_type': pd.Categorical(
-                np.random.choice(gene_types, n_genes, p=gene_type_probs)
-            ),
-            'chromosome': pd.Categorical(
-                [f'chr{i}' for i in np.random.randint(1, 23, n_genes)]
-            ),
-            'mean_expression': np.random.exponential(1, n_genes),
-            'highly_variable': np.random.choice([True, False], n_genes, p=[0.2, 0.8]),
-            'mt': pd.Series(
-                [name.startswith('MT-') for name in [f'GENE_{i:05d}' for i in range(n_genes)]],
-                dtype='object'
-            ),
-            'ribosomal': pd.Series(
-                [name.startswith('RPS') or name.startswith('RPL') 
-                 for name in [f'GENE_{i:05d}' for i in range(n_genes)]],
-                dtype='object'
-            ),
-            'name': [f'GENE_{i:05d}' for i in range(n_genes)]
-        })
-        
-        # Add missing values if requested
-        if add_missing:
-            missing_indices = np.random.choice(n_genes, size=n_genes//10, replace=False)
-            for idx in missing_indices:
-                col = np.random.choice(['gene_type', 'highly_variable', 'mt', 'ribosomal'])
-                var_data.loc[idx, col] = np.nan
+        if minimal_metadata:
+            # For large datasets, use minimal metadata to save memory
+            var_data = pd.DataFrame({
+                'gene_type': pd.Categorical(
+                    np.random.choice(gene_types, n_genes)
+                ),
+                'chromosome': pd.Categorical(
+                    [f'chr{i}' for i in np.random.randint(1, 23, n_genes)]
+                ),
+                'name': [f'GENE_{i:05d}' for i in range(n_genes)]
+            })
+        else:
+            # Generate probability arrays that match the number of categories
+            gene_type_probs = [1.0 / len(gene_types)] * len(gene_types)
+            
+            var_data = pd.DataFrame({
+                'gene_type': pd.Categorical(
+                    np.random.choice(gene_types, n_genes, p=gene_type_probs)
+                ),
+                'chromosome': pd.Categorical(
+                    [f'chr{i}' for i in np.random.randint(1, 23, n_genes)]
+                ),
+                'mean_expression': np.random.exponential(1, n_genes),
+                'highly_variable': np.random.choice([True, False], n_genes, p=[0.2, 0.8]),
+                'mt': pd.Series(
+                    [name.startswith('MT-') for name in [f'GENE_{i:05d}' for i in range(n_genes)]],
+                    dtype='object'
+                ),
+                'ribosomal': pd.Series(
+                    [name.startswith('RPS') or name.startswith('RPL') 
+                     for name in [f'GENE_{i:05d}' for i in range(n_genes)]],
+                    dtype='object'
+                ),
+                'name': [f'GENE_{i:05d}' for i in range(n_genes)]
+            })
+            
+            # Add missing values if requested
+            if add_missing:
+                missing_indices = np.random.choice(n_genes, size=n_genes//10, replace=False)
+                for idx in missing_indices:
+                    col = np.random.choice(['gene_type', 'highly_variable', 'mt', 'ribosomal'])
+                    var_data.loc[idx, col] = np.nan
         
         return var_data
     
     def _create_expression_matrix(self, n_cells: int, n_genes: int, 
-                                sparse: bool = False) -> Union[np.ndarray, scipy.sparse.spmatrix]:
-        """Create expression matrix with realistic single-cell data patterns."""
+                                sparse: bool = False, density: float = 0.1,
+                                chunk_size: int = 10000, mode: str = 'realistic') -> Union[np.ndarray, scipy.sparse.spmatrix]:
+        """Create expression matrix with realistic single-cell data patterns.
+        
+        Args:
+            n_cells: Number of cells
+            n_genes: Number of genes  
+            sparse: Whether to create a sparse matrix
+            density: Density of non-zero elements (0.0 to 1.0). Default 0.1 (10% non-zero)
+            chunk_size: Size of chunks for large matrix generation
+            mode: Generation mode - 'realistic' (unique indices), 'fast' (may have duplicates), 
+                  or 'skeleton' (structure only, no values)
+        """
         if sparse:
-            # Create sparse matrix with realistic sparsity
-            sparsity = 0.9  # 90% zeros
-            nnz = int(n_cells * n_genes * (1 - sparsity))
+            # Ensure density is valid
+            density = max(0.0, min(1.0, density))
             
-            # Generate random indices
-            cell_indices = np.random.randint(0, n_cells, nnz)
-            gene_indices = np.random.randint(0, n_genes, nnz)
+            # For very large matrices, use chunked generation
+            if n_cells * n_genes > 100_000_000:  # 100M elements threshold
+                return self._create_chunked_sparse_matrix(n_cells, n_genes, density, chunk_size, mode)
             
-            # Generate expression values (negative binomial distribution)
-            values = np.random.negative_binomial(5, 0.3, nnz)
-            
-            # Create sparse matrix
-            import scipy.sparse as sp
-            X = sp.csr_matrix((values, (cell_indices, gene_indices)), 
-                            shape=(n_cells, n_genes))
+            # For smaller matrices, use the existing optimized approach
+            return self._create_single_sparse_matrix(n_cells, n_genes, density, mode)
         else:
             # Create dense matrix
             X = np.random.negative_binomial(5, 0.3, (n_cells, n_genes))
         
         return X
+    
+    def _create_single_sparse_matrix(self, n_cells: int, n_genes: int, density: float, mode: str) -> scipy.sparse.spmatrix:
+        """Create a single sparse matrix using the optimized approach."""
+        # Calculate number of non-zero elements
+        nnz = int(n_cells * n_genes * density)
+        
+        # For very sparse matrices, use a more efficient approach
+        if density < 0.01:  # Less than 1% density
+            return self._create_very_sparse_matrix(n_cells, n_genes, nnz, mode)
+        
+        # For moderately sparse matrices, use optimized approach
+        if density < 0.3:  # Less than 30% density
+            return self._create_moderately_sparse_matrix(n_cells, n_genes, nnz, mode)
+        
+        # For dense matrices, use simple approach (duplicates are less likely)
+        return self._create_dense_sparse_matrix(n_cells, n_genes, nnz, mode)
+    
+    def _create_chunked_sparse_matrix(self, n_cells: int, n_genes: int, density: float, 
+                                    chunk_size: int, mode: str) -> scipy.sparse.spmatrix:
+        """Create large sparse matrices using chunked generation."""
+        import scipy.sparse as sp
+        
+        print(f"Generating chunked sparse matrix: {n_cells:,} cells × {n_genes:,} genes, density={density:.3f}")
+        
+        # Calculate total number of non-zero elements
+        total_nnz = int(n_cells * n_genes * density)
+        
+        if mode == 'skeleton':
+            # For skeleton mode, just create the structure without filling values
+            print("Creating skeleton matrix (structure only)")
+            return self._create_skeleton_matrix(n_cells, n_genes, total_nnz)
+        
+        # For very large matrices, use a more memory-efficient approach
+        if total_nnz > 5_000_000:  # 5M non-zero elements threshold
+            print("Using memory-efficient incremental CSR construction...")
+            return self._create_incremental_csr_matrix(n_cells, n_genes, density, chunk_size, mode)
+        
+        # For smaller matrices, use the original approach
+        all_rows = []
+        all_cols = []
+        all_values = []
+        
+        for chunk_start in range(0, n_cells, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, n_cells)
+            chunk_cells = chunk_end - chunk_start
+            
+            # Adjust nnz for this chunk
+            chunk_nnz = int(chunk_cells * n_genes * density)
+            
+            if mode == 'realistic':
+                # Generate unique indices for this chunk
+                chunk_rows, chunk_cols, chunk_vals = self._generate_unique_chunk_indices(
+                    chunk_cells, n_genes, chunk_nnz, chunk_start
+                )
+            else:  # fast mode
+                # Generate indices quickly (may have duplicates)
+                chunk_rows, chunk_cols, chunk_vals = self._generate_fast_chunk_indices(
+                    chunk_cells, n_genes, chunk_nnz, chunk_start
+                )
+            
+            all_rows.extend(chunk_rows)
+            all_cols.extend(chunk_cols)
+            all_values.extend(chunk_vals)
+            
+            if chunk_start % (chunk_size * 10) == 0:
+                print(f"  Processed {chunk_start:,}/{n_cells:,} cells")
+        
+        # Create the final sparse matrix
+        print("Assembling final sparse matrix...")
+        X = sp.csr_matrix((all_values, (all_rows, all_cols)), shape=(n_cells, n_genes))
+        
+        print(f"Final matrix: {X.shape}, nnz: {X.nnz:,}, density: {X.nnz/(n_cells*n_genes):.6f}")
+        return X
+    
+    def _create_incremental_csr_matrix(self, n_cells: int, n_genes: int, density: float,
+                                     chunk_size: int, mode: str) -> scipy.sparse.spmatrix:
+        """Create large sparse matrices using incremental CSR construction to save memory."""
+        import scipy.sparse as sp
+        
+        # Pre-allocate CSR matrix structure
+        total_nnz = int(n_cells * n_genes * density)
+        
+        # Initialize CSR arrays
+        indptr = np.zeros(n_cells + 1, dtype=np.int32)
+        indices = np.zeros(total_nnz, dtype=np.int32)
+        data = np.zeros(total_nnz, dtype=np.float32)
+        
+        current_nnz = 0
+        
+        for chunk_start in range(0, n_cells, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, n_cells)
+            chunk_cells = chunk_end - chunk_start
+            
+            # Adjust nnz for this chunk
+            chunk_nnz = int(chunk_cells * n_genes * density)
+            
+            if mode == 'realistic':
+                # Generate unique indices for this chunk
+                chunk_rows, chunk_cols, chunk_vals = self._generate_unique_chunk_indices(
+                    chunk_cells, n_genes, chunk_nnz, chunk_start
+                )
+            else:  # fast mode
+                # Generate indices quickly (may have duplicates)
+                chunk_rows, chunk_cols, chunk_vals = self._generate_fast_chunk_indices(
+                    chunk_cells, n_genes, chunk_nnz, chunk_start
+                )
+            
+            # Sort by row for CSR format
+            sorted_indices = np.argsort(chunk_rows)
+            chunk_rows = chunk_rows[sorted_indices]
+            chunk_cols = chunk_cols[sorted_indices]
+            chunk_vals = chunk_vals[sorted_indices]
+            
+            # Fill CSR arrays
+            for i, (row, col, val) in enumerate(zip(chunk_rows, chunk_cols, chunk_vals)):
+                if current_nnz >= total_nnz:
+                    break
+                indices[current_nnz] = col
+                data[current_nnz] = val
+                current_nnz += 1
+            
+            # Update indptr for this chunk
+            for row in range(chunk_start, chunk_end):
+                indptr[row + 1] = current_nnz
+            
+            if chunk_start % (chunk_size * 10) == 0:
+                print(f"  Processed {chunk_start:,}/{n_cells:,} cells")
+        
+        # Create CSR matrix
+        X = sp.csr_matrix((data[:current_nnz], indices[:current_nnz], indptr), 
+                         shape=(n_cells, n_genes))
+        
+        print(f"Final matrix: {X.shape}, nnz: {X.nnz:,}, density: {X.nnz/(n_cells*n_genes):.6f}")
+        return X
+    
+    def _generate_unique_chunk_indices(self, chunk_cells: int, n_genes: int, nnz: int, 
+                                     row_offset: int) -> tuple:
+        """Generate unique indices for a chunk."""
+        # Use rejection sampling for unique indices
+        target_size = int(nnz * 1.2)  # Generate 20% more to account for duplicates
+        
+        # Generate initial indices
+        rows = np.random.randint(0, chunk_cells, target_size) + row_offset
+        cols = np.random.randint(0, n_genes, target_size)
+        
+        # Create unique pairs
+        pairs = set(zip(rows, cols))
+        
+        # If we don't have enough unique pairs, generate more
+        while len(pairs) < nnz:
+            additional_size = min(1000, nnz - len(pairs))
+            new_rows = np.random.randint(0, chunk_cells, additional_size) + row_offset
+            new_cols = np.random.randint(0, n_genes, additional_size)
+            pairs.update(zip(new_rows, new_cols))
+        
+        # Take exactly nnz pairs
+        unique_pairs = list(pairs)[:nnz]
+        rows = np.array([p[0] for p in unique_pairs])
+        cols = np.array([p[1] for p in unique_pairs])
+        values = self._generate_realistic_expression_values(nnz)
+        
+        return rows, cols, values
+    
+    def _generate_fast_chunk_indices(self, chunk_cells: int, n_genes: int, nnz: int, 
+                                   row_offset: int) -> tuple:
+        """Generate indices quickly (may have duplicates)."""
+        rows = np.random.randint(0, chunk_cells, nnz) + row_offset
+        cols = np.random.randint(0, n_genes, nnz)
+        values = self._generate_realistic_expression_values(nnz)
+        
+        return rows, cols, values
+    
+    def _create_skeleton_matrix(self, n_cells: int, n_genes: int, nnz: int) -> scipy.sparse.spmatrix:
+        """Create a skeleton matrix with structure but no meaningful values."""
+        import scipy.sparse as sp
+        
+        # Generate random indices (no need to worry about duplicates for skeleton)
+        rows = np.random.randint(0, n_cells, nnz)
+        cols = np.random.randint(0, n_genes, nnz)
+        
+        # Use placeholder values (all 1s or random small integers)
+        values = np.ones(nnz, dtype=np.int32)
+        
+        return sp.csr_matrix((values, (rows, cols)), shape=(n_cells, n_genes))
+    
+    def _create_moderately_sparse_matrix(self, n_cells: int, n_genes: int, nnz: int, mode: str) -> scipy.sparse.spmatrix:
+        """Create moderately sparse matrices efficiently with guaranteed unique indices."""
+        import scipy.sparse as sp
+        
+        if mode == 'fast':
+            # Fast mode - may have duplicates
+            cell_indices = np.random.randint(0, n_cells, nnz)
+            gene_indices = np.random.randint(0, n_genes, nnz)
+            values = self._generate_realistic_expression_values(nnz)
+        elif mode == 'skeleton':
+            # Skeleton mode - just structure
+            cell_indices = np.random.randint(0, n_cells, nnz)
+            gene_indices = np.random.randint(0, n_genes, nnz)
+            values = np.ones(nnz, dtype=np.int32)
+        else:  # realistic mode
+            # Use a more efficient approach for moderate sparsity
+            # Generate indices using rejection sampling with larger initial sample
+            target_size = int(nnz * 1.2)  # Generate 20% more to account for duplicates
+            
+            # Generate initial indices
+            cell_indices = np.random.randint(0, n_cells, target_size)
+            gene_indices = np.random.randint(0, n_genes, target_size)
+            
+            # Create unique pairs
+            pairs = set(zip(cell_indices, gene_indices))
+            
+            # If we don't have enough unique pairs, generate more
+            while len(pairs) < nnz:
+                additional_size = min(1000, nnz - len(pairs))
+                new_cells = np.random.randint(0, n_cells, additional_size)
+                new_genes = np.random.randint(0, n_genes, additional_size)
+                pairs.update(zip(new_cells, new_genes))
+            
+            # Take exactly nnz pairs
+            unique_pairs = list(pairs)[:nnz]
+            cell_indices = np.array([p[0] for p in unique_pairs])
+            gene_indices = np.array([p[1] for p in unique_pairs])
+            values = self._generate_realistic_expression_values(nnz)
+        
+        # Create sparse matrix
+        return sp.csr_matrix((values, (cell_indices, gene_indices)), 
+                           shape=(n_cells, n_genes))
+    
+    def _create_dense_sparse_matrix(self, n_cells: int, n_genes: int, nnz: int, mode: str) -> scipy.sparse.spmatrix:
+        """Create dense sparse matrices using simple approach (duplicates are less likely)."""
+        import scipy.sparse as sp
+        
+        # For dense matrices, duplicates are less likely, so use simple approach
+        cell_indices = np.random.randint(0, n_cells, nnz)
+        gene_indices = np.random.randint(0, n_genes, nnz)
+        
+        if mode == 'skeleton':
+            values = np.ones(nnz, dtype=np.int32)
+        else:
+            values = self._generate_realistic_expression_values(nnz)
+        
+        # Create sparse matrix
+        return sp.csr_matrix((values, (cell_indices, gene_indices)), 
+                           shape=(n_cells, n_genes))
+    
+    def _create_very_sparse_matrix(self, n_cells: int, n_genes: int, nnz: int, mode: str) -> Any:
+        """Create very sparse matrices efficiently using COO format."""
+        import scipy.sparse as sp
+        
+        # For very sparse matrices, use coordinate format for efficiency
+        cell_indices = np.random.choice(n_cells, nnz, replace=True)
+        gene_indices = np.random.choice(n_genes, nnz, replace=True)
+        
+        if mode == 'skeleton':
+            values = np.ones(nnz, dtype=np.int32)
+        else:
+            values = self._generate_realistic_expression_values(nnz)
+        
+        # Create COO matrix and convert to CSR
+        coo_matrix = sp.coo_matrix((values, (cell_indices, gene_indices)), 
+                                  shape=(n_cells, n_genes))
+        csr_matrix = coo_matrix.tocsr()
+        return csr_matrix
+    
+    def _generate_realistic_expression_values(self, n_values: int) -> np.ndarray:
+        """Generate realistic single-cell expression values.
+        
+        Single-cell data typically follows a negative binomial distribution
+        with many zeros and a long tail of high expression values.
+        """
+        # Use negative binomial distribution for realistic counts
+        # Parameters tuned for typical single-cell data
+        r, p = 5, 0.3  # Shape and probability parameters
+        
+        # Generate base values
+        values = np.random.negative_binomial(r, p, n_values)
+        
+        # Add some zeros to make it more realistic (some genes are truly not expressed)
+        zero_prob = 0.3  # 30% chance of being zero
+        zero_mask = np.random.random(n_values) < zero_prob
+        values[zero_mask] = 0
+        
+        # Ensure no negative values (shouldn't happen with negative binomial, but just in case)
+        values = np.maximum(values, 0)
+        
+        return values
     
     def _add_dimension_reductions(self, adata: sc.AnnData):
         """Add dimensionality reductions to the AnnData object."""
@@ -543,32 +911,69 @@ def create_realistic_anndata(n_cells: int = 1000, n_genes: int = 2000,
 
 
 def create_large_anndata(n_cells: int = 10000, n_genes: int = 5000,
-                        add_missing: bool = True) -> sc.AnnData:
+                        add_missing: bool = True, density: float = 0.1) -> sc.AnnData:
     """Create large AnnData object for stress testing."""
     factory = MockAnnDataFactory()
-    return factory.create_large(n_cells, n_genes, add_missing)
+    return factory.create_large(n_cells, n_genes, add_missing, density)
 
 
 def create_memory_efficient_large_anndata(n_cells: int = 10000, n_genes: int = 5000,
-                                         add_missing: bool = True) -> sc.AnnData:
+                                         add_missing: bool = True, density: float = 0.1) -> sc.AnnData:
     """Create memory-efficient large AnnData object for stress testing.
     
     This function creates large datasets without dense layers to avoid
     excessive memory consumption during stress testing.
     """
     factory = MockAnnDataFactory()
-    return factory.create_memory_efficient_large(n_cells, n_genes, add_missing)
+    return factory.create_memory_efficient_large(n_cells, n_genes, add_missing, density)
 
 
 def create_massive_anndata(n_cells: int = 100000, n_genes: int = 10000,
-                          add_missing: bool = True) -> sc.AnnData:
+                          add_missing: bool = True, density: float = 0.1,
+                          chunk_size: int = 10000, mode: str = 'realistic') -> sc.AnnData:
     """Create massive AnnData object for extreme stress testing.
     
     This function creates datasets with 100k+ cells using chunked operations
     to handle memory efficiently. Suitable for testing with real-world scale data.
     """
     factory = MockAnnDataFactory()
-    return factory.create_massive_dataset(n_cells, n_genes, add_missing)
+    return factory.create_massive_dataset(n_cells, n_genes, add_missing, density, chunk_size, mode)
+
+
+def create_extreme_anndata(n_cells: int = 1000000, n_genes: int = 5000,
+                          density: float = 0.001, chunk_size: int = 50000,
+                          mode: str = 'fast') -> sc.AnnData:
+    """Create extreme AnnData object for ultimate stress testing.
+    
+    This function creates datasets with 1M+ cells using optimized chunked operations.
+    Use 'fast' or 'skeleton' mode for best performance with large datasets.
+    """
+    factory = MockAnnDataFactory()
+    return factory.create_extreme_dataset(n_cells, n_genes, density, chunk_size, mode)
+
+
+def create_fast_large_anndata(n_cells: int = 100000, n_genes: int = 5000,
+                             density: float = 0.1, chunk_size: int = 10000) -> sc.AnnData:
+    """Create large AnnData object using fast generation mode.
+    
+    This function prioritizes speed over perfect accuracy (may have duplicate indices).
+    Suitable for stress testing where speed is more important than data quality.
+    """
+    factory = MockAnnDataFactory()
+    return factory.create_massive_dataset(n_cells, n_genes, add_missing=False, 
+                                        density=density, chunk_size=chunk_size, mode='fast')
+
+
+def create_skeleton_anndata(n_cells: int = 100000, n_genes: int = 5000,
+                           density: float = 0.1, chunk_size: int = 10000) -> sc.AnnData:
+    """Create large AnnData object with skeleton matrix (structure only).
+    
+    This function creates a matrix with the correct structure but placeholder values.
+    Fastest option for testing pipeline structure without realistic data.
+    """
+    factory = MockAnnDataFactory()
+    return factory.create_massive_dataset(n_cells, n_genes, add_missing=False,
+                                        density=density, chunk_size=chunk_size, mode='skeleton')
 
 
 def create_edge_case_anndata() -> sc.AnnData:
