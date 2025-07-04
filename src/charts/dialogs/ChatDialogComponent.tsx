@@ -1,7 +1,7 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
 import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
@@ -341,12 +341,12 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, []);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         // Only scroll when there are new messages or progress updates
-        if (messages.length > 0 || requestProgress) {
+        if (messages || requestProgress) {
             scrollToBottom();
         }
-    }, [messages.length, requestProgress, scrollToBottom]);
+    }, [messages, requestProgress, scrollToBottom]);
     
     return (
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
