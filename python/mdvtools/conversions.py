@@ -128,8 +128,7 @@ def convert_scanpy_to_mdv(
     #get the matrix in the correct format
     matrix,sparse= get_matrix(scanpy_object.X)
     #sometimes X is empty - all the data is in the layers
-    assert(matrix is not None)
-    if matrix.shape[1] !=0:
+    if matrix is not None and matrix.shape[1] !=0:
         # add the gene expression
         mdv.add_rows_as_columns_subgroup(
             f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",
