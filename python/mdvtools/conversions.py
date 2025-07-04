@@ -17,8 +17,8 @@ def convert_scanpy_to_mdv(
     max_dims: int = 3, 
     delete_existing: bool = False, 
     label: str = "",
-    chunk_data: bool = False,
-    add_layer_data = True,
+    chunk_data: bool = True,
+    add_layer_data = False,
     gene_identifier_column = None
 ) -> MDVProject:
     """
@@ -98,6 +98,7 @@ def convert_scanpy_to_mdv(
         "name":"cell_id",
         "datatype":"unique"
     }]
+
     mdv.add_datasource(f"{label}cells", cell_table,columns)
 
     # create datasource 'genes'

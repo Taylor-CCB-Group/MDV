@@ -35,14 +35,14 @@ Your task is to:
     - Pie Chart: Requires one categorical column.  
     - Row Chart: Requires one categorical column.  
     - Row summary box: Requires any column(s).  
-    - Sankey diagram: Requires two categorical columns.  
+    - Sankey plot: Requires two categorical columns.  
       - If only one categorical variable is available, return it twice.  
     - Scatter plot (2D): Requires two numerical columns and one any column for color.
     - Scatter plot (3D): Requires three numerical columns and one any column for color.  
     - Selection dialog plot: Requires any column.  
     - Stacked row chart: Requires two categorical columns.  
       - If only one categorical variable is available, return it twice.  
-    - Table: Requires any column(s).  
+    - Table Plot: Requires any column(s).  
     - Text box: Requires no columns, just text.  
     - Violin plot: Requires one categorical column and one numerical column.  
     - Wordcloud: Requires one categorical column.  
@@ -146,7 +146,7 @@ Each script follows this standard workflow:
     - Only wrap genes—do not apply `get_loc()` or `index` on `data_frame_obs` fields.
 
 7. Queries requiring subsetting of the dataset:
-    If to answer the question requires a subset of the data, make sure to:
+    If to answer the question requires a subset of the data or filtering the data, make sure to:
     - Add a selection dialog plot with all the parameters that were passed on as params.
 
 8. Your Task:
@@ -161,7 +161,30 @@ Each script follows this standard workflow:
         - data_path = '"""+path_to_data+"""'
         - view_name = a string describing what is being visualized.
         - datasource_name = '"""+datasource_name+"""'
-
+    - The type of fields given in params should follow the following visualisation guidelines for each type of chart:
+        - Abundance Box plot: Requires three categorical columns.  
+            - If only one categorical variable is available, return it three times.  
+            - If two are available, return one of them twice.  
+        - Box plot: Requires one categorical column and one numerical column.  
+        - Density Scatter plot: Requires two numerical columns and one categorical column.  
+        - Dot plot: Requires one categorical column and any number of numerical columns.  
+        - Heat map: Requires one categorical column and any number of numerical columns.  
+        - Histogram: Requires one numerical column.  
+        - Multiline chart: Requires one numerical column and one categorical column.  
+        - Pie Chart: Requires one categorical column.  
+        - Row Chart: Requires one categorical column.  
+        - Row summary box: Requires any column(s).  
+        - Sankey plot: Requires two categorical columns.  
+            - If only one categorical variable is available, return it twice.  
+        - Scatter plot (2D): Requires two numerical columns and one any column for color.
+        - Scatter plot (3D): Requires three numerical columns and one any column for color.  
+        - Selection dialog plot: Requires any column.  
+        - Stacked row chart: Requires two categorical columns.  
+            - If only one categorical variable is available, return it twice.  
+        - Table Plot: Requires any column(s).  
+        - Text box: Requires no columns, just text.  
+        - Violin plot: Requires one categorical column and one numerical column.  
+        - Wordcloud: Requires one categorical column.
 """
     )
     return prompt_RAG
