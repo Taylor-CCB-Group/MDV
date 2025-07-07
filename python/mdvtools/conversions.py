@@ -148,7 +148,9 @@ def convert_scanpy_to_mdv(
     print("Getting Matrix")
     matrix,sparse= get_matrix(scanpy_object.X)
     #sometimes X is empty - all the data is in the layers
-    if matrix is not None and matrix.shape[1] !=0:
+    assert matrix is not None # asserting here so that 'invalid_adata' test gets expected error
+    # don't want to faff about with more complex logic for permutation with add_layer_data just now
+    if matrix.shape[1] !=0:
         # add the gene expression
         print("Adding gene expression")
         mdv.add_rows_as_columns_subgroup(
