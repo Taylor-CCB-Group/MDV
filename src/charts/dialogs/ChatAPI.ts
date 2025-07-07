@@ -1,7 +1,7 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { z } from 'zod';
+import * as z from 'zod/v4';
 import { useQuery } from '@tanstack/react-query';
 import { useChartManager, useViewManager } from "@/react/hooks";
 
@@ -49,6 +49,7 @@ const chatLogItemSchema = z.object({
 //     convesationId: data.conversation_id,
 // }));
 const chatLogSchema = z.array(chatLogItemSchema);
+// z.toJSONSchema(chatLogSchema);
 
 export type ChatLogItem = z.infer<typeof chatLogItemSchema>;
 
