@@ -1162,6 +1162,8 @@ class MDVProject:
 
         if sparse:
             # Handle sparse matrix
+            density = f"{len(data.data) / (data.shape[0] * data.shape[1]):.3f}"
+            logger.info(f"Adding sparse matrix to {row_ds} with {len(data.data)} elements (density {density})")
             gr.create_dataset(
                 "x", (len(data.data),), data=data.data, dtype=numpy.float32
             )
@@ -1171,6 +1173,7 @@ class MDVProject:
             gr.create_dataset("p", (len(data.indptr),), data=data.indptr)
         else:
             # Fallback to dense or convertible
+            logger.info(f"Adding dense matrix to {row_ds}")
             try:
                 #Requires a lot of RAM leads to memory errors on smaller machines
                 if not chunk_data:
@@ -1202,9 +1205,14 @@ class MDVProject:
                     # normalization creating (different) non zero values in each gene for 0 reads
                     # Transposing the array without loading into memmory would probably take the 
                     # same amount of time
-                    for i in range(0, num_cols,1000):
-                        dset[i*num_rows:(i+1000)*num_rows] = data[:,i:i+1000].flatten("F")
-
+                    # Adapt chunk_size so large row length won't consume too much memory.
+                    chunk_size = self._get_optimal_chunk_size(num_rows, num_cols)
+                    for i in range(0, num_cols,chunk_size):
+                        # protect against out-of-bounds end_col here 
+                        # - although in testing, no difference observed, because
+                        # total_len of dset is the right size & both slices will truncate correctly
+                        end_col = min(i + chunk_size, num_cols)
+                        dset[i*num_rows:(end_col)*num_rows] = data[:,i:end_col].flatten("F")
             except Exception as e:
                 raise TypeError(f"Unsupported data type for dense processing: {type(data)}. Original error: {e}")
 
@@ -1217,6 +1225,28 @@ class MDVProject:
         }
         self.set_datasource_metadata(ds)
         h5.close()
+
+    def _get_optimal_chunk_size(self, rows: int, cols: int) -> int:
+        """Determine optimal chunk size based on matrix dimensions and available memory."""
+        try:
+            import psutil
+            available_memory_mb = psutil.virtual_memory().available / 1024 / 1024
+        except ImportError:
+            # Fallback if psutil is not available
+            available_memory_mb = 1000  # Assume 1GB available
+        
+        # Estimate memory per element (float32 = 4 bytes)
+        bytes_per_element = 4
+        
+        # Calculate how many elements we can process with available memory
+        # Use 25% of available memory to be very safe for large datasets
+        safe_memory_bytes = available_memory_mb * 1024 * 1024 * 0.25
+        max_elements = safe_memory_bytes / bytes_per_element
+        
+        if rows * cols <= max_elements:
+            return cols
+        else:
+            return max(1, int(max_elements / rows))
 
     def get_links(self, datasource, filter=None):
         ds = self.get_datasource_metadata(datasource)
@@ -1812,7 +1842,8 @@ class MDVProject:
         return chart
 
 def get_json(file):
-    return json.loads(open(file).read())
+    with open(file) as f:
+        return json.load(f)
 
 
 def save_json(file, data, safe= True):

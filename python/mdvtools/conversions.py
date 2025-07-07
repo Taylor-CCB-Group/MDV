@@ -10,6 +10,23 @@ import gzip
 import copy
 import yaml
 import shutil
+import psutil
+
+def get_memory_usage():
+    """Get current memory usage in GB."""
+    try:
+        process = psutil.Process(os.getpid())
+        return process.memory_info().rss / 1024 / 1024 / 1024
+    except ImportError:
+        return 0.0  # Return 0 if psutil is not available
+
+def log_memory_usage(stage=""):
+    """Log current memory usage."""
+    memory_gb = get_memory_usage()
+    if memory_gb > 0:
+        print(f"Memory usage {stage}: {memory_gb:.2f} GB")
+    else:
+        print(f"Memory monitoring {stage}: psutil not available")
 
 def convert_scanpy_to_mdv(
     folder: str, 
@@ -80,6 +97,8 @@ def convert_scanpy_to_mdv(
     if scanpy_object.n_obs == 0 or scanpy_object.n_vars == 0:
         raise ValueError("Cannot convert empty AnnData object (0 cells or 0 genes)")
     
+    log_memory_usage("at start")
+    
     mdv = MDVProject(folder, delete_existing=delete_existing)
 
     # If not deleting existing, preserve current views
@@ -126,21 +145,25 @@ def convert_scanpy_to_mdv(
     mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", gene_identifier_column, "Gene Expr")
 
     #get the matrix in the correct format
+    print("Getting Matrix")
     matrix,sparse= get_matrix(scanpy_object.X)
     #sometimes X is empty - all the data is in the layers
     if matrix is not None and matrix.shape[1] !=0:
         # add the gene expression
+        print("Adding gene expression")
         mdv.add_rows_as_columns_subgroup(
             f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",
-            sparse=sparse, chunk_data=chunk_data
+            # sparse=sparse, #this should be inferred from the matrix
+            chunk_data=chunk_data
         )
 
     #now add layers
     if add_layer_data:
         for layer,matrix in scanpy_object.layers.items():
             matrix,sparse = get_matrix(matrix)
+            print(f"Adding layer {layer}")
             mdv.add_rows_as_columns_subgroup(
-                f"{label}cells", f"{label}genes", layer, matrix, sparse=sparse, chunk_data=chunk_data
+                f"{label}cells", f"{label}genes", layer, matrix, chunk_data=chunk_data
             )
 
     if delete_existing:
