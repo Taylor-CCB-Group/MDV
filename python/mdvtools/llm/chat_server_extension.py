@@ -6,6 +6,7 @@ from mdvtools.llm.chat_protocol import (
   ProjectChatProtocol, 
   chat_enabled
 )
+from mdvtools.llm.markdown_utils import create_project_markdown
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 # from mdvtools.dbutils.config import config
@@ -48,15 +49,6 @@ class MDVProjectServerExtension(Protocol):
 class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
-    def create_column_markdown(self, cols: list[str]): 
-        if cols:
-            markdown = "Below is the list of columns for this project:<br><br>"
-            markdown += "\n| |\n|---|\n"
-            for col in cols:
-                markdown += f"| {col} |\n"
-        else:
-            markdown = "No columns found."
-        return "<br><br><br>" + markdown
 
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
         from mdvtools.websocket import socketio
@@ -95,10 +87,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 bot.log(f"ERROR: {error_msg}")
                 return {"message": f"ERROR: {error_msg}", "error": True}
             
-            ds = project.get_datasource_as_dataframe(bot.ds_name)
-            cols = list(ds.columns)
-
-            markdown = self.create_column_markdown(cols)
+            markdown = create_project_markdown(project)
                 
             bot.log(f"Markdown: {markdown}")
             detailed_message = bot.welcome + markdown
@@ -119,6 +108,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 # also, this method may be augmented so that it also logs to the chat log,
                 # and pass this handler to the bot.ask_question method.
                 # Log error to chat_log.json
+                logger.error(f"Chat error: {error}")
                 log_chat_item(project, message or '', None, '', error, conversation_id, None, error=True)
                 socketio.emit(
                     "chat_error",
