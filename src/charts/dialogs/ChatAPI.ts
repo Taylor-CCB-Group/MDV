@@ -186,11 +186,12 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
 
 // Mock suggested questions
 const SUGGESTED_QUESTIONS = [
-    "What columns are available in this project?",
-    "Show me a summary of the data.",
-    "How many rows are in the dataset?",
-    "What is the distribution of ages?",
-    "List all unique values in the 'region' column."
+    // "What columns are available in this project?",
+    "Show me a summary of the cell data.",
+    "Show me a scatterplot of the UMAP coordinates, colored by cluster."
+    // "How many rows are in the dataset?",
+    // "What is the distribution of ages?",
+    // "List all unique values in the 'region' column."
 ];
 
 // todo: The architecture of this hook is a bit poor, there is no single source of truth, we can have both messages and chatLog which could make it out of sync
