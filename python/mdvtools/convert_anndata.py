@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert AnnData to MDV format")
     parser.add_argument("input_h5ad", help="Input h5ad file")
     parser.add_argument("output_folder", help="Output folder for MDV project")
-    parser.add_argument("--delete-existing", action="store_true", default=True, help="Delete existing project data")
+    parser.add_argument("--delete-existing", action="store_false", default=True, help="Delete existing project data")
     # parser.add_argument("--add-layers", default=False, help="Add additional matrix layers (expensive)")
     
     args = parser.parse_args()
