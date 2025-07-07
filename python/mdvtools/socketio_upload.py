@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 from typing import Dict, Optional, Any, List
 
 from mdvtools.mdvproject import MDVProject
-from mdvtools.file_processing import datasource_processing, validate_datasource, anndata_processing, validate_anndata
+from mdvtools.file_processing import datasource_processing, validate_datasource, anndata_processing, validate_anndata, mdv_project_processing, validate_mdv_project
 
 # Upload configuration
 UPLOAD_TTL = timedelta(hours=24)
@@ -23,6 +23,7 @@ CLEANUP_INTERVAL_SECONDS = 3600
 _upload_manager: Optional['FileUploadManager'] = None
 _upload_projects_map: Dict[str, MDVProject] = {}
 _socketio_instance: Optional[SocketIO] = None
+_project_creation_api: Optional['ProjectCreationUploadAPI'] = None
 
 def upload_log(msg: str):
     """Logging function for upload module."""
@@ -287,13 +288,19 @@ class FileUploadManager:
                 
                 if not project:
                     upload_log(f"Project {project_id} not found for processing {file_id}")
-                    state['status'] = 'error'
-                    state['error_message'] = f"Project {project_id} not found"
-                    self._save_upload_state(file_id, state)
-                    self._notify_client(sid, namespace, 'upload_error', {
-                        'file_id': file_id, 'message': state['error_message']
-                    })
-                    continue
+                    
+                    # Check if this is a project creation upload
+                    if project_id == "project_creation":
+                        upload_log(f"Processing project creation upload: {file_id}")
+                        # This is handled in the processing logic below
+                    else:
+                        state['status'] = 'error'
+                        state['error_message'] = f"Project {project_id} not found"
+                        self._save_upload_state(file_id, state)
+                        self._notify_client(sid, namespace, 'upload_error', {
+                            'file_id': file_id, 'message': state['error_message']
+                        })
+                        continue
 
                 upload_log(f"Processing file: {file_id} for project {project_id}")
                 state['status'] = 'processing'
@@ -307,6 +314,11 @@ class FileUploadManager:
                     content_type = state.get('content_type')
                     
                     if content_type == "text/csv":
+                        # Get project from global projects map
+                        project = _upload_projects_map.get(project_id)
+                        if not project:
+                            raise Exception(f"Project {project_id} not found")
+                            
                         with self.app.app_context():
                             result = datasource_processing(
                                 project, 
@@ -319,6 +331,10 @@ class FileUploadManager:
                         response_data = {'result': result}
                     elif content_type == "application/x-hdf" or state['original_filename'].endswith('.h5ad'):
                         # Process AnnData file
+                        project = _upload_projects_map.get(project_id)
+                        if not project:
+                            raise Exception(f"Project {project_id} not found")
+                            
                         with self.app.app_context():
                             result = anndata_processing(
                                 project,
@@ -326,8 +342,24 @@ class FileUploadManager:
                                 state['original_filename']
                             )
                         response_data = {'result': result}
+                    elif (content_type == "application/zip" or state['original_filename'].endswith('.zip')) and project_id == "project_creation":
+                        # Process MDV project zip file for project creation
+                        with self.app.app_context():
+                            # Get projects base directory from app config
+                            projects_base_dir = self.app.config.get('projects_base_dir')
+                            if not projects_base_dir:
+                                raise Exception("Projects base directory not configured")
+                            
+                            result = mdv_project_processing(
+                                self.app,  # Pass the Flask app instance
+                                projects_base_dir,
+                                state['data_filepath'],
+                                state['original_filename'],
+                                state.get('project_name')
+                            )
+                        response_data = {'result': result}
                     else:
-                        response_data = {'warning': f'No processor for {content_type}'}
+                        response_data = {'warning': f'No processor for {content_type} with project_id {project_id}'}
                     
                     self._notify_client(sid, namespace, 'upload_success', {
                         'file_id': file_id,
@@ -391,6 +423,213 @@ class FileUploadManager:
             self.socketio.emit(event, data, room=sid, namespace=namespace)
         except Exception as e:
             upload_log(f"Error notifying client {sid}: {e}")
+
+class ProjectCreationUploadAPI:
+    """SocketIO-based file upload API for creating new projects (zip uploads)."""
+    
+    def __init__(self, app: Flask, socketio: SocketIO, upload_manager: FileUploadManager):
+        self.app = app
+        self.socketio = socketio
+        self.upload_manager = upload_manager
+        self.namespace = "/"  # Use main namespace for project creation
+        
+        # Register event handlers
+        self._register_upload_events()
+        upload_log(f"ProjectCreationUploadAPI initialized for project creation uploads")
+
+    def _register_upload_events(self):
+        """Register SocketIO event handlers for project creation upload operations."""
+        
+        @self.socketio.on('upload_query', namespace=self.namespace)
+        def handle_upload_query(data):
+            """Handle upload status query for project creation."""
+            file_id = data.get('file_id')
+            if not file_id:
+                emit('upload_error', {'message': 'file_id required for query'})
+                return
+                
+            upload_log(f"Project creation upload query for file_id: {file_id}")
+            state = self.upload_manager._load_upload_state(file_id)
+            
+            if state:
+                status = state.get('status')
+                # Only handle zip files for project creation
+                if not (state.get('content_type') == "application/zip" or 
+                        state.get('original_filename', '').endswith('.zip')):
+                    emit('upload_error', {'message': 'This namespace only handles project zip uploads'})
+                    return
+                    
+                if status in ['completed', 'queued', 'processing']:
+                    upload_log(f"File {file_id} status: {status}, re-initiating processing")
+                    self.upload_manager.queue_file_for_processing(state, request.sid, self.namespace)
+                    emit('upload_processing_initiated', {
+                        'file_id': file_id,
+                        'message': f'Processing for {state.get("original_filename", "file")} initiated'
+                    })
+                elif status in ['uploading', 'resuming', 'error']:
+                    emit('upload_resume_info', {
+                        'file_id': file_id,
+                        'received_bytes': state.get('received_bytes', 0),
+                        'total_size': state.get('total_size', 0)
+                    })
+                else:
+                    emit('upload_not_found', {'file_id': file_id})
+            else:
+                emit('upload_not_found', {'file_id': file_id})
+
+        @self.socketio.on('upload_start', namespace=self.namespace)
+        def handle_upload_start(data):
+            """Handle upload start for project creation."""
+            try:
+                file_id = data.get('file_id') or str(uuid.uuid4())
+                filename = secure_filename(data.get('filename', f'file_{file_id}'))
+                total_size = int(data.get('size', 0))
+                content_type = data.get('content_type', 'application/octet-stream')
+                
+                # Only allow zip files for project creation
+                if not (content_type == "application/zip" or filename.endswith('.zip')):
+                    emit('upload_error', {
+                        'file_id': file_id,
+                        'message': 'This namespace only accepts zip files for project creation'
+                    })
+                    return
+                
+                extra_data = {}
+                
+                # Validate MDV project zip file
+                try:
+                    validation_params = {k: data.get(k) for k in ["project_name"]}
+                    validation_params = {k: v for k, v in validation_params.items() if v is not None}
+                    with self.upload_manager.app.app_context():
+                        projects_base_dir = self.upload_manager.app.config.get('projects_base_dir')
+                        if not projects_base_dir:
+                            raise Exception("Projects base directory not configured")
+                        validated_data = validate_mdv_project(self.upload_manager.app, projects_base_dir, validation_params)
+                    extra_data.update(validated_data)
+                except Exception as val_err:
+                    emit('upload_error', {
+                        'file_id': file_id,
+                        'message': f"Validation Error: {getattr(val_err, 'message', str(val_err))}"
+                    })
+                    return
+                
+                state = self.upload_manager.initialize_upload(
+                    file_id, filename, total_size, "project_creation", content_type, extra_data
+                )
+                
+                if state:
+                    ack_type = 'upload_start_ack'
+                    message = 'Project creation upload started'
+                    if state.get('status') == 'resuming':
+                        ack_type = 'upload_resume_ack'
+                        message = f"Resuming project creation upload from byte {state.get('received_bytes', 0)}"
+                    
+                    emit(ack_type, {
+                        'file_id': file_id,
+                        'received_bytes': state.get('received_bytes', 0),
+                        'message': message
+                    })
+                    upload_log(f"{message} for file {filename} ({file_id})")
+                else:
+                    emit('upload_error', {'file_id': file_id, 'message': 'Failed to initialize project creation upload'})
+                    
+            except Exception as e:
+                upload_log(f"Error in project creation upload_start: {e}")
+                emit('upload_error', {'message': f'Upload start error: {str(e)}'})
+
+        @self.socketio.on('upload_chunk', namespace=self.namespace)
+        def handle_upload_chunk(data):
+            """Handle file chunk upload for project creation."""
+            try:
+                file_id = data.get('file_id')
+                chunk_num = int(data.get('chunk_num', 0))
+                chunk_data_b64 = data.get('data')
+                
+                if not all([file_id, chunk_data_b64 is not None]):
+                    emit('upload_error', {'message': 'Missing required chunk data'})
+                    return
+                
+                try:
+                    chunk_data = base64.b64decode(chunk_data_b64)
+                except Exception:
+                    emit('upload_error', {'file_id': file_id, 'message': 'Invalid chunk data encoding'})
+                    return
+                
+                updated_state = self.upload_manager.write_chunk(file_id, chunk_data)
+                if updated_state:
+                    # Send progress updates periodically
+                    if chunk_num % 5 == 0 or updated_state['received_bytes'] == updated_state['total_size']:
+                        progress = min(100, int((updated_state['received_bytes'] / updated_state['total_size']) * 100)) if updated_state['total_size'] > 0 else 100
+                        emit('upload_progress', {
+                            'file_id': file_id,
+                            'received': updated_state['received_bytes'],
+                            'total': updated_state['total_size'],
+                            'progress': progress
+                        })
+                else:
+                    emit('upload_error', {'file_id': file_id, 'message': 'Failed to write chunk'})
+                    
+            except Exception as e:
+                upload_log(f"Error in project creation upload_chunk: {e}")
+                emit('upload_error', {'message': f'Chunk upload error: {str(e)}'})
+
+        @self.socketio.on('upload_end', namespace=self.namespace)
+        def handle_upload_end(data):
+            """Handle upload completion for project creation."""
+            try:
+                file_id = data.get('file_id')
+                if not file_id:
+                    emit('upload_error', {'message': 'file_id required for upload_end'})
+                    return
+                
+                final_state = self.upload_manager.finalize_upload(file_id)
+                if final_state:
+                    self.upload_manager.queue_file_for_processing(final_state, request.sid, self.namespace)
+                    
+                    # Calculate upload stats
+                    try:
+                        start_time = datetime.fromisoformat(final_state.get('start_time_iso', datetime.now(timezone.utc).isoformat()))
+                        elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+                        speed = final_state['total_size'] / (elapsed or 0.001) / 1024
+                    except Exception:
+                        elapsed = -1
+                        speed = -1
+                    
+                    emit('upload_end_ack', {
+                        'file_id': file_id,
+                        'message': 'Project creation upload completed and verified. Queued for processing.',
+                        'upload_speed_KBps': round(speed, 2) if speed != -1 else 'N/A',
+                        'upload_time_sec': round(elapsed, 2) if elapsed != -1 else 'N/A'
+                    })
+                    upload_log(f"Project creation upload completed and queued: {final_state['filename']} ({file_id})")
+                else:
+                    emit('upload_error', {'file_id': file_id, 'message': 'Upload finalization failed'})
+                    
+            except Exception as e:
+                upload_log(f"Error in project creation upload_end: {e}")
+                emit('upload_error', {'message': f'Upload end error: {str(e)}'})
+
+        @self.socketio.on('upload_cancel', namespace=self.namespace)
+        def handle_upload_cancel(data):
+            """Handle upload cancellation for project creation."""
+            try:
+                file_id = data.get('file_id')
+                if not file_id:
+                    emit('upload_error', {'message': 'file_id required for cancel'})
+                    return
+                
+                upload_log(f"Cancelling project creation upload: {file_id}")
+                self.upload_manager.cancel_upload(file_id)
+                emit('upload_cancel_ack', {'file_id': file_id, 'message': 'Project creation upload cancelled'})
+                
+            except Exception as e:
+                upload_log(f"Error in project creation upload_cancel: {e}")
+                emit('upload_error', {'message': f'Cancel error: {str(e)}'})
+
+        @self.socketio.on('ping', namespace=self.namespace)
+        def handle_ping(data):
+            """Handle ping for connection testing."""
+            emit('pong', {'message': 'pong'})
 
 class UploadSocketAPI:
     """SocketIO-based file upload API for a specific project."""
@@ -615,7 +854,7 @@ def initialize_socketio_upload(app: Flask, base_temp_dir: Optional[str] = None) 
         mdv_socketio(app)  # Initialize SocketIO first
         upload_manager = initialize_socketio_upload(app)
     """
-    global _upload_manager, _socketio_instance
+    global _upload_manager, _socketio_instance, _project_creation_api
     
     if _upload_manager is not None:
         upload_log("Upload system already initialized")
@@ -638,6 +877,10 @@ def initialize_socketio_upload(app: Flask, base_temp_dir: Optional[str] = None) 
         raise RuntimeError("SocketIO instance not available. Call mdv_socketio(app) first.")
     
     _upload_manager = FileUploadManager(app, _socketio_instance, base_temp_dir)
+    
+    # Initialize project creation upload API for the main namespace
+    _project_creation_api = ProjectCreationUploadAPI(app, _socketio_instance, _upload_manager)
+    
     upload_log("SocketIO upload system initialized successfully")
     return _upload_manager
 
@@ -664,6 +907,43 @@ def register_project_for_upload(project_id: str, project: MDVProject) -> UploadS
     upload_api = UploadSocketAPI(project, _socketio_instance, _upload_manager)
     upload_log(f"Registered project {project_id} for uploads")
     return upload_api
+
+def initialize_project_creation_uploads(app: Flask) -> bool:
+    """
+    Initialize project creation upload capability.
+    This should be called during multi-project server setup.
+    
+    Args:
+        app (Flask): Flask application instance with projects_base_dir configured
+        
+    Returns:
+        bool: True if successfully initialized
+        
+    Example:
+        app = Flask(__name__)
+        app.config['projects_base_dir'] = '/path/to/projects'
+        mdv_socketio(app)
+        initialize_socketio_upload(app)
+        initialize_project_creation_uploads(app)
+    """
+    global _project_creation_api
+    
+    if not app.config.get('projects_base_dir'):
+        upload_log("Warning: projects_base_dir not configured, project creation uploads disabled")
+        return False
+        
+    if _upload_manager is None or _socketio_instance is None:
+        upload_log("Upload system not initialized, call initialize_socketio_upload() first")
+        return False
+        
+    if _project_creation_api is not None:
+        upload_log("Project creation uploads already initialized")
+        return True
+    
+    # Initialize project creation upload API
+    _project_creation_api = ProjectCreationUploadAPI(app, _socketio_instance, _upload_manager)
+    upload_log("Project creation upload API initialized successfully")
+    return True
 
 # --- Legacy/Alternative API Functions ---
 
@@ -719,5 +999,6 @@ def get_upload_stats() -> Dict[str, Any]:
         "base_temp_dir": _upload_manager.base_temp_dir,
         "registered_projects": get_registered_projects(),
         "upload_ttl_hours": _upload_manager.upload_ttl.total_seconds() / 3600,
-        "processing_queue_size": len(_upload_manager.processing_queue) if _upload_manager else 0
+        "processing_queue_size": len(_upload_manager.processing_queue) if _upload_manager else 0,
+        "project_creation_enabled": _project_creation_api is not None
     }
