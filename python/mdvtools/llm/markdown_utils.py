@@ -12,13 +12,24 @@ def create_project_markdown(project: MDVProject) -> str:
     markdown += "\n\n</details>\n\n"
     return markdown
 
+def escape_markdown(text: str) -> str:
+    """
+    Escape special markdown characters.
+    In future we may want more advanced markdown functionality which may warrant
+    adding a markdown library.
+    """
+    special_chars = "\\`*_{}[]()#+-.!<>|"
+    for char in special_chars:
+        text = text.replace(char, "\\" + char)
+    return text
+
 def create_column_markdown(cols: list[tuple[str, str]]) -> str:
     if cols:
         markdown = "\n| Column Name | Data Type |\n|---|---|\n"
         for col in cols:
             # todo - consider more comprehensive escaping and validation
             # particularly if we use this for e.g. LLM queries.
-            col_name = col[0].replace('|', '\\|')
+            col_name = escape_markdown(col[0])
             markdown += f"| {col_name} | {col[1]} |\n"
     else:
         markdown = "No columns found."
