@@ -1260,15 +1260,29 @@ class MDVProject:
                     links.append({"datasource": lnkto, "link": lnk})
         return links
 
-    def serve(self, options: Optional[MDVServerOptions] = None):
+    def serve(self, **kwargs):
         from mdvtools.server import create_app
+        from mdvtools.server_extension import MDVServerOptions
 
-        if options is None:
-            # create default options
-            options = MDVServerOptions()
-            if options.websocket:
-                from mdvtools.llm.chat_server_extension import chat_extension
+        options = kwargs.pop("options", None)
+
+        if options is not None:
+            if kwargs:
+                warnings.warn(
+                    "Redundant keyword arguments passed to serve() along with 'options' object. "
+                    "These arguments will be ignored.",
+                    UserWarning
+                )
+        else:
+            # `options` was not provided, create it from kwargs.
+            options = MDVServerOptions(**kwargs)
+        
+        if options.websocket:
+            # I swear I'm going to clean up this logic soon...
+            from mdvtools.llm.chat_server_extension import chat_extension
+            if chat_extension not in options.extensions:
                 options.extensions.append(chat_extension)
+
 
         create_app(self, options=options)
         
