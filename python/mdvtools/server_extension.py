@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import Protocol, TYPE_CHECKING, List, Optional
-from mdvtools.project_router import ProjectBlueprintProtocol
 from flask import Flask
 from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
+    from mdvtools.project_router import ProjectBlueprintProtocol
     from mdvtools.mdvproject import MDVProject
 
 
