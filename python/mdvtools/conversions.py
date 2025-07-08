@@ -11,6 +11,7 @@ import copy
 import yaml
 import shutil
 
+
 def convert_scanpy_to_mdv(
     folder: str, 
     scanpy_object: AnnData, 
@@ -126,22 +127,27 @@ def convert_scanpy_to_mdv(
     mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", gene_identifier_column, "Gene Expr")
 
     #get the matrix in the correct format
+    print("Getting Matrix")
     matrix,sparse= get_matrix(scanpy_object.X)
     #sometimes X is empty - all the data is in the layers
-    assert(matrix is not None)
+    assert matrix is not None # asserting here so that 'invalid_adata' test gets expected error
+    # don't want to faff about with more complex logic for permutation with add_layer_data just now
     if matrix.shape[1] !=0:
         # add the gene expression
+        print("Adding gene expression")
         mdv.add_rows_as_columns_subgroup(
             f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",
-            sparse=sparse, chunk_data=chunk_data
+            # sparse=sparse, #this should be inferred from the matrix
+            chunk_data=chunk_data
         )
 
     #now add layers
     if add_layer_data:
         for layer,matrix in scanpy_object.layers.items():
             matrix,sparse = get_matrix(matrix)
+            print(f"Adding layer {layer}")
             mdv.add_rows_as_columns_subgroup(
-                f"{label}cells", f"{label}genes", layer, matrix, sparse=sparse, chunk_data=chunk_data
+                f"{label}cells", f"{label}genes", layer, matrix, chunk_data=chunk_data
             )
 
     if delete_existing:
