@@ -34,12 +34,6 @@ def create_auth_provider(auth_method: str, app):
         return DummyAuthProvider(app)
     
     elif auth_method == "shibboleth":
-        # This is a special case: if the default auth method is 'dummy',
-        # we force a dummy provider even if 'shibboleth' was requested.
-        # This allows for easy disabling of Shibboleth during development.
-        if app.config.get("DEFAULT_AUTH_METHOD", "").lower() == "dummy":
-            from mdvtools.auth.dummy_provider import DummyAuthProvider
-            return DummyAuthProvider(app)
         from mdvtools.auth.shibboleth_provider import ShibbolethProvider
         return ShibbolethProvider(app)
     
@@ -48,16 +42,39 @@ def create_auth_provider(auth_method: str, app):
 
 def get_auth_provider():
     """
-    Determines the correct authentication method from session or app configuration
-    and returns an instance of the corresponding auth provider.
+    Determines the correct authentication method and returns an instance of the
+    corresponding auth provider.
+
+    The resolution order is:
+    1. If DEFAULT_AUTH_METHOD in the app config is explicitly set to 'dummy',
+       the DummyAuthProvider is ALWAYS used. This is a developer override for
+       safe local testing.
+    2. If 'auth_method' is present in the session, that method is used.
+    3. Otherwise, the value from the required DEFAULT_AUTH_METHOD app
+       configuration is used.
+
+    Raises:
+        ValueError: If DEFAULT_AUTH_METHOD is not configured in the application.
     """
+    # Fail loudly if the default auth method is not explicitly configured.
+    # This prevents silently falling back to an insecure 'dummy' mode.
+    try:
+        default_method = current_app.config["DEFAULT_AUTH_METHOD"]
+    except KeyError:
+        raise ValueError("Security risk: DEFAULT_AUTH_METHOD must be explicitly configured.")
+
+    # 1. Check for the developer override.
+    if default_method.lower() == 'dummy':
+        return create_auth_provider('dummy', current_app)
+
+    # 2. Check for a method specified in the session.
+    auth_method = None
     if has_request_context():
         auth_method = session.get("auth_method")
-    else:
-        auth_method = None
     
+    # 3. Fall back to the configured default method.
     if not auth_method:
-        auth_method = current_app.config.get("DEFAULT_AUTH_METHOD", "dummy")
+        auth_method = default_method
     
     return create_auth_provider(auth_method, current_app)
 
