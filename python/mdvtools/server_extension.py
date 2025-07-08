@@ -1,9 +1,12 @@
-from typing import Protocol
-from mdvtools.mdvproject import MDVProject
+from __future__ import annotations
+from typing import Protocol, TYPE_CHECKING, List, Optional
 from mdvtools.project_router import ProjectBlueprintProtocol
 from flask import Flask
 from dataclasses import dataclass, field
-from typing import List, Optional
+
+if TYPE_CHECKING:
+    from mdvtools.mdvproject import MDVProject
+
 
 class MDVProjectServerExtension(Protocol):
     """
