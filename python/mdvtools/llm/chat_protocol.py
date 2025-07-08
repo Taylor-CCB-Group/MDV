@@ -36,18 +36,21 @@ class ProjectChatProtocol(Protocol):
 
 chat_enabled = False
 try:
+    chat_enabled = True # this is a bit stupid atm, maybe better along with server extension config mechanism?
     from mdvtools.llm.langchain_mdv import ProjectChat as _ProjectChat # type: ignore
-    chat_enabled = True
+    # raise Exception("test error in import langchain_mdv")
 except Exception as e:
     msg = str(e)
     class _ProjectChat(ProjectChatProtocol):
         def __init__(self, project: MDVProject):
             self.project = project
             self.ds_name = "dummy"
+            self.init_error = True
             self.welcome = (
                 "There was a problem initializing the chatbot:\n\n"
                 f"{msg}"
             )
+            self.error_message = msg
 
         def log(self, msg, *args):
             print("[dummy bot]: " + (msg % args if args else msg))
