@@ -1,10 +1,12 @@
-from typing import Optional, Protocol
+import traceback
+from typing import Optional, Protocol, Union
 from mdvtools.llm.chat_protocol import (
   ChatRequest,
   ProjectChat,
   ProjectChatProtocol, 
   chat_enabled
 )
+from mdvtools.llm.markdown_utils import create_project_markdown, create_error_markdown
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 # from mdvtools.dbutils.config import config
@@ -47,6 +49,7 @@ class MDVProjectServerExtension(Protocol):
 class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
+
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
         from mdvtools.websocket import socketio
         if socketio is None:
@@ -75,14 +78,20 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 try:
                     bot = ProjectChat(project)
                 except Exception as e:
-                    print(f"ERROR: {str(e)[:500]}")
-                    return {"message": f"ERROR: {str(e)[:500]}", "error": True}
+                    error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
+                    print(f"ERROR: {error_message}")
+                    return {"message": f"ERROR: {error_message}", "error": True}
             if bot.init_error:
                 # Log and return the error
                 error_msg = bot.error_message or "An unknown error occurred"
                 bot.log(f"ERROR: {error_msg}")
                 return {"message": f"ERROR: {error_msg}", "error": True}
-            return {"message": bot.welcome}
+            
+            markdown = create_project_markdown(project)
+                
+            bot.log(f"Markdown: {markdown}")
+            detailed_message = bot.welcome + markdown
+            return {"message": detailed_message}
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):
@@ -94,15 +103,20 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             id = data.get("id")
             room = f"{sid}_{id}"
             join_room(room)
-            def handle_error(error: str):
-                #! todo - frontend should handle this, and show an error message to the user.
-                # also, this method may be augmented so that it also logs to the chat log,
-                # and pass this handler to the bot.ask_question method.
-                # Log error to chat_log.json
-                log_chat_item(project, message or '', None, '', error, conversation_id, None, error=True)
+            def handle_error(error: Union[str, Exception], *, extra_metadata: Optional[dict] = None):
+                if isinstance(error, Exception):
+                    error_message = str(error)
+                    traceback_str = traceback.format_exc()
+                else:
+                    error_message = error
+                    traceback_str = None
+
+                markdown = create_error_markdown(error_message, traceback_str, extra_metadata)
+                logger.error(f"Chat error: {markdown}")
+                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, error=True)
                 socketio.emit(
                     "chat_error",
-                    {"message": error},
+                    {"message": markdown},
                     namespace=f"/project/{project.id}",
                     to=room
                 )
@@ -147,11 +161,13 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
             except Exception as e:
                 # Log error to chat_log.json
-                # print(f"ERROR: {str(e)[:500]}")
-                handle_error(f"ERROR: {str(e)[:500]}")
+                error_message = str(e)
+                tb_str = traceback.format_exc()
+                print(f"ERROR: {error_message}\n\n{tb_str}")
+                handle_error(e)
                 leave_room(room)
                 return
-    
+            
     def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
         """
         Mutate the state.json before returning it as a request response,

@@ -1,7 +1,7 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { z } from 'zod';
+import * as z from 'zod/v4';
 import { useQuery } from '@tanstack/react-query';
 import { useChartManager, useViewManager } from "@/react/hooks";
 
@@ -49,6 +49,7 @@ const chatLogItemSchema = z.object({
 //     convesationId: data.conversation_id,
 // }));
 const chatLogSchema = z.array(chatLogItemSchema);
+// z.toJSONSchema(chatLogSchema);
 
 export type ChatLogItem = z.infer<typeof chatLogItemSchema>;
 
@@ -184,6 +185,16 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
     return [userMessage, botMessage];
 };
 
+// Mock suggested questions
+const SUGGESTED_QUESTIONS = [
+    // "What columns are available in this project?",
+    "Show me a summary of the cell data.",
+    "Show me a scatterplot of the UMAP coordinates, colored by cluster."
+    // "How many rows are in the dataset?",
+    // "What is the distribution of ages?",
+    // "List all unique values in the 'region' column."
+];
+
 // todo: The architecture of this hook is a bit poor, there is no single source of truth, we can have both messages and chatLog which could make it out of sync
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
@@ -209,6 +220,7 @@ const useChat = () => {
     const [conversationId, setConversationId] = useState<string>(generateConversationId());
     const [conversationMap, setConversationMap] = useState<ConversationMap>({});
     const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
+    const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
     const socket = useMemo(() => {
         if (!cm.ipc || !cm.ipc.socket) return null;
         return cm.ipc.socket;
@@ -300,6 +312,7 @@ const useChat = () => {
             const response = await sendMessageHttp('', id, routeInit, conversationId);
             if (!response) return;
             if (response?.error) throw response.message;
+            
             // Only set initial message if we don't have any messages yet
             if (messages.length === 0) {
                 setMessages([{
@@ -309,6 +322,9 @@ const useChat = () => {
                     conversationId,
                 }]);
             }
+            // todo: Update when the endpoint is ready
+            // const suggestedQuestions = await axios.get("");
+            setSuggestedQuestions(SUGGESTED_QUESTIONS);
         } catch (error: any) {
             const errorMessage =  error?.message ? 
                 error.message : 
@@ -475,6 +491,7 @@ const useChat = () => {
         switchConversation,
         conversationMap,
         isLoadingInit,
+        suggestedQuestions,
     };
 };
 

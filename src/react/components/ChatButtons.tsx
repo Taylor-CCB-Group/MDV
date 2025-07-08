@@ -39,6 +39,7 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
         conversationMap,
         conversationId,
         isLoadingInit,
+        suggestedQuestions,
     } = useChat();
 
     const chatDialogProps = {
@@ -53,6 +54,7 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
         conversationMap,
         conversationId,
         isLoadingInit,
+        suggestedQuestions,
     };
 
     const dialog = (

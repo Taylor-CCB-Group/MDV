@@ -21,7 +21,7 @@ import {
     Search as SearchIcon,
     ViewSidebar as ViewSidebarIcon,
 } from "@mui/icons-material";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 import { useResizeDrawer } from "@/react/hooks";
 import { Loader } from "@/react/components/ImportProjectDialog";
@@ -38,6 +38,7 @@ export type ChatDialogProps = {
     switchConversation: (id: string) => void;
     conversationMap: ConversationMap;
     conversationId: string;
+    suggestedQuestions: string[];
     onPopout?: () => void;
     isPopout?: boolean;
     fullscreen?: boolean;
@@ -57,6 +58,7 @@ const ChatDialog = ({
     switchConversation,
     conversationMap,
     conversationId,
+    suggestedQuestions,
     onPopout,
     isPopout,
     fullscreen = false,
@@ -224,20 +226,6 @@ const ChatDialog = ({
                                         ))
                                     )}
                                 </List>
-                                <Box
-                                    sx={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        right: 0,
-                                        width: 8,
-                                        height: '100%',
-                                        cursor: 'ew-resize',
-                                        zIndex: 10,
-                                        background: 'rgba(0,0,0,0.05)',
-                                        '&:hover': { background: 'rgba(0,0,0,0.15)' },
-                                    }}
-                                    onMouseDown={onMouseDown}
-                                />
                             </Box>
                         </Drawer>
                         <Box
@@ -249,7 +237,7 @@ const ChatDialog = ({
                                 height: '100%',
                                 cursor: 'ew-resize',
                                 zIndex: 10,
-                                background: 'rgba(0,0,0,0.05)',
+                                backgroundColor: 'rgba(0,0,0,0.05)',
                                 '&:hover': { background: 'rgba(0,0,0,0.15)' },
                             }}
                             onMouseDown={onMouseDown}
@@ -266,6 +254,7 @@ const ChatDialog = ({
                                 sendAPI={sendAPI}
                                 verboseProgress={verboseProgress}
                                 onClose={onClose}
+                                suggestedQuestions={suggestedQuestions}
                             />)
                             }
                     </Box>
