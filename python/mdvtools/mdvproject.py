@@ -1263,6 +1263,7 @@ class MDVProject:
         from mdvtools.server import create_app
 
         create_app(self, **kwargs)
+        
 
     def delete(self):
         # todo - remove from project routes, set a flag indicating it's been deleted

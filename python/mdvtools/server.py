@@ -4,16 +4,17 @@ from flask import (
     render_template,
     request,
     make_response,
-    send_file,
-    Response,
     jsonify,
     current_app
 )
+from mdvtools.server_utils import (
+    send_file,
+    get_range,
+    add_safe_headers,
+)
+
 import webbrowser
-import mimetypes
 import json
-import sys
-import re
 from mdvtools.llm.code_manipulation import parse_view_name
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
@@ -45,57 +46,7 @@ def log(*args, **kwargs):
 routes = set()
 
 
-# consider using flask_cors...
-def add_safe_headers(resp):
-    # headers required for web workers
-    resp.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-    resp.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
-    # headers required if serving endpoints for another server e,g dev server
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    #required for vite dev
-    resp.headers["Cross-Origin-Resource-Policy"] ="cross-origin"
-    return resp
 
-
-# flask send_file can't always cope with relative paths
-# sets the cwd to the python path for some reason
-def _send_file(f):
-    if not os.path.isabs(f):
-        f = os.path.join(os.getcwd(), f)
-    return send_file(f)
-
-
-def get_range(file_name, range_header):
-    file = open(file_name, "rb")
-    size = sys.getsizeof(file_name)
-    byte1, byte2 = 0, None
-
-    m = re.search(r"(\d+)-(\d*)", range_header)
-    if not m:
-        raise Exception("Invalid Range Header")
-    g = m.groups()
-
-    if g[0]:
-        byte1 = int(g[0])
-    if g[1]:
-        byte2 = int(g[1])
-
-    length = size - byte1
-    if byte2 is not None:
-        length = byte2 - byte1 + 1
-
-    file.seek(byte1)
-    data = file.read(length)
-    rv = Response(
-        data, 206, mimetype=mimetypes.guess_type(file_name)[0], direct_passthrough=True
-    )
-    rv.headers.add(
-        "Content-Range", "bytes {0}-{1}/{2}".format(byte1, byte1 + length - 1, size)
-    )
-    rv.headers.add("Accept-Ranges", "bytes")
-    file.close()
-    return rv
 
 
 def create_app(
@@ -210,7 +161,7 @@ def create_app(
                     return state
                 except Exception as e:
                     return f"Problem parsing state file: {e}", 500
-        return _send_file(path)
+        return send_file(path)
 
     # gets the raw byte data and packages it in the correct response
     @project_bp.route("/get_data", methods=["POST"])
@@ -233,12 +184,9 @@ def create_app(
     @project_bp.route("/images/<path:path>")
     def images(path):
         try:
-            response= make_response(_send_file(project.get_image(path)))
+            return send_file(project.get_image(path))
         except Exception:
-            response =  make_response(_send_file(safe_join(project.imagefolder, path)))
-        #make sure images are cached
-        response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
-        return response
+            return send_file(safe_join(project.imagefolder, path))
 
     # All the project's metadata
     @project_bp.route("/get_configs", methods=["GET", "POST"])
@@ -298,7 +246,7 @@ def create_app(
         file_name = safe_join(project.trackfolder, path)
         range_header = request.headers.get("Range", None)
         if not range_header:
-            return _send_file(file_name)
+            return send_file(file_name)
         return get_range(file_name, range_header)
 
     @project_bp.route("/save_state", access_level='editable', methods=["POST"])
