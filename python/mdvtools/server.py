@@ -33,6 +33,7 @@ from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.server_extension import MDVServerOptions
 from mdvtools.logging_config import get_logger
 
+
 logger = get_logger(__name__)
 logger.info("server.py module loaded")
 def log(*args, **kwargs):
@@ -85,9 +86,9 @@ def create_app(
         
 
         if options.backend_db:
-            from mdvtools.project_router import ProjectBlueprint_v2 as Blueprint_v2
-            log("backend_db is True")
-            project_bp = Blueprint_v2(project.id, __name__, url_prefix=route)
+            project_bp = Blueprint(project.id, __name__, url_prefix=route)
+            from mdvtools.auth.project_auth import project_pre_dispatch_checks
+            project_bp.before_request(project_pre_dispatch_checks)
         else:
             project_bp = Blueprint(project.id, __name__, url_prefix=route)
 
@@ -623,7 +624,7 @@ def create_app(
             log(f"there is already a blueprint at {route}")
         log(f"Adding project {project.id} to existing app")
         ## nb - uncomment this if not using ProjectBlueprint refactor...
-        # app.register_bluelog(project_bp)
+        # app.register_blueprint(project_bp)
     else:
         # user_reloader=False, allows the server to work within jupyter
 

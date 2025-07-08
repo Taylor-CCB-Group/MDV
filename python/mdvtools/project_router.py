@@ -1,10 +1,8 @@
-import logging
-from flask import Flask, jsonify, session
+from flask import Flask
 from flask.typing import ResponseReturnValue as Response
-from typing import Dict, Any, Callable, Tuple
+from typing import Dict, Any, Callable, Tuple, List
 import re
 from urllib.parse import urlparse
-from datetime import datetime, timedelta
 import functools
 from typing import Protocol
 from mdvtools.logging_config import get_logger
@@ -18,6 +16,10 @@ of a Flask app that can add (and remove) MDVProjects dynamically at runtime.
 class ProjectBlueprintProtocol(Protocol):
     def route(self, rule: str, **options: Any) -> Callable:
         ...
+    
+    def before_request(self, f: Callable) -> Callable:
+        ...
+
 class ProjectBlueprint(ProjectBlueprintProtocol):
     blueprints: Dict[str, "ProjectBlueprint"] = {}
 
@@ -27,8 +29,6 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
             "/project/<project_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PATCH"]
         )
         @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST", "PATCH"])
-        #incorporated below to resolve issue related to redirecting the request to http
-        #@app.route("/project/<project_id>", defaults={'subpath': ''}, methods=["GET", "POST"])
         def project_route(project_id: str, subpath: str):
             """This generic route should call the appropriate method on the project with the given id.
 
@@ -38,96 +38,24 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
             if project_id in ProjectBlueprint.blueprints:
                 try:
                     return ProjectBlueprint.blueprints[project_id].dispatch_request(
-                        subpath
+                        subpath, project_id
                     )
                 except Exception as e:
-                    return {"status": "error", "message": str(e)}
+                    logger.exception(f"Error dispatching request for project {project_id} on subpath {subpath}")
+                    return {"status": "error", "message": str(e)}, 500
             return {"status": "error", "message": "invalid project_id or method"}, 500
 
-    def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
-        self.name = name
-        self.url_prefix = url_prefix  # i.e. /project/<project_id>/
-        self.routes: Dict[re.Pattern[str], Callable] = {}
-        ProjectBlueprint.blueprints[name] = self
-
-    def route(self, rule: str, **options: Any) -> Callable:
-        def decorator(f: Callable) -> Callable:
-            """As of this writing, the rules in server.py all have one or zero dynamic parts.
-            i.e. all of our view_func have 0 or 1 arguments.
-            We use route keys which are regex patterns to match the subpath and parse out the dynamic parts.
-            We should also ignore any query parameters in the subpath (trailing '/' in generic overall route does this).
-            We have a further issue with '/' matching all routes, so we use f'^{rule}$' to match the full path.
-            """
-            # would be nice to re-use logic from Flask's routing, but it's a bit complex to use out of context
-            # from werkzeug.routing import Rule
-            rule_re = re.compile(re.sub(r"<.*?>", "(.*)", f"^{rule}$"))
-            self.routes[rule_re] = f
-            return f
-
-        return decorator
-
-    def dispatch_request(self, subpath: str) -> Response:
-        """We need to parse `subpath` so that we can route in a compatible way:
-        Currently, we have regex patterns as keys in self.routes that match the subpath, with groups for
-        any dynamic parts, so '/tracks/<path:path>' becomes '/tracks/(.*)'. If we get a request for '/tracks/mytrack',
-        it will match the rule and call the method with 'mytrack' as the argument.
-        """
-        # find the method in self.routes that matches the subpath
-        # e.g. '/tracks/mytrack' -> self.routes['/tracks/<path:path>']('mytrack')
-        # /get_data -> self.routes['/get_data']()
-        # '/datasources.json' -> self.routes['/<file>.json']('datasources')...
-        # we need to parse the subpath to find the right method
-        # as of now, we only have 0 or 1 <dynamic> parts in the rules
-        # so we can match '/tracks/mytrack' to '/tracks/<path:path>'
-        # and pass 'mytrack' to the method
-
-        # find the item in self.routes that matches the subpath
-        subpath = f"/{urlparse(subpath).path}"
-        for rule, method in self.routes.items():
-            match = rule.match(subpath)
-            if match:
-                return method(*match.groups())
-        raise ValueError(f"no matching route for {subpath}")
-    
-class ProjectBlueprint_v2(ProjectBlueprintProtocol):
-    blueprints: Dict[str, "ProjectBlueprint_v2"] = {}
-    # Class-level constant for the timestamp update interval
-    TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
-
-    # Normalize ENABLE_AUTH to a boolean
-
-    @staticmethod
-    def register_app(app: Flask) -> None:
-        @app.route(
-            "/project/<project_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PATCH"]
-        )
-        @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST", "PATCH"])
-        #incorporated below to resolve issue related to redirecting the request to http
-        #@app.route("/project/<project_id>", defaults={'subpath': ''}, methods=["GET", "POST"])
-        def project_route(project_id: str, subpath: str):
-            """This generic route should call the appropriate method on the project with the given id.
-
-            It will look up the project_id in ProjectBlueprint_v2.blueprints and call the method with the given subpath.
-            The ProjectBlueprint_v2 instance is responsible for routing the request to the correct method etc.
-            """
-            #if ProjectBlueprint_v2.AUTH_ENABLED and not ProjectBlueprint_v2.is_authenticated():
-            #    return redirect(url_for('login_dev'))
-            
-            if project_id in ProjectBlueprint_v2.blueprints:
-                try:
-                    return ProjectBlueprint_v2.blueprints[project_id].dispatch_request(
-                        subpath,
-                        project_id
-                    )
-                except Exception as e:
-                    return {"status": "error", "message": str(e)}
-            return {"status": "error", "message": "invalid project_id or method"}, 500
-    
     def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
         self.name = name
         self.url_prefix = url_prefix  # i.e. /project/<project_id>/
         self.routes: Dict[re.Pattern[str], Tuple[Callable, Dict[str, Any]]] = {}
-        ProjectBlueprint_v2.blueprints[name] = self
+        self.before_request_funcs: List[Callable] = []
+        ProjectBlueprint.blueprints[name] = self
+
+    def before_request(self, f: Callable) -> Callable:
+        """Register a function to run before each request for this blueprint."""
+        self.before_request_funcs.append(f)
+        return f
 
     def route(self, rule: str, **options: Any) -> Callable:
         def decorator(f: Callable) -> Callable:
@@ -153,108 +81,19 @@ class ProjectBlueprint_v2(ProjectBlueprintProtocol):
         any dynamic parts, so '/tracks/<path:path>' becomes '/tracks/(.*)'. If we get a request for '/tracks/mytrack',
         it will match the rule and call the method with 'mytrack' as the argument.
         """
-        # find the method in self.routes that matches the subpath
-        # e.g. '/tracks/mytrack' -> self.routes['/tracks/<path:path>']('mytrack')
-        # /get_data -> self.routes['/get_data']()
-        # '/datasources.json' -> self.routes['/<file>.json']('datasources')...
-        # we need to parse the subpath to find the right method
-        # as of now, we only have 0 or 1 <dynamic> parts in the rules
-        # so we can match '/tracks/mytrack' to '/tracks/<path:path>'
-        # and pass 'mytrack' to the method
-
-        # find the item in self.routes that matches the subpath
-        from mdvtools.dbutils.dbservice import ProjectService
-        from mdvtools.dbutils.mdv_server_app import ENABLE_AUTH
-        from mdvtools.auth.authutils import user_project_cache
-        
-        # Reduce logging verbosity - only log in debug mode
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Inside dispatch request for project_id: {project_id} and subpath: {subpath}")
-        
         subpath = f"/{urlparse(subpath).path}"
         for rule, (method, options) in self.routes.items():
             match = rule.match(subpath)
             if match:
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"options: '{options}")
+                # Run all before_request functions. These are responsible for auth, etc.
+                for func in self.before_request_funcs:
+                    # The hook needs access to project_id and the route options
+                    rv = func(project_id=project_id, options=options)
+                    if rv is not None:
+                        # If a hook returns a value, it becomes the response, short-circuiting the request
+                        return rv
                 
-                # Update the accessed timestamp only if the last update was more than TIMESTAMP_UPDATE_INTERVAL ago
-                project = ProjectService.get_project_by_id(project_id)
-                if project and (not project.accessed_timestamp or 
-                    datetime.now() - project.accessed_timestamp > self.TIMESTAMP_UPDATE_INTERVAL):
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug("****time interval greater than an hour ")
-                    try:
-                        ProjectService.set_project_accessed_timestamp(project_id)
-                        if logger.isEnabledFor(logging.DEBUG):
-                            logger.debug(f"In dispatch_request: Updated accessed timestamp for project ID {project_id}")
-                    except Exception as e:
-                        logger.exception(f"dispatch_request: Error updating accessed timestamp: {e}")
-                        return jsonify({"error": "Failed to update project accessed timestamp"}), 500
-
-                
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"Enable_auth: '{ENABLE_AUTH}'")
-                project_permissions = None
-                # Check if authentication is enabled
-                if ENABLE_AUTH:
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug("Auth Enabled")
-
-                    user = session.get('user')
-                    user_id = user["id"] if user else None
-                    if not user_id:
-                        return jsonify({"error": "Unable to retrieve user ID"}), 401
-                    
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(f"Authenticated user: {user_id}") 
-                    
-                    # Retrieve user permissions from the cache (without using update_cache)
-                    user_projects = None
-                    if user_id:
-                        # Directly fetch the user's project permissions from cache
-                        user_projects = user_project_cache.get(user_id)  # Fetch from cache
-                    
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(f"User Projects from Cache: '{user_projects}'")
-                    
-                    if user_projects:
-                        # Step 4: Validate if the user has permissions for the requested project
-                        project_permissions = user_projects.get(int(project_id))  # Use string keys for consistency
-
-                # Check for access level only if specified in options
-                if options and 'access_level' in options:
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(f"match '{match}'")
-                    #project_id = match.group(0).split('/')[2]  # Extract project_id from matched route
-                    project = ProjectService.get_project_by_id(project_id)  # Fetch the project
-                    
-                    if project is None:
-                        logger.error("In dispatch_request: Error - project doesn't exist")
-                        return jsonify({"error": f"Project with ID {project_id} not found"}), 404
-
-                    required_access_level = options['access_level']  # Get required access level
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(f"required_access_level: '{required_access_level}")
-                    if required_access_level == 'editable':
-                        if logger.isEnabledFor(logging.DEBUG):
-                            logger.debug(f"required_access_level is editable, fetched project is '{project}'")
-                        
-                        if ENABLE_AUTH:
-                            if project_permissions:
-                                if not (project_permissions.get("is_owner", False) or project_permissions.get("can_write", False)):
-                                    return jsonify({"error": "User does not have the required permissions"}), 403
-
-             
-                        if project.access_level != 'editable':
-                            return jsonify({"error": "This project is read-only and cannot be modified."}), 403
-                        if logger.isEnabledFor(logging.DEBUG):
-                            logger.debug(f"updating timestamp for project {project_id} '{subpath}'")
-                        # calling this here means that any edits done via any edit route will update the timestamp...
-                        # this could almost be the *only* place where we call this method
-                        # - although other methods executed by scripts etc rather than web interface will not go through here
-                        ProjectService.set_project_update_timestamp(project_id)
-                
+                # If all hooks passed (returned None), call the original view function
                 return method(*match.groups())
             
         raise ValueError(f"no matching route for {subpath}")
@@ -264,6 +103,12 @@ class ProjectBlueprint_v2(ProjectBlueprintProtocol):
 class SingleProjectShim(ProjectBlueprintProtocol):
     def __init__(self, app: Flask) -> None:
         self.app = app
+
+    def before_request(self, f: Callable) -> Callable:
+        # This is a no-op for the single project shim.
+        # It's here to satisfy the ProjectBlueprintProtocol.
+        # logger.warning("before_request is not implemented for SingleProjectShim and has no effect.")
+        return f
 
     def route(self, rule: str, **options: Any) -> Callable:
         access_level = options.pop("access_level", None)  # Remove access_level if present

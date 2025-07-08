@@ -16,6 +16,7 @@ from flask_socketio import join_room, leave_room
 from mdvtools.logging_config import get_logger
 from mdvtools.llm.chatlog import log_chat_item
 from mdvtools.server_extension import MDVProjectServerExtension
+from mdvtools.auth.authutils import is_authenticated
 
 logger = get_logger(__name__)
 logger.info("chat server extension loading...")
@@ -38,6 +39,8 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             We should check authentication here,
             **nb the coupling of sockets and "chat" should be removed.**
             """
+            if not is_authenticated():
+                return False
             # todo - check access level, whether chat is enabled etc
             # at the time you connect, flask_socketio session by default is "forked from http session"
             # if we made SocketIO instance with manage_session=False, then they would reference the same session.
@@ -73,6 +76,9 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):
+            if not is_authenticated():
+                return
+
             nonlocal bot
             sid = request.sid # type: ignore - flask_socketio.request.sid
             # todo - auth (via custom decorator? see comments above)

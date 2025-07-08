@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
-from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
+from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
