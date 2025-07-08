@@ -66,11 +66,11 @@ def execute_code(final_code: str, open_code=False, log = print):
             for warning in w:
                 if issubclass(warning.category, UserWarning):
                     log(f"UserWarning encountered: {warning.message}")
-            if stdout:
+            if stdout is not None:
                 log(f"Standard Output: {stdout}")
                 return True, stdout, stderr
             else:
-                log("--- No standard output - overall execution failed ---")
+                log("--- Execution failed ---")
                 log(final_code)
                 return False, stdout, stderr
 
