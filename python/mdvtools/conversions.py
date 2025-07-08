@@ -10,23 +10,7 @@ import gzip
 import copy
 import yaml
 import shutil
-import psutil
 
-def get_memory_usage():
-    """Get current memory usage in GB."""
-    try:
-        process = psutil.Process(os.getpid())
-        return process.memory_info().rss / 1024 / 1024 / 1024
-    except ImportError:
-        return 0.0  # Return 0 if psutil is not available
-
-def log_memory_usage(stage=""):
-    """Log current memory usage."""
-    memory_gb = get_memory_usage()
-    if memory_gb > 0:
-        print(f"Memory usage {stage}: {memory_gb:.2f} GB")
-    else:
-        print(f"Memory monitoring {stage}: psutil not available")
 
 def convert_scanpy_to_mdv(
     folder: str, 
@@ -96,8 +80,6 @@ def convert_scanpy_to_mdv(
     # Validate input AnnData
     if scanpy_object.n_obs == 0 or scanpy_object.n_vars == 0:
         raise ValueError("Cannot convert empty AnnData object (0 cells or 0 genes)")
-    
-    log_memory_usage("at start")
     
     mdv = MDVProject(folder, delete_existing=delete_existing)
 

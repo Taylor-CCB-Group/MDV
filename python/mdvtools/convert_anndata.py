@@ -1,4 +1,5 @@
-from .conversions import convert_scanpy_to_mdv, log_memory_usage
+from .conversions import convert_scanpy_to_mdv
+from .benchmarking.memory import log_memory_usage
 import scanpy as sc
 import argparse
 import os

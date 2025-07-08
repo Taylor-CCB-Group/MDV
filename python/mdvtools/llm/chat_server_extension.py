@@ -1,5 +1,6 @@
 import traceback
 from typing import Optional, Protocol, Union
+from mdvtools.benchmarking.memory import log_memory_usage
 from mdvtools.llm.chat_protocol import (
   ChatRequest,
   ProjectChat,
@@ -75,8 +76,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         def chat_init():
             nonlocal bot
             if bot is None:
+                log_memory_usage("before bot init")
                 try:
                     bot = ProjectChat(project)
+                    log_memory_usage("after bot init")
                 except Exception as e:
                     error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
                     print(f"ERROR: {error_message}")
@@ -139,7 +142,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
                 result = bot.ask_question(chat_request)
-
+                log_memory_usage("after bot ask_question")
                 if result["error"]:
                     socketio.emit(
                         "chat_error", 
