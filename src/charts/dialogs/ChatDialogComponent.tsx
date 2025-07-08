@@ -1,21 +1,25 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
-import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen } from 'lucide-react';
-import useChat, { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
+import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Box, Button, Divider, TextField } from '@mui/material';
-import { useChartManager } from '@/react/hooks';
-import { fetchJsonConfig } from '@/dataloaders/DataLoaderUtil';
-import { useProject } from '@/modules/ProjectContext';
-import type { DataSource } from '../charts';
+import { Box, Button, Divider, IconButton, InputAdornment, TextField } from '@mui/material';
 import _ from 'lodash';
-import ErrorDisplay from './DebugErrorComponent';
+import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
+
+export type MessageType = {
+    onClose: () => void;
+    updateInput: (text: string) => void;
+    suggestedQuestions: string[];
+}
 
 /**
  * prototype for new ways of handling project state...
@@ -59,29 +63,82 @@ import ErrorDisplay from './DebugErrorComponent';
 //     }, [cm, root]);
 // }
 
+const SuggestedQuestions = ({ onSelect, suggestedQuestions }: { onSelect: (q: string) => void, suggestedQuestions: string[] }) => (
+    <div className="flex flex-wrap gap-2 mt-4 mb-4 flex-col">
+        <div className='font-bold'>Suggested Questions:</div>
+        <div className='flex flex-wrap gap-2 mt-2'>{suggestedQuestions.map((q) => (
+            <Button
+                key={q}
+                variant="outlined"
+                onClick={() => onSelect(q)}
+                size='large'
+                sx={{ textTransform: 'none', borderRadius: 2, color: "inherit" }}
+            >
+                {q}
+            </Button>
+        ))}
+        </div>
+    </div>
+);
 
-const Message = ({ text, sender, view, onClose }: ChatMessage & {onClose: () => void}) => {
+const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQuestions }: ChatMessage & MessageType) => {
     const isUser = sender === 'user';
+    const [copied, setCopied] = useState(false);
     const pythonSections = extractPythonSections(text);
     try {
         text = JSON.parse(text);
     } catch (e) {
     }
-    // todo: handle the scenario when view doesn't exist
-    // const isError = sender === 'bot' && !view;
+
+    const messageStyle = isUser ? 
+        'bg-teal-200 self-end dark:bg-teal-900' :
+        (error ?
+            'bg-slate-200 dark:bg-slate-800 self-start border border-red-900':
+            'bg-slate-200 dark:bg-slate-800 self-start'
+        )
+    
+    const messageIcon = error ?
+            <CircleAlert color='red' /> :
+            isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />;
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(typeof text === 'string' ? text : JSON.stringify(text, null, 2));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error("Failed to copy error details:", err);
+        }
+    };
+
     return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
-        <div className='selectable'>
-            {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
-            <div className={`mb-2 p-4 rounded-lg ${
-                isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
-                }`}>
+        <div className='selectable mt-4'>
+            <div>{messageIcon}</div>
+            <div className={`mb-2 p-4 rounded-lg ${messageStyle} relative markdown-body`}>
                 {/* <JsonView src={text} /> */}
-                {/* {isError ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />} */}
+                {(sender === "bot" || error) && (
+                    <IconButton
+                        size="small"
+                        aria-label="Copy button"
+                        onClick={handleCopy}
+                        sx={{ position: 'absolute', top: 2, right: 2 }}
+                    >
+                        {copied ? (
+                            <Check fontSize='small' />
+                        ) : (
+                            <ContentCopy fontSize='small' />
+                        )}
+                    </IconButton>
+                )}
                 <MessageMarkdown text={text} />
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
             ))} */}
+
+            {/* Show suggested questions only for the welcome message (sender: 'system') */}
+            {sender === 'system' && (
+                <SuggestedQuestions suggestedQuestions={suggestedQuestions} onSelect={updateInput} />
+            )}
             
             {/* Uncomment later and add logic for feedback buttons */}
             {/* {(sender === 'bot') && <MessageFeedback />} */}
@@ -178,6 +235,8 @@ const MessageMarkdown = ({ text }: { text: string }) => {
         <ReactMarkdown
             // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-markdown, not our code
             children={markdown}
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
             components={{
                 code({ node, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '')
@@ -233,10 +292,11 @@ export type ChatBotProps = {
     requestProgress: ChatProgress | null;
     verboseProgress: string[];
     onClose: () => void;
+    suggestedQuestions: string[];
 };
 
 
-const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose}: ChatBotProps) => {
+const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose, suggestedQuestions}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();
@@ -251,29 +311,37 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         setInput(e.target.value);
     }, []);
 
+    const updateInput = useCallback((text: string) => {
+        setInput(text);
+    }, []);
+
     const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             handleSend();
         }
     }, [handleSend]);
 
+    const handleClearInput = useCallback(() => {
+        setInput("");
+    }, []);
+
     const scrollToBottom = useCallback(() => {
         //! block: 'nearest' seems to solve issue with dialog header disappearing from top
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, []);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         // Only scroll when there are new messages or progress updates
-        if (messages.length > 0 || requestProgress) {
+        if (messages || requestProgress) {
             scrollToBottom();
         }
-    }, [messages.length, requestProgress, scrollToBottom]);
+    }, [messages, requestProgress, scrollToBottom]);
     
     return (
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
             <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
                 {messages.map((message) => (
-                    <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} />
+                    <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} updateInput={updateInput} suggestedQuestions={suggestedQuestions} />
                 ))}
                 {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
                 {/* {
@@ -281,9 +349,9 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
                 <Box ref={messagesEndRef} />
             </Box>
-            <Box className='absolute opacity-10 pointer-events-none right-0'>
+             {/*<Box className='absolute opacity-10 pointer-events-none right-0'>
                 <RobotPandaSVG />
-            </Box>
+            </Box> */}
             <Divider />
             <Box className="flex p-4 w-full">
                 <TextField
@@ -297,8 +365,19 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                     sx={{
                         mr: 2,
                     }}
+                    slotProps={{
+                        input: {
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton onClick={handleClearInput}>
+                                        <ClearIcon fontSize="small" />
+                                    </IconButton>
+                                </InputAdornment>
+                            )
+                        }
+                    }}
                 />
-                <Button onClick={handleSend} disabled={isSending} 
+                <Button onClick={handleSend} disabled={isSending || !input} 
                 className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
                     Send
                 </Button>

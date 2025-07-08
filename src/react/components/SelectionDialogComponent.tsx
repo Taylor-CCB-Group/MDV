@@ -1,4 +1,4 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
@@ -9,6 +9,7 @@ import CachedIcon from '@mui/icons-material/Cached';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
@@ -23,6 +24,24 @@ import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
 import { isArray } from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { RowsAsColsQuery } from "@/links/link_utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -100,6 +119,25 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         }
     }, [selectAll, setValue, values]);
 
+    const handleValueChange = useCallback((newValue: string | string[] | null) => {
+        // If newValue is null, set value to empty array
+        if (!newValue) {
+            setValue([]);
+        } else {
+            const valueArray = Array.isArray(newValue) ? newValue : [newValue];
+            setValue(valueArray);
+        }
+    }, [setValue]);
+
+    const handlePaste = usePasteHandler({
+        options: values,
+        multiple: true,
+        currentValue: value,
+        setValue: handleValueChange,
+        getLabel: (option: string) => option,
+        getValue: (option: string) => option,
+    });
+
     return (
         <Autocomplete
             multiple
@@ -118,11 +156,20 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             onClose={() => setOpen(false)}
             ref={ref}
             renderInput={(props) => {
-                const { key, ...p } = props as typeof props & {
+                const { key, InputProps, ...p } = props as typeof props & {
                     key: string;
                 }; //questionable mui types?
                 return <>
-                    <TextFieldExtended key={key} {...p} />
+                    <TextFieldExtended
+                        key={key}
+                        {...p}
+                        slotProps={{
+                            input: {
+                                ...InputProps,
+                                onPaste: handlePaste,
+                            }
+                        }}
+                    />
                 </>
             }}
             renderOption={(props, option) => {
@@ -504,6 +551,21 @@ const Components: {
 }
 
 const AbstractComponent = observer(function AbstractComponent<K extends DataType>({ column }: Props<K>) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: column.field });
+
+    const style = {
+        transform: CSS.Translate.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
     const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& invert / active toggle?) for each filter
     const config = useConfig<SelectionDialogConfig>();
@@ -523,16 +585,36 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const deleteFilter = useCallback((e: MouseEvent) => {
         e.stopPropagation();
         runInAction(() => {
-            delete filters[column.field];
             if (!isArray(config.param)) throw new Error("expected param array");
-            config.param = config.param.filter((p) => p !== column.field);
+            
+            // Filter the config.param by removing the column
+            const newParam = config.param.filter(p => {
+                if (typeof p === "string") {
+                    return p !== column.field;
+                }
+                if (p instanceof RowsAsColsQuery) {
+                    return false;
+                }
+                return true;
+            });
+            
+            // Update the config.param with new array
+            config.param = newParam;
+            
+            // Delete the column field in config.filters
+            delete config.filters[column.field];
+            if (config.order) {
+                // Delete the column field in config.order
+                delete config.order[column.field];
+            }
         });
-        console.log('Delete item');
-    }, [filters, column.field, config]);
+    }, [config, column]);
     return (
         <Accordion defaultExpanded={true}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            style={style}
+            ref={setNodeRef}
         >
             <AccordionSummary
                 expandIcon={<ArrowDropDownIcon />}
@@ -555,7 +637,25 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                 >
                     <HighlightOffIcon />
                 </IconButton>
-                <div className="flex items-center h-4">
+                <div className="flex items-center h-4 w-full">
+                    <IconButton
+                        {...attributes}
+                        {...listeners}
+                        size="small"
+                        sx={{
+                            opacity: isHovered ? 0.7 : 0.3,
+                            transition: 'opacity 0.3s',
+                            cursor: 'grab',
+                            '&:active': {
+                                cursor: 'grabbing',
+                            },
+                            '&:hover': {
+                                opacity: 1,
+                            },
+                        }}
+                    >
+                        <DragIndicatorIcon fontSize="small" />
+                    </IconButton>
                     <Typography variant="subtitle1">{column.name}
                         {hasFilter && <IconButton onClick={clearFilter}>
                             <CachedIcon fontSize="small" />
@@ -679,12 +779,57 @@ const SelectionDialogComponent = () => {
     //if we wrap this, then any change causes whole page to reload)
     //! since this is outside the ErrorBoundary, problems in this hook are not well handled
     //we could consider returning some kind of `Result` object from this hook...
-    const cols = useParamColumnsExperimental();
+    const orderedParams = useOrderedParamColumns();
+    const config = useConfig<SelectionDialogConfig>();
     useResetButton();
     const showAddRow = false;
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                // Need 8px of movement to start dragging
+                distance: 8,
+            }
+        })
+    );
+
+    const onDragEnd = useCallback((event: DragEndEvent) => {
+        // active - dragged item, over - dropped item
+        const { active, over } = event;
+
+        // Check if dragged and dropped item are different and other sanity checks
+        if (active && over && active.id !== over?.id) {
+            const oldIndex = orderedParams.findIndex(p => p.field === active.id);
+            const newIndex = orderedParams.findIndex(p => p.field === over.id);
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                // Update the config.order with the new order
+                const newOrderedFields = arrayMove(orderedParams.map(p => p.field), oldIndex, newIndex);
+                const newOrder: Record<string, number> = {};
+                newOrderedFields.forEach((field, index) => {
+                    newOrder[field] = index;
+                });
+                
+                runInAction(() => {
+                    config.order = newOrder;
+                });
+            }
+        }
+    }, [config, orderedParams]);
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
-            {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
+            >
+                <SortableContext 
+                    items={orderedParams.map(col => col.field)}
+                    strategy={verticalListSortingStrategy}
+                >
+                    {orderedParams.map((col) => <AbstractComponent key={col.field} column={col} />)}
+                </SortableContext>
+            </DndContext>
             {showAddRow && <ErrorBoundary FallbackComponent={
                 ({ error }) => 
                     (

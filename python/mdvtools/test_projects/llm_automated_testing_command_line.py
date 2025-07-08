@@ -26,7 +26,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent
 
 from mdvtools.llm.local_files_utils import extract_python_code_from_py, extract_python_code_from_ipynb
-from mdvtools.llm.templates import get_createproject_prompt_RAG_copy, prompt_data
+from mdvtools.llm.templates import get_createproject_prompt_RAG, prompt_data
 from mdvtools.llm.code_manipulation import prepare_code
 from mdvtools.llm.code_execution import execute_code
 
@@ -233,7 +233,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
             response = agent(full_prompt)
             
-            prompt_RAG = get_createproject_prompt_RAG_copy(project, dataset_path, datasource_names[0], response['output'], response['input'])
+            prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'], response['input'])
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)

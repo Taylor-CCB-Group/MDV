@@ -80,3 +80,17 @@ export function matchString(str1: string[], str2: string) {
 export function matchEmail(str1: string, str2: string) {
     return str2.includes(str1) && str2.startsWith(str1);
 }
+
+/**
+ * 
+ * Helper function to parse and extract the items from a string by splitting it by 
+ * space, comma, tab and new line
+ */
+export function parseDelimitedString(str: string) {
+    // Split by space or any whitespace character
+    const items = str
+        .split(/[,\s]+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    return items;
+}

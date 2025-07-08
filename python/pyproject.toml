@@ -38,14 +38,14 @@ faiss-cpu = "=1.8.0.post1"
 tabulate = "^0.9.0"
 python-dotenv = "^1.0.1"
 nbformat = "^5.10.4"
+ruff = "^0.3.7"
 
 [tool.poetry.group.dev]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-pyright = "^1.1.358"
+pyright = "^1.1.402"
 pytest = "^8.1.1"
-ruff = "^0.3.7"
 ome-types = "^0.5.0"
 jupyterlab = "^4.1.8"
 leidenalg = "^0.10.2"
@@ -107,3 +107,20 @@ typeCheckingMode = "standard"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+markers = [
+    "performance: marks tests as performance tests (deselect with '-m \"not performance\"')",
+    "slow: marks tests as slow running",
+    "integration: marks tests as integration tests"
+]
+
+testpaths = ["mdvtools/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers"
+]

@@ -1,17 +1,18 @@
 import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
-import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action, autorun } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType, FieldName, LoadedDataColumn, NumberDataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
-import { isArray, notEmpty } from "@/lib/utils";
+import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
+import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
 
 
 /**
@@ -194,6 +195,56 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
         });
     }, [chart.config.param, columnIndex, chart.dataStore]);
     return columns;
+}
+
+/**
+ * version of {@link useParamColumns} which returns a sorted column array based on config.order
+ */
+export function useOrderedParamColumns(): LoadedDataColumn<DataType>[] {
+    const chart = useChart();
+    const { columnIndex } = chart.dataStore;
+    const config = useConfig<SelectionDialogConfig>();
+    const [orderedParams, setOrderedParams] = useState<LoadedDataColumn<DataType>[]>([]);
+
+    useEffect(() => {
+        const disposer = autorun(() => {
+            const param = config.param;
+            if (!isArray(param)) throw "config.param should always be an array";
+            const cm = window.mdv.chartManager;
+            const dsName = chart.dataStore.name;
+            if (!param || param.length === 0) {
+                setOrderedParams([]);
+                return;
+            }
+            const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
+            cm.loadColumnSet(renderedParam, dsName, () => {
+                // Get the loaded columns
+                const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
+                if (!allColumnsLoaded(cols)) throw "bad column state";
+                
+                // Sort the columns based on config.order if it exists
+                const orderMap = config.order;
+                if (orderMap) {
+                    const sortedCols = [...cols].sort((a, b) => {
+                        const orderA = orderMap[a.field];
+                        const orderB = orderMap[b.field];
+                        const valA = orderA === undefined ? Number.MAX_SAFE_INTEGER : orderA;
+                        const valB = orderB === undefined ? Number.MAX_SAFE_INTEGER : orderB;
+                        return valA - valB;
+                    });
+                    setOrderedParams(sortedCols);
+                } else {
+                    setOrderedParams(cols);
+                }
+            });
+            return;
+        });
+
+        // Cleanup the disposer
+        return () => disposer();
+    }, [config.param, config.order, columnIndex, chart.dataStore]);
+
+    return orderedParams;
 }
 
 
@@ -489,4 +540,126 @@ export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClos
             observer.disconnect();
         }
     }, [ref.current, onClose]);
+};
+
+export type PasteHandlerType<T, V = T> = {
+    options: T[];
+    getLabel: (option: T) => string;
+    getValue: (option: T) => V;
+    multiple: boolean;
+    currentValue: V | V[] | null;
+    setValue: (v: V | V[] | null) => void;
+};
+
+/**
+ * Hook that provides onPaste handler for Autocomplete components.
+ * Handles parsing delimited strings and matching them against available options.
+ */
+export const usePasteHandler = <T, V = T>({
+    options,
+    multiple,
+    currentValue,
+    setValue,
+    getLabel,
+    getValue,
+}: PasteHandlerType<T, V>) => {
+    return useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
+        const text = e.clipboardData.getData("text");
+        // Parse the string to extract the pasted items
+        const items = parseDelimitedString(text);
+        if (items.length === 0) return;
+        
+        if (!multiple) {
+            const itemLower = items[0]?.toLowerCase();
+
+            // Find the option which matches the pasted text
+            const matched = options.find((option) => {
+                const optionLower = getLabel(option).toLowerCase().split(" ");
+                return matchString(optionLower, itemLower);
+            });
+
+            if (matched) {
+                // Preventing default paste behaviour
+                e.preventDefault();
+                // Set the value with extracted value from matched option
+                setValue(getValue(matched));
+            }
+        } else {
+            const itemLower = items.map((item) => item.toLowerCase());
+            // Filters the options to get the options which match the pasted text
+            const matched = options.filter((option) => 
+                itemLower.some((item) => {
+                    const optionLower = getLabel(option).toLowerCase().split(" ");
+                    return matchString(optionLower, item);
+                })
+            );
+
+            if (matched.length > 0) {
+                // Preventing default paste behaviour
+                e.preventDefault();
+                const matchedValues = matched.map(getValue);
+                const currentValues = Array.isArray(currentValue) ? currentValue : [];
+                // Create a set for unique values
+                const uniqueMatched = Array.from(
+                    new Set([...matchedValues, ...currentValues])
+                );
+                // Update the value with the unique values
+                setValue(uniqueMatched);
+            }
+            // Nothing matched, proceed as normal
+        }
+    }, [multiple, getLabel, options, setValue, getValue, currentValue]);
+};
+
+/**
+ * Hook that provides the resize logic for a drawer
+ */
+export const useResizeDrawer = (
+    dialogRef: React.RefObject<HTMLDivElement>, 
+    defaultDrawerWidth: number, 
+    minDrawerWidth: number, 
+    maxDrawerWidth: number
+) => {
+    
+    const [drawerWidth, setDrawerWidth] = useState(defaultDrawerWidth);
+    const [resizing, setResizing] = useState(false);
+    const initialMouseX = useRef(0);
+    const initialDrawerWidth = useRef(defaultDrawerWidth);
+
+    // Calculate the new width of the drawer when resizing
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        const offset = e.clientX - initialMouseX.current;
+        const newWidth = Math.max(minDrawerWidth, Math.min(initialDrawerWidth.current + offset, maxDrawerWidth));
+        setDrawerWidth(newWidth);
+    }, [maxDrawerWidth, minDrawerWidth]);
+
+    // Setting resize to false after releasing the mouse
+    const handleMouseUp = useCallback(() => {
+        setResizing(false);
+    }, []);
+
+    // Store the initial width and clientX and setResizing to true
+    const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        setResizing(true);
+        initialMouseX.current = e.clientX;
+        initialDrawerWidth.current = drawerWidth;
+    }, [drawerWidth]);
+
+    useEffect(() => {
+        // Use the owner document if it exists (valid when the dialog is popped out)
+        const doc = dialogRef.current?.ownerDocument ?? document;
+
+        if (!resizing) return;
+        
+        doc.addEventListener("mousemove", handleMouseMove);
+        doc.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            doc.removeEventListener("mousemove", handleMouseMove);
+            doc.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [resizing, dialogRef.current, handleMouseMove, handleMouseUp]);
+
+    return {
+        drawerWidth, onMouseDown
+    }
 };

@@ -22,9 +22,9 @@ RUN echo "Build args received:" && \
     echo "GIT_DIRTY: $GIT_DIRTY"
 
 ENV VITE_GIT_COMMIT_DATE=$GIT_COMMIT_DATE
-ENV VITE_GIT_BRANCH_NAME=$GIT_BRANCH_NAME
+ENV VITE_GIT_BRANCH_NAME="$GIT_BRANCH_NAME"
 ENV VITE_GIT_COMMIT_HASH=$GIT_COMMIT_HASH
-ENV VITE_GIT_LAST_COMMIT_MESSAGE=$GIT_LAST_COMMIT_MESSAGE
+ENV VITE_GIT_LAST_COMMIT_MESSAGE="$GIT_LAST_COMMIT_MESSAGE"
 ENV VITE_BUILD_DATE=$BUILD_DATE
 ENV VITE_GIT_DIRTY=$GIT_DIRTY
 
@@ -139,6 +139,10 @@ RUN npm config set script-shell "/bin/bash"
 # Add automatic poetry shell activation for terminal use
 RUN echo 'cd /app/python && $(poetry env activate)' >> ~/.bashrc && \
     echo 'cd /app' >> ~/.bashrc
+
+USER root
+RUN mkdir -p /app/logs && chown -R pn:pn /app/logs
+USER pn
 
 # Command to run Gunicorn
 CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "200", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]

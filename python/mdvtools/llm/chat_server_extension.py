@@ -1,14 +1,24 @@
-from typing import Optional, Protocol, cast
+import traceback
+from typing import Optional, Protocol, Union
+from mdvtools.benchmarking.memory import log_memory_usage
 from mdvtools.llm.chat_protocol import (
+  ChatRequest,
   ProjectChat,
   ProjectChatProtocol, 
   chat_enabled
 )
-from mdvtools.llm.code_manipulation import parse_view_name
+from mdvtools.llm.markdown_utils import create_project_markdown, create_error_markdown
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 # from mdvtools.dbutils.config import config
-from flask import Flask, request, session, current_app
+from flask import Flask, request
+from flask_socketio import join_room, leave_room
+from mdvtools.logging_config import get_logger
+from mdvtools.llm.chatlog import log_chat_item
+
+logger = get_logger(__name__)
+logger.info("chat server extension loading...")
+
 
 class MDVProjectServerExtension(Protocol):
     """
@@ -40,6 +50,7 @@ class MDVProjectServerExtension(Protocol):
 class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
+
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
         from mdvtools.websocket import socketio
         if socketio is None:
@@ -53,6 +64,11 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             **nb the coupling of sockets and "chat" should be removed.**
             """
             # todo - check access level, whether chat is enabled etc
+            # at the time you connect, flask_socketio session by default is "forked from http session"
+            # if we made SocketIO instance with manage_session=False, then they would reference the same session.
+            # Not sure how this relates to how we handle auth, access_level etc.
+            # https://blog.miguelgrinberg.com/post/flask-socketio-and-the-user-session
+            # https://flask-socketio.readthedocs.io/en/latest/implementation_notes.html#using-flask-login-with-flask-socketio
             
 
         bot: Optional[ProjectChatProtocol] = None
@@ -60,41 +76,101 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         def chat_init():
             nonlocal bot
             if bot is None:
-                bot = ProjectChat(project)
-            return {"message": bot.welcome}
-        @project_bp.route("/chat", access_level='editable', methods=["POST"])
-        def chat():
+                log_memory_usage("before bot init")
+                try:
+                    bot = ProjectChat(project)
+                    log_memory_usage("after bot init")
+                except Exception as e:
+                    error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
+                    print(f"ERROR: {error_message}")
+                    return {"message": f"ERROR: {error_message}", "error": True}
+            if bot.init_error:
+                # Log and return the error
+                error_msg = bot.error_message or "An unknown error occurred"
+                bot.log(f"ERROR: {error_msg}")
+                return {"message": f"ERROR: {error_msg}", "error": True}
+            
+            markdown = create_project_markdown(project)
+                
+            bot.log(f"Markdown: {markdown}")
+            detailed_message = bot.welcome + markdown
+            return {"message": detailed_message}
+
+        @socketio.on("chat_request", namespace=f"/project/{project.id}")
+        def chat(data):
             nonlocal bot
-            if not request.json:
-                return {"error": "No JSON data in request"}, 500
-            message = request.json.get("message")
-            id = request.json.get("id")
+            sid = request.sid # type: ignore - flask_socketio.request.sid
+            # todo - auth (via custom decorator? see comments above)
+
+            message = data.get("message")
+            id = data.get("id")
+            room = f"{sid}_{id}"
+            join_room(room)
+            def handle_error(error: Union[str, Exception], *, extra_metadata: Optional[dict] = None):
+                if isinstance(error, Exception):
+                    error_message = str(error)
+                    traceback_str = traceback.format_exc()
+                else:
+                    error_message = error
+                    traceback_str = None
+
+                markdown = create_error_markdown(error_message, traceback_str, extra_metadata)
+                logger.error(f"Chat error: {markdown}")
+                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, error=True)
+                socketio.emit(
+                    "chat_error",
+                    {"message": markdown},
+                    namespace=f"/project/{project.id}",
+                    to=room
+                )
             if not message or not id:
-                return {"error": "Missing 'message' or 'id' in request JSON"}, 400
-            # todo - consider having a socket.io event for this, rather than a REST endpoint.
-            # this would mean that we could use request.sid to track the chat session
-            conversation_id = request.json.get("conversation_id")
+                handle_error("Missing 'message' or 'id' in request JSON")
+                leave_room(room)
+                return
+            conversation_id = data.get("conversation_id")
+            chat_request = ChatRequest(
+                message=message,
+                id=id,
+                conversation_id=conversation_id,
+                room=room,
+                handle_error=handle_error
+            )
             try:
                 if bot is None:
+                    # todo - allow this to be freed at some point if we're not using it anymore.
                     bot = ProjectChat(project)
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
-                final_code = bot.ask_question(message, id, conversation_id)
-                try:
-                    # this can give a confusing error if we don't explicitly catch it...
-                    view_name = parse_view_name(final_code)
-                    if view_name is None:
-                        raise Exception(final_code)
-                    bot.log(f"view_name: {view_name}")
-                    return {"message": final_code, "view": view_name, "id": id}
-                except Exception as e:
-                    bot.log(f"final_code returned by bot.ask_question is bad, probably an earlier error: {e}")
-                    # final_code is probably an error message, at this point.
-                    return {"message": final_code}
+                result = bot.ask_question(chat_request)
+                log_memory_usage("after bot ask_question")
+                if result["error"]:
+                    socketio.emit(
+                        "chat_error", 
+                        {"message": result["message"], "error": True, "id": id}, 
+                        namespace=f"/project/{project.id}", 
+                        to=room
+                    )
+                    leave_room(room)
+                    return
+                else:
+                    socketio.emit(
+                        "chat_response", 
+                        {"message": result["code"], "view": result["view_name"], "id": id}, 
+                        namespace=f"/project/{project.id}", 
+                        to=room
+                    )
+                    leave_room(room)
+                    return
+
             except Exception as e:
-                print(e)
-                return {"message": str(e)}
-    
+                # Log error to chat_log.json
+                error_message = str(e)
+                tb_str = traceback.format_exc()
+                print(f"ERROR: {error_message}\n\n{tb_str}")
+                handle_error(e)
+                leave_room(room)
+                return
+            
     def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
         """
         Mutate the state.json before returning it as a request response,

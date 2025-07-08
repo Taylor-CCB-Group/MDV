@@ -31,6 +31,18 @@ import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.llm.chat_server_extension import chat_extension
+from mdvtools.logging_config import get_logger
+
+logger = get_logger(__name__)
+logger.info("server.py module loaded")
+def log(*args, **kwargs):
+    """
+    Log info-level messages using the module logger.
+    Behaves similarly to print, but sends output to logger.info.
+    """
+    msg = " ".join(str(arg) for arg in args)
+    logger.info(msg)
+
 routes = set()
 
 
@@ -53,7 +65,7 @@ def create_app(
         route = ""
         # route = "/project/" + project.name # for testing new API with simple app...
         app = Flask(__name__)
-        print(f"created Flask {app}")
+        log(f"created Flask {app}")
         # add headers to allow web workers
         app.after_request(add_safe_headers)
         project_bp = SingleProjectShim(app)
@@ -78,7 +90,7 @@ def create_app(
 
         if backend_db:
             from mdvtools.project_router import ProjectBlueprint_v2 as Blueprint_v2
-            print("backend_db is True")
+            log("backend_db is True")
             project_bp = Blueprint_v2(project.id, __name__, url_prefix=route)
         else:
             project_bp = Blueprint(project.id, __name__, url_prefix=route)
@@ -102,7 +114,7 @@ def create_app(
 
     @project_bp.route("/")
     def project_index():
-        print("recieved request to project_index")
+        log("recieved request to project_index")
         # the backend page currently needs to be different to workaround a server config issue
         # some requests were being downgraded to http, which caused problems with the backend
         # but if we always add the header it messes up localhost development.
@@ -130,7 +142,7 @@ def create_app(
         if project.dir is None:
             return "Project directory not found", 404
         path = safe_join(project.dir, file + ".json")
-        # print(f"get_json_file: '{path}' for project {project.id}")
+        # log(f"get_json_file: '{path}' for project {project.id}")
 
         
         if path is None or not os.path.exists(path):
@@ -165,7 +177,7 @@ def create_app(
             response.headers.set("Content-Type", "application/octet-stream")
             return response
         except Exception as e:
-            print(e)
+            log(e)
             return "Problem handling request", 400
 
     # images contained in the project
@@ -271,7 +283,7 @@ def create_app(
 
         Example:
             >>> temp_path = create_temp_folder('/path/to/project')
-            >>> print(temp_path)
+            >>> log(temp_path)
             '/path/to/project/temp_anndata_20250129_143022'
         """
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -537,7 +549,7 @@ def create_app(
             view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file)
             
             # If no exception is raised, the operation was successful. let the client know which view will show the image.
-            print(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
+            log(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
             return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully", "view": view_name}), 200
 
         except Exception as e:
@@ -560,7 +572,7 @@ def create_app(
         try:
             name = request.form["name"]
 
-            print("In server.py add_datasource")
+            log("In server.py add_datasource")
 
             if not name:
                 return "Request must contain 'name'", 400
@@ -593,8 +605,8 @@ def create_app(
             file.save(file_name)
             #df = pd.read_csv(file.stream)
             df = pd.read_csv(file_name)
-            print("In server.py add_datasource- df created")
-            print("df is ready, calling project.add_datasource")
+            log("In server.py add_datasource- df created")
+            log("df is ready, calling project.add_datasource")
             project.add_datasource(
                 #project.id,
                 name,
@@ -604,7 +616,7 @@ def create_app(
                 supplied_columns_only=supplied_only,
                 replace_data=replace
                 )
-            print("added df - project.add_datasource completed")
+            log("added df - project.add_datasource completed")
         except Exception as e:
             # success = False
             return str(e), 400
@@ -618,10 +630,10 @@ def create_app(
     if multi_project:
         assert(isinstance(app, Flask))
         if route in app.blueprints:
-            print(f"there is already a blueprint at {route}")
-        print(f"Adding project {project.id} to existing app")
+            log(f"there is already a blueprint at {route}")
+        log(f"Adding project {project.id} to existing app")
         ## nb - uncomment this if not using ProjectBlueprint refactor...
-        # app.register_blueprint(project_bp)
+        # app.register_bluelog(project_bp)
     else:
         # user_reloader=False, allows the server to work within jupyter
 

@@ -1,18 +1,14 @@
 from flask import Flask, Request as FlaskRequest
 from flask_socketio import SocketIO
 from datetime import datetime
-# import asyncio
-# from typing import Optional
-from mdvtools.mdvproject import MDVProject
-
-import logging
+from typing import Optional
 
 def log(msg: str):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[[[ socket.io ]]] [{date_str}] - {msg}")
 
-socketio: SocketIO = None # type: ignore
+socketio: Optional[SocketIO] = None
 
 # This is a map of chat request IDs to user IDs, used to track which user is associated with which chat session.
 # something of a placeholder
@@ -64,71 +60,3 @@ def mdv_socketio(app: Flask):
     #         # error asyncio.run() cannot be called from a running event loop
     #         # asyncio.run(response(sid, data.get('message')))
     #         # response(sid, data.get('message'))
-
-
-def get_socket_logger(event_name="log"):
-    logger = logging.getLogger(event_name)
-    logger.setLevel(logging.INFO)
-    handler = SocketIOHandler(socketio, event_name)
-    logger.addHandler(handler)
-    return logger
-
-class ChatSocketAPI:
-    def __init__(self, project: MDVProject):
-        self.project = project
-        self.socketio = socketio
-        # todo refactor event/room/namespace names 
-        log_name = f"/project/{project.id}/chat"
-        self.progress_name = f"/project/{project.id}/chat_progress"
-        self.logger = get_socket_logger(log_name)
-        self.project_namespace = f"/project/{project.id}"
-    def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
-        """
-        Send a message to the chat log and also update the progress bar.
-        
-        Args:
-            message (str): the message to send to the chat log
-            id (str): the id of the associated chat request
-            progress (int): the progress value (%) to update the progress bar with
-            delta (int): the expected cost of the current operation (%)
-        """
-        # we should descriminate which user to send this to... 
-        # which implies that this instance should be associated...
-        # or that we can map the chat request ID to a user ID.
-
-        # I think simplest way to do this will be to use request.sid,
-        # which implies that the `/chat` endpoint should be socket.io rather than REST.
-
-        # to = chat_sid_map.get(id, None)
-        # if to is None:
-        #     log(f"Chat progress update for {id} but no associated user found, skipping.")
-        #     return
-        self.socketio.emit(self.progress_name, {
-            "message": message, "id": id, "progress": progress, "delta": delta
-        }, namespace=self.project_namespace)
-
-class SocketIOHandler(logging.StreamHandler):
-    def __init__(self, socketio: SocketIO, event_name="log"):
-        super().__init__()
-        log(f"handler initialized for event: {event_name}")
-        self.socketio = socketio
-        # todo - event_name vs namespace vs room refactor
-        self.event_name = event_name
-        def my_function_handler(data):
-            log(f"{event_name}: {data}")
-        # log(f"socketio.on_event({event_name}, my_function_handler)")
-        socketio.on_event(event_name, my_function_handler)
-        # socketio.on(event_name, )
-
-    def emit(self, record):
-        """
-        Emit a record - send it via socketio & also print it to the console.
-        subject to change.
-        """
-        try:
-            msg = self.format(record)
-            log(f"[ {self.event_name} ] {msg}")
-            #!!! to=???
-            self.socketio.emit(self.event_name, msg)
-        except Exception:
-            self.handleError(record)

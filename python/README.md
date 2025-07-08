@@ -141,3 +141,51 @@ with socketserver.TCPServer(("", 8000), CustomHandler) as httpd:
     print("serving at port", 8000)
     httpd.serve_forever()
 ```
+
+## Testing
+
+### Running Tests
+
+To run the standard test suite (excluding performance tests):
+
+```bash
+make test
+```
+
+To run only performance/stress tests:
+
+```bash
+make test-performance
+```
+
+To run all tests including performance tests:
+
+```bash
+poetry run pytest mdvtools/
+```
+
+### Performance Testing in CI
+
+Performance tests are resource-intensive and are not run by default in CI to conserve resources. They can be triggered in several ways:
+
+1. **Commit message trigger**: Include `[perf-test]` in your commit message
+2. **Pull request title**: Include `[perf-test]` in the PR title
+3. **Manual workflow dispatch**: Go to the GitHub Actions tab and manually trigger the "Python Performance Tests" workflow
+
+Example commit message:
+```
+feat: add new conversion feature [perf-test]
+```
+
+The performance tests will run on large datasets (up to 100k cells × 8k genes) and verify:
+- Memory efficiency during conversion
+- Conversion speed benchmarks
+- Memory leak detection
+- Chunked normalization performance
+
+### Test Markers
+
+Tests are categorized using pytest markers:
+- `@pytest.mark.performance`: Performance/stress tests (excluded from regular CI)
+- `@pytest.mark.slow`: Slow-running tests
+- `@pytest.mark.integration`: Integration tests

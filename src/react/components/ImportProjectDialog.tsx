@@ -6,7 +6,6 @@ import {
     DropzoneContainer,
     DynamicText,
     FileInputLabel,
-    Button as FileUploadButton,
 } from "@/charts/dialogs/FileUploadDialog";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import {
@@ -17,8 +16,6 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    TextField,
-    Typography,
 } from "@mui/material";
 import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
 import axios, { AxiosError } from "axios";
@@ -27,7 +24,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
-const Loader = () => {
+export const Loader = () => {
     return (
         <Box
             sx={{
@@ -54,16 +51,81 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<{ message: string; stack?: string }>();
     const [errorOpen, setErrorOpen] = useState(false);
+    const [validationError, setValidationError] = useState<string | null>(null);
     const { fetchProjects } = useProjects();
 
-    // todo: add additional checks
-    const onDrop = useCallback((acceptedFiles: File[]) => {
-        if (acceptedFiles[0]) {
-            setFile(acceptedFiles[0]);
-            const name = acceptedFiles[0].name.split(".")[0];
-            setProjectName(name ?? "");
+    
+    
+    const validateMDVProject = useCallback(async (file: File): Promise<{ isValid: boolean; error?: string }> => {
+        // nb, this is a mirror of the python code and not necessarily our final implementation
+        // but hopefully having something here will help us avoid support questions whenever users try to drop random incompatible zip files
+        const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);
+        const findRootPrefix = (names: string[]): string | null => {
+            // Check if all required files are in the root of archive
+            const rootFiles = new Set(names.filter(n => !n.includes("/")).map(n => n.split("/").pop() || ""));
+            if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => rootFiles.has(file)).length) {
+                return "";
+            }
+            
+            // Check one level below if required files exist
+            const dirs = new Set(names.filter(n => n.includes("/")).map(n => n.split("/")[0]));
+            for (const dir of dirs) {
+                const filesInDir = new Set(
+                    names
+                        .filter(n => n.startsWith(`${dir}/`))
+                        .map(n => n.split("/").pop() || "")
+                );
+                if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => filesInDir.has(file)).length) {
+                    return `${dir}/`;
+                }
+            }
+            return null;
+        };
+
+        try {
+            // Dynamically import JSZip only when needed
+            const JSZip = (await import('jszip')).default;
+            const zip = new JSZip();
+            const zipContent = await zip.loadAsync(file);
+            
+            const fileNames = Object.keys(zipContent.files);
+            
+            // Reject entries with absolute paths or ".."
+            const badEntries = fileNames.filter(n => n.startsWith("/") || n.startsWith("\\") || n.includes(".."));
+            if (badEntries.length > 0) {
+                return { isValid: false, error: "Invalid ZIP file: unsafe paths detected" };
+            }
+
+            // Find the root directory of the mdv project
+            const root = findRootPrefix(fileNames);
+            if (root === null) {
+                return { isValid: false, error: "Not a valid MDV project: missing required files (views.json, state.json, datasources.json)" };
+            }
+
+            return { isValid: true };
+        } catch (error) {
+            return { isValid: false, error: "Failed to read ZIP file contents" };
         }
     }, []);
+
+    // todo: add additional checks
+    const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        if (acceptedFiles[0]) {
+            setValidationError(null);
+            const file = acceptedFiles[0];
+            
+            // Validate the file before accepting it
+            const validation = await validateMDVProject(file);
+            if (!validation.isValid) {
+                setValidationError(validation.error || "Invalid MDV project file");
+                return;
+            }
+            
+            setFile(file);
+            const name = file.name.match(/^(.+?)(?:\.mdv)?\.zip$/)?.[1];
+            setProjectName(name ?? "");
+        }
+    }, [validateMDVProject]);
 
     const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
         onDrop,
@@ -73,14 +135,20 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         },
         // todo: update later for larger files support
         maxSize: 2000 * 1024 * 1024, // 2 GB
+        validator: (file) => {
+            // Basic file type validation is handled by accept prop
+            return null;
+        },
     });
 
     const rejectionMessage =
         fileRejections.length > 0
             ? "Only ZIP files are allowed under 2 GB. Please try again."
-            : "Drag and drop a file here or click the button below (only *.zip files are allowed)";
+            : validationError
+            ? validationError
+            : "Drag and drop a file here or click the button below (only MDV project archive *.zip files are allowed)";
 
-    const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
+    const rejectionMessageStyle = fileRejections.length > 0 || validationError ? "text-red-500" : "";
 
     const onClose = useCallback(() => {
         setOpen(false);
@@ -161,7 +229,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                                         <DynamicText text={"Drop files here..."} className="text-sm" />
                                     ) : (
                                         <DynamicText
-                                            text={file ? `Selected file: ${file.name}` : rejectionMessage}
+                                            text={file ? `Selected file: ${file.name} (${projectName})` : rejectionMessage}
                                             className={`${rejectionMessageStyle} text-sm`}
                                         />
                                     )}
