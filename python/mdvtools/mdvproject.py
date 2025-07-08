@@ -1261,8 +1261,25 @@ class MDVProject:
 
     def serve(self, **kwargs):
         from mdvtools.server import create_app
+        from mdvtools.server_extension import MDVServerOptions
 
-        create_app(self, **kwargs)
+        extensions = kwargs.get("extensions", [])
+        if kwargs.get("websocket", True):
+            # To avoid circular dependencies and keep this optional, we import it here.
+            from mdvtools.llm.chat_server_extension import chat_extension
+            extensions.append(chat_extension)
+
+        options = MDVServerOptions(
+            open_browser=kwargs.get("open_browser", True),
+            port=kwargs.get("port", 5050),
+            websocket=kwargs.get("websocket", True),
+            use_reloader=kwargs.get("use_reloader", False),
+            app=kwargs.get("app"),
+            backend_db=kwargs.get("backend_db", False),
+            extensions=extensions,
+        )
+
+        create_app(self, options=options)
         
 
     def delete(self):
