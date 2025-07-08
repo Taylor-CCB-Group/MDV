@@ -16,6 +16,7 @@ from mdvtools.auth.authutils import register_before_request_auth, get_auth_provi
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
+from mdvtools.dbutils.server_options import get_server_options_for_db_projects
 # this shouldn't be necessary in future
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
@@ -329,6 +330,7 @@ def serve_projects_from_db(app):
         # Get all projects from the database
         logger.info("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
         projects = Project.query.all()
+        options = get_server_options_for_db_projects(app)
 
         for project in projects:
             
@@ -341,7 +343,7 @@ def serve_projects_from_db(app):
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
                     p.set_editable(True)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
-                    p.serve(app=app, open_browser=False, backend_db=True)
+                    p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
 
                     # Update or add files in the database to reflect the actual files in the filesystem
@@ -398,6 +400,7 @@ def serve_projects_from_filesystem(app, base_dir):
         # Determine which project paths are in the filesystem but not in the database
         missing_project_paths = project_paths_in_fs - projects_in_db
         logger.info(f"Missing project paths: {missing_project_paths}")
+        options = get_server_options_for_db_projects(app)
 
         # Iterate over missing project paths to create and serve them
         for project_path in missing_project_paths:
@@ -416,7 +419,7 @@ def serve_projects_from_filesystem(app, base_dir):
 
                     p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
                     p.set_editable(True)
-                    p.serve(app=app, open_browser=False, backend_db=True) 
+                    p.serve(options=options) 
                     logger.info(f"Serving project: {project_path}")
 
                     # Create a new Project record in the database with the default name

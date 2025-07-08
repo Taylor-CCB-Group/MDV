@@ -27,6 +27,7 @@ import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
 from mdvtools.logging_config import get_logger
+from mdvtools.server_extension import MDVServerOptions
 
 logger = get_logger(__name__)
 
@@ -1259,25 +1260,15 @@ class MDVProject:
                     links.append({"datasource": lnkto, "link": lnk})
         return links
 
-    def serve(self, **kwargs):
+    def serve(self, options: Optional[MDVServerOptions] = None):
         from mdvtools.server import create_app
-        from mdvtools.server_extension import MDVServerOptions
 
-        extensions = kwargs.get("extensions", [])
-        if kwargs.get("websocket", True):
-            # To avoid circular dependencies and keep this optional, we import it here.
-            from mdvtools.llm.chat_server_extension import chat_extension
-            extensions.append(chat_extension)
-
-        options = MDVServerOptions(
-            open_browser=kwargs.get("open_browser", True),
-            port=kwargs.get("port", 5050),
-            websocket=kwargs.get("websocket", True),
-            use_reloader=kwargs.get("use_reloader", False),
-            app=kwargs.get("app"),
-            backend_db=kwargs.get("backend_db", False),
-            extensions=extensions,
-        )
+        if options is None:
+            # create default options
+            options = MDVServerOptions()
+            if options.websocket:
+                from mdvtools.llm.chat_server_extension import chat_extension
+                options.extensions.append(chat_extension)
 
         create_app(self, options=options)
         
