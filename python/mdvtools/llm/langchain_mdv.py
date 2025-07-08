@@ -172,16 +172,9 @@ class ProjectChat(ProjectChatProtocol):
             self.ds_name1 = project.datasources[1]['name'] # maybe comment this out?
             self.df1 = project.get_datasource_as_dataframe(self.ds_name1) # and maybe comment this out?
 
-        if len(project.datasources) >= 2:
-            df_list = [project.get_datasource_as_dataframe(ds['name']) for ds in project.datasources[:2]]
-        elif len(project.datasources) == 0:
-            raise ValueError("The project does not have any datasources")
-        else:
-            df_list = [project.get_datasource_as_dataframe(project.datasources[0]['name'])]
         self.ds_name = project.datasources[0]['name']
         try:
             # raise ValueError("test error")
-            # self.df = project.get_datasource_as_dataframe(self.ds_name) # not used
             self.df = None
             # Prepare dataframes for the agent
             if len(self.project.datasources) >= 2:
@@ -374,7 +367,7 @@ class ProjectChat(ProjectChatProtocol):
                 h5ad_file = None
 
                 # Identify the CSV or H5AD file
-                # subject to review at a later date
+                # subject to review...
                 for file in files_in_dir:
                     if file.endswith(".csv"):
                         csv_file = file
@@ -396,7 +389,7 @@ class ProjectChat(ProjectChatProtocol):
                 # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
-                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], response['input']) #self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], response['input'])
                 chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
 
                 prompt_RAG_template = PromptTemplate(
