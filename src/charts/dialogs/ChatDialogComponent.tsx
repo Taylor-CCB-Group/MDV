@@ -129,18 +129,7 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
                         )}
                     </IconButton>
                 )}
-                {error ? (
-                    <pre 
-                        style={{
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word"
-                        }}
-                    >
-                        {text}
-                    </pre>
-                ): (
-                    <MessageMarkdown text={text} />
-                )}
+                <MessageMarkdown text={text} />
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />

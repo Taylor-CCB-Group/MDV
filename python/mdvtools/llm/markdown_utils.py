@@ -1,4 +1,15 @@
 from mdvtools.mdvproject import MDVProject
+from typing import Optional
+import json
+
+def create_error_markdown(message: str, traceback: Optional[str] = None, extra_metadata: Optional[dict] = None) -> str:
+    markdown = f"**Error:** {escape_markdown(message)}\n\n"
+    if traceback:
+        # Use HTML details tag for collapsable section
+        markdown += f"<details><summary>Traceback</summary>\n\n```\n{traceback}\n```\n\n</details>\n\n"
+    if extra_metadata:
+        markdown += f"<details><summary>Extra Metadata</summary>\n\n```json\n{json.dumps(extra_metadata, indent=2)}\n```\n\n</details>\n\n"
+    return markdown
 
 def create_project_markdown(project: MDVProject) -> str:
     markdown = "\n\n<details>\n\n"

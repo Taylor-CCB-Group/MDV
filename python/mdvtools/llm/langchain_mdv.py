@@ -470,5 +470,5 @@ class ProjectChat(ProjectChatProtocol):
             socket_api.update_chat_progress(
                 f"Error: {error_message}", id, 100, 0
             )
-            handle_error(f"ERROR: {error_message}")
+            handle_error(e)
             return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {error_message}"}

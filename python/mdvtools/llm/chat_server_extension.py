@@ -1,12 +1,12 @@
 import traceback
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Union
 from mdvtools.llm.chat_protocol import (
   ChatRequest,
   ProjectChat,
   ProjectChatProtocol, 
   chat_enabled
 )
-from mdvtools.llm.markdown_utils import create_project_markdown
+from mdvtools.llm.markdown_utils import create_project_markdown, create_error_markdown
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 # from mdvtools.dbutils.config import config
@@ -103,16 +103,20 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             id = data.get("id")
             room = f"{sid}_{id}"
             join_room(room)
-            def handle_error(error: str):
-                #! todo - frontend should handle this, and show an error message to the user.
-                # also, this method may be augmented so that it also logs to the chat log,
-                # and pass this handler to the bot.ask_question method.
-                # Log error to chat_log.json
-                logger.error(f"Chat error: {error}")
-                log_chat_item(project, message or '', None, '', error, conversation_id, None, error=True)
+            def handle_error(error: Union[str, Exception], *, extra_metadata: Optional[dict] = None):
+                if isinstance(error, Exception):
+                    error_message = str(error)
+                    traceback_str = traceback.format_exc()
+                else:
+                    error_message = error
+                    traceback_str = None
+
+                markdown = create_error_markdown(error_message, traceback_str, extra_metadata)
+                logger.error(f"Chat error: {markdown}")
+                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, error=True)
                 socketio.emit(
                     "chat_error",
-                    {"message": error},
+                    {"message": markdown},
                     namespace=f"/project/{project.id}",
                     to=room
                 )
@@ -157,9 +161,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
             except Exception as e:
                 # Log error to chat_log.json
-                error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
-                print(f"ERROR: {error_message}")
-                handle_error(f"ERROR: {error_message}")
+                error_message = str(e)
+                tb_str = traceback.format_exc()
+                print(f"ERROR: {error_message}\n\n{tb_str}")
+                handle_error(e)
                 leave_room(room)
                 return
             

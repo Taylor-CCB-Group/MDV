@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Protocol, Any, TypedDict
+from typing import Optional, Protocol, Any, TypedDict, Union
 from mdvtools.mdvproject import MDVProject
 
 
@@ -9,12 +9,17 @@ class AskQuestionResult(TypedDict):
     message: str
 
 
+class HandleError(Protocol):
+    def __call__(self, error: Union[str, Exception], *, extra_metadata: Optional[dict] = None) -> None:
+        ...
+
+
 class ChatRequest(TypedDict):
     message: str
     id: str
     conversation_id: str
     room: str
-    handle_error: Callable[[str], None]
+    handle_error: HandleError
 
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
@@ -40,7 +45,7 @@ except Exception as e:
             self.project = project
             self.ds_name = "dummy"
             self.welcome = (
-                "There was a problem initializing the chatbot\n\n"
+                "There was a problem initializing the chatbot:\n\n"
                 f"{msg}"
             )
 
@@ -49,8 +54,8 @@ except Exception as e:
 
         def ask_question(self, chat_request: ChatRequest):
             handle_error = chat_request["handle_error"]
-            msg = chat_request["message"]
-            handle_error(f"Sorry, I can't help you right now\n\n{msg}")
+            msg = self.welcome
+            handle_error(f"## Sorry, I can't help you right now...\n\n{msg}")
             return AskQuestionResult(
                 code=None,
                 view_name=None,
