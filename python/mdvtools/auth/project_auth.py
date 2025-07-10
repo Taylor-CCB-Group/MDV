@@ -36,7 +36,9 @@ def project_pre_dispatch_checks(project_id: str, options: dict):
 
     # If auth is not enabled for the app, we can skip the user-specific checks
     if not current_app.config.get("ENABLE_AUTH", False):
-        if options.get('access_level') == 'editable' and project.access_level != 'editable':
+        if options.get('access_level') == 'editable' and (
+            not project.access_level or project.access_level != 'editable'
+        ):
             return jsonify({"error": "This project is read-only and cannot be modified."}), 403
         return None # No more checks needed
 
