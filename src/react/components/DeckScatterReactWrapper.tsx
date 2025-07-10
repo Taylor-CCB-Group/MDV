@@ -218,9 +218,9 @@ BaseChart.types["DeckScatter3D"] = {
     }
 };
 BaseChart.types["wgl_scatter_plot_dev"] = {
-    name: "2D Scatter Plot",
+    name: "2D Scatter Plot (experimental)",
     class: DeckScatterReact,
-    allow_user_add: false,
+    allow_user_add: true,
     params: [
         {
             type: "number",
