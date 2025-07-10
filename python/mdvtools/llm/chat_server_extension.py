@@ -1,5 +1,5 @@
 import traceback
-from typing import Optional, Protocol, Union
+from typing import Optional, Union
 from mdvtools.benchmarking.memory import log_memory_usage
 from mdvtools.llm.chat_protocol import (
   ChatRequest,
@@ -15,36 +15,12 @@ from flask import Flask, request
 from flask_socketio import join_room, leave_room
 from mdvtools.logging_config import get_logger
 from mdvtools.llm.chatlog import log_chat_item
+from mdvtools.server_extension import MDVProjectServerExtension
+from mdvtools.auth.authutils import is_authenticated
 
 logger = get_logger(__name__)
 logger.info("chat server extension loading...")
 
-
-class MDVProjectServerExtension(Protocol):
-    """
-    A protocol for server extensions that can be used with MDV projects.
-
-    We might use this for blocks of other functionality that aren't totally core mdv functionality,
-    integrating other services/libraries/functionality.
-    We might also re-arrange so that some things like the add_anndata routes are moved into an extension.
-
-    Maybe rather than pass a Flask app to `server.py`, we pass something representing MDV app configuration,
-    including a Flask app, these extensions, auth provider etc...
-    Flask becomes an implementation detail that we abstract away somewhat.
-    """
-    def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
-        """
-        Assign any extra `/project/<project_id>/<path>` routes to the blueprint for this project instance.
-        """
-        ...
-    def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
-        """
-        Mutate the state.json before returning it as a request response,
-        e.g. to add information about the extension.
-
-        Don't really want to pass flask app here, doing so for now to allow access to config.
-        """
-        ...
 
 
 class MDVProjectChatServerExtension(MDVProjectServerExtension):
@@ -63,6 +39,8 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             We should check authentication here,
             **nb the coupling of sockets and "chat" should be removed.**
             """
+            if not is_authenticated():
+                return False
             # todo - check access level, whether chat is enabled etc
             # at the time you connect, flask_socketio session by default is "forked from http session"
             # if we made SocketIO instance with manage_session=False, then they would reference the same session.
@@ -98,6 +76,9 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):
+            if not is_authenticated():
+                return
+
             nonlocal bot
             sid = request.sid # type: ignore - flask_socketio.request.sid
             # todo - auth (via custom decorator? see comments above)

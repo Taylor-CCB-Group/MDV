@@ -27,6 +27,7 @@ import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
 from mdvtools.logging_config import get_logger
+from mdvtools.server_extension import MDVServerOptions
 
 logger = get_logger(__name__)
 
@@ -1261,8 +1262,29 @@ class MDVProject:
 
     def serve(self, **kwargs):
         from mdvtools.server import create_app
+        from mdvtools.server_extension import MDVServerOptions
 
-        create_app(self, **kwargs)
+        options = kwargs.pop("options", None)
+
+        if options is not None:
+            if kwargs:
+                warnings.warn(
+                    "Redundant keyword arguments passed to serve() along with 'options' object. "
+                    "These arguments will be ignored.",
+                    UserWarning
+                )
+        else:
+            # `options` was not provided, create it from kwargs.
+            options = MDVServerOptions(**kwargs)
+        
+        if options.websocket:
+            # I swear I'm going to clean up this logic soon...
+            from mdvtools.llm.chat_server_extension import chat_extension
+            if chat_extension not in options.extensions:
+                options.extensions.append(chat_extension)
+
+
+        create_app(self, options=options)
         
 
     def delete(self):

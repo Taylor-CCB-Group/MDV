@@ -9,8 +9,8 @@ def register_routes(app, ENABLE_AUTH):
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
-    from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
-    from mdvtools.dbutils.dbmodels import User, UserProject
+    from mdvtools.project_router import ProjectBlueprint
+    from mdvtools.dbutils.dbmodels import User
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
     import tempfile
     import zipfile
