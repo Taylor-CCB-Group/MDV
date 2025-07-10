@@ -112,7 +112,7 @@
     "uuid": "^11.0.3",
     "wordcloud": "^1.2.2",
     "zod": "^3.25.49",
-    "zustand": "^4.4.5"
+    "zustand": "^5.0.6"
   },
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "^7.25.9",
