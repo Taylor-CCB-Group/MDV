@@ -46,7 +46,12 @@ def project_pre_dispatch_checks(project_id: str, options: dict):
     if not user_id:
         return jsonify({"error": "Authentication required."}), 401
 
-    project_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
+    try:
+        project_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
+    except ValueError as e:
+        # project_id is passed as a string, conversion to int may fail
+        logger.exception(f"Error getting project permissions for user {user_id} and project {project_id}: {e}")
+        return jsonify({"error": "Failed to get project permissions"}), 500
 
     # Check for access level only if specified in options
     if options.get('access_level') == 'editable':

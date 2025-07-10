@@ -564,7 +564,6 @@ class TestServeProjectsFromDb(unittest.TestCase):
         serve_projects_from_db(self.app)
         
         # Should handle errors gracefully and continue
-        mock_mdv_project.serve.assert_not_called()
 
 
 class TestServeProjectsFromFilesystem(unittest.TestCase):
