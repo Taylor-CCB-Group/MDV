@@ -190,6 +190,9 @@ class ProjectChat(ProjectChatProtocol):
             self.error_message = error_message
             self.init_error = True
 
+    def get_suggested_questions(self):
+        return ["What is the average age of the patients?", "What is the average height of the patients?"]
+    
     def get_or_create_memory(self, conversation_id: str):
         """Get or create conversation memory for a specific conversation"""
         if conversation_id not in self.conversation_memories:
