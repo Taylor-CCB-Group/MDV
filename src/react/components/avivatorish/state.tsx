@@ -28,18 +28,18 @@ export type TogglesReturnType<T> = {
 export type WithToggles<T> = T & TogglesReturnType<T>;
 export type SetFunctionType<T> = (fn: (state: T) => T) => void;
 
-function generateToggles<T extends {}>(
-    defaults: T,
-    set: SetFunctionType<T>,
-): TogglesReturnType<T> {
+function generateToggles<TDefaults extends {}, TState extends TDefaults>(
+    defaults: TDefaults,
+    // I don't know why we suddenly needed to add TState... typescript complaining otherwise
+    set: SetFunctionType<TState>,
+): TogglesReturnType<TDefaults> {
     const toggles: any = {};
     Object.entries(defaults).forEach(([k, v]) => {
         if (typeof v === "boolean") {
             toggles[`toggle${capitalize(k)}`] = () =>
                 set((state) => ({
                     ...state,
-                    //@ts-ignore
-                    [k]: !state[k],
+                    [k]: !state[k as keyof TState],
                 }));
         }
     });
