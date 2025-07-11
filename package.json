@@ -33,7 +33,8 @@
     "docker_stack_prune": "docker stack rm mdv_stack && docker container prune -f && docker image prune -a -f && docker volume prune -f",
     "fix_npm_win": "npm config set script-shell \"cmd\"",
     "jslint": "biome lint --write ./src",
-    "jsformat": "biome format --write ./src"
+    "jsformat": "biome format --write ./src",
+    "test": "cross-env build=desktop_pt vitest"
   },
   "repository": {
     "type": "git",
