@@ -92,3 +92,59 @@ def create_column_markdown(cols: list[dict]) -> str:
         markdown = "No columns found."
     
     return f"{markdown}\n\n"
+
+chart_types_md = """
+- Abundance Box Plot
+- Box Plot
+- Density Scatter Plot
+- Dot Plot
+- Heat Map
+- Histogram Plot
+- Multi Line Chart
+- Pie Chart
+- Row Chart
+- Row Summary Box
+- Sankey Diagram
+- Stacked Row Chart (Categorical Heatmap)
+- Table
+- Text Box
+- 2D Scatter Plot
+- Violin Plot
+- Word Cloud
+"""
+
+example_intents_md = """
+- "distribution", "spread" = Histogram Plot, Box Plot, Violin Plot
+- "relationship", "correlation" = Scatter Plot, Density Scatter, Heat Map
+- "comparison", "difference", "change" = Box Plot, Violin Plot, Multi Line Chart, Dot Plot
+- "composition", "proportion", "breakdown" = Pie Chart, Stacked Row Chart, Row Chart
+- "over time", "trend", "temporal" = Line Chart, Multi Line Chart
+- "expression", "gene", "marker" = Dot Plot, Heat Map, Box Plot
+- "spatial", "location", "embedding" = 2D Scatter Plot, Density Scatter Plot
+- "flow", "transition" = Sankey Diagram
+- "metadata", "category", "annotation" = Table, Row Summary Box, Row Chart
+- "filter", "subset", "select" = Selection Dialog Plot
+"""
+
+def create_suggested_questions_prompt(project: MDVProject) -> str:
+    return f"""
+    You are an expert in the data in this project.
+    You are given a project with the following datasources:
+    {create_project_markdown(project)}
+
+    Given this data, generate a list of 5 biologically relevant questions we could visualise.
+    When phrasing the questions, only refer to column names found in that project data, and only suggest visualisations using these charts:
+
+    {chart_types_md}
+
+    ## Example intents:
+
+    {example_intents_md}
+
+    If a query needs multiple charts to be plotted, show them as individual queries. 
+    For example: What is the distribution of age_or_mean_of_age_range or BMI among different disease categories? 
+    Chart: Histogram Plot, Box Plot, Violin Plot should be What is the distribution of age_or_mean_of_age_range 
+    among different disease categories? Violin Plot to keep the visualisation simple.
+
+    Each question should be a single, complete sentence.
+    """
