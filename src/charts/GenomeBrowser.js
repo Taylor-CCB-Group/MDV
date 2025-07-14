@@ -1,6 +1,10 @@
 import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
+import { useDataSources } from "@/react/hooks";
+async function loadColumns(columns){
+    
+}
 
 class GenomeBrowser extends BaseChart {
     constructor(dataStore, div, config) {
@@ -79,6 +83,9 @@ class GenomeBrowser extends BaseChart {
                 }
             }
         });
+        if (c.sync_with_datastores){
+
+        }
     }
 
     onBrowserAction(type, data, e) {
@@ -230,14 +237,20 @@ class GenomeBrowser extends BaseChart {
     }
 
     getConfig() {
+        //this method is now called before the browser is created
+        //the values it adds to the config should be added dynamically
+        //when the user adds a track etc
         const config = super.getConfig();
         const b = this.browser;
-        config.tracks = this.browser.getAllTrackConfigs();
-        config.genome_location = {
-            chr: b.chr,
-            start: b.start,
-            end: b.end,
-        };
+        if (b){
+            config.genome_location = {
+                chr: b.chr,
+                start: b.start,
+                end: b.end,
+            };
+            config.tracks = this.browser.getAllTrackConfigs();
+        }
+    
         return config;
     }
 
@@ -294,9 +307,9 @@ class GenomeBrowser extends BaseChart {
 
     //called when a feature is highlighted
     onDataHighlighted(data) {
-        if (data.source === this) {
-            return;
-        }
+        //if (data.source === this) {
+        //    return;
+        //}
         const p = this.config.param;
         const vm = this.config.view_margins;
         const o = this.dataStore.getRowAsObject(data.indexes[0], p);
@@ -373,6 +386,13 @@ class GenomeBrowser extends BaseChart {
                 }
             }
             //this.browser.track_order=track_order;
+        }
+
+        const textColor = getComputedStyle(this.contentDiv).getPropertyValue('color');
+        // set the highlighted region
+        this.browser.removeAllHighlightedRegions();
+        if (this.config.highlight_selected_region){
+            this.browser.setHighlightedRegion({chr:o[p[0]],start:st-1,end:en},"_highlight",textColor,0.3);
         }
         let margin = 1000;
         if (vm.type === "percentage") {
@@ -561,6 +581,20 @@ class GenomeBrowser extends BaseChart {
                 }
             },
         });
+        
+        settings.push({
+            label:"Highlight Selected Region",
+            type:"check",
+            current_value:c.highlight_selected_region,
+            func:x=>{
+                c.highlight_selected_region=x;
+                const d = this.dataStore.getHighlightedData();
+                if (d){
+                    this.onDataHighlighted({indexes:[d]});
+                }
+              
+            }
+        })
         return settings;
     }
 }

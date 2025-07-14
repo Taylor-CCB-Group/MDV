@@ -6,10 +6,12 @@
     position:absolute;
     right:5px;
     display:none;
-    background-color: white;
-    color:black;
+    background-color: var(--background_color);
+    color: var(--text_color);
+    border: 0.5px solid var(--text_color);
     font-size:13px;
-    cursor:pointer
+    cursor:pointer;
+    padding:0 4px;
 
 }
 
