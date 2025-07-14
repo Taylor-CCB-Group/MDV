@@ -72,7 +72,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 
             bot.log(f"Markdown: {markdown}")
             detailed_message = bot.welcome + markdown
-            return {"message": detailed_message}
+            # we want some suggested questions here.
+            suggested_questions = bot.get_suggested_questions()
+            logger.info(f"Suggested questions: {suggested_questions}")
+            return {"message": detailed_message, "suggested_questions": suggested_questions}
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):

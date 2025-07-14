@@ -3,7 +3,7 @@ import logging
 from contextlib import contextmanager
 import os
 import traceback
-from typing import Callable
+from typing import List
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
@@ -15,6 +15,9 @@ from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain.schema import HumanMessage
+from .markdown_utils import create_suggested_questions_prompt
 
 # from langchain.prompts import PromptTemplate
 
@@ -67,6 +70,12 @@ chat_debug_handler.setFormatter(formatter)
 
 # attach the handler
 chat_debug_logger.addHandler(chat_debug_handler)
+
+class SuggestedQuestions(BaseModel):
+    """A list of suggested questions to ask about the data."""
+    questions: List[str] = Field(
+        description="A list of 5 suggested questions based on the provided data context. Each question should be a single, complete sentence."
+    )
 
 @contextmanager
 def time_block(name):
@@ -163,7 +172,7 @@ class ProjectChat(ProjectChatProtocol):
         
         # Store conversation memories for persistence across requests
         self.conversation_memories = {}  # Dict to store ConversationBufferMemory for each conversation
-        
+        self.suggested_questions: list[str] = []
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
         elif len(project.datasources) > 1: # remove? or make it == 1 ?
@@ -182,6 +191,19 @@ class ProjectChat(ProjectChatProtocol):
             else:
                 self.df_list = [self.project.get_datasource_as_dataframe(self.project.datasources[0]['name'])]
 
+            try:
+                with time_block("b_suggest: Generating suggested questions"):
+                    llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
+                    structured_llm = llm.with_structured_output(SuggestedQuestions)
+                    prompt_text = create_suggested_questions_prompt(self.project)
+                    messages = [HumanMessage(content=prompt_text)]
+                    result = structured_llm.invoke(messages)
+                    self.suggested_questions = result.questions # type: ignore
+                    self.log(f"Generated suggested questions: {self.suggested_questions}")
+            except Exception as e:
+                self.log(f"Could not generate suggested questions: {e}")
+                self.suggested_questions = [str(e)]
+
             self.init_error = False
         except Exception as e:
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
@@ -190,6 +212,13 @@ class ProjectChat(ProjectChatProtocol):
             self.error_message = error_message
             self.init_error = True
 
+    def get_suggested_questions(self):
+        if self.init_error:
+            return []
+        if self.suggested_questions:
+            return self.suggested_questions
+        return ["This should be unreachable"]
+    
     def get_or_create_memory(self, conversation_id: str):
         """Get or create conversation memory for a specific conversation"""
         if conversation_id not in self.conversation_memories:

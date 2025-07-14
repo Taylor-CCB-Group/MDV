@@ -537,26 +537,29 @@ select, input, textarea {
 .markdown-body table {
     font-size: small;
     border-collapse: collapse;
-    display: inline-block;
+    display: block;
     max-height: 250px;
-    overflow: scroll;
+    overflow: auto;
     text-align: center;
-    width: 50%;
     border: 1px solid var(--border_menu_bar_color);
 }
 
 .markdown-body thead, .markdown-body tbody {
-    display: table;
     width: 100%;
 }
 
 .markdown-body td {
     border: 1px solid var(--menu_bar_color);
+    min-width: 5rem;
     padding: 4px 8px;
 }
 
 .markdown-body th {
-    display: none;
+    /* display: none; */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: bold;
 }
 
 .markdown-body tr:nth-child(odd) {
