@@ -25,6 +25,7 @@ export const ParamTypeSchema = z.enum([
 export const RowsAsColsQuerySerializedSchema = z.object({
     type: z.literal("RowsAsColsQuery"),
     linkedDsName: z.string(),
+    // TODO - should have subgroup name
     maxItems: z.number().int().positive()
 });
 
@@ -37,8 +38,13 @@ export const FieldSpecSchema = z.union([
 // Field specifications (array of field specs)
 export const FieldSpecsSchema = z.array(FieldSpecSchema);
 
+export const GridStackConfigSchema = z.object({
+    gssize: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional(),
+    gsposition: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional(),
+});
+
 // Base configuration that all charts extend
-export const BaseConfigSchema = z.object({
+export const BaseConfigSchema = GridStackConfigSchema.extend({
     id: z.string(),
     size: z.tuple([z.number(), z.number()]),
     title: z.string(),
