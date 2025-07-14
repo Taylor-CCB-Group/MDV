@@ -15,6 +15,7 @@
     "build-flask-vite": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "build-flask-dockerjs": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./dist/flask",
     "build-flask-docker-hotfix": "cross-env build=desktop_pt vite build --outDir ./python/dist_hotfix/flask",
+    "build-schemas": "node --experimental-strip-types ./scripts/generate-schemas.ts",
     "docs-env-setup": "python -m venv docsenv && source docsenv/bin/activate && cd docs && pip install -r requirements.txt && npm run build-docs-nix",
     "build-docs": "sphinx-build -M html docs/maindocs docs/maindocs/_build",
     "build-docs-nix": "source docsenv/bin/activate && npm run build-docs",
