@@ -4,6 +4,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -158,6 +188,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -303,6 +363,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -453,6 +543,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -598,6 +718,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -743,6 +893,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -888,6 +1068,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -1033,6 +1243,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -1178,6 +1418,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -1323,6 +1593,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -1472,6 +1772,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -1617,6 +1947,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -1762,6 +2122,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -1922,6 +2312,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -2067,6 +2487,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -2212,6 +2662,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -2357,6 +2837,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -2502,6 +3012,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -2647,6 +3187,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -2792,6 +3362,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -2937,6 +3537,36 @@
     {
       "type": "object",
       "properties": {
+        "gssize": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "gsposition": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },

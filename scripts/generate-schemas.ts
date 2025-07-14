@@ -1,5 +1,6 @@
 import * as z from "zod/v4";
 import { ChartConfigSchema } from "../src/charts/schemas/ChartConfigSchema.ts";
+import { DataSourceSchema, DataSourcesArraySchema } from "../src/charts/schemas/DataSourceSchema.ts";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -48,6 +49,24 @@ async function main() {
                 }
             });
         }
+
+        // Generate datasource schema
+        const datasourceSchema = generateAndSaveSchema(
+            DataSourceSchema,
+            "datasource-schema.json"
+        );
+
+        console.log("📊 Datasource schema generated successfully!");
+        console.log("📋 Schema includes validation for datasource configuration");
+
+        // Generate datasources array schema
+        const datasourcesArraySchema = generateAndSaveSchema(
+            DataSourcesArraySchema,
+            "datasources-array-schema.json"
+        );
+
+        console.log("📊 Datasources array schema generated successfully!");
+        console.log("📋 Schema includes validation for arrays of datasources");
         
         console.log("\n✨ Schema generation complete!");
         
@@ -59,6 +78,7 @@ async function main() {
 
 // Run if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
+    // we could have a watch mode...
     main();
 }
 
