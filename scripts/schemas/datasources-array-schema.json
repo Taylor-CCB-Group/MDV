@@ -1,29 +1,38 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Array of multiple datasource configurations",
   "type": "array",
   "items": {
+    "description": "Complete configuration for a datasource including data structure, relationships, and visualization options",
     "type": "object",
     "properties": {
       "name": {
+        "description": "Human-readable name for the datasource",
         "type": "string"
       },
       "size": {
+        "description": "Number of rows in the datasource",
         "type": "integer",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991
       },
       "columns": {
+        "description": "Array of column configurations defining the data structure",
         "type": "array",
         "items": {
+          "description": "Configuration for a single column in a datasource, defining its properties, data type, and behavior",
           "type": "object",
           "properties": {
             "name": {
+              "description": "Human-readable name for the column displayed to users",
               "type": "string"
             },
             "field": {
+              "description": "Unique identifier for the column used internally",
               "type": "string"
             },
             "datatype": {
+              "description": "Data type defining how the column values are stored and processed",
               "type": "string",
               "enum": [
                 "integer",
@@ -36,32 +45,39 @@
               ]
             },
             "values": {
+              "description": "For text/multitext columns: array of possible values, with raw data containing indices into this array",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "colors": {
+              "description": "Array of hex color codes mapped to values or interpolated for numeric data",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "stringLength": {
+              "description": "For unique columns: length of longest value; for multitext: max values per item",
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
             },
             "colorLogScale": {
+              "description": "Whether to use logarithmic scaling for color mapping of numeric columns",
               "type": "boolean"
             },
             "editable": {
+              "description": "Whether users can edit values in this column",
               "type": "boolean"
             },
             "is_url": {
+              "description": "Whether this column contains URL links (for unique and text columns)",
               "type": "boolean"
             },
             "minMax": {
+              "description": "For numeric columns: [minimum, maximum] values for optimization",
               "type": "array",
               "prefixItems": [
                 {
@@ -73,9 +89,11 @@
               ]
             },
             "quantiles": {
+              "description": "Pre-calculated quantiles for efficient color scaling and outlier handling",
               "type": "object",
               "properties": {
                 "0.05": {
+                  "description": "5th and 95th percentiles",
                   "type": "array",
                   "prefixItems": [
                     {
@@ -87,6 +105,7 @@
                   ]
                 },
                 "0.01": {
+                  "description": "1st and 99th percentiles",
                   "type": "array",
                   "prefixItems": [
                     {
@@ -98,6 +117,7 @@
                   ]
                 },
                 "0.001": {
+                  "description": "0.1st and 99.9th percentiles",
                   "type": "array",
                   "prefixItems": [
                     {
@@ -116,17 +136,23 @@
               ],
               "additionalProperties": false
             },
-            "data": {},
+            "data": {
+              "description": "Column data as array or SharedArrayBuffer - usually loaded on demand"
+            },
             "delimiter": {
+              "description": "Delimiter character for multitext columns (default: comma)",
               "type": "string"
             },
             "subgroup": {
+              "description": "Subgroup identifier for rows-as-columns queries",
               "type": "string"
             },
             "sgindex": {
+              "description": "Unique identifier for rows-as-columns data",
               "type": "string"
             },
             "sgtype": {
+              "description": "Data type for rows-as-columns (e.g., 'sparse')",
               "type": "string"
             }
           },
@@ -139,14 +165,18 @@
         }
       },
       "columnGroups": {
+        "description": "Logical groupings of related columns",
         "type": "array",
         "items": {
+          "description": "Logical grouping of related columns for organizational purposes",
           "type": "object",
           "properties": {
             "name": {
+              "description": "Human-readable name for the column group",
               "type": "string"
             },
             "columns": {
+              "description": "Array of column field names belonging to this group",
               "type": "array",
               "items": {
                 "type": "string"
@@ -161,28 +191,34 @@
         }
       },
       "links": {
+        "description": "Relationships with other datasources",
         "type": "object",
         "propertyNames": {
           "type": "string"
         },
         "additionalProperties": {
+          "description": "Configuration for different types of relationships between datasources",
           "type": "object",
           "properties": {
             "interactions": {
+              "description": "Configuration for interaction data between entities",
               "allOf": [
                 {
                   "type": "object",
                   "properties": {
                     "pivot_column": {
+                      "description": "Column defining the scope of interactions (e.g., region, condition, sample)",
                       "type": "string"
                     },
                     "interaction_columns": {
+                      "description": "Two columns specifying the interacting entities (e.g., cell types)",
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
                     "is_single_region": {
+                      "description": "Whether interactions are within single regions (true) or across conditions (false)",
                       "type": "boolean"
                     }
                   },
@@ -194,21 +230,27 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Default chart configurations for interaction visualization types",
                   "type": "object",
                   "properties": {
                     "spatial_connectivity_map": {
+                      "description": "Default column mappings for spatial connectivity map charts",
                       "type": "object",
                       "properties": {
                         "link_length": {
+                          "description": "Column name for link length in spatial connectivity maps",
                           "type": "string"
                         },
                         "link_thickness": {
+                          "description": "Column name for link thickness in spatial connectivity maps",
                           "type": "string"
                         },
                         "link_color": {
+                          "description": "Column name for link color in spatial connectivity maps",
                           "type": "string"
                         },
                         "node_size": {
+                          "description": "Column name for node size in spatial connectivity maps",
                           "type": "string"
                         }
                       },
@@ -221,9 +263,11 @@
                       "additionalProperties": false
                     },
                     "interaction_matrix": {
+                      "description": "Default grouping configuration for interaction matrix charts",
                       "type": "object",
                       "properties": {
                         "groups": {
+                          "description": "Column names for grouping interactions in matrix charts",
                           "type": "array",
                           "items": {
                             "type": "string"
@@ -236,9 +280,11 @@
                       "additionalProperties": false
                     },
                     "cell_radial_chart": {
+                      "description": "Default column mapping for cell radial charts",
                       "type": "object",
                       "properties": {
                         "link_thickness": {
+                          "description": "Column name for link thickness in radial charts",
                           "type": "string"
                         }
                       },
@@ -253,29 +299,37 @@
               ]
             },
             "rows_as_columns": {
+              "description": "Configuration for treating rows as columns",
               "type": "object",
               "properties": {
                 "name_column": {
+                  "description": "Column in linked datasource containing unique identifiers (e.g., gene names)",
                   "type": "string"
                 },
                 "name": {
+                  "description": "Human-readable name for the rows-as-columns data (e.g., 'Gene Scores')",
                   "type": "string"
                 },
                 "subgroups": {
+                  "description": "Dictionary of available data subgroups",
                   "type": "object",
                   "propertyNames": {
                     "type": "string"
                   },
                   "additionalProperties": {
+                    "description": "Configuration for a subgroup within rows-as-columns data (e.g., gene expression scores)",
                     "type": "object",
                     "properties": {
                       "name": {
+                        "description": "Internal name for the subgroup",
                         "type": "string"
                       },
                       "type": {
+                        "description": "Data type for the subgroup (e.g., 'sparse' for sparse matrices)",
                         "type": "string"
                       },
                       "label": {
+                        "description": "Human-readable label for the subgroup",
                         "type": "string"
                       }
                     },
@@ -295,26 +349,32 @@
               "additionalProperties": false
             },
             "columns": {
+              "description": "Array of column names to link from another datasource",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "index": {
+              "description": "Column name used as index for linking datasources",
               "type": "string"
             },
             "access_data": {
+              "description": "Whether this datasource can access data from the linked datasource",
               "type": "boolean"
             },
             "sync_column_colors": {
+              "description": "Configuration for synchronizing column colors",
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
                   "link_to": {
+                    "description": "Column name in the linked datasource to sync colors from",
                     "type": "string"
                   },
                   "col": {
+                    "description": "Column name in the current datasource to sync colors to",
                     "type": "string"
                   }
                 },
@@ -326,12 +386,15 @@
               }
             },
             "valueset": {
+              "description": "Configuration for valueset-based filtering",
               "type": "object",
               "properties": {
                 "source_column": {
+                  "description": "Column in source datasource containing values to filter by",
                   "type": "string"
                 },
                 "dest_column": {
+                  "description": "Column in destination datasource to apply filtering to",
                   "type": "string"
                 }
               },
@@ -346,20 +409,25 @@
         }
       },
       "images": {
+        "description": "Thumbnail images associated with datasource rows",
         "type": "object",
         "propertyNames": {
           "type": "string"
         },
         "additionalProperties": {
+          "description": "Configuration for a set of images associated with datasource rows",
           "type": "object",
           "properties": {
             "base_url": {
+              "description": "Base URL where images are stored - image key and type will be appended",
               "type": "string"
             },
             "key_column": {
+              "description": "Column name containing the keys used to construct image URLs",
               "type": "string"
             },
             "type": {
+              "description": "Image file extension (e.g., 'png', 'jpg')",
               "type": "string"
             }
           },
@@ -372,20 +440,25 @@
         }
       },
       "large_images": {
+        "description": "High-resolution images for detailed viewing",
         "type": "object",
         "propertyNames": {
           "type": "string"
         },
         "additionalProperties": {
+          "description": "Configuration for a set of images associated with datasource rows",
           "type": "object",
           "properties": {
             "base_url": {
+              "description": "Base URL where images are stored - image key and type will be appended",
               "type": "string"
             },
             "key_column": {
+              "description": "Column name containing the keys used to construct image URLs",
               "type": "string"
             },
             "type": {
+              "description": "Image file extension (e.g., 'png', 'jpg')",
               "type": "string"
             }
           },
@@ -398,50 +471,64 @@
         }
       },
       "regions": {
+        "description": "Spatial regions configuration for spatial data",
         "type": "object",
         "properties": {
           "position_fields": {
+            "description": "Column names containing x,y coordinates for spatial data",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
           "region_field": {
+            "description": "Column name identifying which region each data point belongs to",
             "type": "string"
           },
           "default_color": {
+            "description": "Default column to use for color mapping in spatial visualizations",
             "type": "string"
           },
           "scale_unit": {
+            "description": "Unit of measurement for spatial scale (e.g., 'mm', 'μm')",
             "type": "string"
           },
           "scale": {
+            "description": "Scale factor converting pixel coordinates to real-world units",
             "type": "number"
           },
           "base_url": {
+            "description": "Base URL where region images are stored",
             "type": "string"
           },
           "all_regions": {
+            "description": "Dictionary of all regions, keyed by region identifier",
             "type": "object",
             "propertyNames": {
               "type": "string"
             },
             "additionalProperties": {
+              "description": "Configuration for a single spatial region with its boundaries and associated images",
               "type": "object",
               "properties": {
                 "roi": {
+                  "description": "Bounding box defining the spatial extent of this region",
                   "type": "object",
                   "properties": {
                     "min_x": {
+                      "description": "Minimum x coordinate of the region",
                       "type": "number"
                     },
                     "max_x": {
+                      "description": "Maximum x coordinate of the region",
                       "type": "number"
                     },
                     "min_y": {
+                      "description": "Minimum y coordinate of the region",
                       "type": "number"
                     },
                     "max_y": {
+                      "description": "Maximum y coordinate of the region",
                       "type": "number"
                     }
                   },
@@ -454,6 +541,7 @@
                   "additionalProperties": false
                 },
                 "default_image": {
+                  "description": "Name of the default background image to display (null = no image)",
                   "anyOf": [
                     {
                       "type": "string"
@@ -464,17 +552,21 @@
                   ]
                 },
                 "images": {
+                  "description": "Dictionary of available background images for this region",
                   "type": "object",
                   "propertyNames": {
                     "type": "string"
                   },
                   "additionalProperties": {
+                    "description": "Metadata for a background image within a spatial region",
                     "type": "object",
                     "properties": {
                       "file": {
+                        "description": "Filename of the image",
                         "type": "string"
                       },
                       "position": {
+                        "description": "[x, y] offset position of the image within the region",
                         "type": "array",
                         "prefixItems": [
                           {
@@ -486,12 +578,15 @@
                         ]
                       },
                       "height": {
+                        "description": "Height of the image in pixels",
                         "type": "number"
                       },
                       "width": {
+                        "description": "Width of the image in pixels",
                         "type": "number"
                       },
                       "name": {
+                        "description": "Human-readable name for the image",
                         "type": "string"
                       }
                     },
@@ -506,6 +601,7 @@
                   }
                 },
                 "ome_tiff": {
+                  "description": "Filename of the OME-TIFF image associated with this region",
                   "type": "string"
                 }
               },
@@ -525,20 +621,24 @@
         "additionalProperties": false
       },
       "interactions": {
+        "description": "Interaction data configuration",
         "allOf": [
           {
             "type": "object",
             "properties": {
               "pivot_column": {
+                "description": "Column defining the scope of interactions (e.g., region, condition, sample)",
                 "type": "string"
               },
               "interaction_columns": {
+                "description": "Two columns specifying the interacting entities (e.g., cell types)",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "is_single_region": {
+                "description": "Whether interactions are within single regions (true) or across conditions (false)",
                 "type": "boolean"
               }
             },
@@ -550,21 +650,27 @@
             "additionalProperties": false
           },
           {
+            "description": "Default chart configurations for interaction visualization types",
             "type": "object",
             "properties": {
               "spatial_connectivity_map": {
+                "description": "Default column mappings for spatial connectivity map charts",
                 "type": "object",
                 "properties": {
                   "link_length": {
+                    "description": "Column name for link length in spatial connectivity maps",
                     "type": "string"
                   },
                   "link_thickness": {
+                    "description": "Column name for link thickness in spatial connectivity maps",
                     "type": "string"
                   },
                   "link_color": {
+                    "description": "Column name for link color in spatial connectivity maps",
                     "type": "string"
                   },
                   "node_size": {
+                    "description": "Column name for node size in spatial connectivity maps",
                     "type": "string"
                   }
                 },
@@ -577,9 +683,11 @@
                 "additionalProperties": false
               },
               "interaction_matrix": {
+                "description": "Default grouping configuration for interaction matrix charts",
                 "type": "object",
                 "properties": {
                   "groups": {
+                    "description": "Column names for grouping interactions in matrix charts",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -592,9 +700,11 @@
                 "additionalProperties": false
               },
               "cell_radial_chart": {
+                "description": "Default column mapping for cell radial charts",
                 "type": "object",
                 "properties": {
                   "link_thickness": {
+                    "description": "Column name for link thickness in radial charts",
                     "type": "string"
                   }
                 },
@@ -609,21 +719,26 @@
         ]
       },
       "offsets": {
+        "description": "Spatial transformation configuration",
         "type": "object",
         "properties": {
           "param": {
+            "description": "Column names that can be transformed (typically ['x', 'y'])",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
           "groups": {
+            "description": "Column name identifying groups that can have different transformations",
             "type": "string"
           },
           "background_filter": {
+            "description": "Column name for filtering transformations by spatial context (e.g., 'ROI')",
             "type": "string"
           },
           "values": {
+            "description": "Nested dictionary: {filter_value: {group_value: transformation}}",
             "type": "object",
             "propertyNames": {
               "type": "string"
@@ -634,12 +749,15 @@
                 "type": "string"
               },
               "additionalProperties": {
+                "description": "Spatial transformation parameters for aligning data groups",
                 "type": "object",
                 "properties": {
                   "rotation": {
+                    "description": "Rotation angle in degrees (positive = clockwise)",
                     "type": "number"
                   },
                   "offset": {
+                    "description": "[x, y] translation offset in coordinate units",
                     "type": "array",
                     "prefixItems": [
                       {
@@ -651,6 +769,7 @@
                     ]
                   },
                   "rotation_center": {
+                    "description": "[x, y] center point for rotation (relative to data bounds)",
                     "type": "array",
                     "prefixItems": [
                       {
@@ -674,9 +793,11 @@
         "additionalProperties": false
       },
       "genome_browser": {
+        "description": "Genome browser integration configuration",
         "type": "object",
         "properties": {
           "default_parameters": {
+            "description": "Default parameters for the genome browser widget",
             "type": "object",
             "propertyNames": {
               "type": "string"
@@ -684,12 +805,15 @@
             "additionalProperties": {}
           },
           "default_track": {
+            "description": "Primary track showing datasource features",
             "type": "object",
             "properties": {
               "label": {
+                "description": "Human-readable name for the track",
                 "type": "string"
               },
               "url": {
+                "description": "URL to the track data file (gzipped BED format with tabix index)",
                 "type": "string"
               }
             },
@@ -700,6 +824,7 @@
             "additionalProperties": false
           },
           "default_track_parameters": {
+            "description": "Parameters for the default feature track",
             "type": "object",
             "propertyNames": {
               "type": "string"
@@ -707,12 +832,14 @@
             "additionalProperties": {}
           },
           "location_fields": {
+            "description": "Column names for [chromosome, start, end] genomic coordinates",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
           "default_tracks": {
+            "description": "Additional tracks to display by default",
             "type": "array",
             "items": {
               "type": "object",
@@ -723,12 +850,15 @@
             }
           },
           "atac_bam_track": {
+            "description": "ATAC-seq BAM track configuration if applicable",
             "type": "object",
             "properties": {
               "url": {
+                "description": "URL to the BAM file containing ATAC-seq reads",
                 "type": "string"
               },
               "cluster_read": {
+                "description": "Column name in linked datasource for clustering reads by barcode",
                 "type": "string"
               }
             },
@@ -746,6 +876,7 @@
         "additionalProperties": false
       },
       "tree_diagram": {
+        "description": "Tree diagram visualization configuration",
         "type": "object",
         "propertyNames": {
           "type": "string"
@@ -753,15 +884,19 @@
         "additionalProperties": {}
       },
       "avivator": {
+        "description": "Whether Avivator image viewer integration is enabled",
         "type": "boolean"
       },
       "row_data_loader": {
+        "description": "Whether to use row-based data loading",
         "type": "boolean"
       },
       "binary_data_loader": {
+        "description": "Whether to use binary data loading for performance",
         "type": "boolean"
       },
       "deeptools": {
+        "description": "DeepTools integration configuration",
         "type": "object",
         "propertyNames": {
           "type": "string"
