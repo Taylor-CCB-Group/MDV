@@ -1,10 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Union of all possible chart configuration types, allowing for type-safe chart creation",
   "anyOf": [
     {
+      "description": "Configuration for scatter plot charts showing relationships between two variables",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -20,6 +23,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -35,9 +39,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -49,33 +55,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Scatter plot chart type",
           "type": "string",
           "const": "scatter_plot"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -92,26 +108,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -139,11 +162,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -160,17 +187,21 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         },
         "opacity": {
+          "description": "Opacity of scatter plot points (0-1)",
           "type": "number",
           "minimum": 0,
           "maximum": 1
         },
         "radius": {
+          "description": "Radius of scatter plot points in pixels",
           "type": "number",
           "exclusiveMinimum": 0
         }
@@ -186,9 +217,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for bar charts displaying categorical data",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -204,6 +237,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -219,9 +253,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -233,33 +269,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Bar chart type",
           "type": "string",
           "const": "bar_chart"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -276,26 +322,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -323,11 +376,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -344,9 +401,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -361,9 +420,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for histogram charts showing data distribution",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -379,6 +440,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -394,9 +456,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -408,33 +472,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Histogram chart type",
           "type": "string",
           "const": "histogram"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -451,26 +525,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -498,11 +579,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -519,12 +604,15 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         },
         "bins": {
+          "description": "Number of bins for histogram data grouping",
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
@@ -541,9 +629,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for heatmap charts displaying matrix data with color intensity",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -559,6 +649,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -574,9 +665,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -588,33 +681,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Heatmap chart type",
           "type": "string",
           "const": "heatmap"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -631,26 +734,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -678,11 +788,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -699,9 +813,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -716,9 +832,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for dot plots showing individual data points",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -734,6 +852,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -749,9 +868,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -763,33 +884,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Dot plot chart type",
           "type": "string",
           "const": "dot_plot"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -806,26 +937,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -853,11 +991,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -874,9 +1016,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -891,9 +1035,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for box plots showing data distribution statistics",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -909,6 +1055,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -924,9 +1071,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -938,33 +1087,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Box plot chart type",
           "type": "string",
           "const": "box_plot"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -981,26 +1140,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -1028,11 +1194,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -1049,9 +1219,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -1066,9 +1238,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for violin plots showing data density distribution",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -1084,6 +1258,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -1099,9 +1274,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -1113,33 +1290,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Violin plot chart type",
           "type": "string",
           "const": "violin_plot"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -1156,26 +1343,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -1203,11 +1397,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -1224,9 +1422,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -1241,9 +1441,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for pie charts showing proportional data",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -1259,6 +1461,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -1274,9 +1477,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -1288,33 +1493,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Pie chart type",
           "type": "string",
           "const": "pie_chart"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -1331,26 +1546,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -1378,11 +1600,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -1399,9 +1625,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -1416,9 +1644,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for data tables displaying tabular information",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -1434,6 +1664,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -1449,9 +1680,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -1463,33 +1696,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Table chart type",
           "type": "string",
           "const": "table"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -1506,26 +1749,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -1553,11 +1803,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -1574,9 +1828,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -1591,9 +1847,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for text boxes displaying static or dynamic text content",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -1609,6 +1867,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -1624,9 +1883,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -1638,33 +1899,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Text box chart type",
           "type": "string",
           "const": "text_box"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -1681,26 +1952,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -1728,11 +2006,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -1749,12 +2031,15 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         },
         "text": {
+          "description": "Text content to display in the text box",
           "type": "string"
         }
       },
@@ -1770,9 +2055,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for wordcloud charts showing text frequency",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -1788,6 +2075,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -1803,9 +2091,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -1817,33 +2107,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Wordcloud chart type",
           "type": "string",
           "const": "wordcloud"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -1860,26 +2160,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -1907,11 +2214,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -1928,9 +2239,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -1945,9 +2258,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for Sankey diagrams showing flow between categories",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -1963,6 +2278,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -1978,9 +2294,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -1992,33 +2310,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Sankey diagram type",
           "type": "string",
           "const": "sankey"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -2035,26 +2363,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -2082,11 +2417,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -2103,9 +2442,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -2120,9 +2461,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for multi-line charts showing multiple time series or categories",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -2138,6 +2481,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -2153,9 +2497,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -2167,33 +2513,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Multi-line chart type",
           "type": "string",
           "const": "multi_line_chart"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -2210,26 +2566,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -2257,11 +2620,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -2278,24 +2645,30 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         },
         "stacked": {
+          "description": "Whether to stack multiple lines on top of each other",
           "type": "boolean"
         },
         "band_width": {
+          "description": "Width of confidence bands around lines",
           "type": "number",
           "exclusiveMinimum": 0
         },
         "intervals": {
+          "description": "Number of intervals for data aggregation",
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
         },
         "scaletrim": {
+          "description": "Whether to trim the scale to focus on data range",
           "type": "boolean"
         }
       },
@@ -2310,9 +2683,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for multi-box plots comparing distributions across categories",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -2328,6 +2703,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -2343,9 +2719,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -2357,33 +2735,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Multi-box plot chart type",
           "type": "string",
           "const": "multi_box_plot"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -2400,26 +2788,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -2447,11 +2842,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -2468,9 +2867,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -2485,9 +2886,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for abundance box plots showing distribution of abundance data",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -2503,6 +2906,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -2518,9 +2922,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -2532,33 +2938,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Abundance box plot chart type",
           "type": "string",
           "const": "abundance_box_plot"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -2575,26 +2991,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -2622,11 +3045,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -2643,9 +3070,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -2660,9 +3089,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for density scatter plots showing point density with color intensity",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -2678,6 +3109,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -2693,9 +3125,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -2707,33 +3141,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Density scatter plot chart type",
           "type": "string",
           "const": "density_scatter"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -2750,26 +3194,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -2797,11 +3248,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -2818,9 +3273,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -2835,9 +3292,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for row charts displaying data in horizontal bars",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -2853,6 +3312,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -2868,9 +3328,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -2882,33 +3344,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Row chart type",
           "type": "string",
           "const": "row_chart"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -2925,26 +3397,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -2972,11 +3451,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -2993,9 +3476,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -3010,9 +3495,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for stacked row charts with multiple data series per row",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -3028,6 +3515,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -3043,9 +3531,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -3057,33 +3547,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Stacked row chart type",
           "type": "string",
           "const": "stacked_row_chart"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -3100,26 +3600,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -3147,11 +3654,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -3168,9 +3679,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -3185,9 +3698,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for row summary boxes displaying aggregated statistics",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -3203,6 +3718,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -3218,9 +3734,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -3232,33 +3750,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Row summary box chart type",
           "type": "string",
           "const": "row_summary_box"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -3275,26 +3803,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -3322,11 +3857,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -3343,9 +3882,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -3360,9 +3901,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Configuration for selection dialogs allowing user interaction",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -3378,6 +3921,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -3393,9 +3937,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -3407,33 +3953,43 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Selection dialog chart type",
           "type": "string",
           "const": "selection_dialog"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -3450,26 +4006,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -3497,11 +4060,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -3518,9 +4085,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
@@ -3535,9 +4104,11 @@
       "additionalProperties": {}
     },
     {
+      "description": "Base configuration shared by all chart types, including layout, styling, and data mapping",
       "type": "object",
       "properties": {
         "gssize": {
+          "description": "GridStack size as [width, height] in grid units",
           "type": "array",
           "prefixItems": [
             {
@@ -3553,6 +4124,7 @@
           ]
         },
         "gsposition": {
+          "description": "GridStack position as [x, y] coordinates",
           "type": "array",
           "prefixItems": [
             {
@@ -3568,9 +4140,11 @@
           ]
         },
         "id": {
+          "description": "Unique identifier for the chart instance",
           "type": "string"
         },
         "size": {
+          "description": "Chart dimensions as [width, height] in pixels",
           "type": "array",
           "prefixItems": [
             {
@@ -3582,32 +4156,42 @@
           ]
         },
         "title": {
+          "description": "Display title for the chart",
           "type": "string"
         },
         "legend": {
+          "description": "Legend text describing the chart's purpose",
           "type": "string"
         },
         "type": {
+          "description": "Chart type identifier (e.g., 'scatter_plot', 'bar_chart')",
           "type": "string"
         },
         "param": {
+          "description": "Array of field specifications defining the data columns used by this chart",
           "type": "array",
           "items": {
+            "description": "A field specification can be either a direct column name or a complex query to another datasource",
             "anyOf": [
               {
+                "description": "Direct field name reference",
                 "type": "string"
               },
               {
+                "description": "Configuration for queries that treat rows from another datasource as columns in the current chart",
                 "type": "object",
                 "properties": {
                   "type": {
+                    "description": "Identifies this as a rows-as-columns query",
                     "type": "string",
                     "const": "RowsAsColsQuery"
                   },
                   "linkedDsName": {
+                    "description": "Name of the linked datasource that contains the row data",
                     "type": "string"
                   },
                   "maxItems": {
+                    "description": "Maximum number of items to retrieve from the linked datasource",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -3624,26 +4208,33 @@
           }
         },
         "title_color": {
+          "description": "CSS color value for the chart title",
           "type": "string"
         },
         "color_by": {
+          "description": "Field or column configuration used to determine color mapping",
           "anyOf": [
             {
+              "description": "Simple field name for color mapping",
               "type": "string"
             },
             {
+              "description": "Complex column object for color mapping",
               "type": "object",
               "properties": {
                 "column": {
                   "type": "object",
                   "properties": {
                     "field": {
+                      "description": "Column field identifier",
                       "type": "string"
                     },
                     "name": {
+                      "description": "Human-readable column name",
                       "type": "string"
                     },
                     "datatype": {
+                      "description": "Data type of the column",
                       "type": "string",
                       "enum": [
                         "integer",
@@ -3671,11 +4262,15 @@
             }
           ]
         },
-        "color_legend": {},
+        "color_legend": {
+          "description": "Custom color legend configuration"
+        },
         "log_color_scale": {
+          "description": "Whether to use logarithmic scaling for color values",
           "type": "boolean"
         },
         "trim_color_scale": {
+          "description": "Quantile trimming for color scale to handle outliers",
           "anyOf": [
             {
               "type": "string",
@@ -3692,9 +4287,11 @@
           ]
         },
         "color_overlay": {
+          "description": "Opacity value for color overlay effects",
           "type": "number"
         },
         "fallbackOnZero": {
+          "description": "Whether to use fallback colors when values are zero",
           "type": "boolean"
         }
       },
