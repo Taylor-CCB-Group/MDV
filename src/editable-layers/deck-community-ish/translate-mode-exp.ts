@@ -1,5 +1,13 @@
-import { TranslateMode, type FeatureCollection, type ModeProps, type Position, type AnyCoordinates, ImmutableFeatureCollection, type Geometry } from "@deck.gl-community/editable-layers";
-import type { GeoJsonEditAction } from "@deck.gl-community/editable-layers/dist/edit-modes/geojson-edit-mode";
+import {
+    TranslateMode,
+    type FeatureCollection,
+    type ModeProps,
+    type Position,
+    type AnyCoordinates,
+    ImmutableFeatureCollection,
+    type Geometry,
+    type EditAction,
+} from "@deck.gl-community/editable-layers";
 
 import clone from '@turf/clone';
 import { point, type Feature as TurfFeature, type Geometry as TurfGeometry } from '@turf/helpers';
@@ -75,7 +83,7 @@ function translate(feature: TurfFeature<TurfGeometry>, dp: [number, number]) {
  * This is an edit mode for translating GeoJSON features with non-geographic coordinates.
  */
 export default class TranslateModeEx extends TranslateMode {
-  getTranslateAction(startDragPoint: Position, currentPoint: Position, editType: string, props: ModeProps<FeatureCollection>): GeoJsonEditAction | null | undefined {
+  getTranslateAction(startDragPoint: Position, currentPoint: Position, editType: string, props: ModeProps<FeatureCollection>): EditAction<FeatureCollection> | null | undefined {
     if (!this._geometryBeforeTranslate) {
       return null;
     }

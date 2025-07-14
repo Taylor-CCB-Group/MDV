@@ -25,7 +25,15 @@ import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
-import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
+
+//!!! temporary fix for tsgo preview compatibility
+// import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
+type TooltipContent = null | string | {
+    text?: string;
+    html?: string;
+    className?: string;
+    style?: Partial<CSSStyleDeclaration>;
+};
 
 export type TooltipConfig = {
     tooltip: {

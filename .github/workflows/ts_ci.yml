@@ -26,4 +26,5 @@ jobs:
           cache: 'npm'
       - run: npm install
       - run: npm run vite-build
+      - run: npm run test
       # - uses: icrawl/action-tsc@v1

@@ -912,6 +912,10 @@ export class ChartManager {
         new ViewDialogWrapper("add");
     }
 
+    /**
+     * @param {()=>void=} action
+     * @param {string=} content
+     */
     showSaveViewDialog(action, content) {
         new ViewDialogWrapper("save", action, content);
     }
