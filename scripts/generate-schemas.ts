@@ -1,4 +1,5 @@
-import * as z from "zod/v4";
+import type * as z from "zod";
+import zodToJsonSchema from "zod-to-json-schema";
 import { ChartConfigSchema } from "../src/charts/schemas/ChartConfigSchema.ts";
 import { DataSourceSchema, DataSourcesArraySchema } from "../src/charts/schemas/DataSourceSchema.ts";
 import * as fs from "node:fs";
@@ -13,7 +14,13 @@ function generateAndSaveSchema(schema: z.ZodTypeAny, filename: string, outputDir
         }
 
         // Generate JSON schema
-        const jsonSchema = z.toJSONSchema(schema);
+        // using zod-to-json-schema to generate the json schema rather than built-in zod/v4 toJSONSchema
+        // because we believe it should be better at making use of $refStrategy...
+        // but we need to change the shape of the schema to be able to benefit.
+        const jsonSchema = zodToJsonSchema(schema, {
+            name: filename.replace('.json', ''),
+            $refStrategy: "root",
+        });
         
         // Save to file
         const outputPath = path.join(outputDir, filename);
@@ -26,39 +33,6 @@ function generateAndSaveSchema(schema: z.ZodTypeAny, filename: string, outputDir
         throw error;
     }
 }
-
-// Function to convert Zod schema to Python Pydantic model
-function zodToPydantic(schema: z.ZodTypeAny, className: string): string {
-    const jsonSchema = z.toJSONSchema(schema);
-    return generatePydanticFromJsonSchema(jsonSchema, className);
-}
-
-// Function to generate Python Pydantic code from JSON schema
-function generatePydanticFromJsonSchema(jsonSchema: any, className: string): string {
-    let pythonCode = `"""
-Auto-generated Pydantic models from Zod schemas.
-This file is generated automatically - do not edit manually.
-"""
-
-from typing import List, Optional, Union, Dict, Any, Tuple
-from pydantic import BaseModel, Field
-from enum import Enum
-
-`;
-
-    // Generate enums first
-    const enums = extractEnums(jsonSchema);
-    for (const [enumName, enumValues] of Object.entries(enums)) {
-        pythonCode += generateEnum(enumName, enumValues as string[]);
-        pythonCode += "\n\n";
-    }
-
-    // Generate the main class
-    pythonCode += generateClassFromSchema(jsonSchema, className);
-
-    return pythonCode;
-}
-
 // Function to extract enums from JSON schema
 function extractEnums(jsonSchema: any): Record<string, string[]> {
     const enums: Record<string, string[]> = {};
@@ -156,9 +130,9 @@ async function generatePythonModels(): Promise<string> {
     const { DataSourceSchema, DataSourcesArraySchema } = await import("../src/charts/schemas/DataSourceSchema.ts");
     
     // Convert schemas to JSON Schema format using Zod's toJSONSchema method
-    const chartConfigJsonSchema = z.toJSONSchema(ChartConfigSchema);
-    const datasourceJsonSchema = z.toJSONSchema(DataSourceSchema);
-    const datasourcesArrayJsonSchema = z.toJSONSchema(DataSourcesArraySchema);
+    const chartConfigJsonSchema = zodToJsonSchema(ChartConfigSchema);
+    const datasourceJsonSchema = zodToJsonSchema(DataSourceSchema);
+    const datasourcesArrayJsonSchema = zodToJsonSchema(DataSourcesArraySchema);
 
     // Extract enums from schemas
     const chartEnums = extractEnums(chartConfigJsonSchema);
@@ -185,11 +159,12 @@ from enum import Enum
     }
 
     // Generate individual chart classes from the union schema
-    if (chartConfigJsonSchema.anyOf) {
+    const chartConfigAny = chartConfigJsonSchema as any;
+    if (chartConfigAny.anyOf) {
         const chartClasses: string[] = [];
         const chartTypeNames: string[] = [];
         
-        for (const schema of chartConfigJsonSchema.anyOf) {
+        for (const schema of chartConfigAny.anyOf) {
             // Only generate a class if this schema has properties (is an object type)
             if ((schema as any).properties && typeof (schema as any).properties === 'object' && (schema as any).properties.type?.const) {
                 const chartType = (schema as any).properties.type.const;
@@ -329,16 +304,6 @@ async function main() {
         );
         
         console.log("📊 Chart config schema generated successfully!");
-        console.log("📋 Schema includes validation for all chart types:");
-        
-        // Log the chart types that are included in the schema
-        if (chartConfigSchema.anyOf) {
-            chartConfigSchema.anyOf.forEach((schema: any, index: number) => {
-                if (schema.properties?.type?.const) {
-                    console.log(`   - ${schema.properties.type.const}`);
-                }
-            });
-        }
 
         // Generate datasource schema
         const datasourceSchema = generateAndSaveSchema(
