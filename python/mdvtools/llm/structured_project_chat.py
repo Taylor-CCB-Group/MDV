@@ -8,8 +8,7 @@ import logging
 from contextlib import contextmanager
 import os
 import traceback
-from typing import List, Dict, Any, Optional
-import pandas as pd
+from typing import List, Dict
 
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
 from mdvtools.mdvproject import MDVProject
@@ -26,7 +25,6 @@ from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain.schema import HumanMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import LLMChain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
@@ -143,17 +141,9 @@ class StructuredProjectChat(ProjectChatProtocol):
             raise ValueError("The project does not have any datasources")
         elif len(project.datasources) > 1:
             self.log("The project has more than one datasource, only the first one will be used")
-            self.ds_name1 = project.datasources[1]['name']
-            self.df1 = project.get_datasource_as_dataframe(self.ds_name1)
 
         self.ds_name = project.datasources[0]['name']
         try:
-            self.df = None
-            if len(self.project.datasources) >= 2:
-                self.df_list = [self.project.get_datasource_as_dataframe(ds['name']) for ds in self.project.datasources[:2]]
-            else:
-                self.df_list = [self.project.get_datasource_as_dataframe(self.project.datasources[0]['name'])]
-
             try:
                 with time_block("b_suggest: Generating suggested questions"):
                     llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
@@ -196,26 +186,21 @@ class StructuredProjectChat(ProjectChatProtocol):
             del self.conversation_memories[conversation_id]
         chat_debug_logger.info(f"Cleared conversation history for conversation {conversation_id}")
 
-    def analyze_data_structured(self, llm: ChatOpenAI, question: str, dfs: Dict[str, pd.DataFrame]) -> DataAnalysisResult:
-        """Analyze data using structured output instead of PythonAstREPLTool"""
+    def analyze_data_structured(self, llm: ChatOpenAI, question: str, project: MDVProject) -> DataAnalysisResult:
+        """Analyze data using structured output based on project metadata instead of DataFrames"""
         
         # Create structured LLM for data analysis
         structured_llm = llm.with_structured_output(DataAnalysisResult)
         
-        # Build dataframe information
-        df_info = []
-        for name, df in dfs.items():
-            df_info.append(f"{name} columns: {list(df.columns)}")
-            df_info.append(f"{name} shape: {df.shape}")
-            df_info.append(f"{name} dtypes: {dict(df.dtypes)}")
+        # Get project metadata in markdown format (same as used for suggested questions)
+        from mdvtools.llm.markdown_utils import create_project_markdown
+        project_info = create_project_markdown(project)
         
-        df_info_str = "\n".join(df_info)
-        
-        # Create analysis prompt
+        # Create analysis prompt using project metadata
         analysis_prompt = f"""
-        You are analyzing data to help create visualizations. You have access to the following dataframes:
+        You are analyzing data to help create visualizations. You have access to the following project metadata:
         
-        {df_info_str}
+        {project_info}
         
         Based on the user question: "{question}"
         
@@ -224,16 +209,21 @@ class StructuredProjectChat(ProjectChatProtocol):
         2. What columns contain the relevant data
         3. Whether the data is categorical, numerical, or text
         4. How many columns are needed for the requested chart type
+        5. Which datasource(s) contain the relevant data
         
         For gene-related queries, look for gene names in the data and use appropriate gene expression columns.
         For categorical data, select columns that represent categories or groups.
         For numerical data, select columns that represent measurements or values.
         
-        Return a structured analysis with:
-        - selected_columns: List of column names to use
-        - chart_types: List of suitable chart types (e.g., "scatter_plot", "bar_chart", "histogram")
-        - reasoning: Brief explanation of your selection
-        - data_summary: Basic statistics about the selected columns
+        IMPORTANT: The project may have multiple datasources. A given chart belongs to a single datasource,
+        and will have `params` that specifies which columns from that datasource are used.
+        For example, if you need data from both 'cells' and 'genes' datasources, make sure to indicate this.
+        
+        Return a structured output describing a view configuration containing:
+        - dataSources: A dictionary of datasource names to their configuration
+        - initialCharts: A dictionary of datasource names to their chart configurations
+        - title: The title of the view
+        - param: A list of field specifications defining the data columns used by this chart
         """
         
         messages = [HumanMessage(content=analysis_prompt)]
@@ -249,6 +239,20 @@ class StructuredProjectChat(ProjectChatProtocol):
         
         # Determine the best chart type
         chart_type = analysis.chart_types[0] if analysis.chart_types else "scatter_plot"
+        
+        # Parse selected columns to determine which datasources are involved
+        datasources_involved = set()
+        for column in analysis.selected_columns:
+            if ':' in column:
+                datasource_name = column.split(':')[0]
+                datasources_involved.add(datasource_name)
+            else:
+                # If no datasource prefix, assume it's from the primary datasource
+                datasources_involved.add(self.ds_name)
+        
+        # If no datasources were identified, use the primary one
+        if not datasources_involved:
+            datasources_involved = {self.ds_name}
         
         # Create chart configuration
         chart_config = create_chart_config(
@@ -276,6 +280,7 @@ class StructuredProjectChat(ProjectChatProtocol):
         else:
             raise FileNotFoundError("No CSV or H5AD file found in the directory.")
         
+        # Use the primary datasource name for RAG
         datasource_name = self.ds_name
         
         # Use RAG to generate code
@@ -302,7 +307,7 @@ class StructuredProjectChat(ProjectChatProtocol):
         # Prepare the code
         final_code = prepare_code(
             result,
-            self.df,
+            None,  # No longer using DataFrames for analysis
             project,
             self.log,
             modify_existing_project=True,
@@ -360,7 +365,10 @@ class StructuredProjectChat(ProjectChatProtocol):
             )
         
         progress = 0
-        df_list = self.df_list
+        
+        # Initialize variables to avoid unbound variable errors in exception handling
+        data_analysis = None
+        chart_generation = None
         
         try:
             with time_block("b10a: Structured analysis"):
@@ -383,8 +391,7 @@ class StructuredProjectChat(ProjectChatProtocol):
                 
                 # Analyze data using structured output
                 data_analysis = self.analyze_data_structured(
-                    structured_llm, question, 
-                    {"df1": df_list[0], "df2": df_list[1] if len(df_list) > 1 else df_list[0]}
+                    structured_llm, question, self.project
                 )
                 chat_debug_logger.info(f"Data Analysis Result: {data_analysis}")
             
@@ -426,6 +433,45 @@ class StructuredProjectChat(ProjectChatProtocol):
                     success=ok
                 )
                 
+                # Set the view in the project with the generated chart
+                # Determine which datasources are involved in this visualization
+                datasources_involved = set()
+                for column in data_analysis.selected_columns:
+                    if ':' in column:
+                        datasource_name = column.split(':')[0]
+                        datasources_involved.add(datasource_name)
+                    else:
+                        # If no datasource prefix, assume it's from the primary datasource
+                        datasources_involved.add(self.ds_name)
+                
+                # If no datasources were identified, use the primary one
+                if not datasources_involved:
+                    datasources_involved = {self.ds_name}
+                
+                # Create view configuration with appropriate panels
+                view_config = {
+                    "dataSources": {},
+                    "initialCharts": {}
+                }
+                
+                # Calculate panel widths based on number of datasources
+                panel_width = 100 // len(datasources_involved)
+                
+                for i, ds_name in enumerate(datasources_involved):
+                    view_config["dataSources"][ds_name] = {
+                        "layout": "gridstack",
+                        "panelWidth": panel_width
+                    }
+                    
+                    # Add the chart to the appropriate datasource panel
+                    # For now, put the chart in the first datasource panel
+                    if i == 0:
+                        view_config["initialCharts"][ds_name] = [chart_generation.chart_config.dict()]
+                    else:
+                        view_config["initialCharts"][ds_name] = []
+                
+                self.project.set_view(chart_generation.view_name, view_config)
+                
             with time_block("b16: Log chat item"):
                 final_code_updated = f"I ran some code for you (structured analysis):\n\n```python\n{chart_generation.python_code}\n```"
                 log_chat_item(
@@ -452,4 +498,30 @@ class StructuredProjectChat(ProjectChatProtocol):
                 f"Error: {error_message}", id, 100, 0
             )
             handle_error(e)
-            return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {error_message}"} 
+            
+            # Create structured result with error information
+            error_structured_result = StructuredQueryResult(
+                question=question,
+                data_analysis=data_analysis if data_analysis is not None else DataAnalysisResult(
+                    selected_columns=[],
+                    chart_types=[],
+                    reasoning="Analysis failed due to error",
+                    data_summary={}
+                ),
+                chart_generation=chart_generation if chart_generation is not None else ChartGenerationResult(
+                    chart_config=create_chart_config("error", "Error", "Chart generation failed", []),
+                    python_code="",
+                    view_name="error",
+                    dependencies=[]
+                ),
+                execution_result=None,
+                error=error_message,
+                success=False
+            )
+            
+            return {
+                "code": None, 
+                "view_name": None, 
+                "error": True, 
+                "message": f"ERROR: {error_message}"
+            } 
