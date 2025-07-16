@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 
 // Basic data types that can be stored in columns
 export const DataTypeSchema = z.enum([

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 // @ts-expect-error - currently the way we use from node won't resolve without this
 import { DataTypeSchema } from "./ChartConfigSchema.ts";
 
