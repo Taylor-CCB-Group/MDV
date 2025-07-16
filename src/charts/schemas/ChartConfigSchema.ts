@@ -52,27 +52,18 @@ export const BaseConfigSchema = GridStackConfigSchema.extend({
     type: z.string().describe("Chart type identifier (e.g., 'scatter_plot', 'bar_chart')"),
     param: FieldSpecsSchema.describe("Array of field specifications defining the data columns used by this chart"),
     title_color: z.string().optional().describe("CSS color value for the chart title"),
-    // Color configuration properties
-    color_by: z.union([
-        z.string().describe("Simple field name for color mapping"), // FieldName
-        z.object({
-            column: z.object({
-                field: z.string().describe("Column field identifier"),
-                name: z.string().describe("Human-readable column name"),
-                datatype: DataTypeSchema.describe("Data type of the column"),
-                // Other column properties can be added as needed
-            }).loose()
-        }).describe("Complex column object for color mapping")
-    ]).optional().describe("Field or column configuration used to determine color mapping"),
-    color_legend: z.any().optional().describe("Custom color legend configuration"),
+}).describe("Base configuration shared by all chart types, including layout, styling, and data mapping");
+
+// todo - this should be a union of all the color config options, not applied to all charts
+export const ChartColorConfigSchema = z.object({
+    color_by: FieldSpecSchema.optional().describe("Field or column configuration used to determine color mapping"),
+    color_legend: z.record(z.string(), z.unknown()).optional().describe("Custom color legend configuration"),
     log_color_scale: z.boolean().optional().describe("Whether to use logarithmic scaling for color values"),
-    trim_color_scale: z.union([
-        z.enum(["0.05", "0.01", "0.001"]),
-        z.literal("none")
-    ]).optional().describe("Quantile trimming for color scale to handle outliers"),
+    trim_color_scale: z.enum(["0.05", "0.01", "0.001", "none"]).optional().describe("Quantile trimming for color scale to handle outliers"),
     color_overlay: z.number().optional().describe("Opacity value for color overlay effects"),
     fallbackOnZero: z.boolean().optional().describe("Whether to use fallback colors when values are zero")
-}).describe("Base configuration shared by all chart types, including layout, styling, and data mapping");
+}).describe("Configuration for chart color mapping and scaling");
+
 
 // Tooltip configuration
 export const TooltipConfigSchema = z.object({
@@ -84,68 +75,71 @@ export const TooltipConfigSchema = z.object({
 
 // Chart-specific configuration schemas
 export const ScatterPlotConfigSchema = BaseConfigSchema.extend({
+    ...ChartColorConfigSchema.shape,
     type: z.literal("scatter_plot").describe("Scatter plot chart type"),
     opacity: z.number().min(0).max(1).optional().describe("Opacity of scatter plot points (0-1)"),
-    radius: z.number().positive().optional().describe("Radius of scatter plot points in pixels"),
+    radius: z.number().positive().optional().describe("Radius of scatter plot points (units should be better defined)"),
     // Additional scatter plot specific properties
-}).loose().describe("Configuration for scatter plot charts showing relationships between two variables");
+}).describe("Configuration for scatter plot charts showing relationships between two variables");
 
 export const BarChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("bar_chart").describe("Bar chart type"),
     // Additional bar chart specific properties
-}).loose().describe("Configuration for bar charts displaying categorical data");
+}).describe("Configuration for bar charts displaying categorical data");
 
 export const HistogramConfigSchema = BaseConfigSchema.extend({
     type: z.literal("histogram").describe("Histogram chart type"),
     bins: z.number().int().positive().optional().describe("Number of bins for histogram data grouping"),
     // Additional histogram specific properties
-}).loose().describe("Configuration for histogram charts showing data distribution");
+}).describe("Configuration for histogram charts showing data distribution");
 
 export const HeatmapConfigSchema = BaseConfigSchema.extend({
     type: z.literal("heatmap").describe("Heatmap chart type"),
     // Additional heatmap specific properties
-}).loose().describe("Configuration for heatmap charts displaying matrix data with color intensity");
+}).describe("Configuration for heatmap charts displaying matrix data with color intensity");
 
 export const DotPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("dot_plot").describe("Dot plot chart type"),
     // Additional dot plot specific properties
-}).loose().describe("Configuration for dot plots showing individual data points");
+}).describe("Configuration for dot plots showing individual data points");
 
 export const BoxPlotConfigSchema = BaseConfigSchema.extend({
+    ...ChartColorConfigSchema.shape,
     type: z.literal("box_plot").describe("Box plot chart type"),
     // Additional box plot specific properties
-}).loose().describe("Configuration for box plots showing data distribution statistics");
+}).describe("Configuration for box plots showing data distribution statistics");
 
 export const ViolinPlotConfigSchema = BaseConfigSchema.extend({
+    ...ChartColorConfigSchema.shape,
     type: z.literal("violin_plot").describe("Violin plot chart type"),
     // Additional violin plot specific properties
-}).loose().describe("Configuration for violin plots showing data density distribution");
+}).describe("Configuration for violin plots showing data density distribution");
 
 export const PieChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("pie_chart").describe("Pie chart type"),
     // Additional pie chart specific properties
-}).loose().describe("Configuration for pie charts showing proportional data");
+}).describe("Configuration for pie charts showing proportional data");
 
 export const TableConfigSchema = BaseConfigSchema.extend({
     type: z.literal("table").describe("Table chart type"),
     // Additional table specific properties
-}).loose().describe("Configuration for data tables displaying tabular information");
+}).describe("Configuration for data tables displaying tabular information");
 
 export const TextBoxConfigSchema = BaseConfigSchema.extend({
     type: z.literal("text_box").describe("Text box chart type"),
     text: z.string().describe("Text content to display in the text box"),
     // Additional text box specific properties
-}).loose().describe("Configuration for text boxes displaying static or dynamic text content");
+}).describe("Configuration for text boxes displaying static or dynamic text content");
 
 export const WordcloudConfigSchema = BaseConfigSchema.extend({
     type: z.literal("wordcloud").describe("Wordcloud chart type"),
     // Additional wordcloud specific properties
-}).loose().describe("Configuration for wordcloud charts showing text frequency");
+}).describe("Configuration for wordcloud charts showing text frequency");
 
 export const SankeyConfigSchema = BaseConfigSchema.extend({
     type: z.literal("sankey").describe("Sankey diagram type"),
     // Additional sankey specific properties
-}).loose().describe("Configuration for Sankey diagrams showing flow between categories");
+}).describe("Configuration for Sankey diagrams showing flow between categories");
 
 export const MultiLineChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_line_chart").describe("Multi-line chart type"),
@@ -154,42 +148,43 @@ export const MultiLineChartConfigSchema = BaseConfigSchema.extend({
     intervals: z.number().int().positive().optional().describe("Number of intervals for data aggregation"),
     scaletrim: z.boolean().optional().describe("Whether to trim the scale to focus on data range"),
     // Additional multi-line chart specific properties
-}).loose().describe("Configuration for multi-line charts showing multiple time series or categories");
+}).describe("Configuration for multi-line charts showing multiple time series or categories");
 
 export const MultiBoxPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_box_plot").describe("Multi-box plot chart type"),
     // Additional multi-box plot specific properties
-}).loose().describe("Configuration for multi-box plots comparing distributions across categories");
+}).describe("Configuration for multi-box plots comparing distributions across categories");
 
 export const AbundanceBoxPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("abundance_box_plot").describe("Abundance box plot chart type"),
     // Additional abundance box plot specific properties
-}).loose().describe("Configuration for abundance box plots showing distribution of abundance data");
+}).describe("Configuration for abundance box plots showing distribution of abundance data");
 
 export const DensityScatterConfigSchema = BaseConfigSchema.extend({
+    ...ChartColorConfigSchema.shape,
     type: z.literal("density_scatter").describe("Density scatter plot chart type"),
     // Additional density scatter specific properties
-}).loose().describe("Configuration for density scatter plots showing point density with color intensity");
+}).describe("Configuration for density scatter plots showing point density with color intensity");
 
 export const RowChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("row_chart").describe("Row chart type"),
     // Additional row chart specific properties
-}).loose().describe("Configuration for row charts displaying data in horizontal bars");
+}).describe("Configuration for row charts displaying data in horizontal bars");
 
 export const StackedRowChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("stacked_row_chart").describe("Stacked row chart type"),
     // Additional stacked row chart specific properties
-}).loose().describe("Configuration for stacked row charts with multiple data series per row");
+}).describe("Configuration for stacked row charts with multiple data series per row");
 
 export const RowSummaryBoxConfigSchema = BaseConfigSchema.extend({
     type: z.literal("row_summary_box").describe("Row summary box chart type"),
     // Additional row summary box specific properties
-}).loose().describe("Configuration for row summary boxes displaying aggregated statistics");
+}).describe("Configuration for row summary boxes displaying aggregated statistics");
 
 export const SelectionDialogConfigSchema = BaseConfigSchema.extend({
     type: z.literal("selection_dialog").describe("Selection dialog chart type"),
     // Additional selection dialog specific properties
-}).loose().describe("Configuration for selection dialogs allowing user interaction");
+}).describe("Configuration for selection dialogs allowing user interaction");
 
 // Union of all chart configuration types
 export const ChartConfigSchema = z.union([
