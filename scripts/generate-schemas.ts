@@ -1,5 +1,4 @@
-import type * as z from "zod";
-import zodToJsonSchema from "zod-to-json-schema";
+import * as z from "zod/v4";
 import { ChartConfigSchema } from "../src/charts/schemas/ChartConfigSchema.ts";
 import { DataSourceSchema, DataSourcesArraySchema } from "../src/charts/schemas/DataSourceSchema.ts";
 import * as fs from "node:fs";
@@ -14,13 +13,8 @@ function generateAndSaveSchema(schema: z.ZodTypeAny, filename: string, outputDir
         }
 
         // Generate JSON schema
-        // using zod-to-json-schema to generate the json schema rather than built-in zod/v4 toJSONSchema
-        // because we believe it should be better at making use of $refStrategy...
-        // but we need to change the shape of the schema to be able to benefit.
-        const jsonSchema = zodToJsonSchema(schema, {
-            name: filename.replace('.json', ''),
-            $refStrategy: "root",
-        });
+        // nb, built-in zod method has less nice internal names for $defs (__schemaN), but I think we prefer not needing to use zod-to-json-schema
+        const jsonSchema = z.toJSONSchema(schema, { reused: "ref" });
         
         // Save to file
         const outputPath = path.join(outputDir, filename);
@@ -130,9 +124,9 @@ async function generatePythonModels(): Promise<string> {
     const { DataSourceSchema, DataSourcesArraySchema } = await import("../src/charts/schemas/DataSourceSchema.ts");
     
     // Convert schemas to JSON Schema format using Zod's toJSONSchema method
-    const chartConfigJsonSchema = zodToJsonSchema(ChartConfigSchema);
-    const datasourceJsonSchema = zodToJsonSchema(DataSourceSchema);
-    const datasourcesArrayJsonSchema = zodToJsonSchema(DataSourcesArraySchema);
+    const chartConfigJsonSchema = z.toJSONSchema(ChartConfigSchema);
+    const datasourceJsonSchema = z.toJSONSchema(DataSourceSchema);
+    const datasourcesArrayJsonSchema = z.toJSONSchema(DataSourcesArraySchema);
 
     // Extract enums from schemas
     const chartEnums = extractEnums(chartConfigJsonSchema);
