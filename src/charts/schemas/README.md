@@ -1,19 +1,41 @@
 # MDV Chart Configuration Schemas
 
-This directory contains Zod schemas for MDV chart configurations that can be used to derive JSON schema for Python.
+This directory contains Zod schemas for MDV chart configurations that can be used to derive JSON schema for Python and drive UI generation.
 
 ## Overview
 
 The schemas define the structure of chart configurations in MDV, including:
 
-- **BaseConfigSchema**: Common properties that all charts share
+- **BaseConfigSchema**: Common properties that all charts share (layout, basic styling)
+- **ChartColorConfigSchema**: Color-related properties that some charts extend
 - **Chart-specific schemas**: Extended schemas for each chart type (scatter plot, bar chart, etc.)
 - **ChartConfigSchema**: Union of all chart configuration types
-- **AddChartDialogConfigSchema**: Configuration for the Add Chart Dialog
 - **ViewConfigSchema**: Configuration for MDV views
 - **ChartManagerConfigSchema**: Configuration for the Chart Manager
 
+## Current State
+
+This is in a experimental form to explore and guide how we shape the design in future.
+
+
+### Schema Structure
+
+- **BaseConfigSchema**: Contains layout, identification, and basic styling properties
+- **ChartColorConfigSchema**: Separate schema for color-related properties (color_by, color_legend, etc.)
+- **FieldSpecSchema**: Supports both direct column references and complex queries
+- **Chart-specific schemas**: Each chart type extends BaseConfigSchema and optionally ChartColorConfigSchema
+
+We also generate schema for `datasources`.
+
+### Field Specifications
+
+Field specifications can be:
+- **String**: Direct column name (FieldName)
+- **Object**: Serialized column query (e.g., RowsAsColsQuery)
+
 ## Usage
+
+The `npm run build-schemas` script will output both JSON schema definitions & Python source-code.
 
 ### TypeScript/JavaScript
 
@@ -42,40 +64,94 @@ try {
 
 ### Generating JSON Schema for Python
 
-To generate JSON schema from these Zod schemas for use in Python:
+Currently, the build process uses simple TypeScript code to generate Python strings. A future plan is to investigate richer code generation tools like `datamodel-code-generator` for more robust Python model generation.
 
-1. **Using Zod v4's built-in method**:
-   ```typescript
-   import { z } from 'zod/v4';
-   import { ChartConfigSchema } from './ChartConfigSchema';
-   
-   const jsonSchema = z.toJSONSchema(ChartConfigSchema);
-   console.log(JSON.stringify(jsonSchema, null, 2));
-   ```
+**Current approach**: Simple TS string generation means that python doesn't need to be manually updated to reflect changes in model
+**Future plan**: Use `datamodel-code-generator` for richer Python code generation
 
-2. **Using zod-to-json-schema package**:
-   ```bash
-   npm install zod-to-json-schema
-   ```
-   
-   ```typescript
-   import { zodToJsonSchema } from 'zod-to-json-schema';
-   import { ChartConfigSchema } from './ChartConfigSchema';
-   
-   const jsonSchema = zodToJsonSchema(ChartConfigSchema, {
-       name: "ChartConfig",
-       description: "Schema for chart configurations in MDV"
-   });
-   ```
+```bash
+# Future: Install datamodel-code-generator using poetry
+poetry add datamodel-code-generator
 
-3. **Generating Python Pydantic models**:
-   ```bash
-   # Install datamodel-code-generator
-   pip install datamodel-code-generator
-   
-   # Generate Python models from JSON schema
-   datamodel-codegen --input chartConfig.json --output mdv_models.py
-   ```
+# Future: Generate Python models from JSON schema
+datamodel-codegen --input chartConfig.json --output mdv_models.py
+```
+
+**Benefits of datamodel-code-generator**:
+- Automatic Pydantic model generation
+- Better type annotations and validation
+- Support for complex schema features
+- Integration with Python tooling (pyright, IDE support)
+- More maintainable than manual string generation
+
+## Future Plans
+
+### 1. Schema-Driven UI Generation
+
+**Goal**: Generate UI controls (AddChart dialog, settings dialog) directly from schemas.
+
+**Benefits**:
+- Reduce boilerplate code
+- Ensure consistency between validation and UI
+- Enable automatic UI updates when schemas change
+- Support LLM generation of both configs and UIs
+
+**Implementation**:
+- Add metadata to schemas for UI hints (e.g., `.meta({ ui: { type: "slider", range: [0, 1] } })`)
+- Create schema-to-UI generators for common control types
+- Maintain custom settings for complex interactions
+
+### 2. Explicit Field Properties
+
+**Goal**: Move from generic `param` array to explicit, named properties.
+
+**Current**: `param: ["category", "field1", "field2"]`
+**Future**: `category: "category", fields: ["field1", "field2"]`
+
+**Benefits**:
+- Self-documenting configs
+- Better type safety
+- Easier LLM understanding and generation
+- Eliminates complex array mapping logic
+
+### 3. Field Type Constraints
+
+**Goal**: Express column type constraints in schemas.
+
+**Implementation**:
+- Extend `FieldSpecSchema` with metadata for constraints
+- Create specialized schemas (e.g., `CategoricalFieldSpecSchema`, `NumericFieldSpecSchema`)
+- Use metadata to drive UI column filtering and validation
+
+### 4. Graph-Based Data Transformations
+
+**Goal**: Support complex data transformations through visual graph editing.
+
+**Features**:
+- React Flow UI for building transformation graphs
+- Nodes for operations like normalization, scaling, custom expressions
+- Schema-driven node definitions
+- Support for both simple values and complex transformations
+
+**Example Use Cases**:
+- Scatter plot radius: fixed value, column values, or normalized column values
+- Color mapping: direct column or transformed values
+- Multi-step data processing pipelines
+
+### 5. Migration Strategy
+
+**Approach**: Parallel schema registry with migration functions.
+
+**Components**:
+- `BaseChart.schemas` (parallel to `BaseChart.types`)
+- Migration functions for each chart type
+- Version information in schemas
+- Tests for migration correctness
+
+**Benefits**:
+- Backward compatibility with existing configs
+- Gradual migration path
+- Validation of migration functions
 
 ## Schema Structure
 
@@ -88,15 +164,20 @@ All chart configurations extend `BaseConfigSchema` which includes:
 - `title`: Chart title
 - `legend`: Chart description
 - `type`: Chart type identifier
-- `param`: Array of field specifications (columns)
+- `param`: Array of field specifications (columns) - *to be replaced with explicit properties*
 - `title_color`: Optional title bar color
-- Color configuration properties (color_by, color_legend, etc.)
+- GridStack layout properties
 
-### Field Specifications
+### Color Configuration
 
-Field specifications can be:
-- **String**: Direct column name (FieldName)
-- **Object**: Serialized column query (e.g., RowsAsColsQuery)
+Charts that support color mapping extend `ChartColorConfigSchema`:
+
+- `color_by`: Field or column configuration for color mapping
+- `color_legend`: Custom color legend configuration
+- `log_color_scale`: Logarithmic scaling for color values
+- `trim_color_scale`: Quantile trimming for outliers
+- `color_overlay`: Opacity for color overlay effects
+- `fallbackOnZero`: Fallback colors for zero values
 
 ### Chart Types
 
@@ -179,6 +260,6 @@ The generated JSON schema can be used with:
 - **Pydantic**: For data validation and serialization
 - **datamodel-code-generator**: For automatic model generation
 - **jsonschema**: For runtime validation
-- **mypy**: For static type checking
+- **pyright**: For static type checking
 
 This provides a single source of truth for chart configuration validation across both TypeScript and Python codebases. 
