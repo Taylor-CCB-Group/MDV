@@ -64,6 +64,11 @@ import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 
+import "./ReactCharts/HistogramChart"
+import React from "react";
+import ReactDOM from "react-dom/client";
+import MDVChart from "./ReactCharts/MDVChart"
+
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1656,7 +1661,47 @@ export class ChartManager {
      * a chart has been loaded
      */
     async addChart(dataSource, config, notify = false) {
-        if (!BaseChart.types[config.type]) {
+        ///experimental 
+        if (config.experimental) {
+            if (config.location) {
+                const l = config.location;
+                const b = 5;
+                config.size = [
+                    l.width * 90 + l.width * b - b,
+                    l.height * 40 + l.height * b - b,
+                ];
+                config.position = [
+                    (l.x + 1) * b + l.x * 90,
+                    (l.y + 1) * b + l.y * 40,
+                ];
+            }
+            const ds = this.dsIndex[dataSource];
+            const t = themes[this.theme];
+            const { width, height, left, top } = positionChart(ds, config);
+             const div = createEl(
+                "div",
+                {
+                    styles: {
+                        position: "absolute",
+                        width: `${width}px`,
+                        height: `${height}px`,
+                        left: `${left}px`,
+                        top: `${top}px`,
+                        border: `1px solid ${t.text_color}`,
+                        background: t.main_panel_color,
+                        zIndex: "2",
+                        display: "flex",
+                        //alignItems: "center",
+                        //justifyContent: "center",
+                    },
+                },
+                ds.contentDiv,
+            );
+            const element = React.createElement(MDVChart, { config,datastore:ds.dataStore});
+            ReactDOM.createRoot(div).render(element);
+            return
+        }
+        if (!BaseChart.types[config.type] && !config.experimental)  {
             this.createInfoAlert(
                 `Tried to add unknown chart type '${config.type}'`,
                 { type: "danger", duration: 2000 },
@@ -1738,6 +1783,7 @@ export class ChartManager {
             },
             div,
         );
+      
         try {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
             // when it goes wrong, it can cause problems outside the creation of this chart
