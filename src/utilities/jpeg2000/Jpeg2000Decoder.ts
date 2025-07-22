@@ -1,6 +1,5 @@
 import { BaseDecoder, type TypedArray, addDecoder } from "geotiff";
 
-// @ts-ignore
 import openJpegFactory from "@cornerstonejs/codec-openjpeg/decodewasmjs";
 // - nb, comments from https://github.com/cornerstonejs/cornerstone3D/blob/014f4c4cc2b973b200ec9af2e16783464b9a2a0d/packages/dicomImageLoader/src/shared/decoders/decodeJPEG2000.ts#L5
 // Webpack asset/resource copies this to our output folder
@@ -8,9 +7,40 @@ import openJpegFactory from "@cornerstonejs/codec-openjpeg/decodewasmjs";
 // TODO: At some point maybe we can use this instead.
 // This is closer to what Webpack 5 wants but it doesn't seem to work now
 // const wasm = new URL('./blah.wasm', import.meta.url)
-// @ts-ignore
 // import openjpegWasm from '@cornerstonejs/codec-openjpeg/decodewasm';
 const openjpegWasm = new URL("@cornerstonejs/codec-openjpeg/decodewasm", import.meta.url);
+
+// --- START OF TYPES ---
+// These are based on the emscripten bindings and should ideally live in a .d.ts file
+// but for now, we'll define them here to ensure they are applied.
+
+interface J2KDecoder {
+    decode: () => void;
+    readHeader: () => any;
+    calculateSizeAtDecompositionLevel: (level: number) => any;
+    decodeSubResolution: (resolution: number, layer: number) => void;
+    getBlockDimensions: () => any;
+    getColorSpace: () => any;
+    getDecodedBuffer: () => any;
+    getEncodedBuffer: (length: number) => Uint8Array;
+    getFrameInfo: () => any;
+    getImageOffset: () => any;
+    getIsReversible: () => any;
+    getNumDecompositions: () => number;
+    getNumLayers: () => number;
+    getProgressionOrder: () => number;
+    getTileOffset: () => any;
+    getTileSize: () => any;
+}
+
+interface OpenJpegModule {
+    J2KDecoder: {
+        new(): J2KDecoder;
+    };
+}
+
+// --- END OF TYPES ---
+
 
 // passed as argument to BaseDecoder constructor / decode
 interface FileDirectory {
@@ -33,22 +63,22 @@ type CompressedImageFrame = {
 
 
 export default class Jpeg2000Decoder extends BaseDecoder {
-    private openjpeg: any;
+    private openjpeg: OpenJpegModule | null = null;
 
-    private async getOpenJPEG() {
+    private async getOpenJPEG(): Promise<OpenJpegModule> {
         if (!this.openjpeg) {
             console.log(">>> Initializing OpenJPEG");
             try {
                 // Try WASM version first, fall back to JS version
-                this.openjpeg = await openJpegFactory({
+                this.openjpeg = (await openJpegFactory({
                     locateFile: (file: string) => {
                         if (file.endsWith(".wasm")) {
-                            return openjpegWasm.toString(); // href instead of toString()?
+                            return openjpegWasm.href;
                         } else {
                             return file;
                         }
                     },
-                });
+                })) as any as OpenJpegModule;
             } catch (error) {
                 console.warn("WASM version failed, JS version fallback not attempted:", error);
                 throw new Error("Failed to initialize OpenJPEG codec");
@@ -57,11 +87,10 @@ export default class Jpeg2000Decoder extends BaseDecoder {
         return this.openjpeg;
     }
 
-    // async decode(fileDirectory: FileDirectory, buffer: TypedArray) {
-    //     // console.log(">>> Decoding JPEG2000", fileDirectory);
-    //     const compressedImageFrame = await this.decodeBlock(buffer);
-    //     return compressedImageFrame;
-    // }
+    async decode(fileDirectory: FileDirectory, buffer: TypedArray) {
+        const compressedImageFrame = await this.decodeBlock(buffer);
+        return compressedImageFrame;
+    }
     
     async decodeBlock(compressedImageFrame: TypedArray) {
         // this is more-or-less a copy of the code in conerstone3D's decodeJPEG2000.ts
@@ -77,7 +106,6 @@ export default class Jpeg2000Decoder extends BaseDecoder {
             // openjpegwasm_decode.js:9 [INFO] Stream reached its end !
             // openjpegwasm_decode.js:9 [ERROR] JP2H box missing. Required.
             // openjpegwasm_decode.js: 9[ERROR] opj_decompress: failed to read the header
-            // decoder.decodeSubResolution(0, 0); // decode() will only call this internally anyway - doesn't help the issue
             decoder.decode();
             // get information about the decoded image
             const frameInfo = decoder.getFrameInfo();
