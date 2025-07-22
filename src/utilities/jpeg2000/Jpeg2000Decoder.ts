@@ -13,24 +13,54 @@ const openjpegWasm = new URL("@cornerstonejs/codec-openjpeg/decodewasm", import.
 // --- START OF TYPES ---
 // These are based on the emscripten bindings and should ideally live in a .d.ts file
 // but for now, we'll define them here to ensure they are applied.
+interface Size {
+    width: number;
+    height: number;
+}
+interface Point {
+    x: number;
+    y: number;
+}
+
+//  OPJ_CLRSPC_UNKNOWN = -1,    /**< not supported by the library */
+//  OPJ_CLRSPC_UNSPECIFIED = 0, /**< not specified in the codestream */
+//  OPJ_CLRSPC_SRGB = 1,        /**< sRGB */
+//  OPJ_CLRSPC_GRAY = 2,        /**< grayscale */
+//  OPJ_CLRSPC_SYCC = 3,        /**< YUV */
+//  OPJ_CLRSPC_EYCC = 4,        /**< e-YCC */
+//  OPJ_CLRSPC_CMYK = 5         /**< CMYK */
+type ColorSpace = -1 | 0 | 1 | 2 | 3 | 4 | 5;
+
+interface FrameInfo {
+    width: number;
+    height: number;
+    bitsPerSample: number;
+    componentCount: number;
+    isSigned: boolean;
+}
 
 interface J2KDecoder {
+    /**
+     * Decodes the encoded HTJ2K bitstream.  The caller must have copied the
+     * HTJ2K encoded bitstream into the encoded buffer before calling this
+     * method, see getEncodedBuffer() and getEncodedBytes() (latter not exported to js)
+     */
     decode: () => void;
-    readHeader: () => any;
-    calculateSizeAtDecompositionLevel: (level: number) => any;
+    readHeader: () => void;
+    calculateSizeAtDecompositionLevel: (level: number) => Size;
     decodeSubResolution: (resolution: number, layer: number) => void;
-    getBlockDimensions: () => any;
-    getColorSpace: () => any;
-    getDecodedBuffer: () => any;
-    getEncodedBuffer: (length: number) => Uint8Array;
-    getFrameInfo: () => any;
-    getImageOffset: () => any;
-    getIsReversible: () => any;
+    getBlockDimensions: () => Size;
+    getColorSpace: () => ColorSpace;
+    getDecodedBuffer: () => TypedArray;
+    getEncodedBuffer: (length: number) => TypedArray;
+    getFrameInfo: () => FrameInfo;
+    getImageOffset: () => Point;
+    getIsReversible: () => boolean;
     getNumDecompositions: () => number;
     getNumLayers: () => number;
     getProgressionOrder: () => number;
-    getTileOffset: () => any;
-    getTileSize: () => any;
+    getTileOffset: () => Point;
+    getTileSize: () => Size;
 }
 
 interface OpenJpegModule {
