@@ -73,12 +73,43 @@ interface OpenJpegModule {
 
 
 // passed as argument to BaseDecoder constructor / decode
+/* e.g.
+{
+    "NewSubfileType": 1,
+    "ImageWidth": 361,
+    "ImageLength": 220,
+    "BitsPerSample": {
+        "0": 16
+    },
+    "Compression": 34712,
+    "PhotometricInterpretation": 1,
+    "SamplesPerPixel": 1,
+    "XResolution": {
+        "0": 1,
+        "1": 1
+    },
+    "YResolution": {
+        "0": 1,
+        "1": 1
+    },
+    "ResolutionUnit": 1,
+    "TileWidth": 1024,
+    "TileLength": 1024,
+    "TileOffsets": [
+        967136
+    ],
+    "TileByteCounts": [
+        2193
+    ]
+}
+*/
+
 interface FileDirectory {
     TileWidth?: number;
     TileLength?: number;
     ImageWidth: number;
     ImageLength: number;
-    BitsPerSample: number[];
+    BitsPerSample: Record<string, number>;
     Compression: number;
 }
 
@@ -94,6 +125,10 @@ type CompressedImageFrame = {
 
 export default class Jpeg2000Decoder extends BaseDecoder {
     private openjpeg: OpenJpegModule | null = null;
+
+    constructor(fileDirectory: FileDirectory) {
+        super();
+    }
 
     private async getOpenJPEG(): Promise<OpenJpegModule> {
         if (!this.openjpeg) {
@@ -117,10 +152,10 @@ export default class Jpeg2000Decoder extends BaseDecoder {
         return this.openjpeg;
     }
 
-    async decode(fileDirectory: FileDirectory, buffer: TypedArray) {
-        const compressedImageFrame = await this.decodeBlock(buffer);
-        return compressedImageFrame;
-    }
+    // async decode(fileDirectory: FileDirectory, buffer: TypedArray) {
+    //     const compressedImageFrame = await this.decodeBlock(buffer);
+    //     return compressedImageFrame;
+    // }
     
     async decodeBlock(compressedImageFrame: TypedArray) {
         // this is more-or-less a copy of the code in conerstone3D's decodeJPEG2000.ts
