@@ -12,15 +12,15 @@ import openJpegFactory from "@cornerstonejs/codec-openjpeg/decodewasmjs";
 // import openjpegWasm from '@cornerstonejs/codec-openjpeg/decodewasm';
 const openjpegWasm = new URL("@cornerstonejs/codec-openjpeg/decodewasm", import.meta.url);
 
-// passed as argument to BaseDecoder constructor
-// interface FileDirectory {
-//     TileWidth?: number;
-//     TileLength?: number;
-//     ImageWidth: number;
-//     ImageLength: number;
-//     BitsPerSample: number[];
-//     Compression: number;
-// }
+// passed as argument to BaseDecoder constructor / decode
+interface FileDirectory {
+    TileWidth?: number;
+    TileLength?: number;
+    ImageWidth: number;
+    ImageLength: number;
+    BitsPerSample: number[];
+    Compression: number;
+}
 
 type CompressedImageFrame = {
     length: number;
@@ -31,20 +31,19 @@ type CompressedImageFrame = {
     // imageLength: number;
 };
 
-// JPEG2000 compression code in TIFF
-const JPEG2000_COMPRESSION = 34712; // 0x8790
 
 export default class Jpeg2000Decoder extends BaseDecoder {
     private openjpeg: any;
 
     private async getOpenJPEG() {
         if (!this.openjpeg) {
+            console.log(">>> Initializing OpenJPEG");
             try {
                 // Try WASM version first, fall back to JS version
                 this.openjpeg = await openJpegFactory({
                     locateFile: (file: string) => {
                         if (file.endsWith(".wasm")) {
-                            return openjpegWasm.toString();
+                            return openjpegWasm.toString(); // href instead of toString()?
                         } else {
                             return file;
                         }
@@ -58,15 +57,27 @@ export default class Jpeg2000Decoder extends BaseDecoder {
         return this.openjpeg;
     }
 
+    // async decode(fileDirectory: FileDirectory, buffer: TypedArray) {
+    //     // console.log(">>> Decoding JPEG2000", fileDirectory);
+    //     const compressedImageFrame = await this.decodeBlock(buffer);
+    //     return compressedImageFrame;
+    // }
+    
     async decodeBlock(compressedImageFrame: TypedArray) {
         // this is more-or-less a copy of the code in conerstone3D's decodeJPEG2000.ts
         try {
             const openjpeg = await this.getOpenJPEG();
+            // console.log("Inspecting openjpeg object:", Object.keys(openjpeg));
             // the thing we have as openjpeg here doesn't have a decode method...
             // but it might have J2KDecoder...
             const decoder = new openjpeg.J2KDecoder();
             const encodedBufferInWASM = decoder.getEncodedBuffer(compressedImageFrame.length);
             encodedBufferInWASM.set(compressedImageFrame);
+            // this won't throw - but it will complain...
+            // openjpegwasm_decode.js:9 [INFO] Stream reached its end !
+            // openjpegwasm_decode.js:9 [ERROR] JP2H box missing. Required.
+            // openjpegwasm_decode.js: 9[ERROR] opj_decompress: failed to read the header
+            // decoder.decodeSubResolution(0, 0); // decode() will only call this internally anyway - doesn't help the issue
             decoder.decode();
             // get information about the decoded image
             const frameInfo = decoder.getFrameInfo();
@@ -108,8 +119,13 @@ function getPixelData(frameInfo: any, decodedBuffer: any) {
 }
 
 // Register the decoder with geotiff
+// JPEG2000 compression code in TIFF
+const JPEG2000_COMPRESSION = 34712; // this is what we observe `getDecoder` using internally (slightly sidetracked by another image having 8)
 try {
-    addDecoder(JPEG2000_COMPRESSION, () => Promise.resolve(Jpeg2000Decoder));
+    addDecoder(JPEG2000_COMPRESSION, () => {
+        console.log(">>> Using JPEG2000 decoder");
+        return Promise.resolve(Jpeg2000Decoder);
+    });
     console.log("JPEG2000 decoder registered successfully");
 } catch (error) {
     console.error("Failed to register JPEG2000 decoder:", error);
