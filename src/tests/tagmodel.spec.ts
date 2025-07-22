@@ -11,7 +11,7 @@ vi.mock('@/dataloaders/DataLoaderUtil');
 beforeEach(() => {
   vi.clearAllMocks();
 });
-test('TagModel can be instantiated and creates a __tags column if needed', () => {
+test('TagModel can be instantiated and creates a __tags column if needed', async () => {
   const mockColumnIndex: Record<string, any> = {};
   const mockDataStoreInstance = {
     size: 10,
@@ -44,7 +44,7 @@ test('TagModel can be instantiated and creates a __tags column if needed', () =>
   };
   (DataModel as any).mockImplementation(() => mockDataModelInstance);
 
-  const tagModel = new TagModel(mockDataStoreInstance as unknown as DataStore);
+  const tagModel = await TagModel.create(mockDataStoreInstance as unknown as DataStore);
 
   expect(tagModel).toBeInstanceOf(TagModel);
   expect(DataModel).toHaveBeenCalledTimes(1);
@@ -60,6 +60,8 @@ test('TagModel can be instantiated and creates a __tags column if needed', () =>
 });
 
 test('getTags should handle undefined values in the column', async () => {
+  // this test is added to simulate the situation that we had at runtime...
+  // although I'm not sure that it really gets at the root of the problem.
   const mockColumnWithUndefined = {
     name: '__tags',
     datatype: 'multitext' as const,
@@ -94,7 +96,7 @@ test('getTags should handle undefined values in the column', async () => {
   };
   (DataModel as any).mockImplementation(() => mockDataModelInstance);
 
-  const tagModel = new TagModel(mockDataStoreInstance as any);
+  const tagModel = await TagModel.create(mockDataStoreInstance as any);
 
   // Allow for the promise in the constructor to resolve
   await new Promise(process.nextTick);
