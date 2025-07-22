@@ -34,7 +34,7 @@
     "fix_npm_win": "npm config set script-shell \"cmd\"",
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
-    "test": "cross-env build=desktop_pt vitest"
+    "test": "vitest"
   },
   "repository": {
     "type": "git",
