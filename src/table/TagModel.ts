@@ -11,7 +11,8 @@ export type TagColumn = LoadedDataColumn<"multitext">;
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
 const JOIN = "; "; //join with semi-colon and space.
 
-const splitTags = (value: string) => value.split(SEP).filter((v) => v);
+const splitTags = (value?: string) => value?.split(SEP).filter((v) => v) ?? [];
+// const splitTags = (value: string) => value.split(SEP).filter((v) => v);
 
 /** Treating `col.values` as strings containing semi-colon-separated 'tags',
  * find all the indices that include 'tag' as one of those tags.
