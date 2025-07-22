@@ -139,6 +139,7 @@
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.1",
     "jsdoc": "^4.0.2",
+    "jsdom": "^26.1.0",
     "postcss": "^8.4.38",
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.4.3",
