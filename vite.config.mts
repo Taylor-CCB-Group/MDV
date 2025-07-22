@@ -20,7 +20,7 @@ const port = 5170;
  * other methods are supposed to be for replacing other webpack configs.
  */
 function getRollupOptions(): RollupOptions {
-    const build = process.env.build as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
+    const build = process.env.build || "desktop_pt" as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {

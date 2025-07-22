@@ -11,7 +11,8 @@ export type TagColumn = LoadedDataColumn<"multitext">;
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
 const JOIN = "; "; //join with semi-colon and space.
 
-const splitTags = (value: string) => value.split(SEP).filter((v) => v);
+const splitTags = (value?: string) => value?.split(SEP).filter((v) => v) ?? [];
+// const splitTags = (value: string) => value.split(SEP).filter((v) => v);
 
 /** Treating `col.values` as strings containing semi-colon-separated 'tags',
  * find all the indices that include 'tag' as one of those tags.
@@ -46,12 +47,12 @@ function getTagValueIndices(tag: string, col: TagColumn) {
  * Some of the internals of this implementation could be useful for that.
  */
 export default class TagModel {
-    readonly tagColumn: TagColumn;
+    tagColumn: TagColumn;
     readonly dataStore: DataStore;
     readonly dataModel: DataModel;
     isReady = false;
     private listeners: (() => void)[] = [];
-    constructor(dataStore: DataStore, columnName = "__tags") {
+    private constructor(dataStore: DataStore, columnName = "__tags") {
         this.dataStore = dataStore;
         this.dataModel = new DataModel(dataStore, { autoupdate: true });
         this.dataModel.updateModel();
@@ -60,10 +61,10 @@ export default class TagModel {
         this.dataModel.addListener("tag", () => {
             this.callListeners();
         });
-        if (!dataStore.columnIndex[columnName]) {
-            // subgroup - default to 'annotations' but also allow user to specify?
-            // DataStore.addColumn() could take a spec that includes subgroup info,
-            // but it seems to make it a lot more complicated than just setting a string property here.
+        const col = dataStore.columnIndex[columnName];
+        if (!col) {
+            // This case is for when the column doesn't exist at all.
+            // We create it synchronously.
             const columnSpec = {
                 name: columnName,
                 datatype: "multitext" as const,
@@ -72,29 +73,37 @@ export default class TagModel {
                 field: columnName,
                 values: [] as string[],
             };
-            //dataStore.size * 2 should be right for 'multitext' - wrong for 'text'
             const data = new SharedArrayBuffer(dataStore.size * 2);
             dataStore.addColumn(columnSpec, data);
+            this.tagColumn = dataStore.columnIndex[columnName] as TagColumn;
             this.isReady = true;
         } else {
-            loadColumn(dataStore.name, columnName).then((column) => {
-                if (column.delimiter && column.delimiter !== ";") {
-                    throw new Error("delimiter must be ';' for current tag column implementation");
-                }
-                this.isReady = true;
-                this.callListeners();
-            });
+            // This case is for when the column exists but may not be loaded.
+            // We'll handle this in the async factory method.
+            this.tagColumn = col as TagColumn;
         }
-        //! col is `any` here...
-        const col = dataStore.columnIndex[columnName];
-        if (!col) throw `expected columnIndex['${columnName}'] to be present in DataStore '${dataStore.name}'`;
-        if (!isColumnOfType(col, COL_TYPE)) {
-            throw new Error(
-                `column '${columnName}' is not of type '${COL_TYPE}'`,
-            );
+    }
+
+    static async create(dataStore: DataStore, columnName = "__tags"): Promise<TagModel> {
+        const model = new TagModel(dataStore, columnName);
+        
+        if (!model.isReady) {
+            const col = await loadColumn(dataStore.name, columnName);
+            if (col.delimiter && col.delimiter !== ";") {
+                throw new Error("delimiter must be ';' for current tag column implementation");
+            }
+            if (!isColumnOfType(col, COL_TYPE)) {
+                throw new Error(
+                    `column '${columnName}' is not of type '${COL_TYPE}'`,
+                );
+            }
+            if (!isColumnLoaded(col)) throw "expected column to be loaded";
+            model.tagColumn = col;
+            model.isReady = true;
+            model.callListeners();
         }
-        if (!isColumnLoaded(col)) throw "expected column to be loaded";
-        this.tagColumn = col;
+        
+        return model;
     }
     private callListeners() {
         this.listeners.map((callback) => callback());
