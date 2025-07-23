@@ -132,7 +132,6 @@ export default class Jpeg2000Decoder extends BaseDecoder {
 
     private async getOpenJPEG(): Promise<OpenJpegModule> {
         if (!this.openjpeg) {
-            console.log(">>> Initializing OpenJPEG");
             try {
                 // Try WASM version first, fall back to JS version
                 this.openjpeg = (await openJpegFactory({
@@ -152,29 +151,22 @@ export default class Jpeg2000Decoder extends BaseDecoder {
         return this.openjpeg;
     }
 
-    // async decode(fileDirectory: FileDirectory, buffer: TypedArray) {
-    //     const compressedImageFrame = await this.decodeBlock(buffer);
-    //     return compressedImageFrame;
-    // }
-    
     async decodeBlock(compressedImageFrame: ArrayBuffer) {
         // this is more-or-less a copy of the code in conerstone3D's decodeJPEG2000.ts
         try {
             const openjpeg = await this.getOpenJPEG();
-            // console.log("Inspecting openjpeg object:", Object.keys(openjpeg));
-            // the thing we have as openjpeg here doesn't have a decode method...
-            // but it might have J2KDecoder...
             const decoder = new openjpeg.J2KDecoder();
             const buffer = new Uint8Array(compressedImageFrame);
             const encodedBufferInWASM = decoder.getEncodedBuffer(buffer.length);
             encodedBufferInWASM.set(buffer);
-            // this won't throw - but it will complain...
-            // openjpegwasm_decode.js:9 [INFO] Stream reached its end !
-            // openjpegwasm_decode.js:9 [ERROR] JP2H box missing. Required.
-            // openjpegwasm_decode.js: 9[ERROR] opj_decompress: failed to read the header
             decoder.decode();
             // get information about the decoded image
             const frameInfo = decoder.getFrameInfo();
+            // we could probably look at the frameInfo to see if the decode method worked properly
+            // it won't throw an error otherwise...
+            if (frameInfo.width === 0 || frameInfo.height === 0) {
+                throw new Error("Failed to decode JPEG2000 image");
+            }
             // console.log("Frame info:", frameInfo);
             // get the decoded pixels
             const decodedBufferInWASM = decoder.getDecodedBuffer();
@@ -198,19 +190,19 @@ export default class Jpeg2000Decoder extends BaseDecoder {
     }
 }
 function getPixelData(frameInfo: FrameInfo, decodedBuffer: TypedArray) {
+    let pixelData: TypedArray;
     if (frameInfo.bitsPerSample > 8) {
-        if (frameInfo.isSigned) {
-            return new Int16Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength / 2);
-        }
-
-        return new Uint16Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength / 2);
+        pixelData = frameInfo.isSigned
+            ? new Int16Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength / 2)
+            : new Uint16Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength / 2);
+    } else {
+        pixelData = frameInfo.isSigned
+            ? new Int8Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength)
+            : new Uint8Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength);
     }
 
-    if (frameInfo.isSigned) {
-        return new Int8Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength);
-    }
-
-    return new Uint8Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength);
+    // Return a buffer containing only the pixel data
+    return pixelData.buffer.slice(pixelData.byteOffset, pixelData.byteOffset + pixelData.byteLength);
 }
 
 // Register the decoder with geotiff
@@ -218,10 +210,8 @@ function getPixelData(frameInfo: FrameInfo, decodedBuffer: TypedArray) {
 const JPEG2000_COMPRESSION = 34712; // this is what we observe `getDecoder` using internally (slightly sidetracked by another image having 8)
 try {
     addDecoder(JPEG2000_COMPRESSION, () => {
-        console.log(">>> Using JPEG2000 decoder");
         return Promise.resolve(Jpeg2000Decoder);
     });
-    console.log("JPEG2000 decoder registered successfully");
 } catch (error) {
     console.error("Failed to register JPEG2000 decoder:", error);
 }
