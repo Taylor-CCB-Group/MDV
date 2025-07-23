@@ -1,6 +1,6 @@
 import { BaseDecoder, type TypedArray, addDecoder } from "geotiff";
 
-import openJpegFactory from "@cornerstonejs/codec-openjpeg/decodewasmjs";
+import openJpegFactory from "./chafey/openjpegjs.js";
 // - nb, comments from https://github.com/cornerstonejs/cornerstone3D/blob/014f4c4cc2b973b200ec9af2e16783464b9a2a0d/packages/dicomImageLoader/src/shared/decoders/decodeJPEG2000.ts#L5
 // Webpack asset/resource copies this to our output folder
 
@@ -8,7 +8,7 @@ import openJpegFactory from "@cornerstonejs/codec-openjpeg/decodewasmjs";
 // This is closer to what Webpack 5 wants but it doesn't seem to work now
 // const wasm = new URL('./blah.wasm', import.meta.url)
 // import openjpegWasm from '@cornerstonejs/codec-openjpeg/decodewasm';
-const openjpegWasm = new URL("@cornerstonejs/codec-openjpeg/decodewasm", import.meta.url);
+const openjpegWasm = new URL("./chafey/openjpegjs.wasm", import.meta.url);
 
 // --- START OF TYPES ---
 // These are based on the emscripten bindings and should ideally live in a .d.ts file
@@ -126,9 +126,9 @@ type CompressedImageFrame = {
 export default class Jpeg2000Decoder extends BaseDecoder {
     private openjpeg: OpenJpegModule | null = null;
 
-    constructor(fileDirectory: FileDirectory) {
-        super();
-    }
+    // constructor(fileDirectory: FileDirectory) {
+    //     super();
+    // }
 
     private async getOpenJPEG(): Promise<OpenJpegModule> {
         if (!this.openjpeg) {
@@ -195,7 +195,7 @@ export default class Jpeg2000Decoder extends BaseDecoder {
         }
     }
 }
-function getPixelData(frameInfo: any, decodedBuffer: any) {
+function getPixelData(frameInfo: FrameInfo, decodedBuffer: TypedArray) {
     if (frameInfo.bitsPerSample > 8) {
         if (frameInfo.isSigned) {
             return new Int16Array(decodedBuffer.buffer, decodedBuffer.byteOffset, decodedBuffer.byteLength / 2);
