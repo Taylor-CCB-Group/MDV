@@ -260,19 +260,6 @@ export async function createLoader(
         }
         return source;
     } catch (e) {
-        // // Enhanced error handling for TIFF corruption
-        // if (e instanceof RangeError && e.message.includes('Invalid field type')) {
-        //     const fieldTypeMatch = e.message.match(/Invalid field type: (\d+)/);
-        //     const fieldType = fieldTypeMatch ? fieldTypeMatch[1] : 'unknown';
-            
-        //     const errorMessage = 'TIFF file appears to be corrupted. Field type ' + fieldType + ' is not valid according to the TIFF specification. ' +
-        //         'This usually indicates file corruption, an unsupported TIFF variant, or a file that was not properly saved. ' +
-        //         'Please try re-downloading the file or contact the file provider.';
-            
-        //     handleLoaderError(errorMessage);
-        //     throw new Error(errorMessage);
-        // }
-        
         if (e instanceof UnsupportedBrowserError) {
             handleLoaderError(e.message);
         } else {
