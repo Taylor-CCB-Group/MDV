@@ -157,7 +157,7 @@ export default class Jpeg2000Decoder extends BaseDecoder {
     //     return compressedImageFrame;
     // }
     
-    async decodeBlock(compressedImageFrame: TypedArray) {
+    async decodeBlock(compressedImageFrame: ArrayBuffer) {
         // this is more-or-less a copy of the code in conerstone3D's decodeJPEG2000.ts
         try {
             const openjpeg = await this.getOpenJPEG();
@@ -165,8 +165,9 @@ export default class Jpeg2000Decoder extends BaseDecoder {
             // the thing we have as openjpeg here doesn't have a decode method...
             // but it might have J2KDecoder...
             const decoder = new openjpeg.J2KDecoder();
-            const encodedBufferInWASM = decoder.getEncodedBuffer(compressedImageFrame.length);
-            encodedBufferInWASM.set(compressedImageFrame);
+            const buffer = new Uint8Array(compressedImageFrame);
+            const encodedBufferInWASM = decoder.getEncodedBuffer(buffer.length);
+            encodedBufferInWASM.set(buffer);
             // this won't throw - but it will complain...
             // openjpegwasm_decode.js:9 [INFO] Stream reached its end !
             // openjpegwasm_decode.js:9 [ERROR] JP2H box missing. Required.
@@ -174,6 +175,7 @@ export default class Jpeg2000Decoder extends BaseDecoder {
             decoder.decode();
             // get information about the decoded image
             const frameInfo = decoder.getFrameInfo();
+            // console.log("Frame info:", frameInfo);
             // get the decoded pixels
             const decodedBufferInWASM = decoder.getDecodedBuffer();
             const imageFrame = new Uint8Array(decodedBufferInWASM.length);
