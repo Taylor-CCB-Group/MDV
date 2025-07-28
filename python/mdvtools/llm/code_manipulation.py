@@ -7,14 +7,18 @@ import json
 def extract_code_from_response(response: str):
     """Extracts Python code from a markdown string response."""
     # Use a regex pattern to match content between triple backticks
-    code_pattern = r"```python(.*?)```"
-    match = re.search(code_pattern, response, re.DOTALL)
+    code_pattern = r"```python(.*?import.*?[^`]*)```"#"```python(.*?)```"
+    # match = re.search(code_pattern, response, re.DOTALL)
 
-    if match:
-        # Extract the matched code and strip any leading/trailing whitespaces
-        return f"{match.group(1).strip()}"
-    # we should at least issue a warning here, no good will come of this...
-    return ""
+    # if match:
+    #     # Extract the matched code and strip any leading/trailing whitespaces
+    #     return f"{match.group(1).strip()}"
+    # # we should at least issue a warning here, no good will come of this...
+    # return ""
+    matches = re.findall(code_pattern, response, re.DOTALL)
+    if not matches:
+        return ""
+    return matches[-1].strip()
 
 def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
     # if isinstance(dataframe, str):
@@ -269,6 +273,7 @@ def parse_view_name(code: str):
     # when it it parses this - it should be greedy about matching to the last \" in the line...
     #name_match = re.search(r"view_name = \"(.+)\"", code)
     name_match = re.search(r'view_name\s*=\s*"([^"]+)"', code)
+    #name_match = re.search(r'view_name\s*=\s*(["\'])(.*?)\1', code) #needs more testing... changed to capture single quotes, not only double quotes
     if name_match:
         view_name = name_match.group(1)
         print(f"test: {view_name}")
