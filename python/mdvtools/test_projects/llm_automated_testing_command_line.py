@@ -5,6 +5,7 @@ import pandas as pd
 import scanpy as sc
 import sys
 from dotenv import load_dotenv
+import re
 
 from mdvtools.mdvproject import MDVProject
 from mdvtools.conversions import convert_scanpy_to_mdv
@@ -118,7 +119,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     
     embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
     db = FAISS.from_documents(texts, embeddings)
-    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 7})
+    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 5})
     
     project_path = os.path.expanduser(project_path)
     logger.info(f"Loading dataset from {dataset_path}")
@@ -168,7 +169,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         which might reference context in the chat history, formulate a standalone question \
         which can be understood without the chat history. Do NOT answer the question, \
         just reformulate it if needed and otherwise return it as is. \
-        You must always invoked the PythonAstREPLTool to check the DataFrames structure and explore the values of the DataFrames."""
+        """
 
         contextualize_prompt = ChatPromptTemplate.from_messages([
             ("system", contextualize_q_system_prompt),
@@ -182,7 +183,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
         Use these to correct the column names mentioned by the user.
-        You must check the DataFrames structure, by invoking the PythonAstREPLTool.
+        You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
         Use `df.info()` or `df.index()`. 
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
@@ -201,7 +202,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
         # Step 7: Wrapper Function to Use Contextualization and Preserve Memory
         def agent_with_contextualization(question):
-            logger.info(f"\n===== New Question =====\n{question}")
+            #logger.info(f"\n===== New Question =====\n{question}")
             standalone_question = contextualize_chain.run(input=question)
             logger.info(f"Reformulated question: {standalone_question}")
             # Point 1: Log reformulation
@@ -232,21 +233,25 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         try:
             request_counter += 1  # Increase request counter at each iteration.
             full_prompt = prompt_data + "\nQuestion: " + question
-            logger.info(f"Agent prompt input:\n{full_prompt}")
+            #logger.info(f"Agent prompt input:\n{full_prompt}")
 
             ## custom agent code
 
             response = agent(full_prompt)
             logger.info(f"Pandas agent output: {response.get('output', '')}")
 
+            match = re.search(r'charts\s+(.*)', response['output'])
+            charts_part = match.group(1) if match else response['output']
+
             
             prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'], response['input'])
-            logger.info(f"RAG prompt being sent:\n{prompt_RAG}")
+            #logger.info(f"RAG prompt being sent:\n{prompt_RAG}")
 
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
-            output = qa_chain.invoke({"query": response['input'] + response['output']}) #"context": retriever,
+            output = qa_chain.invoke({"query": charts_part})#({"query": response['input'] + response['output']}) #"context": retriever,
+            logger.info(f"Raw output:\n{output}")
 
             result_code = prepare_code(output["result"], df_list[0], project, logger.info, modify_existing_project=True, view_name=question)
             logger.info(f"Generated code:\n{result_code}")
@@ -294,10 +299,10 @@ if __name__ == "__main__":
     
     # args =parser.parse_args()
     #main(args.project_path, args.dataset_path, args.question_list_path, args.output_csv)
-    main("../../mdv/545",
-         "../../mdv/545/TAURUS_raw_counts_annotated_final_UMAP.h5ad", 
-       "chat_testing/logs/taurus_questions1.csv",
-       "chat_testing/logs/taurus_545.csv")
+    main("../../mdv/544",
+         "../../mdv/544/scanpy-pbmc3k.h5ad", 
+       "chat_testing/logs/pbmc3k_questions.csv",
+       "chat_testing/logs/pbmc3k_544_latest.csv")
 
 
 
