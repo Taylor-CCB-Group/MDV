@@ -230,7 +230,7 @@ class ProjectChat(ProjectChatProtocol):
                     which might reference context in the chat history, formulate a standalone question \
                     which can be understood without the chat history. Do NOT answer the question, \
                     just reformulate it if needed and otherwise return it as is. \
-                    You must always check the DataFrames structure, by invoking the PythonAstREPLTool."""
+                    """
 
                     contextualize_prompt = ChatPromptTemplate.from_messages([
                         ("system", contextualize_q_system_prompt),
@@ -245,7 +245,8 @@ class ProjectChat(ProjectChatProtocol):
                     {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
                     Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
                     Use these to correct the column names mentioned by the user.
-                    If you need to check their structure, use `df.info()` or `df.head()`. 
+                    You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
+                    Use `df.info()` or `df.index()`. 
                     Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
                     prompt = ChatPromptTemplate.from_messages([
