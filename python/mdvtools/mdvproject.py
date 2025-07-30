@@ -1107,7 +1107,7 @@ class MDVProject:
             is_lazy = isinstance(dataframe, pl.LazyFrame)
 
             # Determine the number of rows. This is memory-efficient even for lazy frames.
-            if is_lazy:
+            if isinstance(dataframe, pl.LazyFrame):
                 num_rows = dataframe.select(pl.count()).collect().item()
             else:
                 num_rows = len(dataframe)
@@ -1192,7 +1192,11 @@ class MDVProject:
             if add_to_view:
                 # TablePlot parameters
                 title = name
-                params = dataframe.columns
+                # Use collect_schema().names() for LazyFrame, .columns for DataFrame
+                if isinstance(dataframe, pl.LazyFrame):
+                    params = dataframe.collect_schema().names()
+                else:
+                    params = dataframe.columns
                 size = [792, 472]
                 position = [10, 10]
             
@@ -2386,11 +2390,13 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
             
             # Check if this should be unique based on cardinality
             if mdv_dtype == "text":
-                # This triggers a scan of the column if it's a lazy frame,
-                # but only for this single column.
-                unique_count = dataframe.select(pl.col(col_name).n_unique()).collect().item()
-                total_count = num_rows # Use the pre-calculated row count
-                
+                # Handle both DataFrame and LazyFrame cases
+                if isinstance(dataframe, pl.LazyFrame):
+                    unique_count = dataframe.select(pl.col(col_name).n_unique()).collect().item()
+                else:
+                    # For DataFrame, don't call collect()
+                    unique_count = dataframe.select(pl.col(col_name).n_unique()).item()
+                total_count = num_rows
                 # If most values are unique, treat as unique type
                 if unique_count > min(65536, total_count * 0.8):
                     mdv_dtype = "unique"
