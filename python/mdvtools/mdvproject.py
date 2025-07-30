@@ -18,7 +18,7 @@ from pathlib import Path
 import scipy.sparse
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Optional, NewType, List, Union, Any
+from typing import Optional, NewType, List, Union, Any, cast
 from pandas.api.types import is_bool_dtype
 import polars as pl
 # from mdvtools.charts.view import View 
@@ -2119,9 +2119,9 @@ def add_column_to_group(
             data = data.fillna("ND")
         #no boolean datatype in MDV at the moment, have to co-erce to text
         elif is_bool_dtype(data):
-            cat: pandas.Series = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+            cat = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
             assert isinstance(cat, pandas.Series)
-            data = cat
+            data = cast(pandas.Series, cat)
         else:
             # may need to double-check this...
             data = data.fillna("ND")
