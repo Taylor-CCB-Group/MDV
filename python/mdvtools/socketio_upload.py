@@ -241,16 +241,17 @@ class FileUploadManager:
             self._save_upload_state(file_id, state)
             return None
 
-    def queue_file_for_processing(self, state: Dict, sid: str, namespace: str) -> None:
+    def queue_file_for_processing(self, state: Dict, sid: Optional[str], namespace: str) -> None:
         """Queue the file for background processing."""
         file_id = state.get('file_id')
         current_status = state.get('status')
 
         if current_status not in ['completed', 'queued', 'processing']:
             upload_log(f"Cannot queue file {file_id} with status {current_status}")
-            self._notify_client(sid, namespace, 'upload_error', {
-                'file_id': file_id, 'message': f'Cannot queue file with status {current_status}'
-            })
+            if sid:
+                self._notify_client(sid, namespace, 'upload_error', {
+                    'file_id': file_id, 'message': f'Cannot queue file with status {current_status}'
+                })
             return
 
         with self.lock:
@@ -302,9 +303,10 @@ class FileUploadManager:
                             state['status'] = 'error'
                             state['error_message'] = f"Project {project_id} not found"
                             self._save_upload_state(file_id, state)
-                        self._notify_client(sid, namespace, 'upload_error', {
-                            'file_id': file_id, 'message': state['error_message']
-                        })
+                        if sid:
+                            self._notify_client(sid, namespace, 'upload_error', {
+                                'file_id': file_id, 'message': state['error_message']
+                            })
                         continue
 
                 upload_log(f"Processing file: {file_id} for project {project_id}")
@@ -313,9 +315,10 @@ class FileUploadManager:
                     upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
                     continue
                 self._save_upload_state(file_id, state)
-                self._notify_client(sid, namespace, 'upload_processing', {
-                    'file_id': file_id, 'message': 'File processing started'
-                })
+                if sid:
+                    self._notify_client(sid, namespace, 'upload_processing', {
+                        'file_id': file_id, 'message': 'File processing started'
+                    })
 
                 try:
                     response_data = {}
@@ -369,11 +372,12 @@ class FileUploadManager:
                     else:
                         response_data = {'warning': f'No processor for {content_type} with project_id {project_id}'}
                     
-                    self._notify_client(sid, namespace, 'upload_success', {
-                        'file_id': file_id,
-                        'message': 'File processed successfully',
-                        **response_data 
-                    })
+                    if sid:
+                        self._notify_client(sid, namespace, 'upload_success', {
+                            'file_id': file_id,
+                            'message': 'File processed successfully',
+                            **response_data 
+                        })
                     upload_log(f"Successfully processed file: {file_id}")
                     self._delete_upload_dir(file_id)
                     
@@ -385,9 +389,10 @@ class FileUploadManager:
                         upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
                         continue
                     self._save_upload_state(file_id, state)
-                    self._notify_client(sid, namespace, 'upload_error', {
-                        'file_id': file_id, 'message': f"Processing error: {str(e)}"
-                    })
+                    if sid:
+                        self._notify_client(sid, namespace, 'upload_error', {
+                            'file_id': file_id, 'message': f"Processing error: {str(e)}"
+                        })
             else:
                 time.sleep(1.0)
 
@@ -472,7 +477,7 @@ class ProjectCreationUploadAPI:
                     
                 if status in ['completed', 'queued', 'processing']:
                     upload_log(f"File {file_id} status: {status}, re-initiating processing")
-                    self.upload_manager.queue_file_for_processing(state, request.sid, self.namespace)
+                    self.upload_manager.queue_file_for_processing(state, None, self.namespace)
                     emit('upload_processing_initiated', {
                         'file_id': file_id,
                         'message': f'Processing for {state.get("original_filename", "file")} initiated'
@@ -595,7 +600,7 @@ class ProjectCreationUploadAPI:
                 
                 final_state = self.upload_manager.finalize_upload(file_id)
                 if final_state:
-                    self.upload_manager.queue_file_for_processing(final_state, request.sid, self.namespace)
+                    self.upload_manager.queue_file_for_processing(final_state, None, self.namespace)
                     
                     # Calculate upload stats
                     try:
@@ -673,7 +678,7 @@ class UploadSocketAPI:
                 status = state.get('status')
                 if status in ['completed', 'queued', 'processing']:
                     upload_log(f"File {file_id} status: {status}, re-initiating processing")
-                    self.upload_manager.queue_file_for_processing(state, request.sid, self.namespace)
+                    self.upload_manager.queue_file_for_processing(state, None, self.namespace)
                     emit('upload_processing_initiated', {
                         'file_id': file_id,
                         'message': f'Processing for {state.get("original_filename", "file")} initiated'
@@ -799,7 +804,7 @@ class UploadSocketAPI:
                 
                 final_state = self.upload_manager.finalize_upload(file_id)
                 if final_state:
-                    self.upload_manager.queue_file_for_processing(final_state, request.sid, self.namespace)
+                    self.upload_manager.queue_file_for_processing(final_state, None, self.namespace)
                     
                     # Calculate upload stats
                     try:
