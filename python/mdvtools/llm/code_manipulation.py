@@ -16,14 +16,18 @@ if TYPE_CHECKING:
 def extract_code_from_response(response: str):
     """Extracts Python code from a markdown string response."""
     # Use a regex pattern to match content between triple backticks
-    code_pattern = r"```python(.*?)```"
-    match = re.search(code_pattern, response, re.DOTALL)
+    code_pattern = r"```python(.*?)(.*?import.*?[^`]*)```"
+    matches = re.findall(code_pattern, response, re.DOTALL)
+    #match = re.search(code_pattern, response, re.DOTALL)
 
-    if match:
+    #if match:
         # Extract the matched code and strip any leading/trailing whitespaces
-        return f"{match.group(1).strip()}"
+    #    return f"{match.group(1).strip()}"
     # we should at least issue a warning here, no good will come of this...
-    return ""
+    # return ""
+    if not matches:
+        return ""
+    return matches[-1].strip()
 
 
 def prepare_code(result: str, data: Optional[str | pd.DataFrame], project: MDVProject, log = print, 
