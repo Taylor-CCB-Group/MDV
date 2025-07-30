@@ -120,6 +120,7 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
     print(f"Processing MDV project zip file: {original_filename}")
     print(f"Filepath: {filepath}")
 
+    project_path = None
     try:
         # Get next available project ID
         from mdvtools.dbutils.dbservice import ProjectService
@@ -200,7 +201,7 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
     except Exception as e:
         print(f"Error in mdv_project_processing: {str(e)}")
         # Clean up project directory if it was created
-        if 'project_path' in locals() and os.path.exists(project_path):
+        if project_path and os.path.exists(project_path):
             try:
                 shutil.rmtree(project_path)
             except Exception:
