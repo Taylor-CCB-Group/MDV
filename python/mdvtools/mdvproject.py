@@ -2119,7 +2119,7 @@ def add_column_to_group(
             data = data.fillna("ND")
         #no boolean datatype in MDV at the moment, have to co-erce to text
         elif is_bool_dtype(data):
-            cat = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+            cat: pandas.Series = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
             assert isinstance(cat, pandas.Series)
             data = cat
         else:
