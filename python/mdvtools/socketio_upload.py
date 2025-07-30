@@ -265,8 +265,9 @@ class FileUploadManager:
             self.processing_queue.append(processing_info)
         
         if state.get('status') != 'queued':
-            state['status'] = 'queued' 
-            self._save_upload_state(file_id, state)
+            state['status'] = 'queued'
+            if file_id:
+                self._save_upload_state(file_id, state)
 
     def _process_queue(self):
         """Background worker to process uploaded files."""
@@ -297,9 +298,10 @@ class FileUploadManager:
                         upload_log(f"Processing project creation upload: {file_id}")
                         # This is handled in the processing logic below
                     else:
-                        state['status'] = 'error'
-                        state['error_message'] = f"Project {project_id} not found"
-                        self._save_upload_state(file_id, state)
+                        if file_id:  # Only save state if we have a valid file_id
+                            state['status'] = 'error'
+                            state['error_message'] = f"Project {project_id} not found"
+                            self._save_upload_state(file_id, state)
                         self._notify_client(sid, namespace, 'upload_error', {
                             'file_id': file_id, 'message': state['error_message']
                         })
@@ -307,6 +309,9 @@ class FileUploadManager:
 
                 upload_log(f"Processing file: {file_id} for project {project_id}")
                 state['status'] = 'processing'
+                if not file_id:
+                    upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
+                    continue
                 self._save_upload_state(file_id, state)
                 self._notify_client(sid, namespace, 'upload_processing', {
                     'file_id': file_id, 'message': 'File processing started'
@@ -376,6 +381,9 @@ class FileUploadManager:
                     upload_log(f"Error processing file {file_id}: {str(e)}")
                     state['status'] = 'error'
                     state['error_message'] = f"Processing error: {str(e)}"
+                    if not file_id:
+                        upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
+                        continue
                     self._save_upload_state(file_id, state)
                     self._notify_client(sid, namespace, 'upload_error', {
                         'file_id': file_id, 'message': f"Processing error: {str(e)}"
@@ -423,7 +431,7 @@ class FileUploadManager:
     def _notify_client(self, sid: str, namespace: str, event: str, data: dict) -> None:
         """Send a message to a specific client via SocketIO."""
         try:
-            self.socketio.emit(event, data, room=sid, namespace=namespace)
+            self.socketio.emit(event, data, to=sid, namespace=namespace)
         except Exception as e:
             upload_log(f"Error notifying client {sid}: {e}")
 
