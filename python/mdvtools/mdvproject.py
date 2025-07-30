@@ -1101,10 +1101,10 @@ class MDVProject:
             
             # If a path is provided, use scan_csv for lazy loading to prevent
             # loading the entire file into memory at once.
-            is_lazy = False
             if isinstance(dataframe, str):
                 dataframe = pl.scan_csv(dataframe, separator=separator, try_parse_dates=False)
-                is_lazy = True
+
+            is_lazy = isinstance(dataframe, pl.LazyFrame)
 
             # Determine the number of rows. This is memory-efficient even for lazy frames.
             if is_lazy:
@@ -1192,7 +1192,7 @@ class MDVProject:
             if add_to_view:
                 # TablePlot parameters
                 title = name
-                params = dataframe.collect_schema().names() 
+                params = dataframe.columns
                 size = [792, 472]
                 position = [10, 10]
             
