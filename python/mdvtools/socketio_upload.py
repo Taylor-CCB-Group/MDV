@@ -248,10 +248,9 @@ class FileUploadManager:
 
         if current_status not in ['completed', 'queued', 'processing']:
             upload_log(f"Cannot queue file {file_id} with status {current_status}")
-            if sid:
-                self._notify_client(sid, namespace, 'upload_error', {
-                    'file_id': file_id, 'message': f'Cannot queue file with status {current_status}'
-                })
+            self.socketio.emit('upload_error', {
+                'file_id': file_id, 'message': f'Cannot queue file with status {current_status}'
+            }, namespace=namespace)
             return
 
         with self.lock:
@@ -303,10 +302,9 @@ class FileUploadManager:
                             state['status'] = 'error'
                             state['error_message'] = f"Project {project_id} not found"
                             self._save_upload_state(file_id, state)
-                        if sid:
-                            self._notify_client(sid, namespace, 'upload_error', {
-                                'file_id': file_id, 'message': state['error_message']
-                            })
+                        self.socketio.emit('upload_error', {
+                            'file_id': file_id, 'message': state['error_message']
+                        }, namespace=namespace)
                         continue
 
                 upload_log(f"Processing file: {file_id} for project {project_id}")
@@ -315,10 +313,9 @@ class FileUploadManager:
                     upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
                     continue
                 self._save_upload_state(file_id, state)
-                if sid:
-                    self._notify_client(sid, namespace, 'upload_processing', {
-                        'file_id': file_id, 'message': 'File processing started'
-                    })
+                self.socketio.emit('upload_processing', {
+                    'file_id': file_id, 'message': 'File processing started'
+                }, namespace=namespace)
 
                 try:
                     response_data = {}
@@ -372,12 +369,11 @@ class FileUploadManager:
                     else:
                         response_data = {'warning': f'No processor for {content_type} with project_id {project_id}'}
                     
-                    if sid:
-                        self._notify_client(sid, namespace, 'upload_success', {
-                            'file_id': file_id,
-                            'message': 'File processed successfully',
-                            **response_data 
-                        })
+                    self.socketio.emit('upload_success', {
+                        'file_id': file_id,
+                        'message': 'File processed successfully',
+                        **response_data 
+                    }, namespace=namespace)
                     upload_log(f"Successfully processed file: {file_id}")
                     self._delete_upload_dir(file_id)
                     
@@ -389,10 +385,9 @@ class FileUploadManager:
                         upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
                         continue
                     self._save_upload_state(file_id, state)
-                    if sid:
-                        self._notify_client(sid, namespace, 'upload_error', {
-                            'file_id': file_id, 'message': f"Processing error: {str(e)}"
-                        })
+                    self.socketio.emit('upload_error', {
+                        'file_id': file_id, 'message': f"Processing error: {str(e)}"
+                    }, namespace=namespace)
             else:
                 time.sleep(1.0)
 
