@@ -32,7 +32,7 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
         progress_path = os.path.join(project.dir, progress_file)
         
         if resume and os.path.exists(progress_path):
-            print(f"Found existing progress file, attempting to resume...")
+            print("Found existing progress file, attempting to resume...")
             # The add_datasource_polars method will handle the resumption logic
         
         # Add the datasource to the project with resume flag
