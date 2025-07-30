@@ -44,13 +44,13 @@ def main():
     project.add_datasource(datasource_name_2, data_frame_var)
 
     # SelectionDialogPlot parameters
-    title="Example title",
+    selection_dialog_plot_title="Example title",
     params = ["param1", "param2", "param3", "param4", "param5", "param6", "param7", "param8"] # The 'param' list can accept any number of arguments, where each argument can be of any type, including categorical or variable types.
     size = [792, 472]
     position = [10, 10]
 
     # Create plot
-    selection_dialog_plot = create_selection_dialog_plot(title, params, size, position)
+    selection_dialog_plot = create_selection_dialog_plot(selection_dialog_plot_title, params, size, position)
     
     # Convert plot to JSON and set view
     selection_dialog_plot_json = convert_plot_to_json(selection_dialog_plot)

@@ -81,14 +81,14 @@ def main():
     stacked_row_plot_json = convert_plot_to_json(stacked_row_plot)
     
     # SelectionDialogPlot parameters
-    selection_dialog_title = "Selection Dialog Plot Example"
-    selection_dialog_params = ["param2", "param4", "param5"]  # Use any column
+    selection_dialog_plot_title = "Selection Dialog Plot Example"
+    selection_dialog_params = ["param2", "param3", "param4", "param5", "param6"]  # Use any column
     selection_dialog_size = [792, 472]
     selection_dialog_position = [10, 500]
 
     # Create selection dialog plot
     selection_dialog_plot = create_selection_dialog_plot(
-        selection_dialog_title, selection_dialog_params, selection_dialog_size, selection_dialog_position
+        selection_dialog_plot_title, selection_dialog_params, selection_dialog_size, selection_dialog_position
     )
     
     # Convert selection dialog plot to JSON
