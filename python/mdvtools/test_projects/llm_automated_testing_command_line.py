@@ -5,6 +5,7 @@ import pandas as pd
 import scanpy as sc
 import sys
 from dotenv import load_dotenv
+import re
 
 from mdvtools.mdvproject import MDVProject
 from mdvtools.conversions import convert_scanpy_to_mdv
@@ -167,7 +168,8 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         contextualize_q_system_prompt = """Given a chat history and the latest user question \
         which might reference context in the chat history, formulate a standalone question \
         which can be understood without the chat history. Do NOT answer the question, \
-        just reformulate it if needed and otherwise return it as is."""
+        just reformulate it if needed and otherwise return it as is. \
+        """
 
         contextualize_prompt = ChatPromptTemplate.from_messages([
             ("system", contextualize_q_system_prompt),
@@ -181,8 +183,8 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
         Use these to correct the column names mentioned by the user.
-        You must check the DataFrames structure, by invoking the PythonAstREPLTool.
-        Use `df.info()` or `df.head()`. 
+        You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
+        Use `df.info()` or `df.index()`. 
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
         prompt = ChatPromptTemplate.from_messages([
@@ -200,10 +202,13 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
         # Step 7: Wrapper Function to Use Contextualization and Preserve Memory
         def agent_with_contextualization(question):
+            #logger.info(f"\n===== New Question =====\n{question}")
             standalone_question = contextualize_chain.run(input=question)
+            logger.info(f"Reformulated question: {standalone_question}")
             # Point 1: Log reformulation
             # Point 2: Log what you're sending to the agent
             response = agent_executor.invoke({"input": standalone_question})
+            logger.info(f"Agent raw response: {response}")
             # Point 3: Log agent output
             memory.save_context({"input": question}, {"output": response.get("output", str(response))})
             return response
@@ -228,23 +233,35 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         try:
             request_counter += 1  # Increase request counter at each iteration.
             full_prompt = prompt_data + "\nQuestion: " + question
+            #logger.info(f"Agent prompt input:\n{full_prompt}")
 
             ## custom agent code
 
             response = agent(full_prompt)
+            logger.info(f"Pandas agent output: {response.get('output', '')}")
+
+            match = re.search(r'charts\s+(.*)', response['output'])
+            charts_part = match.group(1) if match else response['output']
+
             
             prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'], response['input'])
+            #logger.info(f"RAG prompt being sent:\n{prompt_RAG}")
+
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
-            output = qa_chain.invoke({"query": response['input'] + response['output']}) #"context": retriever, 
+            output = qa_chain.invoke({"query": charts_part})#({"query": response['input'] + response['output']}) #"context": retriever,
+            logger.info(f"Raw output:\n{output}")
+
             result_code = prepare_code(output["result"], df_list[0], project, logger.info, modify_existing_project=True, view_name=question)
+            logger.info(f"Generated code:\n{result_code}")
 
             context_information = output['source_documents']
             context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
             context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
             
             ok, stdout, stderr = execute_code(result_code, open_code=False, log=logger.info)
+
             results.append({
                 "question": question,
                 "pandas_input": response.get('prompt_data', ''), #'input', ''),
@@ -274,16 +291,22 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     project.serve()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run MDV LLM analysis from command line.")
-    parser.add_argument("project_path", help="Path to the MDV project directory")
-    parser.add_argument("dataset_path", help="Path to the H5AD dataset file")
-    parser.add_argument("question_list_path", help="Path to the Excel file containing questions")
-    parser.add_argument("output_csv", help="Path to save the output CSV file")
+    # parser = argparse.ArgumentParser(description="Run MDV LLM analysis from command line.")
+    # parser.add_argument("project_path", help="Path to the MDV project directory")
+    # parser.add_argument("dataset_path", help="Path to the H5AD dataset file")
+    # parser.add_argument("question_list_path", help="Path to the Excel file containing questions")
+    # parser.add_argument("output_csv", help="Path to save the output CSV file")
     
-    args =parser.parse_args()
-    main(args.project_path, args.dataset_path, args.question_list_path, args.output_csv)
-    # main("mdv/automation_pbmc3k_test",
-    #      "mdv/automation_pbmc3k_test/scanpy-pbmc3k.h5ad", 
-    #      "../ChatMDV/testing_results/input/mdv_graph_requests_short.csv",
-    #      "../ChatMDV/testing_results/output/automation_pbmc3k_test.csv")
+    # args =parser.parse_args()
+    #main(args.project_path, args.dataset_path, args.question_list_path, args.output_csv)
+    main("../../mdv/544",
+         "../../mdv/544/scanpy-pbmc3k.h5ad", 
+       "chat_testing/logs/pbmc3k_questions.csv",
+       "chat_testing/logs/pbmc3k_544_latest.csv")
+
+
+
+
+
+
 
