@@ -281,6 +281,9 @@ class FileUploadManager:
                 sid = processing_info['sid']
                 namespace = processing_info['namespace']
                 file_id = state.get('file_id')
+                if not file_id:
+                    upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
+                    continue
                 project_id = state.get('project_id')
                 
                 # Get project from global projects map
