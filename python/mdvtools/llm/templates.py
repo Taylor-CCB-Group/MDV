@@ -188,6 +188,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - Text box: Requires no columns, just text.  
             - Violin plot: Requires only one categorical column and one numerical column.  
             - Wordcloud: Requires one categorical column.
+    Output format: Only return the python code that is to be run to generate the charts.
+
+    
 """
     )
     return prompt_RAG
