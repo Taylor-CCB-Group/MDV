@@ -46,7 +46,7 @@ function parseXeniumCellId(cellId: string) {
     return { cell_id_prefix, dataset_suffix };
 }
 
-function reconstructCellIds(cellIdArray: Uint32Array) {
+function reconstructCellIds(cellIdArray: zarr.TypedArray<zarr.NumberDataType>) {
     const n = cellIdArray.length / 2;
     const ids = new Array(n);
     for (let i = 0; i < n; i++) {
@@ -57,8 +57,8 @@ function reconstructCellIds(cellIdArray: Uint32Array) {
     return ids;
 }
 
+const url = "http://localhost:8080";
 async function test() {
-    const url = "http://localhost:8080";
     // these xenium stores don't have the 'consolidated' metadata 
     // - but if we're making our own spec, we likely will.
     // const cellsStore = await zarr.tryWithConsolidated(new zarr.FetchStore(`${url}/cells.zarr`));
@@ -73,6 +73,7 @@ async function test() {
     if (!id.is("number")) throw new Error("Expected cell_id to be an array of numbers");
 
     const summary = await zarr.open(cellsRoot.resolve("cell_summary"), { kind: "array"});
+    if (!summary.is("number")) throw new Error("Expected cell_summary to be an array of numbers");
     const ids = await zarr.get(id);
     // can we find a specific cell `kalnagga-1`?
     // it should have location 665.253552.41 3552.41, area 87.3, Cluster 8...
@@ -88,37 +89,32 @@ async function test() {
     const c8Indices = await zarr.get(clusterIndices, [c8Slice]); //this gives 2966 indices, as expected
 
     //... so I should be able to use c8Indices to... profit???
-    const allCellIds = (await zarr.get(id, [null, 0])).data;
-    if (!(allCellIds instanceof Uint32Array)) throw new Error("Expected Uint32Array for cell IDs");
 
     // this is heavy, we'd likely want to do things differently
-    if (!(ids.data instanceof Uint32Array)) throw new Error("Expected Uint32Array for cell IDs");
     const allCellIdStrings = reconstructCellIds(ids.data);
-    if (!(c8Indices.data instanceof Uint32Array)) throw new Error("Expected Uint32Array for c8 indices");
-    const c8CellIds = c8Indices.data.map(i => allCellIds[i]);
     //still trying to find this one cell I decided I was interested in...
-    //we also know the area is ~87.3mu^2 - `/cell_summary` should have `[x, y, cell_area, ...]`...
+    //we also know the area is ~87.3µm^2 - `/cell_summary` should have `[x, y, cell_area, ...]`...
     const allCellAreas = await zarr.get(summary, [null, 2]);
     //! oops... if we map over a Uint32Array, we get another Uint32Array... 
     //but we should have a Float64Array here
     // const c8Areas = new Float64Array(c8Indices.data).map(i => allCellAreas.data[i]);
-    //@ts-expect-error - todo
     const c8Areas = Float64Array.from(c8Indices.data, i => allCellAreas.data[i]);
     const queriedCellSize = 87.3;
     // find the indices of cells with areas similar to what we're looking for...
     const closeIndices = c8Areas.map((v, i) => Math.abs(queriedCellSize - v) <= 0.1 ? c8Indices.data[i] : -1).filter(i => i !== -1);
-    const n = closeIndices.length;
     // now let's get the centroids for these cells...
     // const queryX = 665.25, queryY = 3552.41; //for ref, this is the one we are hoping to find
     const allCellCentroids = await zarr.get(summary, [null, zarr.slice(0, 2)]);
     // or is there a transform matrix involved?
     const transform = await zarr.open(cellsRoot.resolve("/masks/homogeneous_transform"), { kind: "array" });
     // looks like a scale matrix, with x&y 4.7058820724487305
-    const transformData = await zarr.get(transform, [null, null]);
+    // const transformData = await zarr.get(transform, [null, null]);
 
 
+    const numVerts = await zarr.open(cellsRoot.resolve("polygon_num_vertices"), { kind: "array" });
+    if (!numVerts.is("number")) throw new Error("Expected polygon_num_vertices to be an array of numbers");
     const numVertsArr = await zarr.get(
-        await zarr.open(cellsRoot.resolve("polygon_num_vertices"), { kind: "array" }),
+        numVerts,
         [0, null] // shape: [2, N] do we have a both nucleus and cell boundary in here maybe?
     );
     const numVertsSet = new Set(Array.from(numVertsArr.data));
@@ -136,45 +132,41 @@ async function test() {
     }
 
     const offsets = computeOffsets(numVertsArr.data);
-    // async function loadPolygonVertices(cellIndex: number, numVerts: Uint32Array) {
-    //     const start = offsets[cellIndex];
-    //     const count = numVerts[cellIndex];
-    //     const polyVerts = await zarr.get(
-    //         await zarr.open(cellsRoot.resolve("polygon_vertices"), { kind: "array" }),
-    //         [zarr.slice(0, 2), zarr.slice(start, start + count)]
-    //     );
-    //     return {
-    //         x: polyVerts.data.subarray(0, count),
-    //         y: polyVerts.data.subarray(count)
-    //     };
-    // }
+    
+    // broken...
+    async function loadPolygonVertices(cellIndex: number) {
+        const start = offsets[cellIndex];
+
+        const count = numVertsArr.data[cellIndex];
+        const polyVertsArr = await zarr.open(cellsRoot.resolve("polygon_vertices"), { kind: "array" });
+        if (!polyVertsArr.is("number")) throw new Error("Expected polygon_vertices to be an array of numbers");
+        try {
+            const polyVerts = await zarr.get(
+                polyVertsArr,
+                [zarr.slice(0, 2), zarr.slice(start, start + count)]
+            );
+            return {
+                x: polyVerts.data.subarray(0, count),
+                y: polyVerts.data.subarray(count)
+            };
+        } catch (error) {
+            return error;
+        }
+    }
 
 
     const queriedCells = await Promise.all([...closeIndices].map(async i => {
         const start = offsets[i];
-        //@ts-expect-error
         const count = numVertsArr.data[i]; //always 13? Is that right? Unlucky for some...
         
-        // const polyVertsArr = await zarr.open(cellsRoot.resolve("polygon_vertices"), { kind: "array" });
-        // if (!polyVertsArr.is("number")) throw new Error("Expected polygon_vertices to be an array of numbers");
-        // // Error: Input contains an empty iterator.
-        // const polyVerts = await zarr.get(
-        //     polyVertsArr,
-        //     [zarr.slice(0,2), zarr.slice(start, start + count)]
-        // );
-        // // polyVerts
-        // const [xRow, yRow] = [polyVerts.data.slice(0, count), polyVerts.data.subarray(count)];
-        // const polyVerts = loadPolygonVertices() //same...
+        const polyVerts = await loadPolygonVertices(i); //still broken...
         return {
             id: allCellIdStrings[i],
-            //@ts-expect-error
             x: allCellCentroids.data[i * 2 + 0],
-            //@ts-expect-error
             y: allCellCentroids.data[i * 2 + 1],
-            //@ts-expect-error
             cellArea: allCellAreas.data[i],
             start, count,
-            // polyVerts
+            polyVerts
         }
     }));
 
@@ -193,11 +185,25 @@ async function test() {
 }
 
 
+async function transcriptTest() {
+    const transcriptsStore = await zarr.tryWithConsolidated(ZipFileStore.fromUrl(`${url}/transcripts.zarr.zip`)) as zarr.Readable;
+    // let's try to get the locations of all transcripts in the most zoomed out pyramid level, with a quality threshold of 0.5
+    const transcriptsRoot = await zarr.open(transcriptsStore);
+    // todo get the grids & check the shape to find the most zoomed out level...
+    // for now, cheating & hardcoding the path... in a spatial view, we'll need to resolve pyramid levels & locations properly
+    const grids = await zarr.open(transcriptsRoot.resolve("grids/6/0,0"), { kind: "group" });
+    const location = await zarr.open(grids.resolve("location"), { kind: "array" });
+    if (!location.is("number")) throw new Error("Expected location to be an array of numbers");
+    const quality = await zarr.open(grids.resolve("quality_score"), { kind: "array" });
+    
+    return { grids };
+}
+
 export default function ZarritaSketch() {
     const url = "http://localhost:8080/";
     const [view, setView] = useState<any>();
     useEffect(() => {
-        test().then(setView);
+        transcriptTest().then(setView);
     }, []); // url should be defined in the parent component
 
 
