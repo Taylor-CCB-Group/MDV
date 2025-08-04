@@ -1,5 +1,5 @@
 import { BaseDecoder, type TypedArray, addDecoder } from "geotiff";
-import type { OpenJpegModule, FrameInfo } from "./chafey/openjpegjs";
+import type { FrameInfo, MainModule as OpenJpegModule } from "./chafey/openjpegjs";
 import openJpegFactory from "./chafey/openjpegjs.js";
 
 // - nb, some comments from https://github.com/cornerstonejs/cornerstone3D/blob/014f4c4cc2b973b200ec9af2e16783464b9a2a0d/packages/dicomImageLoader/src/shared/decoders/decodeJPEG2000.ts#L5
@@ -137,7 +137,7 @@ function getPixelData(frameInfo: FrameInfo, decodedBuffer: TypedArray) {
 
 // Register the decoder with geotiff
 // JPEG2000 compression code in TIFF
-const JPEG2000_COMPRESSION = 34712; // this is what we observe `getDecoder` using internally (slightly sidetracked by another image having 8)
+const JPEG2000_COMPRESSION = [34712, 33004, 33003]; // this is what we observe `getDecoder` using internally (slightly sidetracked by another image having 8)
 try {
     addDecoder(JPEG2000_COMPRESSION, () => {
         return Promise.resolve(Jpeg2000Decoder);
