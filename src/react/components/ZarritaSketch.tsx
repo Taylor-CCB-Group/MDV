@@ -187,7 +187,8 @@ async function test() {
 
 async function transcriptTest() {
     const transcriptsStore = await zarr.tryWithConsolidated(ZipFileStore.fromUrl(`${url}/transcripts.zarr.zip`)) as zarr.Readable;
-    // let's try to get the locations of all transcripts in the most zoomed out pyramid level, with a quality threshold of 0.5
+    // let's try to get the locations of all transcripts in the most zoomed out pyramid level, with a quality threshold
+    const qualityThreshold = 10;
     const transcriptsRoot = await zarr.open(transcriptsStore);
     // todo get the grids & check the shape to find the most zoomed out level...
     // for now, cheating & hardcoding the path... in a spatial view, we'll need to resolve pyramid levels & locations properly
@@ -195,8 +196,23 @@ async function transcriptTest() {
     const location = await zarr.open(grids.resolve("location"), { kind: "array" });
     if (!location.is("number")) throw new Error("Expected location to be an array of numbers");
     const quality = await zarr.open(grids.resolve("quality_score"), { kind: "array" });
+    if (!quality.is("float32")) throw new Error("Expected quality_scores to be float32");
+    // let's do that quality filter - find indices where quality is above 30
+    const qualityData = await zarr.get(quality);
+    const highQualityIndices = Uint32Array.from(
+        Array.from(qualityData.data).map((q, i) => q <= qualityThreshold ? i : -1).filter(i => i !== -1)
+    );
+    // now let's get the locations for these indices
+    const locationData = await zarr.get(location);
+    const locations = Array.from(highQualityIndices).map(i => {
+        const x = locationData.data[i * 3];
+        const y = locationData.data[i * 3 + 1];
+        const z = locationData.data[i * 3 + 2];
+        const q = qualityData.data[i];
+        return { x, y, z, q };
+    });
     
-    return { grids };
+    return { locations };
 }
 
 export default function ZarritaSketch() {
