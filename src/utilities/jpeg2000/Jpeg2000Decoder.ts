@@ -64,7 +64,7 @@ export default class Jpeg2000Decoder extends BaseDecoder {
     private async getOpenJPEG(): Promise<OpenJpegModule> {
         if (!this.openjpeg) {
             try {
-                this.openjpeg = (await openJpegFactory as any)({
+                this.openjpeg = await openJpegFactory({
                     locateFile: (file: string) => {
                         if (file.endsWith(".wasm")) {
                             return openjpegWasm.href;
@@ -72,7 +72,7 @@ export default class Jpeg2000Decoder extends BaseDecoder {
                             return file;
                         }
                     },
-                }) as OpenJpegModule;
+                });
             } catch (error) {
                 console.warn("WASM version failed, JS version fallback not attempted:", error);
                 throw new Error("Failed to initialize OpenJPEG codec");
