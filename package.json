@@ -48,7 +48,6 @@
   "homepage": "https://github.com/Taylor-CCB-Group/MDV#readme",
   "dependencies": {
     "@babel/plugin-proposal-decorators": "^7.25.9",
-    "@cornerstonejs/codec-openjpeg": "^1.2.4",
     "@deck.gl-community/editable-layers": "^9.0.3",
     "@deck.gl-community/layers": "^9.0.3",
     "@dnd-kit/core": "^6.3.1",
