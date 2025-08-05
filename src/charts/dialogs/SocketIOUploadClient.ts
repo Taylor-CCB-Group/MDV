@@ -216,7 +216,7 @@ export class SocketIOUploadClient {
             // Connect to the specific namespace directly
             this.socket = io(`${this.config.serverUrl}${this.config.namespace}`, {
                 autoConnect: false,
-                transports: ['websocket', 'polling'],
+                transports: ['websocket'],
                 timeout: 60000,
             });
 
@@ -516,13 +516,18 @@ export class SocketIOUploadClient {
     }
 
     private async waitForUploadCompletion(): Promise<void> {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => { // Add reject
             const timeout = setTimeout(() => {
-                console.warn('Upload completion timeout, assuming complete');
-                resolve();
+                // FIX: Reject with an error
+                reject(new Error('Timeout: Server did not acknowledge upload completion. The connection was likely lost.'));
             }, 30000);
 
             const checkCompletion = () => {
+                if (this.cancelRequested) {
+                    clearTimeout(timeout);
+                    reject(new Error('Upload was cancelled.'));
+                    return;
+                }
                 if (this.uploadTransferComplete) {
                     clearTimeout(timeout);
                     resolve();
