@@ -186,18 +186,28 @@ async function test() {
 
 
 async function transcriptTest() {
+    const startTime = performance.now();
     const transcriptsStore = await zarr.tryWithConsolidated(ZipFileStore.fromUrl(`${url}/transcripts.zarr.zip`)) as zarr.Readable;
     // let's try to get the locations of all transcripts in the most zoomed out pyramid level, with a quality threshold
     const qualityThreshold = 10;
     const transcriptsRoot = await zarr.open(transcriptsStore);
     // todo get the grids & check the shape to find the most zoomed out level...
     // for now, cheating & hardcoding the path... in a spatial view, we'll need to resolve pyramid levels & locations properly
-    const grids = await zarr.open(transcriptsRoot.resolve("grids/6/0,0"), { kind: "group" });
-    const location = await zarr.open(grids.resolve("location"), { kind: "array" });
+    const smallestGrid = await zarr.open(transcriptsRoot.resolve("grids/6/0,0"), { kind: "group" });
+    // Description for root group attributes:
+    //??? where are these "root group attributes"?
+    // `fov_names` `list[str]` Names of the FOVs used in the dataset as referenced by the FOV indices (/grids/[grid_index]/[grid_position]/id).
+
+    // const fovNames = await zarr.open(transcriptsRoot.resolve("fov_names"), { kind: "array" });
+    // if (!fovNames.is("string")) throw new Error("Expected fov_names to be an array of strings");
+    // const fovNamesData = await zarr.get(fovNames);
+    // let's just log the fov names for now
+    // console.log("FOV Names:", fovNamesData.data);
+    const location = await zarr.open(smallestGrid.resolve("location"), { kind: "array" });
     if (!location.is("number")) throw new Error("Expected location to be an array of numbers");
-    const quality = await zarr.open(grids.resolve("quality_score"), { kind: "array" });
+    const quality = await zarr.open(smallestGrid.resolve("quality_score"), { kind: "array" });
     if (!quality.is("float32")) throw new Error("Expected quality_scores to be float32");
-    // let's do that quality filter - find indices where quality is above 30
+    // let's do that quality filter
     const qualityData = await zarr.get(quality);
     const highQualityIndices = Uint32Array.from(
         Array.from(qualityData.data).map((q, i) => q <= qualityThreshold ? i : -1).filter(i => i !== -1)
@@ -210,16 +220,42 @@ async function transcriptTest() {
         const z = locationData.data[i * 3 + 2];
         const q = qualityData.data[i];
         return { x, y, z, q };
-    });
+    }).sort((a, b) => a.q - b.q); // sort by quality score
+    const endTime = performance.now();
+    return { locations, time: endTime - startTime };
+}
+
+async function testMerfishSpatialData() {
+    // this only worked after I renamed `metadata` to `.metadata`???
+    const url = "http://localhost:8081/data.zarr/";
+    const store = new zarr.FetchStore(url);
+    const merfish = await zarr.tryWithConsolidated(store); //returns `any` according to lsp???
+    // const url = "http://localhost:8081/merfish.zip";
+    // const store = ZipFileStore.fromUrl(url);
+    // const merfish = await zarr.tryWithConsolidated(store) as zarr.AsyncReadable; //missing key /zarr.json
+    const root = await zarr.open(merfish, { kind: "group" });
     
-    return { locations };
+    return { root };
+}
+
+async function testXeniumS3() {
+    const url = "https://s3.embl.de/spatialdata/spatialdata-sandbox/xenium_rep2_io.zarr/";
+    const store = new zarr.FetchStore(url, {
+        overrides: {
+            mode: "cors"
+        }
+    });
+    const xenium = await zarr.tryWithConsolidated(store);
+    return { xenium };
+    // const root = await zarr.open(xenium);
 }
 
 export default function ZarritaSketch() {
     const url = "http://localhost:8080/";
     const [view, setView] = useState<any>();
     useEffect(() => {
-        transcriptTest().then(setView);
+        // transcriptTest().then(setView);
+        testMerfishSpatialData().then(setView);
     }, []); // url should be defined in the parent component
 
 
