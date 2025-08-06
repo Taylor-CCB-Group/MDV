@@ -49,7 +49,7 @@ def test_pandas_agent(project: MDVProject, question: str):
             room="test_room", 
             conversation_id="test_conversation",
             message=question,
-            handle_error=lambda e: print(f"Error: {e}")
+            handle_error=lambda error, **kwargs: print(f"Error: {error}")
         )
         
         # Run the query
@@ -79,7 +79,7 @@ def test_structured_approach(project: MDVProject, question: str):
             room="test_room",
             conversation_id="test_conversation", 
             message=question,
-            handle_error=lambda e: print(f"Error: {e}")
+            handle_error=lambda error, **kwargs: print(f"Error: {error}")
         )
         
         # Run the query
