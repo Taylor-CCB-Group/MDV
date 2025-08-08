@@ -8,7 +8,7 @@ def register_auth_routes(app):
     
 
     """
-    Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
+     Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
     with centralized and route-specific error handling.
     """
     print("Registering AUTH routes...")

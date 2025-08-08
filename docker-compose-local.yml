@@ -2,7 +2,7 @@ services:
   mdv_app:
     build:
      context: .
-    image: jayeshire/mdv-frontend:latest
+    image: jayeshire/mdv-frontend:rbac
     ports:
       - "5055:5055"
     volumes:
