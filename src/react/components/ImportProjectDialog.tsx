@@ -55,7 +55,7 @@ export type ImportProjectDialogProps = {
 };
 
 // Read the environment variable to determine the upload method
-const USE_SOCKETIO_UPLOAD = import.meta.env.USE_SOCKETIO_UPLOAD === 'true';
+const USE_SOCKETIO_UPLOAD = true; // Change to false to use HTTP upload
 
 const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [file, setFile] = useState<File | null>(null);
