@@ -216,8 +216,12 @@ export class SocketIOUploadClient {
             // Connect to the specific namespace directly
             this.socket = io(`${this.config.serverUrl}${this.config.namespace}`, {
                 autoConnect: false,
-                transports: ['websocket'],
+                transports: ['websocket', 'polling'],
                 timeout: 60000,
+                forceNew: true,
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 5,
             });
 
             this.setupSocketEventHandlers();
@@ -252,10 +256,18 @@ export class SocketIOUploadClient {
         });
     }
 
+
     private async queryUploadStatus(): Promise<boolean> {
         return new Promise((resolve) => {
             if (!this.socket) {
                 resolve(false);
+                return;
+            }
+
+            // Don't query if we're already in processing state
+            if (this.state.status === 'processing' && this.processingComplete === false) {
+                console.log('Already in processing state, skipping query');
+                resolve(true);
                 return;
             }
 
@@ -386,50 +398,84 @@ export class SocketIOUploadClient {
         this.socket.emit('upload_end', endMsg);
     }
 
-    private async waitForProcessing(): Promise<void> {
-        const timeout = 3600000; // 1 hour timeout
-        const startTime = Date.now();
-        let lastPingTime = Date.now();
-        const pingInterval = 30000; // 30 seconds
+private async waitForProcessing(): Promise<void> {
+    const timeout = 3600000; // 1 hour timeout
+    const startTime = Date.now();
+    let lastPingTime = Date.now();
+    const pingInterval = 30000; // 30 seconds
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
 
-        console.log('Waiting for processing completion...');
+    console.log('Waiting for processing completion...');
 
-        while (!this.shouldExitProcessingWait && !this.cancelRequested) {
-            const currentTime = Date.now();
+    while (!this.shouldExitProcessingWait && !this.cancelRequested) {
+        const currentTime = Date.now();
 
-            // Check timeout
-            if (currentTime - startTime > timeout) {
-                throw new Error('Timeout waiting for processing completion');
-            }
+        // Check timeout
+        if (currentTime - startTime > timeout) {
+            throw new Error('Timeout waiting for processing completion');
+        }
 
-            // Check connection
-            if (!this.socket?.connected) {
-                console.warn('Connection lost during processing wait');
-                // Try to reconnect once
+        // Check connection and handle reconnection
+        if (!this.socket?.connected) {
+            console.warn('Connection lost during processing wait');
+            
+            if (reconnectAttempts < maxReconnectAttempts) {
                 try {
-                    await this.connectToServer();
-                    if (this.socket?.connected) {
+                    console.log(`Attempting reconnection ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+                    
+                    // Disconnect old socket completely
+                    if (this.socket) {
+                        this.socket.disconnect();
+                        this.socket = null;
+                    }
+                    
+                    // Create new connection with preferred transport
+                    const connected = await this.connectToServer();
+                    if (connected) {
                         console.log('Reconnected successfully');
+                        reconnectAttempts = 0; // Reset on successful connection
+                        lastPingTime = currentTime; // Reset ping timer
+                        
+                        // Re-query status to get current processing state
+                        await this.queryUploadStatus();
+                    } else {
+                        reconnectAttempts++;
+                        console.warn(`Reconnection attempt ${reconnectAttempts} failed`);
+                        
+                        // Exponential backoff
+                        await new Promise(resolve => 
+                            setTimeout(resolve, Math.min(1000 * Math.pow(2, reconnectAttempts), 30000))
+                        );
                     }
                 } catch (error) {
-                    console.warn('Reconnection failed:', error);
+                    reconnectAttempts++;
+                    console.warn(`Reconnection failed:`, error);
+                    
+                    if (reconnectAttempts >= maxReconnectAttempts) {
+                        throw new Error(`Failed to reconnect after ${maxReconnectAttempts} attempts`);
+                    }
                 }
+            } else {
+                throw new Error(`Connection lost and failed to reconnect after ${maxReconnectAttempts} attempts`);
             }
-
-            // Send periodic pings
-            if (currentTime - lastPingTime > pingInterval && this.socket?.connected) {
-                try {
-                    this.socket.emit('ping', { message: 'keepalive' });
-                    lastPingTime = currentTime;
-                } catch (error) {
-                    console.warn('Failed to send keepalive ping:', error);
-                }
-            }
-
-            // Wait before next check
-            await new Promise(resolve => setTimeout(resolve, 1000));
         }
+
+        // Send periodic pings only when connected
+        if (this.socket?.connected && currentTime - lastPingTime > pingInterval) {
+            try {
+                this.socket.emit('ping', { message: 'keepalive', file_id: this.state.fileId });
+                lastPingTime = currentTime;
+                console.log('Sent keepalive ping');
+            } catch (error) {
+                console.warn('Failed to send keepalive ping:', error);
+            }
+        }
+
+        // Wait before next check
+        await new Promise(resolve => setTimeout(resolve, 1000));
     }
+}
 
     public async upload(): Promise<any> {
         try {
