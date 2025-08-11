@@ -24,7 +24,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 import { createSocketIOUpload, type SocketIOUploadClient } from "../../charts/dialogs/SocketIOUploadClient";
-
+import { ZipReader, BlobReader } from "@zip.js/zip.js";
 export const Loader = () => {
     return (
         <Box
@@ -74,53 +74,55 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [uploadClient, setUploadClient] = useState<SocketIOUploadClient | null>(null);
     
     const validateMDVProject = useCallback(async (file: File): Promise<{ isValid: boolean; error?: string }> => {
-        // nb, this is a mirror of the python code and not necessarily our final implementation
-        // but hopefully having something here will help us avoid support questions whenever users try to drop random incompatible zip files
         const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);
-        const findRootPrefix = (names: string[]): string | null => {
-            // Check if all required files are in the root of archive
-            const rootFiles = new Set(names.filter(n => !n.includes("/")).map(n => n.split("/").pop() || ""));
-            if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => rootFiles.has(file)).length) {
-                return "";
-            }
-            
-            // Check one level below if required files exist
-            const dirs = new Set(names.filter(n => n.includes("/")).map(n => n.split("/")[0]));
-            for (const dir of dirs) {
-                const filesInDir = new Set(
-                    names
-                        .filter(n => n.startsWith(`${dir}/`))
-                        .map(n => n.split("/").pop() || "")
-                );
-                if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => filesInDir.has(file)).length) {
-                    return `${dir}/`;
-                }
-            }
-            return null;
-        };
-
+        
         try {
-            // Dynamically import JSZip only when needed
-            const JSZip = (await import('jszip')).default;
-            const zip = new JSZip();
-            const zipContent = await zip.loadAsync(file);
+            const zipReader = new ZipReader(new BlobReader(file));
+            const entries = await zipReader.getEntries();
             
-            const fileNames = Object.keys(zipContent.files);
+            // Get just the filenames without loading file contents
+            const fileNames = entries.map(entry => entry.filename);
             
             // Reject entries with absolute paths or ".."
             const badEntries = fileNames.filter(n => n.startsWith("/") || n.startsWith("\\") || n.includes(".."));
             if (badEntries.length > 0) {
+                await zipReader.close();
                 return { isValid: false, error: "Invalid ZIP file: unsafe paths detected" };
             }
 
-            // Find the root directory of the mdv project
+            // Find the root directory of the mdv project (same logic as before)
+            const findRootPrefix = (names: string[]): string | null => {
+                // Check if all required files are in the root of archive
+                const rootFiles = new Set(names.filter(n => !n.includes("/")).map(n => n.split("/").pop() || ""));
+                if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => rootFiles.has(file)).length) {
+                    return "";
+                }
+                
+                // Check one level below if required files exist
+                const dirs = new Set(names.filter(n => n.includes("/")).map(n => n.split("/")[0]));
+                for (const dir of dirs) {
+                    const filesInDir = new Set(
+                        names
+                            .filter(n => n.startsWith(`${dir}/`))
+                            .map(n => n.split("/").pop() || "")
+                    );
+                    if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => filesInDir.has(file)).length) {
+                        return `${dir}/`;
+                    }
+                }
+                return null;
+            };
+
             const root = findRootPrefix(fileNames);
+            await zipReader.close();
+            
             if (root === null) {
                 return { isValid: false, error: "Not a valid MDV project: missing required files (views.json, state.json, datasources.json)" };
             }
 
             return { isValid: true };
         } catch (error) {
+            console.error('ZIP validation error:', error);
             return { isValid: false, error: "Failed to read ZIP file contents" };
         }
     }, []);
@@ -146,12 +148,12 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         onDrop,
         multiple: false,
         accept: { "application/zip": [".zip"] },
-        maxSize: 2000 * 1024 * 1024,
+        maxSize: 20000 * 1024 * 1024,
     });
 
     const rejectionMessage =
         fileRejections.length > 0
-            ? "Only ZIP files are allowed under 2 GB. Please try again."
+            ? "Only ZIP files are allowed under 20 GB. Please try again."
             : validationError
             ? validationError
             : "Drag and drop a file here or click the button below (only MDV project archive *.zip files are allowed)";
