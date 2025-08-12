@@ -9,7 +9,7 @@ def register_auth_routes(app):
     from mdvtools.auth.authutils import get_auth_provider
     
     """
-    Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
+     Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
     with centralized and route-specific error handling.
     """
     logger.info("Registering AUTH routes...")
