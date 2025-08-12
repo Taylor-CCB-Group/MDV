@@ -1,5 +1,6 @@
 import time
 import logging
+import re
 from contextlib import contextmanager
 import os
 import traceback
@@ -250,11 +251,12 @@ class ProjectChat(ProjectChatProtocol):
         # New fixes:
         python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
 
-        # Step 2: Define Contextualization Chain
+        # Step 3: Define Contextualization Chain
         contextualize_q_system_prompt = """Given a chat history and the latest user question \
         which might reference context in the chat history, formulate a standalone question \
         which can be understood without the chat history. Do NOT answer the question, \
-        just reformulate it if needed and otherwise return it as is."""
+        just reformulate it if needed and otherwise return it as is. \
+        """
 
         contextualize_prompt = ChatPromptTemplate.from_messages([
             ("system", contextualize_q_system_prompt),
@@ -269,7 +271,8 @@ class ProjectChat(ProjectChatProtocol):
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
         Use these to correct the column names mentioned by the user.
-        If you need to check their structure, use `df.info()` or `df.head()`. 
+        You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
+        Use `df.info()` or `df.index()`.
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
         prompt = ChatPromptTemplate.from_messages([
@@ -431,13 +434,16 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 progress += 60
 
+                match = re.search(r'charts\s+(.*)', response['output'])
+                charts_part = match.group(1) if match else response['output']
+
                 qa_chain = RetrievalQA.from_llm(
                     llm=code_llm, 
                     prompt=prompt_RAG_template, 
                     retriever=retriever,
                     return_source_documents=True,
                 )
-                output_qa = qa_chain.invoke({"query": response['input']})
+                output_qa = qa_chain.invoke({"query": charts_part})
                 result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time

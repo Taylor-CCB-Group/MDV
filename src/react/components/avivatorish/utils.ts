@@ -17,6 +17,9 @@ import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
 import { isArray } from "@/lib/utils";
 import type { OME_TIFF, PixelSource } from "./state";
 
+// Import and register JPEG2000 decoder
+import "@/utilities/jpeg2000/Jpeg2000Decoder";
+
 const MAX_CHANNELS_FOR_SNACKBAR_WARNING = 40;
 
 /**

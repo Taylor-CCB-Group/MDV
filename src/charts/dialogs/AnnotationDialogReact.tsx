@@ -19,11 +19,22 @@ function TagView({
     dataStore,
     columnName,
 }: { dataStore: DataStore; columnName: string }) {
-    const tagModel = useMemo(
-        () => new TagModel(dataStore, columnName),
-        [dataStore, columnName],
-    );
+    const [tagModel, setTagModel] = useState<TagModel | null>(null);
+
     useEffect(() => {
+        let isMounted = true;
+        TagModel.create(dataStore, columnName).then(model => {
+            if (isMounted) {
+                setTagModel(model);
+            }
+        });
+        return () => {
+            isMounted = false;
+        };
+    }, [dataStore, columnName]);
+
+    useEffect(() => {
+        if (!tagModel) return;
         const listener = tagModel.addListener(() => {
             console.log("tagModel changed");
             setTagList(tagModel.getTags());
@@ -40,11 +51,15 @@ function TagView({
     }, [tagModel]);
 
     const [tagList, setTagList] = useState(
-        tagModel.isReady ? tagModel.getTags() : new Set<string>(),
+        tagModel?.isReady ? tagModel.getTags() : new Set<string>(),
     );
     const [tagsInSelection, setTagsInSelection] = useState(
-        tagModel.isReady ? tagModel.getTagsInSelection() : new Set<string>(),
+        tagModel?.isReady ? tagModel.getTagsInSelection() : new Set<string>(),
     );
+
+    if (!tagModel) {
+        return <div>Loading tags...</div>;
+    }
 
     return (
         <>
@@ -97,20 +112,16 @@ function TagView({
                 }}
                 // getOptionLabel={o => typeof o === "string" ? o : o.tag}
                 // getOptionLabel={o => o}
-                renderOption={(props, tag, { selected }) => {
-                    const { key, ...optionProps } = props as typeof props & {
-                        key: string;
-                    }; //questionable mui types?
+                renderOption={(props, option, { selected }) => {
                     const indeterminate =
-                        !tagModel.entireSelectionHasTag(tag) &&
-                        tagsInSelection.has(tag);
+                        !tagModel.entireSelectionHasTag(option) &&
+                        tagsInSelection.has(option);
                     return (
                         <li
-                            key={key}
-                            {...optionProps}
+                            {...props}
                             onClick={() => {
-                                if (indeterminate) tagModel.setTag(tag, true);
-                                else tagModel.setTag(tag, !selected);
+                                if (indeterminate) tagModel.setTag(option, true);
+                                else tagModel.setTag(option, !selected);
                             }}
                         >
                             <Checkbox
@@ -119,21 +130,27 @@ function TagView({
                                 style={{ marginRight: 8 }}
                                 // checked={option.inSelection === 'entire'}
                                 // indeterminate={option.inSelection === 'partial'}
-                                checked={tagModel.entireSelectionHasTag(tag)}
+                                checked={tagModel.entireSelectionHasTag(option)}
                                 indeterminate={indeterminate}
                             />
-                            {tag}
+                            {option}
                         </li>
                     );
                 }}
-                renderTags={(tagValue, getTagValues) => {
-                    //seems to be a material-ui bug with not properly handling key / props...
-                    //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
-                    return tagValue.map((option, index) => {
-                        const { key, ...tagValues } = getTagValues({ index });
-                        return <Chip key={key} {...tagValues} label={option} />;
-                    });
-                }}
+                renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                        <Chip
+                            {...getTagProps({ index })}
+                            key={option}
+                            label={option}
+                            // className={
+                            //     tagModel.entireSelectionHasTag(option)
+                            //         ? ""
+                            //         : "indeterminate"
+                            // }
+                        />
+                    ))
+                }
             />
         </>
     );
