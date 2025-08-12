@@ -4,6 +4,7 @@ import {
     Save as SaveIcon,
     SaveAs as SaveAsIcon,
     Add as AddIcon,
+    AddLink as AddLinkIcon,
     Remove as RemoveIcon,
     CloudUpload as CloudUploadIcon,
     PestControl as PestControlIcon,
@@ -13,6 +14,7 @@ import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
 import FileUploadDialogReact from "@/charts/dialogs/FileUploadDialogWrapper";
+import ZarrMetadataDialog from "@/charts/dialogs/zarrStream/ZarrMetadataDialogWrapper";
 import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
 import BaseChart from "@/charts/BaseChart";
 import { useProject } from "@/modules/ProjectContext";
@@ -59,6 +61,10 @@ const MenuBarComponent = () => {
 
     const handleAddDataSourceClick = () => {
         new FileUploadDialogReact();
+    };
+
+    const handleAddRemoteDataSourceClick = () => {
+        new ZarrMetadataDialog();
     };
 
     const handleDebugButtonClick = async () => {
@@ -125,9 +131,14 @@ const MenuBarComponent = () => {
                             </>
                         )}
                         {config.permission === "edit" && (
-                            <IconWithTooltip tooltipText="Add Datasource" onClick={handleAddDataSourceClick}>
-                                <CloudUploadIcon />
-                            </IconWithTooltip>
+                            <>
+                                <IconWithTooltip tooltipText="Add Datasource" onClick={handleAddDataSourceClick}>
+                                    <CloudUploadIcon />
+                                </IconWithTooltip>
+                                <IconWithTooltip tooltipText="Add Remote Datasource" onClick={handleAddRemoteDataSourceClick}>
+                                    <AddLinkIcon />
+                                </IconWithTooltip>
+                            </>
                         )}
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center" }}>
