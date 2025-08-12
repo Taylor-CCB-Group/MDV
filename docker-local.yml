@@ -8,12 +8,17 @@ services:
     volumes:
       #- ./python:/app/python
       - mdv-data:/app/mdv
-      - ./app_logs:/app/logs
+      #- ./app_logs:/app/logs
     env_file:
       - .env  # Load environment variables from the .env file
     depends_on:
       - mdv_db
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
   mdv_db:
     image: postgres:16
     volumes:
