@@ -142,7 +142,7 @@ check_docker_installed
 check_docker_daemon
 
 # Create app_logs directory if it doesn't exist
-mkdir -p app_logs && echo "Ensured app_logs directory exists."
+#mkdir -p app_logs && echo "Ensured app_logs directory exists."
 
 create_or_validate_env_file
 
