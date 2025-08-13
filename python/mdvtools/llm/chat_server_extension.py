@@ -100,7 +100,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
                 markdown = create_error_markdown(error_message, traceback_str, extra_metadata)
                 logger.error(f"Chat error: {markdown}")
-                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, error=True)
+                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, None, error=True)
                 socketio.emit(
                     "chat_error",
                     {"message": markdown},

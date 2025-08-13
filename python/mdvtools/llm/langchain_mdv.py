@@ -482,9 +482,35 @@ class ProjectChat(ProjectChatProtocol):
                 log(f"view_name: {view_name}")
                 
             with time_block("b16: Log chat item"):
-                final_code_updated = f"I ran some code for you:\n\n```python\n{final_code}\n```"
+                context_information = output_qa['source_documents']
+                context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+                context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+                context_information_metadata_name = [s for s in context_information_metadata_url]
+                context = str(context_information_metadata_name)
+                context_files = (
+                    "<br><br>"
+                    "The context used to generate the above code has been augmented by the following files:\n\n"
+                    + "\n".join(f"- {name}" for name in context_information_metadata_name)
+                    + "\n\n"
+                )
+                final_code_updated = (
+                    "I ran some code for you:\n\n"
+                    "```python\n"
+                    f"{final_code}\n"
+                    "```\n\n"
+                    f"{context_files}"
+                )
                 # Log successful code execution
-                log_chat_item(self.project, question, output_qa, prompt_RAG, final_code_updated, conversation_id, view_name)
+                log_chat_item(
+                    project=self.project, 
+                    question=question, 
+                    output=output_qa, 
+                    prompt_template=prompt_RAG, 
+                    response=final_code_updated, 
+                    conversation_id=conversation_id, 
+                    context=context, 
+                    view_name=view_name
+                )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0
