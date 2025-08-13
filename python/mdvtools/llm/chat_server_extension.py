@@ -88,6 +88,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
             message = data.get("message")
             id = data.get("id")
+            conversation_id = data.get("conversation_id")
             room = f"{sid}_{id}"
             join_room(room)
             def handle_error(error: Union[str, Exception], *, extra_metadata: Optional[dict] = None):
@@ -111,7 +112,6 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 handle_error("Missing 'message' or 'id' in request JSON")
                 leave_room(room)
                 return
-            conversation_id = data.get("conversation_id")
             chat_request = ChatRequest(
                 message=message,
                 id=id,

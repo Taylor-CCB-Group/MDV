@@ -290,8 +290,11 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         prompt_template = prompt_template or ""
         
 
+    # Ensure context is always a non-optional string for ChatLogItem
+    context_str: str = context if context is not None else "[]"
+
     chat_item = ChatLogItem(
-        context=context,
+        context=context_str,
         query=question,
         prompt_template=prompt_template,
         response=response,
