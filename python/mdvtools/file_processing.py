@@ -90,7 +90,7 @@ def anndata_processing(project, filepath, original_filename):
         
     except Exception as e:
         print(f"Error in anndata_processing: {str(e)}")
-        raise ValidationError(str(e), status_code=400)
+        raise ValidationError(str(e), status_code=400) from e
 
 def mdv_project_processing(app, projects_base_dir, filepath, original_filename, project_name=None):
     """
