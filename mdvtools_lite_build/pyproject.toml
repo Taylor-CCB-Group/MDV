@@ -39,6 +39,9 @@ dependencies = [
 [tool.hatch.build]
 directory = "./dist"
 
+[project.scripts]
+mdvtools = "mdvtools.cli:cli"
+
 [tool.hatch.build.targets.wheel.force-include]
 "../python/mdvtools/mdvproject.py" = "mdvtools/mdvproject.py"
 "../python/mdvtools/__init__.py" = "mdvtools/__init__.py"
@@ -50,6 +53,8 @@ directory = "./dist"
 "../python/mdvtools/static"="mdvtools/static"
 "../python/mdvtools/templates"="mdvtools/templates"
 "../python/mdvtools/chart_prototypes.py" = "mdvtools/chart_prototypes.py"
+"../python/mdvtools/logging_config.py"="mdvtools/logging_config.py"
+"../python/mdvtools/cli.py"="mdvtools/cli.py"
 
 
 

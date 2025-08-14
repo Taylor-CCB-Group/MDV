@@ -27,7 +27,6 @@ import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
 from mdvtools.logging_config import get_logger
-from mdvtools.server_extension import MDVServerOptions
 
 logger = get_logger(__name__)
 
