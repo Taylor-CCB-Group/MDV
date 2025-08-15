@@ -4,7 +4,7 @@ import mudata as mu
 import shutil
 import zipfile
 import os
-from os.path import exists, join
+from os.path import exists, join, basename
 from .conversions import convert_scanpy_to_mdv, convert_mudata_to_mdv, convert_vcf_to_mdv
 
 def zip_and_remove(folder):
@@ -42,10 +42,17 @@ def cli():
 @click.option('--add_layer_data', is_flag=True, default=True, help='Add layer data (log values etc.).')
 @click.option('--gene_identifier_column', default=None, help='Gene column for identification.')
 @click.option('--zip', 'zip_output', is_flag=True, help='Zip the output folder and delete the original.')
-def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column, zip_output):
+@click.option('--chatmdv', is_flag=True, help='Include the original Scanpy .h5ad file in the zipped project.')
+def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column, zip_output, chatmdv):
     """Convert Scanpy AnnData object to MDV format."""
     adata = sc.read_h5ad(scanpy_object)
     convert_scanpy_to_mdv(folder, adata, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column)
+
+    if chatmdv:
+        dest_path = os.path.join(folder, basename(scanpy_object))
+        shutil.copy(scanpy_object, dest_path)
+        click.echo(f"Included original scanpy file: {dest_path}")
+
     if zip_output:
         zip_and_remove(folder)
 
