@@ -1,4 +1,6 @@
 import click
+import scanpy as sc
+import mudata as mu
 from os.path import exists,join
 from .conversions import convert_scanpy_to_mdv, convert_mudata_to_mdv, convert_vcf_to_mdv
 
@@ -18,7 +20,8 @@ def cli():
 @click.option('--gene_identifier_column', default=None, help='Gene column for identification.')
 def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column):
     """Convert Scanpy AnnData object to MDV format."""
-    convert_scanpy_to_mdv(folder, scanpy_object, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column)
+    adata = sc.read_h5ad(scanpy_object)
+    convert_scanpy_to_mdv(folder, adata, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column)
 
 @cli.command()
 @click.argument('folder')
@@ -28,7 +31,8 @@ def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, chun
 @click.option('--chunk_data', is_flag=True, help='Transpose and flatten in chunks to save memory.')
 def convert_mudata(folder, mudata_object, max_dims, delete_existing, chunk_data):
     """Convert MuData object to MDV format."""
-    convert_mudata_to_mdv(folder, mudata_object, max_dims, delete_existing, chunk_data)
+    mdata = mu.read(mudata_object)
+    convert_mudata_to_mdv(folder, mdata, max_dims, delete_existing, chunk_data)
 
 @cli.command()
 @click.argument('folder')
