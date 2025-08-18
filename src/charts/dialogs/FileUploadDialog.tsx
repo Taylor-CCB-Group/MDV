@@ -1090,20 +1090,17 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         }, []);
 
         const handleClose = useCallback(async () => {
-            // ADD THIS GUARD CLAUSE
             if (state.isUploading || state.isInserting) {
-                return; // Do nothing if an upload or processing is active
-            }
-
-            // Cancel SocketIO upload if it exists (only relevant if not uploading)
-            if (state.socketioClient) {
-                state.socketioClient.cancel();
+                if (state.socketioClient) {
+                    state.socketioClient.cancel();
+                }
+                // Note: HTTP upload cancellation is not implemented.
             }
             
             dispatch({ type: "SET_FILE_SUMMARY", payload: null });
             onResize(450, 320);
             onClose();
-        }, [onClose, onResize, state.socketioClient, state.isUploading, state.isInserting]); // Add the new state dependencies
+        }, [onClose, onResize, state.socketioClient, state.isUploading, state.isInserting]);
 
         const handleCombineConfirm = async (label: string) => {
             if (!state.conflictData) return;
@@ -1544,11 +1541,8 @@ const Wrapper = (props: Omit<FileUploadDialogComponentProps, 'onLoadingStateChan
     const [isLoading, setIsLoading] = useState(false);
 
     const handleClose = () => {
-        // Only allow close if not loading
-        if (!isLoading) {
-            setOpen(false);
-            props.onClose();
-        }
+        setOpen(false);
+        props.onClose();
     };
     
     return (
