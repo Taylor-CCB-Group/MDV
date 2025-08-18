@@ -286,7 +286,7 @@ const DEFAULT_REDUCER_STATE = {
     tiffMetadata: null as unknown,
     h5Metadata: null as H5Metadata | unknown,
     showReplaceDialog: false,
-    conflictData: null as { tempFolder: string } | null,
+    conflictData: null as { temp_folder: string } | null,
     uploadMethod: USE_SOCKETIO_UPLOAD ? 'socketio' : 'http' as 'http' | 'socketio',
     socketioClient: null as SocketIOUploadClient | null,
 } as const;
@@ -934,7 +934,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     dispatch({
                         type: "SET_CONFLICT_DATA",
                         payload: {
-                            AnndataConflictDialog,
                             temp_folder: error.response.data.temp_folder,
                         },
                     });
