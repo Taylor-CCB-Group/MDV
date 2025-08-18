@@ -102,7 +102,7 @@ create_or_validate_env_file() {
     read -p "Enable Chat? (y/n): " enable_chat
     if [[ "$enable_chat" == "y" ]]; then
       echo "ENABLE_CHAT=1"
-      echo "$(prompt_variable "OPENAI_API_KEY" true)"
+      echo "$(prompt_variable "OPENAI_API_KEY" false)"
     else
       echo "ENABLE_CHAT=0"
     fi
