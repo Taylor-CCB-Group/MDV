@@ -101,10 +101,10 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [uploadClient, setUploadClient] = useState<SocketIOUploadClient | null>(null);
     
     const validateMDVProject = useCallback(async (file: File): Promise<{ isValid: boolean; error?: string }> => {
-        let zipReader: ZipReader | null = null;
+        let zipReader: ZipReader<Blob> | null = null;
         
         try {
-            zipReader = new ZipReader(new BlobReader(file));
+            zipReader = new ZipReader<Blob>(new BlobReader(file));
             const entries = await zipReader.getEntries();
             
             // Get just the filenames without loading file contents
@@ -303,10 +303,10 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
 
     return (
         <>
-            <Dialog open={open} onClose={!isLoading ? onClose : undefined} fullWidth>
+            <Dialog open={open} onClose={onClose} fullWidth>
                 <DialogTitle>
                     Import Project
-                    <DialogCloseIconButton onClose={onClose} disabled={isLoading} />
+                    <DialogCloseIconButton onClose={onClose} />
                 </DialogTitle>
                 <DialogContent dividers>
                     {isLoading ? (
@@ -353,7 +353,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onClose} disabled={isLoading}>Close</Button>
+                    <Button onClick={onClose}>Close</Button>
                 </DialogActions>
             </Dialog>
             {error && (
