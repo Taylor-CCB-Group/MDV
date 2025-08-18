@@ -244,6 +244,9 @@ class FileUploadManager:
     def queue_file_for_processing(self, state: Dict, sid: Optional[str], namespace: str) -> None:
         """Queue the file for background processing."""
         file_id = state.get('file_id')
+        if not file_id:
+            upload_log("Cannot queue file: file_id is missing from state")
+            return
         current_status = state.get('status')
 
         if current_status not in ['completed', 'queued', 'processing']:
@@ -282,9 +285,8 @@ class FileUploadManager:
                 sid = processing_info['sid']
                 namespace = processing_info['namespace']
                 file_id = state.get('file_id')
-                if not file_id:
-                    upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
-                    continue
+                # This should never happen if queue_file_for_processing validates properly
+                assert file_id, f"file_id missing from queued state: {state}"
                 project_id = state.get('project_id')
                 
                 # Get project from global projects map
@@ -298,10 +300,10 @@ class FileUploadManager:
                         upload_log(f"Processing project creation upload: {file_id}")
                         # This is handled in the processing logic below
                     else:
-                        if file_id:  # Only save state if we have a valid file_id
-                            state['status'] = 'error'
-                            state['error_message'] = f"Project {project_id} not found"
-                            self._save_upload_state(file_id, state)
+                        # file_id is guaranteed to exist due to assertion above
+                        state['status'] = 'error'
+                        state['error_message'] = f"Project {project_id} not found"
+                        self._save_upload_state(file_id, state)
                         self.socketio.emit('upload_error', {
                             'file_id': file_id, 'message': state['error_message']
                         }, namespace=namespace)
@@ -309,9 +311,7 @@ class FileUploadManager:
 
                 upload_log(f"Processing file: {file_id} for project {project_id}")
                 state['status'] = 'processing'
-                if not file_id:
-                    upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
-                    continue
+                # file_id is guaranteed to exist due to assertion above
                 self._save_upload_state(file_id, state)
                 self.socketio.emit('upload_processing', {
                     'file_id': file_id, 'message': 'File processing started'
@@ -381,13 +381,14 @@ class FileUploadManager:
                     upload_log(f"Error processing file {file_id}: {str(e)}")
                     state['status'] = 'error'
                     state['error_message'] = f"Processing error: {str(e)}"
-                    if not file_id:
-                        upload_log(f"CRITICAL: file_id is missing from state in _process_queue. State: {state}")
-                        continue
+                    # file_id is guaranteed to exist due to assertion above
                     self._save_upload_state(file_id, state)
-                    self.socketio.emit('upload_error', {
-                        'file_id': file_id, 'message': f"Processing error: {str(e)}"
-                    }, namespace=namespace)
+                    try:
+                        self.socketio.emit('upload_error', {
+                            'file_id': file_id, 'message': f"Processing error: {str(e)}"
+                        }, namespace=namespace)
+                    except Exception as emit_error:
+                        upload_log(f"Failed to emit error for {file_id}: {emit_error}")
             else:
                 time.sleep(1.0)
 
