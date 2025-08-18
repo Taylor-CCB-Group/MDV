@@ -41,7 +41,7 @@ export const Loader = () => {
     );
 };
 
-const ProgressBar = ({ value, max }: { value: number; max: string }) => (
+const ProgressBar = ({ value, max }: { value: number; max: number }) => (
     <progress
         className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded"
         value={value}
@@ -304,7 +304,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                             <p className="text-lg font-bold text-[#333] dark:text-white text-center">
                                 Your project is being uploaded, please wait...
                             </p>
-                            <ProgressBar value={progress} max="100" />
+                            <ProgressBar value={progress} max={100} />
                         </div>
                     ) : (
                         <Container>
