@@ -25,6 +25,33 @@ import { useDropzone } from "react-dropzone";
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 import { createSocketIOUpload, type SocketIOUploadClient } from "../../charts/dialogs/SocketIOUploadClient";
 import { ZipReader, BlobReader } from "@zip.js/zip.js";
+
+// Constants moved to module level to avoid recreation
+const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);
+
+// Helper function moved outside component for better organization
+const findRootPrefix = (names: string[]): string | null => {
+    // Check if all required files are in the root of archive
+    const rootFiles = new Set(names.filter(n => !n.includes("/")).map(n => n.split("/").pop() || ""));
+    if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => rootFiles.has(file)).length) {
+        return "";
+    }
+    
+    // Check one level below if required files exist
+    const dirs = new Set(names.filter(n => n.includes("/")).map(n => n.split("/")[0]));
+    for (const dir of dirs) {
+        const filesInDir = new Set(
+            names
+                .filter(n => n.startsWith(`${dir}/`))
+                .map(n => n.split("/").pop() || "")
+        );
+        if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => filesInDir.has(file)).length) {
+            return `${dir}/`;
+        }
+    }
+    return null;
+};
+
 export const Loader = () => {
     return (
         <Box
@@ -74,10 +101,10 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [uploadClient, setUploadClient] = useState<SocketIOUploadClient | null>(null);
     
     const validateMDVProject = useCallback(async (file: File): Promise<{ isValid: boolean; error?: string }> => {
-        const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);
+        let zipReader: ZipReader | null = null;
         
         try {
-            const zipReader = new ZipReader(new BlobReader(file));
+            zipReader = new ZipReader(new BlobReader(file));
             const entries = await zipReader.getEntries();
             
             // Get just the filenames without loading file contents
@@ -86,35 +113,10 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
             // Reject entries with absolute paths or ".."
             const badEntries = fileNames.filter(n => n.startsWith("/") || n.startsWith("\\") || n.includes(".."));
             if (badEntries.length > 0) {
-                await zipReader.close();
                 return { isValid: false, error: "Invalid ZIP file: unsafe paths detected" };
             }
 
-            // Find the root directory of the mdv project (same logic as before)
-            const findRootPrefix = (names: string[]): string | null => {
-                // Check if all required files are in the root of archive
-                const rootFiles = new Set(names.filter(n => !n.includes("/")).map(n => n.split("/").pop() || ""));
-                if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => rootFiles.has(file)).length) {
-                    return "";
-                }
-                
-                // Check one level below if required files exist
-                const dirs = new Set(names.filter(n => n.includes("/")).map(n => n.split("/")[0]));
-                for (const dir of dirs) {
-                    const filesInDir = new Set(
-                        names
-                            .filter(n => n.startsWith(`${dir}/`))
-                            .map(n => n.split("/").pop() || "")
-                    );
-                    if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => filesInDir.has(file)).length) {
-                        return `${dir}/`;
-                    }
-                }
-                return null;
-            };
-
             const root = findRootPrefix(fileNames);
-            await zipReader.close();
             
             if (root === null) {
                 return { isValid: false, error: "Not a valid MDV project: missing required files (views.json, state.json, datasources.json)" };
@@ -124,6 +126,14 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         } catch (error) {
             console.error('ZIP validation error:', error);
             return { isValid: false, error: "Failed to read ZIP file contents" };
+        } finally {
+            if (zipReader) {
+                try {
+                    await zipReader.close();
+                } catch (closeError) {
+                    console.warn('Failed to close ZIP reader:', closeError);
+                }
+            }
         }
     }, []);
 
