@@ -1,5 +1,6 @@
 from mdvtools.mdvproject import MDVProject
 from typing import Any
+from mdvtools.llm.markdown_utils import create_project_markdown, create_column_markdown
 prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
@@ -102,8 +103,18 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
     Handles both standard and gene-related queries.
     """
+    # Build markdown context for the selected datasource; fall back to whole project if needed
+    try:
+        ds_meta = project.get_datasource_metadata(datasource_name)
+        context_md = f"## **{datasource_name}:** ({ds_meta['size']} rows)\n\n" + create_column_markdown(ds_meta["columns"])
+    except Exception:
+        context_md = create_project_markdown(project)
     prompt_RAG = (
     """
+    Project Data Context:
+
+    """ + context_md + """
+
     Context: {context}
 
     The provided scripts demonstrate how to generate various data visualizations using the `mdvtools` library in Python.
@@ -190,7 +201,10 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - Wordcloud: Requires one categorical column.
     Output format: Only return the python code that is to be run to generate the charts.
 
-    
+    Always include a text box in the Viewto explain why this chart is the best way to answer the question and what is the biological insight.
+
+
+
 """
     )
     return prompt_RAG
