@@ -41,7 +41,7 @@ create_or_validate_env_file() {
     if [ "$hide_value" == "true" ]; then
         # Hide input (silent mode)
         read -s -p "Enter value for $var_name [$default_value]: " new_value
-        echo "" # Move to the next line after input
+        echo "" >&2 # Move to the next line after input
     else
         # Show input with default value suggestion
         read -p "Enter value for $var_name [$default_value]: " new_value
