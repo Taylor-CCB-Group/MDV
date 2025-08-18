@@ -40,23 +40,23 @@ create_or_validate_env_file() {
 
     if [ "$hide_value" == "true" ]; then
         # Hide input (silent mode)
-        read -s -p "Enter value for $var_name [$current_value]: " new_value
-        echo  # Move to the next line after input
+        read -s -p "Enter value for $var_name [$default_value]: " new_value
+        echo "" # Move to the next line after input
     else
         # Show input with default value suggestion
-        read -p "Enter value for $var_name [$current_value]: " new_value
-        echo  # Move to the next line after input
+        read -p "Enter value for $var_name [$default_value]: " new_value
+        echo "" # Move to the next line after input
     fi
 
-    new_value=${new_value:-$current_value}  # Use the new value or fallback to the current value
+    new_value=${new_value:-$default_value}  # Use the new value or fallback to the current value
     echo "$var_name=$new_value"  # Return the value assignment (not the value alone)
   }
 
 
   # Capture the output of prompt_variable and extract the values
-  DB_USER=$(prompt_variable "DB_USER" false | cut -d'=' -f2 | tr -d '\n' | xargs)
-  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true | cut -d'=' -f2 | tr -d '\n' | xargs)
-  DB_NAME=$(prompt_variable "DB_NAME" false | cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_USER=$(prompt_variable "DB_USER" false "testuser"| cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true "testpass"| cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_NAME=$(prompt_variable "DB_NAME" false "testdb"| cut -d'=' -f2 | tr -d '\n' | xargs)
 
 
   # Set PostgreSQL variables
@@ -97,6 +97,14 @@ create_or_validate_env_file() {
       echo "$(prompt_variable "SHIBBOLETH_LOGOUT_URL" false)"
     else
       echo "ENABLE_AUTH=0"
+    fi
+    # Chat
+    read -p "Enable Chat? (y/n): " enable_chat
+    if [[ "$enable_chat" == "y" ]]; then
+      echo "ENABLE_CHAT=1"
+      echo "$(prompt_variable "OPENAI_API_KEY" true)"
+    else
+      echo "ENABLE_CHAT=0"
     fi
   } > "$env_file"
 
