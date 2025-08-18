@@ -300,7 +300,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                 </DialogTitle>
                 <DialogContent dividers>
                     {isLoading ? (
-                        <div className="flex flex-col justify-center items-center w-full h-40 dark:bg-#333">
+                        <div className="flex flex-col justify-center items-center w-full h-40 dark:bg-[#333]">
                             <p className="text-lg font-bold text-[#333] dark:text-white text-center">
                                 Your project is being uploaded, please wait...
                             </p>
