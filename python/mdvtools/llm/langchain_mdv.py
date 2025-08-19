@@ -422,7 +422,7 @@ class ProjectChat(ProjectChatProtocol):
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
                 prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], response['input'])
-                chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
+                chat_debug_logger.info(f"=== RAG Base Prompt (before context injection) ===\n{prompt_RAG}\n=== End Base Prompt ===")
 
                 prompt_RAG_template = PromptTemplate(
                      template=prompt_RAG,
@@ -444,6 +444,11 @@ class ProjectChat(ProjectChatProtocol):
                     return_source_documents=True,
                 )
                 output_qa = qa_chain.invoke({"query": charts_part})
+                # Log the complete prompt after context injection
+                if "source_documents" in output_qa:
+                    retrieved_context = "\n".join(doc.page_content for doc in output_qa["source_documents"])
+                    complete_prompt = prompt_RAG_template.format(context=retrieved_context, question=charts_part)
+                    chat_debug_logger.info(f"=== Complete RAG Prompt (with injected context) ===\n{complete_prompt}\n=== End Complete Prompt ===")
                 result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time
@@ -482,15 +487,20 @@ class ProjectChat(ProjectChatProtocol):
                 log(f"view_name: {view_name}")
                 
             with time_block("b16: Log chat item"):
-                final_code_updated = f"I ran some code for you:\n\n```python\n{final_code}\n```"
+                # Get the explanation from the LLM's response
+                explanation = output_qa["result"]
+                
+                # Combine code and explanation in the response
+                final_response = f"I ran some code for you:\n\n```python\n{final_code}\n```\n\n{explanation}"
+                
                 # Log successful code execution
-                log_chat_item(self.project, question, output_qa, prompt_RAG, final_code_updated, conversation_id, view_name)
-                log(final_code_updated)
+                log_chat_item(self.project, question, output_qa, prompt_RAG, final_response, conversation_id, view_name)
+                log(final_response)
                 socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return {"code": final_code_updated, "view_name": view_name, "error": False, "message": "Success"}
+                return {"code": final_response, "view_name": view_name, "error": False, "message": "Success"}
         except Exception as e:
             # Log general error
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
