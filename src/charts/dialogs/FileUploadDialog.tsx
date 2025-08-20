@@ -371,6 +371,7 @@ export interface FileUploadDialogComponentProps {
     onClose: () => void;
     onResize: (width: number, height: number) => void;
     onLoadingStateChange: (isLoading: boolean) => void;
+    socketioClientRef?: (client: SocketIOUploadClient | null) => void;
 }
 
 // Define supported file types and their configurations
@@ -494,7 +495,7 @@ const useFileUploadProgress = () => {
 //todo figure out why type inference is failing with observer if we take out the `React.FC<...>` here
 //also - are we actually observing anything here? not that it particularly matters (apart from type inference, apparently)
 const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
-    observer(({ onClose, onResize, onLoadingStateChange }: FileUploadDialogComponentProps) => {
+    observer(({ onClose, onResize, onLoadingStateChange, socketioClientRef }: FileUploadDialogComponentProps) => {
         const { root, projectName, chartManager } = useProject();
 
         const [selectedOption, setSelectedOption] = useState<string | null>(
@@ -544,6 +545,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         useEffect(() => {
             onLoadingStateChange(state.isUploading || state.isInserting);
         }, [state.isUploading, state.isInserting, onLoadingStateChange]);
+
+        useEffect(() => {
+            if (socketioClientRef) {
+                socketioClientRef(state.socketioClient);
+            }
+        }, [state.socketioClient, socketioClientRef]);
 
         const viewerStore = useViewerStoreApi();
 
@@ -1089,17 +1096,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         }, []);
 
         const handleClose = useCallback(async () => {
-            if (state.isUploading || state.isInserting) {
-                if (state.socketioClient) {
-                    state.socketioClient.cancel();
-                }
-                // Note: HTTP upload cancellation is not implemented.
+            if (state.socketioClient) {
+                state.socketioClient.cancel();
             }
             
             dispatch({ type: "SET_FILE_SUMMARY", payload: null });
             onResize(450, 320);
             onClose();
-        }, [onClose, onResize, state.socketioClient, state.isUploading, state.isInserting]);
+        }, [onClose, onResize, state.socketioClient]);
 
         const handleCombineConfirm = async (label: string) => {
             if (!state.conflictData) return;
@@ -1535,11 +1539,15 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         );
     });
 
-const Wrapper = (props: Omit<FileUploadDialogComponentProps, 'onLoadingStateChange'>) => {
+const Wrapper = (props: Omit<FileUploadDialogComponentProps, 'onLoadingStateChange' | 'socketioClientRef'>) => {
     const [open, setOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
+    const [socketioClient, setSocketioClient] = useState<SocketIOUploadClient | null>(null);
 
     const handleClose = () => {
+        if (socketioClient) {
+            socketioClient.cancel();
+        }
         setOpen(false);
         props.onClose();
     };
@@ -1553,7 +1561,8 @@ const Wrapper = (props: Omit<FileUploadDialogComponentProps, 'onLoadingStateChan
                 <FileUploadDialogComponent 
                     {...props} 
                     onClose={handleClose} 
-                    onLoadingStateChange={setIsLoading} 
+                    onLoadingStateChange={setIsLoading}
+                    socketioClientRef={setSocketioClient}
                 />
             } 
         />
