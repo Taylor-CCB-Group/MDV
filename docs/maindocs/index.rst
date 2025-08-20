@@ -26,7 +26,7 @@ API Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: JS/TS API (External link):
+   :caption: JavaScript/TypeScript API (External link):
 
    JS/TS API Reference <https://oceanus.cmd.ox.ac.uk/public/mdv/typedoc/index.html>
 
