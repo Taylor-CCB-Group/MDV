@@ -59,7 +59,7 @@ check_existing_service() {
     echo -e "${RED}✗ Error: Existing Docker containers, volumes, or networks detected.${NC}"
     echo -e "${YELLOW}To remove them safely, run the following command:${NC}"
     echo
-    echo -e "${BLUE}docker rm -f \$(docker ps -aq) && docker volume rm \$(docker volume ls -q) && docker network prune -f${NC}"
+    echo -e "${BLUE}docker ps -aq | xargs -r docker rm -f && docker volume ls -q | xargs -r docker volume rm && docker network prune -f${NC}"
     echo
     exit 1
   else
