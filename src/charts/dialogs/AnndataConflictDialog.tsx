@@ -112,9 +112,8 @@ const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
                     </Box>
 
                     <Alert severity="info" className="mt-4">
-                        This will preserve your existing data, while adding new
-                        datasources with your chosen prefix (columns will not be
-                        merged, these will be distinct, separate, datasources).
+                        This will preserve your existing data while adding the
+                        new sources with your chosen prefix.
                     </Alert>
                 </Box>
             </DialogContent>
