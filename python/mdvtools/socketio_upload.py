@@ -326,6 +326,11 @@ class FileUploadManager:
                         project = _upload_projects_map.get(project_id)
                         if not project:
                             raise Exception(f"Project {project_id} not found")
+                        
+                        # Copy the CSV file to the project directory before processing
+                        project_csv_path = os.path.join(project.dir, state['original_filename'])
+                        shutil.copy2(state['data_filepath'], project_csv_path)
+                        upload_log(f"Copied CSV file to project directory: {project_csv_path}")
                             
                         with self.app.app_context():
                             result = datasource_processing(
@@ -342,6 +347,11 @@ class FileUploadManager:
                         project = _upload_projects_map.get(project_id)
                         if not project:
                             raise Exception(f"Project {project_id} not found")
+                            
+                        # Copy the h5ad file to the project directory before processing
+                        project_h5ad_path = os.path.join(project.dir, state['original_filename'])
+                        shutil.copy2(state['data_filepath'], project_h5ad_path)
+                        upload_log(f"Copied h5ad file to project directory: {project_h5ad_path}")
                             
                         with self.app.app_context():
                             result = anndata_processing(
