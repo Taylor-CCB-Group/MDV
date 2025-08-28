@@ -17,7 +17,7 @@ from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
 from mdvtools.dbutils.server_options import get_server_options_for_db_projects
-# this shouldn't be necessary in future
+#this shouldn't be necessary in future
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
 
