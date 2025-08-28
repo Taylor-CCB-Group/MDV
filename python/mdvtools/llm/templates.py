@@ -152,7 +152,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         If to answer the question requires a subset of the data or filtering the data, make sure to:
         - Add a selection dialog plot with all the parameters that were passed on as params. Make sure it has a title.
 
-    8. Your Task:
+    8. Always add a selection dialog plot along the other charts. It must have all the parameters that were passed on as params. It must have a title.
+
+    9. Your Task:
         - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+final_answer+"""
         - Use the fields in the """+final_answer+""" as params appropriately:
             - Wrap only gene names as shown.
