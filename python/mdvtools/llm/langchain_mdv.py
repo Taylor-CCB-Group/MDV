@@ -4,6 +4,7 @@ import re
 from contextlib import contextmanager
 import os
 import traceback
+import html
 from typing import List
 
 # Code Generation using Retrieval Augmented Generation + LangChain
@@ -498,7 +499,8 @@ class ProjectChat(ProjectChatProtocol):
                 context_files = (
                     "<br><br>"
                     "The context used to generate the above code has been augmented by the following files:\n\n"
-                    + "\n".join(f"- {name}" for name in context_information_metadata_name)
+                    # Prevent XSS by adding html.escape (Suggested by coderabbit)
+                    + "\n".join(f"- `{html.escape(name)}`" for name in context_information_metadata_name)
                     + "\n\n"
                 )
                 final_code_updated = (
@@ -507,7 +509,7 @@ class ProjectChat(ProjectChatProtocol):
                     f"{final_code}\n"
                     "```\n\n"
                     "<br><br>"
-                    f"{explanation}"
+                    f"{html.escape(explanation)}"
                     "\n\n"
                     f"{context_files}"
                 )
