@@ -32,7 +32,7 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import parse_view_name, prepare_code
+from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
@@ -487,8 +487,9 @@ class ProjectChat(ProjectChatProtocol):
                 log(f"view_name: {view_name}")
                 
             with time_block("b16: Log chat item"):
-                 # Get the explanation from the LLM's response
-                explanation = output_qa["result"]
+                 # Extract the explanation section from the LLM's response (removing code blocks)
+                explanation = extract_explanation_from_response(output_qa["result"])
+                # Extract the context information from the response
                 context_information = output_qa['source_documents']
                 context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
                 context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
@@ -505,6 +506,7 @@ class ProjectChat(ProjectChatProtocol):
                     "```python\n"
                     f"{final_code}\n"
                     "```\n\n"
+                    "<br><br>"
                     f"{explanation}"
                     "\n\n"
                     f"{context_files}"
@@ -525,7 +527,7 @@ class ProjectChat(ProjectChatProtocol):
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return {"code": final_response, "view_name": view_name, "error": False, "message": "Success"}
+                return {"code": final_code_updated, "view_name": view_name, "error": False, "message": "Success"}
         except Exception as e:
             # Log general error
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
