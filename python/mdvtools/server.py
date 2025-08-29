@@ -30,6 +30,7 @@ from typing import Optional
 import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
+from mdvtools.socketio_upload import initialize_socketio_upload, register_project_for_upload
 from mdvtools.server_extension import MDVServerOptions
 from mdvtools.logging_config import get_logger
 
@@ -96,6 +97,13 @@ def create_app(
     #     raise Exception(
     #         "Route already exists - can't have two projects with the same name"
     #     )
+
+        # SocketIO upload initialization
+        initialize_socketio_upload(app)
+        register_project_for_upload(project.id, project)
+
+
+
     routes.add(route)
 
     for extension in options.extensions:

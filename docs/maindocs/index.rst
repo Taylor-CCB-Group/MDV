@@ -3,19 +3,32 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to MDV's documentation
-==========================================
+Welcome to MDV's Documentation
+=================================
 
+MDV (Multi-Dimensional Visualization) is a powerful platform for interactive data visualization and analysis.
+
+Overview
+--------
+
+This documentation provides comprehensive guides and API references for both Python and JavaScript/TypeScript development with MDV.
+
+API Documentation
+-----------------
 
 .. toctree::
-   :maxdepth: 3
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Python API:
 
-      User Docs <userdocs/index.md>
-      Developer Docs <devdocs/index.rst>
-   
+   Python API Reference <../autoapi/mdvtools/index>
 
+|
 
+.. toctree::
+   :maxdepth: 1
+   :caption: JavaScript/TypeScript API (External link):
+
+   JS/TS API Reference <https://oceanus.cmd.ox.ac.uk/public/mdv/typedoc/index.html>
 
 
 ..

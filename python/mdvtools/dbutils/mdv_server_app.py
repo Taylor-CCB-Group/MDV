@@ -17,7 +17,7 @@ from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
 from mdvtools.dbutils.server_options import get_server_options_for_db_projects
-# this shouldn't be necessary in future
+#this shouldn't be necessary in future
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
 
@@ -436,6 +436,7 @@ def serve_projects_from_filesystem(app, base_dir):
                     logger.info(f"Added project to DB: {new_project}")
 
                     # Rename directory to use project ID as folder name
+                    """
                     project_id_str = str(new_project.id)
                     desired_path = os.path.join(app.config["projects_base_dir"], project_id_str)
 
@@ -455,7 +456,7 @@ def serve_projects_from_filesystem(app, base_dir):
 
                         except Exception as rename_error:
                             logger.exception(f"Failed to rename project directory or update DB for project ID {new_project.id}: {rename_error}")
-
+                    """
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:

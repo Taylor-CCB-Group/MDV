@@ -1,18 +1,69 @@
 #!/bin/bash
 
-# Function to check if Docker is installed
-check_docker_installed() {
-  if ! command -v docker &> /dev/null; then
-    echo "Error: Docker is not installed. Please install Docker before running this script."
-    exit 1
-  fi
+# MDV Cross-Platform Setup Script
+# Compatible with Windows WSL, macOS, and Linux
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logo
+echo -e "${BLUE}"
+echo "  __  __  _____   __      __"
+echo " |  \/  | |  __ \ \ \    / /"
+echo " | \  / | | |  | | \ \  / / "
+echo " | |\/| | | |  | |  \ \/ /  "
+echo " | |  | | | |__| |   \  /   "
+echo " |_|  |_| |_____/     \/    "
+echo ""
+echo "Multi-Dimensional Viewer Setup"
+echo -e "${NC}"
+
+# Check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+# Docker checks
+check_docker() {
+    echo -e "${BLUE}Checking Docker installation...${NC}"
+    
+    if ! command_exists docker; then
+        echo -e "${RED}Error: Docker is not installed.${NC}"
+        exit 1
+    fi
+    
+    if ! docker info >/dev/null 2>&1; then
+        echo -e "${RED}Error: Docker daemon is not running.${NC}"
+        exit 1
+    fi
+    
+    if ! command_exists docker-compose && ! docker compose version >/dev/null 2>&1; then
+        echo -e "${RED}Error: Docker Compose is not available.${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓ Docker is properly installed and running${NC}"
 }
 
-# Function to check if Docker daemon is running
-check_docker_daemon() {
-  if ! docker info &> /dev/null; then
-    echo "Error: Docker daemon is not running. Please start Docker before running this script."
+# Function to check for existing Docker containers, volumes, or networks
+check_existing_service() {
+  existing_containers=$(docker ps -aq)
+  existing_volumes=$(docker volume ls -q)
+  
+  if [[ -n "$existing_containers" || -n "$existing_volumes" ]]; then
+    echo -e "${RED}✗ Error: Existing Docker containers, volumes, or networks detected.${NC}"
+    echo -e "${YELLOW}To remove them safely, run the following command:${NC}"
+    echo
+    echo -e "${BLUE}docker ps -aq | xargs -r docker rm -f && docker volume ls -q | xargs -r docker volume rm && docker network prune -f${NC}"
+    echo
     exit 1
+  else
+    echo -e "${GREEN}✓ No conflicting Docker containers, volumes, or networks found${NC}"
   fi
 }
 
@@ -40,23 +91,23 @@ create_or_validate_env_file() {
 
     if [ "$hide_value" == "true" ]; then
         # Hide input (silent mode)
-        read -s -p "Enter value for $var_name [$current_value]: " new_value
-        echo  # Move to the next line after input
+        read -s -p "Enter value for $var_name [$default_value]: " new_value
+        echo "" >&2 # Move to the next line after input
     else
         # Show input with default value suggestion
-        read -p "Enter value for $var_name [$current_value]: " new_value
-        echo  # Move to the next line after input
+        read -p "Enter value for $var_name [$default_value]: " new_value
+        echo "" # Move to the next line after input
     fi
 
-    new_value=${new_value:-$current_value}  # Use the new value or fallback to the current value
+    new_value=${new_value:-$default_value}  # Use the new value or fallback to the current value
     echo "$var_name=$new_value"  # Return the value assignment (not the value alone)
   }
 
 
   # Capture the output of prompt_variable and extract the values
-  DB_USER=$(prompt_variable "DB_USER" false | cut -d'=' -f2 | tr -d '\n' | xargs)
-  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true | cut -d'=' -f2 | tr -d '\n' | xargs)
-  DB_NAME=$(prompt_variable "DB_NAME" false | cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_USER=$(prompt_variable "DB_USER" false "testuser"| cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true "testpass"| cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_NAME=$(prompt_variable "DB_NAME" false "testdb"| cut -d'=' -f2 | tr -d '\n' | xargs)
 
 
   # Set PostgreSQL variables
@@ -98,9 +149,17 @@ create_or_validate_env_file() {
     else
       echo "ENABLE_AUTH=0"
     fi
+    # Chat
+    read -p "Enable Chat? (y/n): " enable_chat
+    if [[ "$enable_chat" == "y" ]]; then
+      echo "ENABLE_CHAT=1"
+      echo "$(prompt_variable "OPENAI_API_KEY" false)"
+    else
+      echo "ENABLE_CHAT=0"
+    fi
   } > "$env_file"
 
-  echo "Environment variables updated and saved to $env_file."
+  echo -e "${GREEN}✓ Environment variables updated and saved to $env_file."
 }
 
 # Function to download and run Docker Compose
@@ -111,7 +170,7 @@ run_docker_compose() {
   if [ ! -f "$compose_file" ]; then
     echo "Downloading $compose_file..."
     if ! curl -O "$compose_url"; then
-      echo "Error: Failed to download $compose_file."
+      echo -e "${RED} Error: Failed to download $compose_file."
       exit 1
     fi
   fi
@@ -121,25 +180,25 @@ run_docker_compose() {
 
   echo "Starting Docker Compose..."
   docker compose -f "$compose_file" up -d || {
-    echo "Error: Failed to start Docker Compose."
+    echo -e "${RED} Error: Failed to start Docker Compose."
     exit 1
   }
 
-  echo "Docker Compose started successfully!"
+  echo -e "${GREEN}✓ Docker Compose started successfully!"
 }
 
 # Function to open the application in the browser
 open_browser() {
   URL="http://localhost:5055"
-  echo "Application deployed successfully!"
-  echo "Open $URL in your browser."
+  echo -e "${GREEN}✓ Application deployed successfully!"
+  echo -e "${GREEN} Open $URL in your browser."
 }
 
 # Main Execution
 echo "Starting MDV Deployment..."
 
-check_docker_installed
-check_docker_daemon
+check_docker
+check_existing_service
 
 # Create app_logs directory if it doesn't exist
 #mkdir -p app_logs && echo "Ensured app_logs directory exists."

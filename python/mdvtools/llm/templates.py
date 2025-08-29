@@ -1,5 +1,6 @@
 from mdvtools.mdvproject import MDVProject
 from typing import Any
+from mdvtools.llm.markdown_utils import create_project_markdown, create_column_markdown
 prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
@@ -102,8 +103,18 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
     Handles both standard and gene-related queries.
     """
+    # Build markdown context for the selected datasource; fall back to whole project if needed
+    try:
+        ds_meta = project.get_datasource_metadata(datasource_name)
+        context_md = f"## **{datasource_name}:** ({ds_meta['size']} rows)\n\n" + create_column_markdown(ds_meta["columns"])
+    except Exception:
+        context_md = create_project_markdown(project)
     prompt_RAG = (
     """
+    Project Data Context:
+
+    """ + context_md + """
+
     Context: {context}
 
     The provided scripts demonstrate how to generate various data visualizations using the `mdvtools` library in Python.
@@ -152,7 +163,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         If to answer the question requires a subset of the data or filtering the data, make sure to:
         - Add a selection dialog plot with all the parameters that were passed on as params. Make sure it has a title.
 
-    8. Your Task:
+    8. Always add a selection dialog plot along the other charts. It must have all the parameters that were passed on as params. It must have a title.
+
+    9. Your Task:
         - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+final_answer+"""
         - Use the fields in the """+final_answer+""" as params appropriately:
             - Wrap only gene names as shown.
@@ -185,12 +198,20 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - Stacked row chart: Requires two categorical columns.  
                 - If only one categorical variable is available, use it twice.  
             - Table Plot: Requires any column(s).  
-            - Text box: Requires no columns, just text.  
+            - Text box plot: Requires no columns, just text.  
             - Violin plot: Requires only one categorical column and one numerical column.  
             - Wordcloud: Requires one categorical column.
     Output format: Only return the python code that is to be run to generate the charts.
 
-    
+    After generating the code, include a detailed explanation in your response that covers:
+    1. Why this chart is the best way to answer the question
+    2. What biological insights can be gained from this visualization
+    3. What subsequent analysis tasks could be performed based on these results
+
+    The explanation will be displayed in the chat window automatically.
+
+
+
 """
     )
     return prompt_RAG
