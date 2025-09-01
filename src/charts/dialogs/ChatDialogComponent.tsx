@@ -136,7 +136,7 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
             ))} */}
 
             {/* Show suggested questions only for the welcome message (sender: 'system') */}
-            {sender === 'system' && (
+            {sender === 'system' && suggestedQuestions.length > 0 && (
                 <SuggestedQuestions suggestedQuestions={suggestedQuestions} onSelect={updateInput} />
             )}
             

@@ -88,6 +88,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
             message = data.get("message")
             id = data.get("id")
+            conversation_id = data.get("conversation_id")
             room = f"{sid}_{id}"
             join_room(room)
             def handle_error(error: Union[str, Exception], *, extra_metadata: Optional[dict] = None):
@@ -100,7 +101,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
                 markdown = create_error_markdown(error_message, traceback_str, extra_metadata)
                 logger.error(f"Chat error: {markdown}")
-                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, error=True)
+                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, None, error=True)
                 socketio.emit(
                     "chat_error",
                     {"message": markdown},
@@ -111,7 +112,6 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 handle_error("Missing 'message' or 'id' in request JSON")
                 leave_room(room)
                 return
-            conversation_id = data.get("conversation_id")
             chat_request = ChatRequest(
                 message=message,
                 id=id,

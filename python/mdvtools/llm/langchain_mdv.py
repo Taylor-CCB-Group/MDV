@@ -4,6 +4,7 @@ import re
 from contextlib import contextmanager
 import os
 import traceback
+import html
 from typing import List
 
 # Code Generation using Retrieval Augmented Generation + LangChain
@@ -32,7 +33,7 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import parse_view_name, prepare_code
+from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
@@ -487,20 +488,48 @@ class ProjectChat(ProjectChatProtocol):
                 log(f"view_name: {view_name}")
                 
             with time_block("b16: Log chat item"):
-                # Get the explanation from the LLM's response
-                explanation = output_qa["result"]
-                
-                # Combine code and explanation in the response
-                final_response = f"I ran some code for you:\n\n```python\n{final_code}\n```\n\n{explanation}"
-                
+                 # Extract the explanation section from the LLM's response (removing code blocks)
+                explanation = extract_explanation_from_response(output_qa["result"])
+                # Extract the context information from the response
+                context_information = output_qa['source_documents']
+                context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+                context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+                context_information_metadata_name = [s for s in context_information_metadata_url]
+                context = str(context_information_metadata_name)
+                context_files = (
+                    "<br><br>"
+                    "The context used to generate the above code has been augmented by the following files:\n\n"
+                    # Prevent XSS by adding html.escape (Suggested by coderabbit)
+                    + "\n".join(f"- `{html.escape(name)}`" for name in context_information_metadata_name)
+                    + "\n\n"
+                )
+                final_code_updated = (
+                    "I ran some code for you:\n\n"
+                    "```python\n"
+                    f"{final_code}\n"
+                    "```\n\n"
+                    "<br><br>"
+                    f"{html.escape(explanation)}"
+                    "\n\n"
+                    f"{context_files}"
+                )
                 # Log successful code execution
-                log_chat_item(self.project, question, output_qa, prompt_RAG, final_response, conversation_id, view_name)
-                log(final_response)
+                log_chat_item(
+                    project=self.project, 
+                    question=question, 
+                    output=output_qa, 
+                    prompt_template=prompt_RAG, 
+                    response=final_code_updated, 
+                    conversation_id=conversation_id, 
+                    context=context, 
+                    view_name=view_name
+                )
+                log(final_code_updated)
                 socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return {"code": final_response, "view_name": view_name, "error": False, "message": "Success"}
+                return {"code": final_code_updated, "view_name": view_name, "error": False, "message": "Success"}
         except Exception as e:
             # Log general error
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
