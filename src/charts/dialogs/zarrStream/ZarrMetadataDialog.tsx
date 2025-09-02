@@ -285,77 +285,34 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
         const { root } = useProject();
         const [state, dispatch] = useReducer(reducer, DEFAULT_REDUCER_STATE);
 
-        // Mock function to simulate zarr metadata fetching
-        // Replace this with actual zarr-js implementation
+        // Fetch zarr metadata from backend API
         const fetchZarrMetadata = async (url: string): Promise<ZarrMetadata> => {
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            const apiUrl = `${root}/zarr/metadata?url=${encodeURIComponent(url)}`;
             
-            // Mock data structure based on Xenium dataset
-            return {
-                datasetStructure: {
-                    groups: ["images", "labels", "tables"],
-                    arrays: ["images/tissue_image", "labels/nuclei_segmentation", "tables/my_ann_data"]
+            console.log('ZarrMetadataDialog DEBUG:');
+            console.log('- root:', root);
+            console.log('- constructed apiUrl:', apiUrl);
+            console.log('- zarr url parameter:', url);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
-                spatialData: {
-                    coordinateSystems: {
-                        "global": {
-                            "axes": ["x", "y"],
-                            "units": ["micrometer", "micrometer"]
-                        }
-                    },
-                    elements: {
-                        "tissue_image": "image",
-                        "nuclei_segmentation": "labels",
-                        "my_ann_data": "table"
-                    },
-                    transformations: []
-                },
-                images: {
-                    "tissue_image": {
-                        shape: [4096, 4096, 3],
-                        dtype: "uint8",
-                        chunks: [512, 512, 3],
-                        dimensions: ["y", "x", "c"],
-                        physicalSizeX: 0.2125,
-                        physicalSizeY: 0.2125,
-                        units: "micrometer",
-                        channels: ["Red", "Green", "Blue"]
-                    }
-                },
-                tables: {
-                    "my_ann_data": {
-                        shape: [156432, 541],
-                        obsNames: ["cell_001", "cell_002", "cell_003"],
-                        varNames: ["GAPDH", "ACTB", "MYC"],
-                        observations: {
-                            "cell_type": "string",
-                            "total_counts": "float64",
-                            "n_genes_by_counts": "int64"
-                        },
-                        variables: {
-                            "gene_symbol": "string",
-                            "highly_variable": "bool",
-                            "mean": "float64"
-                        },
-                        embeddings: ["X_umap", "X_pca"]
-                    }
-                },
-                labels: {
-                    "nuclei_segmentation": {
-                        shape: [4096, 4096],
-                        dtype: "uint32",
-                        labelValues: [0, 1, 2, 3],
-                        categories: ["background", "nucleus"]
-                    }
-                },
-                groupAttributes: {
-                    "created_by": "spatialdata-io",
-                    "version": "0.1.0",
-                    "experiment_type": "Xenium",
-                    "organism": "Homo sapiens"
-                }
-            };
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to fetch metadata');
+            }
+
+            return data.metadata;
         };
 
         const handleUrlChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -377,21 +334,10 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
             dispatch({ type: "SET_ERROR", payload: null });
 
             try {
-                let transformedUrl = state.url.trim();
-
-                // Match EMBL Zarr URLs and transform them for the local proxy
-                if (transformedUrl.startsWith("https://s3.embl.de/spatialdata/")) {
-                    const subpath = transformedUrl.replace("https://s3.embl.de/spatialdata/", "");
-                    transformedUrl = `${window.location.origin}/zarr_proxy/${subpath}`;
-                } else if (transformedUrl.startsWith('/zarr_proxy/')) {
-                    transformedUrl = `${window.location.origin}${transformedUrl}`;
-                }
+                const zarrUrl = state.url.trim();
                 
-                // For debugging, you can keep this, but it's not needed for the final logic.
-                // await debugExploreZarrDataset(transformedUrl);
-
-                // Call the primary extraction function. It has its own internal fallback.
-                const metadata = await extractZarrMetadata(transformedUrl);
+                // Call backend API to fetch metadata
+                const metadata = await fetchZarrMetadata(zarrUrl);
 
                 if (!metadata) {
                     throw new Error("Metadata could not be extracted.");
@@ -438,6 +384,15 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
 
             const { metadata } = state;
             const attrs = metadata.groupAttributes;
+            
+            // Extract data from different groups
+            const cellsAttrs = attrs.cells || {};
+            const transcriptsAttrs = attrs.transcripts || {};
+            const analysisAttrs = attrs.analysis || {};
+            const rootAttrs = { ...attrs };
+            delete rootAttrs.cells;
+            delete rootAttrs.transcripts;
+            delete rootAttrs.analysis;
 
             return (
                 <div className="w-full max-h-[600px] overflow-y-auto">
@@ -448,93 +403,225 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                             <MetadataCard title="Dataset URL">
                                 <span className="font-mono text-xs break-all">{state.url}</span>
                             </MetadataCard>
-                            <MetadataCard title="Dataset Info">
+                            <MetadataCard title="Zarr Structure">
                                 <div className="space-y-1 text-xs">
-                                    <div><strong>Name:</strong> {attrs.name || 'Unknown'}</div>
-                                    <div><strong>Version:</strong> {attrs.major_version}.{attrs.minor_version}</div>
-                                    <div><strong>UUID:</strong> {attrs.dataset_uuid?.slice(0, 8)}...</div>
-                                    <div><strong>Format:</strong> {attrs.data_format}</div>
+                                    <div><strong>Groups:</strong> {metadata.datasetStructure.groups.length}</div>
+                                    <div><strong>Arrays:</strong> {metadata.datasetStructure.arrays.length}</div>
+                                    <div><strong>Format:</strong> Zarr v2</div>
                                 </div>
                             </MetadataCard>
-                            <MetadataCard title="Spatial Info">
+                            <MetadataCard title="Data Tables">
                                 <div className="space-y-1 text-xs">
-                                    <div><strong>Units:</strong> {attrs.spatial_units}</div>
-                                    <div><strong>Coordinate Space:</strong> {attrs.coordinate_space}</div>
-                                    <div><strong>FOV Count:</strong> {attrs.fov_names?.length || 0}</div>
-                                </div>
-                            </MetadataCard>
-                        </MetadataGrid>
-                    </MetadataContainer>
-
-                    {/* Transcripts Data */}
-                    <MetadataContainer>
-                        <SectionHeader icon={<TableIcon />}>Transcript Data</SectionHeader>
-                        <MetadataGrid>
-                            <MetadataCard title="RNA Counts">
-                                <div className="space-y-1 text-xs">
-                                    <div><strong>Total RNAs:</strong> {attrs.number_rnas?.toLocaleString() || 'Unknown'}</div>
-                                    <div><strong>Total Genes:</strong> {attrs.number_genes?.toLocaleString() || 'Unknown'}</div>
-                                    <div><strong>Codewords:</strong> {attrs.codeword_count?.toLocaleString() || 'Unknown'}</div>
-                                </div>
-                            </MetadataCard>
-                            <MetadataCard title="Gene Categories">
-                                <div className="space-y-1 text-xs">
-                                    {attrs.codeword_gene_names && (
-                                        <>
-                                            <div><strong>Target Genes:</strong> {attrs.codeword_gene_names.filter((name: string) => !name.startsWith('NegControl') && !name.startsWith('UnassignedCodeword')).length}</div>
-                                            <div><strong>Negative Controls:</strong> {attrs.codeword_gene_names.filter((name: string) => name.startsWith('NegControl')).length}</div>
-                                            <div><strong>Unassigned:</strong> {attrs.codeword_gene_names.filter((name: string) => name.startsWith('UnassignedCodeword')).length}</div>
-                                        </>
+                                    {Object.keys(metadata.tables || {}).length > 0 ? (
+                                        Object.entries(metadata.tables || {}).map(([name, info]: [string, any]) => (
+                                            <div key={name}>
+                                                <strong>{name}:</strong> {info.shape?.join(' × ') || 'Unknown shape'}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-gray-500">No table data found</div>
                                     )}
-                                </div>
-                            </MetadataCard>
-                            <MetadataCard title="Fields of View">
-                                <div className="space-y-1 text-xs max-h-20 overflow-y-auto">
-                                    {attrs.fov_names?.slice(0, 10).map((fov: string) => (
-                                        <div key={fov} className="font-mono text-xs">{fov}</div>
-                                    ))}
-                                    {attrs.fov_names?.length > 10 && <div className="text-gray-500">...and {attrs.fov_names.length - 10} more</div>}
                                 </div>
                             </MetadataCard>
                         </MetadataGrid>
                         
-                        {/* Sample Genes */}
-                        {attrs.gene_names && (
+                        {/* Discovered Groups */}
+                        {metadata.datasetStructure.groups.length > 0 && (
                             <div className="mt-4">
-                                <h5 className="font-medium text-sm mb-2">Sample Target Genes</h5>
-                                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs">
-                                    {attrs.gene_names.filter((name: string) => !name.startsWith('NegControl') && !name.startsWith('UnassignedCodeword')).slice(0, 18).map((gene: string) => (
-                                        <div key={gene} className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-center">{gene}</div>
+                                <h5 className="font-medium text-sm mb-2">Discovered Zarr Groups</h5>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                    {metadata.datasetStructure.groups.map((group: string) => (
+                                        <div key={group} className="bg-blue-50 dark:bg-blue-900 px-3 py-2 rounded text-xs font-mono text-center">
+                                            {group}
+                                        </div>
                                     ))}
                                 </div>
-                                {attrs.gene_names.length > 18 && (
-                                    <div className="text-xs text-gray-500 mt-2">
-                                        Showing 18 of {attrs.gene_names.filter((name: string) => !name.startsWith('NegControl') && !name.startsWith('UnassignedCodeword')).length} target genes
-                                    </div>
-                                )}
+                            </div>
+                        )}
+
+                        {/* Discovered Arrays */}
+                        {metadata.datasetStructure.arrays.length > 0 && (
+                            <div className="mt-4">
+                                <h5 className="font-medium text-sm mb-2">Discovered Zarr Arrays</h5>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {metadata.datasetStructure.arrays.map((array: string) => (
+                                        <div key={array} className="bg-green-50 dark:bg-green-900 px-3 py-2 rounded">
+                                            <div className="font-mono text-xs font-semibold">{array}</div>
+                                            {metadata.tables?.[array.split('/').pop() || ''] && (
+                                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                                    Shape: {metadata.tables[array.split('/').pop() || ''].shape?.join(' × ')} | 
+                                                    Type: {metadata.tables[array.split('/').pop() || ''].dtype}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </MetadataContainer>
 
-                    {/* Raw Structure Explorer */}
-                    {metadata.rawStructure && (
+                    {/* Cell Data Section */}
+                    {Object.keys(cellsAttrs).length > 0 && (
                         <MetadataContainer>
-                            <SectionHeader icon={<FolderIcon />}>Zarr Structure</SectionHeader>
-                            <div className="space-y-2">
-                                <div className="text-sm">
-                                    <strong>Groups:</strong> {metadata.datasetStructure.groups.length} | <strong>Arrays:</strong> {metadata.datasetStructure.arrays.length}
-                                </div>
-                                {metadata.datasetStructure.groups.length === 0 && metadata.datasetStructure.arrays.length === 0 && (
-                                    <div className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                                        This appears to be a root-level Zarr group with metadata only. The subdirectories (codeword_category, density, gene_category, grids) were not accessible as Zarr arrays or groups.
+                            <SectionHeader icon={<TableIcon />}>Cell Data (cells.zarr)</SectionHeader>
+                            <MetadataGrid>
+                                <MetadataCard title="Cell Arrays">
+                                    <div className="space-y-1 text-xs">
+                                        {metadata.datasetStructure.arrays
+                                            .filter((arr: string) => arr.startsWith('cells.zarr/'))
+                                            .map((arr: string) => (
+                                                <div key={arr} className="font-mono">{arr.replace('cells.zarr/', '')}</div>
+                                            ))
+                                        }
                                     </div>
-                                )}
-                                {Object.keys(attrs).length > 0 && (
-                                    <div>
-                                        <h5 className="font-medium text-sm mb-2">Root Attributes ({Object.keys(attrs).length} total)</h5>
-                                        <DataTable data={Object.fromEntries(Object.entries(attrs).filter(([key, value]) => 
-                                            !['codeword_gene_mapping', 'codeword_gene_names', 'gene_names', 'gene_index_map', 'fov_names'].includes(key)
-                                        ).slice(0, 10))} maxRows={10} />
+                                </MetadataCard>
+                                <MetadataCard title="Cell Attributes">
+                                    <div className="space-y-1 text-xs">
+                                        {Object.entries(cellsAttrs).slice(0, 5).map(([key, value]) => (
+                                            <div key={key}>
+                                                <strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) + '...' : String(value)}
+                                            </div>
+                                        ))}
+                                        {Object.keys(cellsAttrs).length > 5 && (
+                                            <div className="text-gray-500">...and {Object.keys(cellsAttrs).length - 5} more</div>
+                                        )}
+                                    </div>
+                                </MetadataCard>
+                            </MetadataGrid>
+                        </MetadataContainer>
+                    )}
+
+                    {/* Transcript Data Section */}
+                    {Object.keys(transcriptsAttrs).length > 0 && (
+                        <MetadataContainer>
+                            <SectionHeader icon={<TableIcon />}>Transcript Data (transcripts.zarr)</SectionHeader>
+                            <MetadataGrid>
+                                <MetadataCard title="RNA Counts">
+                                    <div className="space-y-1 text-xs">
+                                        <div><strong>Total RNAs:</strong> {transcriptsAttrs.number_rnas?.toLocaleString() || 'Unknown'}</div>
+                                        <div><strong>Total Genes:</strong> {transcriptsAttrs.number_genes?.toLocaleString() || 'Unknown'}</div>
+                                        <div><strong>Codewords:</strong> {transcriptsAttrs.codeword_count?.toLocaleString() || 'Unknown'}</div>
+                                    </div>
+                                </MetadataCard>
+                                <MetadataCard title="Gene Categories">
+                                    <div className="space-y-1 text-xs">
+                                        {transcriptsAttrs.codeword_gene_names && (
+                                            <>
+                                                <div><strong>Target Genes:</strong> {transcriptsAttrs.codeword_gene_names.filter((name: string) => !name.startsWith('NegControl') && !name.startsWith('UnassignedCodeword')).length}</div>
+                                                <div><strong>Negative Controls:</strong> {transcriptsAttrs.codeword_gene_names.filter((name: string) => name.startsWith('NegControl')).length}</div>
+                                                <div><strong>Unassigned:</strong> {transcriptsAttrs.codeword_gene_names.filter((name: string) => name.startsWith('UnassignedCodeword')).length}</div>
+                                            </>
+                                        )}
+                                    </div>
+                                </MetadataCard>
+                                <MetadataCard title="Transcript Arrays">
+                                    <div className="space-y-1 text-xs">
+                                        {metadata.datasetStructure.arrays
+                                            .filter((arr: string) => arr.startsWith('transcripts.zarr/'))
+                                            .slice(0, 8)
+                                            .map((arr: string) => (
+                                                <div key={arr} className="font-mono">{arr.replace('transcripts.zarr/', '')}</div>
+                                            ))
+                                        }
+                                        {metadata.datasetStructure.arrays.filter((arr: string) => arr.startsWith('transcripts.zarr/')).length > 8 && (
+                                            <div className="text-gray-500">...and {metadata.datasetStructure.arrays.filter((arr: string) => arr.startsWith('transcripts.zarr/')).length - 8} more</div>
+                                        )}
+                                    </div>
+                                </MetadataCard>
+                            </MetadataGrid>
+                            
+                            {/* Sample Genes */}
+                            {transcriptsAttrs.gene_names && (
+                                <div className="mt-4">
+                                    <h5 className="font-medium text-sm mb-2">Sample Target Genes</h5>
+                                    <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+                                        {transcriptsAttrs.gene_names.filter((name: string) => !name.startsWith('NegControl') && !name.startsWith('UnassignedCodeword')).slice(0, 24).map((gene: string) => (
+                                            <div key={gene} className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-center">{gene}</div>
+                                        ))}
+                                    </div>
+                                    {transcriptsAttrs.gene_names.length > 24 && (
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            Showing 24 of {transcriptsAttrs.gene_names.filter((name: string) => !name.startsWith('NegControl') && !name.startsWith('UnassignedCodeword')).length} target genes
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Fields of View */}
+                            {transcriptsAttrs.fov_names && (
+                                <div className="mt-4">
+                                    <h5 className="font-medium text-sm mb-2">Fields of View ({transcriptsAttrs.fov_names.length} total)</h5>
+                                    <div className="grid grid-cols-4 md:grid-cols-8 gap-1 text-xs max-h-32 overflow-y-auto">
+                                        {transcriptsAttrs.fov_names.slice(0, 32).map((fov: string) => (
+                                            <div key={fov} className="font-mono bg-blue-50 dark:bg-blue-900 px-1 py-1 rounded text-center">{fov}</div>
+                                        ))}
+                                    </div>
+                                    {transcriptsAttrs.fov_names.length > 32 && (
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            Showing first 32 fields of view
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </MetadataContainer>
+                    )}
+
+                    {/* Analysis Data Section */}
+                    {Object.keys(analysisAttrs).length > 0 && (
+                        <MetadataContainer>
+                            <SectionHeader icon={<TableIcon />}>Analysis Data (analysis.zarr)</SectionHeader>
+                            <MetadataGrid>
+                                <MetadataCard title="Analysis Arrays">
+                                    <div className="space-y-1 text-xs">
+                                        {metadata.datasetStructure.arrays
+                                            .filter((arr: string) => arr.startsWith('analysis.zarr/'))
+                                            .map((arr: string) => (
+                                                <div key={arr} className="font-mono">{arr.replace('analysis.zarr/', '')}</div>
+                                            ))
+                                        }
+                                    </div>
+                                </MetadataCard>
+                                <MetadataCard title="Cell Groups">
+                                    <div className="space-y-1 text-xs">
+                                        {metadata.tables?.cell_groups && (
+                                            <>
+                                                <div><strong>Shape:</strong> {metadata.tables.cell_groups.shape?.join(' × ') || 'Unknown'}</div>
+                                                <div><strong>Type:</strong> {metadata.tables.cell_groups.dtype || 'Unknown'}</div>
+                                                <div><strong>Description:</strong> Cell grouping/clustering analysis results</div>
+                                            </>
+                                        )}
+                                    </div>
+                                </MetadataCard>
+                                <MetadataCard title="Analysis Attributes">
+                                    <div className="space-y-1 text-xs">
+                                        {Object.entries(analysisAttrs).slice(0, 5).map(([key, value]) => (
+                                            <div key={key}>
+                                                <strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) + '...' : String(value)}
+                                            </div>
+                                        ))}
+                                        {Object.keys(analysisAttrs).length > 5 && (
+                                            <div className="text-gray-500">...and {Object.keys(analysisAttrs).length - 5} more</div>
+                                        )}
+                                    </div>
+                                </MetadataCard>
+                            </MetadataGrid>
+                        </MetadataContainer>
+                    )}
+
+                    {/* Additional Root Attributes */}
+                    {Object.keys(rootAttrs).length > 0 && (
+                        <MetadataContainer>
+                            <SectionHeader icon={<FolderIcon />}>Root Attributes</SectionHeader>
+                            <div className="space-y-2">
+                                <DataTable 
+                                    data={Object.fromEntries(Object.entries(rootAttrs).filter(([key, value]) => 
+                                        !['codeword_gene_mapping', 'codeword_gene_names', 'gene_names', 'gene_index_map', 'fov_names', 'cell_groups'].includes(key)
+                                    ).slice(0, 15))} 
+                                    maxRows={15} 
+                                />
+                                {Object.keys(rootAttrs).length > 15 && (
+                                    <div className="text-xs text-gray-500 mt-2">
+                                        Showing 15 of {Object.keys(rootAttrs).length} root attributes
                                     </div>
                                 )}
                             </div>
@@ -542,7 +629,7 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                     )}
 
                     {/* Gene Index Mapping */}
-                    {attrs.gene_index_map && (
+                    {(transcriptsAttrs.gene_index_map || rootAttrs.gene_index_map) && (
                         <MetadataContainer>
                             <SectionHeader icon={<TableIcon />}>Gene Index Mapping</SectionHeader>
                             <div className="space-y-2">
@@ -551,11 +638,11 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                                 </div>
                                 <DataTable 
                                     data={Object.fromEntries(
-                                        Object.entries(attrs.gene_index_map)
+                                        Object.entries(transcriptsAttrs.gene_index_map || rootAttrs.gene_index_map || {})
                                             .filter(([gene]) => !gene.startsWith('NegControl') && !gene.startsWith('UnassignedCodeword'))
-                                            .slice(0, 20)
+                                            .slice(0, 25)
                                     )} 
-                                    maxRows={20} 
+                                    maxRows={25} 
                                 />
                                 <div className="text-xs text-gray-500 mt-2">
                                     Showing sample gene mappings (target genes only)
@@ -635,10 +722,10 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                                     value={state.url}
                                     onChange={handleUrlChange}
                                     className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-gray-300 dark:bg-gray-800 dark:border-gray-600"
-                                    placeholder="https://s3.embl.de/spatialdata/spatialdata-sandbox/xenium_rep1_io.zarr"
+                                    placeholder="http://localhost:8000/your-zarr-dataset.zarr"
                                 />
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Enter the URL of a remote Zarr dataset in SpatialData format
+                                    Enter the URL of a Zarr dataset (supports HTTP/HTTPS)
                                 </p>
                             </div>
                             <div className="flex justify-center items-center gap-6">
