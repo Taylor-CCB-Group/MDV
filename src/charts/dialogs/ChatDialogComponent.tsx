@@ -8,7 +8,7 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Box, Button, Divider, IconButton, InputAdornment, TextField } from '@mui/material';
+import { Box, Button, Divider, IconButton, InputAdornment, Skeleton, TextField } from '@mui/material';
 import _ from 'lodash';
 import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
 import remarkGfm from 'remark-gfm';
@@ -343,7 +343,14 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 {messages.map((message) => (
                     <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} updateInput={updateInput} suggestedQuestions={suggestedQuestions} />
                 ))}
-                {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
+                {isSending ?  
+                    (requestProgress ? 
+                        <Progress {...requestProgress} verboseProgress={verboseProgress} /> : 
+                        <Skeleton variant='rectangular' sx={{ fontSize: "1.2rem", marginBottom: 2, marginTop: 2}} />
+                    ) : (
+                        <></>
+                    )
+                }
                 {/* {
                 isSending && 
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}

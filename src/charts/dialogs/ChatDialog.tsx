@@ -202,7 +202,7 @@ const ChatDialog = ({
                                 />
                                 <Divider />
                                 <List>
-                                    {isLoading ? (
+                                    {isLoading || isLoadingInit ? (
                                         <ListItemButton>
                                             <ListItemText primary="Loading chat history..." />
                                         </ListItemButton>
