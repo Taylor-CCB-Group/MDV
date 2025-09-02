@@ -219,7 +219,7 @@ function makeResizable(el, config = {}) {
     //document can change if in another window
     el.__doc__ = config.doc || document;
     // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
-    el.style.overflow = "hidden";
+    el.style.overflow = "visible";
     //el.style.zIndex="0";
     if (config.onresizeend) {
         ri.onresize = addResizeListener(
