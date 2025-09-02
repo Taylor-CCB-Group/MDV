@@ -285,9 +285,9 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
         const { root } = useProject();
         const [state, dispatch] = useReducer(reducer, DEFAULT_REDUCER_STATE);
 
-        // Fetch zarr metadata from backend API
+        // Fetch dataset metadata from backend API (supports Zarr and SpatialData)
         const fetchZarrMetadata = async (url: string): Promise<ZarrMetadata> => {
-            const apiUrl = `${root}/zarr/metadata?url=${encodeURIComponent(url)}`;
+            const apiUrl = `${root}/get_metadata?url=${encodeURIComponent(url)}`;
             
             console.log('ZarrMetadataDialog DEBUG:');
             console.log('- root:', root);
@@ -403,11 +403,11 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                             <MetadataCard title="Dataset URL">
                                 <span className="font-mono text-xs break-all">{state.url}</span>
                             </MetadataCard>
-                            <MetadataCard title="Zarr Structure">
+                            <MetadataCard title="Dataset Structure">
                                 <div className="space-y-1 text-xs">
                                     <div><strong>Groups:</strong> {metadata.datasetStructure.groups.length}</div>
                                     <div><strong>Arrays:</strong> {metadata.datasetStructure.arrays.length}</div>
-                                    <div><strong>Format:</strong> Zarr v2</div>
+                                    <div><strong>Format:</strong> {(metadata as any).datasetFormat === 'spatialdata' ? 'SpatialData' : 'Zarr v2'}</div>
                                 </div>
                             </MetadataCard>
                             <MetadataCard title="Data Tables">
@@ -459,6 +459,93 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                             </div>
                         )}
                     </MetadataContainer>
+
+                    {/* SpatialData-specific sections */}
+                    {(metadata as any).datasetFormat === 'spatialdata' && (
+                        <>
+                            {/* Images Section */}
+                            {Object.keys((metadata as any).images || {}).length > 0 && (
+                                <MetadataContainer>
+                                    <SectionHeader icon={<ImageIcon />}>Images</SectionHeader>
+                                    <MetadataGrid>
+                                        {Object.entries((metadata as any).images || {}).map(([name, info]: [string, any]) => (
+                                            <MetadataCard key={name} title={name}>
+                                                <div className="space-y-1 text-xs">
+                                                    <div><strong>Type:</strong> {info.type}</div>
+                                                    {info.scales && info.scales.length > 0 && (
+                                                        <div><strong>Scales:</strong> {info.scales.length}</div>
+                                                    )}
+                                                    {info.scales && info.scales[0] && (
+                                                        <div><strong>Shape:</strong> {info.scales[0].shape?.join(' × ')}</div>
+                                                    )}
+                                                </div>
+                                            </MetadataCard>
+                                        ))}
+                                    </MetadataGrid>
+                                </MetadataContainer>
+                            )}
+
+                            {/* Points Section */}
+                            {Object.keys((metadata as any).points || {}).length > 0 && (
+                                <MetadataContainer>
+                                    <SectionHeader icon={<CloudDownloadIcon />}>Points Data</SectionHeader>
+                                    <MetadataGrid>
+                                        {Object.entries((metadata as any).points || {}).map(([name, info]: [string, any]) => (
+                                            <MetadataCard key={name} title={name}>
+                                                <div className="space-y-1 text-xs">
+                                                    <div><strong>Type:</strong> {info.type}</div>
+                                                    <div><strong>Format:</strong> {info.format}</div>
+                                                    <div><strong>Description:</strong> {info.description}</div>
+                                                </div>
+                                            </MetadataCard>
+                                        ))}
+                                    </MetadataGrid>
+                                </MetadataContainer>
+                            )}
+
+                            {/* Shapes Section */}
+                            {Object.keys((metadata as any).shapes || {}).length > 0 && (
+                                <MetadataContainer>
+                                    <SectionHeader icon={<FolderIcon />}>Shapes Data</SectionHeader>
+                                    <MetadataGrid>
+                                        {Object.entries((metadata as any).shapes || {}).map(([name, info]: [string, any]) => (
+                                            <MetadataCard key={name} title={name}>
+                                                <div className="space-y-1 text-xs">
+                                                    <div><strong>Type:</strong> {info.type}</div>
+                                                    <div><strong>Format:</strong> {info.format}</div>
+                                                    <div><strong>Description:</strong> {info.description}</div>
+                                                </div>
+                                            </MetadataCard>
+                                        ))}
+                                    </MetadataGrid>
+                                </MetadataContainer>
+                            )}
+
+                            {/* Tables Section for SpatialData */}
+                            {Object.keys((metadata as any).tables || {}).length > 0 && (metadata as any).datasetFormat === 'spatialdata' && (
+                                <MetadataContainer>
+                                    <SectionHeader icon={<TableIcon />}>Tables (AnnData-like)</SectionHeader>
+                                    <MetadataGrid>
+                                        {Object.entries((metadata as any).tables || {}).map(([name, info]: [string, any]) => (
+                                            <MetadataCard key={name} title={name}>
+                                                <div className="space-y-1 text-xs">
+                                                    <div><strong>Type:</strong> {info.type}</div>
+                                                    {info.components && Object.keys(info.components).length > 0 && (
+                                                        <div>
+                                                            <strong>Components:</strong> {Object.keys(info.components).join(', ')}
+                                                        </div>
+                                                    )}
+                                                    {info.components?.X && (
+                                                        <div><strong>Expression Matrix:</strong> {info.components.X.type}</div>
+                                                    )}
+                                                </div>
+                                            </MetadataCard>
+                                        ))}
+                                    </MetadataGrid>
+                                </MetadataContainer>
+                            )}
+                        </>
+                    )}
 
                     {/* Cell Data Section */}
                     {Object.keys(cellsAttrs).length > 0 && (

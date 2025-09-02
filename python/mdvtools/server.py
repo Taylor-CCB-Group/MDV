@@ -156,64 +156,64 @@ def create_app(
                     return f"Problem parsing state file: {e}", 500
         return send_file(path)
 
-    # Zarr metadata endpoint for fetching remote Zarr dataset information
-    @project_bp.route("/zarr/metadata", methods=["GET"])
-    def get_zarr_metadata():
+    # Universal metadata endpoint for fetching remote dataset information
+    @project_bp.route("/get_metadata", methods=["GET"])
+    def get_metadata():
         """
-        Fetch metadata from a Zarr dataset URL.
+        Fetch metadata from a dataset URL (supports Zarr and SpatialData formats).
         
         Query Parameters:
-            url: The URL of the Zarr dataset to fetch metadata from
+            url: The URL of the dataset to fetch metadata from
             
         Returns:
             JSON response with metadata structure or error message
         """
-        log("=== ZARR METADATA REQUEST ===")
+        log("=== METADATA REQUEST ===")
         log(f"Request method: {request.method}")
         log(f"Request path: {request.path}")
         log(f"Request args: {request.args}")
         log(f"Project: {project.id}")
         
-        zarr_url = None
+        dataset_url = None
         try:
-            zarr_url = request.args.get('url')
-            log(f"Extracted zarr_url: {zarr_url}")
+            dataset_url = request.args.get('url')
+            log(f"Extracted dataset_url: {dataset_url}")
             
-            if not zarr_url:
+            if not dataset_url:
                 log("ERROR: Missing 'url' parameter")
                 return jsonify({
                     "error": "Missing 'url' parameter",
-                    "message": "Please provide a 'url' query parameter with the Zarr dataset URL"
+                    "message": "Please provide a 'url' query parameter with the dataset URL"
                 }), 400
                 
             # Validate URL format
-            if not zarr_url.startswith(('http://', 'https://')):
-                log(f"ERROR: Invalid URL format: {zarr_url}")
+            if not dataset_url.startswith(('http://', 'https://')):
+                log(f"ERROR: Invalid URL format: {dataset_url}")
                 return jsonify({
                     "error": "Invalid URL format", 
                     "message": "URL must start with http:// or https://"
                 }), 400
             
             # Convert localhost to host.docker.internal if running in Docker
-            if 'localhost' in zarr_url and os.path.exists('/.dockerenv'):
-                zarr_url = zarr_url.replace('localhost', 'host.docker.internal')
-                log(f"Running in Docker, converted URL to: {zarr_url}")
+            if 'localhost' in dataset_url and os.path.exists('/.dockerenv'):
+                dataset_url = dataset_url.replace('localhost', 'host.docker.internal')
+                log(f"Running in Docker, converted URL to: {dataset_url}")
             
-            log(f"URL validation passed, fetching metadata for: {zarr_url}")
+            log(f"URL validation passed, fetching metadata for: {dataset_url}")
             
-            # Extract metadata using zarr utilities
-            log("Getting zarr extractor...")
+            # Extract metadata using zarr utilities (supports both Zarr and SpatialData)
+            log("Getting metadata extractor...")
             extractor = get_zarr_extractor()
-            log(f"Zarr extractor: {extractor}")
+            log(f"Metadata extractor: {extractor}")
             
             log("Calling fetch_zarr_metadata...")
-            print("Creating new event loop for async zarr call...")
+            print("Creating new event loop for async metadata call...")
             # Run the async function in the current event loop
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
                 print("Running fetch_zarr_metadata in event loop...")
-                metadata = loop.run_until_complete(extractor.fetch_zarr_metadata(zarr_url))
+                metadata = loop.run_until_complete(extractor.fetch_zarr_metadata(dataset_url))
                 print(f"Event loop completed, metadata type: {type(metadata)}")
             except Exception as loop_e:
                 print(f"Exception in event loop: {loop_e}")
@@ -228,13 +228,13 @@ def create_app(
             response_data = {
                 "success": True,
                 "metadata": metadata,
-                "url": zarr_url
+                "url": dataset_url
             }
             log("Returning successful response")
             return jsonify(response_data)
             
         except Exception as e:
-            log(f"EXCEPTION in get_zarr_metadata: {str(e)}")
+            log(f"EXCEPTION in get_metadata: {str(e)}")
             log(f"Exception type: {type(e)}")
             import traceback
             log(f"Full traceback: {traceback.format_exc()}")
@@ -242,7 +242,7 @@ def create_app(
             return jsonify({
                 "error": "Metadata extraction failed",
                 "message": str(e),
-                "url": zarr_url
+                "url": dataset_url
             }), 500
 
     # gets the raw byte data and packages it in the correct response

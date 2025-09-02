@@ -1,0 +1,123 @@
+
+D:\mdv\datasets\xenium_rep1_io\data.zarr
+├── .zattrs
+├── .zgroup
+├── images
+│   ├── .zgroup
+│   ├── morphology_focus
+│   │   ├── .zattrs
+│   │   ├── .zgroup
+│   │   └── 0 (...and 4 more)
+│   │       └── [zarr array with 1 chunks]
+│   └── morphology_mip
+│       ├── .zattrs
+│       ├── .zgroup
+│       └── 0 (...and 4 more)
+│           └── [zarr array with 1 chunks]
+├── points
+│   ├── .zgroup
+│   └── transcripts
+│       ├── .zattrs
+│       ├── .zgroup
+│       └── points.parquet
+│           ├── part.0.parquet
+│           ├── part.1.parquet
+│           ├── part.2.parquet
+│           ├── part.3.parquet
+│           ├── part.4.parquet
+│           ├── part.5.parquet
+│           ├── part.6.parquet
+│           └── part.7.parquet
+├── shapes
+│   ├── .zgroup
+│   ├── cell_boundaries
+│   │   ├── .zattrs
+│   │   ├── .zgroup
+│   │   └── shapes.parquet
+│   └── cell_circles
+│       ├── .zattrs
+│       ├── .zgroup
+│       └── shapes.parquet
+├── tables
+│   ├── .zgroup
+│   └── table
+│       ├── .zattrs
+│       ├── .zgroup
+│       ├── X
+│       │   ├── .zattrs
+│       │   ├── .zgroup
+│       │   ├── data
+│       │   │   └── [zarr array with 64 chunks]
+│       │   ├── indices
+│       │   │   └── [zarr array with 64 chunks]
+│       │   └── indptr
+│       │       └── [zarr array with 2 chunks]
+│       ├── layers
+│       │   ├── .zattrs
+│       │   └── .zgroup
+│       ├── obs
+│       │   ├── .zattrs
+│       │   ├── .zgroup
+│       │   ├── _index
+│       │   │   └── [zarr array with 4 chunks]
+│       │   ├── cell_area
+│       │   │   └── [zarr array with 4 chunks]
+│       │   ├── cell_id
+│       │   │   └── [zarr array with 2 chunks]
+│       │   ├── control_codeword_counts
+│       │   │   └── [zarr array with 4 chunks]
+│       │   ├── control_probe_counts
+│       │   │   └── [zarr array with 4 chunks]
+│       │   ├── nucleus_area
+│       │   │   └── [zarr array with 4 chunks]
+│       │   ├── region
+│       │   │   ├── .zattrs
+│       │   │   ├── .zgroup
+│       │   │   ├── categories
+│       │   │   │   └── [zarr array with 1 chunks]
+│       │   │   └── codes
+│       │   │       └── [zarr array with 1 chunks]
+│       │   ├── total_counts
+│       │   │   └── [zarr array with 4 chunks]
+│       │   └── transcript_counts
+│       │       └── [zarr array with 4 chunks]
+│       ├── obsm
+│       │   ├── .zattrs
+│       │   ├── .zgroup
+│       │   └── spatial
+│       │       └── [zarr array with 4 chunks]
+│       ├── obsp
+│       │   ├── .zattrs
+│       │   └── .zgroup
+│       ├── raw
+│       │   └── [zarr array with 1 chunks]
+│       ├── uns
+│       │   ├── .zattrs
+│       │   ├── .zgroup
+│       │   └── spatialdata_attrs
+│       │       ├── .zattrs
+│       │       ├── .zgroup
+│       │       ├── instance_key
+│       │       │   └── [zarr array with 1 chunks]
+│       │       ├── region
+│       │       │   └── [zarr array with 1 chunks]
+│       │       └── region_key
+│       │           └── [zarr array with 1 chunks]
+│       ├── var
+│       │   ├── .zattrs
+│       │   ├── .zgroup
+│       │   ├── _index
+│       │   │   └── [zarr array with 1 chunks]
+│       │   ├── feature_types
+│       │   │   └── [zarr array with 1 chunks]
+│       │   ├── gene_ids
+│       │   │   └── [zarr array with 1 chunks]
+│       │   └── genome
+│       │       └── [zarr array with 1 chunks]
+│       ├── varm
+│       │   ├── .zattrs
+│       │   └── .zgroup
+│       └── varp
+│           ├── .zattrs
+│           └── .zgroup
+└── zmetadata

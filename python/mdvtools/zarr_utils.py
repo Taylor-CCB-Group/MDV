@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 class ZarrMetadataExtractor:
-    """Extracts metadata from Zarr stores for the MDV platform"""
+    """Extracts metadata from Zarr stores and SpatialData formats for the MDV platform"""
 
     def __init__(self):
         self.timeout = aiohttp.ClientTimeout(total=30)
 
     async def fetch_zarr_metadata(self, url: str) -> Dict[str, Any]:
         """
-        Fetch metadata from a Zarr dataset URL using async HTTP requests.
+        Fetch metadata from a Zarr dataset or SpatialData URL using async HTTP requests.
+        Automatically detects the format and extracts appropriate metadata.
         
         Args:
             url: URL to the Zarr dataset (can be HTTP/HTTPS)
@@ -42,17 +43,125 @@ class ZarrMetadataExtractor:
             print(f"[ZARR] Creating aiohttp session...")
             # Use async HTTP approach to avoid fsspec conflicts
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                print(f"[ZARR] Session created, calling _fetch_http_zarr_metadata...")
-                metadata = await self._fetch_http_zarr_metadata(session, url)
-                print(f"[ZARR] _fetch_http_zarr_metadata returned: {type(metadata)}")
+                print(f"[ZARR] Session created, detecting dataset format...")
+                dataset_format = await self._detect_dataset_format(session, url)
+                print(f"[ZARR] Detected format: {dataset_format}")
+                
+                if dataset_format == "spatialdata":
+                    print(f"[ZARR] Processing as SpatialData format...")
+                    metadata = await self._fetch_spatialdata_metadata(session, url)
+                else:
+                    print(f"[ZARR] Processing as standard Zarr format...")
+                    metadata = await self._fetch_http_zarr_metadata(session, url)
+                    
+                print(f"[ZARR] Metadata extraction returned: {type(metadata)}")
             
-            print(f"[ZARR] Successfully extracted Zarr metadata")
-            logger.info("Successfully extracted Zarr metadata")
+            print(f"[ZARR] Successfully extracted metadata")
+            logger.info("Successfully extracted metadata")
             return metadata
             
         except Exception as e:
             logger.error(f"Error fetching Zarr metadata from {url}: {str(e)}")
             raise Exception(f"Failed to fetch metadata from {url}: {str(e)}")
+
+    async def _detect_dataset_format(self, session: aiohttp.ClientSession, url: str) -> str:
+        """
+        Detect if the dataset is SpatialData format or standard Zarr format.
+        SpatialData typically has organized groups: images, points, shapes, tables.
+        """
+        if not url.endswith('/'):
+            url = url + '/'
+        
+        logger.info(f"Detecting dataset format for: {url}")
+        
+        # Check for SpatialData indicators
+        spatialdata_groups = ['images', 'points', 'shapes', 'tables']
+        found_groups = 0
+        
+        for group in spatialdata_groups:
+            try:
+                group_url = urljoin(url, f'{group}/')
+                zgroup_url = urljoin(group_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        found_groups += 1
+                        logger.info(f"Found SpatialData group: {group}")
+            except Exception as e:
+                logger.debug(f"Could not check group {group}: {e}")
+        
+        # If we found 2 or more SpatialData-specific groups, classify as SpatialData
+        if found_groups >= 2:
+            logger.info("Detected SpatialData format")
+            return "spatialdata"
+        else:
+            logger.info("Detected standard Zarr format")
+            return "zarr"
+
+    async def _fetch_spatialdata_metadata(self, session: aiohttp.ClientSession, url: str) -> Dict[str, Any]:
+        """
+        Fetch metadata from a SpatialData-formatted Zarr store.
+        """
+        logger.info(f"Fetching SpatialData metadata from: {url}")
+        
+        if not url.endswith('/'):
+            url = url + '/'
+        
+        metadata = {
+            "datasetFormat": "spatialdata",
+            "datasetStructure": {
+                "groups": [],
+                "arrays": []
+            },
+            "spatialData": {
+                "coordinateSystems": {},
+                "elements": {},
+                "transformations": []
+            },
+            "images": {},
+            "tables": {},
+            "labels": {},
+            "points": {},
+            "shapes": {},
+            "groupAttributes": {},
+            "rawStructure": True
+        }
+        
+        # Get root attributes
+        try:
+            attrs_url = urljoin(url, '.zattrs')
+            async with session.get(attrs_url) as response:
+                if response.status == 200:
+                    attrs_text = await response.text()
+                    metadata["groupAttributes"] = json.loads(attrs_text)
+                    logger.info(f"Found root attributes: {list(metadata['groupAttributes'].keys())}")
+        except Exception as e:
+            logger.warning(f"Could not fetch root attributes: {e}")
+        
+        # Process SpatialData groups
+        spatialdata_groups = {
+            'images': self._process_images_group,
+            'points': self._process_points_group, 
+            'shapes': self._process_shapes_group,
+            'tables': self._process_tables_group
+        }
+        
+        for group_name, processor in spatialdata_groups.items():
+            try:
+                group_url = urljoin(url, f'{group_name}/')
+                zgroup_url = urljoin(group_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        logger.info(f"Processing SpatialData group: {group_name}")
+                        metadata["datasetStructure"]["groups"].append(group_name)
+                        await processor(session, group_url, metadata)
+                        
+            except Exception as e:
+                logger.info(f"Group {group_name} not found or inaccessible: {e}")
+        
+        logger.info(f"SpatialData metadata extraction completed. Found {len(metadata['datasetStructure']['groups'])} groups, {len(metadata['datasetStructure']['arrays'])} arrays")
+        return metadata
 
     async def _fetch_http_zarr_metadata(self, session: aiohttp.ClientSession, url: str) -> Dict[str, Any]:
         """
@@ -97,6 +206,7 @@ class ZarrMetadataExtractor:
         logger.info("Parsing consolidated metadata")
         
         metadata = {
+            "datasetFormat": "zarr",
             "datasetStructure": {
                 "groups": [],
                 "arrays": []
@@ -145,6 +255,7 @@ class ZarrMetadataExtractor:
         logger.info("Exploring Zarr structure via HTTP")
         
         metadata = {
+            "datasetFormat": "zarr",
             "datasetStructure": {
                 "groups": [],
                 "arrays": []
@@ -461,6 +572,247 @@ class ZarrMetadataExtractor:
             "dtype": str(array.dtype),
             "labelValues": label_values,
             "categories": attrs.get('categories', [])
+        }
+
+    async def _process_images_group(self, session: aiohttp.ClientSession, group_url: str, metadata: Dict[str, Any]):
+        """Process the images group in SpatialData format."""
+        logger.info(f"Processing images group at: {group_url}")
+        
+        # Look for common image names in SpatialData/Xenium format
+        image_names = ['morphology_focus', 'morphology_mip', 'he', 'dapi']
+        
+        for image_name in image_names:
+            try:
+                image_url = urljoin(group_url, f'{image_name}/')
+                zgroup_url = urljoin(image_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        logger.info(f"Found image: {image_name}")
+                        full_path = f"images/{image_name}"
+                        metadata["datasetStructure"]["groups"].append(full_path)
+                        
+                        # Get image metadata
+                        image_metadata = await self._extract_spatialdata_image_metadata(session, image_url, image_name)
+                        metadata["images"][image_name] = image_metadata
+                        
+            except Exception as e:
+                logger.debug(f"Image {image_name} not found: {e}")
+
+    async def _process_points_group(self, session: aiohttp.ClientSession, group_url: str, metadata: Dict[str, Any]):
+        """Process the points group in SpatialData format."""
+        logger.info(f"Processing points group at: {group_url}")
+        
+        # Look for points data (typically transcripts in Xenium)
+        points_names = ['transcripts']
+        
+        for points_name in points_names:
+            try:
+                points_url = urljoin(group_url, f'{points_name}/')
+                zgroup_url = urljoin(points_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        logger.info(f"Found points data: {points_name}")
+                        full_path = f"points/{points_name}"
+                        metadata["datasetStructure"]["groups"].append(full_path)
+                        
+                        # Get points metadata
+                        points_metadata = await self._extract_spatialdata_points_metadata(session, points_url, points_name)
+                        metadata["points"][points_name] = points_metadata
+                        
+            except Exception as e:
+                logger.debug(f"Points data {points_name} not found: {e}")
+
+    async def _process_shapes_group(self, session: aiohttp.ClientSession, group_url: str, metadata: Dict[str, Any]):
+        """Process the shapes group in SpatialData format."""
+        logger.info(f"Processing shapes group at: {group_url}")
+        
+        # Look for shape data (cell boundaries, circles, etc.)
+        shapes_names = ['cell_boundaries', 'cell_circles', 'nuclei']
+        
+        for shape_name in shapes_names:
+            try:
+                shape_url = urljoin(group_url, f'{shape_name}/')
+                zgroup_url = urljoin(shape_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        logger.info(f"Found shape data: {shape_name}")
+                        full_path = f"shapes/{shape_name}"
+                        metadata["datasetStructure"]["groups"].append(full_path)
+                        
+                        # Get shapes metadata
+                        shapes_metadata = await self._extract_spatialdata_shapes_metadata(session, shape_url, shape_name)
+                        metadata["shapes"][shape_name] = shapes_metadata
+                        
+            except Exception as e:
+                logger.debug(f"Shape data {shape_name} not found: {e}")
+
+    async def _process_tables_group(self, session: aiohttp.ClientSession, group_url: str, metadata: Dict[str, Any]):
+        """Process the tables group in SpatialData format."""
+        logger.info(f"Processing tables group at: {group_url}")
+        
+        # Look for table data
+        table_names = ['table']
+        
+        for table_name in table_names:
+            try:
+                table_url = urljoin(group_url, f'{table_name}/')
+                zgroup_url = urljoin(table_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        logger.info(f"Found table data: {table_name}")
+                        full_path = f"tables/{table_name}"
+                        metadata["datasetStructure"]["groups"].append(full_path)
+                        
+                        # Get table metadata - this is the most complex part
+                        table_metadata = await self._extract_spatialdata_table_metadata(session, table_url, table_name)
+                        metadata["tables"][table_name] = table_metadata
+                        
+            except Exception as e:
+                logger.debug(f"Table data {table_name} not found: {e}")
+
+    async def _extract_spatialdata_image_metadata(self, session: aiohttp.ClientSession, image_url: str, image_name: str) -> Dict[str, Any]:
+        """Extract metadata from SpatialData image."""
+        metadata = {
+            "name": image_name,
+            "type": "image",
+            "scales": []
+        }
+        
+        # Look for scale directories (0, 1, 2, etc.)
+        for scale in range(5):  # Check scales 0-4
+            try:
+                scale_url = urljoin(image_url, f'{scale}/')
+                zarray_url = urljoin(scale_url, '.zarray')
+                
+                async with session.get(zarray_url) as response:
+                    if response.status == 200:
+                        zarray_text = await response.text()
+                        array_meta = json.loads(zarray_text)
+                        
+                        scale_info = {
+                            "scale": scale,
+                            "shape": array_meta.get('shape', []),
+                            "dtype": array_meta.get('dtype', 'unknown'),
+                            "chunks": array_meta.get('chunks', [])
+                        }
+                        metadata["scales"].append(scale_info)
+                        
+            except Exception as e:
+                logger.debug(f"Scale {scale} not found for image {image_name}: {e}")
+                break
+        
+        return metadata
+
+    async def _extract_spatialdata_points_metadata(self, session: aiohttp.ClientSession, points_url: str, points_name: str) -> Dict[str, Any]:
+        """Extract metadata from SpatialData points."""
+        return {
+            "name": points_name,
+            "type": "points",
+            "format": "parquet",
+            "description": f"Point data for {points_name}"
+        }
+
+    async def _extract_spatialdata_shapes_metadata(self, session: aiohttp.ClientSession, shapes_url: str, shape_name: str) -> Dict[str, Any]:
+        """Extract metadata from SpatialData shapes."""
+        return {
+            "name": shape_name,
+            "type": "shapes",
+            "format": "parquet",
+            "description": f"Shape data for {shape_name}"
+        }
+
+    async def _extract_spatialdata_table_metadata(self, session: aiohttp.ClientSession, table_url: str, table_name: str) -> Dict[str, Any]:
+        """Extract metadata from SpatialData table (most complex - AnnData-like structure)."""
+        metadata = {
+            "name": table_name,
+            "type": "table",
+            "components": {}
+        }
+        
+        # Look for standard AnnData components
+        components = ['X', 'obs', 'var', 'obsm', 'varm', 'layers', 'uns']
+        
+        for component in components:
+            try:
+                component_url = urljoin(table_url, f'{component}/')
+                zgroup_url = urljoin(component_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        logger.info(f"Found table component: {component}")
+                        full_path = f"tables/{table_name}/{component}"
+                        
+                        if component == 'X':
+                            # X matrix - sparse or dense
+                            x_metadata = await self._extract_x_matrix_metadata(session, component_url)
+                            metadata["components"][component] = x_metadata
+                        elif component in ['obs', 'var']:
+                            # Observation/variable metadata
+                            metadata["components"][component] = {
+                                "type": "dataframe",
+                                "description": f"{component} annotations"
+                            }
+                        elif component in ['obsm', 'varm']:
+                            # Multi-dimensional annotations
+                            metadata["components"][component] = {
+                                "type": "multidimensional", 
+                                "description": f"{component} multidimensional data"
+                            }
+                        else:
+                            metadata["components"][component] = {
+                                "type": "group",
+                                "description": f"{component} data"
+                            }
+                        
+            except Exception as e:
+                logger.debug(f"Table component {component} not found: {e}")
+        
+        return metadata
+
+    async def _extract_x_matrix_metadata(self, session: aiohttp.ClientSession, x_url: str) -> Dict[str, Any]:
+        """Extract metadata from X matrix (expression data)."""
+        # Check for sparse matrix components
+        sparse_components = ['data', 'indices', 'indptr']
+        found_sparse = 0
+        
+        for component in sparse_components:
+            try:
+                comp_url = urljoin(x_url, f'{component}/')
+                zarray_url = urljoin(comp_url, '.zarray')
+                
+                async with session.get(zarray_url) as response:
+                    if response.status == 200:
+                        found_sparse += 1
+                        
+            except Exception:
+                pass
+        
+        if found_sparse == 3:
+            return {
+                "type": "sparse_matrix",
+                "format": "csr", 
+                "description": "Sparse expression matrix"
+            }
+        else:
+            # Try dense matrix
+            try:
+                zarray_url = urljoin(x_url, '.zarray')
+                async with session.get(zarray_url) as response:
+                    if response.status == 200:
+                        return {
+                            "type": "dense_matrix",
+                            "description": "Dense expression matrix"
+                        }
+            except Exception:
+                pass
+        
+        return {
+            "type": "unknown",
+            "description": "Expression matrix"
         }
 
 
