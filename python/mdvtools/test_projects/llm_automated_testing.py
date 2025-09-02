@@ -214,7 +214,7 @@ for question in question_list:
             view_name = parse_view_name(final_code)
             if view_name is None:
                 raise Exception("Parsing view name failed")
-            log_chat_item(projectMK, question, output, prompt_RAG, final_code, conversation_id="test", view_name=view_name)
+            log_chat_item(projectMK, question, output, prompt_RAG, final_code, conversation_id="test", context="", view_name=view_name)
 
             # we want to know the view_name to navigate to as well... for now we do that in the calling code
             #return f"I ran some code for you:\n\n```python\n{final_code}```"

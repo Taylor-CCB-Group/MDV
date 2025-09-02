@@ -30,6 +30,13 @@ def extract_code_from_response(response: str):
     # return matches[-1].strip()
 
 
+def extract_explanation_from_response(response: str):
+    """Extracts the explanation text by removing code blocks from the response."""
+    # Remove all code blocks (```python...``` or ```...```)
+    explanation = re.sub(r"```.*?```", "", response, flags=re.DOTALL)
+    return explanation.strip()
+
+
 def prepare_code(result: str, data: Optional[str | pd.DataFrame], project: MDVProject, log = print, 
                  modify_existing_project=False, view_name="default"):
     """Given a response from the LLM, extract the code and post-process it, 

@@ -269,7 +269,7 @@ class LangchainLoggingHandler(BaseCallbackHandler):
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
         self.log(f"Chain ended, outputs: {outputs}")
 
-def log_chat_item(project, question, output, prompt_template, response, conversation_id, view_name: str | None, error: bool = False):
+def log_chat_item(project, question, output, prompt_template, response, conversation_id, context: str | None, view_name: str | None, error: bool = False):
     """
     Log a chat interaction to the chat log file.
     Args:
@@ -278,25 +278,23 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         prompt_template: The template used for the prompt (can be empty for errors)
         response: The response generated (error message if error)
         conversation_id: ID to group messages from the same conversation
+        context: Context of the response code generated which contains file names
         error: Whether this log is for an error
     """
     # Create a ChatLogger instance for this project
     chat_file = os.path.join(project.dir, "chat_log.json")
     chat_logger = ChatLogger(chat_file)
-    
     if error or output is None:
         context = "[]"
         view_name = None
         prompt_template = prompt_template or ""
-    else:
-        context_information = output['source_documents']
-        context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
-        context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-        context_information_metadata_name = [s for s in context_information_metadata_url]
-        context = str(context_information_metadata_name)
+        
+
+    # Ensure context is always a non-optional string for ChatLogItem
+    context_str: str = context if context is not None else "[]"
 
     chat_item = ChatLogItem(
-        context=context,
+        context=context_str,
         query=question,
         prompt_template=prompt_template,
         response=response,

@@ -16,7 +16,7 @@ const completedChatResponseSchema = z.object({
 });
 const chatInitResponseSchema = z.object({
     message: z.string(),
-    suggested_questions: z.array(z.string()),
+    suggested_questions: z.array(z.string()).optional(),
     error: z.boolean().optional(),
 });
 type ChatInitResponse = z.infer<typeof chatInitResponseSchema>;
@@ -331,7 +331,7 @@ const useChat = () => {
             }
             // todo: Update when the endpoint is ready
             // const suggestedQuestions = await axios.get("");
-            setSuggestedQuestions(response.suggested_questions);
+            if (response?.suggested_questions) setSuggestedQuestions(response?.suggested_questions);
         } catch (error: any) {
             const errorMessage =  error?.message ? 
                 error.message : 
