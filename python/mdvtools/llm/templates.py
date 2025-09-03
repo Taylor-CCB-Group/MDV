@@ -201,9 +201,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - Text box plot: Requires no columns, just text.  
             - Violin plot: Requires only one categorical column and one numerical column.  
             - Wordcloud: Requires one categorical column.
-    Output format: Only return the python code that is to be run to generate the charts.
+    Output format: Return the python code that is to be run to generate the charts.
 
-    After generating the code, include a detailed explanation in your response, with proper markdown syntax that can be rendered by markdown renderer, that covers:
+    After generating the code, include a detailed explanation in your response (renderable by markdown renderer) that covers:
     1. Why this chart is the best way to answer the question
     2. What biological insights can be gained from this visualization
     3. What subsequent analysis tasks could be performed based on these results

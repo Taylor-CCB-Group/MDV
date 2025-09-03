@@ -13,6 +13,7 @@ import _ from 'lodash';
 import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 
 export type MessageType = {
@@ -236,7 +237,7 @@ const MessageMarkdown = ({ text }: { text: string }) => {
             // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-markdown, not our code
             children={markdown}
             remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw]}
+            rehypePlugins={[rehypeRaw, rehypeSanitize]}
             components={{
                 code({ node, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '')

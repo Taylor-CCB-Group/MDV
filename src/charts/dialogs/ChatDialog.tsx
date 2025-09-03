@@ -63,7 +63,7 @@ const ChatDialog = ({
     isPopout,
     fullscreen = false,
     isLoading = false,
-    isLoadingInit,
+    isLoadingInit = false,
 }: ChatDialogProps) => {
     const defaultDrawerWidth = 250;
     const minDrawerWidth = 180;
