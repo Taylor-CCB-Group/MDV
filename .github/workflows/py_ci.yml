@@ -2,16 +2,12 @@ name: Python CI
 on:
   push:
     branches:
-      # FIXME replace this with main after merge to main
-      - dev
-#      - main
+      - main
     paths:
       - 'python/**'
   pull_request:
     branches:
-      # FIXME replace this with main after merge to main
-      - dev
-#      - main
+      - main
     paths:
       - 'python/**'
 
