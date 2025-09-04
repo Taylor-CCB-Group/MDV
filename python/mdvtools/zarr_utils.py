@@ -679,10 +679,22 @@ class ZarrMetadataExtractor:
         metadata = {
             "name": image_name,
             "type": "image",
-            "scales": []
+            "scales": [],
+            "technical_details": {
+                "pyramid_levels": 0,
+                "total_size_mb": 0,
+                "coordinate_system": None,
+                "pixel_size": None
+            },
+            "image_info": {
+                "channels": [],
+                "dimensions": [],
+                "bit_depth": None
+            }
         }
         
         # Look for scale directories (0, 1, 2, etc.)
+        total_size_bytes = 0
         for scale in range(5):  # Check scales 0-4
             try:
                 scale_url = urljoin(image_url, f'{scale}/')
@@ -693,17 +705,71 @@ class ZarrMetadataExtractor:
                         zarray_text = await response.text()
                         array_meta = json.loads(zarray_text)
                         
+                        shape = array_meta.get('shape', [])
+                        dtype = array_meta.get('dtype', 'unknown')
+                        chunks = array_meta.get('chunks', [])
+                        
+                        # Calculate approximate size
+                        if shape:
+                            element_count = 1
+                            for dim in shape:
+                                element_count *= dim
+                            
+                            # Estimate bytes per element based on dtype
+                            bytes_per_element = 1
+                            if 'int16' in dtype or 'float16' in dtype:
+                                bytes_per_element = 2
+                            elif 'int32' in dtype or 'float32' in dtype:
+                                bytes_per_element = 4
+                            elif 'int64' in dtype or 'float64' in dtype:
+                                bytes_per_element = 8
+                            
+                            scale_size_bytes = element_count * bytes_per_element
+                            total_size_bytes += scale_size_bytes
+                        
                         scale_info = {
                             "scale": scale,
-                            "shape": array_meta.get('shape', []),
-                            "dtype": array_meta.get('dtype', 'unknown'),
-                            "chunks": array_meta.get('chunks', [])
+                            "shape": shape,
+                            "dtype": dtype,
+                            "chunks": chunks,
+                            "size_mb": round(scale_size_bytes / (1024 * 1024), 2) if shape else 0
                         }
+                        
+                        # Extract image-specific information from the first scale
+                        if scale == 0 and shape:
+                            if len(shape) >= 2:
+                                metadata["image_info"]["dimensions"] = [f"dim_{i}" for i in range(len(shape))]
+                                if len(shape) >= 3:
+                                    # Assume last dimension might be channels
+                                    metadata["image_info"]["channels"] = [f"channel_{i}" for i in range(shape[-1])]
+                            
+                            metadata["image_info"]["bit_depth"] = dtype
+                        
                         metadata["scales"].append(scale_info)
+                        metadata["technical_details"]["pyramid_levels"] += 1
                         
             except Exception as e:
                 logger.debug(f"Scale {scale} not found for image {image_name}: {e}")
                 break
+        
+        metadata["technical_details"]["total_size_mb"] = round(total_size_bytes / (1024 * 1024), 2)
+        
+        # Try to get image attributes for coordinate system info
+        try:
+            attrs_url = urljoin(image_url, '.zattrs')
+            async with session.get(attrs_url) as response:
+                if response.status == 200:
+                    attrs_text = await response.text()
+                    attrs_data = json.loads(attrs_text)
+                    
+                    # Look for coordinate system or spatial metadata
+                    if 'coordinate_systems' in attrs_data:
+                        metadata["technical_details"]["coordinate_system"] = attrs_data['coordinate_systems']
+                    if 'pixel_size' in attrs_data:
+                        metadata["technical_details"]["pixel_size"] = attrs_data['pixel_size']
+                        
+        except Exception as e:
+            logger.debug(f"Could not get image attributes for {image_name}: {e}")
         
         return metadata
 
@@ -730,7 +796,19 @@ class ZarrMetadataExtractor:
         metadata = {
             "name": table_name,
             "type": "table",
-            "components": {}
+            "components": {},
+            "statistics": {
+                "n_obs": 0,
+                "n_vars": 0,
+                "memory_usage_mb": 0,
+                "data_types": []
+            },
+            "biological_context": {
+                "gene_list_preview": [],
+                "cell_type_categories": [],
+                "spatial_range": {},
+                "quality_metrics": {}
+            }
         }
         
         # Look for standard AnnData components
@@ -750,18 +828,50 @@ class ZarrMetadataExtractor:
                             # X matrix - sparse or dense
                             x_metadata = await self._extract_x_matrix_metadata(session, component_url)
                             metadata["components"][component] = x_metadata
-                        elif component in ['obs', 'var']:
-                            # Observation/variable metadata
-                            metadata["components"][component] = {
-                                "type": "dataframe",
-                                "description": f"{component} annotations"
-                            }
-                        elif component in ['obsm', 'varm']:
-                            # Multi-dimensional annotations
-                            metadata["components"][component] = {
-                                "type": "multidimensional", 
-                                "description": f"{component} multidimensional data"
-                            }
+                            
+                            # Extract dimensions for statistics
+                            if 'shape' in x_metadata:
+                                metadata["statistics"]["n_obs"] = x_metadata["shape"][0] if len(x_metadata["shape"]) > 0 else 0
+                                metadata["statistics"]["n_vars"] = x_metadata["shape"][1] if len(x_metadata["shape"]) > 1 else 0
+                                
+                        elif component == 'obs':
+                            # Observation metadata - extract cell information
+                            obs_metadata = await self._extract_obs_metadata(session, component_url)
+                            metadata["components"][component] = obs_metadata
+                            
+                            # Extract biological context from obs
+                            if 'categorical_columns' in obs_metadata:
+                                for col in obs_metadata['categorical_columns']:
+                                    if any(keyword in col.lower() for keyword in ['cell_type', 'cluster', 'annotation']):
+                                        metadata["biological_context"]["cell_type_categories"] = obs_metadata.get('column_info', {}).get(col, {}).get('categories', [])
+                                        
+                            # Extract spatial information
+                            spatial_cols = [col for col in obs_metadata.get('columns', []) if any(keyword in col.lower() for keyword in ['x', 'y', 'spatial', 'coord'])]
+                            if spatial_cols:
+                                metadata["biological_context"]["spatial_range"] = {
+                                    "spatial_columns": spatial_cols,
+                                    "has_spatial_data": True
+                                }
+                                
+                        elif component == 'var':
+                            # Variable metadata - extract gene information
+                            var_metadata = await self._extract_var_metadata(session, component_url)
+                            metadata["components"][component] = var_metadata
+                            
+                            # Extract gene list preview
+                            if 'gene_names' in var_metadata:
+                                metadata["biological_context"]["gene_list_preview"] = var_metadata["gene_names"][:20]  # First 20 genes
+                                
+                        elif component == 'obsm':
+                            # Multi-dimensional observations (embeddings, spatial coords)
+                            obsm_metadata = await self._extract_obsm_metadata(session, component_url)
+                            metadata["components"][component] = obsm_metadata
+                            
+                        elif component == 'uns':
+                            # Unstructured metadata
+                            uns_metadata = await self._extract_uns_metadata(session, component_url)
+                            metadata["components"][component] = uns_metadata
+                            
                         else:
                             metadata["components"][component] = {
                                 "type": "group",
@@ -778,6 +888,9 @@ class ZarrMetadataExtractor:
         # Check for sparse matrix components
         sparse_components = ['data', 'indices', 'indptr']
         found_sparse = 0
+        shape = []
+        dtype = "unknown"
+        chunks = []
         
         for component in sparse_components:
             try:
@@ -787,15 +900,37 @@ class ZarrMetadataExtractor:
                 async with session.get(zarray_url) as response:
                     if response.status == 200:
                         found_sparse += 1
-                        
+                        if component == 'data':
+                            # Get data array metadata
+                            zarray_text = await response.text()
+                            array_meta = json.loads(zarray_text)
+                            dtype = array_meta.get('dtype', 'unknown')
+                            chunks = array_meta.get('chunks', [])
+                            
             except Exception:
                 pass
         
         if found_sparse == 3:
+            # Try to get shape from indptr
+            try:
+                indptr_url = urljoin(x_url, 'indptr/.zarray')
+                async with session.get(indptr_url) as response:
+                    if response.status == 200:
+                        indptr_text = await response.text()
+                        indptr_meta = json.loads(indptr_text)
+                        n_obs = indptr_meta.get('shape', [0])[0] - 1 if indptr_meta.get('shape') else 0
+                        shape = [n_obs, "unknown"]
+            except Exception:
+                pass
+                
             return {
                 "type": "sparse_matrix",
                 "format": "csr", 
-                "description": "Sparse expression matrix"
+                "description": "Sparse expression matrix",
+                "shape": shape,
+                "dtype": dtype,
+                "chunks": chunks,
+                "sparsity": "compressed sparse row format"
             }
         else:
             # Try dense matrix
@@ -803,9 +938,14 @@ class ZarrMetadataExtractor:
                 zarray_url = urljoin(x_url, '.zarray')
                 async with session.get(zarray_url) as response:
                     if response.status == 200:
+                        zarray_text = await response.text()
+                        array_meta = json.loads(zarray_text)
                         return {
                             "type": "dense_matrix",
-                            "description": "Dense expression matrix"
+                            "description": "Dense expression matrix",
+                            "shape": array_meta.get('shape', []),
+                            "dtype": array_meta.get('dtype', 'unknown'),
+                            "chunks": array_meta.get('chunks', [])
                         }
             except Exception:
                 pass
@@ -814,6 +954,181 @@ class ZarrMetadataExtractor:
             "type": "unknown",
             "description": "Expression matrix"
         }
+
+    async def _extract_obs_metadata(self, session: aiohttp.ClientSession, obs_url: str) -> Dict[str, Any]:
+        """Extract metadata from obs (observations/cells) component."""
+        metadata = {
+            "type": "dataframe",
+            "description": "Cell/observation annotations",
+            "columns": [],
+            "categorical_columns": [],
+            "numerical_columns": [],
+            "column_info": {},
+            "sample_data": {}
+        }
+        
+        # Try to find column arrays
+        common_obs_columns = [
+            'cell_id', '_index', 'cell_area', 'nucleus_area', 'total_counts', 
+            'transcript_counts', 'control_probe_counts', 'region', 'cell_type',
+            'cluster', 'leiden', 'louvain'
+        ]
+        
+        for col_name in common_obs_columns:
+            try:
+                col_url = urljoin(obs_url, f'{col_name}/')
+                zarray_url = urljoin(col_url, '.zarray')
+                
+                async with session.get(zarray_url) as response:
+                    if response.status == 200:
+                        zarray_text = await response.text()
+                        array_meta = json.loads(zarray_text)
+                        
+                        metadata["columns"].append(col_name)
+                        col_info = {
+                            "shape": array_meta.get('shape', []),
+                            "dtype": array_meta.get('dtype', 'unknown')
+                        }
+                        
+                        # Check if it's categorical (has categories subdirectory)
+                        try:
+                            cat_url = urljoin(col_url, 'categories/.zarray')
+                            async with session.get(cat_url) as cat_response:
+                                if cat_response.status == 200:
+                                    metadata["categorical_columns"].append(col_name)
+                                    col_info["type"] = "categorical"
+                                    # Could extract category names here if needed
+                                else:
+                                    # Check dtype for numerical vs string
+                                    if any(num_type in str(array_meta.get('dtype', '')).lower() 
+                                           for num_type in ['int', 'float', 'double']):
+                                        metadata["numerical_columns"].append(col_name)
+                                        col_info["type"] = "numerical"
+                                    else:
+                                        col_info["type"] = "string"
+                        except Exception:
+                            # Fallback type detection
+                            if any(num_type in str(array_meta.get('dtype', '')).lower() 
+                                   for num_type in ['int', 'float', 'double']):
+                                metadata["numerical_columns"].append(col_name)
+                                col_info["type"] = "numerical"
+                            else:
+                                col_info["type"] = "string"
+                        
+                        metadata["column_info"][col_name] = col_info
+                        
+            except Exception as e:
+                logger.debug(f"Column {col_name} not found in obs: {e}")
+        
+        return metadata
+
+    async def _extract_var_metadata(self, session: aiohttp.ClientSession, var_url: str) -> Dict[str, Any]:
+        """Extract metadata from var (variables/genes) component."""
+        metadata = {
+            "type": "dataframe", 
+            "description": "Gene/feature annotations",
+            "columns": [],
+            "gene_names": [],
+            "gene_types": [],
+            "column_info": {}
+        }
+        
+        # Common var columns
+        common_var_columns = ['_index', 'gene_ids', 'feature_types', 'genome', 'gene_symbols']
+        
+        for col_name in common_var_columns:
+            try:
+                col_url = urljoin(var_url, f'{col_name}/')
+                zarray_url = urljoin(col_url, '.zarray')
+                
+                async with session.get(zarray_url) as response:
+                    if response.status == 200:
+                        zarray_text = await response.text()
+                        array_meta = json.loads(zarray_text)
+                        
+                        metadata["columns"].append(col_name)
+                        metadata["column_info"][col_name] = {
+                            "shape": array_meta.get('shape', []),
+                            "dtype": array_meta.get('dtype', 'unknown')
+                        }
+                        
+                        # If this looks like gene names, try to extract some
+                        if col_name in ['_index', 'gene_ids', 'gene_symbols']:
+                            # For now, we can't easily extract the actual data without loading
+                            # But we can note the presence and shape
+                            gene_count = array_meta.get('shape', [0])[0] if array_meta.get('shape') else 0
+                            metadata["gene_names"] = [f"Gene_{i}" for i in range(min(20, gene_count))]  # Placeholder
+                        
+            except Exception as e:
+                logger.debug(f"Column {col_name} not found in var: {e}")
+        
+        return metadata
+
+    async def _extract_obsm_metadata(self, session: aiohttp.ClientSession, obsm_url: str) -> Dict[str, Any]:
+        """Extract metadata from obsm (multidimensional observations)."""
+        metadata = {
+            "type": "multidimensional",
+            "description": "Multidimensional observations (embeddings, coordinates)",
+            "embeddings": {},
+            "spatial_coords": {}
+        }
+        
+        # Common obsm arrays
+        common_obsm = ['spatial', 'X_pca', 'X_umap', 'X_tsne', 'X_leiden', 'coordinates']
+        
+        for array_name in common_obsm:
+            try:
+                array_url = urljoin(obsm_url, f'{array_name}/')
+                zarray_url = urljoin(array_url, '.zarray')
+                
+                async with session.get(zarray_url) as response:
+                    if response.status == 200:
+                        zarray_text = await response.text()
+                        array_meta = json.loads(zarray_text)
+                        
+                        array_info = {
+                            "shape": array_meta.get('shape', []),
+                            "dtype": array_meta.get('dtype', 'unknown'),
+                            "chunks": array_meta.get('chunks', [])
+                        }
+                        
+                        if 'spatial' in array_name.lower() or 'coord' in array_name.lower():
+                            metadata["spatial_coords"][array_name] = array_info
+                        else:
+                            metadata["embeddings"][array_name] = array_info
+                            
+            except Exception as e:
+                logger.debug(f"Obsm array {array_name} not found: {e}")
+        
+        return metadata
+
+    async def _extract_uns_metadata(self, session: aiohttp.ClientSession, uns_url: str) -> Dict[str, Any]:
+        """Extract metadata from uns (unstructured) component."""
+        metadata = {
+            "type": "unstructured",
+            "description": "Unstructured metadata and analysis results",
+            "contents": {}
+        }
+        
+        # Common uns contents
+        common_uns = ['spatialdata_attrs', 'neighbors', 'pca', 'umap', 'rank_genes_groups']
+        
+        for item_name in common_uns:
+            try:
+                item_url = urljoin(uns_url, f'{item_name}/')
+                zgroup_url = urljoin(item_url, '.zgroup')
+                
+                async with session.get(zgroup_url) as response:
+                    if response.status == 200:
+                        metadata["contents"][item_name] = {
+                            "type": "group",
+                            "description": f"Analysis results: {item_name}"
+                        }
+                        
+            except Exception as e:
+                logger.debug(f"Uns item {item_name} not found: {e}")
+        
+        return metadata
 
 
 # Global instance for reuse

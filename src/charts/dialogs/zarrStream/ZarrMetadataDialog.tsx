@@ -15,6 +15,12 @@ import {
     Image as ImageIcon,
     TableChart as TableIcon,
     Info as InfoIcon,
+    Assessment as AssessmentIcon,
+    Storage as StorageIcon,
+    Biotech as BiotechIcon,
+    Memory as MemoryIcon,
+    ExpandMore as ExpandMoreIcon,
+    GetApp as DownloadIcon,
 } from "@mui/icons-material";
 import ReusableDialog from "../ReusableDialog";
 import { debugExploreWithHTTP, debugExploreZarrDataset, extractZarrMetadata } from "./zarrMetadataUtils";
@@ -95,6 +101,87 @@ const DataTable = ({ data, maxRows = 10 }: { data: Record<string, any>; maxRows?
         </div>
     );
 };
+
+const ExpandableSection = ({ title, children, defaultExpanded = false }: PropsWithChildren & { title: string; defaultExpanded?: boolean }) => {
+    const [expanded, setExpanded] = useState(defaultExpanded);
+    
+    return (
+        <div className="border border-gray-200 dark:border-gray-600 rounded-lg mb-4">
+            <button
+                className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => setExpanded(!expanded)}
+            >
+                <span className="font-medium text-sm text-gray-800 dark:text-gray-200">{title}</span>
+                <ExpandMoreIcon 
+                    className={`transform transition-transform ${expanded ? 'rotate-180' : ''}`}
+                    style={{ fontSize: 18 }}
+                />
+            </button>
+            {expanded && (
+                <div className="p-3 border-t border-gray-200 dark:border-gray-600">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const StatisticCard = ({ label, value, unit = "", icon }: { label: string; value: string | number; unit?: string; icon?: React.ReactNode }) => (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3 flex items-center space-x-3">
+        {icon && <div className="text-blue-500">{icon}</div>}
+        <div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">{label}</div>
+            <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                {value}{unit}
+            </div>
+        </div>
+    </div>
+);
+
+const ArrayPreviewTable = ({ columns, columnInfo }: { columns: string[]; columnInfo: Record<string, any> }) => (
+    <div className="overflow-x-auto">
+        <table className="min-w-full text-xs">
+            <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th className="px-2 py-1 text-left font-medium text-gray-600 dark:text-gray-300">Column</th>
+                    <th className="px-2 py-1 text-left font-medium text-gray-600 dark:text-gray-300">Type</th>
+                    <th className="px-2 py-1 text-left font-medium text-gray-600 dark:text-gray-300">Shape</th>
+                    <th className="px-2 py-1 text-left font-medium text-gray-600 dark:text-gray-300">DType</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                {columns.slice(0, 10).map((col) => {
+                    const info = columnInfo[col] || {};
+                    return (
+                        <tr key={col} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="px-2 py-1 font-mono text-gray-800 dark:text-gray-200">{col}</td>
+                            <td className="px-2 py-1">
+                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                    info.type === 'categorical' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                                    info.type === 'numerical' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                }`}>
+                                    {info.type || 'unknown'}
+                                </span>
+                            </td>
+                            <td className="px-2 py-1 text-gray-600 dark:text-gray-400">
+                                {info.shape ? info.shape.join(' × ') : 'N/A'}
+                            </td>
+                            <td className="px-2 py-1 font-mono text-gray-600 dark:text-gray-400">
+                                {info.dtype || 'N/A'}
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+        {columns.length > 10 && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                Showing 10 of {columns.length} columns
+            </div>
+        )}
+    </div>
+);
 
 const Spinner = () => {
     return (
@@ -467,21 +554,61 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                             {Object.keys((metadata as any).images || {}).length > 0 && (
                                 <MetadataContainer>
                                     <SectionHeader icon={<ImageIcon />}>Images</SectionHeader>
-                                    <MetadataGrid>
-                                        {Object.entries((metadata as any).images || {}).map(([name, info]: [string, any]) => (
-                                            <MetadataCard key={name} title={name}>
-                                                <div className="space-y-1 text-xs">
-                                                    <div><strong>Type:</strong> {info.type}</div>
-                                                    {info.scales && info.scales.length > 0 && (
-                                                        <div><strong>Scales:</strong> {info.scales.length}</div>
-                                                    )}
-                                                    {info.scales && info.scales[0] && (
-                                                        <div><strong>Shape:</strong> {info.scales[0].shape?.join(' × ')}</div>
-                                                    )}
+                                    {Object.entries((metadata as any).images || {}).map(([name, info]: [string, any]) => (
+                                        <ExpandableSection key={name} title={`${name} Image`} defaultExpanded={true}>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                                <StatisticCard 
+                                                    label="Pyramid Levels" 
+                                                    value={info.technical_details?.pyramid_levels || info.scales?.length || 0} 
+                                                    icon={<StorageIcon style={{ fontSize: 16 }} />}
+                                                />
+                                                <StatisticCard 
+                                                    label="Total Size" 
+                                                    value={info.technical_details?.total_size_mb || 0} 
+                                                    unit=" MB"
+                                                    icon={<MemoryIcon style={{ fontSize: 16 }} />}
+                                                />
+                                                <StatisticCard 
+                                                    label="Bit Depth" 
+                                                    value={info.image_info?.bit_depth || 'Unknown'} 
+                                                    icon={<AssessmentIcon style={{ fontSize: 16 }} />}
+                                                />
+                                                <StatisticCard 
+                                                    label="Channels" 
+                                                    value={info.image_info?.channels?.length || 1} 
+                                                    icon={<ImageIcon style={{ fontSize: 16 }} />}
+                                                />
+                                            </div>
+                                            
+                                            {info.scales && info.scales.length > 0 && (
+                                                <div>
+                                                    <h5 className="font-medium text-sm mb-2">Scale Details</h5>
+                                                    <div className="overflow-x-auto">
+                                                        <table className="min-w-full text-xs">
+                                                            <thead className="bg-gray-50 dark:bg-gray-700">
+                                                                <tr>
+                                                                    <th className="px-2 py-1 text-left">Scale</th>
+                                                                    <th className="px-2 py-1 text-left">Shape</th>
+                                                                    <th className="px-2 py-1 text-left">Size</th>
+                                                                    <th className="px-2 py-1 text-left">Chunks</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                                                                {info.scales.map((scale: any, idx: number) => (
+                                                                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                                        <td className="px-2 py-1 font-mono">{scale.scale}</td>
+                                                                        <td className="px-2 py-1">{scale.shape?.join(' × ')}</td>
+                                                                        <td className="px-2 py-1">{scale.size_mb || 0} MB</td>
+                                                                        <td className="px-2 py-1 font-mono text-xs">{scale.chunks?.join(' × ')}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
                                                 </div>
-                                            </MetadataCard>
-                                        ))}
-                                    </MetadataGrid>
+                                            )}
+                                        </ExpandableSection>
+                                    ))}
                                 </MetadataContainer>
                             )}
 
@@ -525,23 +652,175 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                             {Object.keys((metadata as any).tables || {}).length > 0 && (metadata as any).datasetFormat === 'spatialdata' && (
                                 <MetadataContainer>
                                     <SectionHeader icon={<TableIcon />}>Tables (AnnData-like)</SectionHeader>
-                                    <MetadataGrid>
-                                        {Object.entries((metadata as any).tables || {}).map(([name, info]: [string, any]) => (
-                                            <MetadataCard key={name} title={name}>
-                                                <div className="space-y-1 text-xs">
-                                                    <div><strong>Type:</strong> {info.type}</div>
-                                                    {info.components && Object.keys(info.components).length > 0 && (
-                                                        <div>
-                                                            <strong>Components:</strong> {Object.keys(info.components).join(', ')}
+                                    {Object.entries((metadata as any).tables || {}).map(([name, info]: [string, any]) => (
+                                        <ExpandableSection key={name} title={`${name} Table`} defaultExpanded={true}>
+                                            {/* Statistics Overview */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                                <StatisticCard 
+                                                    label="Observations" 
+                                                    value={info.statistics?.n_obs || 0} 
+                                                    icon={<BiotechIcon style={{ fontSize: 16 }} />}
+                                                />
+                                                <StatisticCard 
+                                                    label="Variables" 
+                                                    value={info.statistics?.n_vars || 0} 
+                                                    icon={<AssessmentIcon style={{ fontSize: 16 }} />}
+                                                />
+                                                <StatisticCard 
+                                                    label="Memory Usage" 
+                                                    value={info.statistics?.memory_usage_mb || 0} 
+                                                    unit=" MB"
+                                                    icon={<MemoryIcon style={{ fontSize: 16 }} />}
+                                                />
+                                                <StatisticCard 
+                                                    label="Components" 
+                                                    value={Object.keys(info.components || {}).length} 
+                                                    icon={<StorageIcon style={{ fontSize: 16 }} />}
+                                                />
+                                            </div>
+
+                                            {/* Biological Context */}
+                                            {info.biological_context && (
+                                                <ExpandableSection title="Biological Context" defaultExpanded={false}>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {/* Gene Preview */}
+                                                        {info.biological_context.gene_list_preview && info.biological_context.gene_list_preview.length > 0 && (
+                                                            <div>
+                                                                <h6 className="font-medium text-sm mb-2">Gene Preview (Top 20)</h6>
+                                                                <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded max-h-32 overflow-y-auto">
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {info.biological_context.gene_list_preview.map((gene: string, idx: number) => (
+                                                                            <span key={idx} className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded text-xs font-mono">
+                                                                                {gene}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Cell Type Categories */}
+                                                        {info.biological_context.cell_type_categories && info.biological_context.cell_type_categories.length > 0 && (
+                                                            <div>
+                                                                <h6 className="font-medium text-sm mb-2">Cell Type Categories</h6>
+                                                                <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {info.biological_context.cell_type_categories.slice(0, 10).map((cellType: string, idx: number) => (
+                                                                            <span key={idx} className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded text-xs">
+                                                                                {cellType}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Spatial Information */}
+                                                    {info.biological_context.spatial_range && info.biological_context.spatial_range.has_spatial_data && (
+                                                        <div className="mt-4">
+                                                            <h6 className="font-medium text-sm mb-2">Spatial Information</h6>
+                                                            <div className="bg-yellow-50 dark:bg-yellow-900 p-2 rounded">
+                                                                <div className="text-xs">
+                                                                    <strong>Spatial Columns:</strong> {info.biological_context.spatial_range.spatial_columns?.join(', ')}
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     )}
-                                                    {info.components?.X && (
-                                                        <div><strong>Expression Matrix:</strong> {info.components.X.type}</div>
+                                                </ExpandableSection>
+                                            )}
+
+                                            {/* Component Details */}
+                                            {info.components && Object.keys(info.components).length > 0 && (
+                                                <ExpandableSection title="Component Details" defaultExpanded={false}>
+                                                    {/* Expression Matrix (X) */}
+                                                    {info.components.X && (
+                                                        <div className="mb-4">
+                                                            <h6 className="font-medium text-sm mb-2">Expression Matrix (X)</h6>
+                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                                <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                                                                    <div className="text-xs text-gray-500">Type</div>
+                                                                    <div className="font-medium text-sm">{info.components.X.type}</div>
+                                                                </div>
+                                                                <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                                                                    <div className="text-xs text-gray-500">Format</div>
+                                                                    <div className="font-medium text-sm">{info.components.X.format || 'N/A'}</div>
+                                                                </div>
+                                                                <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                                                                    <div className="text-xs text-gray-500">Shape</div>
+                                                                    <div className="font-medium text-sm">{info.components.X.shape?.join(' × ') || 'N/A'}</div>
+                                                                </div>
+                                                                <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                                                                    <div className="text-xs text-gray-500">Data Type</div>
+                                                                    <div className="font-medium text-sm font-mono">{info.components.X.dtype || 'N/A'}</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     )}
-                                                </div>
-                                            </MetadataCard>
-                                        ))}
-                                    </MetadataGrid>
+
+                                                    {/* Observations (obs) */}
+                                                    {info.components.obs && (
+                                                        <div className="mb-4">
+                                                            <h6 className="font-medium text-sm mb-2">Cell Annotations (obs)</h6>
+                                                            {info.components.obs.columns && info.components.obs.columns.length > 0 && (
+                                                                <ArrayPreviewTable 
+                                                                    columns={info.components.obs.columns} 
+                                                                    columnInfo={info.components.obs.column_info || {}}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Variables (var) */}
+                                                    {info.components.var && (
+                                                        <div className="mb-4">
+                                                            <h6 className="font-medium text-sm mb-2">Gene Annotations (var)</h6>
+                                                            {info.components.var.columns && info.components.var.columns.length > 0 && (
+                                                                <ArrayPreviewTable 
+                                                                    columns={info.components.var.columns} 
+                                                                    columnInfo={info.components.var.column_info || {}}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Multidimensional observations (obsm) */}
+                                                    {info.components.obsm && (
+                                                        <div className="mb-4">
+                                                            <h6 className="font-medium text-sm mb-2">Embeddings & Coordinates (obsm)</h6>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                {/* Embeddings */}
+                                                                {info.components.obsm.embeddings && Object.keys(info.components.obsm.embeddings).length > 0 && (
+                                                                    <div>
+                                                                        <div className="text-xs font-medium mb-1">Embeddings</div>
+                                                                        {Object.entries(info.components.obsm.embeddings).map(([embName, embInfo]: [string, any]) => (
+                                                                            <div key={embName} className="bg-blue-50 dark:bg-blue-900 p-2 rounded mb-2">
+                                                                                <div className="font-mono text-xs font-semibold">{embName}</div>
+                                                                                <div className="text-xs">Shape: {embInfo.shape?.join(' × ')}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Spatial Coordinates */}
+                                                                {info.components.obsm.spatial_coords && Object.keys(info.components.obsm.spatial_coords).length > 0 && (
+                                                                    <div>
+                                                                        <div className="text-xs font-medium mb-1">Spatial Coordinates</div>
+                                                                        {Object.entries(info.components.obsm.spatial_coords).map(([coordName, coordInfo]: [string, any]) => (
+                                                                            <div key={coordName} className="bg-yellow-50 dark:bg-yellow-900 p-2 rounded mb-2">
+                                                                                <div className="font-mono text-xs font-semibold">{coordName}</div>
+                                                                                <div className="text-xs">Shape: {coordInfo.shape?.join(' × ')}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </ExpandableSection>
+                                            )}
+                                        </ExpandableSection>
+                                    ))}
                                 </MetadataContainer>
                             )}
                         </>
@@ -815,13 +1094,35 @@ const ZarrMetadataDialogComponent: React.FC<ZarrMetadataDialogComponentProps> =
                                     Enter the URL of a Zarr dataset (supports HTTP/HTTPS)
                                 </p>
                             </div>
-                            <div className="flex justify-center items-center gap-6">
+                            <div className="flex justify-center items-center gap-4">
                                 <Button 
                                     onClick={handleFetchMetadata}
                                     disabled={!state.url.trim()}
                                 >
                                     Fetch Metadata
                                 </Button>
+                                
+                                {state.metadata && (
+                                    <button
+                                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
+                                        onClick={() => {
+                                            const dataStr = JSON.stringify(state.metadata, null, 2);
+                                            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                                            const url = URL.createObjectURL(dataBlob);
+                                            const link = document.createElement('a');
+                                            link.href = url;
+                                            link.download = `dataset-metadata-${new Date().toISOString().split('T')[0]}.json`;
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                            URL.revokeObjectURL(url);
+                                        }}
+                                    >
+                                        <DownloadIcon style={{ fontSize: 18 }} />
+                                        Export
+                                    </button>
+                                )}
+                                
                                 <Button
                                     color="gray"
                                     onClick={handleClose}
