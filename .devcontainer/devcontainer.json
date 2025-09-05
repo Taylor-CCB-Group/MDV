@@ -37,11 +37,7 @@
             }
         }
     },
+    // running this is a bit redundant, but it makes sure that the git info is set correctly when rebuilding.
+    "postCreateCommand": "cd /app && npm run build-flask-dockerjs",
     "postStartCommand": "git config --global --add safe.directory /app"
-    //"postCreateCommand": "npm run dev"
-    //running a command that doesn't return will cause other issues
-    //subsequent devcontainer steps like copying .gitconfig end up not happening...
-    //we could do something like this:
-    //"postStartCommand": "nohup bash -c 'npm run dev &'"
-    //& watch nohup.out for the output... but for now, we'll just run it manually
 }
