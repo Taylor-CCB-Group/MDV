@@ -205,7 +205,7 @@ check_existing_service
 
 create_or_validate_env_file
 
-DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/dev/docker-local.yml"
+DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/main/docker-local.yml"
 run_docker_compose "$DOCKER_COMPOSE_URL"
 
 open_browser
