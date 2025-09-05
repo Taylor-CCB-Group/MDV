@@ -63,7 +63,7 @@ const ChatDialog = ({
     isPopout,
     fullscreen = false,
     isLoading = false,
-    isLoadingInit,
+    isLoadingInit = false,
 }: ChatDialogProps) => {
     const defaultDrawerWidth = 250;
     const minDrawerWidth = 180;
@@ -202,7 +202,7 @@ const ChatDialog = ({
                                 />
                                 <Divider />
                                 <List>
-                                    {isLoading ? (
+                                    {isLoading || isLoadingInit ? (
                                         <ListItemButton>
                                             <ListItemText primary="Loading chat history..." />
                                         </ListItemButton>

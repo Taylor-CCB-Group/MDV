@@ -103,6 +103,7 @@
     "react18-json-view": "^0.2.8",
     "regl": "^2.1.0",
     "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "socket.io-client": "^4.8.1",
     "split.js": "^1.6.5",

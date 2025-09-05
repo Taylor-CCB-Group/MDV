@@ -91,10 +91,12 @@ h1, h2, h3, h4, h5, p, ol, ul {
     @apply mb-1
 }
 ul {
-    @apply list-disc list-inside;
+    @apply list-disc list-outside;
+    @apply pl-4;
 }
 ol {
-    @apply list-decimal list-inside;
+    @apply list-decimal list-outside;
+    @apply pl-4;
 }
 
 textarea {
