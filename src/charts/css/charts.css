@@ -198,7 +198,7 @@ select, input, textarea {
     height: 5px;
     cursor: n-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }
   
   /* Bottom */
@@ -210,7 +210,7 @@ select, input, textarea {
     height: 10px;
     cursor: s-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }
   
   /* Right */
@@ -222,7 +222,7 @@ select, input, textarea {
     height: 100%;
     cursor: e-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }
   
   /* Left */
@@ -234,7 +234,7 @@ select, input, textarea {
     height: 100%;
     cursor: w-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }
   
   /* Top-right */
@@ -246,7 +246,7 @@ select, input, textarea {
     height: 10px;
     cursor: ne-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }
   
   /* Top-left */
@@ -258,7 +258,7 @@ select, input, textarea {
     height: 10px;
     cursor: nw-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }
   
   /* Bottom-right */
@@ -270,7 +270,7 @@ select, input, textarea {
     height: 10px;
     cursor: se-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }
   
   /* Bottom-left */
@@ -282,7 +282,7 @@ select, input, textarea {
     height: 10px;
     cursor: sw-resize;
     background: transparent;
-    z-index: 2;
+    z-index: inherit;
   }  
 
 .ciview-chart-titlebar{
@@ -292,6 +292,7 @@ select, input, textarea {
     background-color: var(--background_color);
     flex:0 0 auto;
     font-size:14px;
+    overflow:hidden;
     border: 1px solid rgba(120,120,120, 0.2); /* Add a subtle border */
 }
 
@@ -325,6 +326,7 @@ select, input, textarea {
     min-height:1px;
     background-color: var(--main_panel_color);
     color: var(--text_color);
+    overflow: hidden;
 }
 
 .legend-container {
@@ -570,4 +572,11 @@ select, input, textarea {
     background-color: var(--background_color)
 }
 
+.tippy-content{
+    background: var(--tooltip_background_color);
+    color: var(--tooltip_text_color);
+}
 
+.tippy-arrow:before {
+   color: var(--tooltip_background_color);
+}
