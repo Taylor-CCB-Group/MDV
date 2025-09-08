@@ -239,7 +239,7 @@ class BaseChart<T extends BaseConfig> {
             action(() => {
                 //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
                 if (this.__doc__.fullscreenElement) {
-                    if (this.div === this.__doc__.fullscreenElement) {
+                    if (this.div === this.__doc__.fullscreenElement) {               
                         this.observable.container = this.div;
                         const rect = window.screen;
                         this.setSize(rect.width, rect.height);
@@ -261,6 +261,7 @@ class BaseChart<T extends BaseConfig> {
                     this.isFullscreen = true;
                 } else {
                     this.observable.container = this.__doc__.body;
+                 
                     // Reset the size of chart
                     this.setSize(...oldSize);
                     const cm = window.mdv.chartManager;
@@ -441,7 +442,8 @@ class BaseChart<T extends BaseConfig> {
             this.menuSpace,
         );
         const t= tippy(sp, {
-            content: tooltip
+            content: tooltip,
+            appendTo: this.div
         });
         //need to store in order to switch document when chart is popped out/in
         this.menuTooltips.push(t);  
@@ -964,7 +966,6 @@ class BaseChart<T extends BaseConfig> {
         //   ^^ that's not a changeBaseDocument() thing, it's a fullscreen thing...
         this.contextMenu.__doc__ = doc;
         this.menuTooltips.forEach(t=>{
-            t.setProps({appendTo: doc.body});
             //for some reason the popout tooltip layer shows in the popout window
             //and needs closing
             setTimeout(()=>t.hide(),20);
