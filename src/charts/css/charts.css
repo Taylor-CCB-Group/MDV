@@ -216,11 +216,13 @@ select, input, textarea {
     position: absolute !important;
     bottom: -10px !important;
     right: -10px !important;
+    background: transparent !important;
  }
 .grid-stack .ui-resizable-sw { 
     position: absolute !important;
     bottom: -10px !important;
     left: -10px !important;
+    background: transparent !important;
  }
 
 .dark .gridLock {
