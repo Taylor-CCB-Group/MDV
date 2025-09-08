@@ -691,6 +691,8 @@ class BaseChart<T extends BaseConfig> {
         for (const disposer of this.reactionDisposers) {
             disposer();
         }
+        this.menuTooltips.forEach(t => t.destroy());
+        this.menuTooltips = [];
         // dynamic props?
     }
     removeLayout?(): void;
