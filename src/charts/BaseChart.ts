@@ -446,7 +446,8 @@ class BaseChart<T extends BaseConfig> {
             appendTo: this.div
         });
         //need to store in order to switch document when chart is popped out/in
-        this.menuTooltips.push(t);  
+        this.menuTooltips.push(t); 
+        // event listener for hiding the tooltip on mouseleave event for popout window
         sp.addEventListener('mouseleave', () => {
             t.hide();
           });

@@ -216,6 +216,7 @@ select, input, textarea {
     position: absolute !important;
     bottom: -10px !important;
     right: -10px !important;
+    /* To hide the duplicate resize handles at the bottom */
     background: transparent !important;
  }
 .grid-stack .ui-resizable-sw { 
@@ -239,6 +240,7 @@ select, input, textarea {
     box-shadow: 0 0 1em var(--shadow_color);
 }
 
+/* Resize handlers */
 /* Top */
 .resizer-n {
     position: absolute;
@@ -264,7 +266,7 @@ select, input, textarea {
   }
   
   /* Right */
-  /* The ciview-chart-titlebar is of height 31px */
+  /* Hardcoding the height of ciview-chart-titlebar (31px) to avoid drag and resize overlap */
   .resizer-e {
     position: absolute;
     top: 31px;
