@@ -14,7 +14,7 @@ import { initialiseChartConfig } from "./chartConfigUtils";
 import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
-import tippy, {Instance as TippyInstance} from "tippy.js";
+import tippy, {type Instance as TippyInstance} from "tippy.js";
 import 'tippy.js/dist/tippy.css'; 
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
@@ -447,7 +447,9 @@ class BaseChart<T extends BaseConfig> {
         });
         //need to store in order to switch document when chart is popped out/in
         this.menuTooltips.push(t);  
-
+        sp.addEventListener('mouseleave', () => {
+            t.hide();
+          });
         createEl(
             "i",
             {
