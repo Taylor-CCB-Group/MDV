@@ -250,7 +250,7 @@ select, input, textarea {
     height: 10px;
     cursor: n-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }
   
   /* Bottom */
@@ -262,7 +262,7 @@ select, input, textarea {
     height: 10px;
     cursor: s-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }
   
   /* Right */
@@ -275,7 +275,7 @@ select, input, textarea {
     height: calc(100% - 31px);
     cursor: e-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }
   
   /* Left */
@@ -287,7 +287,7 @@ select, input, textarea {
     height: calc(100% - 31px);
     cursor: w-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }
   
   /* Top-right */
@@ -299,7 +299,7 @@ select, input, textarea {
     height: 10px;
     cursor: ne-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }
   
   /* Top-left */
@@ -311,7 +311,7 @@ select, input, textarea {
     height: 10px;
     cursor: nw-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }
   
   /* Bottom-right */
@@ -323,7 +323,7 @@ select, input, textarea {
     height: 10px;
     cursor: se-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }
   
   /* Bottom-left */
@@ -335,7 +335,7 @@ select, input, textarea {
     height: 10px;
     cursor: sw-resize;
     background: transparent;
-    z-index: inherit;
+    z-index: 2;
   }  
 
 .ciview-chart-titlebar{
