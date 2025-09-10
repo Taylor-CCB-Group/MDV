@@ -35,7 +35,7 @@ if ENABLE_AUTH:
     
 
 def create_flask_app(config_name=None):
-    """ Create and configure the Flask app."""
+    """Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
 
     if config_name == 'test':
