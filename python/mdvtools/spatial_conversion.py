@@ -1,11 +1,14 @@
-import pandas as pd
 from typing import Optional, List
 import spatialdata as sd
 from spatialdata_io import xenium
 import copy
+import subprocess
+import os
+import tempfile
+import shutil
 
-from .mdvproject import MDVProject
-from .conversions import get_matrix, _add_dims
+from mdvtools.mdvproject import MDVProject
+from mdvtools.conversions import get_matrix, _add_dims
 
 
 def convert_xenium_to_mdv(
@@ -15,8 +18,9 @@ def convert_xenium_to_mdv(
     delete_existing: bool = False,
     label: str = "",
     chunk_data: bool = False,
-    load_cell_boundaries: bool = True,
-    load_nucleus_boundaries: bool = True,
+    # todo handling of cell boundaries, transcripts, transcripts.
+    load_cell_boundaries: bool = False,
+    load_nucleus_boundaries: bool = False,
     load_transcripts: bool = False,
     load_morphology_images: bool = True,
     load_cells_table: bool = True,
@@ -70,7 +74,7 @@ def convert_xenium_to_mdv(
         - Links cells and genes through expression data
         - Optionally adds cell/nucleus boundaries as separate datasources
         - Optionally adds transcript locations as points datasource
-        - Optionally adds morphology images as image datasources
+        - Optionally adds morphology images as OME-NGFF image datasources
 
         Spatial Data Handling:
         - Sets up region data for spatial visualization
@@ -86,7 +90,7 @@ def convert_xenium_to_mdv(
     # Load Xenium data using spatialdata-io
     print(f"Loading Xenium data from {xenium_path}")
     try:
-        sdata = xenium(
+        sdata: sd.SpatialData = xenium(
             xenium_path,
             cells_boundaries=load_cell_boundaries,
             nucleus_boundaries=load_nucleus_boundaries,
@@ -205,57 +209,58 @@ def convert_xenium_to_mdv(
                 default_color="total_counts" if "total_counts" in cell_table.columns else "cell_id",
                 position_fields=["x", "y"],
                 scale_unit="µm",
-                scale=1.0
+                scale=1.0 # todo: adjust based on provided scale info. in future, more sopbisticated coordinate system handling
             )
         except Exception as e:
             print(f"Warning: Could not set up region data: {str(e)}")
     
+    # todo: current idea is that these won't be DataSources, but things that are associated with cells regions
+    #  and understood by SpatialLayers
     # Add cell boundaries if available
-    if load_cell_boundaries and "cell_boundaries" in sdata.shapes:
-        print("Adding cell boundaries")
-        try:
-            cell_boundaries = sdata.shapes["cell_boundaries"]
-            # Convert GeoDataFrame to DataFrame for MDV
-            boundaries_df = pd.DataFrame({
-                "cell_id": cell_boundaries.index,
-                "geometry": cell_boundaries.geometry
-            })
-            mdv.add_datasource(f"{label}cell_boundaries", boundaries_df)
-        except Exception as e:
-            print(f"Warning: Could not add cell boundaries: {str(e)}")
+    # if load_cell_boundaries and "cell_boundaries" in sdata.shapes:
+    #     print("Adding cell boundaries")
+    #     try:
+    #         cell_boundaries = sdata.shapes["cell_boundaries"]
+    #         # Convert GeoDataFrame to DataFrame for MDV
+    #         boundaries_df = pd.DataFrame({
+    #             "cell_id": cell_boundaries.index,
+    #             "geometry": cell_boundaries.geometry
+    #         })
+    #         mdv.add_datasource(f"{label}cell_boundaries", boundaries_df)
+    #     except Exception as e:
+    #         print(f"Warning: Could not add cell boundaries: {str(e)}")
     
-    # Add nucleus boundaries if available
-    if load_nucleus_boundaries and "nucleus_boundaries" in sdata.shapes:
-        print("Adding nucleus boundaries")
-        try:
-            nucleus_boundaries = sdata.shapes["nucleus_boundaries"]
-            boundaries_df = pd.DataFrame({
-                "nucleus_id": nucleus_boundaries.index,
-                "geometry": nucleus_boundaries.geometry
-            })
-            mdv.add_datasource(f"{label}nucleus_boundaries", boundaries_df)
-        except Exception as e:
-            print(f"Warning: Could not add nucleus boundaries: {str(e)}")
+    # # Add nucleus boundaries if available
+    # if load_nucleus_boundaries and "nucleus_boundaries" in sdata.shapes:
+    #     print("Adding nucleus boundaries")
+    #     try:
+    #         nucleus_boundaries = sdata.shapes["nucleus_boundaries"]
+    #         boundaries_df = pd.DataFrame({
+    #             "nucleus_id": nucleus_boundaries.index,
+    #             "geometry": nucleus_boundaries.geometry
+    #         })
+    #         mdv.add_datasource(f"{label}nucleus_boundaries", boundaries_df)
+    #     except Exception as e:
+    #         print(f"Warning: Could not add nucleus boundaries: {str(e)}")
     
-    # Add transcripts if available
-    if load_transcripts and "transcripts" in sdata.points:
-        print("Adding transcripts")
-        try:
-            transcripts = sdata.points["transcripts"]
-            # Convert to DataFrame
-            transcripts_df = pd.DataFrame(transcripts)
-            mdv.add_datasource(f"{label}transcripts", transcripts_df)
-        except Exception as e:
-            print(f"Warning: Could not add transcripts: {str(e)}")
+    # # Add transcripts if available
+    # if load_transcripts and "transcripts" in sdata.points:
+    #     print("Adding transcripts")
+    #     try:
+    #         transcripts = sdata.points["transcripts"]
+    #         # Convert to DataFrame
+    #         transcripts_df = pd.DataFrame(transcripts)
+    #         mdv.add_datasource(f"{label}transcripts", transcripts_df)
+    #     except Exception as e:
+    #         print(f"Warning: Could not add transcripts: {str(e)}")
     
-    # Add morphology images if available
+    # Add morphology images as OME-NGFF format if available
     if load_morphology_images and "morphology_focus" in sdata.images:
-        print("Adding morphology images")
+        print("Adding morphology images as JP2K OME-TIFF")
         try:
-            # For now, we'll add image metadata - full image handling would need more complex implementation
             morphology_image = sdata.images["morphology_focus"]
-            # This is a placeholder - full image integration would require additional MDV image handling
-            print("Morphology image detected but full integration requires additional implementation")
+            # _save_ome_ngff_image(mdv, morphology_image, f"{label}morphology_focus")
+            _convert_morphology_image(mdv, xenium_path)
         except Exception as e:
             print(f"Warning: Could not add morphology images: {str(e)}")
     
@@ -358,3 +363,72 @@ def convert_xenium_zarr_to_mdv(
         selected_genes=selected_genes,
         gene_identifier_column=gene_identifier_column
     )
+
+def _convert_morphology_image(mdv: MDVProject, xenium_path: str) -> None:
+    # use bioformats2raw & raw2ometiff to convert the image to JP2K OME-TIFF
+    # this is particularly flakey because we don't have those as dependencies - also require java, blosc, ...
+    # first test is running locally with bespoke environment implied, may update docker container to include them, or not.
+    # get a directory listing of xenium_path/morphology_focus, then find the one of the ome.tif files for bioformats2raw
+    # then use raw2ometiff to convert the raw file to OME-TIFF
+    file = os.listdir(f"{xenium_path}/morphology_focus")[0] # todo: more robust way to find the file
+    with tempfile.TemporaryDirectory() as temp_dir:
+        tmp_zarr = f"{temp_dir}/{file}.zarr"
+        tmp_tiff = f"{temp_dir}/jp2_{file}"
+        print(f"Converting {file} to JP2K OME-TIFF")
+        print(f"tmp_zarr: '{tmp_zarr}'")
+        print(f"tmp_tiff: '{tmp_tiff}'")
+        subprocess.run(["bioformats2raw", f"{xenium_path}/morphology_focus/{file}", tmp_zarr])
+        subprocess.run([
+            "raw2ometiff", tmp_zarr, tmp_tiff, 
+            "--compression", "JPEG-2000 Lossy", "--quality", "10"
+        ])
+        # move the tiff file to the images directory
+        os.makedirs(f"{mdv.dir}/images/avivator", exist_ok=True)
+        shutil.move(tmp_tiff, f"{mdv.dir}/images/avivator/jp2_{file}")
+        ds = mdv.get_datasource_metadata("cells")
+        # First-pass, CBA to try to use the methods documented in spatialdata.md - I think we may want a refactor
+        # this is somewhat based on mdv.update_datasource_for_tiff - also sus.
+        # mdv.set_region_data("cells", region_field="region", default_color="x")
+        # mdv.add_viv_images("cells", [])
+        ds["regions"] = {
+            "position_fields": ["x", "y"],
+            "region_field": "region",
+            "default_color": "region",
+            "scale_unit": "µm",
+            "scale": 1.0, # todo: read appropriate scale/roi from the image metadata
+            "all_regions": {
+                # definitely not wanting this as region id but looks like it might work for very initial testing
+                # ultimately want to be able to have multiple e.g. xenium inputs in the same project
+                # - so each input can have a corresponding region id... and we might have ways of loading column data from a given store...
+                "cell_circles": {
+                    "roi": {
+                        "min_x": 0,
+                        "min_y": 0,
+                        "max_x": 100,
+                        "max_y": 100
+                    },
+                    "images": {},
+                    "viv_image": {
+                        "file": f"jp2_{file}",
+                        "linked_file": False,
+                    }
+                }
+            },
+            "avivator": {
+                "default_channels": [],
+                "base_url": "images/avivator"
+            }
+        }
+        print(ds)
+        mdv.set_datasource_metadata(ds)
+
+if __name__ == "__main__":
+    import os
+    folder = os.path.expanduser("~/data/mdv_xenium_test")
+    x_path = os.path.expanduser("~/data/Xenium_Prime_MultiCellSeg_Mouse_Ileum_tiny_outs")
+    mdv = convert_xenium_to_mdv(
+        folder=folder,
+        xenium_path=x_path,
+        delete_existing=True,
+    )
+    mdv.serve()
