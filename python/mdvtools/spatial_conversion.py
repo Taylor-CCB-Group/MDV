@@ -105,7 +105,7 @@ def convert_xenium_to_mdv(
     # Validate that we have the required data
     if "table" not in sdata.tables:
         raise ValueError("No cell table found in Xenium data")
-    
+        
     adata = sdata.tables["table"]
     if adata.n_obs == 0 or adata.n_vars == 0:
         raise ValueError("Cannot convert empty Xenium data (0 cells or 0 genes)")
@@ -216,6 +216,8 @@ def convert_xenium_to_mdv(
     
     # todo: current idea is that these won't be DataSources, but things that are associated with cells regions
     #  and understood by SpatialLayers
+    # we include an entire spatialdata.zarr store - and aim to use this for as much as possible in future...
+    sdata.write(f"{mdv.dir}/spatialdata.zarr")
     # Add cell boundaries if available
     # if load_cell_boundaries and "cell_boundaries" in sdata.shapes:
     #     print("Adding cell boundaries")
@@ -256,11 +258,12 @@ def convert_xenium_to_mdv(
     
     # Add morphology images as OME-NGFF format if available
     if load_morphology_images and "morphology_focus" in sdata.images:
-        print("Adding morphology images as JP2K OME-TIFF")
+        # print("Adding morphology images as JP2K OME-TIFF")
         try:
-            morphology_image = sdata.images["morphology_focus"]
+            # morphology_image = sdata.images["morphology_focus"]
             # _save_ome_ngff_image(mdv, morphology_image, f"{label}morphology_focus")
-            _convert_morphology_image(mdv, xenium_path)
+            # _convert_morphology_image(mdv, xenium_path)
+            _set_sdata_image(mdv, sdata)
         except Exception as e:
             print(f"Warning: Could not add morphology images: {str(e)}")
     
@@ -370,14 +373,19 @@ def _convert_morphology_image(mdv: MDVProject, xenium_path: str) -> None:
     # first test is running locally with bespoke environment implied, may update docker container to include them, or not.
     # get a directory listing of xenium_path/morphology_focus, then find the one of the ome.tif files for bioformats2raw
     # then use raw2ometiff to convert the raw file to OME-TIFF
-    file = os.listdir(f"{xenium_path}/morphology_focus")[0] # todo: more robust way to find the file
+    file = "morphology_focus.ome.tif"
+    if not os.path.exists(f"{xenium_path}/{file}"):
+        file = os.listdir(f"{xenium_path}/morphology_focus")[0] # todo: more robust way to find the file
+        file = f"morphology_focus/{file}"
     with tempfile.TemporaryDirectory() as temp_dir:
-        tmp_zarr = f"{temp_dir}/{file}.zarr"
+        tmp_zarr = f"{temp_dir}/morphology_focus.zarr"
+        #XXX::: oops, might have a / in file...
         tmp_tiff = f"{temp_dir}/jp2_{file}"
         print(f"Converting {file} to JP2K OME-TIFF")
         print(f"tmp_zarr: '{tmp_zarr}'")
         print(f"tmp_tiff: '{tmp_tiff}'")
-        subprocess.run(["bioformats2raw", f"{xenium_path}/morphology_focus/{file}", tmp_zarr])
+        # subprocess.run(["bioformats2raw", f"{xenium_path}/morphology_focus/{file}", tmp_zarr])
+        subprocess.run(["bioformats2raw", f"{xenium_path}/{file}", tmp_zarr])
         subprocess.run([
             "raw2ometiff", tmp_zarr, tmp_tiff, 
             "--compression", "JPEG-2000 Lossy", "--quality", "10"
@@ -422,13 +430,65 @@ def _convert_morphology_image(mdv: MDVProject, xenium_path: str) -> None:
         print(ds)
         mdv.set_datasource_metadata(ds)
 
+def _set_sdata_image(mdv: MDVProject, sdata: sd.SpatialData):
+    ds = mdv.get_datasource_metadata("cells")
+    # First-pass, CBA to try to use the methods documented in spatialdata.md - I think we may want a refactor
+    # this is somewhat based on mdv.update_datasource_for_tiff - also sus.
+    # mdv.set_region_data("cells", region_field="region", default_color="x")
+    # mdv.add_viv_images("cells", [])
+    
+    # todo - proper use of metadata, more reusable code for handling images in spatialdata objects
+    for img_name in sdata.images:
+        print(f"Found image in sdata: {img_name}")        
+    
+    ds["regions"] = {
+        "position_fields": ["x", "y"],
+        "region_field": "region",
+        "default_color": "region",
+        "scale_unit": "µm",
+        "scale": 1.0,  # todo: read appropriate scale/roi from the image metadata
+        "all_regions": {
+            # definitely not wanting this as region id but looks like it might work for very initial testing
+            # ultimately want to be able to have multiple e.g. xenium inputs in the same project
+            # - so each input can have a corresponding region id... and we might have ways of loading column data from a given store...
+            "cell_circles": {
+                "roi": {"min_x": 0, "min_y": 0, "max_x": 100, "max_y": 100},
+                "images": {},
+                "viv_image": {
+                    "file": "morphology_focus"
+                },
+            }
+        },
+        "avivator": {"default_channels": [], "base_url": "spatialdata.zarr/images"},
+    }
+    mdv.set_datasource_metadata(ds)
+
+
 if __name__ == "__main__":
     import os
-    folder = os.path.expanduser("~/data/mdv_xenium_test")
-    x_path = os.path.expanduser("~/data/Xenium_Prime_MultiCellSeg_Mouse_Ileum_tiny_outs")
-    mdv = convert_xenium_to_mdv(
-        folder=folder,
-        xenium_path=x_path,
-        delete_existing=True,
-    )
-    mdv.serve()
+    kbull = False
+    if kbull:
+        # would be nice to make a composite project for all of these...
+        kbull_dir = "/Volumes/CrucialOx9/KBull_HumanKidney_XeniumData"
+        for dir in os.listdir(kbull_dir):
+            if dir.endswith(".zarr"):
+                continue
+            folder = os.path.expanduser(f"~/data/mdv_xenium_test_kbull_{dir}")
+            if os.path.exists(folder):
+                continue
+            x_path = os.path.expanduser(f"{kbull_dir}/{dir}")
+            mdv = convert_xenium_to_mdv(
+                folder=folder,
+                xenium_path=x_path,
+                delete_existing=True,
+            )
+    else:
+        folder = os.path.expanduser("~/data/mdv_xenium_tiny_test")
+        x_path = os.path.expanduser("~/data/Xenium_Prime_MultiCellSeg_Mouse_Ileum_tiny_outs")
+        mdv = convert_xenium_to_mdv(
+            folder=folder,
+            xenium_path=x_path,
+            delete_existing=True,
+        )
+        mdv.set_editable(True)
+        mdv.serve()

@@ -119,6 +119,12 @@ def create_app(
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
         return render_template("page.html", route=route, backend=options.backend_db)
 
+    @project_bp.route("/spatialdata.zarr/<path:file>")
+    def get_spatialdata(file):
+        # nb - we might have multiple spatialdata objects in future, route might change somewhat.
+        path = safe_join(project.dir, "spatialdata.zarr", file)
+        return send_file(path)
+    
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
