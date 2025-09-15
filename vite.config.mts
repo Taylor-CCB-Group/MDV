@@ -5,8 +5,10 @@ import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
-// zarrita seems to need a polyfill for Buffer - seems like a bug
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
+// zarrita needed a polyfill for Buffer - seems like a bug
+// seems ok without as long we don't use ZipFileStore (marked experimental anyway)
+// having the polyfill means the build works, but devserver fails with 'cannot import outside a module'
+// import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 
 const flaskURL = "http://127.0.0.1:5055";
@@ -173,7 +175,6 @@ export default defineConfig(env => {
         },
     },
     plugins: [
-        nodePolyfills(),
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
             babel: {
