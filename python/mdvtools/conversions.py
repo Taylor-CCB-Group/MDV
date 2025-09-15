@@ -1,3 +1,4 @@
+import re
 from scanpy import AnnData
 import scipy
 import pandas as pd
@@ -662,3 +663,104 @@ def _add_dims(table, dims, max_dims,stub=""):
         #perhaps only necessary with mudata objects but will do no harm
         table = table.merge(dim_table, left_index=True, right_index=True, how= "left")
     return table
+
+
+def convert_vcf_to_svproject(folder, vcf_filename, genome="hg38" ,extra_info = None,
+                             include_sample_names=True, exclude_draft_chromosomes=True):
+    # SV VCF  files have an END field in the INFO column
+    # hoever pysam seems to convert this to a stop field in the record
+    # so we will use that
+    import pysam
+    draft_chrom_pattern = re.compile(
+        r"(random|chrUn|fix|alt|decoy)", re.IGNORECASE
+    )
+
+   
+
+
+    if not extra_info:
+        extra_info = []
+    vcf  = pysam.VariantFile(vcf_filename)
+    info_fields_required = ["SVTYPE","SVLEN","SUPP_VEC"]
+    
+    info_fields_required.extend(extra_info)
+    # do we have all the fields 
+    missing_fields = [x for x in info_fields_required if x not in vcf.header.info]
+    if len(missing_fields)>0:   
+            raise ValueError(f"VCF file missing the following required INFO fields {missing_fields}")
+    # dict to hold all the fields we require
+    column_dict ={
+        "chr1":[],
+        "pos1":[],
+        "chr2":[],
+        "pos2":[],
+        "svtype":[],
+        "length":[],
+        "support":[],
+        "quality":[]
+    }
+    #add any extras
+    if include_sample_names:
+        column_dict["samples"] = []
+    for field in extra_info :
+        column_dict[field] = []
+
+
+    # get the chromosomes 
+    chromosomes = {x[0]:x[1].length for x in vcf.header.contigs.items() if not exclude_draft_chromosomes  or not draft_chrom_pattern.search(x[0])}
+
+    for rec in (vcf):
+        chr1= rec.chrom
+        chr2= rec.info.get("CHR2",chr1)
+        if not chr1 in chromosomes or not chr2 in chromosomes:
+            continue
+        column_dict["chr1"].append(chr1)
+        column_dict["pos1"].append(rec.pos)
+        column_dict["chr2"].append(rec.info.get("CHR2",chr2))
+        column_dict["pos2"].append(rec.stop)
+        column_dict["svtype"].append(rec.info.get("SVTYPE","?"))
+        column_dict["length"].append(abs(rec.info.get("SVLEN",0)))
+        column_dict["quality"].append(rec.qual if rec.qual else 0)
+        for field in extra_info:
+            column_dict[field].append(rec.info.get(field,"NA"))
+        sample_indexes = [i for i, c in enumerate(rec.info.get("SUPP_VEC",[])) if c == "1"]
+        column_dict["support"].append(len(sample_indexes))
+        if include_sample_names:
+            samples  = ",".join([vcf.header.samples[i] for i in sample_indexes])
+            column_dict["samples"].append(samples)
+
+    p= MDVProject(folder, delete_existing=True)
+    df = pd.DataFrame(column_dict)
+    columns = [
+        {"name": "chr1", "datatype": "text"},
+        {"name": "pos1", "datatype": "int32"},
+        {"name": "chr2", "datatype": "text"},
+        {"name": "pos2", "datatype": "int32"},
+        {"name": "svtype", "datatype": "text"},
+        {"name": "length", "datatype": "int32"},
+        {"name": "support", "datatype": "int32"},
+        {"name": "quality", "datatype": "double"},
+    ]
+    if include_sample_names:
+        columns.append({"name": "samples", "datatype": "multitext", "delimiter": ","})
+    for field in extra_info:
+        datatype = "text" if vcf.header.info[field].type== "String" else "double"
+        columns.append({"name": field, "datatype": datatype})
+    p.add_datasource("sv", df, columns)
+    md = p.get_datasource_metadata("sv")
+    # add the genome information
+    md["genome"]={
+        "chromosomes": chromosomes,
+        "assembly": genome,
+        "svs":{
+            "sv_columns":{
+                "chr1":"chr1",
+                "chr2":"chr2",
+                "pos1":"pos1",
+                "pos2":"pos2",
+                "svtype":"svtype"
+            }
+        }
+    }
+    p.set_datasource_metadata(md)
+    

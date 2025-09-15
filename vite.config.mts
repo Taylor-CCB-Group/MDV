@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 
-const flaskURL = "http://127.0.0.1:5055";
+const flaskURL = "http://127.0.0.1:5050";
 const port = 5170;
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints

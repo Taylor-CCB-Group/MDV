@@ -133,6 +133,8 @@ class DataStore {
         }
         this.images = config.images;
         this.genome_browser = config.genome_browser;
+        // a more more generic entry describing the genome
+        this.genome = config.genome;
         this.tree_diagram = config.tree_diagram;
 
         if (config.columns) {
