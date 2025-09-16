@@ -11,7 +11,7 @@ import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
 
 import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
-import { useProject } from "../../modules/ProjectContext";
+import { getProjectInfo, useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview";
 
 import {
@@ -989,17 +989,20 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             try {
                 // Extract server URL and project ID properly
                 // root is something like "/project/117", we need to extract the base URL and project ID
+                const { mainApiRoute } = getProjectInfo(); // Get the main API route
                 const projectId = root.split('/').pop(); // Get the last part which is the project ID
                 const serverUrl = window.location.origin; // Get the base URL like "http://localhost:5055"
-  
+                const socketPath = `${mainApiRoute}socket.io`;
                 console.log('Server URL:', serverUrl);
                 console.log('Project ID:', projectId);
                 console.log('Namespace:', `/project/${projectId}`);
+                console.log('Socket Path:', socketPath);
                 
                 // Create SocketIO upload client
                 const uploadClient = createSocketIOUpload({
                     serverUrl: serverUrl,
                     namespace: `/project/${projectId}`,
+                    socketPath: socketPath, // socket path for path variable: '/test/socket.io'
                     file: file,
                     fileName: file.name,
                     // CSV-specific options

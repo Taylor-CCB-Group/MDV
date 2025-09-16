@@ -20,6 +20,7 @@ export interface SocketIOUploadConfig {
     onStatusChange?: (status: string, message?: string) => void;
     onError?: (error: any) => void;
     onSuccess?: (result: any) => void;
+    socketPath?: string;
 }
 
 export interface SocketIOUploadState {
@@ -215,6 +216,7 @@ export class SocketIOUploadClient {
             
             // Connect to the specific namespace directly
             this.socket = io(`${this.config.serverUrl}${this.config.namespace}`, {
+                path: this.config.socketPath || '/socket.io',   // '/test/socket.io' or '/carroll/socket.io'
                 autoConnect: false,
                 transports: ['websocket', 'polling'],
                 timeout: 60000,
@@ -445,12 +447,12 @@ private async waitForProcessing(): Promise<void> {
                         
                         // Exponential backoff
                         await new Promise(resolve => 
-                            setTimeout(resolve, Math.min(1000 * Math.pow(2, reconnectAttempts), 30000))
+                            setTimeout(resolve, Math.min(1000 * (2 ** reconnectAttempts), 30000))
                         );
                     }
                 } catch (error) {
                     reconnectAttempts++;
-                    console.warn(`Reconnection failed:`, error);
+                    console.warn('Reconnection failed:', error);
                     
                     if (reconnectAttempts >= maxReconnectAttempts) {
                         throw new Error(`Failed to reconnect after ${maxReconnectAttempts} attempts`);

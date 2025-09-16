@@ -84,6 +84,13 @@ export type ImportProjectDialogProps = {
 // Read the environment variable to determine the upload method
 const USE_SOCKETIO_UPLOAD = true; // Change to false to use HTTP upload
 
+const getBasePath = () => {
+    // todo: this is a bit of a hack, but it works for now, we should find a better way to do this
+    // Extract the first segment after the domain, e.g. /test or /carroll
+    const match = window.location.pathname.match(/^\/(\w+)/);
+    return match ? `/${match[1]}` : '';
+};
+
 const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [file, setFile] = useState<File | null>(null);
     const [projectName, setProjectName] = useState("");
@@ -245,10 +252,13 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         setErrorOpen(false);
 
         try {
+            const basePath = getBasePath();
+            const socketPath = `${basePath}/socket.io`;
             const client = createSocketIOUpload({
                 serverUrl: window.location.origin,
-                namespace: "/", 
+                namespace: "/",
                 file: file,
+                socketPath, // socket path for path variable: '/test/socket.io'
                 onProgress: (percent) => {
                     setProgress(percent);
                 },

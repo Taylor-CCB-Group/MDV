@@ -10,6 +10,9 @@ logger.info("safe_mdv_app.py starting")
 # Import the app at the module level (outside any conditionals)
 try:
     from mdvtools.dbutils.mdv_server_app import app
+    from mdvtools.websocket import socketio
+    from mdvtools.socketio_upload import initialize_socketio_upload
+    # app = socketio
     if app is None:
         logger.error("app from mdv_server_app is None - using fallback")
         app = Flask(__name__)
@@ -58,4 +61,7 @@ if __name__ == '__main__':
         logger.info(f"Applying PrefixMiddleware with prefix: {prefix}")
         app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix=prefix)
 
-    app.run(host='0.0.0.0', debug=False, port=5056)
+    # Register upload socket events
+    initialize_socketio_upload(app)
+    # app.run(host='0.0.0.0', debug=False, port=5056)
+    socketio.run(app, host='0.0.0.0', debug=False, port=5056)
