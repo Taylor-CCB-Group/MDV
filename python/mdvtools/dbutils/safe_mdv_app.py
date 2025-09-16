@@ -10,8 +10,6 @@ logger.info("safe_mdv_app.py starting")
 # Import the app at the module level (outside any conditionals)
 try:
     from mdvtools.dbutils.mdv_server_app import app
-    from mdvtools.websocket import socketio
-    from mdvtools.socketio_upload import initialize_socketio_upload
     # app = socketio
     if app is None:
         logger.error("app from mdv_server_app is None - using fallback")
@@ -26,7 +24,8 @@ if __name__ == '__main__':
     Running the app in local debugger with a path prefix
     This can be usefull for testing behaviour app running on a sub-path
     """
-    
+    from mdvtools.websocket import socketio
+    from mdvtools.socketio_upload import initialize_socketio_upload
     # https://stackoverflow.com/a/36033627/279703
     class PrefixMiddleware(object):
 
