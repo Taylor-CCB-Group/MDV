@@ -62,6 +62,10 @@ if __name__ == '__main__':
         app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix=prefix)
 
     # Register upload socket events
-    initialize_socketio_upload(app)
+    if initialize_socketio_upload is not None:
+        initialize_socketio_upload(app)
     # app.run(host='0.0.0.0', debug=False, port=5056)
-    socketio.run(app, host='0.0.0.0', debug=False, port=5056)
+    if socketio is not None:
+        socketio.run(app, host='0.0.0.0', debug=False, port=5056)
+    else:
+        app.run(host='0.0.0.0', debug=False, port=5056)
