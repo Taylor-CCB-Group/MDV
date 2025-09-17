@@ -65,7 +65,12 @@ def register_routes(app, ENABLE_AUTH):
 
         @app.route('/api_root')
         def get_mdv_api_root():
-            return jsonify({"mdv_api_root": os.environ.get("MDV_API_ROOT", "/")})
+            root = os.environ.get("MDV_API_ROOT", "/") or "/"
+            if not root.startswith("/"):
+                root = "/" + root
+            if not root.endswith("/"):
+                root = root + "/"
+            return jsonify({"mdv_api_root": root})
         logger.info("Route registered: /api_root")
 
         @app.route('/rescan_projects')
