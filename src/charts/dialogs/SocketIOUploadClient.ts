@@ -216,13 +216,14 @@ export class SocketIOUploadClient {
             // Connect to the specific namespace directly
             this.socket = io(`${this.config.namespace}`, {
                 path: this.config.socketPath || '/socket.io',   // '/test/socket.io' or '/carroll/socket.io'
-                autoConnect: false,
-                transports: ['websocket', 'polling'],
-                timeout: 60000,
-                forceNew: true,
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 5,
+                // autoConnect: false,
+                transports: ['polling'],
+                upgrade: false,
+                // timeout: 60000,
+                // forceNew: true,
+                // reconnection: true,
+                // reconnectionDelay: 1000,
+                // reconnectionAttempts: 5,
             });
 
             this.setupSocketEventHandlers();
