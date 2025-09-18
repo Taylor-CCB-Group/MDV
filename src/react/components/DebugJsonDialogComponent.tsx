@@ -6,6 +6,7 @@ import "react18-json-view/src/dark.css";
 import { useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import "../../utilities/css/JsonDialogStyles.css";
+import ZarritaSketch from "./ZarritaSketch";
 
 type JSONObject = { [key: string]: any };
 
@@ -86,6 +87,7 @@ export default function ({ json, header }: { json: any; header?: string }) {
                 }}
                 collapsed={1}
             />
+            <ZarritaSketch />
         </div>
     );
 }
