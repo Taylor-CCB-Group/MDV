@@ -99,4 +99,6 @@ jobs:
             --label "org.opencontainers.image.description=${{ steps.release_notes.outputs.release_notes }}" \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ steps.build_metadata.outputs.git_commit_hash }} \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
+            --cache-from=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:cache \
+            --cache-to=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:cache,mode=max \
             --push . 
