@@ -59,12 +59,12 @@ type CompressedImageFrame = {
 */
 
 export default class Jpeg2000Decoder extends BaseDecoder {
-    private static openjpeg: OpenJpegModule | null = null;
+    private static openjpeg?: Promise<OpenJpegModule>;
 
     private async getOpenJPEG(): Promise<OpenJpegModule> {
         if (!Jpeg2000Decoder.openjpeg) {
             try {
-                Jpeg2000Decoder.openjpeg = await openJpegFactory({
+                Jpeg2000Decoder.openjpeg = openJpegFactory({
                     locateFile: (file: string) => {
                         if (file.endsWith(".wasm")) {
                             return openjpegWasm.href;
