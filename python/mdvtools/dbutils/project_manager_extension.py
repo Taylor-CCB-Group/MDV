@@ -34,6 +34,8 @@ def find_root_prefix(names):
 class ProjectManagerExtension(MDVServerExtension):
     def register_global_routes(self, app: Flask, config: dict):
         ENABLE_AUTH = app.config.get('ENABLE_AUTH', False)
+        session = None
+        user_cache = None
         if ENABLE_AUTH:
             from flask import session
             from mdvtools.auth.authutils import user_cache
@@ -75,6 +77,8 @@ class ProjectManagerExtension(MDVServerExtension):
                 if new_project:
                     # Step 5: Associate the admin user with the new project and grant all permissions
                     if ENABLE_AUTH:
+                        assert session is not None
+                        assert user_cache is not None
                         user_data = session.get('user')
                         if not user_data:
                             raise ValueError("User not found in session.")
@@ -197,6 +201,8 @@ class ProjectManagerExtension(MDVServerExtension):
 
                 if new_project:
                     if ENABLE_AUTH:
+                        assert session is not None
+                        assert user_cache is not None
                         user_data = session.get("user")
                         if not user_data:
                             raise ValueError("User not found in session.")
