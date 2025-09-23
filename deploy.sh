@@ -52,20 +52,27 @@ check_docker() {
 
 # Function to check for existing Docker containers, volumes, or networks
 check_existing_service() {
-  existing_containers=$(docker ps -aq)
-  existing_volumes=$(docker volume ls -q)
-  
-  if [[ -n "$existing_containers" || -n "$existing_volumes" ]]; then
-    echo -e "${RED}✗ Error: Existing Docker containers, volumes, or networks detected.${NC}"
+  echo -e "${BLUE}Checking for existing MDV containers, volumes, or networks...${NC}"
+
+  # Look for MDV containers, volumes, or networks
+  existing_containers=$(docker ps -aq --filter "name=mdv")
+  existing_volumes=$(docker volume ls -q --filter "name=mdv")
+  existing_networks=$(docker network ls -q --filter "name=mdv")
+
+  if [[ -n "$existing_containers" || -n "$existing_volumes" || -n "$existing_networks" ]]; then
+    echo -e "${RED}✗ Error: Existing MDV Docker containers, volumes, or networks detected.${NC}"
     echo -e "${YELLOW}To remove them safely, run the following command:${NC}"
     echo
-    echo -e "${BLUE}docker ps -aq | xargs -r docker rm -f && docker volume ls -q | xargs -r docker volume rm && docker network prune -f${NC}"
+    echo -e "${BLUE}docker compose -p mdv down --remove-orphans${NC}"
+    echo -e "${YELLOW}⚠ If you also want to delete volumes (this will erase database/data), run:${NC}"
+    echo -e "${BLUE}docker compose -p mdv down -v --remove-orphans${NC}"
     echo
     exit 1
   else
-    echo -e "${GREEN}✓ No conflicting Docker containers, volumes, or networks found${NC}"
+    echo -e "${GREEN}✓ No conflicting MDV Docker containers, volumes, or networks found${NC}"
   fi
 }
+
 
 # Function to create or validate the .env file
 create_or_validate_env_file() {
@@ -103,12 +110,26 @@ create_or_validate_env_file() {
     echo "$var_name=$new_value"  # Return the value assignment (not the value alone)
   }
 
+  # Check if Postgres volume exists
+  DB_VOLUME_EXISTS=$(docker volume ls -q | grep -E ".*_postgres-data" | wc -l)
 
-  # Capture the output of prompt_variable and extract the values
-  DB_USER=$(prompt_variable "DB_USER" false "testuser"| cut -d'=' -f2 | tr -d '\n' | xargs)
-  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true "testpass"| cut -d'=' -f2 | tr -d '\n' | xargs)
-  DB_NAME=$(prompt_variable "DB_NAME" false "testdb"| cut -d'=' -f2 | tr -d '\n' | xargs)
+  if [ "$DB_VOLUME_EXISTS" -gt 0 ]; then
+      echo -e "${YELLOW}⚠ Existing Postgres data volume detected."
+      echo -e "DB_USER, DB_PASSWORD, and DB_NAME will NOT be changed to keep your database data safe.${NC}"
 
+      # Preserve previously sourced values or use defaults if missing
+      DB_USER="${DB_USER:-testuser}"
+      DB_PASSWORD="${DB_PASSWORD:-testpass}"
+      DB_NAME="${DB_NAME:-testdb}"
+  else
+      echo -e "${YELLOW}Enter DB credentials for new database setup:${NC}"
+      echo -e "${YELLOW}If you want to keep DB data in future redeploys, keep these values the same.${NC}"
+
+      # Capture the output of prompt_variable and extract the values
+      DB_USER=$(prompt_variable "DB_USER" false "testuser"| cut -d'=' -f2 | tr -d '\n' | xargs)
+      DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true "testpass"| cut -d'=' -f2 | tr -d '\n' | xargs)
+      DB_NAME=$(prompt_variable "DB_NAME" false "testdb"| cut -d'=' -f2 | tr -d '\n' | xargs)
+  fi
 
   # Set PostgreSQL variables
   POSTGRES_USER=${DB_USER}
@@ -198,7 +219,7 @@ open_browser() {
 echo "Starting MDV Deployment..."
 
 check_docker
-check_existing_service
+#check_existing_service
 
 # Create app_logs directory if it doesn't exist
 #mkdir -p app_logs && echo "Ensured app_logs directory exists."
