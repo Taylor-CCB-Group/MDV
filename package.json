@@ -110,6 +110,7 @@
     "styled-components": "^6.1.8",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
+    "tippy.js": "^6.3.7",
     "use-debounce": "^10.0.2",
     "uuid": "^11.0.3",
     "wordcloud": "^1.2.2",

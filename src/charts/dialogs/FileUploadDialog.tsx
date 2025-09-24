@@ -12,27 +12,16 @@ import { observer } from "mobx-react-lite";
 
 import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
 import { useProject } from "../../modules/ProjectContext";
-import { ColumnPreview } from "./ColumnPreview";
 
 import {
     useViewerStoreApi,
     useChannelsStoreApi,
-    type PixelSource,
-    type Metadata,
 } from "../../react/components/avivatorish/state";
-import { createLoader } from "../../react/components/avivatorish/utils";
-import { unstable_batchedUpdates } from "react-dom";
 
-import { TiffPreview } from "./TiffPreview";
-import { TiffMetadataTable } from "./TiffMetadataTable";
-import TiffVisualization from "./TiffVisualization";
-import { DatasourceDropdown } from "./DatasourceDropdown";
 import {
     CloudUpload as CloudUploadIcon
 } from "@mui/icons-material";
-import { isArray } from "@/lib/utils";
 // import processH5File from "./utils/h5Processing";
-import H5MetadataPreview from "./H5MetadataPreview";
 import DebugErrorComponent from "./DebugErrorComponent";
 import AnndataConflictDialog from "./AnndataConflictDialog";
 import ReusableDialog from "./ReusableDialog";
@@ -496,7 +485,7 @@ const useFileUploadProgress = () => {
 //also - are we actually observing anything here? not that it particularly matters (apart from type inference, apparently)
 const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
     observer(({ onClose, onResize, onLoadingStateChange, socketioClientRef }: FileUploadDialogComponentProps) => {
-        const { root, projectName, chartManager } = useProject();
+        const { root, chartManager, mainApiRoute } = useProject();
 
         const [selectedOption, setSelectedOption] = useState<string | null>(
             null,
@@ -987,19 +976,17 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             resetProgress();
 
             try {
-                // Extract server URL and project ID properly
                 // root is something like "/project/117", we need to extract the base URL and project ID
-                const projectId = root.split('/').pop(); // Get the last part which is the project ID
-                const serverUrl = window.location.origin; // Get the base URL like "http://localhost:5055"
-  
-                console.log('Server URL:', serverUrl);
+                const projectId = root.split('/').filter(Boolean).pop(); // Get the last part which is the project ID
+                const socketPath = `${String(mainApiRoute).replace(/\/$/, '')}/socket.io`;
                 console.log('Project ID:', projectId);
                 console.log('Namespace:', `/project/${projectId}`);
+                console.log('Socket Path:', socketPath);
                 
                 // Create SocketIO upload client
                 const uploadClient = createSocketIOUpload({
-                    serverUrl: serverUrl,
                     namespace: `/project/${projectId}`,
+                    socketPath: socketPath, // socket path for path variable: '/test/socket.io'
                     file: file,
                     fileName: file.name,
                     // CSV-specific options

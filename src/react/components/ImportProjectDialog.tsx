@@ -25,6 +25,7 @@ import { useDropzone } from "react-dropzone";
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 import { createSocketIOUpload, type SocketIOUploadClient } from "../../charts/dialogs/SocketIOUploadClient";
 import { ZipReader, BlobReader } from "@zip.js/zip.js";
+import { useApiRoot } from "@/catalog/hooks/useApiRoot";
 
 // Constants moved to module level to avoid recreation
 const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);
@@ -99,6 +100,9 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         USE_SOCKETIO_UPLOAD ? 'socketio' : 'http'
     );
     const [uploadClient, setUploadClient] = useState<SocketIOUploadClient | null>(null);
+
+    // Get the mdvApiRoot from the hook
+    const mdvApiRoot = useApiRoot();
     
     const validateMDVProject = useCallback(async (file: File): Promise<{ isValid: boolean; error?: string }> => {
         let zipReader: ZipReader<Blob> | null = null;
@@ -245,10 +249,12 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         setErrorOpen(false);
 
         try {
+            // Use mdvApiRoot for socket path
+            const socketPath = `${mdvApiRoot}socket.io`;
             const client = createSocketIOUpload({
-                serverUrl: window.location.origin,
-                namespace: "/", 
+                namespace: "/",
                 file: file,
+                socketPath, // socket path for path variable: '/test/socket.io'
                 onProgress: (percent) => {
                     setProgress(percent);
                 },
@@ -289,7 +295,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
             setError(err);
             setErrorOpen(true);
         }
-    }, [file, fetchProjects, projectName]);
+    }, [file, fetchProjects, mdvApiRoot]);
 
     // Main handler to delegate to the correct upload function
     const handleUpload = useCallback(() => {

@@ -63,6 +63,17 @@ def register_routes(app, ENABLE_AUTH):
             return render_template('login.html')
         logger.info("Route registered: /login_dev")
 
+        # This is a relative route, we need to change it at some point
+        @app.route('/api_root')
+        def get_mdv_api_root():
+            root = os.environ.get("MDV_API_ROOT", "/") or "/"
+            if not root.startswith("/"):
+                root = "/" + root
+            if not root.endswith("/"):
+                root = root + "/"
+            return jsonify({"mdv_api_root": root})
+        logger.info("Route registered: /api_root")
+
         @app.route('/rescan_projects')
         def rescan_projects():
             if ENABLE_AUTH:

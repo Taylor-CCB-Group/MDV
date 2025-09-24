@@ -37,10 +37,12 @@ The Multi-Dimensional Viewer (MDV) is a web-based application designed to help u
 - **Browser**: A modern browser (e.g., Chrome, Firefox, Safari, or Edge)
 - **Memory**: At least 4 GB of RAM, even for handling large datasets (~10 million items), due to the lazy loading of data in raw bytes
 
-You can browse existing projects at the [MDV Website](https://mdv.molbiol.ox.ac.uk/)
-You can register at the [MDV Registration page](https://mdv.molbiol.ox.ac.uk/user/register?next=https://mdv.molbiol.ox.ac.uk/) for your own projects. 
+For information about using MDV and uploading your data please go to the [MDV Website](https://mdv.ndm.ox.ac.uk/).
 
-We are working hard on a new version that will make uploading and installing data much easier. Please contact [Us](mailto:stephen.taylor@well.ox.ac.uk) if you want to upload your own data sets or wish to be added to the mailing list for news. 
+To install MDV using Docker see [MDV Installation](https://mdv.ndm.ox.ac.uk/docs/installation/installation-manual).
+
+You can browse existing projects an old [MDV Projects Website](https://mdv.molbiol.ox.ac.uk/projects)
+
 
 ### For Development or Running a Local Version from the Repository:
 
