@@ -39,18 +39,18 @@ The old system relied on a simple, manually incremented `version.txt` file, whic
 
 ## 4. Consistent Local and CI Environments
 
-It was difficult to get consistent build information between local mainelopment and CI builds.
+It was difficult to get consistent build information between local development and CI builds.
 
 **Change:** The system is now aligned to provide the same metadata in all environments.
-- **`vite.config.mts`:** Updated to gather local Git information when running the main server.
+- **`vite.config.mts`:** Updated to gather local Git information when running the dev server.
 - **`Dockerfile`:** Updated to accept build arguments for all the metadata listed above.
 - **`build-and-deploy.yml`:** The CI workflow now generates this metadata and passes it to the `docker build` command.
 
 This ensures that the `useBuildInfo()` hook in the frontend receives the same data structure, whether running locally or from a deployed container.
 
-## 5. Local mainelopment and Building
+## 5. Local development and Building
 
-To ensure build information is consistent during mainelopment, the following approach is used:
+To ensure build information is consistent during development, the following approach is used:
 
-- **Live mainelopment:** When running the Vite main server inside the main container (`npm run main`), the `vite.config.mts` file automatically detects the mounted `.git` directory and injects the current Git status into the application.
-- **Building a Local Image:** To build a production-like Docker image locally that contains the correct Git metadata, the configuration is handled by `docker-compose`. The `docker-secrets.yml` file (used by the main container) is configured to pass build arguments from the host environment to the Docker build process. You can build the image by running `docker compose -f docker-secrets.yml build` in your terminal, which will automatically pass the necessary environment variables. 
+- **Live development:** When running the Vite dev server inside the devcontainer (`npm run dev`), the `vite.config.mts` file automatically detects the mounted `.git` directory and injects the current Git status into the application.
+- **Building a Local Image:** To build a production-like Docker image locally that contains the correct Git metadata, the configuration is handled by `docker-compose`. The `docker-secrets.yml` file (used by the dev container) is configured to pass build arguments from the host environment to the Docker build process. You can build the image by running `docker compose -f docker-secrets.yml build` in your terminal, which will automatically pass the necessary environment variables. 
