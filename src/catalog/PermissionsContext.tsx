@@ -53,7 +53,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch("get_configs");
+            const response = await fetch("extension_config");
             if (!response.ok) {
                 // Fallback back to default permissions
                 console.warn(
