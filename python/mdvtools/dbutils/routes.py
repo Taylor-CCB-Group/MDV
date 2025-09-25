@@ -75,16 +75,25 @@ def register_routes(app, ENABLE_AUTH):
         @app.route('/extension_config', methods=['GET'])
         def extension_config():
             """Return a static-like map of extension name to its API flags.
-
-            For now, we only expose the 'project_manager' extension and return:
-              { "project_manager": { ...flags from get_session_config()... } }
             """
             try:
                 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 
+                # Determine if project_manager is enabled in config.json
+                enabled_extensions = app.config.get('extensions', []) or []
+                pm_enabled = 'project_manager' in enabled_extensions
+
+                # Get the canonical set of keys from the extension, then override values
                 pm = ProjectManagerExtension()
                 ext_any: Any = pm
-                pm_config = ext_any.get_session_config()  # type: ignore[attr-defined]
+                pm_config_true = ext_any.get_session_config()  # type: ignore[attr-defined]
+
+                if pm_enabled:
+                    pm_config = pm_config_true
+                else:
+                    # Same keys, all set to False
+                    pm_config = {k: False for k in pm_config_true.keys()}
+
                 return jsonify({
                     "project_manager": pm_config
                 })
