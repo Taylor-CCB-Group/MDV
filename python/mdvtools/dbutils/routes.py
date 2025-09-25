@@ -12,6 +12,29 @@ def register_routes(app, ENABLE_AUTH):
     from mdvtools.project_router import ProjectBlueprint
     from mdvtools.dbutils.dbmodels import User
     import tempfile
+
+    def get_project_thumbnail(project_path):
+        """Extract the first available viewImage from a project's views."""
+        try:
+            mdv_project = MDVProject(project_path)
+            return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
+        except Exception as e:
+            logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
+            return None
+        
+    REQUIRED_FILES = {"views.json", "state.json", "datasources.json"}
+
+    def find_root_prefix(names):
+        # Check if all required files are in the root of archive
+        if REQUIRED_FILES.issubset(set(os.path.basename(n) for n in names if "/" not in n)):
+            return ""
+        # Check one level below if required files exist
+        dirs = {n.split("/", 1)[0] for n in names if "/" in n}
+        for d in dirs:
+            files_in_d = {os.path.basename(n) for n in names if n.startswith(f"{d}/")}
+            if REQUIRED_FILES.issubset(files_in_d):
+                return d + "/"
+        return None
     
     """Register routes with the Flask app."""
     logger.info("Registering routes...")
