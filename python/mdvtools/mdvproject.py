@@ -1454,14 +1454,6 @@ class MDVProject:
             "state": self.state,
         }
         
-        # Add session configuration from extensions
-        if hasattr(self, '_server_options') and self._server_options:
-            session_config = {}
-            for extension in self._server_options.extensions:
-                if hasattr(extension, 'get_session_config'):
-                    session_config.update(extension.get_session_config())
-            config["session"] = session_config
-        
         # legacy
         hyperion_conf = join(self.dir, "hyperion_config.json")
         if os.path.exists(hyperion_conf):

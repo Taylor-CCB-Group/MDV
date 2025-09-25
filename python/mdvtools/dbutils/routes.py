@@ -1,3 +1,5 @@
+import os
+from typing import Any
 from mdvtools.logging_config import get_logger
 logger = get_logger(__name__)
 
@@ -70,10 +72,25 @@ def register_routes(app, ENABLE_AUTH):
             return jsonify({"mdv_api_root": root})
         logger.info("Route registered: /api_root")
 
-        @app.route('/extension_config')
+        @app.route('/extension_config', methods=['GET'])
         def extension_config():
-            config = {}
-            
+            """Return a static-like map of extension name to its API flags.
+
+            For now, we only expose the 'project_manager' extension and return:
+              { "project_manager": { ...flags from get_session_config()... } }
+            """
+            try:
+                from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
+
+                pm = ProjectManagerExtension()
+                ext_any: Any = pm
+                pm_config = ext_any.get_session_config()  # type: ignore[attr-defined]
+                return jsonify({
+                    "project_manager": pm_config
+                })
+            except Exception as e:
+                logger.exception(f"Error in /extension_config: {e}")
+                return jsonify({}), 500
 
         @app.route('/rescan_projects')
         def rescan_projects():
