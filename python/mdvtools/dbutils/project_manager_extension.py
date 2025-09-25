@@ -4,7 +4,7 @@ import shutil
 import zipfile
 import io
 import tempfile
-from mdvtools.server_extension import MDVServerExtension
+from mdvtools.server_extension import MDVProjectServerExtension
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
@@ -33,7 +33,7 @@ def find_root_prefix(names):
     return None
 
 
-class ProjectManagerExtension(MDVServerExtension):
+class ProjectManagerExtension(MDVProjectServerExtension):
     def register_global_routes(self, app: Flask, config: dict):
         ENABLE_AUTH = app.config.get('ENABLE_AUTH', False)
         session = None

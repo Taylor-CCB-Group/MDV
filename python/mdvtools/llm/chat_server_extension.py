@@ -15,7 +15,7 @@ from flask import Flask, request
 from flask_socketio import join_room, leave_room
 from mdvtools.logging_config import get_logger
 from mdvtools.llm.chatlog import log_chat_item
-from mdvtools.server_extension import MDVServerExtension
+from mdvtools.server_extension import MDVProjectServerExtension
 from mdvtools.auth.authutils import is_authenticated
 
 logger = get_logger(__name__)
@@ -23,7 +23,7 @@ logger.info("chat server extension loading...")
 
 
 
-class MDVProjectChatServerExtension(MDVServerExtension):
+class MDVProjectChatServerExtension(MDVProjectServerExtension):
     # as well as registering routes and mutating the state.json,
     # we might describe websocket routes here, and how we control auth with that
 
