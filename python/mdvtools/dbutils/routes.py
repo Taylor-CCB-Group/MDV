@@ -70,6 +70,11 @@ def register_routes(app, ENABLE_AUTH):
             return jsonify({"mdv_api_root": root})
         logger.info("Route registered: /api_root")
 
+        @app.route('/extension_config')
+        def extension_config():
+            config = {}
+            
+
         @app.route('/rescan_projects')
         def rescan_projects():
             if ENABLE_AUTH:
