@@ -151,7 +151,14 @@
     "typedoc-plugin-rename-defaults": "^0.7.3",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@luma.gl/core": "~9.1.9",
+    "@luma.gl/engine": "~9.1.9",
+    "@luma.gl/shadertools": "~9.1.9",
+    "@luma.gl/constants": "~9.1.9",
+    "@luma.gl/webgl": "~9.1.9",
+    "@luma.gl/webgpu": "~9.1.9",
+    "@luma.gl/test-utils": "~9.1.9"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.20.1",
