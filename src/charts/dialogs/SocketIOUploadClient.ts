@@ -217,10 +217,10 @@ export class SocketIOUploadClient {
             this.socket = io(`${this.config.namespace}`, {
                 path: this.config.socketPath || '/socket.io',   // '/test/socket.io' or '/carroll/socket.io'
                 autoConnect: false,
-                transports: ['polling'],
+                transports: ['websocket', 'polling'],
                 timeout: 60000,
                 forceNew: true,
-                reconnection: false,
+                reconnection: true,
                 reconnectionDelay: 1000,
                 reconnectionAttempts: 5,
             });
