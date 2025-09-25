@@ -26,6 +26,7 @@ import useProjectShare, { type UserPermission, type RegisteredUser } from "./hoo
 import { useState } from "react";
 import { DialogCloseIconButton } from "./ProjectRenameModal";
 import { matchEmail } from "@/lib/utils";
+import usePermissions from "./PermissionsContext";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -49,6 +50,7 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
         deleteSharedUser,
         changeUserPermission,
     } = useProjectShare(projectId);
+    const { permissions: operationPermissions } = usePermissions();
 
     const handleAddNewUser = async () => {
         if (newUser) {
@@ -184,15 +186,15 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell>Shared Users</TableCell>
-                                                <TableCell>Permission</TableCell>
-                                                <TableCell align="right">Remove</TableCell>
+                                                {operationPermissions.editUserPermissions && <TableCell>Permission</TableCell>}
+                                                {operationPermissions.removeUserFromProject && <TableCell align="right">Remove</TableCell>}
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {sharedUsers.map((user) => (
                                                 <TableRow key={user.id}>
                                                     <TableCell>{user.email}</TableCell>
-                                                    <TableCell>
+                                                    {operationPermissions.editUserPermissions && <TableCell>
                                                         <Select
                                                             value={user.permission}
                                                             size="small"
@@ -208,12 +210,12 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                                             <MenuItem value="Edit">Edit</MenuItem>
                                                             <MenuItem value="Owner">Owner</MenuItem>
                                                         </Select>
-                                                    </TableCell>
-                                                    <TableCell align="right">
+                                                    </TableCell>}
+                                                    {operationPermissions.removeUserFromProject && <TableCell align="right">
                                                         <IconButton onClick={() => handleDeleteUser(user.id)}>
                                                             <DeleteIcon />
                                                         </IconButton>
-                                                    </TableCell>
+                                                    </TableCell>}
                                                 </TableRow>
                                             ))}
                                         </TableBody>

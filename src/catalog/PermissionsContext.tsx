@@ -12,9 +12,11 @@ export interface ProjectOperationPermissions {
     importProject: boolean;
     deleteProject: boolean;
     renameProject: boolean;
-    changeProjectType: boolean;
+    changeProjectAccess: boolean;
     exportProject: boolean;
     shareProject: boolean;
+    editUserPermissions: boolean;
+    removeUserFromProject: boolean;
 }
 
 // Default state
@@ -23,9 +25,11 @@ const defaultPermissions: ProjectOperationPermissions = {
     importProject: false,
     deleteProject: false,
     renameProject: false,
-    changeProjectType: false,
+    changeProjectAccess: false,
     exportProject: false,
     shareProject: false,
+    editUserPermissions: false,
+    removeUserFromProject: false,
 };
 
 interface PermissionsContextType {
@@ -64,13 +68,15 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
             }
             const data = await response.json();
             const projectPermissions: ProjectOperationPermissions = {
-                createProject: data.projectManager.createProject ?? true,
-                importProject: data.projectManager.importProject ?? true,
-                deleteProject: data.projectManager.deleteProject ?? true,
-                renameProject: data.projectManager.renameProject ?? true,
-                changeProjectType: data.projectManager.changeProjectType ?? true,
-                exportProject: data.projectManager.exportProject ?? true,
-                shareProject: data.projectManager.shareProject ?? true,
+                createProject: data.project_manager.createProject ?? true,
+                importProject: data.project_manager.importProject ?? true,
+                deleteProject: data.project_manager.deleteProject ?? true,
+                renameProject: data.project_manager.renameProject ?? true,
+                changeProjectAccess: data.project_manager.changeProjectAccess ?? true,
+                exportProject: data.project_manager.exportProject ?? true,
+                shareProject: data.project_manager.shareProject ?? true,
+                editUserPermissions: data.project_manager.editUserPermissions ?? true,
+                removeUserFromProject: data.project_manager.removeUserFromProject ?? true,
             };
             setPermissions(projectPermissions);
         } catch (e) {
