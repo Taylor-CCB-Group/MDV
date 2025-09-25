@@ -32,7 +32,7 @@ export class ScatterSquareExtension extends LayerExtension {
                 // a bit wasteful to keep the original shader for circle rendering above
                 // we should arrange layers/extensions differently, but YOLO
                 // (actually, this is really dodgy & it's embarassing not rendering quads correctly)
-                if (stroked > 0.5) {
+                if (scatterplot.stroked > 0.5) {
                     vec2 uv = abs(unitPosition);
                     float isLine = step(innerUnitRadius, max(uv.x, uv.y));
                     if (_lineWidthPixels <= 0.01) isLine = 0.;
