@@ -128,13 +128,28 @@ def create_flask_app(config_name=None):
             logger.exception(f"Error setting up authentication: {e}")
             raise e
 
-    # Register other routes (base routes like /, /projects, etc.)
+    # Register other routes (base routes like /, /projects, /rescan_projects, etc.)
+    # Note: Project management routes are now handled by ProjectManagerExtension
     try:
         # Register routes
-        logger.info("Registering base routes: /, /projects, /create_project, /delete_project")
+        logger.info("Registering base routes: /, /projects, /rescan_projects")
         register_routes(app, ENABLE_AUTH)
     except Exception as e:
         logger.exception(f"Error registering routes: {e}")
+        raise e
+
+    # Register global routes from extensions
+    try:
+        logger.info("Registering global routes from extensions")
+        from mdvtools.dbutils.server_options import get_server_options_for_db_projects
+        options = get_server_options_for_db_projects(app)
+        
+        for extension in options.extensions:
+            if hasattr(extension, 'register_global_routes'):
+                logger.info(f"Registering global routes for extension: {extension.__class__.__name__}")
+                extension.register_global_routes(app, app.config)
+    except Exception as e:
+        logger.exception(f"Error registering global routes from extensions: {e}")
         raise e
 
     return app
