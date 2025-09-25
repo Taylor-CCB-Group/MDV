@@ -151,6 +151,7 @@
     "jsdoc": "^4.0.2",
     "jsdom": "^26.1.0",
     "postcss": "^8.4.38",
+    "puppeteer": "^24.22.3",
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.4.3",
     "ts-loader": "^9.5.1",
