@@ -32,11 +32,6 @@ function _mdvInit(routeFromTemplate) {
     getConfigs(staticFolder).then((resp) => {
         const config = resp.state;
         
-        // Merge session configuration from extensions if available
-        if (resp.session) {
-            Object.assign(config, resp.session);
-        }
-        
         //is view in the URL
         const urlParams = new URLSearchParams(window.location.search);
         const view = urlParams.get("view");

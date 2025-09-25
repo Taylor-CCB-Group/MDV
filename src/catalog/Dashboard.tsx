@@ -47,11 +47,12 @@ import {
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
+import usePermissions from "./PermissionsContext";
 
 const Dashboard: React.FC = () => {
     const {
         projects,
-        isLoading,
+        isLoading: projectsLoading,
         error,
         isErrorModalOpen,
         closeErrorModal,
@@ -63,6 +64,7 @@ const Dashboard: React.FC = () => {
         setFilter,
         exportProject,
     } = useProjects();
+    const { permissions, isLoading: permissionsLoading } = usePermissions();
 
     const { mode, toggleColorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -71,6 +73,8 @@ const Dashboard: React.FC = () => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [open, setOpen] = useState(false);
     const theme = useTheme();
+
+    const isLoading = projectsLoading || permissionsLoading;
 
     React.useEffect(() => {
         fetchProjects();
@@ -173,66 +177,70 @@ const Dashboard: React.FC = () => {
 
                 <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
                     <Grid container spacing={3} sx={{ mb: 4 }}>
-                        <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
-                            <ButtonBase
-                                sx={{
-                                    width: "100%",
-                                    display: "block",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <Paper
+                        {permissions.createProject && (
+                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                                <ButtonBase
                                     sx={{
-                                        p: 2,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
+                                        width: "100%",
+                                        display: "block",
+                                        textAlign: "center",
                                     }}
-                                    onClick={() => handleCreateProject()}
                                 >
-                                    <Add
+                                    <Paper
                                         sx={{
-                                            fontSize: 40,
-                                            color: "primary.main",
-                                            mb: 1,
+                                            p: 2,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
                                         }}
-                                    />
-                                    <Typography variant="subtitle1" align="center">
-                                        Create new project
-                                    </Typography>
-                                </Paper>
-                            </ButtonBase>
-                        </Grid>
-                        <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
-                            <ButtonBase
-                                sx={{
-                                    width: "100%",
-                                    display: "block",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <Paper
+                                        onClick={() => handleCreateProject()}
+                                    >
+                                        <Add
+                                            sx={{
+                                                fontSize: 40,
+                                                color: "primary.main",
+                                                mb: 1,
+                                            }}
+                                        />
+                                        <Typography variant="subtitle1" align="center">
+                                            Create new project
+                                        </Typography>
+                                    </Paper>
+                                </ButtonBase>
+                            </Grid>
+                        )}
+                        {permissions.importProject && (
+                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                                <ButtonBase
                                     sx={{
-                                        p: 2,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
+                                        width: "100%",
+                                        display: "block",
+                                        textAlign: "center",
                                     }}
-                                    onClick={() => setOpen(true)}
                                 >
-                                    <DownloadIcon
+                                    <Paper
                                         sx={{
-                                            fontSize: 40,
-                                            color: "primary.main",
-                                            mb: 1,
+                                            p: 2,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
                                         }}
-                                    />
-                                    <Typography variant="subtitle1" align="center" sx={{}}>
-                                        Import an existing project
-                                    </Typography>
-                                </Paper>
-                            </ButtonBase>
-                        </Grid>
+                                        onClick={() => setOpen(true)}
+                                    >
+                                        <DownloadIcon
+                                            sx={{
+                                                fontSize: 40,
+                                                color: "primary.main",
+                                                mb: 1,
+                                            }}
+                                        />
+                                        <Typography variant="subtitle1" align="center" sx={{}}>
+                                            Import an existing project
+                                        </Typography>
+                                    </Paper>
+                                </ButtonBase>
+                            </Grid>
+                        )}
                     </Grid>
 
                     <Box
@@ -394,12 +402,15 @@ const Dashboard: React.FC = () => {
                         }
                     />
                 )}
-                {open && (
+                {open && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
                 )}
             </Box>
-            {isLoading && (    
-                <Backdrop open={isLoading} sx={{zIndex: theme.zIndex.modal + 1}}>
+            {isLoading && (
+                <Backdrop
+                    open={isLoading}
+                    sx={{ zIndex: theme.zIndex.modal + 1 }}
+                >
                     <CircularProgress color="inherit" />
                 </Backdrop>
             )}
