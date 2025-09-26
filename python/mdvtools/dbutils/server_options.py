@@ -12,7 +12,7 @@ extension_classes: dict[str, type[MDVProjectServerExtension]] = {
 def get_server_options_for_db_projects(app: Flask) -> MDVServerOptions:
     """
     Returns the server options for projects served from the database.
-    This includes enabling configured extensions like chat and project_manager.
+    This  includes enabling configured extensions like chat and project_manager.
     """
     # in future we may have a more structured way of configuring extensions:
     # - bringing in code that isn't part of the mdvtools package
