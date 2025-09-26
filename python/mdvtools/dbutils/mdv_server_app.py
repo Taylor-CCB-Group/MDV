@@ -417,7 +417,7 @@ def serve_projects_from_filesystem(app, base_dir):
         logger.info(f"Project paths in DB: {projects_in_db}")
 
         # Get all project directories in the filesystem
-        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))}
+        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and d != 'lost+found'}
         logger.info(f"Project paths in filesystem: {project_paths_in_fs}")
 
         # Determine which project paths are in the filesystem but not in the database
