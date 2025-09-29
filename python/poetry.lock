@@ -151,28 +151,35 @@ files = [
 
 [[package]]
 name = "anndata"
-version = "0.9.2"
+version = "0.11.4"
 description = "Annotated data."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "anndata-0.9.2-py3-none-any.whl", hash = "sha256:badab44bf0b4d598ae49403ee634a6ffc8896d9aa21db52f0f6af98d6fe1fceb"},
-    {file = "anndata-0.9.2.tar.gz", hash = "sha256:e5b8383d09723af674cae7ad0c2ef53eb1f8c73949b7f4c182a6e30f42196327"},
+    {file = "anndata-0.11.4-py3-none-any.whl", hash = "sha256:fefebb1480316dfa5a23924aa9f74781d447484421bb0c788b0b2ca5e3b339d2"},
+    {file = "anndata-0.11.4.tar.gz", hash = "sha256:4ce08d09d2ccb5f37d32790363bbcc7fc1b79863842296ae4badfaf48c736e24"},
 ]
 
 [package.dependencies]
-h5py = ">=3"
+array-api-compat = ">1.4,<1.5 || >1.5"
+exceptiongroup = {version = "*", markers = "python_version < \"3.11\""}
+h5py = ">=3.7"
 natsort = "*"
-numpy = ">=1.16.5"
-packaging = ">=20"
-pandas = ">=1.1.1,<2.0.1 || >2.0.1"
-scipy = ">1.4"
+numpy = ">=1.23"
+packaging = ">=24.2"
+pandas = ">=1.4,<2.1.0rc0 || >2.1.0rc0,<2.1.2 || >2.1.2"
+scipy = ">1.8"
 
 [package.extras]
-dev = ["pytest-xdist", "setuptools_scm"]
-doc = ["IPython", "awkward (>=2.0.7)", "myst_parser", "nbsphinx", "scanpydoc[theme] (>=0.9)", "sphinx (>=4.4)", "sphinx-autodoc-typehints (>=1.11.0)", "sphinx-rtd-theme (>=1.1.1)", "sphinx_issues", "sphinxext.opengraph", "zarr"]
-test = ["awkward (>=2.3)", "boltons", "dask[array]", "joblib", "loompy (>=3.0.5)", "matplotlib", "openpyxl", "pytest (>=6.0)", "pytest-cov (>=2.10)", "pytest_memray", "scanpy", "scikit-learn", "zarr"]
+cu11 = ["cupy-cuda11x"]
+cu12 = ["cupy-cuda12x"]
+dask = ["dask[array] (>=2022.09.2,<2024.8.dev0 || >=2024.10.dev0,<2025.2.0)"]
+dev = ["awkward (>=2.3)", "boltons", "dask[array] (>=2022.09.2,<2024.8.dev0 || >=2024.10.dev0,<2025.2.0)", "dask[distributed]", "filelock", "hatch-vcs", "httpx", "joblib", "loompy (>=3.0.5)", "matplotlib", "openpyxl", "pyarrow", "pytest (>=8.2,<8.3.4)", "pytest-cov (>=2.10)", "pytest-memray", "pytest-mock", "pytest-randomly", "pytest-xdist[psutil]", "scanpy (>=1.9.8)", "scikit-learn", "towncrier (>=24.8.0)", "zarr (<3)"]
+dev-doc = ["towncrier (>=24.8.0)"]
+doc = ["awkward (>=2.3)", "ipython", "myst-nb", "myst-parser", "readthedocs-sphinx-search", "scanpydoc[theme,typehints] (>=0.15.1)", "sphinx (>=8.2.1)", "sphinx-autodoc-typehints (>=2.2.0)", "sphinx-book-theme (>=1.1.0)", "sphinx-copybutton", "sphinx-design (>=0.5.0)", "sphinx-issues", "sphinx-toolbox (>=3.8.0)", "sphinxext-opengraph", "towncrier (>=24.8.0)", "zarr (<3)"]
+gpu = ["cupy"]
+test = ["awkward (>=2.3)", "boltons", "dask[array] (>=2022.09.2,<2024.8.dev0 || >=2024.10.dev0,<2025.2.0)", "dask[distributed]", "filelock", "httpx", "joblib", "loompy (>=3.0.5)", "matplotlib", "openpyxl", "pyarrow", "pytest (>=8.2,<8.3.4)", "pytest-cov (>=2.10)", "pytest-memray", "pytest-mock", "pytest-randomly", "pytest-xdist[psutil]", "scanpy (>=1.9.8)", "scikit-learn", "zarr (<3)"]
 
 [[package]]
 name = "annotated-types"
@@ -273,6 +280,29 @@ files = [
 
 [package.dependencies]
 cffi = {version = ">=1.0.1", markers = "python_version < \"3.14\""}
+
+[[package]]
+name = "array-api-compat"
+version = "1.12.0"
+description = "A wrapper around NumPy and other array libraries to make them compatible with the Array API standard"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "array_api_compat-1.12.0-py3-none-any.whl", hash = "sha256:a0b4795b6944a9507fde54679f9350e2ad2b1e2acf4a2408a098cdc27f890a8b"},
+    {file = "array_api_compat-1.12.0.tar.gz", hash = "sha256:585bc615f650de53ac24b7c012baecfcdd810f50df3573be47e6dd9fa20df974"},
+]
+
+[package.extras]
+cupy = ["cupy"]
+dask = ["dask (>=2024.9.0)"]
+dev = ["array-api-strict", "dask[array] (>=2024.9.0)", "jax[cpu]", "ndonnx", "numpy (>=1.22)", "pytest", "sparse (>=0.15.1)", "torch"]
+docs = ["furo", "linkify-it-py", "myst-parser", "sphinx", "sphinx-autobuild", "sphinx-copybutton"]
+jax = ["jax"]
+ndonnx = ["ndonnx"]
+numpy = ["numpy (>=1.22)"]
+pytorch = ["torch"]
+sparse = ["sparse (>=0.15.1)"]
 
 [[package]]
 name = "arrow"
@@ -6828,4 +6858,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "854afd5efcd49ff3c01a5002f6a1cc811b28ebf038fa7c99e94effa2a9167547"
+content-hash = "f0ce5f294ac30470fb9bcc3ea6d0e2a7b0f200e27ae02e68c6600f71220a7fed"
