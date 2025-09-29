@@ -1,3 +1,4 @@
+import argparse
 from typing import Optional, List
 from mdvtools.spatial.xenium import convert_xenium_to_mdv
 import spatialdata as sd
@@ -108,42 +109,25 @@ def convert_spatialdata_to_mdv(
 
 
 
-if __name__ == "__main__X":
-    sdata = sd.datasets.blobs()
-    mdv = convert_spatialdata_to_mdv(
-        folder="/app/mdv/mock_sdata_blobs",
-        sdata=sdata,
-        delete_existing=True,
-    )
-    mdv.serve()
+# if __name__ == "__main__X":
+#     sdata = sd.datasets.blobs()
+#     mdv = convert_spatialdata_to_mdv(
+#         folder="/app/mdv/mock_sdata_blobs",
+#         spatialdata_path="/app/mdv/mock_sdata_blobs/spatialdata.zarr",
+#         delete_existing=True,
+#     )
+#     mdv.serve()
 
 if __name__ == "__main__":
-    import os
-    kbull = False
-    if kbull:
-        # would be nice to make a composite project for all of these...
-        kbull_dir = "/Volumes/CrucialOx9/KBull_HumanKidney_XeniumData"
-        for dir in os.listdir(kbull_dir):
-            if dir.endswith(".zarr"):
-                continue
-            folder = os.path.expanduser(f"~/data/mdv_xenium_test_kbull_{dir}")
-            # if os.path.exists(folder):
-            #     continue
-            x_path = os.path.expanduser(f"{kbull_dir}/{dir}")
-            mdv = convert_xenium_to_mdv(
-                folder=folder,
-                xenium_path=x_path,
-                delete_existing=True,
-            )
-            mdv.serve()
-            break
-    else:
-        folder = os.path.expanduser("~/data/mdv_xenium_tiny_test")
-        x_path = os.path.expanduser("~/data/Xenium_Prime_MultiCellSeg_Mouse_Ileum_tiny_outs")
-        mdv = convert_xenium_to_mdv(
-            folder=folder,
-            xenium_path=x_path,
-            delete_existing=True,
-        )
-        mdv.set_editable(True)
-        mdv.serve()
+    parser = argparse.ArgumentParser(description="Convert SpatialData to MDV format")
+    parser.add_argument("spatialdata_path", type=str, help="Path to SpatialData data")
+    parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
+    parser.add_argument("--delete-existing", action="store_false", default=True, help="Delete existing project data")
+    args = parser.parse_args()
+
+    mdv = convert_spatialdata_to_mdv(
+        folder=args.output_folder,
+        sdata=args.spatialdata_path,
+        delete_existing=args.delete_existing,
+    )
+    mdv.serve()

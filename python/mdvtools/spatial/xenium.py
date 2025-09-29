@@ -12,7 +12,7 @@ import subprocess
 import os
 import tempfile
 import shutil
-
+import argparse
 
 def convert_xenium_to_mdv(
     folder: str,
@@ -405,4 +405,16 @@ def _set_xenium_sdata_image(mdv: MDVProject, sdata: sd.SpatialData):
     }
     mdv.set_datasource_metadata(ds)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Convert Xenium data to MDV format")
+    parser.add_argument("xenium_path", type=str, help="Path to Xenium data")
+    parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
+    parser.add_argument("--delete-existing", action="store_false", default=True, help="Delete existing project data")
+    args = parser.parse_args()
 
+    mdv = convert_xenium_to_mdv(
+        folder=args.output_folder,
+        xenium_path=args.xenium_path,
+        delete_existing=args.delete_existing,
+    )
+    mdv.serve()
