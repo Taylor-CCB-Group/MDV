@@ -6,6 +6,8 @@ import scanpy as sc
 import sys
 from dotenv import load_dotenv
 import re
+import tempfile
+import shutil
 
 from mdvtools.mdvproject import MDVProject
 from mdvtools.conversions import convert_scanpy_to_mdv
@@ -93,8 +95,7 @@ def setup_logging(log_file="mdv_llm.log"):
 
 def main(project_path, dataset_path, question_list_path, output_csv):
     logger = setup_logging()
-    #load_dotenv()
-    load_dotenv("python/mdvtools/llm/.env")
+    load_dotenv(os.path.join(os.path.dirname(__file__), "../llm/.env"))
 
     
     logger.info("Crawling the local repository...")
@@ -121,13 +122,26 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     db = FAISS.from_documents(texts, embeddings)
     retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 5})
     
-    project_path = os.path.expanduser(project_path)
-    logger.info(f"Loading dataset from {dataset_path}")
-    adata = sc.read_h5ad(dataset_path)
-    
-    logger.info("Creating MDV project...")
-    project = convert_scanpy_to_mdv(project_path, adata)
-    
+    temp_dir = None
+    if project_path is None or dataset_path is None:
+        temp_dir = tempfile.mkdtemp()
+        project_path = temp_dir
+        logger.info("Using temporary directory for project path.")
+
+        # Load sample data
+        logger.info("Loading sample dataset pbmc3k.")
+        adata = sc.datasets.pbmc3k()
+
+        logger.info("Creating MDV project...")
+        project = convert_scanpy_to_mdv(project_path, adata)
+    else:
+        project_path = os.path.expanduser(project_path)
+        logger.info(f"Loading dataset from {dataset_path}")
+        adata = sc.read_h5ad(dataset_path)
+
+        logger.info("Creating MDV project...")
+        project = convert_scanpy_to_mdv(project_path, adata)
+
     logger.info("Setting up LLM interaction...")
     code_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
     dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
@@ -290,6 +304,11 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     project.set_editable(True)
     project.serve()
 
+    # Clean up the temporary directory if it was used
+    if temp_dir is not None and project_path == temp_dir:
+        shutil.rmtree(temp_dir)
+        logger.info("Temporary directory cleaned up.")
+
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser(description="Run MDV LLM analysis from command line.")
     # parser.add_argument("project_path", help="Path to the MDV project directory")
@@ -299,10 +318,8 @@ if __name__ == "__main__":
     
     # args =parser.parse_args()
     #main(args.project_path, args.dataset_path, args.question_list_path, args.output_csv)
-    main("../../mdv/544",
-         "../../mdv/544/scanpy-pbmc3k.h5ad", 
-       "chat_testing/logs/pbmc3k_questions.csv",
-       "chat_testing/logs/pbmc3k_544_latest.csv")
+    # todo - have a default version of the questions file in the repo.
+    main(None, None, f"chat_testing/logs/pbmc3k_questions.csv", "chat_testing/logs/pbmc3k_544_latest.csv")
 
 
 
