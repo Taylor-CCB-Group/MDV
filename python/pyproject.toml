@@ -75,7 +75,7 @@ optional = true
 [tool.poetry.group.backend.dependencies]
 flask-sqlalchemy = "^3.1.1"
 psycopg2 = "^2.9.9"
-gunicorn = "^22.0.0"
+gunicorn = "23.0.0"
 psycogreen = "^1.0.2"
 
 
