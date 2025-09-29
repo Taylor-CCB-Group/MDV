@@ -15,8 +15,8 @@ classifiers = [
 
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-anndata = "0.11.4"
+python = ">=3.11,<3.13"
+anndata = "0.12.2"
 fasteners = "^0.18"
 Flask = "3.0.3"
 Flask-SocketIO = "^5.3.6"
@@ -61,7 +61,6 @@ seaborn = "^0.13.2"
 umap-learn = "^0.5.6"
 statsmodels = "^0.14.2"
 generate-tiff-offsets = "^0.1.7"
-vitessce = {extras = ["all"], version = "^3.7.4"}
 spatialdata-plot = "^0.2.12"
 
 
