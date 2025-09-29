@@ -122,6 +122,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     db = FAISS.from_documents(texts, embeddings)
     retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 5})
     
+    temp_dir = None
     if project_path is None or dataset_path is None:
         temp_dir = tempfile.mkdtemp()
         project_path = temp_dir
@@ -304,7 +305,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     project.serve()
 
     # Clean up the temporary directory if it was used
-    if project_path == temp_dir:
+    if temp_dir is not None and project_path == temp_dir:
         shutil.rmtree(temp_dir)
         logger.info("Temporary directory cleaned up.")
 
