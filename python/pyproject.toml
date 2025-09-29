@@ -24,8 +24,8 @@ h5py = "^3.10.0"
 mudata = "^0.2.3"
 # numpy 2.3.0 drops support for Python 3.10
 numpy = "<2.3.0"
-pandas = "^2.1.1"
-scanpy = "^1.9.8"
+pandas = "2.3.2"
+scanpy = "1.11.4"
 scipy = "^1.11.3"
 werkzeug = "^3.0.2"
 # previously in backend group - needed for MDVProject.serve() now.
