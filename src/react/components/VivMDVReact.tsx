@@ -22,7 +22,8 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
-import { g, isArray, toArray } from "@/lib/utils";
+import { g, toArray } from "@/lib/utils";
+import { getDensitySettings } from "../contour_state";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 
@@ -58,7 +59,7 @@ const MainChart = observer(() => {
     useImage(source);
     return !isViewerLoading && <VivScatter />;
 });
-
+//! todo move these types to different files
 export type TooltipConfig = {
     tooltip: {
         show: boolean;
@@ -99,7 +100,6 @@ export type VivMDVReact = VivMdvReact;
 function adaptConfig(originalConfig: VivMdvReactConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
-    //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
     // if (!config.)
     // === some dead code ===
@@ -175,23 +175,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const c = this.config;
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList();// as DataColumn<DataType>[];
-        const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
-        //@ts-expect-error category column values...
-        const ocats = this.dataStore.getColumnValues(c.param[2]).slice() || [];
-        const cats = ocats.map((x) => {
-            return { t: x };
-        });
-        // could've sworn mobx observable had been working here at some point
-        // (changing contourParameter should immediately update "Contour Category" dropdowns)... it isn't now.
-        // and the type is dodgy - need to get on top of that with mobx in general.
-        const catsValues = observable.array([cats, "t", "t"]) as unknown as [{t: string}[], "t", "t"];
-        // const catsValues = [cats, "t", "t"];
-
-        // What I would like is ability to
-        // - change selected image at runtime.
-        // - choose multiple categories on which to filter.
         const filters = c.category_filters.map((f) => {
             // what we really want is to have a type that is fairly specific to category filters...
             // able to handle an array of them with controls for adding/removing...
@@ -216,7 +201,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             (r) => ds.regions?.all_regions[r].viv_image,
         );
         const images = imageRegionKeys.map((r) => ({ name: r, value: r }));
-
 
         return settings.concat([
             g({
@@ -302,112 +286,9 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.showJson = x;
                 },
             }),
-            g({
-                type: "folder",
-                label: "Density Visualisation",
-                current_value: [
-                    g({
-                        type: "folder",
-                        label: "Category selection",
-                        current_value: [
-                            //maybe 2-spaces format is better...
-                            g({
-                                type: "dropdown", //todo, make this "column" and fix odd behaviour with showing the value...
-                                //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
-                                label: "Contour parameter",
-                                // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
-                                //@ts-expect-error contourParameter type
-                                current_value: c.contourParameter || c.param[2],
-                                values: [catCols, "name", "field"],
-                                func: (x) => {
-                                    if (x === c.contourParameter) return;
-                                    // could we change 'cats' and have the dropdowns update?
-                                    // was thinking this might mean a more general refactoring of the settings...
-                                    if (!isArray(c.param)) throw "expected param array";
-                                    c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
-                                    // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
-                                    const newCats = (
-                                        this.dataStore.getColumnValues(x) || []
-                                    ).map((t) => ({ t }));
-                                    // newCats.push({ t: "None" });
-                                    console.warn("changing contour parameter isn't properly updating dropdowns as of this writing...");
-                                    catsValues[0] = newCats;
-                                    //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
-                                    //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
-                                    // c.category1 = c.category2 = null;  //maybe we can allow state to be invalid?
-                                    //the dropdowns can set values to null if they're invalid rather than throw error?
-                                    //is that a good idea?
-                                },
-                            }),
-                            g({
-                                type: "multidropdown",
-                                label: "Contour Category 1",
-                                current_value: toArray(c.category1 || "None"),
-                                // values: [cats, "t", "t"],
-                                values: catsValues,
-                                func(x) {
-                                    // if (x === "None") x = null;
-                                    c.category1 = x;
-                                },
-                            }),
-                            g({
-                                type: "multidropdown",
-                                label: "Contour Category 2",
-                                current_value: toArray(c.category2 || "None"),
-                                // values: [cats, "t", "t"],
-                                values: catsValues,
-                                func(x) {
-                                    // if (x === "None") x = null;
-                                    c.category2 = x;
-                                },
-                            }),
-                        ],
-                    }),
-                    g({
-                        type: "slider",
-                        max: 25,
-                        min: 1,
-
-                        // doc: this.__doc__, //why?
-                        current_value: c.contour_bandwidth,
-                        label: "KDE Bandwidth",
-                        continuous: true,
-                        func(x) {
-                            c.contour_bandwidth = x;
-                        },
-                    }),
-                    g({
-                        label: "Fill Contours",
-                        type: "check",
-                        current_value: c.contour_fill,
-                        func(x) {
-                            c.contour_fill = x;
-                        },
-                    }),
-                    g({
-                        type: "slider",
-                        max: 1,
-                        min: 0,
-                        current_value: c.contour_intensity,
-                        continuous: true,
-                        label: "Fill Intensity",
-                        func(x) {
-                            c.contour_intensity = x;
-                        },
-                    }),
-                    g({
-                        type: "slider",
-                        max: 1,
-                        min: 0,
-                        current_value: c.contour_opacity,
-                        continuous: false, //why so slow?
-                        label: "Contour opacity",
-                        func(x) {
-                            c.contour_opacity = x ** 3;
-                        },
-                    }),
-                ],
-            }),
+            // side-note; what if "folders" could just be keyed objects?
+            // also, it might be nice to remember which folders were open...
+            getDensitySettings(c, this),
             g({
                 type: "folder",
                 label: "Category Filters",
@@ -474,6 +355,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
 BaseChart.types["VivMdvRegionReact"] = {
     ...BaseChart.types["viv_scatter_plot"], //this is doing something that means my default radius isn't being used...
+    // configEntriesUsingColumns: ["densityFields"],
     init: (config, ds, ec) => {
         const base = BaseChart.types["viv_scatter_plot"];
         if (!base || !base.init) throw "no base viv_scatter_plot"; //may well want to change this behaviour soon
