@@ -632,7 +632,19 @@ def _create_dt_heatmap(
     project.set_datasource_metadata(md)
 
 
-def _add_dims(table, dims, max_dims,stub=""):
+def _add_dims(table, dims, max_dims: int, stub: str = "") -> pd.DataFrame:
+    """
+    Add dimensions to a table from a dictionary of dimension reductions.
+
+    Args:
+        table (pd.DataFrame): The table to add dimensions to.
+        dims (dict): A dictionary of dimension reductions.
+        max_dims (int): The maximum number of dimensions to add.
+        stub (str): A string to prefix the dimension names with.
+
+    Returns:
+        pd.DataFrame: The table with dimensions added.
+    """
     if len(dims.keys()) == 0:
         return table
     #stub is if there is  more than one modality e.g.
