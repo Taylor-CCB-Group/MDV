@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 // zarrita needed a polyfill for Buffer - seems like a bug
 // seems ok without as long we don't use ZipFileStore (marked experimental anyway)
 // having the polyfill means the build works, but devserver fails with 'cannot import outside a module'
+// (not in the code using zarrita, but in unrelated worker modules)
 // import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 
