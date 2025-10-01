@@ -942,7 +942,7 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | pandas.Series | str,
+        dataframe: pandas.DataFrame | str,
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
