@@ -38,7 +38,7 @@ const DatasourceWorker = new Worker(
 );
 
 // Environment variable to control upload method
-const USE_SOCKETIO_UPLOAD = true; // Change to false to use HTTP upload
+const USE_SOCKETIO_UPLOAD = false; // Change to false to use HTTP upload
 
 export const Container = ({ children }: PropsWithChildren) => {
     return (
