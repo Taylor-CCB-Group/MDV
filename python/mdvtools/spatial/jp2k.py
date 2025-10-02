@@ -2,6 +2,7 @@ import subprocess
 import tempfile
 import os
 import argparse
+from generate_tiff_offsets import generate_tiff_offsets
 
 def bf_to_jp2k(input_path: str, output_path: str, lossless: bool = False, quality: int = 10):
     """
@@ -18,6 +19,8 @@ def bf_to_jp2k(input_path: str, output_path: str, lossless: bool = False, qualit
             "--compression", "JPEG-2000" if lossless else "JPEG-2000 Lossy",
             "--quality", str(quality),
         ], check=True)
+        generate_tiff_offsets(output_path)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
