@@ -181,13 +181,13 @@ const Main = observer(() => {
             //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
             layers: [jsonLayer, scatterplotLayer, selectionLayer],
             id: `${id}deck`,
-            glOptions: {
-                // no longer working with new deck.gl version?
-                preserveDrawingBuffer: true,
-            },
             controller: {
                 doubleClickZoom: false,
-            }
+            },
+            // deviceProps: {
+            //     // todo - get this working more usefully.
+            //     debugSpectorJS: true,
+            // }
         }),
         [
             scatterplotLayer,
