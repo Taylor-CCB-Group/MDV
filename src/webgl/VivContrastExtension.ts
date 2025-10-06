@@ -1,52 +1,71 @@
 import { type Layer, LayerExtension, type UpdateParameters } from "@deck.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
-
+const N_CHANNELS = 6;
 export type ContrastProps = {
-    contrast: number[];
-    brightness: number[];
+    // order may matter here(?)
+    redTest: number;
+    greenTest: number;
+    contrast: [number, number, number, number, number, number];
+    brightness: [number, number, number, number, number, number];
 };
+
+const vivDeclCode = /*glsl*/ `
+///----- VivContrastExtension decl
+// in future we might have a #define for N_CHANNELS, at the viv level (xr-layer-fragment).
+uniform VivContrastExtensionUniforms {
+    float redTest;
+    float greenTest;
+    float contrast[${N_CHANNELS}];
+    float brightness[${N_CHANNELS}];
+} vivContrast;
+
+//https://cis700-procedural-graphics.github.io/files/toolbox_functions.pdf
+float bias(float b, float t) {
+    return pow(t, log(b) / log(0.5));
+}
+float gain(float g, float t) {
+    if (t < 0.5) {
+        return bias(1. - g, 2. * t) / 2.;
+    } else {
+        return 1. - bias(1. - g, 2. - 2. * t) / 2.;
+    }
+}
+float applyBrightnessContrast(float intensity, int channelIndex) {
+    float c = vivContrast.contrast[channelIndex];
+    float b = vivContrast.brightness[channelIndex];
+    // return bias(b, gain(c, intensity));
+    return intensity;
+}
+///---- end VivContrastExtension
+`;
+
+const vivProcessIntensityCode = /*glsl*/ `
+///----- VivContrastExtension DECKGL_PROCESS_INTENSITY
+intensity = apply_contrast_limits(intensity, contrastLimits);
+intensity = clamp(intensity, 0., 1.);
+intensity = applyBrightnessContrast(intensity, channelIndex);
+///---- end VivContrastExtension
+`;
 
 const contrastModule = {
     name: "VivContrastExtension",
+    uniformTypes: {
+        // this is not how we type these arrays
+        // we should probably start with a simpler extension that doesn't have arrays
+        redTest: "f32",
+        greenTest: "f32",
+        contrast: "mat3x2<f32>", //will decode to `{ type: 'f32', components: 6 }`
+        brightness: "mat3x2<f32>",
+    },
     inject: {
-        "fs:#decl": /*glsl*/ `///----- VivContrastExtension decl
-                // todo - UBO version.
-                // may need future revision if we change the number of channels.
-                // layout(std140) uniform ChannelData {
-                //     float contrast[6];
-                //     float brightness[6];
-                // };
-                uniform float contrast[6];
-                uniform float brightness[6];
-
-                //https://cis700-procedural-graphics.github.io/files/toolbox_functions.pdf
-                float bias(float b, float t) {
-                    return pow(t, log(b) / log(0.5));
-                }
-                float gain(float g, float t) {
-                    if (t < 0.5) {
-                        return bias(1. - g, 2. * t) / 2.;
-                    } else {
-                        return 1. - bias(1. - g, 2. - 2. * t) / 2.;
-                    }
-                }
-                float applyBrightnessContrast(float intensity, int channelIndex) {
-                    float c = contrast[channelIndex];
-                    float b = brightness[channelIndex];
-                    return bias(b, gain(c, intensity));
-                }
-                ///---- end VivContrastExtension
-                `,
-        "fs:DECKGL_PROCESS_INTENSITY": /*glsl*/ `///----- VivContrastExtension DECKGL_PROCESS_INTENSITY
-                intensity = apply_contrast_limits(intensity, contrastLimits);
-                intensity = clamp(intensity, 0., 1.);
-                intensity = applyBrightnessContrast(intensity, channelIndex);
-                ///---- end VivContrastExtension
-                `,
-        // 'fs:DECKGL_MUTATE_COLOR': /*glsl*/`
-        // //---- VivContrastExtension DECKGL_MUTATE_COLOR
-        // // contrast adjustment
-        // `
+        "fs:#decl": vivDeclCode,
+        "fs:DECKGL_PROCESS_INTENSITY": vivProcessIntensityCode,
+        'fs:DECKGL_MUTATE_COLOR': /*glsl*/`
+        //---- VivContrastExtension DECKGL_MUTATE_COLOR
+        rgba.r *= vivContrast.redTest;
+        rgba.g *= vivContrast.greenTest;
+        ///---- end VivContrastExtension
+        `
     },
 } as const satisfies ShaderModule<ContrastProps>;
 
@@ -63,13 +82,13 @@ export default class VivContrastExtension extends LayerExtension<ContrastProps> 
     updateState(this: Layer<ContrastProps>, params: UpdateParameters<Layer<ContrastProps>>, extension: this): void {
         const { props } = params;
         const { contrast, brightness } = props;
-        // should be arrays of 6... probably in imageSettingsStore.
+        // should be arrays of N_CHANNELS... probably in imageSettingsStore.
         // --- would be nice if viv etc were better about managing variable number of channels ---
-        if (contrast.length !== 6 || brightness.length !== 6) {
+        if (contrast.length !== N_CHANNELS || brightness.length !== N_CHANNELS) {
             // throw new Error('contrast and brightness must be arrays of length 6');
-            const contrastA = Array(6);
-            const brightnessA = Array(6);
-            for (let i = 0; i < 6; i++) {
+            const contrastA = Array(N_CHANNELS);
+            const brightnessA = Array(N_CHANNELS);
+            for (let i = 0; i < N_CHANNELS; i++) {
                 //don't really care about default values for missing entries...
                 contrastA[i] = contrast[i] ?? 1;
                 brightnessA[i] = brightness[i] ?? 0;
@@ -96,14 +115,35 @@ export default class VivContrastExtension extends LayerExtension<ContrastProps> 
                 //model.shaderInputs.setProps({custom: CustomProps});
 
                 model.shaderInputs.setProps({
-                    // contrast: contrastA,
-                    // brightness: brightnessA
+                    "VivContrastExtension": {
+                        // vivContrast: {
+                        //     contrast: contrastA,
+                        //     brightness: brightnessA,
+                        // },
+                        contrast: contrastA,
+                        brightness: brightnessA,
+                        redTest: 0.5,
+                        greenTest: 0.5,
+                    },
                 });
             }
             return;
         }
         for (const model of this.getModels()) {
-            model.setUniforms({ contrast, brightness });
+            // model.setUniforms({ contrast, brightness });
+            model.shaderInputs.setProps({
+                "VivContrastExtension": {
+                    // vivContrast: {
+                    //     contrast,
+                    //     brightness,
+                    // },
+                    // re-using the arrays - is there a possibility that luma/deck.gl will not update the mutated contents?
+                    contrast,
+                    brightness,
+                    redTest: 1.5,
+                    greenTest: 0.9,
+                },
+            });
         }
     }
 }
