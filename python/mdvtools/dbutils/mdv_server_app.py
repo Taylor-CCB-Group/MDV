@@ -364,23 +364,20 @@ def serve_projects_from_db(app):
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
-                    # Respect DB access level when serving
+                    # Sync DB access level from state.json if present, then serve with resulting editability
                     try:
-                        is_editable = (project.access_level == 'editable') if getattr(project, 'access_level', None) else False
+                        state = p.state or {}
+                        perm = (state.get('permission') or '').lower()
+                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                        if desired_level is not None and desired_level != getattr(project, 'access_level', None):
+                            ProjectService.change_project_access(project.id, desired_level)
+                            is_editable = (desired_level == 'editable')
+                        else:
+                            is_editable = (project.access_level == 'editable') if getattr(project, 'access_level', None) else False
                         p.set_editable(is_editable)
                     except Exception:
                         # Fallback to non-editable if anything goes wrong
                         p.set_editable(False)
-                    # One-time sync: if DB access_level is unset, initialize from state.json.permission
-                    try:
-                        if not getattr(project, 'access_level', None):
-                            state = p.state or {}
-                            perm = (state.get('permission') or '').lower()
-                            desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
-                            if desired_level is not None:
-                                ProjectService.change_project_access(project.id, desired_level)
-                    except Exception:
-                        pass
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
