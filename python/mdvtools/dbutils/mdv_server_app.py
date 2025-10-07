@@ -364,7 +364,23 @@ def serve_projects_from_db(app):
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
-                    p.set_editable(True)
+                    # Respect DB access level when serving
+                    try:
+                        is_editable = (project.access_level == 'editable') if getattr(project, 'access_level', None) else False
+                        p.set_editable(is_editable)
+                    except Exception:
+                        # Fallback to non-editable if anything goes wrong
+                        p.set_editable(False)
+                    # One-time sync: if DB access_level is unset, initialize from state.json.permission
+                    try:
+                        if not getattr(project, 'access_level', None):
+                            state = p.state or {}
+                            perm = (state.get('permission') or '').lower()
+                            desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                            if desired_level is not None:
+                                ProjectService.change_project_access(project.id, desired_level)
+                    except Exception:
+                        pass
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
@@ -441,7 +457,14 @@ def serve_projects_from_filesystem(app, base_dir):
                         next_id += 1
 
                     p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
-                    p.set_editable(True)
+                    # Respect existing state.json permission if present; default to editable only if explicit
+                    try:
+                        state = p.state or {}
+                        perm = (state.get('permission') or '').lower()
+                        is_editable = True if perm == 'edit' else False if perm == 'view' else False
+                        p.set_editable(is_editable)
+                    except Exception:
+                        p.set_editable(False)
                     p.serve(options=options) 
                     logger.info(f"Serving project: {project_path}")
 
@@ -451,6 +474,15 @@ def serve_projects_from_filesystem(app, base_dir):
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
                     
                     logger.info(f"Added project to DB: {new_project}")
+                    # One-time sync: initialize DB access_level from state.json.permission
+                    try:
+                        state = p.state or {}
+                        perm = (state.get('permission') or '').lower()
+                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                        if desired_level is not None:
+                            ProjectService.change_project_access(new_project.id, desired_level)
+                    except Exception:
+                        pass
 
                     # Rename directory to use project ID as folder name
                     """

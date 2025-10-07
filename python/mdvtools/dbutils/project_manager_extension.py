@@ -194,7 +194,14 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 
                 # # Create a new MDV project out of the new path and files copied
                 p = MDVProject(project_path, backend_db=True)
-                p.set_editable(True)
+                # Respect permission in imported state.json, default to non-editable if unspecified
+                try:
+                    state = p.state or {}
+                    perm = (state.get('permission') or '').lower()
+                    is_editable = True if perm == 'edit' else False if perm == 'view' else False
+                    p.set_editable(is_editable)
+                except Exception:
+                    p.set_editable(False)
                 p.serve(app=app, open_browser=False, backend_db=True)
                 
 
