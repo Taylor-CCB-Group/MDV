@@ -27,7 +27,7 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     // Update this to match the port of the server you are running
-    baseURL: 'http://localhost:5170/',
+    baseURL: 'http://localhost:5055/',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -35,6 +35,7 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    // Existing browser projects (for catalog etc)
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
@@ -72,11 +73,11 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    // Update this to match the port of the server you are running
-    command: 'npm run dev',
-    url: 'http://localhost:5170/',
-    reuseExistingServer: true,
-    timeout: 120000,
-  },
+  // webServer: {
+  //   // Update this to match the port of the server you are running
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:5170/',
+  //   reuseExistingServer: true,
+  //   timeout: 120000,
+  // },
 });

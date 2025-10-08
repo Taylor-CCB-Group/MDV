@@ -5,6 +5,7 @@ test('create project navigates to project view', async ({ page }) => {
   await mockApiRoot(page);
   await mockProjects(page, []);
 
+  // mock create project api
   await page.route('**/create_project', r => r.fulfill({ json: { id: '123', name: 'New Project' } }));
 
   await gotoPath(page);

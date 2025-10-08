@@ -10,7 +10,7 @@ test('import dialog opens and success navigates', async ({ page }) => {
   await gotoPath(page);
 
   await page.getByText('Import an existing project').click();
-  // Set the hidden file input directly
+  // Upload zip file
   const filePath = path.join(__dirname, '..', 'test-data', 'pbmc3k-mdv.mdv.zip');
   await page.locator('input[type="file"]').setInputFiles(filePath);
 
