@@ -63,6 +63,7 @@ const useProjects = () => {
                                 owner: true,
                             },
                     thumbnail: item?.thumbnail,
+                    readme: item?.readme,
                 }));
 
                 setProjects(formattedProjects);

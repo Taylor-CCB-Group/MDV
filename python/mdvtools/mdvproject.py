@@ -80,6 +80,7 @@ class MDVProject:
         self.datasourcesfile = join(dir, "datasources.json")
         self.statefile = join(dir, "state.json")
         self.viewsfile = join(dir, "views.json")
+        self.readmefile = join(dir, 'README.md')
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
         if not exists(dir):
@@ -106,6 +107,14 @@ class MDVProject:
     @datasources.setter
     def datasources(self, value):
         save_json(self.datasourcesfile, value, self.safe_file_save)
+    
+    @property
+    def readme(self):
+        if not exists(self.readmefile): 
+            return None
+        with open(self.readmefile, 'r') as f:
+            markdown_string = f.read()
+        return markdown_string
 
     @property
     def views(self):
