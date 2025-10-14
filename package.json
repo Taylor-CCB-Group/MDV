@@ -34,7 +34,9 @@
     "fix_npm_win": "npm config set script-shell \"cmd\"",
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
-    "test": "vitest"
+    "test": "vitest",
+    "playwright-test": "npx playwright test",
+    "playwright-test-ui": "npx playwright test --ui"
   },
   "repository": {
     "type": "git",
