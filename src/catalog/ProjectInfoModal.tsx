@@ -41,11 +41,11 @@ const ProjectInfoModal: React.FC<ProjectInfoModalProps> = ({
         <Dialog
             open={open}
             onClose={onClose}
-            aria-labelledby="project-info-dialog-title"
+            aria-labelledby="project_info_dialog-title"
             maxWidth="sm"
             fullWidth
         >
-            <DialogTitle id="project-info-dialog-title">
+            <DialogTitle id="project_info_dialog-title">
                 Project Information
                 <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
