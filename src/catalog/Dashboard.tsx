@@ -36,7 +36,7 @@ import {
 import React, { useCallback, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
 import ProjectListView from "./ProjectListView";
-import UserProfile from "./UserProfile";
+// import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
 import useProjects from "./hooks/useProjects";
 import {
@@ -160,7 +160,9 @@ const Dashboard: React.FC = () => {
                                 <Search />
                             </IconButton>
                         </Paper>
-                        <UserProfile />
+                        {/* todo: Uncomment for auth enabled */}
+                        {/* Commenting this for public website */}
+                        {/* <UserProfile /> */}
                         <IconButton
                             sx={{ ml: 1 }}
                             onClick={toggleColorMode}
