@@ -1,3 +1,7 @@
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from anndata import AnnData
+
 from mdvtools.mdvproject import MDVProject
 from mdvtools.conversions import get_matrix, _add_dims
 from typing import Optional, List
@@ -208,7 +212,7 @@ def convert_xenium_to_mdv(
             mdv.set_region_data(
                 f"{label}cells",
                 cell_table,
-                region_field="cell_id",
+                # region_field="cell_id", # wtf
                 default_color="total_counts" if "total_counts" in cell_table.columns else "cell_id",
                 position_fields=["x", "y"],
                 scale_unit="µm",
@@ -349,7 +353,11 @@ def _set_xenium_sdata_image(mdv: MDVProject, sdata: sd.SpatialData):
 
     # assume "cell_circles" in various ways while we figure this out...
     # we expect this to have a Scale transform appropriate for putting points on the image
-    transform = get_transformation(sdata["cell_circles"])
+    cell_circles = sdata["cell_circles"]
+    if isinstance(cell_circles, AnnData):
+        # todo: handle this case
+        raise ValueError("unexpected AnnData in cell_circles")
+    transform = get_transformation(cell_circles)
     assert isinstance(transform, Scale), "Expected a Scale transform"
     scale = transform.scale
     assert len(scale) == 2, "Expected a 2D scale transform"

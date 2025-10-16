@@ -1,5 +1,15 @@
 import argparse
 import os
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    import spatialdata as sd
+
+def _find_default_image_for_cs(sdata: sd.SpatialData, coord_system="global"):
+    sd = sdata.filter_by_coordinate_system(coord_system)
+    if not hasattr(sd, "images"):
+        return None
+    return sd.images.items()[0][0]  # type: ignore
+
 
 if __name__ == "__main__":
     # take an array of spatialdata objects from a folder and convert them to mdv.

@@ -40,12 +40,12 @@ def sdata_to_mermaid(sdata: SpatialData) -> str:
         for element_type in el_types:
             if hasattr(cs_data, element_type):
                 collection = getattr(cs_data, element_type)
-                for element_name, element in collection.items():
-                    if not element_type in cs_elements:
+                for element_name, _element in collection.items():
+                    if element_type not in cs_elements:
                         cs_elements[element_type] = []
                     cs_elements[element_type].append(element_name)
                     if element_type == "tables":
-                        annotated, element_description, instance_key = get_table_keys(cs_data.tables["table"])
+                        annotated, _element_description, _instance_key = get_table_keys(cs_data.tables["table"])
                         annotated_arrary = annotated if isinstance(annotated, list) else [annotated]    
                         cs_annotations[element_name] = annotated_arrary
                     

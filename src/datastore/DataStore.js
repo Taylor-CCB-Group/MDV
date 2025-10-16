@@ -33,7 +33,7 @@ class DataStore {
      * links with other DataStore
      * @param {Object} [config.images] - an object describing thumbnails which
      * are associated with each item/row in the DataStore
-     * @param {Object} [config.large_iamges] - an object describing large images which
+     * @param {Object} [config.large_images] - an object describing large images which
      * are associated with each item/row in the DataStore
      * @param {Object} [config.offsets] - an object specifying which columns can
      * have values that can be transformed and rotated and any transformations/
