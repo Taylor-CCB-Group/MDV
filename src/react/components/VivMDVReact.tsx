@@ -179,7 +179,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const settings = super.getSettings();
 
         //@ts-expect-error category column values...
-        const ocats = this.dataStore.getColumnValues(c.param[2]).slice() || [];
+        const ocats = this.dataStore.getColumnValues(c.param[2])?.slice() || [];
         const cats = ocats.map((x) => {
             return { t: x };
         });
