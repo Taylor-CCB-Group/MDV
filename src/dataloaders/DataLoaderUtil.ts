@@ -7,7 +7,6 @@ import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { createMdvPortal } from "@/react/react_utils";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import { decompressData } from "./DataLoaders";
-import getZarrDataLoader from "./ZarrDataLoader";
 
 let projectRoot = "";
 /**
@@ -98,9 +97,6 @@ export function getDataLoader(
               rowDataLoader: loadRowData,
               binaryDataLoader: loadBinaryData,
           };
-    if (datasources.some(ds => ds.zarr)) {
-        return getZarrDataLoader(datasources, root);
-    }
     return loader;
     //PJT - want to clarify /binarydata/ & /rowdata/ folders, and use of .b vs .gz
 

@@ -172,8 +172,7 @@ export type DataSource = {
     links?: DataSourceLinks;
     size: number;
     columns: DataColumn<DataType>[];
-    zarr?: ExperimentalZarrStore;
-};// | ExperimentalZarrStore; ? maybe we can have a kind of datasource that just says what kind of preset type of store it is? or not.
+};// | ExperimentalZarrStore; ? something something spatialdata.js ...
 // maybe that the
 
 type DropdownMappedValue<T extends string, V extends string> = {
