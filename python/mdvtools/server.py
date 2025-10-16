@@ -119,10 +119,11 @@ def create_app(
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
         return render_template("page.html", route=route, backend=options.backend_db)
 
-    @project_bp.route("/spatialdata.zarr/<path:file>")
+    @project_bp.route("/spatial/<path:file>")
+    # @project_bp.route("/spatialdata.zarr/<path:file>") # legacy for older experimental projects
     def get_spatialdata(file):
         # nb - we might have multiple spatialdata objects in future, route might change somewhat.
-        path = safe_join(project.dir, "spatialdata.zarr", file)
+        path = safe_join(project.dir, "spatial", file)
         return send_file(path)
     
     @project_bp.route("/<file>.b")
