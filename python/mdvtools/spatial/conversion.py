@@ -15,6 +15,7 @@ if __name__ == "__main__":
     import numpy as np
     import spatialdata as sd
     from spatialdata.transformations import get_transformation
+    from spatialdata.models import get_table_keys
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
 
@@ -43,8 +44,9 @@ if __name__ == "__main__":
             print(f"Found image in sdata: {image_name}")
             break
         assert main_image is not None, "No image found in SpatialData object"
-        transformation = get_transformation(main_image)
-        assert transformation is not None, "No transformation found for image"
+        region, _element_description, _instance_key = get_table_keys(adata)
+        transformation = get_transformation(sdata[region])
+        assert transformation is not None, f"No transformation found for region {region}"
         ## Apply transformation matrix to spatial coordinates
         # Convert spatialdata transformation to affine matrix and apply to coordinates
         try:
