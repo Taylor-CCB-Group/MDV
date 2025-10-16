@@ -72,6 +72,13 @@ def register_routes(app, ENABLE_AUTH):
             return jsonify({"mdv_api_root": root})
         logger.info("Route registered: /api_root")
 
+        @app.route('/enable_auth')
+        def get_enable_auth():
+            enable_auth = os.environ.get("ENABLE_AUTH") or "0"
+            is_auth_enabled = True if enable_auth == "1" else False
+            return jsonify({"enable_auth": is_auth_enabled})
+        logger.info("Route registered: /enable_auth")
+
         @app.route('/extension_config', methods=['GET'])
         def extension_config():
             """Return a static-like map of extension name to its API flags.

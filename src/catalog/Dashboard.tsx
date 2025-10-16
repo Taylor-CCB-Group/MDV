@@ -33,10 +33,10 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
 import ProjectListView from "./ProjectListView";
-// import UserProfile from "./UserProfile";
+import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
 import useProjects from "./hooks/useProjects";
 import {
@@ -48,6 +48,7 @@ import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
 import usePermissions from "./PermissionsContext";
+import useAuthEnabled from "./hooks/useAuthEnabled";
 
 const Dashboard: React.FC = () => {
     const {
@@ -66,6 +67,8 @@ const Dashboard: React.FC = () => {
     } = useProjects();
     const { permissions, isLoading: permissionsLoading } = usePermissions();
 
+    // Check if auth is enabled
+    const authEnabled = useAuthEnabled();
     const { mode, toggleColorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [sortBy, setSortBy] = useState<SortBy>("lastModified");
@@ -160,9 +163,7 @@ const Dashboard: React.FC = () => {
                                 <Search />
                             </IconButton>
                         </Paper>
-                        {/* todo: Uncomment for auth enabled */}
-                        {/* Commenting this for public website */}
-                        {/* <UserProfile /> */}
+                        {authEnabled && <UserProfile />}
                         <IconButton
                             sx={{ ml: 1 }}
                             onClick={toggleColorMode}
@@ -253,7 +254,7 @@ const Dashboard: React.FC = () => {
                             mb: 1,
                         }}
                     >
-                        <Typography variant="h5">Recent Projects</Typography>
+                        <Typography variant="h5">{authEnabled ? "Recent Projects" : "Published Projects"}</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                             <Paper
                                 elevation={1}
