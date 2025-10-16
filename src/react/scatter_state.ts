@@ -134,12 +134,12 @@ export function useRegionScale() {
     if (!metadata) return 1 / regionScale; // might want to start using this with non-image data that has real units
     if (!("Pixels" in metadata)) return 1/regionScale;
     const { Pixels } = metadata;
+    if (!Pixels.PhysicalSizeX) return 1 / regionScale;
     if (Pixels.PhysicalSizeXUnit !== regionUnit)
         console.warn(
             `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
         );
     // if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
-    if (!Pixels.PhysicalSizeX) return 1 / regionScale;
     const scale = Pixels.PhysicalSizeX / regionScale;
     return Number.isFinite(scale) ? scale : 1;
 }
