@@ -1,6 +1,12 @@
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from anndata import AnnData
+"""
+nb - this script is in need of review...
+probably trying to do too much, but maybe some useful things to be salvaged.
+Should be made to more easily consume multiple xenium datasets in the same project.
+*** may not be working just now, haven't tested it in a while. ***
+"""
+
+
+from anndata import AnnData
 
 from mdvtools.mdvproject import MDVProject
 from mdvtools.conversions import get_matrix, _add_dims
@@ -224,7 +230,7 @@ def convert_xenium_to_mdv(
     # todo: current idea is that these won't be DataSources, but things that are associated with cells regions
     #  and understood by SpatialLayers
     # we include an entire spatialdata.zarr store - and aim to use this for as much as possible in future...
-    sdata.write(f"{mdv.dir}/spatialdata.zarr")
+    sdata.write(f"{mdv.dir}/spatial/xenium.zarr")
     # Add cell and nucleus boundaries if available, transcripts, etc...
     # we should do this by adding to the region data with description of where to read in the zarr store
     # boundaries as polygons vs labels rasters...
