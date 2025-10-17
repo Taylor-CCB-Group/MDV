@@ -225,7 +225,11 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
 # Only required if data is being added from a modality,as sometimes
 # the modality's obs_names will be in a different order and/or a subset of the main names
 # Hence a sparse matrix corresponding to the main indices needs to be created
-def get_matrix(matrix,main_names=[],mod_names=[]) -> tuple[scipy.sparse.csc_matrix | np.ndarray, bool]:
+def get_matrix(matrix,main_names=None,mod_names=None) -> tuple[scipy.sparse.csc_matrix | np.ndarray, bool]:
+    if main_names is None:
+        main_names = []
+    if mod_names is None:
+        mod_names = []
     #check where the matrix data actually is
     matrix = matrix.value if hasattr(matrix,"value") else matrix
     #is the matrix backed sparse matrix -convert to non backed else cannot convert
