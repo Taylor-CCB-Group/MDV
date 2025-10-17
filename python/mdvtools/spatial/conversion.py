@@ -8,7 +8,8 @@ def _find_default_image_for_cs(sdata: sd.SpatialData, coord_system="global"):
     sd = sdata.filter_by_coordinate_system(coord_system)
     if not hasattr(sd, "images"):
         return None
-    return sd.images.items()[0][0]  # type: ignore
+    items = list(sd.images.items())  
+    return items[0][0] if items else None
 
 
 if __name__ == "__main__":
@@ -16,8 +17,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert SpatialData to MDV format")
     parser.add_argument("spatialdata_path", type=str, help="Path to SpatialData data")
     parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
-    parser.add_argument("--delete-existing", action="store_false", default=True, help="Delete existing project data")
-    parser.add_argument("--serve", action="store_false", default=True, help="Serve the project after conversion")
+    parser.add_argument("--preserve-existing", action="store_false", default=False, help="Preserve existing project data")
+    parser.add_argument("--serve", action="store_false", default=False, help="Serve the project after conversion")
     args = parser.parse_args()
 
     # imports can be slow, so doing them here rather than at the top of the file
@@ -41,8 +42,10 @@ if __name__ == "__main__":
         sdata = sd.read_zarr(sdata_path)
         sdata_objects[sdata_name] = sdata
         # FOR NOW::: assert that they each have a single coordinate system, image & table.
+        if "table" not in sdata.tables:
+            # pending implementation of support for other tables etc.
+            raise ValueError(f"No default table found in SpatialData object '{sdata_path}' - this is not yet supported.")
         adata = sdata.tables["table"]
-        assert adata is not None, "No table found in SpatialData object"
         adata.obs["spatialdata_path"] = sdata_name
         adata_objects[sdata_path] = adata
         # get the transformation for the image
@@ -53,33 +56,45 @@ if __name__ == "__main__":
             main_image_name = image_name
             print(f"Found image in sdata: {image_name}")
             break
-        assert main_image is not None, "No image found in SpatialData object"
+        if len(sdata.images.items()) > 1:
+            print(f"Warning: Multiple images found in SpatialData object '{sdata_path}' - this is not yet properly supported and may result in unexpected behaviour.")
+        if main_image is None:
+            # it should be valid to have no image - and w
+            raise ValueError(f"No image found in SpatialData object '{sdata_path}' - this is not yet supported.")
         region, _element_description, _instance_key = get_table_keys(adata)
         transformation = get_transformation(sdata[region])
-        assert transformation is not None, f"No transformation found for region {region}"
+        if transformation is None:
+            print(f"Warning: No transformation found for region {region} in SpatialData object '{sdata_path}' - this is unexpected, using Identity.")
+            transformation = sd.transformations.Identity()
         ## Apply transformation matrix to spatial coordinates
         # Convert spatialdata transformation to affine matrix and apply to coordinates
         try:
-            # Get the affine matrix from the transformation
-            # For spatial coordinates, we typically have x, y axes
-            input_axes = ["x", "y"]
-            output_axes = ["x", "y"]
-            affine_matrix = transformation.to_affine_matrix(input_axes=input_axes, output_axes=output_axes)
-            # nb - in the case of xenium, the transormation is Identity but we know there is a scale factor...
-            
-            # Convert coordinates to homogeneous coordinates (add 1s for translation)
-            coords_homogeneous = np.column_stack([adata.obsm["spatial"], np.ones(adata.obsm["spatial"].shape[0])])            
-            # Apply transformation: each row of coords_homogeneous @ affine_matrix
-            transformed_coords_homogeneous = coords_homogeneous @ affine_matrix.T
-            # Convert back from homogeneous coordinates (remove the last column)
-            coords = transformed_coords_homogeneous[:, :-1]
-            
-            # we're keeping the original spatial coordinates in the obsm and adding these as x,y in obs
-            # which will be used for position fields in the cells region data
-            # in future we'll be able to use the untransformed coordinates, with the transform applied in shader
-            # - we might be able to have a column data-type for 2d/3d coordinates and reduce marshalling in gpu buffer creation.
-            adata.obs["x"] = coords[:, 0]
-            adata.obs["y"] = coords[:, 1]
+            if isinstance(transformation, sd.transformations.Identity):
+                # no point doing a load of matrix multiplication if the transformation is Identity
+                coords = adata.obsm["spatial"]
+                adata.obs["x"] = coords[:, 0]
+                adata.obs["y"] = coords[:, 1]
+            else:            
+                # Get the affine matrix from the transformation
+                # For spatial coordinates, we typically have x, y axes
+                input_axes = ["x", "y"]
+                output_axes = ["x", "y"]
+                affine_matrix = transformation.to_affine_matrix(input_axes=input_axes, output_axes=output_axes)
+                # nb - in the case of xenium, the transormation is Identity but we know there is a scale factor...
+                
+                # Convert coordinates to homogeneous coordinates (add 1s for translation)
+                coords_homogeneous = np.column_stack([adata.obsm["spatial"], np.ones(adata.obsm["spatial"].shape[0])])            
+                # Apply transformation: each row of coords_homogeneous @ affine_matrix
+                transformed_coords_homogeneous = coords_homogeneous @ affine_matrix.T
+                # Convert back from homogeneous coordinates (remove the last column)
+                coords = transformed_coords_homogeneous[:, :-1]
+                
+                # we're keeping the original spatial coordinates in the obsm and adding these as x,y in obs
+                # which will be used for position fields in the cells region data
+                # in future we'll be able to use the untransformed coordinates, with the transform applied in shader
+                # - we might be able to have a column data-type for 2d/3d coordinates and reduce marshalling in gpu buffer creation.
+                adata.obs["x"] = coords[:, 0]
+                adata.obs["y"] = coords[:, 1]
             # add a column to the obs to indicate the coordinate system
             # when we handle multiple coordinate systems within an sdata this will need to be updated.
             adata.obs["coordinate_system"] = sdata_name
@@ -109,7 +124,7 @@ if __name__ == "__main__":
 
     # merged_adata = ad.concat(adata_objects.values(), label="coordinate_system", index_unique="_")
     merged_adata = ad.concat(adata_objects.values(), index_unique="_")
-    mdv = convert_scanpy_to_mdv(args.output_folder, merged_adata, delete_existing=args.delete_existing)
+    mdv = convert_scanpy_to_mdv(args.output_folder, merged_adata, delete_existing=not args.preserve_existing)
     for sdata_path, sdata in sdata_objects.items():
         sdata.write(f"{mdv.dir}/spatial/{sdata_path}")
     mdv.set_editable()
