@@ -37,8 +37,12 @@ if __name__ == "__main__":
     sdata_objects: dict[str, sd.SpatialData] = {}
     adata_objects: dict[str, ad.AnnData] = {}
     all_regions: dict[str, dict] = {}
+    names: set[str] = set()
     for sdata_path in sdata_paths:
         sdata_name = os.path.basename(sdata_path)
+        if sdata_name in names:
+            raise ValueError(f"SpatialData object '{sdata_path}' has the same name as another object - this is not yet supported.")
+        names.add(sdata_name)
         sdata = sd.read_zarr(sdata_path)
         sdata_objects[sdata_name] = sdata
         # FOR NOW::: assert that they each have a single coordinate system, image & table.
@@ -125,8 +129,10 @@ if __name__ == "__main__":
     # merged_adata = ad.concat(adata_objects.values(), label="coordinate_system", index_unique="_")
     merged_adata = ad.concat(adata_objects.values(), index_unique="_")
     mdv = convert_scanpy_to_mdv(args.output_folder, merged_adata, delete_existing=not args.preserve_existing)
+    os.makedirs(f"{mdv.dir}/spatial", exist_ok=True) # pretty sure sdata.write will do this anyway
     for sdata_path, sdata in sdata_objects.items():
-        sdata.write(f"{mdv.dir}/spatial/{sdata_path}")
+        sdata_name = os.path.basename(sdata_path)
+        sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
     mdv.set_editable()
 
     # these methods won't do what we actually want... this should be addressed.
