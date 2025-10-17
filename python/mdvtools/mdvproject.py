@@ -1442,13 +1442,6 @@ class MDVProject:
             # `options` was not provided, create it from kwargs.
             options = MDVServerOptions(**kwargs)
         
-        if options.websocket:
-            # I swear I'm going to clean up this logic soon...
-            from mdvtools.llm.chat_server_extension import chat_extension
-            if chat_extension not in options.extensions:
-                options.extensions.append(chat_extension)
-
-
         create_app(self, options=options)
         
 
