@@ -34,7 +34,9 @@ export default function MainVivColorDialog({
 }
 
 const ChannelChooserMUI = ({ index }: { index: number }) => {
+    //@ts-expect-error - TODO: fix avivatorish metadata type
     const channels = useMetadata()?.Pixels.Channels.map(
+        //@ts-expect-error - TODO: fix avivatorish metadata type
         (c) => c.Name,
     ) as string[];
     const selections = useChannelsStore(({ selections }) => selections);
@@ -70,7 +72,9 @@ const ChannelChooserMUI = ({ index }: { index: number }) => {
 };
 
 const ChannelChooser = ({ index }: { index: number }) => {
+    //@ts-expect-error - TODO: fix avivatorish metadata type
     const channels = useMetadata()?.Pixels.Channels.map(
+        //@ts-expect-error - TODO: fix avivatorish metadata type
         (c) => c.Name,
     ) as string[];
     const { selections, setPropertiesForChannel } = useChannelsStore(
