@@ -225,7 +225,11 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
 # Only required if data is being added from a modality,as sometimes
 # the modality's obs_names will be in a different order and/or a subset of the main names
 # Hence a sparse matrix corresponding to the main indices needs to be created
-def get_matrix(matrix,main_names=[],mod_names=[]):
+def get_matrix(matrix,main_names=None,mod_names=None) -> tuple[scipy.sparse.csc_matrix | np.ndarray, bool]:
+    if main_names is None:
+        main_names = []
+    if mod_names is None:
+        mod_names = []
     #check where the matrix data actually is
     matrix = matrix.value if hasattr(matrix,"value") else matrix
     #is the matrix backed sparse matrix -convert to non backed else cannot convert
@@ -632,7 +636,19 @@ def _create_dt_heatmap(
     project.set_datasource_metadata(md)
 
 
-def _add_dims(table, dims, max_dims,stub=""):
+def _add_dims(table, dims, max_dims: int, stub: str = "") -> pd.DataFrame:
+    """
+    Add dimensions to a table from a dictionary of dimension reductions.
+
+    Args:
+        table (pd.DataFrame): The table to add dimensions to.
+        dims (dict): A dictionary of dimension reductions.
+        max_dims (int): The maximum number of dimensions to add.
+        stub (str): A string to prefix the dimension names with.
+
+    Returns:
+        pd.DataFrame: The table with dimensions added.
+    """
     if len(dims.keys()) == 0:
         return table
     #stub is if there is  more than one modality e.g.

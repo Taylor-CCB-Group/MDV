@@ -1,0 +1,28 @@
+{
+  "position_fields": [
+    "x",
+    "y"
+  ],
+  "region_field": "region",
+  "default_color": "region",
+  "scale_unit": "µm",
+  "scale": 1,
+  "all_regions": {
+    "cell_circles": {
+      "roi": {
+        "min_x": 0,
+        "min_y": 0,
+        "max_x": 100,
+        "max_y": 100
+      },
+      "images": {},
+      "viv_image": {
+        "file": "morphology_focus"
+      }
+    }
+  },
+  "avivator": {
+    "default_channels": [],
+    "base_url": "spatialdata.zarr/images"
+  }
+}

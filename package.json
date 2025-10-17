@@ -113,6 +113,7 @@
     "tippy.js": "^6.3.7",
     "use-debounce": "^10.0.2",
     "uuid": "^11.0.3",
+    "vite-plugin-node-polyfills": "^0.24.0",
     "wordcloud": "^1.2.2",
     "zod": "^3.25.49",
     "zustand": "^5.0.6"

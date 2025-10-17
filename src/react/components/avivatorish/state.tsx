@@ -348,7 +348,7 @@ export const useLoader = () => {
     return Array.isArray(fullLoader[0]) ? fullLoader[image] : fullLoader;
 };
 //! todo review the typing here...
-export type Metadata = OME_TIFF['metadata'];// | OME_ZARR['metadata'] | BIO_ZARR['metadata'];
+export type Metadata = OME_TIFF['metadata'] | OME_ZARR['metadata'] | BIO_ZARR['metadata'];
 //export type Metadata = TiffPreviewProps["metadata"];
 export const useMetadata = (): Metadata | undefined | null => {
     try {

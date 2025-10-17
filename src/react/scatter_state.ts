@@ -105,6 +105,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_opacity: 0.5,
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
+    // todo omit this so we can have better HMR.
     selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 
@@ -130,14 +131,15 @@ export function useRegionScale() {
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
     //MDVProject.set_region_scale assumes that all regions have the same scale?
-    if (!metadata) return 1; // / regionScale?; // might want to start using this with non-image data that has real units
+    if (!metadata) return 1 / regionScale; // might want to start using this with non-image data that has real units
+    if (!("Pixels" in metadata)) return 1/regionScale;
     const { Pixels } = metadata;
+    if (!Pixels.PhysicalSizeX) return 1 / regionScale;
     if (Pixels.PhysicalSizeXUnit !== regionUnit)
         console.warn(
             `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
         );
     // if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
-    if (!Pixels.PhysicalSizeX) return 1;
     const scale = Pixels.PhysicalSizeX / regionScale;
     return Number.isFinite(scale) ? scale : 1;
 }
