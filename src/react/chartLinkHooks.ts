@@ -35,14 +35,12 @@ export const useViewStateLink = () => {
         const unsubscribe = viewerStore.subscribe(({ viewState }) => {
             thisChart.ignoreStateUpdate = true; //<< add a setting for this, make sure we get the logic right
             const originalZoom = viewState.zoom as number;
-            //@ts-expect-error - TODO: fix avivatorish metadata type
             const ourPhysicalSize = metadata?.Pixels.PhysicalSizeX 
             if (!ourPhysicalSize) {
                 //! todo - allow this link to work without physical size/viv context.
                 console.warn("no physical size in metadata, unexpected metadata format, or used outside viv context?");
                 return;
             }
-            //@ts-expect-error - TODO: fix avivatorish metadata type
             const ourUnits = metadata.Pixels.PhysicalSizeXUnit;
             // should we consider viewerStore.useLinkedView?
             // best to be clear about what is and isn't similar to Avivator.
@@ -60,10 +58,8 @@ export const useViewStateLink = () => {
                     const otherMeta =
                         c.vivStores?.viewerStore.getState().metadata;
                     if (!otherMeta) return;
-                    //@ts-expect-error - TODO: fix avivatorish metadata type
                     const otherPhysicalSize = otherMeta.Pixels.PhysicalSizeX;
                     if (!otherPhysicalSize) return;
-                    //@ts-expect-error - TODO: fix avivatorish metadata type
                     const otherUnits = otherMeta.Pixels.PhysicalSizeXUnit;
                     if (otherUnits !== ourUnits)
                         throw "physical size units do not match"; //we could probably convert if this is a common case
@@ -83,9 +79,7 @@ export const useViewStateLink = () => {
     }, [
         viewerStore,
         id,
-        //@ts-expect-error - TODO: fix avivatorish metadata type
         metadata?.Pixels.PhysicalSizeX,
-        //@ts-expect-error - TODO: fix avivatorish metadata type
         metadata?.Pixels.PhysicalSizeXUnit,
     ]);
 };

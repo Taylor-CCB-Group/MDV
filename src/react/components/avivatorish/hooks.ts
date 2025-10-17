@@ -142,10 +142,8 @@ export const useImage = (
             viewerStore.setState({ isViewerLoading: true });
             if (use3d) toggleUse3d();
             const newSelections = buildDefaultSelection(loader[0]);
-            //@ts-expect-error - TODO: fix avivatorish metadata type
             const { Channels } = metadata.Pixels;
             const channelOptions = Channels.map(
-                //@ts-expect-error - TODO: fix avivatorish metadata type
                 (c, i) => c.Name ?? `Channel ${i}`,
             );
             // Default RGB.
