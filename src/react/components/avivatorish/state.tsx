@@ -365,7 +365,6 @@ export const useMetadata = (): Metadata | undefined | null => {
     try {
         const image = useChannelsStore((store) => store.image);
         const metadata = useViewerStore((store) => store.metadata);
-        console.log("metadata", metadata);
         return Array.isArray(metadata) ? metadata[image] : metadata;
     } catch (e) {
         // we now sometimes call this hook outside of a Viv context, so this is expected.
