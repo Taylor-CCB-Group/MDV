@@ -353,7 +353,7 @@ type OME_METADATA = OME_ZARR['metadata'] & {
     // at least, that was true for the first sample I looked at...
     // and at least that allows us to remove some ts-expect-error
     Pixels: {
-        Channels: [{Name: string, SamplesPerPixel: number, Color?: any}],
+        Channels: Array<{Name: string, SamplesPerPixel: number, Color?: any}>,
         //! I don't think we actually do see these on OME-ZARR
         PhysicalSizeX?: number;
         PhysicalSizeXUnit?: string;
