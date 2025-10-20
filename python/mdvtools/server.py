@@ -191,9 +191,22 @@ def create_app(
     @project_bp.route("/images/<path:path>")
     def images(path):
         try:
-            return send_file(project.get_image(path))
+            file_path = project.get_image(path)
         except Exception:
-            return send_file(safe_join(project.imagefolder, path))
+            file_path = safe_join(project.imagefolder, path)
+
+        range_header = request.headers.get("Range", None)
+        if range_header:
+            response = get_range(file_path, range_header)
+        else:
+            response = send_file(file_path)
+
+        # Add long-lived cache headers for static images
+        try:
+            response.headers["Cache-Control"] = "public, max-age=31536000"
+        except Exception:
+            pass
+        return response
 
     # All the project's metadata
     @project_bp.route("/get_configs", methods=["GET", "POST"])
