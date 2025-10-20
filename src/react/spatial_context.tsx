@@ -50,7 +50,7 @@ export const getEmptyFeatureCollection = () => ({
 
 function useSelectionCoords(selection: FeatureCollection) {
     // where should we keep this in config for persisting?
-    const feature = selection.features[0];
+    const feature = selection?.features[0];
     const coords = useMemo(() => {
         if (!feature) return [];
         //these casts are unsafe in a general sense, but should be ok in our editor.
@@ -65,7 +65,11 @@ function useSelectionCoords(selection: FeatureCollection) {
     return coords as [number, number][];
 }
 
-/** for this to be more useful as a hook will depend on state/context... */
+/** 
+ * for this to be more useful as a hook will depend on state/context...
+ * and with proper spatialdata support we should review this so we have proper coordinate system.
+ * hopefully we can move some things around for better HMR editing DX as well.
+ */
 function useScatterModelMatrix() {
     const scale = useRegionScale();
     const s = 1 / scale;

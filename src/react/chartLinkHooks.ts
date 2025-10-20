@@ -35,7 +35,7 @@ export const useViewStateLink = () => {
         const unsubscribe = viewerStore.subscribe(({ viewState }) => {
             thisChart.ignoreStateUpdate = true; //<< add a setting for this, make sure we get the logic right
             const originalZoom = viewState.zoom as number;
-            const ourPhysicalSize = metadata?.Pixels.PhysicalSizeX;
+            const ourPhysicalSize = metadata?.Pixels.PhysicalSizeX 
             if (!ourPhysicalSize) {
                 //! todo - allow this link to work without physical size/viv context.
                 console.warn("no physical size in metadata, unexpected metadata format, or used outside viv context?");

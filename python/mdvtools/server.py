@@ -119,6 +119,14 @@ def create_app(
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
         return render_template("page.html", route=route, backend=options.backend_db)
 
+    @project_bp.route("/spatial/<path:file>")
+    def get_spatialdata(file):
+        path = safe_join(project.dir, "spatial", file)
+        if path is None or not os.path.exists(path):
+            return "File not found", 404
+        # consider allowing directory listing here if it's not a file?
+        return send_file(path)
+    
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
