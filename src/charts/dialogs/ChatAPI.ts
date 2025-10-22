@@ -103,19 +103,17 @@ const sendChatInitHttp = async (message: string, id: string, route: string, conv
     return parsed;
 };
 
-const sendMessageSocket = async (message: string, id: string, _routeUnused: string, conversationId: string) => {
+const sendMessageSocket = async (message: string, id: string, _routeUnused: string, conversationId: string, time?: number) => {
     // consider refactoring to be a generator function, so that we can yield progress updates
     const socket = window.mdv.chartManager.ipc?.socket;
     if (!socket) return;
 
     socket.emit('chat_request', { message, id, conversation_id: conversationId });
     const response = await new Promise<ChatResponse>((resolve, reject) => {
-        // 5-minute timeout - because in reality it does often take quite a while to run.
-        // we may consider something like re-querying, requesting status, or something like that?
-        const timeout = setTimeout(() => {
+        const timeout = time ? setTimeout(() => {
             socket.off('chat_response', onChatResponse);
             reject(new Error('Socket request timeout'));
-        }, 300000);
+        }, time) : undefined;
 
         const onChatResponse = (data: any) => {
             clearTimeout(timeout);
