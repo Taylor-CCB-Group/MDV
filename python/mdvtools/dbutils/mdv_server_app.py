@@ -237,6 +237,7 @@ def read_secret(secret_name):
 
 def load_config(app, config_name=None, enable_auth=False):
     try:
+        # todo - as well as the default config stored in the repo, we can have a config.json for a given deployment
         config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
         with open(config_file_path) as config_file:
             config = json.load(config_file)
@@ -245,6 +246,7 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['upload_folder'] = config.get('upload_folder', '')
             app.config['projects_base_dir'] = config.get('projects_base_dir', '')
             app.config['db_host'] = config.get('db_container', '')
+            app.config['extensions'] = config.get('extensions', [])
             logger.info("Configuration loaded successfully!")
     except FileNotFoundError:
         logger.exception("Error: Configuration file not found.")
