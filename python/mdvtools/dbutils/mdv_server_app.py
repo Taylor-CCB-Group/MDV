@@ -261,7 +261,25 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['upload_folder'] = config.get('upload_folder', '')
             app.config['projects_base_dir'] = config.get('projects_base_dir', '')
             app.config['db_host'] = config.get('db_container', '')
-            app.config['extensions'] = config.get('extensions', [])
+            # Allow extensions to be configured via user-provided JSON file for deployment flexibility
+            # Check if external config path is provided via environment variable
+            external_config_path = os.getenv('MDV_USER_CONFIG_PATH')
+            if external_config_path:
+                if os.path.exists(external_config_path):
+                    try:
+                        with open(external_config_path) as user_config_file:
+                            user_config = json.load(user_config_file)
+                            app.config['extensions'] = user_config.get('extensions', [])
+                            logger.info(f"Loaded extensions from user config at {external_config_path}: {app.config['extensions']}")
+                    except (json.JSONDecodeError, IOError) as e:
+                        logger.warning(f"Could not load user config from {external_config_path}: {e}. Using default extensions.")
+                        app.config['extensions'] = config.get('extensions', [])
+                else:
+                    logger.warning(f"User config file not found at {external_config_path}. Using default extensions.")
+                    app.config['extensions'] = config.get('extensions', [])
+            else:
+                # No external config path specified, keep extensions empty
+                app.config['extensions'] = []
             logger.info("Configuration loaded successfully!")
     except FileNotFoundError:
         logger.exception("Error: Configuration file not found.")
