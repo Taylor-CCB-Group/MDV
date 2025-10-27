@@ -85,7 +85,7 @@ jobs:
       - name: Build and push linux/amd64 image
         run: |
           echo "Building and pushing image..."
-          docker buildx build --platform linux/amd64 \
+          docker buildx build --platform linux/amd64,linux/arm64 \
             --build-arg GIT_COMMIT_DATE="${{ steps.build_metadata.outputs.git_commit_date }}" \
             --build-arg GIT_BRANCH_NAME="${{ steps.build_metadata.outputs.git_branch_name }}" \
             --build-arg GIT_COMMIT_HASH="${{ steps.build_metadata.outputs.git_commit_hash }}" \
