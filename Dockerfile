@@ -97,7 +97,7 @@ WORKDIR /app/python
 #16 20.81 In a future version of Poetry this warning will become an error!
 # seems to be ok to first install with --no-root for dependencies, then install the root package later
 # we don't want to set package-mode = false in pyproject.toml
-RUN poetry install --with dev,backend,auth --no-root
+RUN NUMCODECS_NO_ASM=1 poetry install --with dev,backend,auth --no-root
 
 WORKDIR /app
 # copy the package.json and package-lock.json as a separate step so npm install can be cached (with correct ownership)
