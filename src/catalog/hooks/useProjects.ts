@@ -355,6 +355,36 @@ const useProjects = () => {
             }
     }, [handleError])
 
+    const rescanProjects = useCallback(
+        async () => {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const response = await fetch("rescan_projects");
+                if (response.ok) {
+                   console.log("Rescan successfull"); 
+                } else {
+                    const errorResponse = await parseErrorResponse({
+                        response, 
+                        fallbackText: "Error rescanning projects. Please try again later."
+                    });
+                    throw errorResponse;
+                }
+            } catch (error) {
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : "Error rescanning projects. Please try again later.";
+
+                handleError(errorMessage);
+                console.error("Error rescanning projects:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }, [handleError]
+    );
+
     return {
         projects: filteredAndSortedProjects,
         isLoading,
@@ -371,6 +401,7 @@ const useProjects = () => {
         setSortOrder,
         sortBy,
         exportProject,
+        rescanProjects,
     };
 };
 

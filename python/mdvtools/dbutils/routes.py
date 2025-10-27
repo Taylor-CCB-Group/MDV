@@ -108,7 +108,7 @@ def register_routes(app, ENABLE_AUTH):
                 logger.exception(f"Error in /extension_config: {e}")
                 return jsonify({}), 500
 
-        @app.route('/rescan_projects')
+        @app.route('/rescan_projects', methods=['GET'])
         def rescan_projects():
             if ENABLE_AUTH:
                 user = session.get('user')

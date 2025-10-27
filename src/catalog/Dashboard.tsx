@@ -1,15 +1,11 @@
 import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
-    Cloud,
-    CloudUpload,
     Download as DownloadIcon,
     ExpandMore,
-    Folder,
     GridView,
     Reorder as ReorderIcon,
     Search,
-    Upload,
 } from "@mui/icons-material";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
@@ -33,7 +29,7 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
 import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
@@ -49,6 +45,7 @@ import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
 import usePermissions from "./PermissionsContext";
 import useAuthEnabled from "./hooks/useAuthEnabled";
+import { RefreshCwIcon } from "lucide-react";
 
 const Dashboard: React.FC = () => {
     const {
@@ -64,6 +61,7 @@ const Dashboard: React.FC = () => {
         changeProjectType,
         setFilter,
         exportProject,
+        rescanProjects,
     } = useProjects();
     const { permissions, isLoading: permissionsLoading } = usePermissions();
 
@@ -117,6 +115,12 @@ const Dashboard: React.FC = () => {
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
     };
+
+    const onRescanClick = useCallback(
+        async () => {
+            await rescanProjects();
+        }, [rescanProjects]
+    )
 
     return (
         <>
@@ -259,7 +263,38 @@ const Dashboard: React.FC = () => {
                             <Paper
                                 elevation={1}
                                 sx={{
-                                    padding: "8px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    borderRadius: "4px",
+                                    bgcolor: "background.paper",
+                                    marginRight: 2,
+                                    height: "50px",
+                                }}
+                            >
+                                <Button
+                                    sx={{
+                                        padding: 1,
+                                        display: "flex",
+                                        justifyContent: "space-around",
+                                        height: "100%",
+                                        width: "100%"
+                                    }}
+                                    onClick={onRescanClick}
+                                >
+                                    <RefreshCwIcon />
+                                    <Typography 
+                                        sx={{
+                                            marginLeft: 1
+                                        }}
+                                    >
+                                        Rescan Projects
+                                    </Typography>
+                                </Button>
+                            </Paper>
+                            <Paper
+                                elevation={1}
+                                sx={{
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -273,6 +308,7 @@ const Dashboard: React.FC = () => {
                                     endIcon={<ExpandMore />}
                                     onClick={toggleDropdown}
                                     sx={{
+                                        padding: 1,
                                         textTransform: "none",
                                         width: "100%",
                                         height: "100%",
