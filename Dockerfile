@@ -128,6 +128,7 @@ WORKDIR /app/python
 # installing again so we have mdvtools as a module, on top of the previous install layer with dependencies
 # this step should be very fast
 # if we don't have this, the server itself runs, but anything that doesn't run from this workdir will fail to import mdvtools
+ENV NUMCODECS_NO_ASM=1
 RUN poetry install --with dev,backend,auth 
 
 # Expose the port that Flask will run on
