@@ -261,6 +261,12 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['upload_folder'] = config.get('upload_folder', '')
             app.config['projects_base_dir'] = config.get('projects_base_dir', '')
             app.config['db_host'] = config.get('db_container', '')
+            # Control expensive per-file database sync during project serve
+            sync_env = os.getenv('ENABLE_FILE_SYNC')
+            if sync_env is not None:
+                app.config['ENABLE_FILE_SYNC'] = sync_env.lower() in ["1", "true", "yes"]
+            else:
+                app.config['ENABLE_FILE_SYNC'] = config.get('enable_file_sync', False)
             # Allow extensions to be configured via user-provided JSON file for deployment flexibility
             # Check if external config path is provided via environment variable
             external_config_path = os.getenv('MDV_USER_CONFIG_PATH')
@@ -400,23 +406,22 @@ def serve_projects_from_db(app):
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
 
-                    # Update or add files in the database to reflect the actual files in the filesystem
-                    for root, dirs, files in os.walk(project.path):
-                        for file_name in files:
-                            full_file_path = os.path.join(root, file_name)
+                    # Optionally update/add files in DB to reflect filesystem
+                    if app.config.get('ENABLE_FILE_SYNC', False):
+                        for root, dirs, files in os.walk(project.path):
+                            for file_name in files:
+                                full_file_path = os.path.join(root, file_name)
 
-                            # Use the utility function to add or update the file in the database
-                            try:
-                                # Attempt to add or update the file in the database
-                                FileService.add_or_update_file_in_project(
-                                    file_name=file_name,
-                                    file_path=full_file_path,
-                                    project_id=project.id
-                                )
-                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
-
-                            except RuntimeError as file_error:
-                                logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                                try:
+                                    FileService.add_or_update_file_in_project(
+                                        file_name=file_name,
+                                        file_path=full_file_path,
+                                        project_id=project.id
+                                    )
+                                except RuntimeError as file_error:
+                                    logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                    else:
+                        logger.info("Skipping file sync for project %s (ENABLE_FILE_SYNC disabled)", project.id)
 
 
                 except Exception as e:
@@ -533,25 +538,21 @@ def serve_projects_from_filesystem(app, base_dir):
                             logger.exception(f"Error syncing users or caching for {project_name}: {auth_e}")
 
                     
-                    # Add files from the project directory to the database
-                    for root, dirs, files in os.walk(project_path):
-                        for file_name in files:
-                            # Construct the full file path
-                            full_file_path = os.path.join(root, file_name)
-                            
-                            # Use the full file path when adding or updating the file in the database
-                            # Use the utility function to add or update the file in the database
-                            try:
-                                # Attempt to add or update the file in the database
-                                FileService.add_or_update_file_in_project(
-                                    file_name=file_name,
-                                    file_path=full_file_path,
-                                    project_id=new_project.id
-                                )
-                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
-
-                            except RuntimeError as file_error:
-                                logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                    # Optionally add files from the project directory to the database
+                    if app.config.get('ENABLE_FILE_SYNC', False):
+                        for root, dirs, files in os.walk(project_path):
+                            for file_name in files:
+                                full_file_path = os.path.join(root, file_name)
+                                try:
+                                    FileService.add_or_update_file_in_project(
+                                        file_name=file_name,
+                                        file_path=full_file_path,
+                                        project_id=new_project.id
+                                    )
+                                except RuntimeError as file_error:
+                                    logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                    else:
+                        logger.info("Skipping file sync for new project %s (ENABLE_FILE_SYNC disabled)", new_project.id)
                 except Exception as e:
                     logger.exception(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
                     raise
