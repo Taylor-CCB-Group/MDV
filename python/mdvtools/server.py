@@ -28,6 +28,19 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 import threading
+# Configure Numba caching before importing libraries that depend on it (e.g. scanpy)
+# In some deployment environments (zip/venv layers), Numba cannot locate source files for caching
+# which raises: "cannot cache function: no locator available". Disabling caching or providing a
+# writable cache directory avoids this during import time.
+_numba_cache_dir = os.environ.get("NUMBA_CACHE_DIR", "/tmp/numba_cache")
+try:
+    os.makedirs(_numba_cache_dir, exist_ok=True)
+except Exception:
+    # Best-effort only; if this fails, we still disable caching below
+    pass
+os.environ.setdefault("NUMBA_CACHE_DIR", _numba_cache_dir)
+os.environ.setdefault("NUMBA_DISABLE_CACHING", "1")
+
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.socketio_upload import initialize_socketio_upload, register_project_for_upload
