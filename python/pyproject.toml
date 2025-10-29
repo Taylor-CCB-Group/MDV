@@ -43,6 +43,7 @@ polars = "^1.31.0"
 ruff = "^0.3.7"
 spatialdata = "^0.5.0"
 spatialdata-io = "^0.3.0"
+celery = "^5.4.0"
 
 [tool.poetry.group.dev]
 optional = true
