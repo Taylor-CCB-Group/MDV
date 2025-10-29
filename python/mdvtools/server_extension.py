@@ -33,6 +33,11 @@ class MDVProjectServerExtension(Protocol):
         Don't really want to pass flask app here, doing so for now to allow access to config.
         """
         ...
+    def register_global_routes(self, app: Flask, config: dict):
+        """
+        Register global routes that apply to the entire application.
+        """
+        ...
 
 
 @dataclass

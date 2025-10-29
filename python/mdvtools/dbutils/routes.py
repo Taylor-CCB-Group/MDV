@@ -1,6 +1,7 @@
 import os
 from typing import Any
 from mdvtools.logging_config import get_logger
+from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 logger = get_logger(__name__)
 
 # Module-level constants and functions that can be imported

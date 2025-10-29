@@ -92,6 +92,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 f"No image found in SpatialData object '{sdata_path}' - this is not yet supported."
             )
         region, _element_description, _instance_key = get_table_keys(adata)
+        if isinstance(region, list):
+            region = region[0]  # Take the first region if it's a list
         transformation = get_transformation(sdata[region])
         if transformation is None:
             print(
@@ -109,11 +111,17 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             else:
                 # Get the affine matrix from the transformation
                 # For spatial coordinates, we typically have x, y axes
-                input_axes = ["x", "y"]
-                output_axes = ["x", "y"]
-                affine_matrix = transformation.to_affine_matrix(
-                    input_axes=input_axes, output_axes=output_axes
-                )
+                input_axes = ("x", "y")
+                output_axes = ("x", "y")
+                if hasattr(transformation, 'to_affine_matrix'):
+                    affine_matrix = transformation.to_affine_matrix(
+                        input_axes=input_axes, output_axes=output_axes
+                    )
+                else:
+                    # If transformation is a dict or doesn't have the method, use identity
+                    affine_matrix = sd.transformations.Identity().to_affine_matrix(
+                        input_axes=input_axes, output_axes=output_axes
+                    )
                 # nb - in the case of xenium, the transormation is Identity but we know there is a scale factor...
 
                 # Convert coordinates to homogeneous coordinates (add 1s for translation)
@@ -213,5 +221,13 @@ if __name__ == "__main__":
     parser.add_argument("--preserve-existing", action="store_false", default=False, help="Preserve existing project data")
     parser.add_argument("--serve", action="store_false", default=False, help="Serve the project after conversion")
     args = parser.parse_args()
+    
+    # Convert argparse.Namespace to SpatialDataConversionArgs
+    conversion_args = SpatialDataConversionArgs(
+        spatialdata_path=args.spatialdata_path,
+        output_folder=args.output_folder,
+        preserve_existing=args.preserve_existing,
+        serve=args.serve
+    )
 
-    mdv = convert_spatialdata_to_mdv(args)
+    mdv = convert_spatialdata_to_mdv(conversion_args)

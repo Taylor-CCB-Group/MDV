@@ -998,8 +998,8 @@ def get_anndata_summary(adata: sc.AnnData) -> Dict[str, Any]:
         'layers_keys': list(adata.layers.keys()),
         'uns_keys': list(adata.uns.keys()),
         'sparse': hasattr(adata.X, 'toarray'),
-        'has_missing_obs': bool(adata.obs.isnull().values.any()),
-        'has_missing_var': bool(adata.var.isnull().values.any()),
+        'has_missing_obs': bool(adata.obs.to_pandas().isnull().values.any()) if hasattr(adata.obs, 'to_pandas') else False,
+        'has_missing_var': bool(adata.var.to_pandas().isnull().values.any()) if hasattr(adata.var, 'to_pandas') else False,
         'categorical_obs': [col for col in adata.obs.columns 
                           if hasattr(adata.obs[col], 'cat')],
         'categorical_var': [col for col in adata.var.columns 

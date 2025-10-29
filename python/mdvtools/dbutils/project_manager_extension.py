@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, Response
+from typing import Union, Tuple
 import os
 import shutil
 import zipfile
@@ -47,7 +48,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
             from mdvtools.auth.authutils import user_cache, active_projects_cache, user_project_cache, all_users_cache
 
         @app.route("/create_project", methods=["POST"])
-        def create_project():   
+        def create_project() -> Union[Response, Tuple[Response, int]]:   
             """
             Creates a new project and updates the caches and database accordingly.
             """
@@ -145,7 +146,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         logger.info("Route registered: /create_project")
 
         @app.route("/import_project", methods=["POST"])
-        def import_project():
+        def import_project() -> Union[Response, Tuple[Response, int]]:
             try:
                 # Check if the request contains a file
                 if 'file' not in request.files:
@@ -282,7 +283,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         logger.info("Route registered: /import_project")
 
         @app.route("/export_project/<int:project_id>", methods=["GET"])
-        def export_project(project_id: int):
+        def export_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             try:
 
                 # Fetch the project using the provided project id
@@ -294,11 +295,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     return jsonify({"error": f"Project with ID {project_id} not found in database"})
 
                 if ENABLE_AUTH:
+                    if session is None:
+                        raise ValueError("Session not available.")
                     user = session.get('user')
                     if not user:
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id)
+                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can export the project."}), 403
@@ -344,7 +347,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         print("Route registered: /export_project/<project_id>")
 
         @app.route("/delete_project/<int:project_id>", methods=["DELETE"])
-        def delete_project(project_id: int):
+        def delete_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             #project_removed_from_blueprints = False
             nonlocal active_projects_cache
             try:
@@ -352,11 +355,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 
                 # Step 2: Check if the user is owner using in-memory cache
                 if ENABLE_AUTH:
+                    if session is None:
+                        raise ValueError("Session not available.")
                     user = session.get('user')
                     if not user:
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id)
+                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can delete the project."}), 403
@@ -402,7 +407,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         logger.info("Route registered: /delete_project/<project_id>")
 
         @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
-        def rename_project(project_id: int):
+        def rename_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             # Retrieve the new project name from the multipart/form-data payload
             new_name = request.form.get("name")
             
@@ -418,11 +423,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 # Step 2: Check ownership using cache
                 if ENABLE_AUTH:
+                    if session is None:
+                        raise ValueError("Session not available.")
                     user = session.get('user')
                     if not user:
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id)
+                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can rename the project."}), 403
@@ -459,7 +466,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         logger.info("Route registered: /projects/<int:project_id>/rename")
 
         @app.route("/projects/<int:project_id>/access", methods=["PUT"])
-        def change_project_access(project_id: int):
+        def change_project_access(project_id: int) -> Union[Response, Tuple[Response, int]]:
             """API endpoint to change the access level of a project (editable or read-only)."""
             try:
                 # Get the new access level from the request
@@ -472,11 +479,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 # Step 3: Check ownership from the user_project_cache
                 if ENABLE_AUTH:
+                    if session is None:
+                        raise ValueError("Session not available.")
                     user = session.get('user')
                     if not user:
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id)
+                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can change the access level."}), 403
@@ -497,7 +506,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         logger.info("Route registered: /projects/<int:project_id>/access")
 
         @app.route("/projects/<int:project_id>/share", methods=["GET"])
-        def share_project(project_id: int):
+        def share_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             """Fetch users with whom the project is shared along with their permissions."""
             try:
                 logger.info(f"Sharing project '{project_id}'")
@@ -507,12 +516,14 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     logger.info("Authentication is disabled, skipping authentication check.")
                     return jsonify({"error": "Authentication is disabled, no action taken."})
                 
+                if session is None:
+                    raise ValueError("Session not available.")
                 user = session.get('user')
                 if not user:
                     raise ValueError("User not found in session.")
                 user_id = user["id"]
 
-                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
+                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can share the project"}), 403
                 
@@ -522,7 +533,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 for uid, permissions in user_project_cache.items():
                     proj_perm = permissions.get(project_id)
                     if proj_perm:
-                        user_data = user_cache.get(uid)
+                        user_data = user_cache.get(uid) if user_cache is not None else None
                         if not user_data:
                             # Fallback: Try fetching from the DB if not in cache
                             user_obj = User.query.get(uid)
@@ -535,7 +546,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                                 "is_admin": user_obj.is_admin
                             }
                             # Optionally update cache to avoid this hit next time
-                            user_cache[uid] = user_data
+                            if user_cache is not None:
+                                user_cache[uid] = user_data
                             if user_data not in all_users_cache:
                                 all_users_cache.append(user_data)
 
@@ -568,7 +580,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         logger.info("Route registered: /projects/<int:project_id>/share- GET")
             
         @app.route("/projects/<int:project_id>/share", methods=["POST"])
-        def add_user_to_project(project_id: int):
+        def add_user_to_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             """Add a user to the project with specified permissions."""
             try:
                 logger.info(f"Adding user to project '{project_id}'")
@@ -578,13 +590,15 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     logger.info("Authentication is disabled, skipping authentication check.")
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
+                if session is None:
+                    raise ValueError("Session not available.")
                 user = session.get('user')
                 if not user:
                     raise ValueError("User not found in session.")
                 user_id = user["id"]
 
                 # Step 2: Check if current user is owner of the project
-                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
+                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can share the project"}), 403
 
@@ -631,7 +645,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
 
         @app.route("/projects/<int:project_id>/share/<int:user_id>/edit", methods=["POST"])
-        def edit_user_permission(project_id: int, user_id: int):
+        def edit_user_permission(project_id: int, user_id: int) -> Union[Response, Tuple[Response, int]]:
             """Edit user permissions for a project."""
             try:
                 logger.info(f"Editing permissions for user '{user_id}' in project '{project_id}'")
@@ -642,13 +656,15 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"Error": "Authentication is disabled, no action taken."})
 
+                if session is None:
+                    raise ValueError("Session not available.")
                 user = session.get('user')
                 if not user:
                     raise ValueError("User not found in session.")
                 current_user_id = user["id"]
                 
                 # Step 2: Validate if current user is the owner
-                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id))
+                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can edit permissions"}), 403
 
@@ -672,14 +688,15 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 )
                 
                 # Step 5: Update cache
-                if user_id not in user_project_cache:
-                    user_project_cache[user_id] = {}
+                if user_project_cache is not None:
+                    if user_id not in user_project_cache:
+                        user_project_cache[user_id] = {}
 
-                user_project_cache[user_id][project_id] = {
-                    "can_read": can_read,
-                    "can_write": can_write,
-                    "is_owner": is_owner
-                }
+                    user_project_cache[user_id][project_id] = {
+                        "can_read": can_read,
+                        "can_write": can_write,
+                        "is_owner": is_owner
+                    }
 
                 logger.info(f"Updated permissions for user {user_id} in project {project_id}: {new_permission}")
                 return jsonify({"message": "Permissions updated successfully"}), 200
@@ -690,7 +707,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         logger.info("Route registered: /projects/<int:project_id>/share/<int:user_id>/edit")
             
         @app.route("/projects/<int:project_id>/share/<int:user_id>/delete", methods=["POST"])
-        def delete_user_from_project(project_id: int, user_id: int):
+        def delete_user_from_project(project_id: int, user_id: int) -> Union[Response, Tuple[Response, int]]:
             """Remove a user from the project."""
             try:
                 logger.info(f"Removing user '{user_id}' from project '{project_id}'")
@@ -701,13 +718,15 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
+                if session is None:
+                    raise ValueError("Session not available.")
                 user = session.get('user')
                 if not user:
                     raise ValueError("User not found in session.")
                 current_user_id = user["id"]
 
                 # Step 2: Validate ownership
-                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id))
+                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can remove users"}), 403
 
@@ -716,9 +735,9 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 # Step 5: Check if the user is part of the project
                 # Step 5: Check if the user is part of the project
-                user_permissions_cache = user_project_cache.get(user_id)
+                user_permissions_cache = user_project_cache.get(user_id) if user_project_cache is not None else None
                 if user_permissions_cache:
-                    if project_id in user_project_cache[user_id]:
+                    if user_project_cache is not None and user_id in user_project_cache and project_id in user_project_cache[user_id]:
                         del user_project_cache[user_id][project_id]
                     else:
                         logger.warning(f"Project {project_id} not found in cache for user {user_id}")
@@ -729,7 +748,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 return jsonify({"error": str(e)}), 500
         logger.info("Route registered: /projects/<int:project_id>/share/<int:user_id>/delete")
         
-    def register_project_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
+    def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
         pass
 
     def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
