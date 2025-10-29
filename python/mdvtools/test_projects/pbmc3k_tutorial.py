@@ -295,6 +295,11 @@ except (AttributeError, TypeError):
     # Fallback if conversion methods don't work
     gene_table_df = gene_table
 
+# Type assertion to ensure it's treated as DataFrame or str
+from typing import cast, Union
+import pandas as pd
+gene_table_df = cast(Union[pd.DataFrame, str], gene_table_df)
+
 p.add_datasource("genes", gene_table_df)
 
 
