@@ -123,7 +123,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         "id": new_project.id,
                         "name": new_project.name,
                         "status": "success"
-                    })     
+                    })
+                else:
+                    logger.error("Failed to create project in database")
+                    return jsonify({"error": "Failed to create project in database"}), 500
 
             except Exception as e:
                 logger.error(f"In register_routes - /create_project : Error creating project: {e}")

@@ -983,6 +983,21 @@ def create_edge_case_anndata() -> sc.AnnData:
 
 
 # Utility functions for testing
+def _check_missing_values(data):
+    """Check for missing values in a Dataset2D or DataFrame object."""
+    try:
+        if hasattr(data, 'to_pandas') and callable(getattr(data, 'to_pandas')):
+            df = data.to_pandas()
+        elif hasattr(data, 'to_dataframe') and callable(getattr(data, 'to_dataframe')):
+            df = data.to_dataframe()
+        else:
+            # Assume it's already a DataFrame or similar
+            df = data
+        return bool(df.isnull().values.any())
+    except (AttributeError, TypeError):
+        # If we can't check for missing values, assume False
+        return False
+
 def get_anndata_summary(adata: sc.AnnData) -> Dict[str, Any]:
     """Get a summary of AnnData object properties for testing."""
     # Ensure adata.X is valid
@@ -998,8 +1013,8 @@ def get_anndata_summary(adata: sc.AnnData) -> Dict[str, Any]:
         'layers_keys': list(adata.layers.keys()),
         'uns_keys': list(adata.uns.keys()),
         'sparse': hasattr(adata.X, 'toarray'),
-        'has_missing_obs': bool(adata.obs.to_pandas().isnull().values.any()) if hasattr(adata.obs, 'to_pandas') else False,
-        'has_missing_var': bool(adata.var.to_pandas().isnull().values.any()) if hasattr(adata.var, 'to_pandas') else False,
+        'has_missing_obs': _check_missing_values(adata.obs),
+        'has_missing_var': _check_missing_values(adata.var),
         'categorical_obs': [col for col in adata.obs.columns 
                           if hasattr(adata.obs[col], 'cat')],
         'categorical_var': [col for col in adata.var.columns 

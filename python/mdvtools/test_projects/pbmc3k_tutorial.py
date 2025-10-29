@@ -282,9 +282,12 @@ p = MDVProject(os.path.expanduser(project_path), delete_existing=True)
 # Add data to the project
 p.add_datasource("cells", cells_df)
 # Ensure gene_table is a DataFrame
-if hasattr(gene_table, 'to_pandas'):
+if hasattr(gene_table, 'to_pandas') and callable(getattr(gene_table, 'to_pandas')):
     gene_table_df = gene_table.to_pandas()
+elif hasattr(gene_table, 'to_dataframe') and callable(getattr(gene_table, 'to_dataframe')):
+    gene_table_df = gene_table.to_dataframe()
 else:
+    # If it's already a DataFrame or can be converted directly
     gene_table_df = gene_table
 p.add_datasource("genes", gene_table_df)
 
