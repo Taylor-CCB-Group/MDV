@@ -142,6 +142,35 @@ with socketserver.TCPServer(("", 8000), CustomHandler) as httpd:
     httpd.serve_forever()
 ```
 
+## Configuration
+
+### User Configuration File
+
+MDV supports user-provided configuration for extensions via a JSON file specified through an environment variable:
+
+- **MDV_USER_CONFIG_PATH**: Set this environment variable to the path of your user configuration file to configure extensions. Available extensions include:
+  - `chat`: Enables the chat/LLM extension
+  - `project_manager`: Enables the project management extension
+  
+  Example user_config.json:
+  ```json
+  {
+    "extensions": ["chat", "project_manager"]
+  }
+  ```
+  
+  Example usage:
+  ```bash
+  export MDV_USER_CONFIG_PATH="/path/to/your/user_config.json"
+  ```
+  
+  **Important for Docker deployments**: You must mount the config file into the container so it can access it. For example, if your config file is at `./config/user_config.json` on the host, you would:
+  
+  1. Set the environment variable: `MDV_USER_CONFIG_PATH=/config/user_config.json`
+  2. Mount the file in docker-compose: `- ./config/user_config.json:/config/user_config.json`
+  
+  This allows you to configure extensions at deployment time without modifying the repository configuration files or rebuilding the image. If the environment variable is not set, no extensions will be enabled. If the specified file is not found or cannot be parsed, no extensions will be enabled.
+
 ## Testing
 
 ### Running Tests

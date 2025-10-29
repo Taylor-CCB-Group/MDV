@@ -28,6 +28,15 @@ class ProjectService:
                 except Exception as e:
                     logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
                     return None
+            
+            def get_readme_file(project_path):
+                try:
+                    mdv_project = MDVProject(project_path)
+                    readme_file = mdv_project.readme
+                    return readme_file
+                except Exception as e:
+                    logger.exception(f"Error getting readme file for project at {project_path}: {e}")
+                    return None
 
             project_list = [
                 {
@@ -35,6 +44,7 @@ class ProjectService:
                     "name": p.name,
                     "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                     "thumbnail": get_project_thumbnail(p.path),
+                    "readme": get_readme_file(p.path),
                 }
                 for p in projects if p.id not in failed_project_ids
             ]
