@@ -101,7 +101,9 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             # For AnnData, we can't get transformation, so use Identity
             transformation = None
         else:
-            transformation = get_transformation(spatial_element)
+            # Type assertion: we know it's SpatialElement at this point
+            from typing import cast, Any
+            transformation = get_transformation(cast(Any, spatial_element))
         if transformation is None:
             print(
                 f"Warning: No transformation found for region {region} in SpatialData object '{sdata_path}' - this is unexpected, using Identity."
@@ -120,7 +122,10 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 # For spatial coordinates, we typically have x, y axes
                 input_axes = ("x", "y")
                 output_axes = ("x", "y")
-                if hasattr(transformation, 'to_affine_matrix') and callable(getattr(transformation, 'to_affine_matrix')):
+                # Check if transformation has the method and is not a dict
+                if (hasattr(transformation, 'to_affine_matrix') and 
+                    callable(getattr(transformation, 'to_affine_matrix')) and
+                    not isinstance(transformation, dict)):
                     affine_matrix = transformation.to_affine_matrix(
                         input_axes=input_axes, output_axes=output_axes
                     )

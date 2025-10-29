@@ -986,10 +986,10 @@ def create_edge_case_anndata() -> sc.AnnData:
 def _check_missing_values(data):
     """Check for missing values in a Dataset2D or DataFrame object."""
     try:
-        if hasattr(data, 'to_pandas') and callable(getattr(data, 'to_pandas')):
-            df = data.to_pandas()
-        elif hasattr(data, 'to_dataframe') and callable(getattr(data, 'to_dataframe')):
-            df = data.to_dataframe()
+        if hasattr(data, 'to_pandas'):
+            df = data.to_pandas()  # type: ignore
+        elif hasattr(data, 'to_dataframe'):
+            df = data.to_dataframe()  # type: ignore
         else:
             # Assume it's already a DataFrame or similar
             df = data
