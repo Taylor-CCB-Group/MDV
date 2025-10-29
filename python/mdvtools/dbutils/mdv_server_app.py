@@ -397,12 +397,12 @@ def serve_projects_from_db(app):
                             ProjectService.change_project_access(project.id, desired_level)
                             is_editable = (desired_level == 'editable')
                         else:
-                            # Default to non-editable when access level is missing/unknown
-                            is_editable = (project.access_level == 'editable') if getattr(project, 'access_level', None) else False
+                            # Default to editable when access level is missing/unknown
+                            is_editable = (project.access_level == 'editable') if getattr(project, 'access_level', None) else True
                         p.set_editable(is_editable)
                     except Exception:
-                        # Fall back to non-editable on unexpected errors
-                        p.set_editable(False)
+                        # Favor editable by default on unexpected errors
+                        p.set_editable(True)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
@@ -478,14 +478,14 @@ def serve_projects_from_filesystem(app, base_dir):
                         next_id += 1
 
                     p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
-                    # Respect existing state.json permission if present; default to non-editable when unspecified
+                    # Respect existing state.json permission if present; default to editable when unspecified
                     try:
                         state = p.state or {}
                         perm = (state.get('permission') or '').lower()
-                        is_editable = True if perm == 'edit' else False if perm == 'view' else False
+                        is_editable = True if perm == 'edit' else False if perm == 'view' else True
                         p.set_editable(is_editable)
                     except Exception:
-                        p.set_editable(False)
+                        p.set_editable(True)
                     p.serve(options=options) 
                     logger.info(f"Serving project: {project_path}")
 
