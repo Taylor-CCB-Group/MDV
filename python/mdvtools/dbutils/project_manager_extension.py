@@ -11,7 +11,6 @@ from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
 from mdvtools.dbutils.dbmodels import User
 from mdvtools.auth.authutils import update_cache
-from mdvtools.dbutils.routes import get_project_thumbnail
 from mdvtools.logging_config import get_logger
 
 from mdvtools.project_router import ProjectBlueprint
@@ -98,7 +97,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         auth_id = user_data["auth_id"]
                         owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
                         # Generate thumbnail
-                        thumbnail = get_project_thumbnail(project_path)
+                        thumbnail = _get_project_thumbnail(project_path)
                         
                         # Step 6: Update caches for the admin user and new project
                         update_cache(
@@ -232,7 +231,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         )
                         auth_id = user_data["auth_id"]
                         owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
-                        thumbnail = get_project_thumbnail(project_path)
+                        thumbnail = _get_project_thumbnail(project_path)
 
                         # Update cache with the new project data and user id
                         update_cache(
@@ -769,3 +768,16 @@ class ProjectManagerExtension(MDVProjectServerExtension):
             "editUserPermissions": True,
             "removeUserFromProject": True
         }
+
+
+def _get_project_thumbnail(project_path):
+    """Extract the first available viewImage from a project's views.
+    Duplicated here to avoid importing from routes.py and creating a circular import during test collection.
+    """
+    try:
+        from mdvtools.mdvproject import MDVProject
+        mdv_project = MDVProject(project_path)
+        return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
+    except Exception as e:
+        logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
+        return None
