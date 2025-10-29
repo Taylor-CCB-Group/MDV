@@ -397,10 +397,11 @@ def serve_projects_from_db(app):
                             ProjectService.change_project_access(project.id, desired_level)
                             is_editable = (desired_level == 'editable')
                         else:
+                            # Default to non-editable when access level is missing/unknown
                             is_editable = (project.access_level == 'editable') if getattr(project, 'access_level', None) else False
                         p.set_editable(is_editable)
                     except Exception:
-                        # Fallback to non-editable if anything goes wrong
+                        # Fall back to non-editable on unexpected errors
                         p.set_editable(False)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
@@ -477,7 +478,7 @@ def serve_projects_from_filesystem(app, base_dir):
                         next_id += 1
 
                     p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
-                    # Respect existing state.json permission if present; default to editable only if explicit
+                    # Respect existing state.json permission if present; default to non-editable when unspecified
                     try:
                         state = p.state or {}
                         perm = (state.get('permission') or '').lower()
