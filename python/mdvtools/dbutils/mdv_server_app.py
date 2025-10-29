@@ -397,8 +397,9 @@ def serve_projects_from_db(app):
                             ProjectService.change_project_access(project.id, desired_level)
                             is_editable = (desired_level == 'editable')
                         else:
-                            # Default to editable when access level is missing/unknown
-                            is_editable = (project.access_level == 'editable') if getattr(project, 'access_level', None) else True
+                            # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
+                            access_level_val = getattr(project, 'access_level', None)
+                            is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
                         p.set_editable(is_editable)
                     except Exception:
                         # Favor editable by default on unexpected errors
