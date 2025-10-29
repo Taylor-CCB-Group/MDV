@@ -34,6 +34,8 @@ def register_routes(app, ENABLE_AUTH):
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, user_cache, all_users_cache
     from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
     from mdvtools.dbutils.dbservice import ProjectService
+    from celery.result import AsyncResult
+    from mdvtools.tasks.sample_tasks import add as task_add, long_running as task_long_running
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
@@ -210,6 +212,36 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify({"error": str(e)}), 500
 
         logger.info("Route registered: /projects")
+
+        # Celery sample routes
+        @app.route('/tasks/sample-add', methods=['POST'])
+        def tasks_sample_add():
+            data = request.get_json(silent=True) or {}
+            x = int(data.get('x', 1))
+            y = int(data.get('y', 1))
+            res = task_add.delay(x, y)
+            return jsonify({"task_id": res.id}), 202
+
+        @app.route('/tasks/sample-long', methods=['POST'])
+        def tasks_sample_long():
+            data = request.get_json(silent=True) or {}
+            res = task_long_running.delay(data)
+            return jsonify({"task_id": res.id}), 202
+
+        @app.route('/tasks/<task_id>', methods=['GET'])
+        def tasks_status(task_id: str):
+            result = AsyncResult(task_id)
+            payload = {
+                "task_id": task_id,
+                "state": result.state,
+                "ready": result.ready(),
+            }
+            if result.successful():
+                payload["result"] = result.result
+            elif result.failed():
+                payload["error"] = str(result.result)
+            return jsonify(payload)
+        logger.info("Routes registered: /tasks/sample-add, /tasks/sample-long, /tasks/<task_id>")
 
     except Exception as e:
         logger.exception(f"Error registering routes: {e}")

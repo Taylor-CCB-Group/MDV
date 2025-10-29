@@ -17,6 +17,7 @@ from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
 from mdvtools.dbutils.server_options import get_server_options_for_db_projects
+from mdvtools.celery_app import make_celery
 #this shouldn't be necessary in future
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
@@ -61,6 +62,13 @@ def create_flask_app(config_name=None):
     except Exception as e:
         logger.exception(f"Error loading configuration: {e}")
         raise e
+
+    # Initialize Celery using Flask config/env defaults
+    try:
+        app.celery_app = make_celery(app)  # type: ignore[attr-defined]
+        logger.info("Celery initialized for Flask app")
+    except Exception as e:
+        logger.exception(f"Error initializing Celery: {e}")
     
     try:
         logger.info("Creating base directory")
@@ -261,6 +269,9 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['upload_folder'] = config.get('upload_folder', '')
             app.config['projects_base_dir'] = config.get('projects_base_dir', '')
             app.config['db_host'] = config.get('db_container', '')
+            # Celery defaults (can be overridden via env)
+            app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL') or config.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
+            app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND') or config.get('CELERY_RESULT_BACKEND') or app.config['CELERY_BROKER_URL']
             # Control expensive per-file database sync during project serve
             sync_env = os.getenv('ENABLE_FILE_SYNC')
             if sync_env is not None:
