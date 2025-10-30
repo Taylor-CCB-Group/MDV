@@ -31,9 +31,9 @@ def find_root_prefix(names):
 
 def register_routes(app, ENABLE_AUTH):
     from flask import abort, request, jsonify, session, redirect, url_for, render_template
-    from mdvtools.auth.authutils import active_projects_cache, user_project_cache, user_cache, all_users_cache
+    from mdvtools.auth.authutils import active_projects_cache, user_project_cache, user_cache, all_users_cache, cache_user_projects
     from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
-    from mdvtools.dbutils.dbservice import ProjectService
+    from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
@@ -124,7 +124,19 @@ def register_routes(app, ENABLE_AUTH):
 
             try:
                 # Serve the projects after checking authentication and admin privileges
-                serve_projects_from_filesystem(app, app.config["projects_base_dir"])
+                created_ids = serve_projects_from_filesystem(app, app.config["projects_base_dir"])
+
+                # If auth is enabled and there are new projects, grant owner to current admin and refresh cache
+                if ENABLE_AUTH and created_ids:
+                    try:
+                        user_id = user.get("id") if user else None
+                        if user_id is not None:
+                            for pid in created_ids:
+                                UserProjectService.add_or_update_user_project(user_id=user_id, project_id=pid, is_owner=True)
+                        # Refresh caches so /projects reflects new permissions
+                        cache_user_projects()
+                    except Exception as perm_e:
+                        logger.exception(f"Error assigning permissions for new projects {created_ids}: {perm_e}")
             except Exception as e:
                 # Handle potential errors while serving the projects
                 logger.exception(f"Error while serving the projects: {e}")

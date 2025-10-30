@@ -464,6 +464,7 @@ def serve_projects_from_filesystem(app, base_dir):
         options = get_server_options_for_db_projects(app)
 
         # Iterate over missing project paths to create and serve them
+        created_project_ids: list[int] = []
         for project_path in missing_project_paths:
             logger.info(f"Processing project path: {project_path}")
             
@@ -496,6 +497,7 @@ def serve_projects_from_filesystem(app, base_dir):
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
                     
                     logger.info(f"Added project to DB: {new_project}")
+                    created_project_ids.append(new_project.id)
                     # One-time sync: initialize DB access_level from state.json.permission
                     try:
                         state = p.state or {}
@@ -560,7 +562,8 @@ def serve_projects_from_filesystem(app, base_dir):
                     raise
             else:
                 logger.error(f"In create_projects_from_filesystem: Error - Project path '{project_path}' does not exist.")
-                
+        # Return the list of newly created project IDs so callers can set permissions/cache
+        return created_project_ids
     except Exception as e:
         logger.exception(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
         raise

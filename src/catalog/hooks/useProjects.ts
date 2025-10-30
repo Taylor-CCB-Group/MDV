@@ -363,7 +363,9 @@ const useProjects = () => {
             try {
                 const response = await fetch("rescan_projects");
                 if (response.ok) {
-                   console.log("Rescan successfull"); 
+                   console.log("Rescan successful");
+                   // Refresh the project list so newly discovered projects appear (works with or without auth)
+                   await fetchProjects();
                 } else {
                     const errorResponse = await parseErrorResponse({
                         response, 
@@ -382,7 +384,7 @@ const useProjects = () => {
             } finally {
                 setIsLoading(false);
             }
-        }, [handleError]
+        }, [handleError, fetchProjects]
     );
 
     return {
