@@ -20,6 +20,14 @@ class SpatialDataConversionArgs:
     preserve_existing: bool = False
     serve: bool = False
 
+def _try_read_zarr(path: str) -> sd.SpatialData | None:
+    try:
+        import spatialdata as sd
+        return sd.read_zarr(path)
+    except Exception as e:
+        print(f"Warning: Failed to read SpatialData object from {path}: '{e}'")
+        return None
+
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
     Convert all SpatialData objects in a folder to MDV format.
@@ -49,7 +57,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         os.path.join(args.spatialdata_path, f)
         for f in os.listdir(args.spatialdata_path)
     ]
-    sdata_paths = [f for f in sdata_paths if f.endswith(".zarr")]
+    # sdata_paths = [f for f in sdata_paths if f.endswith(".zarr")]
     sdata_paths = sorted(sdata_paths)
     assert len(sdata_paths) > 0, "No SpatialData objects found in the folder"
     sdata_objects: dict[str, sd.SpatialData] = {}
@@ -62,8 +70,10 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             raise ValueError(
                 f"SpatialData object '{sdata_path}' has the same name as another object - this is not yet supported."
             )
+        sdata = _try_read_zarr(sdata_path)
+        if sdata is None:
+            continue
         names.add(sdata_name)
-        sdata = sd.read_zarr(sdata_path)
         sdata_objects[sdata_name] = sdata
         # FOR NOW::: assert that they each have a single coordinate system, image & table.
         if "table" not in sdata.tables:
@@ -92,7 +102,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 f"No image found in SpatialData object '{sdata_path}' - this is not yet supported."
             )
         region, _element_description, _instance_key = get_table_keys(adata)
-        transformation = get_transformation(sdata[region])
+        transformation = get_transformation(sdata[region]) # type: ignore
         if transformation is None:
             print(
                 f"Warning: No transformation found for region {region} in SpatialData object '{sdata_path}' - this is unexpected, using Identity."
@@ -111,8 +121,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 # For spatial coordinates, we typically have x, y axes
                 input_axes = ["x", "y"]
                 output_axes = ["x", "y"]
-                affine_matrix = transformation.to_affine_matrix(
-                    input_axes=input_axes, output_axes=output_axes
+                affine_matrix = transformation.to_affine_matrix( # type: ignore
+                    input_axes=input_axes, output_axes=output_axes # type: ignore
                 )
                 # nb - in the case of xenium, the transormation is Identity but we know there is a scale factor...
 
@@ -214,4 +224,4 @@ if __name__ == "__main__":
     parser.add_argument("--serve", action="store_false", default=False, help="Serve the project after conversion")
     args = parser.parse_args()
 
-    mdv = convert_spatialdata_to_mdv(args)
+    mdv = convert_spatialdata_to_mdv(args) # type: ignore argparse->SpatialDataConversionArgs
