@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import spatialdata as sd
 
-def _find_default_image_for_cs(sdata: sd.SpatialData, coord_system="global"):
-    sd = sdata.filter_by_coordinate_system(coord_system)
-    if not hasattr(sd, "images"):
-        return None
-    items = list(sd.images.items())  
-    return items[0][0] if items else None
+# def _find_default_image_for_cs(sdata: sd.SpatialData, coord_system="global"):
+#     sd = sdata.filter_by_coordinate_system(coord_system)
+#     if not hasattr(sd, "images"):
+#         return None
+#     items = list(sd.images.items())  
+#     return items[0][0] if items else None
 
 
 @dataclass
@@ -20,7 +20,7 @@ class SpatialDataConversionArgs:
     preserve_existing: bool = False
     serve: bool = False
 
-def _try_read_zarr(path: str) -> sd.SpatialData | None:
+def _try_read_zarr(path: str):# -> sd.SpatialData | None:
     try:
         import spatialdata as sd
         return sd.read_zarr(path)
