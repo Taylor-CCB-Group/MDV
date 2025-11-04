@@ -373,6 +373,8 @@ def is_valid_mdv_project(path: str):
 
 def serve_projects_from_db(app):
     failed_projects: list[tuple[int, str | Exception]] = []
+    failed_project_paths: list[str] = []
+    projects = []
     try:
         # Get all projects from the database
         logger.info("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
@@ -432,20 +434,27 @@ def serve_projects_from_db(app):
                     # but keep track of failed projects & associated errors
                     # nb keeping track via project.id rather than instance of Project, because ORM seems to make that not work
                     failed_projects.append((project.id, e))
+                    failed_project_paths.append(project.path)
             else:
                 e = f"Error serving project #{project.id}: path '{project.path}' does not exist."
                 logger.error(e)
                 failed_projects.append((project.id, e))
+                failed_project_paths.append(project.path)
                
     except Exception as e:
         logger.exception(f"Error serving projects from database: {e}")
-        raise
-    logger.info(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
-    # nb using extend rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
-    # so we really only expect this to run once, and the list to be empty
-    ProjectService.failed_projects.extend(failed_projects)
+        # handle gracefully; do not propagate
+    finally:
+        logger.info(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
+        if failed_project_paths:
+            logger.info(f"Failed project paths: {failed_project_paths}")
+        # nb using extend rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
+        # so we really only expect this to run once, and the list to be empty
+        ProjectService.failed_projects.extend(failed_projects)
 
 def serve_projects_from_filesystem(app, base_dir):
+    created_project_ids: list[int] = []
+    failed_project_paths: list[str] = []
     try:
         logger.info("Serving the projects present in filesystem but missing in database")
         logger.info(f"Scanning base directory: {base_dir}")
@@ -464,7 +473,6 @@ def serve_projects_from_filesystem(app, base_dir):
         options = get_server_options_for_db_projects(app)
 
         # Iterate over missing project paths to create and serve them
-        created_project_ids: list[int] = []
         for project_path in missing_project_paths:
             logger.info(f"Processing project path: {project_path}")
             
@@ -558,18 +566,24 @@ def serve_projects_from_filesystem(app, base_dir):
                     else:
                         logger.info("Skipping file sync for new project %s (ENABLE_FILE_SYNC disabled)", new_project.id)
                 except Exception as e:
-                    logger.exception(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
-                    raise
+                    logger.exception(f"In serve_projects_from_filesystem: Error creating/serving project at path '{project_path}': {e}")
+                    failed_project_paths.append(project_path)
+                    # continue to next project_path without raising
             else:
-                logger.error(f"In create_projects_from_filesystem: Error - Project path '{project_path}' does not exist.")
-        # Return the list of newly created project IDs so callers can set permissions/cache
-        return created_project_ids
+                logger.error(f"In serve_projects_from_filesystem: Error - Project path '{project_path}' does not exist.")
+                failed_project_paths.append(project_path)
     except Exception as e:
-        logger.exception(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
-        raise
+        logger.exception(f"Error in serve_projects_from_filesystem: {e}")
+        # handle gracefully; do not propagate
+    finally:
+        if failed_project_paths:
+            logger.info(f"Failed project paths (filesystem): {failed_project_paths}")
+    # Always return the list of created project IDs, even if errors occurred
+    return created_project_ids
 
 
 # Create the app object at the module level
+app = None
 try:
     app = create_flask_app()
     
@@ -580,7 +594,6 @@ try:
         serve_projects_from_filesystem(app, app.config['projects_base_dir'])
 except Exception as e:
     logger.exception(f"Error during app initialization: {e}")
-    app = None
 
 if __name__ == '__main__':
     logger.info("Inside main..")
