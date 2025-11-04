@@ -40,7 +40,7 @@ def create_flask_app(config_name=None):
 
     if config_name == 'test':
         app.config['TESTING'] = True
-        #Set a default for testing to avoid startup errors.
+        # Set a default for testing to avoid startup errors.
         app.config['DEFAULT_AUTH_METHOD'] = 'dummy'
 
     mdv_socketio(app)
