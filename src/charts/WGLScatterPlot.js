@@ -402,6 +402,7 @@ class WGLScatterPlot extends WGLChart {
 
     addBackgroundImage(ic, change = false) {
         const im = new Image();
+        im.crossOrigin = "anonymous";
         const c = this.config;
         c.image_opacity = c.image_opacity || 1;
         im.src = ic.url
@@ -610,6 +611,7 @@ class WGLScatterPlot extends WGLChart {
     getSettings() {
         const settings = super.getSettings({ pointMax: 30, pointMin: 0 });
         const c = this.config;
+        //this is legacy and probably not used anymore
         if (c.image_choices) {
             const ic = c.image_choices.slice(0);
             ic.unshift(["None", "__none__"]);
@@ -649,18 +651,19 @@ class WGLScatterPlot extends WGLChart {
                 },
             });
         }
+        //the choice of images should be in the datastore 
         const rs = this.dataStore.regions;
         if (c.region && rs && !c.viv) {
             const ic = rs.all_regions[c.region].images;
-            const vals = [["None", "__none__"]];
+            const vals = [{"name":"None", "field":"__none__"}];
             for (const n in ic) {
-                vals.push([n, n]);
+                vals.push({ name: n, field: n });
             }
             const cv = c.background_image?.name || "__none__";
             settings.splice(1, 0, {
                 type: "dropdown",
                 current_value: cv,
-                values: [vals, 0, 1],
+                values: [vals, "name", "field"],
                 label: "Change Image",
                 func: (x) => {
                     if (x === "__none__") {
