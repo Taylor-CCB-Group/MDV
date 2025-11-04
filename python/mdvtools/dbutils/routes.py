@@ -195,7 +195,7 @@ def register_routes(app, ENABLE_AUTH):
                             "thumbnail": p["thumbnail"],
                             "permissions": user_projects[p["id"]],
                             "owner": get_project_owners(p["id"]),
-                            "readme": p["readme"],
+                            "readme": p.get("readme"),
                         }
                         for p in active_projects
                         if p["id"] in allowed_project_ids
@@ -210,7 +210,7 @@ def register_routes(app, ENABLE_AUTH):
                             "thumbnail": p["thumbnail"],
                             "permissions": None,
                             "owner": [],
-                            "readme": p["readme"],
+                            "readme": p.get("readme"),
                         }
                         for p in active_projects
                     ]
