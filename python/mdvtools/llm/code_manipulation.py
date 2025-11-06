@@ -160,8 +160,8 @@ def patch_viewname(code: str, project: MDVProject):
     if view_name not in existing_views:
         # just in case the view_name isn't a duplicate, but might have had quotes in it
         print(f'patched view_name: {escaped_view_name}')
-        complete_view_name = "view_name = \"" + view_name + "\""
-        escaped_complete_view_name = "view_name = \"" + escaped_view_name + "\""
+        complete_view_name = f"view_name = \"{view_name}\""
+        escaped_complete_view_name = f"view_name = \"{escaped_view_name}\""
         return code.replace(complete_view_name, escaped_complete_view_name)
         #return code.replace(view_name, escaped_view_name)
     n = 1
@@ -170,8 +170,8 @@ def patch_viewname(code: str, project: MDVProject):
         n += 1
         new_view_name = f"{escaped_view_name} ({n})"
     print(f'patched view_name: {new_view_name}')
-    complete_view_name = "view_name = \"" + view_name + "\""
-    new_complete_view_name = "view_name = \"" + new_view_name + "\""
+    complete_view_name = f"view_name = \"{view_name}\""
+    new_complete_view_name = f"view_name = \"{new_view_name}\""
     return code.replace(complete_view_name, new_complete_view_name)
     #return code.replace(view_name, new_view_name)
 
@@ -186,11 +186,8 @@ def parse_view_name(code: str):
                 # We are looking for a simple assignment, e.g. view_name = "..."
                 if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'view_name':
                     # The value should be a string literal
-                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str): # Python 3.8+
+                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
                         view_name = node.value.value
-                        return view_name
-                    elif isinstance(node.value, ast.Str): # Python < 3.8
-                        view_name = node.value.s
                         return view_name
     except SyntaxError:
         # print("Failed to parse code with AST. It might contain a syntax error.")

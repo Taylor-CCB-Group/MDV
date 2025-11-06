@@ -1013,8 +1013,8 @@ def get_anndata_summary(adata: sc.AnnData) -> Dict[str, Any]:
         'layers_keys': list(adata.layers.keys()),
         'uns_keys': list(adata.uns.keys()),
         'sparse': hasattr(adata.X, 'toarray'),
-        'has_missing_obs': _check_missing_values(adata.obs),
-        'has_missing_var': _check_missing_values(adata.var),
+        'has_missing_obs': bool(adata.obs.isnull().values.any()), # type: ignore - ! anndata.obs could be Dataset2D which doesn't have isnull()
+        'has_missing_var': bool(adata.var.isnull().values.any()), # type: ignore - ! anndata.var could be Dataset2D which doesn't have isnull()
         'categorical_obs': [col for col in adata.obs.columns 
                           if hasattr(adata.obs[col], 'cat')],
         'categorical_var': [col for col in adata.var.columns 

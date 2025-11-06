@@ -951,7 +951,7 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | str,
+        dataframe: pandas.DataFrame | str, # could we add xarray here - we pass things from anndata which may not be DataFrame.
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,

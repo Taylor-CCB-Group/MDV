@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import spatialdata as sd
 
-def _find_default_image_for_cs(sdata: sd.SpatialData, coord_system="global"):
-    sd = sdata.filter_by_coordinate_system(coord_system)
-    if not hasattr(sd, "images"):
-        return None
-    items = list(sd.images.items())  
-    return items[0][0] if items else None
+# def _find_default_image_for_cs(sdata: sd.SpatialData, coord_system="global"):
+#     sd = sdata.filter_by_coordinate_system(coord_system)
+#     if not hasattr(sd, "images"):
+#         return None
+#     items = list(sd.images.items())  
+#     return items[0][0] if items else None
 
 
 @dataclass
@@ -19,6 +19,14 @@ class SpatialDataConversionArgs:
     output_folder: str
     preserve_existing: bool = False
     serve: bool = False
+
+def _try_read_zarr(path: str):# -> sd.SpatialData | None:
+    try:
+        import spatialdata as sd
+        return sd.read_zarr(path)
+    except Exception as e:
+        print(f"Warning: Failed to read SpatialData object from {path}: '{e}'")
+        return None
 
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
@@ -49,7 +57,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         os.path.join(args.spatialdata_path, f)
         for f in os.listdir(args.spatialdata_path)
     ]
-    sdata_paths = [f for f in sdata_paths if f.endswith(".zarr")]
+    # sdata_paths = [f for f in sdata_paths if f.endswith(".zarr")]
     sdata_paths = sorted(sdata_paths)
     assert len(sdata_paths) > 0, "No SpatialData objects found in the folder"
     sdata_objects: dict[str, sd.SpatialData] = {}
@@ -62,8 +70,10 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             raise ValueError(
                 f"SpatialData object '{sdata_path}' has the same name as another object - this is not yet supported."
             )
+        sdata = _try_read_zarr(sdata_path)
+        if sdata is None:
+            continue
         names.add(sdata_name)
-        sdata = sd.read_zarr(sdata_path)
         sdata_objects[sdata_name] = sdata
         # FOR NOW::: assert that they each have a single coordinate system, image & table.
         if "table" not in sdata.tables:
@@ -92,18 +102,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 f"No image found in SpatialData object '{sdata_path}' - this is not yet supported."
             )
         region, _element_description, _instance_key = get_table_keys(adata)
-        if isinstance(region, list):
-            region = region[0]  # Take the first region if it's a list
-        
-        # Get the spatial element and check if it's the right type
-        spatial_element = sdata[region]
-        if hasattr(spatial_element, 'X'):  # This is AnnData, not SpatialElement
-            # For AnnData, we can't get transformation, so use Identity
-            transformation = None
-        else:
-            # Type assertion: we know it's SpatialElement at this point
-            from typing import cast, Any
-            transformation = get_transformation(cast(Any, spatial_element))
+        transformation = get_transformation(sdata[region]) # type: ignore
         if transformation is None:
             print(
                 f"Warning: No transformation found for region {region} in SpatialData object '{sdata_path}' - this is unexpected, using Identity."
@@ -120,21 +119,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             else:
                 # Get the affine matrix from the transformation
                 # For spatial coordinates, we typically have x, y axes
-                input_axes = ("x", "y")
-                output_axes = ("x", "y")
-                # Check if transformation has the method and is not a dict
-                if (hasattr(transformation, 'to_affine_matrix') and 
-                    callable(getattr(transformation, 'to_affine_matrix')) and
-                    not isinstance(transformation, dict)):
-                    affine_matrix = transformation.to_affine_matrix(
-                        input_axes=input_axes, output_axes=output_axes
-                    )
-                else:
-                    # If transformation is a dict or doesn't have the method, use identity
-                    identity_transform = sd.transformations.Identity()
-                    affine_matrix = identity_transform.to_affine_matrix(
-                        input_axes=input_axes, output_axes=output_axes
-                    )
+                input_axes = ["x", "y"]
+                output_axes = ["x", "y"]
+                affine_matrix = transformation.to_affine_matrix( # type: ignore
+                    input_axes=input_axes, output_axes=output_axes # type: ignore
+                )
                 # nb - in the case of xenium, the transormation is Identity but we know there is a scale factor...
 
                 # Convert coordinates to homogeneous coordinates (add 1s for translation)
@@ -234,13 +223,5 @@ if __name__ == "__main__":
     parser.add_argument("--preserve-existing", action="store_false", default=False, help="Preserve existing project data")
     parser.add_argument("--serve", action="store_false", default=False, help="Serve the project after conversion")
     args = parser.parse_args()
-    
-    # Convert argparse.Namespace to SpatialDataConversionArgs
-    conversion_args = SpatialDataConversionArgs(
-        spatialdata_path=args.spatialdata_path,
-        output_folder=args.output_folder,
-        preserve_existing=args.preserve_existing,
-        serve=args.serve
-    )
 
-    mdv = convert_spatialdata_to_mdv(conversion_args)
+    mdv = convert_spatialdata_to_mdv(args) # type: ignore argparse->SpatialDataConversionArgs

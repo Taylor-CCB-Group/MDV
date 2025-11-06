@@ -29,9 +29,7 @@ def main():
     
     # Filter data for sample A (assuming sample A is 'CID003352-2')
     sample_a_df = cells_df[cells_df['sample_id'] == 'CID003352-2']
-    # Ensure it's a DataFrame, not a Series
-    if isinstance(sample_a_df, pd.Series):
-        sample_a_df = sample_a_df.to_frame().T
+    assert isinstance(sample_a_df, pd.DataFrame)
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)

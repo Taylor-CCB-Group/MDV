@@ -281,26 +281,7 @@ p = MDVProject(os.path.expanduser(project_path), delete_existing=True)
 
 # Add data to the project
 p.add_datasource("cells", cells_df)
-# Ensure gene_table is a DataFrame
-try:
-    # Try to convert to pandas DataFrame
-    if hasattr(gene_table, 'to_pandas'):
-        gene_table_df = gene_table.to_pandas()  # type: ignore
-    elif hasattr(gene_table, 'to_dataframe'):
-        gene_table_df = gene_table.to_dataframe()  # type: ignore
-    else:
-        # If it's already a DataFrame or can be converted directly
-        gene_table_df = gene_table
-except (AttributeError, TypeError):
-    # Fallback if conversion methods don't work
-    gene_table_df = gene_table
-
-# Type assertion to ensure it's treated as DataFrame or str
-from typing import cast, Union
-import pandas as pd
-gene_table_df = cast(Union[pd.DataFrame, str], gene_table_df)
-
-p.add_datasource("genes", gene_table_df)
+p.add_datasource("genes", gene_table) # type: ignore - anndata.var could be Dataset2D
 
 
 # Convert plot data to JSON and setup the project view

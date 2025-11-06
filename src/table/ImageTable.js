@@ -23,9 +23,17 @@ class ImageTable {
         this.display_columns = [];
         this.selection_mode = true;
         this.imageFunc = config.imageFunc;
-        //config.background_color=config.background_color?config.background_color:"lightgray";
-
-        this.base_url = getProjectURL(config.base_url);
+        //The base url contains the stub of the image e.g. /images/img
+        //and is not just the folder- need to remove trailing slash
+        //Although clunky this allows integer columns to represent the img
+        //eg. 1 becomes /images/im1.png
+        
+        this.base_url = getProjectURL(config.base_url)
+        if (!config.base_url.endsWith("/")) {
+            this.base_url = this.base_url.replace(/\/+$/, "");
+        }
+        
+      
         this.parent = parent_div;
         this.selected_tiles = {};
 
@@ -105,11 +113,11 @@ class ImageTable {
             }
             this._resize();
         };
-
-        const burl = getProjectURL(this.config.base_url);
+        //load in first image to get preferred dimensions
+        //if none are given
         const type = this.config.image_type;
         const image = this.data_view.getItemField(1, this.config.image_key);
-        im.src = `${burl}${image}.${type}`;
+        im.src = `${this.base_url}${image}.${type}`;
     }
 
     mouseOver(e, img) {
@@ -549,7 +557,6 @@ class ImageTable {
         let x = 0;
         const w = `${this.t_width}px`;
         const h = `${this.t_height}px`;
-        const burl = getProjectURL(this.config.base_url);
         const type = this.config.image_type;
         // looking for something to provide a default name; "Gene" is ok for ytrap...
         const titleColumn = this.config.image_title || "Gene";
@@ -605,7 +612,7 @@ class ImageTable {
             createEl(
                 "img",
                 {
-                    src: `${burl}${image}.${type}`,
+                    src: `${this.base_url}${image}.${type}`,
                     id: `mlvtile-${this.domId}-${i}`,
                     styles: {
                         border: border,
