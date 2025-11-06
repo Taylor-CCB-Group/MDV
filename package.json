@@ -85,7 +85,7 @@
     "jszip": "^3.10.1",
     "lil-gui": "^0.18.1",
     "lodash": "^4.17.21",
-    "lucide-react": "^0.372.0",
+    "lucide-react": "^0.552.0",
     "marked": "^4.2.4",
     "microtip": "^0.2.2",
     "mobx": "^6.13.3",
