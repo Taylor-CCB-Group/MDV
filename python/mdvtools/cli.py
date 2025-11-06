@@ -5,7 +5,12 @@ import shutil
 import zipfile
 import os
 from os.path import exists, join, basename
-from .conversions import convert_scanpy_to_mdv, convert_mudata_to_mdv, convert_vcf_to_mdv
+from .conversions import (
+    convert_scanpy_to_mdv,
+    convert_mudata_to_mdv,
+    convert_vcf_to_mdv,
+    merge_projects,
+)
 
 def zip_and_remove(folder):
     """Zip a directory and delete the original."""
@@ -92,6 +97,26 @@ def serve(folder):
     if not exists(ds_path):
         raise FileNotFoundError(f"{folder} does not contain a valid MDV project.")
     serve_project(MDVProject(folder))
+
+
+@cli.command("merge-project")
+@click.argument("base_project")
+@click.argument("extra_project")
+@click.option(
+    "--prefix",
+    default=None,
+    help="Prefix applied to imported datasource names. "
+    "If omitted, a prefix derived from EXTRA_PROJECT is used.",
+)
+@click.option(
+    "--view-prefix",
+    default=None,
+    help="Prefix applied to imported view names. Defaults to the datasource prefix.",
+)
+def merge_project(base_project, extra_project, prefix, view_prefix):
+    """Merge an existing MDV project into another project."""
+    merge_projects(base_project, extra_project, prefix=prefix, view_prefix=view_prefix)
+    click.echo(f"Merged '{extra_project}' into '{base_project}'.")
 
 if __name__ == '__main__':
     cli()
