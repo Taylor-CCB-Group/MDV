@@ -21,7 +21,7 @@ from mdvtools.dbutils.server_options import get_server_options_for_db_projects
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
 
-# Setup logging using the centralized logging module
+#Setup logging using the centralized logging module
 logger = get_logger(__name__)
 
 #Read environment flag for authentication
