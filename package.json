@@ -63,7 +63,7 @@
     "@radix-ui/react-label": "^2.0.2",
     "@radix-ui/react-radio-group": "^1.1.3",
     "@tanstack/react-query": "^5.80.0",
-    "@visx/visx": "^3.12.0",
+    "@visx/visx": "^3.13.2-alpha.0",
     "@vivjs-experimental/viv": "^1.0.1",
     "axios": "^1.10.0",
     "canvas-to-svg": "^1.0.3",
