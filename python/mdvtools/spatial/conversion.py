@@ -12,8 +12,6 @@ if TYPE_CHECKING:
     from spatialdata import SpatialData
     from spatialdata.models import SpatialElement
 
-print("done with imports...")
-
 REGION_FIELD = "spatial_region"
 @dataclass
 class ImageEntry:
