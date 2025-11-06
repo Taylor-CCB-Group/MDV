@@ -137,7 +137,6 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@typescript/native-preview": "^7.0.0-dev.20250723.1",
     "@vitejs/plugin-react": "^4.6.0",
-    "@welldone-software/why-did-you-render": "^8.0.3",
     "autoprefixer": "^10.4.19",
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.1",
