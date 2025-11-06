@@ -5,14 +5,10 @@ from typing import TYPE_CHECKING, Tuple, Optional
 import numpy as np
 # nb, main spatialdata import should happen lazily
 # so user doesn't have to wait and see lots of scary unrelated output if they input bad arguments.
-print("importing spatialdata transformations...")
-from spatialdata.transformations import get_transformation, get_transformation_between_coordinate_systems, BaseTransformation
-print("importing spatialdata models...")
-from spatialdata.models import get_table_keys
-print("importing anndata...")
-from anndata import AnnData, concat as ad_concat
 if TYPE_CHECKING:
     # import spatialdata as sd
+    from anndata import AnnData
+    from spatialdata.transformations import BaseTransformation
     from spatialdata import SpatialData
     from spatialdata.models import SpatialElement
 
@@ -26,17 +22,18 @@ class ImageEntry:
     Local helper, not part of the public API or set in stone.
     """
     path: str
-    transform_to_image: BaseTransformation
+    transform_to_image: "BaseTransformation"
     extent_px: Optional[Tuple[int, int]]
     is_primary: bool
     region_id: str
 
 
 
-def transform_table_coordinates(adata: AnnData, region_to_image: dict[str, ImageEntry]):
+def transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
     """
     Transform the coordinates of an AnnData table to the coordinates of the images associated with the regions.
     """
+    from spatialdata.models import get_table_keys
     # todo: support non-2d cases...
     axes = ("x", "y")
     # Convert coordinates to homogeneous coordinates (add 1s for translation)
@@ -65,12 +62,16 @@ def transform_table_coordinates(adata: AnnData, region_to_image: dict[str, Image
     return adata
 
 def _get_transform_keys(e: "SpatialElement") -> list[str]:
+    from spatialdata.transformations import get_transformation
     transformations = get_transformation(e, get_all=True)
     assert isinstance(transformations, dict)
     return list(transformations.keys())
 
 # ---- region resolution ----
 def resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name: str):
+    from spatialdata.transformations import get_transformation, get_transformation_between_coordinate_systems
+    from spatialdata.models import get_table_keys
+    from anndata import AnnData
     adata = sdata.tables[table_name]
     assert isinstance(adata, AnnData)
 
@@ -191,7 +192,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         Exception: For other unexpected errors during conversion
     """
     # imports can be slow, so doing them here rather than at the top of the file
-    import spatialdata as sd
+    from anndata import concat as ad_concat
 
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
