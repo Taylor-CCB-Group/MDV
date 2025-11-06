@@ -219,7 +219,7 @@ function makeResizable(el, config = {}) {
     //document can change if in another window
     el.__doc__ = config.doc || document;
     // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
-    el.style.overflow = "hidden";
+    el.style.overflow = "visible";
     //el.style.zIndex="0";
     if (config.onresizeend) {
         ri.onresize = addResizeListener(
@@ -236,7 +236,6 @@ function makeResizable(el, config = {}) {
 
     // List of all the resizers based on directions and corresponding css classes
     const directions = [
-        // The top resizers are messing with title bar buttons causing bad UX, commenting for now
         { dir: "n", className: "resizer-n" },
         { dir: "s", className: "resizer-s" },
         { dir: "e", className: "resizer-e" },

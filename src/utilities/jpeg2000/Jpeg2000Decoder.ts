@@ -59,12 +59,12 @@ type CompressedImageFrame = {
 */
 
 export default class Jpeg2000Decoder extends BaseDecoder {
-    private openjpeg: OpenJpegModule | null = null;
+    private static openjpeg?: Promise<OpenJpegModule>;
 
     private async getOpenJPEG(): Promise<OpenJpegModule> {
-        if (!this.openjpeg) {
+        if (!Jpeg2000Decoder.openjpeg) {
             try {
-                this.openjpeg = await openJpegFactory({
+                Jpeg2000Decoder.openjpeg = openJpegFactory({
                     locateFile: (file: string) => {
                         if (file.endsWith(".wasm")) {
                             return openjpegWasm.href;
@@ -78,15 +78,16 @@ export default class Jpeg2000Decoder extends BaseDecoder {
                 throw new Error("Failed to initialize OpenJPEG codec");
             }
         }
-        return this.openjpeg;
+        return Jpeg2000Decoder.openjpeg;
     }
 
     async decodeBlock(compressedImageFrame: ArrayBuffer) {
         // this is more-or-less a copy of the code in conerstone3D's decodeJPEG2000.ts
         // (or it was originally, now various changes to make it do what we need)
+        let decoder: InstanceType<OpenJpegModule["J2KDecoder"]> | null = null;
         try {
             const openjpeg = await this.getOpenJPEG();
-            const decoder = new openjpeg.J2KDecoder();
+            decoder = new openjpeg.J2KDecoder();
             const buffer = new Uint8Array(compressedImageFrame);
             const encodedBufferInWASM = decoder.getEncodedBuffer(buffer.length);
             encodedBufferInWASM.set(buffer);
@@ -100,8 +101,6 @@ export default class Jpeg2000Decoder extends BaseDecoder {
             }
             // get the decoded pixels
             const decodedBufferInWASM = decoder.getDecodedBuffer();
-            const imageFrame = new Uint8Array(decodedBufferInWASM.length);
-            imageFrame.set(decodedBufferInWASM);
             const pixelData = getPixelData(frameInfo, decodedBufferInWASM);
 
             return pixelData;
@@ -116,6 +115,10 @@ export default class Jpeg2000Decoder extends BaseDecoder {
             }
 
             throw error;
+        } finally {
+            try {
+                decoder?.delete();
+            } catch (error) {}
         }
     }
 }

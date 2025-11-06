@@ -281,7 +281,7 @@ p = MDVProject(os.path.expanduser(project_path), delete_existing=True)
 
 # Add data to the project
 p.add_datasource("cells", cells_df)
-p.add_datasource("genes", gene_table)
+p.add_datasource("genes", gene_table) # type: ignore - anndata.var could be Dataset2D
 
 
 # Convert plot data to JSON and setup the project view

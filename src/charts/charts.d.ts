@@ -145,6 +145,16 @@ export type DataSourceLinks = Record<
 >;
 
 /**
+ * This is a very provisional type for a way of specifying a zarr store that can be used to load data.
+ * 
+ * I would prefer the definition for this to be in a schema, will need to get back to this later.
+ */
+export type ExperimentalZarrStore = {
+    path: string,
+    type: "xe_cells" | "xe_transcripts" | "xe_analysis"
+}
+
+/**
  * nb - there should be a type for the entries in `datasources.json`...
  * *but this is not that type!* even though it is being used in places where that type is expected.
  * There is some confusion here about the internal representation in `ChartManager` of a panel with
@@ -153,7 +163,7 @@ export type DataSourceLinks = Record<
  */
 export type DataSource = {
     name: DataSourceName;
-    charts: Chart[];
+    charts: Chart[]; //what's this? probably an artifact of me not understanding when I first wrote this...
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
@@ -162,7 +172,8 @@ export type DataSource = {
     links?: DataSourceLinks;
     size: number;
     columns: DataColumn<DataType>[];
-};
+};// | ExperimentalZarrStore; ? something something spatialdata.js ...
+// maybe that the
 
 type DropdownMappedValue<T extends string, V extends string> = {
     [P in T]: string;

@@ -137,10 +137,10 @@ export default class GridStackManager {
                 //apply these to the chart's div for absolute positioning
                 cdiv.style.position = "absolute";
                 cdiv.style.width = `${w - 6}px`;
-                cdiv.style.height = `${h - 6}px`;
+                cdiv.style.height = `${h - 12}px`;
                 cdiv.style.left = `${l}px`;
                 cdiv.style.top = `${t}px`;
-                chart.config.size = [w- 6, h - 6];
+                chart.config.size = [w- 6, h - 12];
                 chart.config.position = [l,t]
             }
             //remove the gridstack data from the chart's config

@@ -14,6 +14,8 @@ import { initialiseChartConfig } from "./chartConfigUtils";
 import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
+import tippy, {type Instance as TippyInstance} from "tippy.js";
+import 'tippy.js/dist/tippy.css'; 
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
 export type LegacyColorBy = { column: DataColumn<any> }
@@ -67,6 +69,7 @@ class BaseChart<T extends BaseConfig> {
     observable: { container: HTMLElement };
     width = 0;
     height = 0;
+    menuTooltips:TippyInstance[]=[];
     legend: any;
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
@@ -236,7 +239,7 @@ class BaseChart<T extends BaseConfig> {
             action(() => {
                 //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
                 if (this.__doc__.fullscreenElement) {
-                    if (this.div === this.__doc__.fullscreenElement) {
+                    if (this.div === this.__doc__.fullscreenElement) {               
                         this.observable.container = this.div;
                         const rect = window.screen;
                         this.setSize(rect.width, rect.height);
@@ -258,6 +261,7 @@ class BaseChart<T extends BaseConfig> {
                     this.isFullscreen = true;
                 } else {
                     this.observable.container = this.__doc__.body;
+                 
                     // Reset the size of chart
                     this.setSize(...oldSize);
                     const cm = window.mdv.chartManager;
@@ -430,18 +434,23 @@ class BaseChart<T extends BaseConfig> {
         const sp = createEl(
             "span",
             {
-                "aria-label": tooltip,
-                "data-microtip-color": "red",
-                role: "tooltip",
-                "data-microtip-size": config.size || "small",
-                "data-microtip-position": config.position || "bottom-left",
+                
                 styles: {
                     margin: "0px 1px",
                 },
             },
             this.menuSpace,
         );
-
+        const t= tippy(sp, {
+            content: tooltip,
+            appendTo: this.div
+        });
+        //need to store in order to switch document when chart is popped out/in
+        this.menuTooltips.push(t); 
+        // event listener for hiding the tooltip on mouseleave event for popout window
+        sp.addEventListener('mouseleave', () => {
+            t.hide();
+          });
         createEl(
             "i",
             {
@@ -682,6 +691,8 @@ class BaseChart<T extends BaseConfig> {
         for (const disposer of this.reactionDisposers) {
             disposer();
         }
+        this.menuTooltips.forEach(t => t.destroy());
+        this.menuTooltips = [];
         // dynamic props?
     }
     removeLayout?(): void;
@@ -959,6 +970,11 @@ class BaseChart<T extends BaseConfig> {
         // - fullscreen... some permutations of dialog behaviour / mouse events on deck are a bit odd
         //   ^^ that's not a changeBaseDocument() thing, it's a fullscreen thing...
         this.contextMenu.__doc__ = doc;
+        this.menuTooltips.forEach(t=>{
+            //for some reason the popout tooltip layer shows in the popout window
+            //and needs closing
+            setTimeout(()=>t.hide(),20);
+        });
         action(() => (this.observable.container = doc.body))();
         this.__doc__ = doc;
         for (const d of this.dialogs) {

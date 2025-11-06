@@ -1,7 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 
 export interface SocketIOUploadConfig {
-    serverUrl: string;
     namespace: string;
     file: File;
     fileName?: string;
@@ -20,6 +19,7 @@ export interface SocketIOUploadConfig {
     onStatusChange?: (status: string, message?: string) => void;
     onError?: (error: any) => void;
     onSuccess?: (result: any) => void;
+    socketPath?: string;
 }
 
 export interface SocketIOUploadState {
@@ -63,7 +63,7 @@ export class SocketIOUploadClient {
     }
 
     private generateFileId(): string {
-        return 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        return `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
     private detectFileType(): { type: string; contentType: string } {
@@ -210,16 +210,17 @@ export class SocketIOUploadClient {
 
     private async connectToServer(): Promise<boolean> {
         return new Promise((resolve) => {
-            console.log('Attempting to connect to:', this.config.serverUrl);
             console.log('Using namespace:', this.config.namespace);
+            console.log('Using socket path:', this.config.socketPath);
             
             // Connect to the specific namespace directly
-            this.socket = io(`${this.config.serverUrl}${this.config.namespace}`, {
+            this.socket = io(`${this.config.namespace}`, {
+                path: this.config.socketPath || '/socket.io',   // '/test/socket.io' or '/carroll/socket.io'
                 autoConnect: false,
-                transports: ['websocket', 'polling'],
+                transports: ['polling'],
                 timeout: 60000,
                 forceNew: true,
-                reconnection: true,
+                reconnection: false,
                 reconnectionDelay: 1000,
                 reconnectionAttempts: 5,
             });
@@ -445,12 +446,12 @@ private async waitForProcessing(): Promise<void> {
                         
                         // Exponential backoff
                         await new Promise(resolve => 
-                            setTimeout(resolve, Math.min(1000 * Math.pow(2, reconnectAttempts), 30000))
+                            setTimeout(resolve, Math.min(1000 * (2 ** reconnectAttempts), 30000))
                         );
                     }
                 } catch (error) {
                     reconnectAttempts++;
-                    console.warn(`Reconnection failed:`, error);
+                    console.warn('Reconnection failed:', error);
                     
                     if (reconnectAttempts >= maxReconnectAttempts) {
                         throw new Error(`Failed to reconnect after ${maxReconnectAttempts} attempts`);

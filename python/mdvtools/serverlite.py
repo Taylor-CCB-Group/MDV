@@ -8,6 +8,7 @@ with support for HTTP range requests and security headers.
 import json
 import os
 import sys
+import zlib
 from flask import (
     Flask,
     render_template,
@@ -25,7 +26,7 @@ from mdvtools.server_utils import (
     add_safe_headers,
 )
 
-def create_app(project: MDVProject):
+def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     """
     Create and configure a Flask application for serving MDV project data.
 
@@ -52,6 +53,8 @@ def create_app(project: MDVProject):
                     "Request must contain JSON with 'columns' and 'data_source'"
                 )
             bytes_ = project.get_byte_data(data["columns"], data["data_source"])
+            if compress_column_data:
+                bytes_ = zlib.compress(bytes_)
             response = make_response(bytes_)
             response.headers.set("Content-Type", "application/octet-stream")
             return response
@@ -150,16 +153,17 @@ def create_app(project: MDVProject):
     return app
 
 
-def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bool = True ):
+def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bool = True ,compress_column_data: bool = False):
     """Serve an MDV project using a lightweight Flask server. 
     Args:
         project (MDVProject | str): The MDV project instance or path to the project directory.
         port (int): The port to run the server on. Defaults to 5050.
         open_browser (bool): Whether to open the browser automatically. Defaults to True.
+        compress_column_data (bool): Whether to compress column data. Defaults to False.
     """
     if isinstance(project, str):
         project = MDVProject(project)
-    app = create_app(project)
+    app = create_app(project, compress_column_data=compress_column_data)
     if open_browser:
         import webbrowser
         webbrowser.open(f"http://localhost:{port}/")

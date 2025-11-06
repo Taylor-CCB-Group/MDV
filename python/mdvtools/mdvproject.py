@@ -124,7 +124,7 @@ class MDVProject:
     def state(self, value):
         save_json(self.statefile, value ,self.safe_file_save)
 
-    def set_editable(self, edit):
+    def set_editable(self, edit=True):
         c = self.state
         c["permission"] = "edit" if edit else "view"
         self.state = c
@@ -294,6 +294,7 @@ class MDVProject:
     def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file):
         """Add or update an image datasource in datasources.json
         returns the name of the added view so the user can navigate to it"""
+        # todo consider moving this elsewhere & generally review the methods for adding spatial data
         # Load current datasources
         datasources = self.datasources
         # Check if the datasource exists
@@ -941,7 +942,7 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | pandas.Series | str,
+        dataframe: pandas.DataFrame | str, # could we add xarray here - we pass things from anndata which may not be DataFrame.
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
