@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from spatialdata.transformations import BaseTransformation
     from spatialdata import SpatialData
     from spatialdata.models import SpatialElement
+    from mdvtools.mdvproject import MDVProject
 
 REGION_FIELD = "spatial_region"
 @dataclass
@@ -189,6 +190,26 @@ def _try_read_zarr(path: str):# -> sd.SpatialData | None:
         print(f"Warning: Failed to read SpatialData object from {path}: '{e}'")
         return None
 
+def _set_default_image_view(mdv: "MDVProject"):
+    """
+    Uses a template view for the default view of the spatial data.
+    In future it would be good to make this user-configurable.
+    """
+    import json
+    import os
+
+    # find a region with a viv_image and use key from that...
+    for region_name, region_data in mdv.get_datasource_metadata("cells")["regions"]["all_regions"].items():
+        if "viv_image" in region_data:
+            break
+    else:
+        raise ValueError("No region with a viv_image found")
+
+    print(f"Using region '{region_name}' for default view")
+    with open(os.path.join(os.path.dirname(__file__), "spatial_view_template.json"), "r") as f:
+        view_str = f.read().replace("<SPATIAL_REGION_NAME>", region_name)
+        mdv.set_view("default", json.loads(view_str), True)
+
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
     Convert all SpatialData objects in a folder to MDV format.
@@ -293,6 +314,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         "all_regions": all_regions,
     }
     mdv.set_datasource_metadata(cells_md)
+    _set_default_image_view(mdv)
 
     if args.serve:
         print(f"Serving project at {args.output_folder}")
