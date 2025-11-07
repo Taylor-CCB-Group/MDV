@@ -22,9 +22,9 @@ import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
-import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { getEmptyFeatureCollection } from "./deck_state";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
@@ -105,7 +105,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_opacity: 0.5,
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
-    // todo omit this so we can have better HMR.
+    // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 

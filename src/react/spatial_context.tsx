@@ -10,7 +10,7 @@ import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { action, toJS } from "mobx";
-import { useOuterContainer } from "./screen_state";
+import { getEmptyFeatureCollection } from "./deck_state";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -43,10 +43,6 @@ export type SpatialAnnotationState = {
 // Could more usefully be thought of as SpatialContext?
 const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
-export const getEmptyFeatureCollection = () => ({
-    type: "FeatureCollection",
-    features: []
-} as FeatureCollection);
 
 function useSelectionCoords(selection: FeatureCollection) {
     // where should we keep this in config for persisting?
@@ -101,7 +97,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     useEffect(() => {
         console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
-            setSelectionFeatureCollection(getEmptyFeatureCollection());            
+            setSelectionFeatureCollection(getEmptyFeatureCollection());
         }
     }, [chart, setSelectionFeatureCollection]);
     useEffect(() => {
