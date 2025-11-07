@@ -90,7 +90,7 @@ const queryClient = new QueryClient({
  * If not provided, the default is document.body.
  * @returns the root element that was created
  */
-const createMdvPortal = (component: JSX.Element, container: HTMLElement, parent?: BaseChart<any> | BaseDialog) => {
+const createMdvPortal = (component: React.JSX.Element, container: HTMLElement, parent?: BaseChart<any> | BaseDialog) => {
     const root = createRoot(container);
     root.render(
         <StrictMode>

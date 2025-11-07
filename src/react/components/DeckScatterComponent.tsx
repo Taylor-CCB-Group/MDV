@@ -257,7 +257,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
         return scatterplotLayer.unproject(coords);
     }, [scatterplotLayer]);
     const outerContainer = useOuterContainer();
-    const deckRef = useRef<any>();
+    const deckRef = useRef<any | null>(null);
     // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
     useEffect(() => {
         outerContainer; // make sure the hook runs when this changes

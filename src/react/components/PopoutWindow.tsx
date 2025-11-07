@@ -17,8 +17,8 @@ export function PopoutWindow({ children, features = "width=600,height=400", titl
     // Popout window
     const externalWindow = useRef<Window | null>(null);
     // Theme and style observers
-    const themeObserver = useRef<MutationObserver>();
-    const observer = useRef<MutationObserver>();
+    const themeObserver = useRef<MutationObserver | null>(null);
+    const observer = useRef<MutationObserver | null>(null);
     const onCloseRef = useRef(onClose);
     const emotionCacheRef = useRef<EmotionCache | null>(null);
 
