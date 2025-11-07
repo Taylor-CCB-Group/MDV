@@ -1,4 +1,4 @@
-//! Uncommented due to incompatibility with React 19
+//! Commented due to incompatibility with React 19
 // /// <reference types="@welldone-software/why-did-you-render" />
 // import React from "react";
 
