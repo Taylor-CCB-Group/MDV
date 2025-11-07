@@ -379,5 +379,9 @@ if __name__ == "__main__":
     parser.add_argument("--preserve-existing", action="store_false", default=False, help="Preserve existing project data")
     parser.add_argument("--serve", action="store_false", default=False, help="Serve the project after conversion")
     args = parser.parse_args()
+    print(f"Converting SpatialData from '{args.spatialdata_path}' to {args.output_folder}")
+    print(f"Preserving existing project data: {args.preserve_existing}")
+    print(f"Serving the project after conversion: {args.serve}")
+    print(f"Converting {len(os.listdir(args.spatialdata_path))} potential SpatialData objects")
 
     mdv = convert_spatialdata_to_mdv(args) # type: ignore argparse->SpatialDataConversionArgs
