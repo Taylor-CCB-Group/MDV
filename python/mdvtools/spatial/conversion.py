@@ -13,6 +13,30 @@ if TYPE_CHECKING:
     from spatialdata.models import SpatialElement
     from mdvtools.mdvproject import MDVProject
 
+def _process_sdata_path(sdata_path: str):
+    """Processes a single SpatialData object path."""
+    # imports need to be here for the separate process
+    from mdvtools.spatial.conversion import _try_read_zarr, _resolve_regions_for_table
+    import os
+
+    sdata_name = os.path.basename(sdata_path)
+    sdata = _try_read_zarr(sdata_path)
+    if sdata is None:
+        return None
+
+    adata_objects = []
+    all_regions = {}
+    for table_name, adata in sdata.tables.items():
+        _resolve_regions_for_table(sdata, table_name, sdata_name)
+        adata.obs["spatialdata_path"] = sdata_name
+        adata.obs["table_name"] = table_name
+        adata_objects.append(adata)
+        if "regions" in adata.uns.get("mdv", {}):
+            all_regions.update(adata.uns["mdv"]["regions"])
+
+    return sdata_name, sdata, adata_objects, all_regions
+
+
 REGION_FIELD = "spatial_region"
 @dataclass
 class ImageEntry:
@@ -257,6 +281,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
     # imports can be slow, so doing them here rather than at the top of the file
     from anndata import concat as ad_concat
+    from concurrent.futures import ProcessPoolExecutor
 
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
@@ -273,30 +298,23 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     adata_objects: list[AnnData] = []
     all_regions: dict[str, dict] = {}
     names: set[str] = set()
-    for sdata_path in sdata_paths:
-        sdata_name = os.path.basename(sdata_path)
+    with ProcessPoolExecutor() as executor:
+        results = executor.map(_process_sdata_path, sdata_paths)
+
+    for result in results:
+        if result is None:
+            continue
+        
+        sdata_name, sdata, adatas, regions = result
         if sdata_name in names:
             raise ValueError(
-                f"SpatialData object '{sdata_path}' has the same name as another object - this is not yet supported."
+                f"SpatialData object with name '{sdata_name}' already processed. Please ensure names are unique."
             )
-        sdata = _try_read_zarr(sdata_path)
-        if sdata is None:
-            continue
+        
         names.add(sdata_name)
         sdata_objects[sdata_name] = sdata
-        # if there are no tables, maybe we could still try to get images as regions, just without any rows corresponding to them.
-        for table_name, adata in sdata.tables.items():
-            # this will have all kinds of side-effects on the adata
-            # once it returns, it will have
-            # - transformed coordinates in obs[x, y]
-            # - regions metadata in uns["mdv"]["regions"]
-            _resolve_regions_for_table(sdata, table_name, sdata_name)
-            adata_objects.append(adata)
-            # should these go in uns rather than obs?
-            adata.obs["spatialdata_path"] = sdata_name
-            adata.obs["table_name"] = table_name
-
-            all_regions.update(adata.uns["mdv"]["regions"])
+        adata_objects.extend(adatas)
+        all_regions.update(regions)
 
     if len(adata_objects) == 0:
         raise ValueError("No tables found in any SpatialData objects - this is not yet supported.")
