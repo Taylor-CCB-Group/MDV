@@ -1,7 +1,7 @@
 import argparse
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Tuple, Optional
+from typing import TYPE_CHECKING
 import numpy as np
 # nb, main spatialdata import should happen lazily
 # so user doesn't have to wait and see lots of scary unrelated output if they input bad arguments.
@@ -21,17 +21,22 @@ class ImageEntry:
     """
     path: str
     transform_to_image: "BaseTransformation"
-    extent_px: Optional[Tuple[int, int]]
+    extent_px: tuple[int, int]
     is_primary: bool
     region_id: str
 
 
 
-def transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
+def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
     """
     Transform the coordinates of an AnnData table to the coordinates of the images associated with the regions.
     """
     from spatialdata.models import get_table_keys
+    if "spatial" not in adata.obsm:
+        # todo: proper support for non-spatial tables, add tests.
+        print(f"WARNING: No spatial coordinates found in obsm['spatial']")
+        print(f"We should be able to handle this case, but it is not supported or tested yet, results may be undesired.")
+        return adata
     # todo: support non-2d cases...
     axes = ("x", "y")
     # Convert coordinates to homogeneous coordinates (add 1s for translation)
@@ -62,16 +67,19 @@ def transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Ima
 def _get_transform_keys(e: "SpatialElement") -> list[str]:
     from spatialdata.transformations import get_transformation
     transformations = get_transformation(e, get_all=True)
-    assert isinstance(transformations, dict)
+    if not isinstance(transformations, dict):
+        raise ValueError(f"This should be unreachable, get_transformation with get_all=True should always return a dict")
     return list(transformations.keys())
 
 # ---- region resolution ----
-def resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name: str):
+def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name: str):
     from spatialdata.transformations import get_transformation, get_transformation_between_coordinate_systems
     from spatialdata.models import get_table_keys
     from anndata import AnnData
     adata = sdata.tables[table_name]
-    assert isinstance(adata, AnnData)
+    if not isinstance(adata, AnnData):
+        # if you hit this, it is likely because an invalid table_name was passed to this function.
+        raise ValueError(f"Invalid table_name? '{table_name}' is not a table in '{sdata_name}':\n{sdata}")
 
     region, _obs_region_col, _instance_key = get_table_keys(adata)
 
@@ -85,16 +93,17 @@ def resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name:
     
     for r in regions:
         annotated = sdata[r]  # shapes/points/labels/image ... probably shapes, but we need to find an appropriate image.
-        assert not isinstance(annotated, AnnData)
+        if isinstance(annotated, AnnData):
+            raise ValueError(f"This should be unreachable - '{r}' is not a table in '{sdata_name}':\n{sdata}")
         transformations = get_transformation(annotated, get_all=True)
-        assert isinstance(transformations, dict)
+        if not isinstance(transformations, dict):
+            raise ValueError(f"This should be unreachable, get_transformation with get_all=True should always return a dict")
         cs_names = list(transformations.keys())
         if not cs_names:
             raise ValueError(f"Annotated element '{r}' has no coordinate system definitions")
 
         # Heuristic: prefer a CS literally named like the region, else the first
         cs = r if r in cs_names else cs_names[0]
-        assert isinstance(cs, str)
 
         # images that are likely compatible
         img_candidates = [img for img in sdata.images.items() if cs in _get_transform_keys(img[1])]
@@ -107,11 +116,16 @@ def resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name:
             if T is None:
                 continue
             # try to extract pixel size / extent if available
-            extent_px = getattr(img_obj, "shape", None)  # (C?, Y, X) or (Y, X)
-            if extent_px is not None:
-                wh = (extent_px[-1], extent_px[-2])
-            else:
-                wh = None
+            # nb, this is wrong, it was written by an LLM.
+            # not really used anyway so just putting some arbitrary defaults.
+            # extent_px = getattr(img_obj, "shape", None)  # (C?, Y, X) or (Y, X)
+            # if extent_px is not None:
+            #     wh = (extent_px[-1], extent_px[-2])
+            # else:
+            #     print(f"WARNING: No extent found for image '{img_path}' - using default 1000x1000")
+            #     print("This is only used for legacy reasons anyway and is unlikely to impact functionality.")
+            #     wh = (1000, 1000)
+            wh = (1000, 1000)
 
             img_entries.append(ImageEntry(
                 path=img_path,
@@ -144,8 +158,8 @@ def resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name:
             "roi": {
                 "min_x": 0,
                 "min_y": 0,
-                "max_x": 1000,
-                "max_y": 1000,
+                "max_x": best_img.extent_px[0],
+                "max_y": best_img.extent_px[1],
             },
             "images": {},
         }
@@ -153,7 +167,7 @@ def resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name:
         region_to_image[r] = best_img
 
     # transform coordinates to image coordinates for each row in the table
-    transform_table_coordinates(adata, region_to_image)
+    _transform_table_coordinates(adata, region_to_image)
     
     # store in uns for this table
     adata.uns.setdefault("mdv", {})
@@ -224,7 +238,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             # once it returns, it will have
             # - transformed coordinates in obs[x, y]
             # - regions metadata in uns["mdv"]["regions"]
-            resolve_regions_for_table(sdata, table_name, sdata_name)
+            _resolve_regions_for_table(sdata, table_name, sdata_name)
             adata_objects.append(adata)
             # should these go in uns rather than obs?
             adata.obs["spatialdata_path"] = sdata_name
@@ -232,6 +246,9 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
 
             all_regions.update(adata.uns["mdv"]["regions"])
 
+    if len(adata_objects) == 0:
+        raise ValueError("No tables found in any SpatialData objects - this is not yet supported.")
+    
     ## todo - try to make sure we have sparse CSC matrices if possible.
     merged_adata = ad_concat(adata_objects, index_unique="_")
     mdv = convert_scanpy_to_mdv(
