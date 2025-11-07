@@ -293,7 +293,10 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     ]
     # sdata_paths = [f for f in sdata_paths if f.endswith(".zarr")]
     sdata_paths = sorted(sdata_paths)
-    assert len(sdata_paths) > 0, "No SpatialData objects found in the folder"
+    if len(sdata_paths) == 0:
+        # we haven't actually yet determined whether any of the paths are really sdata...
+        # this happens when the folder is totally empty.
+        raise ValueError(f"No SpatialData objects found in the folder '{args.spatialdata_path}'")
     sdata_objects: dict[str, SpatialData] = {}
     adata_objects: list[AnnData] = []
     all_regions: dict[str, dict] = {}
