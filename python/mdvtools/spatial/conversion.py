@@ -66,6 +66,9 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
     return adata
 
 def _get_transform_keys(e: "SpatialElement") -> list[str]:
+    """
+    Returns a list of coordinate system names that are defined for the given element.
+    """
     from spatialdata.transformations import get_transformation
     transformations = get_transformation(e, get_all=True)
     if not isinstance(transformations, dict):
@@ -74,6 +77,14 @@ def _get_transform_keys(e: "SpatialElement") -> list[str]:
 
 # ---- region resolution ----
 def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name: str):
+    """
+    Internal processing of a table with various side-effects on the provided adata object:
+    - the annotated elements for each region (which may be shapes etc) is used to establish an 'image' that should be appropriate for the region.
+    - a new set of spatial coordinates are added to obs[x, y], with the obs['spatial'] coordinates transformed to the image coordinates.
+      (this is so that current MDV - which isn't able to process transformation from spatialdata - can display the data. The original data is preserved)
+    - metadata is added to uns["mdv"]["regions"] in a form that resembles what will be needed for mdv regions
+      this is used later to set the region metadata for the mdv project.
+    """
     from spatialdata.transformations import get_transformation, get_transformation_between_coordinate_systems
     from spatialdata.models import get_table_keys
     from anndata import AnnData
@@ -82,6 +93,18 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
         # if you hit this, it is likely because an invalid table_name was passed to this function.
         raise ValueError(f"Invalid table_name? '{table_name}' is not a table in '{sdata_name}':\n{sdata}")
 
+    adata.uns.setdefault("mdv", {})
+    # Early return for non-spatial tables
+    if "spatial" not in adata.obsm:
+        print(f"INFO: Skipping region resolution for non-spatial table '{table_name}' in '{sdata_name}'")
+        # Mark as non-spatial for downstream handling
+        adata.uns["mdv"]["is_spatial"] = False
+        return adata
+
+    # Mark as spatial
+    adata.uns["mdv"]["is_spatial"] = True
+
+    
     region, _obs_region_col, _instance_key = get_table_keys(adata)
 
     regions = region if isinstance(region, list) else [region]
@@ -141,6 +164,11 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
                 best_idx = len(img_entries)-1
 
 
+        if not img_entries:
+            # raise ValueError(f"No images found for region '{r}' in '{sdata_name}'")
+            print(f"WARNING: No images found for region '{r}' in '{sdata_name}'")
+            continue
+        
         for j, entry in enumerate(img_entries):
             entry.is_primary = (j == best_idx)
 
@@ -183,6 +211,9 @@ class SpatialDataConversionArgs:
     serve: bool = False
 
 def _try_read_zarr(path: str):# -> sd.SpatialData | None:
+    """
+    Attempts to read arbitrary path string as a SpatialData object, falling back to None if it fails.
+    """
     try:
         import spatialdata as sd
         return sd.read_zarr(path)
@@ -270,6 +301,23 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     if len(adata_objects) == 0:
         raise ValueError("No tables found in any SpatialData objects - this is not yet supported.")
     
+    # Check if we have at least one spatial table - maybe this is unnecessary noise?
+    spatial_tables = [ad for ad in adata_objects if ad.uns.get("mdv", {}).get("is_spatial", False)]
+
+    if len(spatial_tables) == 0:
+        print("WARNING: No spatial tables found. Skipping spatial-specific metadata and view setup.")
+        # Still merge and convert, but skip spatial operations
+        merged_adata = ad_concat(adata_objects, index_unique="_")
+        mdv = convert_scanpy_to_mdv(
+            args.output_folder, merged_adata, delete_existing=not args.preserve_existing
+        )
+        # ... write sdata objects but skip region metadata and _set_default_image_view
+        return mdv
+
+    # Proceed with normal spatial workflow if we have spatial tables
+    if not all_regions:
+        raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
+
     ## todo - try to make sure we have sparse CSC matrices if possible.
     merged_adata = ad_concat(adata_objects, index_unique="_")
     mdv = convert_scanpy_to_mdv(
