@@ -3,10 +3,9 @@ import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../sc
 import type { DataColumn } from "@/charts/charts";
 import { useChartSize, useParamColumns } from "../hooks";
 import { useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
-// import * as Axis from "@visx/axis";
-// import * as Scale from "@visx/scale";
+import * as Axis from "@visx/axis";
+import * as Scale from "@visx/scale";
 
-//! This component is broken as the visx dependency is uninstalled due to incompatibility with React 19 version
 type AxisComponentProps = {
     config: ScatterPlotConfig2D | ScatterPlotConfig3D
     unproject: (xy: [number, number]) => number[];
@@ -76,18 +75,18 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
         }
     }, [viewState, chartWidth, chartHeight, unproject, cx.minMax, cy.minMax]);
 
-    // const scaleX = useMemo(() => Scale.scaleLinear({
-    //     domain: ranges.domainX.sort(), // e.g. [min, max]
-    //     range: [margin.left, chartWidth + margin.left],
-    // }), [chartWidth, ranges, margin.left]);
-    // const scaleY = useMemo(() => Scale.scaleLinear({
-    //     domain: ranges.domainY.sort(), // e.g. [min, max]
-    //     range: [chartHeight + margin.top, margin.top],
-    // }), [chartHeight, ranges, margin.top]);
+    const scaleX = useMemo(() => Scale.scaleLinear({
+        domain: ranges.domainX.sort(), // e.g. [min, max]
+        range: [margin.left, chartWidth + margin.left],
+    }), [chartWidth, ranges, margin.left]);
+    const scaleY = useMemo(() => Scale.scaleLinear({
+        domain: ranges.domainY.sort(), // e.g. [min, max]
+        range: [chartHeight + margin.top, margin.top],
+    }), [chartHeight, ranges, margin.top]);
 
     return { 
         ranges, margin, chartWidth, chartHeight, 
-        // scaleX, scaleY 
+        scaleX, scaleY 
     };
 }
 
@@ -97,8 +96,9 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     const is2d = dimension === "2d";
     const [width, height] = useChartSize();
     const { 
-        // scaleX, scaleY, 
-        margin, chartWidth, chartHeight } = useSynchronizedScales({ config, unproject });
+        scaleX, scaleY, 
+        margin, chartWidth, chartHeight 
+    } = useSynchronizedScales({ config, unproject });
     
     const deckStyle = useMemo(() => ({
         position: "absolute",
@@ -111,7 +111,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     //     if (is2d && (config.axis.x.rotate_labels || config.axis.y.rotate_labels)) {
     //         console.warn("Axis rotation not implemented for react charts");
     //     }
-    // }, [is2d]);
+    // }, [is2d, config.axis.x.rotate_labels, config.axis.y.rotate_labels]);
     useEffect(() => {
         console.warn("This is a broken chart, visx dependency has been removed");
     }, []);
@@ -119,7 +119,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
         <>
             <div style={deckStyle}>{children}</div>
             {is2d && <svg width={width} height={height}>
-                {/* <Axis.AxisBottom
+                <Axis.AxisBottom
                     top={chartHeight + margin.top}
                     scale={scaleX}
                     stroke={"var(--text_color)"}
@@ -156,7 +156,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
                     }}
                     labelOffset={20}
                     label={cy.name}
-                /> */}
+                />
             </svg>}        
         </>
     )
