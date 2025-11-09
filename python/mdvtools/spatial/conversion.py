@@ -23,7 +23,7 @@ def _process_sdata_path(sdata_path: str):
     sdata = _try_read_zarr(sdata_path)
     if sdata is None:
         return None
-
+    print(sdata)
     adata_objects = []
     all_regions = {}
     for table_name, adata in sdata.tables.items():
