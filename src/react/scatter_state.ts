@@ -144,7 +144,12 @@ export function useRegionScale() {
     return Number.isFinite(scale) ? scale : 1;
 }
 
-
+/**
+ * This hook is used to fit the scatterplot to the data when data filter changes.
+ * 
+ * It can be a bit janky when reacting to changes originating from the same view,
+ * we should consider a better approach.
+ */
 function useZoomOnFilter(modelMatrix: Matrix4) {
     const config = useConfig<ScatterPlotConfig>();
     const data = useFilteredIndices();
