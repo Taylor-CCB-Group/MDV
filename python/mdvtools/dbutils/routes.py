@@ -147,7 +147,14 @@ def register_routes(app, ENABLE_AUTH):
                 abort(500, description="Error while serving the projects.")
 
             # If everything goes well, redirect to the 'index' page
-            return redirect(url_for('index'))
+            # Check for MDV_API_ROOT environment variable
+            mdv_api_root = os.getenv('MDV_API_ROOT')
+            if mdv_api_root:
+                logger.info(f"Redirecting to MDV_API_ROOT: {mdv_api_root}")
+                return redirect(mdv_api_root)
+            else:
+                logger.info("MDV_API_ROOT not set, redirecting to index")
+                return redirect(url_for("index"))
         
         def get_project_owners(project_id):
             owners = []
