@@ -284,8 +284,8 @@ def load_config(app, config_name=None, enable_auth=False):
                     logger.warning(f"User config file not found at {external_config_path}. Using default extensions.")
                     app.config['extensions'] = config.get('extensions', [])
             else:
-                # No external config path specified, keep extensions empty
-                app.config['extensions'] = []
+                # No external config path specified, use default extensions from config.json
+                app.config['extensions'] = config.get('extensions', [])
             logger.info("Configuration loaded successfully!")
     except FileNotFoundError:
         logger.exception("Error: Configuration file not found.")

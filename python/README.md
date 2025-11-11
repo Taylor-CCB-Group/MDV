@@ -169,7 +169,13 @@ MDV supports user-provided configuration for extensions via a JSON file specifie
   1. Set the environment variable: `MDV_USER_CONFIG_PATH=/config/user_config.json`
   2. Mount the file in docker-compose: `- ./config/user_config.json:/config/user_config.json`
   
-  This allows you to configure extensions at deployment time without modifying the repository configuration files or rebuilding the image. If the environment variable is not set, no extensions will be enabled. If the specified file is not found or cannot be parsed, no extensions will be enabled.
+  **Extension Configuration Behavior**:
+  
+  - If `MDV_USER_CONFIG_PATH` is **set** and the file exists and is valid: Extensions are loaded from the user config file.
+  - If `MDV_USER_CONFIG_PATH` is **set** but the file is missing or cannot be parsed: The system falls back to default extensions from the repository's `config.json` (if any are defined). This is useful for development where default extensions may be enabled in the repository's config.
+  - If `MDV_USER_CONFIG_PATH` is **not set**: Extensions are read from the repository's `config.json` file (if any are defined). This allows development environments to use default extensions without needing to set environment variables.
+  
+  This allows you to configure extensions at deployment time without modifying the repository configuration files or rebuilding the image. For development environments, you can add default extensions to the repository's `config.json` file, and they will be used automatically when `MDV_USER_CONFIG_PATH` is not set, or as a fallback when it is set but the specified file is missing or invalid. To use custom extensions in production, set `MDV_USER_CONFIG_PATH` and provide a valid user config file.
 
 ## Testing
 
