@@ -1743,7 +1743,20 @@ class DataStore {
             throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
         }
         if (!c.minMax) {
-            throw new Error(`no minMax for column '${column}' ${c}`);
+            // apparently this can happen via some kind of column loading...
+            // Return the calculated min and max values
+            let min = Number.MAX_VALUE;
+                let max = Number.MIN_VALUE;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const value = dataArray[i];
+                    if (Number.isNaN(value)) {
+                        continue;
+                    }
+                    min = value < min ? value : min;
+                    max = value > max ? value : max;
+                }
+                c.minMax = [min, max]
+                return c.minMax;
         }
         return c.minMax;
     }
