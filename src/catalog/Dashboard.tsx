@@ -29,7 +29,7 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
 import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
@@ -63,7 +63,7 @@ const Dashboard: React.FC = () => {
         exportProject,
         rescanProjects,
     } = useProjects();
-    const { permissions, isLoading: permissionsLoading } = usePermissions();
+    const { permissions, isLoading: permissionsLoading, isProjectManagerExists } = usePermissions();
 
     // Check if auth is enabled
     const authEnabled = useAuthEnabled();
@@ -80,6 +80,13 @@ const Dashboard: React.FC = () => {
     React.useEffect(() => {
         fetchProjects();
     }, [fetchProjects]);
+
+    useEffect(() => {
+        if (!permissionsLoading && isProjectManagerExists) {
+            setSortBy("name");
+            setSortOrder("asc");
+        }
+    }, [isProjectManagerExists, permissionsLoading]);
 
     const handleCreateProject = async () => {
         try {
@@ -120,7 +127,7 @@ const Dashboard: React.FC = () => {
         async () => {
             await rescanProjects();
         }, [rescanProjects]
-    )
+    );
 
     return (
         <>
@@ -324,9 +331,13 @@ const Dashboard: React.FC = () => {
                                         }}
                                     >
                                         Sort by:{" "}
-                                        {sortBy === "lastModified"
-                                            ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
-                                            : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`}
+                                        {!isProjectManagerExists ? 
+                                            sortBy === "lastModified"
+                                                ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
+                                                : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
+                                            :
+                                            `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
+                                        }
                                     </Box>
                                 </Button>
                             </Paper>
@@ -357,24 +368,27 @@ const Dashboard: React.FC = () => {
                             open={Boolean(anchorEl)}
                             onClose={() => setAnchorEl(null)}
                         >
-                            <MenuItem
-                                onClick={() => handleSort("lastModified")}
-                                sx={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    width: "200px",
-                                    gap: 1,
-                                }}
-                            >
-                                <span>Last modified</span>
-                                {sortBy === "lastModified" && (
-                                    <span>
-                                        {sortOrder === "desc"
-                                            ? "Newest first"
-                                            : "Oldest first"}
-                                    </span>
-                                )}
-                            </MenuItem>
+                            {!isProjectManagerExists && 
+                                (<MenuItem
+                                    onClick={() => handleSort("lastModified")}
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        width: "200px",
+                                        gap: 1,
+                                    }}
+                                >
+                                    <span>Last modified</span>
+                                    {sortBy === "lastModified" && (
+                                        <span>
+                                            {sortOrder === "desc"
+                                                ? "(Oldest first)"
+                                                : "(Newest first)"
+                                            }
+                                        </span>
+                                    )}
+                                </MenuItem>)
+                            }
                             <MenuItem
                                 onClick={() => handleSort("name")}
                                 sx={{
@@ -387,7 +401,7 @@ const Dashboard: React.FC = () => {
                                 <span>Name</span>
                                 {sortBy === "name" && (
                                     <span>
-                                        {sortOrder === "desc" ? "Z to A" : "A to Z"}
+                                        {sortOrder === "desc" ? "A to Z" : "Z to A"}
                                     </span>
                                 )}
                             </MenuItem>

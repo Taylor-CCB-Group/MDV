@@ -36,6 +36,7 @@ interface PermissionsContextType {
     permissions: ProjectOperationPermissions;
     isLoading: boolean;
     error: string | null;
+    isProjectManagerExists: boolean;
 }
 
 const PermissionsContext = createContext<PermissionsContextType | undefined>(
@@ -52,6 +53,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         useState<ProjectOperationPermissions>(defaultPermissions);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isProjectManagerExists, setIsProjectManagerExists] = useState(false);
 
     const fetchPermissions = useCallback(async () => {
         setIsLoading(true);
@@ -67,6 +69,10 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
                 return;
             }
             const data = await response.json();
+            if (data.project_manager) {
+                setIsProjectManagerExists(true);
+            }
+
             const projectPermissions: ProjectOperationPermissions = {
                 createProject: data.project_manager.createProject ?? true,
                 importProject: data.project_manager.importProject ?? true,
@@ -84,6 +90,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
             setError("Failed to load permissions.");
             // Fallback to default permissions on error
             setPermissions(defaultPermissions);
+            setIsProjectManagerExists(false);
         } finally {
             setIsLoading(false);
         }
@@ -93,7 +100,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         fetchPermissions();
     }, [fetchPermissions]);
 
-    const value = { permissions, isLoading, error };
+    const value = { permissions, isLoading, error, isProjectManagerExists };
 
     return (
         <PermissionsContext.Provider value={value}>

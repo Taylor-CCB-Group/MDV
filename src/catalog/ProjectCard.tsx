@@ -19,6 +19,7 @@ import {
     ListItemText,
     Menu,
     MenuItem,
+    Tooltip,
     Typography,
     useTheme,
 } from "@mui/material";
@@ -76,7 +77,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const theme = useTheme();
-    const { permissions: operationPermissions } = usePermissions();
+    const { permissions: operationPermissions, isProjectManagerExists } = usePermissions();
     
     // todo - review how we do stuff like this
     const base = import.meta.env.DEV
@@ -152,23 +153,49 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         justifyContent: "flex-end",
                     }}
                 >
-                    <Typography
-                        gutterBottom
-                        variant="h6"
-                        component="div"
-                        noWrap
-                        color="text.primary"
-                        sx={{ marginBottom: "4px" }}
+                    <Tooltip 
+                        title={name} 
+                        placement="bottom-start"
+                        enterDelay={500}
+                        slotProps={{
+                            popper: {
+                                modifiers: [
+                                    {
+                                        name: 'offset',
+                                        options: {
+                                            offset: [0, -8],
+                                        }
+                                    }
+                                ]
+                            },
+                            tooltip: {
+                                sx: {
+                                    fontSize: "0.9rem",
+                                    fontWeight: "normal",
+                                }
+                            },
+                        }}
                     >
-                        {name}
-                    </Typography>
-                    <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ marginBottom: "0" }}
-                    >
-                        Last modified: {lastModified}
-                    </Typography>
+                        <Typography
+                            gutterBottom
+                            variant="h6"
+                            component="div"
+                            noWrap
+                            color="text.primary"
+                            sx={{ marginBottom: !isProjectManagerExists ? "4px" : "12px" }}
+                        >
+                            {name}
+                        </Typography>
+                    </Tooltip>
+                    {!isProjectManagerExists && (
+                        <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ marginBottom: "0" }}
+                        >
+                            Last modified: {lastModified}
+                        </Typography>
+                    )}
                 </CardContent>
             </a>
 
