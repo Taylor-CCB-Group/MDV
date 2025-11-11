@@ -111,6 +111,9 @@ def register_routes(app, ENABLE_AUTH):
 
         @app.route('/rescan_projects', methods=['GET'])
         def rescan_projects():
+
+            logger.info(" /RESCAN PROJECTS...")
+
             if ENABLE_AUTH:
                 user = session.get('user')
                 if not user:
