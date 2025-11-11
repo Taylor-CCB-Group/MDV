@@ -25,13 +25,13 @@ def cs_to_mermaid(cs: CoordinateSystem) -> str:
             lines.append(f'  {table_name} -->|annotates|{annotated_element}')
     return "\n".join(lines)
 
-def sdata_to_mermaid(sdata: "SpatialData") -> str:
+def sdata_to_mermaid(sdata: "SpatialData", orientation: Literal["LR", "TD"] = "LR") -> str:
     """
     Convert a SpatialData object to a Mermaid diagram.
 
     Shows the relationship between coordinate systems, elements, and annotations.
     """
-    lines = ['flowchart LR']
+    lines = [f'flowchart {orientation}']
     for cs_name in sdata.coordinate_systems:
         cs_data  = sdata.filter_by_coordinate_system(cs_name)
         cs_elements = {}

@@ -17,13 +17,15 @@ def _process_sdata_path(sdata_path: str):
     """Processes a single SpatialData object path."""
     # imports need to be here for the separate process
     from mdvtools.spatial.conversion import _try_read_zarr, _resolve_regions_for_table
+    from mdvtools.spatial.mermaid import sdata_to_mermaid
     import os
 
     sdata_name = os.path.basename(sdata_path)
     sdata = _try_read_zarr(sdata_path)
     if sdata is None:
         return None
-    print(sdata)
+    print(f"## SpatialData object representation:\n\n```{sdata}\n```\n")
+    print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
     adata_objects = []
     all_regions = {}
     for table_name, adata in sdata.tables.items():
@@ -285,6 +287,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
 
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
+    from mdvtools.llm.markdown_utils import create_project_markdown
+    
 
     # we could do a nicer glob thing here, but I don't want to test that right now.
     sdata_paths = [
@@ -384,7 +388,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     }
     mdv.set_datasource_metadata(cells_md)
     _set_default_image_view(mdv)
-
+    print(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n")
+    print(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---")
     if args.serve:
         print(f"Serving project at {args.output_folder}")
         mdv.serve()
