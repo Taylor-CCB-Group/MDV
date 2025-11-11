@@ -114,6 +114,7 @@ def register_routes(app, ENABLE_AUTH):
 
             logger.info(" /RESCAN PROJECTS...")
 
+            user = None
             if ENABLE_AUTH:
                 user = session.get('user')
                 if not user:
