@@ -1,0 +1,131 @@
+{
+  "initialCharts": {
+    "cells": [
+      {
+        "course_radius": 1,
+        "radius": 10,
+        "opacity": 1,
+        "tooltip": {
+          "show": false
+        },
+        "category_filters": [],
+        "zoom_on_filter": false,
+        "point_shape": "circle",
+        "contour_fill": false,
+        "contour_bandwidth": 0.1,
+        "contour_intensity": 1,
+        "contour_opacity": 0.5,
+        "dimension": "2d",
+        "on_filter": "hide",
+        "selectionFeatureCollection": {
+          "type": "FeatureCollection",
+          "features": []
+        },
+        "title": "",
+        "legend": "",
+        "param": [
+          "x",
+          "y",
+          "x"
+        ],
+        "type": "VivMdvRegionReact",
+        "region": "<SPATIAL_REGION_NAME>",
+        "color_by": {
+          "linkedDsName": "genes",
+          "maxItems": 1,
+          "type": "RowsAsColsQuery"
+        },
+        "background_filter": {
+          "column": "spatial_region",
+          "category": "<SPATIAL_REGION_NAME>"
+        },
+        "color_legend": {
+          "display": false
+        },
+        "roi": {
+          "min_x": 0,
+          "min_y": 0,
+          "max_x": 1000,
+          "max_y": 1000
+        },
+        "viv": {
+          "channels": []
+        },
+        "contourParameter": "x",
+        "id": "3PZt1J",
+        "size": [
+          849,
+          592
+        ],
+        "gssize": [
+          12,
+          4
+        ],
+        "gsposition": [
+          0,
+          0
+        ]
+      }
+    ],
+    "genes": [
+      {
+        "title": "",
+        "legend": "",
+        "param": [
+          "name"
+        ],
+        "type": "selection_dialog",
+        "filters": {
+          "name": null
+        },
+        "order": {},
+        "noClearFilters": false,
+        "id": "hEauxC",
+        "size": [
+          375,
+          293
+        ],
+        "gssize": [
+          1,
+          2
+        ],
+        "gsposition": [
+          0,
+          2
+        ]
+      },
+      {
+        "title": "",
+        "legend": "",
+        "param": [
+          "name"
+        ],
+        "type": "table_chart",
+        "id": "lFuDYZ",
+        "size": [
+          375,
+          293
+        ],
+        "gssize": [
+          1,
+          2
+        ],
+        "gsposition": [
+          0,
+          0
+        ],
+        "column_widths": {}
+      }
+    ]
+  },
+  "dataSources": {
+    "cells": {
+      "panelWidth": 69.0849,
+      "layout": "gridstack"
+    },
+    "genes": {
+      "panelWidth": 30.9151,
+      "layout": "gridstack"
+    }
+  }
+}
