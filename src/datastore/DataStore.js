@@ -20,7 +20,7 @@ class DataStore {
     /**
      * Creates a data store object based on the given configuration. Does not
      * initially load any data, but will hold references to column data once loaded.
-     * 
+     *
      * [Data Source](../../docs/extradocs/datasource.md)
      * @typedef {import("@/charts/charts").DataSource} DataSource
      * @param {number} size - the number of rows(items) of the data structure
@@ -476,6 +476,11 @@ class DataStore {
             c.values = column.values || [""];
         } else if (isColumnNumeric(column)) {
             c.colorLogScale = column.colorLogScale;
+            // if (!column.minMax) {
+                // this will probably happen any time a linked column is used...
+                // probably don't want a warning every time!
+                // console.warn(`Column ${column.name} has no minMax`, column);
+            // }
             c.minMax = column.minMax;
             c.quantiles = column.quantiles;
         } else {
@@ -1223,6 +1228,7 @@ class DataStore {
                     ? new Int32Array(buffer)
                     : new Float32Array(buffer));
             if (!c.minMax) {
+                console.log(`Calculating min/max for ${c.name}`);
                 let min = Number.MAX_VALUE;
                 let max = Number.MIN_VALUE;
                 for (let i = 0; i < dataArray.length; i++) {
@@ -1559,12 +1565,13 @@ class DataStore {
             c.datatype === "double" ||
             c.datatype === "int32"
         ) {
-            let range = c.minMaX;
+            const [min, max] = this.getMinMaxForColumn(column);
+            let range = [min, max];
             if (config.overideValues) {
                 const ov = config.overideValues;
                 range = [
-                    ov.min == null ? c.minMax[0] : ov.min,
-                    ov.max == null ? c.minMax[1] : ov.max,
+                    ov.min == null ? min : ov.min,
+                    ov.max == null ? max : ov.max,
                 ];
             }
             return getColorBar(colors, { range: range, label: name });
@@ -1767,12 +1774,8 @@ class DataStore {
     }
 
     getColumnRange(column) {
-        const c = this.columnIndex[column];
-        if (!c.minMax) {
-            console.error(`unknown minMax for column ${column}`);
-            return [0, 50];
-        }
-        return c.minMax[1] - c.minMax[0];
+        const [min, max] = this.getMinMaxForColumn(column);
+        return max - min;
     }
 
     /**
