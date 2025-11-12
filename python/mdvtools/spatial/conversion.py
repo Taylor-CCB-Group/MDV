@@ -89,10 +89,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial
     print(f"README.md written to {os.path.join(mdv.dir, 'README.md')}")
     textbox = TextBox(title="SpatialData conversion information", param=[], size=[792, 472], position=[10, 10])
     textbox.set_text(markdown)
-    # this really shouldn't be necessary.
-    textbox_json = json.loads(json.dumps(textbox.plot_data, indent=2).replace("\\\\", ""))
-    mdv.set_view("Data summary", {"initialCharts": {"cells": [textbox_json]}})
-    return textbox_json
+    mdv.set_view("Data summary", {"initialCharts": {"cells": [textbox.plot_data]}})
         
 def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
     """
