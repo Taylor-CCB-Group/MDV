@@ -24,7 +24,7 @@ def _process_sdata_path(sdata_path: str):
     sdata = _try_read_zarr(sdata_path)
     if sdata is None:
         return None
-    print(f"## SpatialData object representation:\n\n```{sdata}\n```\n")
+    print(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n")
     print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
     adata_objects = []
     all_regions = {}
