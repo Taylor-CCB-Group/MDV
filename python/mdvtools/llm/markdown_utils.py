@@ -40,7 +40,6 @@ def create_project_markdown(project: MDVProject, wrap_in_details: bool = True) -
         markdown += create_column_markdown(ds["columns"])
     if wrap_in_details:
         markdown += "\n\n</details>\n\n"
-        return f"```markdown\n{markdown}\n```"
     return markdown
 
 def escape_markdown(text: str) -> str:
