@@ -639,3 +639,14 @@ select, input, textarea {
 .tippy-arrow:before {
    color: var(--tooltip_background_color);
 }
+
+/* Slick Grid React styles */
+.slick-cell, .slick-header-column {
+    border: unset;
+    border-right: var(--slick-container-border-top) !important;
+    border-left: var(--slick-container-border-top) !important;
+}
+
+.slick-empty-data-warning {
+    display: none !important;
+}
