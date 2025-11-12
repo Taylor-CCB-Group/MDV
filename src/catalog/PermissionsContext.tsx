@@ -19,7 +19,7 @@ export interface ProjectOperationPermissions {
     removeUserFromProject: boolean;
 }
 
-// Default state
+// Default state (All false)
 const defaultPermissions: ProjectOperationPermissions = {
     createProject: false,
     importProject: false,
@@ -36,7 +36,7 @@ interface PermissionsContextType {
     permissions: ProjectOperationPermissions;
     isLoading: boolean;
     error: string | null;
-    isProjectManagerExists: boolean;
+    isPublicPage: boolean;
 }
 
 const PermissionsContext = createContext<PermissionsContextType | undefined>(
@@ -53,8 +53,8 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         useState<ProjectOperationPermissions>(defaultPermissions);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    //! Currently the idea is that the project manager exists only for the public page
-    const [isProjectManagerExists, setIsProjectManagerExists] = useState(false);
+    //! Public page is true by default
+    const [isPublicPage, setIsPublicPage] = useState(true);
 
     const fetchPermissions = useCallback(async () => {
         setIsLoading(true);
@@ -70,28 +70,39 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
                 return;
             }
             const data = await response.json();
-            if (data.project_manager) {
-                setIsProjectManagerExists(true);
-            }
 
-            const projectPermissions: ProjectOperationPermissions = {
-                createProject: data.project_manager.createProject ?? true,
-                importProject: data.project_manager.importProject ?? true,
-                deleteProject: data.project_manager.deleteProject ?? true,
-                renameProject: data.project_manager.renameProject ?? true,
-                changeProjectAccess: data.project_manager.changeProjectAccess ?? true,
-                exportProject: data.project_manager.exportProject ?? true,
-                shareProject: data.project_manager.shareProject ?? true,
-                editUserPermissions: data.project_manager.editUserPermissions ?? true,
-                removeUserFromProject: data.project_manager.removeUserFromProject ?? true,
-            };
-            setPermissions(projectPermissions);
+            if (data.project_manager) {
+                const project_manager = data.project_manager;
+
+                const pmOperations = Object.values(project_manager).every((operation) => !operation);
+                // Public page is false if any one of the values is true, else it's true by default
+                if (!pmOperations) {
+                    setIsPublicPage(false);
+                }
+                
+                // If any permission doesn't exist, then we assign it as false
+                const projectPermissions: ProjectOperationPermissions = {
+                    createProject: data.project_manager?.createProject ?? false,
+                    importProject: data.project_manager?.importProject ?? false,
+                    deleteProject: data.project_manager?.importProject ?? false,
+                    renameProject: data.project_manager?.renameProject ?? false,
+                    changeProjectAccess: data.project_manager?.changeProjectAccess ?? false,
+                    exportProject: data.project_manager?.exportProject ?? false,
+                    shareProject: data.project_manager?.shareProject ?? false,
+                    editUserPermissions: data.project_manager?.editUserPermissions ?? false,
+                    removeUserFromProject: data.project_manager?.removeUserFromProject ?? false,
+                };
+                setPermissions(projectPermissions);
+            } else {
+                // If project manager doesn't exist, go with default permissions
+                setPermissions(defaultPermissions);
+            }
         } catch (e) {
             console.error("Failed to fetch project permissions:", e);
             setError("Failed to load permissions.");
             // Fallback to default permissions on error
             setPermissions(defaultPermissions);
-            setIsProjectManagerExists(false);
+            setIsPublicPage(true);
         } finally {
             setIsLoading(false);
         }
@@ -101,7 +112,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         fetchPermissions();
     }, [fetchPermissions]);
 
-    const value = { permissions, isLoading, error, isProjectManagerExists };
+    const value = { permissions, isLoading, error, isPublicPage };
 
     return (
         <PermissionsContext.Provider value={value}>

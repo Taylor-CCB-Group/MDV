@@ -77,7 +77,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const theme = useTheme();
-    const { permissions: operationPermissions, isProjectManagerExists } = usePermissions();
+    const { permissions: operationPermissions, isPublicPage } = usePermissions();
     
     // todo - review how we do stuff like this
     const base = import.meta.env.DEV
@@ -182,12 +182,12 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                             component="div"
                             noWrap
                             color="text.primary"
-                            sx={{ marginBottom: !isProjectManagerExists ? "4px" : "12px" }}
+                            sx={{ marginBottom: !isPublicPage ? "4px" : "12px" }}
                         >
                             {name}
                         </Typography>
                     </Tooltip>
-                    {!isProjectManagerExists && (
+                    {!isPublicPage && (
                         <Typography
                             variant="body2"
                             color="text.secondary"

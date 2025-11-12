@@ -51,7 +51,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const theme = useTheme();
-    const { permissions: operationPermissions, isProjectManagerExists } = usePermissions();
+    const { permissions: operationPermissions, isPublicPage } = usePermissions();
 
     const handleMenuClick = useCallback((event: MouseEv, project: Project) => {
         event.stopPropagation();
@@ -91,7 +91,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                         <TableRow>
                             <TableCell>Name</TableCell>
                             <TableCell>Owner</TableCell>
-                            {!isProjectManagerExists && <TableCell>Last Modified</TableCell>}
+                            {!isPublicPage && <TableCell>Last Modified</TableCell>}
                             <TableCell>Type</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
@@ -113,7 +113,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                     </div>
                                 </TableCell>
                                 <TableCell>{project.owner ? project.owner.join(', ') : ''}</TableCell>
-                                {!isProjectManagerExists && <TableCell>{project.lastModified}</TableCell>}
+                                {!isPublicPage && <TableCell>{project.lastModified}</TableCell>}
                                 <TableCell>{project.type}</TableCell>
                                 <TableCell align="right">
                                 {(hasReadme(project) || hasPermissions(project)) && 

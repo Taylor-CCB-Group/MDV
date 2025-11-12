@@ -65,7 +65,7 @@ const Dashboard: React.FC = () => {
         exportProject,
         rescanProjects,
     } = useProjects();
-    const { permissions, isLoading: permissionsLoading, isProjectManagerExists } = usePermissions();
+    const { permissions, isLoading: permissionsLoading, isPublicPage } = usePermissions();
 
     // Check if auth is enabled
     const authEnabled = useAuthEnabled();
@@ -84,11 +84,11 @@ const Dashboard: React.FC = () => {
     }, [fetchProjects]);
 
     useEffect(() => {
-        if (!permissionsLoading && isProjectManagerExists) {
+        if (!permissionsLoading && isPublicPage) {
             setSortBy("name");
             setSortOrder("asc");
         }
-    }, [isProjectManagerExists, permissionsLoading]);
+    }, [isPublicPage, permissionsLoading]);
 
     const handleCreateProject = async () => {
         try {
@@ -270,7 +270,7 @@ const Dashboard: React.FC = () => {
                         <Typography variant="h5">{authEnabled ? "Recent Projects" : "Published Projects"}</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                             {/* Hide rescan projects on public page */}
-                            {!isProjectManagerExists && (
+                            {!isPublicPage && (
                                 <Paper
                                     elevation={1}
                                     sx={{
@@ -337,7 +337,7 @@ const Dashboard: React.FC = () => {
                                     >
                                         {/* Hide last modified on public page */}
                                         Sort by:{" "}
-                                        {!isProjectManagerExists ? 
+                                        {!isPublicPage ? 
                                             sortBy === "lastModified"
                                                 ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
                                                 : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
@@ -374,7 +374,7 @@ const Dashboard: React.FC = () => {
                             open={Boolean(anchorEl)}
                             onClose={() => setAnchorEl(null)}
                         >
-                            {!isProjectManagerExists && 
+                            {!isPublicPage && 
                                 (<MenuItem
                                     onClick={() => handleSort("lastModified")}
                                     sx={{
