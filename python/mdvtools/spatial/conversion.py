@@ -66,7 +66,6 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial
     markdown += f"# SpatialData conversion information:\n\n"
     # todo add build information here
     # markdown += f"### Build information:\n\n"
-    markdown += create_project_markdown(mdv, False)
     markdown += "## SpatialData objects:\n\n"
     spatial_dir = os.path.join(mdv.dir, "spatial")
     for sdata_name in os.listdir(spatial_dir):
@@ -76,8 +75,12 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial
         sdata = _try_read_zarr(sdata_path)
         if sdata is None:
             continue
-        sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```\n\n{sdata_to_mermaid(sdata)}\n\n"
+        sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```"
+        sdata_md += f"\n\n### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
         markdown += sdata_md
+    
+    markdown += "\n\n---\n\n## Project DataSource summary:\n\n"
+    markdown += create_project_markdown(mdv, False)
     # todo - add anndata markdown here
     # if adata is not None:
     #     markdown += f"\n{create_anndata_markdown(adata)}"
