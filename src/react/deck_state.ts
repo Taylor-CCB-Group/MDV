@@ -1,3 +1,4 @@
+import type { FeatureCollection } from '@turf/helpers';
 import { useViewerStore } from "./components/avivatorish/state";
 import type { DeckScatterConfig } from "./components/DeckScatterReactWrapper";
 import { useConfig } from "./hooks";
@@ -20,3 +21,8 @@ export function useViewState() {
         return config.viewState;
     }
 }
+
+export const getEmptyFeatureCollection = () => ({
+    type: "FeatureCollection",
+    features: []
+} as FeatureCollection);

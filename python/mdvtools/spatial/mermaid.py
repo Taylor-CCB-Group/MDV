@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from spatialdata.models import get_table_keys
 if TYPE_CHECKING:
-    from typing import Literal
     from spatialdata import SpatialData
 
 ElementType = Literal["images", "labels", "points", "shapes", "tables"]
@@ -26,13 +25,13 @@ def cs_to_mermaid(cs: CoordinateSystem) -> str:
             lines.append(f'  {table_name} -->|annotates|{annotated_element}')
     return "\n".join(lines)
 
-def sdata_to_mermaid(sdata: SpatialData) -> str:
+def sdata_to_mermaid(sdata: "SpatialData", orientation: Literal["LR", "TD"] = "LR") -> str:
     """
     Convert a SpatialData object to a Mermaid diagram.
 
     Shows the relationship between coordinate systems, elements, and annotations.
     """
-    lines = ['flowchart LR']
+    lines = [f'flowchart {orientation}']
     for cs_name in sdata.coordinate_systems:
         cs_data  = sdata.filter_by_coordinate_system(cs_name)
         cs_elements = {}
@@ -52,4 +51,5 @@ def sdata_to_mermaid(sdata: SpatialData) -> str:
      
         cs = CoordinateSystem(name=cs_name, elements=cs_elements, annotations=cs_annotations)
         lines.append(cs_to_mermaid(cs))
-    return "\n".join(lines)
+    str = "\n".join(lines)
+    return f"```mermaid\n{str}\n```"

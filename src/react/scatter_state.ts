@@ -22,9 +22,9 @@ import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
-import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { getEmptyFeatureCollection } from "./deck_state";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
@@ -105,7 +105,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_opacity: 0.5,
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
-    // todo omit this so we can have better HMR.
+    // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 
@@ -144,7 +144,12 @@ export function useRegionScale() {
     return Number.isFinite(scale) ? scale : 1;
 }
 
-
+/**
+ * This hook is used to fit the scatterplot to the data when data filter changes.
+ * 
+ * It can be a bit janky when reacting to changes originating from the same view,
+ * we should consider a better approach.
+ */
 function useZoomOnFilter(modelMatrix: Matrix4) {
     const config = useConfig<ScatterPlotConfig>();
     const data = useFilteredIndices();
