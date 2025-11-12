@@ -1742,21 +1742,26 @@ class DataStore {
         if (!isDatatypeNumeric(c.datatype)) {
             throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
         }
+        // columns loaded via rows_as_columns_link may not automatically have this metadata, so we can compute here.
         if (!c.minMax) {
-            // apparently this can happen via some kind of column loading...
+            if (!c.data) {
+                throw new Error(`Attempting to compute minMax for column '${column}' which is not loaded...`);
+                //considered returning some default vals here
+                // return [0, 1];
+            }
             // Return the calculated min and max values
             let min = Number.MAX_VALUE;
-                let max = Number.MIN_VALUE;
-                for (let i = 0; i < dataArray.length; i++) {
-                    const value = dataArray[i];
-                    if (Number.isNaN(value)) {
-                        continue;
-                    }
-                    min = value < min ? value : min;
-                    max = value > max ? value : max;
+            let max = Number.MIN_VALUE;
+            for (let i = 0; i < c.data.length; i++) {
+                const value = c.data[i];
+                if (Number.isNaN(value)) {
+                    continue;
                 }
-                c.minMax = [min, max]
-                return c.minMax;
+                min = value < min ? value : min;
+                max = value > max ? value : max;
+            }
+            c.minMax = [min, max]
+            return c.minMax;
         }
         return c.minMax;
     }
