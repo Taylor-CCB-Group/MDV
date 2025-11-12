@@ -32,18 +32,6 @@ const defaultPermissions: ProjectOperationPermissions = {
     removeUserFromProject: false,
 };
 
-const enabledPermissions: ProjectOperationPermissions = {
-    createProject: true,
-    importProject: true,
-    deleteProject: true,
-    renameProject: true,
-    changeProjectAccess: true,
-    exportProject: true,
-    shareProject: true,
-    editUserPermissions: true,
-    removeUserFromProject: true,
-};
-
 interface PermissionsContextType {
     permissions: ProjectOperationPermissions;
     isLoading: boolean;
@@ -74,11 +62,6 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         try {
             const response = await fetch("extension_config");
             if (!response.ok) {
-                if (response.status === 404) {
-                    setPermissions(enabledPermissions);
-                    setIsPublicPage(false);
-                    return;
-                }
                 // Fallback back to default permissions
                 console.warn(
                     `Permissions endpoint not found (${response.status}). Falling back to default permissions.`,
@@ -111,14 +94,12 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
                 };
                 setPermissions(projectPermissions);
             } else {
-                setPermissions(enabledPermissions);
-                setIsPublicPage(false);
+                setPermissions(defaultPermissions);
             }
         } catch (e) {
             console.error("Failed to fetch project permissions:", e);
             setError("Failed to load permissions.");
-            setPermissions(enabledPermissions);
-            setIsPublicPage(false);
+            setPermissions(defaultPermissions);
         } finally {
             setIsLoading(false);
         }
