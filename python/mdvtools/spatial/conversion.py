@@ -1,7 +1,7 @@
 import argparse
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 import numpy as np
 # nb, main spatialdata import should happen lazily
 # so user doesn't have to wait and see lots of scary unrelated output if they input bad arguments.
@@ -52,8 +52,45 @@ class ImageEntry:
     is_primary: bool
     region_id: str
 
+def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial_markdown = ""):
+    """
+    Add a README.md file to the project.
 
-
+    We may consider adding more configuration options etc.
+    """
+    from mdvtools.spatial.mermaid import sdata_to_mermaid
+    from mdvtools.llm.markdown_utils import create_project_markdown
+    from mdvtools.charts.text_box_plot import TextBox
+    import json
+    markdown = initial_markdown
+    markdown += f"# SpatialData conversion information:\n\n"
+    # todo add build information here
+    # markdown += f"### Build information:\n\n"
+    markdown += create_project_markdown(mdv, False)
+    markdown += "## SpatialData objects:\n\n"
+    spatial_dir = os.path.join(mdv.dir, "spatial")
+    for sdata_name in os.listdir(spatial_dir):
+        sdata_path = os.path.join(spatial_dir, sdata_name)
+        if not os.path.exists(sdata_path):
+            continue
+        sdata = _try_read_zarr(sdata_path)
+        if sdata is None:
+            continue
+        sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```\n\n{sdata_to_mermaid(sdata)}\n\n"
+        markdown += sdata_md
+    # todo - add anndata markdown here
+    # if adata is not None:
+    #     markdown += f"\n{create_anndata_markdown(adata)}"
+    with open(os.path.join(mdv.dir, "README.md"), "w") as f:
+        f.write(markdown)
+    print(f"README.md written to {os.path.join(mdv.dir, 'README.md')}")
+    textbox = TextBox(title="SpatialData conversion information", param=[], size=[792, 472], position=[10, 10])
+    textbox.set_text(markdown)
+    # this really shouldn't be necessary.
+    textbox_json = json.loads(json.dumps(textbox.plot_data, indent=2).replace("\\\\", ""))
+    mdv.set_view("Data summary", {"initialCharts": {"cells": [textbox_json]}})
+    return textbox_json
+        
 def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
     """
     Transform the coordinates of an AnnData table to the coordinates of the images associated with the regions.
@@ -390,6 +427,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     _set_default_image_view(mdv)
     print(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n")
     print(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---")
+    add_readme_to_project(mdv, merged_adata)
     if args.serve:
         print(f"Serving project at {args.output_folder}")
         mdv.serve()
