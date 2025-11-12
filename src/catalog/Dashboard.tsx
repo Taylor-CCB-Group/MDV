@@ -47,6 +47,8 @@ import usePermissions from "./PermissionsContext";
 import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
 
+// todo: Refactor the code into different components and hooks for cleaner and readable code
+// Maybe use a design pattern? As displaying certain components depend on some states
 const Dashboard: React.FC = () => {
     const {
         projects,
@@ -267,38 +269,41 @@ const Dashboard: React.FC = () => {
                     >
                         <Typography variant="h5">{authEnabled ? "Recent Projects" : "Published Projects"}</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
-                            <Paper
-                                elevation={1}
-                                sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    borderRadius: "4px",
-                                    bgcolor: "background.paper",
-                                    marginRight: 2,
-                                    height: "50px",
-                                }}
-                            >
-                                <Button
+                            {/* Hide rescan projects on public page */}
+                            {!isProjectManagerExists && (
+                                <Paper
+                                    elevation={1}
                                     sx={{
-                                        padding: 1,
                                         display: "flex",
-                                        justifyContent: "space-around",
-                                        height: "100%",
-                                        width: "100%"
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        borderRadius: "4px",
+                                        bgcolor: "background.paper",
+                                        marginRight: 2,
+                                        height: "50px",
                                     }}
-                                    onClick={onRescanClick}
                                 >
-                                    <RefreshCwIcon />
-                                    <Typography 
+                                    <Button
                                         sx={{
-                                            marginLeft: 1
+                                            padding: 1,
+                                            display: "flex",
+                                            justifyContent: "space-around",
+                                            height: "100%",
+                                            width: "100%"
                                         }}
+                                        onClick={onRescanClick}
                                     >
-                                        Rescan Projects
-                                    </Typography>
-                                </Button>
-                            </Paper>
+                                        <RefreshCwIcon />
+                                        <Typography 
+                                            sx={{
+                                                marginLeft: 1
+                                            }}
+                                        >
+                                            Rescan Projects
+                                        </Typography>
+                                    </Button>
+                                </Paper>
+                            )}
                             <Paper
                                 elevation={1}
                                 sx={{
@@ -330,6 +335,7 @@ const Dashboard: React.FC = () => {
                                             alignItems: "center",
                                         }}
                                     >
+                                        {/* Hide last modified on public page */}
                                         Sort by:{" "}
                                         {!isProjectManagerExists ? 
                                             sortBy === "lastModified"

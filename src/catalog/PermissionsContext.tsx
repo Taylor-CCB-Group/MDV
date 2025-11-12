@@ -53,6 +53,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         useState<ProjectOperationPermissions>(defaultPermissions);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    //! Currently the idea is that the project manager exists only for the public page
     const [isProjectManagerExists, setIsProjectManagerExists] = useState(false);
 
     const fetchPermissions = useCallback(async () => {
