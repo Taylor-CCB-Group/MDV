@@ -14,6 +14,7 @@ import { g, isArray, toArray } from "@/lib/utils";
 import { observable } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
+import type { FieldSpec } from "@/lib/columnTypeHelpers";
 
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
@@ -24,7 +25,7 @@ export type CategoryContourProps = {
     /** the column - if not present, should we not filter the data? at the moment, we reduce to nothing
      * maybe it should not be optional, in which case we need to re-arrange how hooks are called
      */
-    parameter?: string;
+    parameter?: FieldSpec;
     category?: string | string[];
     fill: boolean;
     bandwidth: number;
@@ -247,7 +248,8 @@ export type ContourVisualConfig = {
  * but this should be somewhat compatible with the previous implementation
  */
 export type DualContourLegacyConfig = {
-    contourParameter?: string; //this is param[2] in the original code
+    //config vs state again... could we make this a DataColumn?
+    contourParameter?: FieldSpec; //this is param[2] in the original code
     category1?: string | string[];
     category2?: string | string[];
 } & ContourVisualConfig;
@@ -259,6 +261,13 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
     const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
     // this autorun will be disposed when the chart is disposed... really it should be tied to the settings dialog
     chart.mobxAutorun(() => {
+        if (typeof c.contourParameter !== "string") {
+            // as of now, categorical parameter like this is expected to be a string here
+            // we would like to be operating on a version of state that just had a column object
+            // complete with values, regardless of provenance, and not need to refer to dataStore
+            console.error("unexpected type for contourParameter");
+            return;
+        }
         const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
         const cats = ocats.map((x) => ({ t: x }));
         catsValues[0] = cats;
@@ -281,7 +290,6 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                         func: (x) => {
                             if (x === c.contourParameter) return;
                             if (!isArray(c.param)) throw "expected param array";
-                            //@ts-expect-error contourParameter type was written when it was a string
                             c.contourParameter = c.param[2] = x;
                             //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
                             //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
