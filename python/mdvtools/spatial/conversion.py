@@ -285,8 +285,6 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             if "cell_boundaries" in sdata.shapes:
                 print(f"Xenium hack... using cell_boundaries for geojson output for region '{r}' in '{sdata_name}'")
                 annotated = sdata["cell_boundaries"]
-            else:
-                print(f"WARNING: No cell_boundaries found for region '{r}' in '{sdata_name}'")
             
             if isinstance(annotated, GeoDataFrame):
                 geojson = _shape_to_geojson(annotated, best_img.transform_to_image)
