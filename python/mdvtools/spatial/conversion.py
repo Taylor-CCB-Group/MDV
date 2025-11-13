@@ -280,17 +280,17 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
         # do we want to save geojson for this region?
         if conversion_args.output_geojson:
             from geopandas import GeoDataFrame
-            if not isinstance(annotated, GeoDataFrame):
+            if isinstance(annotated, GeoDataFrame):
+                geojson = _shape_to_geojson(annotated, best_img.transform_to_image)
+                region_id = best_img.region_id
+                name = f"{region_id}.geojson"
+                path = os.path.join(conversion_args.temp_folder, name)
+                all_regions[region_id]["json"] = f"spatial/{name}"
+                with open(path, "w") as f:
+                    f.write(geojson)
+                    print(f"Wrote geojson for region '{region_id}' to {path}")
+            else:
                 print(f"WARNING: No geojson output for region '{r}' in '{sdata_name}' because it is not a GeoDataFrame")
-                continue
-            geojson = _shape_to_geojson(annotated, best_img.transform_to_image)
-            region_id = best_img.region_id
-            name = f"{region_id}.geojson"
-            path = os.path.join(conversion_args.temp_folder, name)
-            all_regions[region_id]["json"] = f"spatial/{name}"
-            with open(path, "w") as f:
-                f.write(geojson)
-                print(f"Wrote geojson for region '{region_id}' to {path}")
         
         region_to_image[r] = best_img
 
