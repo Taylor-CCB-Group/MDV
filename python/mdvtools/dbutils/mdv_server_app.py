@@ -31,7 +31,7 @@ oauth = None
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
-    oauth = OAuth()  #Initialize OAuth only if auth is enabled
+    oauth = OAuth()  # Initialize OAuth only if auth is enabled
     
 
 def create_flask_app(config_name=None):
