@@ -59,7 +59,7 @@ const MainChart = observer(() => {
     useImage(source);
     return !isViewerLoading && <VivScatter />;
 });
-
+//! todo move these types to different files
 export type TooltipConfig = {
     tooltip: {
         show: boolean;
@@ -100,7 +100,6 @@ export type VivMDVReact = VivMdvReact;
 function adaptConfig(originalConfig: VivMdvReactConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
-    //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
     // if (!config.)
     // === some dead code ===
@@ -176,7 +175,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const c = this.config;
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList();// as DataColumn<DataType>[];
-        const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
         //@ts-expect-error category column values...
