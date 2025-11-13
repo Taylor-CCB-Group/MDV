@@ -278,12 +278,23 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
         }
 
         # do we want to save geojson for this region?
+        # nb this will be deprecated once we have spatialdata.js layers with shapes.
         if conversion_args.output_geojson:
             from geopandas import GeoDataFrame
+            # xenium hack... we want cell_boundaries, not cell_circles which is the annotated element...
+            xenium_hack = False
+            if "cell_boundaries" in sdata.shapes:
+                xenium_hack = True
+                print(f"Xenium hack... using cell_boundaries for geojson output for region '{r}' in '{sdata_name}'")
+                annotated = sdata["cell_boundaries"]
+            else:
+                print(f"WARNING: No cell_boundaries found for region '{r}' in '{sdata_name}'")
+            
             if isinstance(annotated, GeoDataFrame):
                 geojson = _shape_to_geojson(annotated, best_img.transform_to_image)
                 region_id = best_img.region_id
-                name = f"{region_id}.geojson"
+                name = "cell_boundaries" if xenium_hack else region_id
+                name = f"{name}.geojson"
                 path = os.path.join(conversion_args.temp_folder, name)
                 all_regions[region_id]["json"] = f"spatial/{name}"
                 with open(path, "w") as f:
