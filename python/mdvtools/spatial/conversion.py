@@ -494,7 +494,7 @@ if __name__ == "__main__":
     parser.add_argument("spatialdata_path", type=str, help="Path to SpatialData data")
     parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
     parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data")
-    parser.add_argument("--output_geojson", action="store_true", help="Output geojson for each region")
+    parser.add_argument("--output_geojson", action="store_true", help="Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes)")
     parser.add_argument("--serve", action="store_true", help="Serve the project after conversion")
     args = parser.parse_args()
     print(f"Converting SpatialData from '{args.spatialdata_path}' to {args.output_folder}")
