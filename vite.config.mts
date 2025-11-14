@@ -154,7 +154,7 @@ export default defineConfig(env => {
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
     return ({
-    base: "./",
+    base: process.env.asset_base || "./",
     server: {
         headers: {
             "Cross-Origin-Embedder-Policy": "require-corp",
@@ -167,9 +167,9 @@ export default defineConfig(env => {
         strictPort: true,
         proxy,
     },
-    publicDir: 'examples', //used for netlify.toml??... the rest is noise.
+    publicDir: process.env.exclude_dir?'':'examples', //used for netlify.toml??... the rest is noise.
     build: {
-        sourcemap: true,
+        sourcemap: process.env.nomap?false:true,
         rollupOptions: { 
             ...getRollupOptions(),
             external: ['./python/**'],
@@ -191,7 +191,7 @@ export default defineConfig(env => {
         })
     ],
     worker: {
-        format: 'iife',
+        format: process.env.worker_format || 'iife',
     },
     resolve: {
         alias: {
