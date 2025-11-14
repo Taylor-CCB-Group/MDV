@@ -243,7 +243,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
  * If we have very different scales in x and y, then we probably want to also scale each axis
  * rather than assuming a 1:1 ratio - somewhat related concern... also need to consider that
  * we still want circular points to be circular...
- * 
+ *
  * Also note that we would like in future to be able to set the size of individual points
  * based on some property of the data - but for now we just return a number.
  */
@@ -256,7 +256,11 @@ export function useScatterRadius() {
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
     // (which implies that if we have a warped aspect ratio but making circles circular, they will be based on one or other axis)
-    const radiusScale = (radius * course_radius)/scale;
+    // see DensityPlot.js for an example of how this has been done there:
+    // y_scale = [0, 400 / whRatio];
+    // x_scale = [0, 400];
+
+    const radiusScale = (radius * course_radius) / scale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {
             const xRange = cx.minMax[1] - cx.minMax[0];
@@ -273,7 +277,7 @@ export type P = [number, number];
 /**
  * ! in its current form, this hook is only called by `useCreateSpatialAnnotationState`
  * in future we may want to be able to have different arrangement of layers & rework this.
- * 
+ *
  * As of now, charts with appropriate spatial context can call `useSpatialLayers()` at any point
  * to access the scatterplot layer, and the tooltip function.
  */
@@ -470,7 +474,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 const m = modelMatrix.invert();
                 const p3 = m.transform(p) as P;
                 m.invert();
-                return p3;                
+                return p3;
             } catch (e) {
                 //console.error("unproject error", e);
                 return [0, 0];

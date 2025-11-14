@@ -27,7 +27,7 @@ float smoothContour(float value) {
     float w = width * fwidth(value);
     float f = 0.5; // reciprocol bandwidth
     if (value < f) return 0.; //todo something better
-    // if (value > 50. * f) return 1.; //metaballs
+    if (value > 2. * f) return 1.; //metaballs - should be controllable parameter with nice animation
     float wa = smoothstep(0., (w * f), mod(value * f, 1.)-0.5); //nb -0.5 is to center the contour
     wa = 1. - max(smoothstep(1.-w, 1., wa), smoothstep(w, 0., wa));
     // return 0.0;
