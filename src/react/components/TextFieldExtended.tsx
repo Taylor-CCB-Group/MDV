@@ -14,7 +14,7 @@ const StyledAdornment = styled('div')(({ theme }) => ({
 /** Modified version of TextField that allows a `customEndAdornment`
  * along with the standard endAdornment passed in `InputProps`.
  */
-export const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.Element; customStartAdornment?: JSX.Element}) => {
+export const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: React.JSX.Element; customStartAdornment?: React.JSX.Element}) => {
     const { InputProps, customEndAdornment, ...rest } = props;
     const inputProps: typeof InputProps = {
         ...InputProps,
