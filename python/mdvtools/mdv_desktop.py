@@ -22,7 +22,7 @@ if not os.path.exists(project_dir):
 projects = [
     MDVProject(os.path.join(project_dir, d))
     for d in os.listdir(project_dir)
-    if os.path.isdir(os.path.join(project_dir, d))
+    if os.path.isdir(os.path.join(project_dir, d)) and d != 'lost+found'
 ]
 # add other projects as listed in config file (maybe later a sqlite db or something)
 # nothing more permanent than the provisional... just want a quick way of including projects on an external volume.

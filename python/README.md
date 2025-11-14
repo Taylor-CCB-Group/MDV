@@ -142,6 +142,41 @@ with socketserver.TCPServer(("", 8000), CustomHandler) as httpd:
     httpd.serve_forever()
 ```
 
+## Configuration
+
+### User Configuration File
+
+MDV supports user-provided configuration for extensions via a JSON file specified through an environment variable:
+
+- **MDV_USER_CONFIG_PATH**: Set this environment variable to the path of your user configuration file to configure extensions. Available extensions include:
+  - `chat`: Enables the chat/LLM extension
+  - `project_manager`: Enables the project management extension
+  
+  Example user_config.json:
+  ```json
+  {
+    "extensions": ["chat", "project_manager"]
+  }
+  ```
+  
+  Example usage:
+  ```bash
+  export MDV_USER_CONFIG_PATH="/path/to/your/user_config.json"
+  ```
+  
+  **Important for Docker deployments**: You must mount the config file into the container so it can access it. For example, if your config file is at `./config/user_config.json` on the host, you would:
+  
+  1. Set the environment variable: `MDV_USER_CONFIG_PATH=/config/user_config.json`
+  2. Mount the file in docker-compose: `- ./config/user_config.json:/config/user_config.json`
+  
+  **Extension Configuration Behavior**:
+  
+  - If `MDV_USER_CONFIG_PATH` is **set** and the file exists and is valid: Extensions are loaded from the user config file.
+  - If `MDV_USER_CONFIG_PATH` is **set** but the file is missing or cannot be parsed: The system falls back to default extensions from the repository's `config.json` (if any are defined). This is useful for development where default extensions may be enabled in the repository's config.
+  - If `MDV_USER_CONFIG_PATH` is **not set**: Extensions are read from the repository's `config.json` file (if any are defined). This allows development environments to use default extensions without needing to set environment variables.
+  
+  This allows you to configure extensions at deployment time without modifying the repository configuration files or rebuilding the image. For development environments, you can add default extensions to the repository's `config.json` file, and they will be used automatically when `MDV_USER_CONFIG_PATH` is not set, or as a fallback when it is set but the specified file is missing or invalid. To use custom extensions in production, set `MDV_USER_CONFIG_PATH` and provide a valid user config file.
+
 ## Testing
 
 ### Running Tests

@@ -113,7 +113,11 @@ const proxy = [
     '/import_project',
     '/export_project',
     '/delete_project',
-    //'/socket.io', //pending...
+    '/extension_config',
+    '/enable_auth',
+    '/api_root',
+    '/rescan_projects',
+    '/login_dev',
 // biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config
 ].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {}) as Record<string, ProxyOptions>;
 // (failed) attempt to let this proxy without cors_allowed_origins wildcard on server
