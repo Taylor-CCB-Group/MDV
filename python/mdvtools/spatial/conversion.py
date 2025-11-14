@@ -302,7 +302,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
                 # the name may be misleading in xenium case, but avoids other potential naming conflicts.
                 name = f"{region_id}.geojson"
                 path = os.path.join(conversion_args.temp_folder, name)
-                all_regions[region_id]["json"] = f"spatial/{name}"
+                all_regions[region_id]["json"] = f"images/{name}"
                 with open(path, "w") as f:
                     f.write(geojson)
                     print(f"Wrote geojson for region '{region_id}' to {path}")
@@ -453,7 +453,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     # especially if linking (should avoid side-effects in linked folder)
     if args.output_geojson:
         import shutil
-        dest_dir = os.path.join(mdv.dir, "spatial")
+        dest_dir = os.path.join(mdv.dir, "images")
         os.makedirs(dest_dir, exist_ok=True)
         for f in os.listdir(args.temp_folder):
             shutil.move(os.path.join(args.temp_folder, f), os.path.join(dest_dir, f))
