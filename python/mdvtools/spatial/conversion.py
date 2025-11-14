@@ -14,6 +14,16 @@ if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
     from geopandas import GeoDataFrame
 
+@dataclass
+class SpatialDataConversionArgs:
+    spatialdata_path: str
+    output_folder: str
+    temp_folder: str
+    preserve_existing: bool = False
+    output_geojson: bool = False
+    serve: bool = False
+    link: bool = False
+
 def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversionArgs"):
     """Processes a single SpatialData object path."""
     # imports need to be here for the separate process
@@ -309,14 +319,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
     adata.uns["mdv"].setdefault("regions", all_regions)
 
 
-@dataclass
-class SpatialDataConversionArgs:
-    spatialdata_path: str
-    output_folder: str
-    temp_folder: str
-    preserve_existing: bool = False
-    output_geojson: bool = False
-    serve: bool = False
+
 
 def _try_read_zarr(path: str):# -> sd.SpatialData | None:
     """
@@ -430,13 +433,24 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     mdv = convert_scanpy_to_mdv(
         args.output_folder, merged_adata, delete_existing=not args.preserve_existing
     )
-    os.makedirs(
-        f"{mdv.dir}/spatial", exist_ok=True
-    )  # pretty sure sdata.write will do this anyway
-    for sdata_path, sdata in sdata_objects.items():
-        sdata_name = os.path.basename(sdata_path)
-        sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
+    if args.link:
+        print(f"Linking spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
+        os.symlink(
+            os.path.abspath(args.spatialdata_path), 
+            os.path.join(mdv.dir, "spatial"), target_is_directory=True
+        )
+    else:
+        print(f"Copying spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
+        os.makedirs(
+            f"{mdv.dir}/spatial", exist_ok=True
+        )  # pretty sure sdata.write will do this anyway
+        for sdata_path, sdata in sdata_objects.items():
+            sdata_name = os.path.basename(sdata_path)
+            # pay attention to format specifier here?
+            sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
     # move contents of temp_folder to output_folder/spatial
+    # nb would probably rather avoid non spatialdata in spatial folder, 
+    # especially if linking (should avoid side-effects in linked folder)
     if args.output_geojson:
         import shutil
         dest_dir = os.path.join(mdv.dir, "spatial")
@@ -493,6 +507,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert SpatialData to MDV format")
     parser.add_argument("spatialdata_path", type=str, help="Path to SpatialData data")
     parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
+    parser.add_argument("--link", action="store_true", help="Symlink to the original SpatialData objects")
     parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data")
     parser.add_argument("--output_geojson", action="store_true", help="Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes)")
     parser.add_argument("--serve", action="store_true", help="Serve the project after conversion")
