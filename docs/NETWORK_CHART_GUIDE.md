@@ -1,12 +1,22 @@
-# Network Chart Quick Start Guide
+# Spatial Connectivity Map - Metadata-Driven Network Chart
 
 ## Overview
 
-The **Spatial Connectivity Map** (CellNetworkChart) creates interactive force-directed network visualizations of cell-cell interactions, ligand-receptor signaling, or any network data in MDV.
+The **Spatial Connectivity Map** (CellNetworkChart) creates interactive force-directed network visualizations with Python-configured metadata. This chart requires setup but provides advanced features like ego networks and spatial integration.
 
 **Chart Type**: `cell_network_chart` (displays as "Spatial Connectivity Map" in GUI)  
-**Status**: ✅ Already available in MDV GUI  
-**Location**: JavaScript: `/app/src/charts/CellNetworkChart.js`
+**Status**: ✅ Available in MDV GUI **only after Python setup**  
+**Location**: `/app/src/charts/CellNetworkChart.js`
+
+> **⚠️ Important**: This chart **will not appear** in the Add Chart dialog unless you configure the `interactions` metadata using Python (see setup below). For quick exploration without Python setup, use the [Network Graph](/app/docs/NETWORK_GRAPH_GUIDE.md) instead!
+
+---
+
+## Why Not Visible in GUI?
+
+**The "Spatial Connectivity Map" chart requires Python configuration first.** It will **not appear** in the Add Chart dialog until you run `setup_ligand_network()` in Python.
+
+This is by design - the chart requires specific metadata that must be configured programmatically. If you want a chart that works immediately without setup, use [Network Graph](NETWORK_GRAPH_GUIDE.md) instead.
 
 ---
 
