@@ -9,6 +9,8 @@ import {
     scaleSqrt,
     scaleLinear,
     schemeReds,
+    zoom,
+    zoomIdentity,
 } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
@@ -110,6 +112,15 @@ class FlexibleNetworkChart extends SVGChart {
             .force("link", this.forceLink.strength(c.link_strength))
             .force("charge", this.forceManyBody.strength(c.node_repulsion))
             .force("center", forceCenter(this.width / 2, this.height / 2));
+        
+        // Set up zoom behavior
+        this.zoomBehavior = zoom()
+            .scaleExtent([0.1, 10])  // Allow zoom from 10% to 1000%
+            .on("zoom", (event) => {
+                this.graph_area.attr("transform", event.transform);
+            });
+        
+        this.svg.call(this.zoomBehavior);
         
         this.setColorLegend();
         this.reCalculate();
@@ -240,7 +251,8 @@ class FlexibleNetworkChart extends SVGChart {
     }
     
     drawChart() {
-        this.svg.selectAll("*").remove();
+        // Clear only graph_area contents, not the entire SVG (preserves zoom)
+        this.graph_area.selectAll("*").remove();
         const c = this.config;
         
         // Colors for nodes - prioritize color_by over node type
@@ -256,7 +268,7 @@ class FlexibleNetworkChart extends SVGChart {
         }
         
         // Create links
-        const links = this.svg.append("g")
+        const links = this.graph_area.append("g")
             .attr("class", "links")
             .selectAll("line")
             .data(this.linkData)
@@ -285,7 +297,7 @@ class FlexibleNetworkChart extends SVGChart {
         // Create arrows for directionality (if enabled)
         let arrows;
         if (c.show_directionality) {
-            arrows = this.svg.append("g")
+            arrows = this.graph_area.append("g")
                 .attr("class", "arrows")
                 .selectAll("path")
                 .data(this.linkData)
@@ -304,7 +316,7 @@ class FlexibleNetworkChart extends SVGChart {
         }
         
         // Create nodes
-        const nodes = this.svg.append("g")
+        const nodes = this.graph_area.append("g")
             .attr("class", "nodes")
             .selectAll("g")
             .data(this.nodeData)
@@ -548,6 +560,12 @@ class FlexibleNetworkChart extends SVGChart {
         this.simulation.alpha(0.3).restart();
     }
     
+    resetZoom() {
+        this.svg.transition()
+            .duration(750)
+            .call(this.zoomBehavior.transform, zoomIdentity);
+    }
+    
     getSettings() {
         const settings = super.getSettings();
         const c = this.config;
@@ -677,6 +695,15 @@ class FlexibleNetworkChart extends SVGChart {
                 },
             });
         }
+        
+        // Reset zoom button
+        settings.push({
+            type: "button",
+            label: "Reset Zoom",
+            func: () => {
+                this.resetZoom();
+            },
+        });
         
         return settings;
     }
