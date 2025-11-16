@@ -82,6 +82,7 @@ class FlexibleNetworkChart extends SVGChart {
         c.show_labels = c.show_labels !== false;
         c.label_size = c.label_size || 10;
         c.show_directionality = c.show_directionality || false;
+        c.link_opacity = c.link_opacity !== undefined ? c.link_opacity : 0.6;
         
         // Set up force simulation
         this.forceLink = forceLink().id((d) => d.id);
@@ -215,7 +216,7 @@ class FlexibleNetworkChart extends SVGChart {
                 }
                 return "currentcolor";
             })
-            .style("opacity", 0.6)
+            .style("opacity", c.link_opacity)
             .on("click", (e, d) => {
                 this.dataStore.dataHighlighted([d.d_index], this);
             })
@@ -445,6 +446,19 @@ class FlexibleNetworkChart extends SVGChart {
                 c.label_size = x;
                 this.svg.selectAll("text")
                     .style("font-size", `${x}px`);
+            },
+        });
+        
+        settings.push({
+            type: "slider",
+            max: 1,
+            min: 0.1,
+            current_value: c.link_opacity,
+            label: "Link Opacity",
+            func: (x) => {
+                c.link_opacity = x;
+                this.svg.selectAll(".links line")
+                    .style("opacity", x);
             },
         });
         
