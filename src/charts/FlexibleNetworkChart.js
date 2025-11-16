@@ -11,6 +11,7 @@ import {
     schemeReds,
 } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 const color_schemes = {
     "blue yellow": [
@@ -83,7 +84,6 @@ class FlexibleNetworkChart extends SVGChart {
         c.label_size = c.label_size || 10;
         c.show_directionality = c.show_directionality || false;
         c.link_opacity = c.link_opacity !== undefined ? c.link_opacity : 0.6;
-        c.color_overlay = c.color_overlay !== undefined ? c.color_overlay : 0;
         
         // Initialize color legend
         if (!c.color_legend) {
@@ -97,7 +97,6 @@ class FlexibleNetworkChart extends SVGChart {
                 asArray: false,  // Return color strings for SVG, not RGB arrays
                 overideValues: {
                     colorLogScale: c.log_color_scale,
-                    colorOverlay: c.color_overlay,
                 },
             };
             this._addTrimmedColor(c.color_by, conf);
@@ -419,6 +418,57 @@ class FlexibleNetworkChart extends SVGChart {
         d.fy = null;
     }
     
+    @loadColumnData
+    setParams(params) {
+        this.config.param = params;
+        const c = this.config;
+        
+        // Rebuild all scales with new columns
+        // Set up link thickness (always from param[2])
+        const weightQuantile = this.dataStore.getColumnQuantile(c.param[2], 0.01);
+        this.linkThicknessScale.domain(weightQuantile).range([1, 10]);
+        
+        // Set up link length (param[4] if provided, else constant)
+        if (c.param[4]) {
+            if (!this.linkLengthScale) {
+                this.linkLengthScale = scaleLinear();
+            }
+            const lengthQuantile = this.dataStore.getColumnQuantile(c.param[4], 0.01);
+            this.linkLengthScale.domain(lengthQuantile).range([30, 120]);
+        } else {
+            this.linkLengthScale = null;
+        }
+        
+        // Set up link color (param[5] if provided)
+        if (c.param[5]) {
+            if (!this.linkColorScale) {
+                this.linkColorScale = scaleLinear();
+            }
+            const colorQuantile = this.dataStore.getColumnQuantile(c.param[5], 0.01);
+            this.linkColorScale
+                .domain([colorQuantile[0], (colorQuantile[0] + colorQuantile[1]) / 2, colorQuantile[1]])
+                .range(["darkred", "orange", "lightgray"]);
+        } else {
+            this.linkColorScale = null;
+        }
+        
+        // Set up node size (param[6] if provided, else constant)
+        if (c.param[6]) {
+            const sizeQuantile = this.dataStore.getMinMaxForColumn(c.param[6]);
+            this.nodeScale.domain(sizeQuantile).range([5, 20]);
+        } else {
+            this.nodeScale.domain([1, 1]).range([8, 8]);
+        }
+        
+        // Update color legend if node type changed
+        if (c.param[7]) {
+            c.color_legend.display = true;
+        }
+        
+        this.setColorLegend();
+        this.reCalculate();
+    }
+    
     onDataFiltered(dim) {
         this.reCalculate();
     }
@@ -446,7 +496,6 @@ class FlexibleNetworkChart extends SVGChart {
             asArray: false,  // Return color strings for SVG, not RGB arrays
             overideValues: {
                 colorLogScale: this.config.log_color_scale,
-                colorOverlay: this.config.color_overlay,
             },
         };
         this._addTrimmedColor(column, conf);
@@ -481,7 +530,7 @@ class FlexibleNetworkChart extends SVGChart {
     getColorOptions() {
         return {
             colorby: ["integer", "double", "int32"],  // Support numeric columns for coloring
-            color_overlay: 1,  // Enable color overlay slider (0-1 range)
+            // Note: color_overlay removed - not needed for network charts and causes unnecessary redraws
         };
     }
     
