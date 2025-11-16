@@ -155,7 +155,7 @@ class HeatMap extends SVGChart {
                 : this.config.color_scale.trim;
         for (let x = 1; x < p.length; x++) {
             const col = this.dataStore.columnIndex[p[x]];
-            const [min, max] = this.dataStore.getMinMaxForColumn(col);
+            const [min, max] = this.dataStore.getMinMaxForColumn(p[x]);
             config.scaleVals.push([
                 q ? col.quantiles[q][0] : min,
                 q ? col.quantiles[q][1] : max,
