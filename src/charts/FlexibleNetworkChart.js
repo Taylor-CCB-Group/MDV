@@ -480,13 +480,6 @@ BaseChart.types["flexible_network_chart"] = {
         { type: "number", name: "Node Size (optional)" },
         { type: "text", name: "Node Type (optional)" },
     ],
-    
-    // Extra controls for filtering and physics
-    extra_controls: (dataStore) => {
-        return [];
-        // Note: Physics controls are available in chart settings panel after creation
-        // Extra controls here would require slider type, but those are better in settings
-    },
 };
 
 export default FlexibleNetworkChart;
