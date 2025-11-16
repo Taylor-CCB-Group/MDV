@@ -80,6 +80,7 @@ class FlexibleNetworkChart extends SVGChart {
         
         c.node_radius = c.node_radius || 8;
         c.show_labels = c.show_labels !== false;
+        c.label_size = c.label_size || 10;
         c.show_directionality = c.show_directionality || false;
         
         // Set up force simulation
@@ -287,7 +288,7 @@ class FlexibleNetworkChart extends SVGChart {
             nodes.append("text")
                 .attr("dx", 12)
                 .attr("dy", 4)
-                .style("font-size", "10px")
+                .style("font-size", `${c.label_size}px`)
                 .style("fill", "currentcolor")
                 .style("pointer-events", "none")
                 .text(d => d.id);
@@ -431,6 +432,19 @@ class FlexibleNetworkChart extends SVGChart {
             func: (x) => {
                 c.show_labels = x;
                 this.drawChart();
+            },
+        });
+        
+        settings.push({
+            type: "slider",
+            max: 20,
+            min: 5,
+            current_value: c.label_size,
+            label: "Label Size",
+            func: (x) => {
+                c.label_size = x;
+                this.svg.selectAll("text")
+                    .style("font-size", `${x}px`);
             },
         });
         
