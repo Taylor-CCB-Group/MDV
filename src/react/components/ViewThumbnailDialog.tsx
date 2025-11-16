@@ -33,23 +33,30 @@ export type ViewImageComponentProps = {
 
 export const ViewImageComponent = ({imgSrc, viewName}: ViewImageComponentProps) => {
     const [hasError, setHasError] = useState(!imgSrc);
-    // Define the desired fixed zoom level (e.g., 1.75 = 175%)
-    const fixedZoom = 1.75;
-    // Calculate base width so full width is visible after zoom
-    const baseWidth = `${(100 / fixedZoom)}%`;
+    
+    // Configuration constants - adjust these to change zoom behavior
+    const ZOOM_LEVEL = 1.75;           // 1.75 = 175% zoom
+    const VERTICAL_OFFSET_PERCENT = 25; // Percentage to shift down (hides bottom bar)
+    
+    /**
+     * Calculate base width so the full width remains visible after zoom transformation.
+     * For example: if zoom is 1.75x, base width = 100/1.75 ≈ 57.14%
+     * When scaled by 1.75x, it becomes 100% of container width
+     */
+    const baseWidth = `${(100 / ZOOM_LEVEL)}%`;
 
-    // The image itself is now wrapped in a centered Box
     return (
         <Box 
-            // This Box acts as the centering container and defines the available space
+            // Centering container with fixed aspect ratio (3:2)
+            // Acts as a viewport that clips the zoomed/shifted image
             sx={{
                 width: "100%",
                 height: "100%",
                 aspectRatio: 3 / 2,
-                display: "flex",          // Enable Flexbox
+                display: "flex",          // Enable Flexbox for alignment
                 justifyContent: "center", // Center horizontally
-                alignItems: "flex-start", // Align to top
-                overflow: "hidden",       // Clips the image smoothly if it scales outside
+                alignItems: "flex-start", // Align to top (combined with translateY to control vertical position)
+                overflow: "hidden",       // Clip content that extends beyond container bounds
             }}
         >
             {!hasError ? (
@@ -57,18 +64,24 @@ export const ViewImageComponent = ({imgSrc, viewName}: ViewImageComponentProps) 
                     src={imgSrc}
                     alt={`${viewName} snapshot`}
                     style={{
-                        // Scale base width so full width is visible after transform
+                        // Size: Start with reduced width (will be scaled up to 100% by transform)
                         width: baseWidth,
-                        height: 'auto',
+                        height: 'auto', // Maintain aspect ratio
                         
-                        // Apply the fixed zoom and shift down to hide bottom bar
-                        transform: `scale(${fixedZoom}) translateY(25%)`,
+                        // Transform: Scale up and shift down to hide bottom UI elements
+                        // Order matters: scale applies first, then translateY in scaled coordinate space
+                        transform: `scale(${ZOOM_LEVEL}) translateY(${VERTICAL_OFFSET_PERCENT}%)`,
+                        
+                        // Smooth transition for any transform changes
                         transition: 'transform 0.2s ease-in-out',
-                        transformOrigin: 'center top', // Ensures scaling focuses on top center
+                        
+                        // Origin point for scaling (center-top means scale from top-center point)
+                        transformOrigin: 'center top',
                     }}
                     onError={() => setHasError(true)}
                 />
             ) : (
+                // Fallback icon displayed when image fails to load
                 <ImageIcon 
                     sx={{ 
                         fontSize: "5rem",
