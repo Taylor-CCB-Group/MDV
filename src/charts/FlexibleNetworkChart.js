@@ -11,6 +11,9 @@ import {
     schemeReds,
     zoom,
     zoomIdentity,
+    pie,
+    arc,
+    select,
 } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
@@ -86,10 +89,11 @@ class FlexibleNetworkChart extends SVGChart {
         c.label_size = c.label_size || 10;
         c.show_directionality = c.show_directionality || false;
         c.link_opacity = c.link_opacity !== undefined ? c.link_opacity : 0.6;
+        c.use_pie_nodes = c.use_pie_nodes !== false; // Enable pie chart nodes by default
         
         // Initialize color legend
         if (!c.color_legend) {
-            c.color_legend = { display: !!c.param[7] || !!c.color_by };
+            c.color_legend = { display: false };
         }
         
         // Set up node coloring
@@ -103,6 +107,9 @@ class FlexibleNetworkChart extends SVGChart {
             };
             this._addTrimmedColor(c.color_by, conf);
             this.nodeColorFunction = this.dataStore.getColorFunction(c.color_by, conf);
+            c.color_legend.display = true; // Show legend when color_by is set
+        } else if (c.param[7]) {
+            c.color_legend.display = true; // Show legend when node type is set
         }
         
         // Set up force simulation
@@ -143,13 +150,14 @@ class FlexibleNetworkChart extends SVGChart {
         // Build network
         const nodeSet = new Set();
         const nodeMetadata = {};
+        const nodeComposition = {}; // Track type composition for each node (for pie charts)
         const nodeFilterStatus = {}; // Track if nodes have filtered connections
         this.linkData = [];
         const links = {}; // Track bidirectional links
         
         const f = this.dataStore.filterArray;
         
-        // First pass: track all nodes (including those in filtered rows)
+        // First pass: track all nodes and build composition data
         for (let i = 0; i < this.dataStore.size; i++) {
             const sourceId = sourceCol.values 
                 ? sourceCol.values[sourceCol.data[i]]
@@ -167,6 +175,18 @@ class FlexibleNetworkChart extends SVGChart {
             if (isFiltered) {
                 nodeFilterStatus[sourceId] = (nodeFilterStatus[sourceId] || 0) + 1;
                 nodeFilterStatus[targetId] = (nodeFilterStatus[targetId] || 0) + 1;
+            }
+            
+            // Build composition for pie charts (track all type occurrences)
+            if (nodeTypeCol) {
+                const nodeType = nodeTypeCol.values 
+                    ? nodeTypeCol.values[nodeTypeCol.data[i]] 
+                    : nodeTypeCol.data[i];
+                
+                if (!nodeComposition[sourceId]) {
+                    nodeComposition[sourceId] = {};
+                }
+                nodeComposition[sourceId][nodeType] = (nodeComposition[sourceId][nodeType] || 0) + 1;
             }
         }
         
@@ -219,11 +239,11 @@ class FlexibleNetworkChart extends SVGChart {
                 };
             }
             if (!nodeMetadata[targetId]) {
-                // For target, try to find its metadata from rows where it's the source
+                // For target nodes that don't appear as source, use current row data
                 nodeMetadata[targetId] = {
-                    size: 1,
-                    type: null,
-                    dataIndex: undefined
+                    size: nodeSizeCol ? nodeSizeCol.data[i] : 1,
+                    type: nodeTypeCol ? (nodeTypeCol.values ? nodeTypeCol.values[nodeTypeCol.data[i]] : nodeTypeCol.data[i]) : null,
+                    dataIndex: i
                 };
             }
             
@@ -238,13 +258,14 @@ class FlexibleNetworkChart extends SVGChart {
             links[`${sourceId}|${targetId}`] = this.linkData.length - 1;
         }
         
-        // Create node array with filter status
+        // Create node array with filter status and composition
         this.nodeData = Array.from(nodeSet).map(id => ({
             id,
             size: nodeMetadata[id]?.size || 1,
             type: nodeMetadata[id]?.type || null,
             dataIndex: nodeMetadata[id]?.dataIndex,
-            hasFilteredConnections: (nodeFilterStatus[id] || 0) > 0
+            hasFilteredConnections: (nodeFilterStatus[id] || 0) > 0,
+            composition: nodeComposition[id] || null  // Composition data for pie charts
         }));
         
         this.drawChart();
@@ -263,8 +284,13 @@ class FlexibleNetworkChart extends SVGChart {
             // Using numeric color_by column
             useNumericColor = true;
         } else if (c.param[7]) {
-            // Using categorical node type
-            nodeColors = this.dataStore.getColumnColors(c.param[7]);
+            // Using categorical node type - create value-to-color mapping
+            const column = this.dataStore.columnIndex[c.param[7]];
+            const colors = this.dataStore.getColumnColors(c.param[7]);
+            nodeColors = {};
+            column.values.forEach((value, index) => {
+                nodeColors[value] = colors[index];
+            });
         }
         
         // Create links
@@ -323,22 +349,74 @@ class FlexibleNetworkChart extends SVGChart {
             .enter()
             .append("g");
         
-        const circles = nodes
-            .append("circle")
-            .attr("r", d => c.param[6] ? this.nodeScale(d.size) : c.node_radius)
-            .attr("fill", d => {
-                // Priority: color_by > node type > default
-                if (useNumericColor && d.dataIndex !== undefined) {
-                    return this.nodeColorFunction(d.dataIndex);
-                }
-                if (nodeColors && d.type) {
-                    return nodeColors[d.type] || "steelblue";
-                }
-                return "steelblue";
-            })
-            .attr("stroke", "#fff")
-            .attr("stroke-width", 1.5)
-            .style("fill-opacity", d => d.hasFilteredConnections ? 0.4 : 1.0)
+        // Helper function to determine if a node should be a pie chart
+        const shouldUsePie = (d) => {
+            return c.use_pie_nodes && 
+                   nodeColors && 
+                   d.composition && 
+                   Object.keys(d.composition).length > 1 &&
+                   !useNumericColor; // Don't use pies for numeric color_by
+        };
+        
+        // Create pie arc generator
+        const pieGenerator = pie()
+            .value(d => d.value)
+            .sort(null);
+        
+        const arcGenerator = arc();
+        
+        // Add node visuals (either pie charts or simple circles)
+        nodes.each((d, i, nodeElements) => {
+            const nodeElement = nodeElements[i];
+            const nodeRadius = c.param[6] ? this.nodeScale(d.size) : c.node_radius;
+            
+            if (shouldUsePie(d)) {
+                // Draw pie chart
+                arcGenerator
+                    .innerRadius(0)
+                    .outerRadius(nodeRadius);
+                
+                const pieData = Object.entries(d.composition).map(([type, count]) => ({
+                    type: type,
+                    value: count
+                }));
+                
+                const arcs = pieGenerator(pieData);
+                
+                // Append pie slices
+                const g = select(nodeElement);
+                g.selectAll("path")
+                    .data(arcs)
+                    .enter()
+                    .append("path")
+                    .attr("d", arcGenerator)
+                    .attr("fill", arc_d => nodeColors[arc_d.data.type] || "steelblue")
+                    .attr("stroke", "#fff")
+                    .attr("stroke-width", 1.5)
+                    .style("fill-opacity", d.hasFilteredConnections ? 0.4 : 1.0);
+            } else {
+                // Draw simple circle
+                select(nodeElement)
+                    .append("circle")
+                    .attr("r", nodeRadius)
+                    .attr("fill", () => {
+                        // Priority: color_by > node type > default
+                        if (useNumericColor && d.dataIndex !== undefined) {
+                            return this.nodeColorFunction(d.dataIndex);
+                        }
+                        if (nodeColors && d.type) {
+                            return nodeColors[d.type] || "steelblue";
+                        }
+                        return "steelblue";
+                    })
+                    .attr("stroke", "#fff")
+                    .attr("stroke-width", 1.5)
+                    .style("fill-opacity", d.hasFilteredConnections ? 0.4 : 1.0);
+            }
+        });
+        
+        // Add click and drag handlers to all nodes
+        nodes
             .on("click", (e, d) => {
                 // Find all interactions for this node
                 const indices = this.linkData
@@ -354,6 +432,26 @@ class FlexibleNetworkChart extends SVGChart {
                 .on("start", (e, d) => this.dragstarted(e, d))
                 .on("drag", (e, d) => this.dragged(e, d))
                 .on("end", (e, d) => this.dragended(e, d)));
+        
+        // Add tooltips showing composition
+        nodes.append("title")
+            .text(d => {
+                let tooltip = `${d.id}`;
+                if (d.composition && Object.keys(d.composition).length > 0) {
+                    tooltip += '\n\nComposition:';
+                    const total = Object.values(d.composition).reduce((a, b) => a + b, 0);
+                    Object.entries(d.composition)
+                        .sort((a, b) => b[1] - a[1]) // Sort by count descending
+                        .forEach(([type, count]) => {
+                            const percent = ((count / total) * 100).toFixed(1);
+                            tooltip += `\n${type}: ${count} (${percent}%)`;
+                        });
+                }
+                if (d.hasFilteredConnections) {
+                    tooltip += '\n\n(Has filtered connections)';
+                }
+                return tooltip;
+            });
         
         // Add labels if enabled
         if (c.show_labels) {
@@ -638,6 +736,19 @@ class FlexibleNetworkChart extends SVGChart {
                     .style("font-size", `${x}px`);
             },
         });
+        
+        // Only show pie chart option if node type column is selected
+        if (c.param[7] && !c.color_by) {
+            settings.push({
+                type: "check",
+                current_value: c.use_pie_nodes,
+                label: "Show Composition as Pie Charts",
+                func: (x) => {
+                    c.use_pie_nodes = x;
+                    this.drawChart();
+                },
+            });
+        }
         
         settings.push({
             type: "slider",
