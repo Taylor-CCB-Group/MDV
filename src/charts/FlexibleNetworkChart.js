@@ -83,6 +83,26 @@ class FlexibleNetworkChart extends SVGChart {
         c.label_size = c.label_size || 10;
         c.show_directionality = c.show_directionality || false;
         c.link_opacity = c.link_opacity !== undefined ? c.link_opacity : 0.6;
+        c.color_overlay = c.color_overlay !== undefined ? c.color_overlay : 0;
+        
+        // Initialize color legend
+        if (!c.color_legend) {
+            c.color_legend = { display: !!c.param[7] || !!c.color_by };
+        }
+        
+        // Set up node coloring
+        this.nodeColorFunction = null;
+        if (c.color_by) {
+            const conf = {
+                asArray: false,  // Return color strings for SVG, not RGB arrays
+                overideValues: {
+                    colorLogScale: c.log_color_scale,
+                    colorOverlay: c.color_overlay,
+                },
+            };
+            this._addTrimmedColor(c.color_by, conf);
+            this.nodeColorFunction = this.dataStore.getColorFunction(c.color_by, conf);
+        }
         
         // Set up force simulation
         this.forceLink = forceLink().id((d) => d.id);
@@ -92,6 +112,7 @@ class FlexibleNetworkChart extends SVGChart {
             .force("charge", this.forceManyBody.strength(c.node_repulsion))
             .force("center", forceCenter(this.width / 2, this.height / 2));
         
+        this.setColorLegend();
         this.reCalculate();
     }
     
@@ -112,13 +133,36 @@ class FlexibleNetworkChart extends SVGChart {
         // Build network
         const nodeSet = new Set();
         const nodeMetadata = {};
+        const nodeFilterStatus = {}; // Track if nodes have filtered connections
         this.linkData = [];
         const links = {}; // Track bidirectional links
         
         const f = this.dataStore.filterArray;
         
+        // First pass: track all nodes (including those in filtered rows)
         for (let i = 0; i < this.dataStore.size; i++) {
-            // Respect filters
+            const sourceId = sourceCol.values 
+                ? sourceCol.values[sourceCol.data[i]]
+                : sourceCol.data[i].toString();
+            const targetId = targetCol.values
+                ? targetCol.values[targetCol.data[i]]
+                : targetCol.data[i].toString();
+            
+            if (sourceId === targetId) continue;
+            
+            // Track if this connection is filtered
+            const isFiltered = f[i] > 0;
+            
+            // Mark nodes that have filtered connections
+            if (isFiltered) {
+                nodeFilterStatus[sourceId] = (nodeFilterStatus[sourceId] || 0) + 1;
+                nodeFilterStatus[targetId] = (nodeFilterStatus[targetId] || 0) + 1;
+            }
+        }
+        
+        // Second pass: build visible network
+        for (let i = 0; i < this.dataStore.size; i++) {
+            // Skip filtered rows
             if (f[i] > 0) continue;
             
             // Get source and target
@@ -160,14 +204,16 @@ class FlexibleNetworkChart extends SVGChart {
             if (!nodeMetadata[sourceId]) {
                 nodeMetadata[sourceId] = {
                     size: nodeSizeCol ? nodeSizeCol.data[i] : 1,
-                    type: nodeTypeCol ? (nodeTypeCol.values ? nodeTypeCol.values[nodeTypeCol.data[i]] : nodeTypeCol.data[i]) : null
+                    type: nodeTypeCol ? (nodeTypeCol.values ? nodeTypeCol.values[nodeTypeCol.data[i]] : nodeTypeCol.data[i]) : null,
+                    dataIndex: i  // Store data index for color_by
                 };
             }
             if (!nodeMetadata[targetId]) {
                 // For target, try to find its metadata from rows where it's the source
                 nodeMetadata[targetId] = {
                     size: 1,
-                    type: null
+                    type: null,
+                    dataIndex: undefined
                 };
             }
             
@@ -182,11 +228,13 @@ class FlexibleNetworkChart extends SVGChart {
             links[`${sourceId}|${targetId}`] = this.linkData.length - 1;
         }
         
-        // Create node array
+        // Create node array with filter status
         this.nodeData = Array.from(nodeSet).map(id => ({
             id,
             size: nodeMetadata[id]?.size || 1,
-            type: nodeMetadata[id]?.type || null
+            type: nodeMetadata[id]?.type || null,
+            dataIndex: nodeMetadata[id]?.dataIndex,
+            hasFilteredConnections: (nodeFilterStatus[id] || 0) > 0
         }));
         
         this.drawChart();
@@ -196,10 +244,17 @@ class FlexibleNetworkChart extends SVGChart {
         this.svg.selectAll("*").remove();
         const c = this.config;
         
-        // Colors for nodes
-        const nodeColors = c.param[7] 
-            ? this.dataStore.getColumnColors(c.param[7])
-            : null;
+        // Colors for nodes - prioritize color_by over node type
+        let nodeColors = null;
+        let useNumericColor = false;
+        
+        if (this.nodeColorFunction && c.color_by) {
+            // Using numeric color_by column
+            useNumericColor = true;
+        } else if (c.param[7]) {
+            // Using categorical node type
+            nodeColors = this.dataStore.getColumnColors(c.param[7]);
+        }
         
         // Create links
         const links = this.svg.append("g")
@@ -261,6 +316,10 @@ class FlexibleNetworkChart extends SVGChart {
             .append("circle")
             .attr("r", d => c.param[6] ? this.nodeScale(d.size) : c.node_radius)
             .attr("fill", d => {
+                // Priority: color_by > node type > default
+                if (useNumericColor && d.dataIndex !== undefined) {
+                    return this.nodeColorFunction(d.dataIndex);
+                }
                 if (nodeColors && d.type) {
                     return nodeColors[d.type] || "steelblue";
                 }
@@ -268,6 +327,7 @@ class FlexibleNetworkChart extends SVGChart {
             })
             .attr("stroke", "#fff")
             .attr("stroke-width", 1.5)
+            .style("fill-opacity", d => d.hasFilteredConnections ? 0.4 : 1.0)
             .on("click", (e, d) => {
                 // Find all interactions for this node
                 const indices = this.linkData
@@ -291,6 +351,7 @@ class FlexibleNetworkChart extends SVGChart {
                 .attr("dy", 4)
                 .style("font-size", `${c.label_size}px`)
                 .style("fill", "currentcolor")
+                .style("fill-opacity", d => d.hasFilteredConnections ? 0.4 : 1.0)
                 .style("pointer-events", "none")
                 .text(d => d.id);
         }
@@ -360,6 +421,68 @@ class FlexibleNetworkChart extends SVGChart {
     
     onDataFiltered(dim) {
         this.reCalculate();
+    }
+    
+    getColorLegend() {
+        const c = this.config;
+        // Priority: color_by > node type
+        if (c.color_by) {
+            return this.dataStore.getColorLegend(c.color_by, {
+                name: this.dataStore.getColumnName(c.color_by)
+            });
+        }
+        // Fall back to node type
+        if (c.param[7]) {
+            return this.dataStore.getColorLegend(c.param[7], {
+                name: this.dataStore.getColumnName(c.param[7])
+            });
+        }
+        return null;
+    }
+    
+    colorByColumn(column) {
+        this.config.color_by = column;
+        const conf = {
+            asArray: false,  // Return color strings for SVG, not RGB arrays
+            overideValues: {
+                colorLogScale: this.config.log_color_scale,
+                colorOverlay: this.config.color_overlay,
+            },
+        };
+        this._addTrimmedColor(column, conf);
+        this.nodeColorFunction = this.dataStore.getColorFunction(column, conf);
+        
+        if (!this.config.color_legend) {
+            this.config.color_legend = { display: true };
+        }
+        this.config.color_legend.display = true;
+        
+        this.setColorLegend();
+        this.drawChart();
+    }
+    
+    colorByDefault() {
+        this.config.color_by = undefined;
+        this.nodeColorFunction = null;
+        
+        // Keep legend if node type is selected
+        if (!this.config.param[7]) {
+            if (this.legend) {
+                this.legend.remove();
+                this.legend = undefined;
+            }
+        } else {
+            this.setColorLegend();
+        }
+        
+        this.drawChart();
+    }
+    
+    getColorOptions() {
+        return {
+            colorby: ["integer", "double", "int32"],  // Support numeric columns for coloring
+            color_overlay: 1,  // Enable color overlay slider (0-1 range)
+        };
     }
     
     remove() {
@@ -471,6 +594,40 @@ class FlexibleNetworkChart extends SVGChart {
                 this.drawChart();
             },
         });
+        
+        // Category filter dropdown (only if category column is selected)
+        if (c.param[3]) {
+            const categoryValues = this.dataStore.getColumnValues(c.param[3]);
+            const categories = categoryValues.map((val) => {
+                return { name: val, value: val };
+            });
+            // Add "All" option at the beginning
+            categories.unshift({ name: "All", value: null });
+            
+            settings.push({
+                type: "dropdown",
+                label: `Filter by ${this.dataStore.getColumnName(c.param[3])}`,
+                values: [categories, "name", "value"],
+                current_value: c.category_filter || null,
+                func: (x) => {
+                    c.category_filter = x;
+                    this.reCalculate();
+                },
+            });
+        }
+        
+        // Show legend toggle only if node type column is selected AND not using color_by
+        if (c.param[7] && !c.color_by) {
+            settings.push({
+                type: "check",
+                current_value: c.color_legend.display,
+                label: "Show Node Type Legend",
+                func: (x) => {
+                    c.color_legend.display = x;
+                    this.setColorLegend();
+                },
+            });
+        }
         
         return settings;
     }
