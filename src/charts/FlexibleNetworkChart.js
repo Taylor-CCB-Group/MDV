@@ -711,7 +711,7 @@ class FlexibleNetworkChart extends SVGChart {
 
 // Register as a new chart type - works with ANY datasource!
 BaseChart.types["flexible_network_chart"] = {
-    name: "Network Graph (Flexible)",
+    name: "Network Graph",
     class: FlexibleNetworkChart,
     
     // NO required metadata! Works with any table
