@@ -703,14 +703,15 @@ class FlexibleNetworkChart extends SVGChart {
             func: (x) => {
                 c.node_radius = x;
                 if (!c.param[6]) {
-                    // No node size column - use fixed radius
-                    this.svg.selectAll("circle").attr("r", x);
+                    // No node size column - update fixed radius scale
+                    this.nodeScale.domain([1, 1]).range([x, x]);
                 } else {
                     // Has node size column - adjust the scale range
                     const domain = this.nodeScale.domain();
                     this.nodeScale.domain(domain).range([x * 0.5, x * 2]);
-                    this.svg.selectAll("circle").attr("r", d => this.nodeScale(d.size));
                 }
+                // Redraw chart to update both circles and pie chart nodes
+                this.drawChart();
             },
         });
         
