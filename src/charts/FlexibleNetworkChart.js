@@ -288,6 +288,7 @@ class FlexibleNetworkChart extends SVGChart {
                 .attr("dx", 12)
                 .attr("dy", 4)
                 .style("font-size", "10px")
+                .style("fill", "currentcolor")
                 .style("pointer-events", "none")
                 .text(d => d.id);
         }
@@ -462,27 +463,9 @@ BaseChart.types["flexible_network_chart"] = {
     
     // Extra controls for filtering and physics
     extra_controls: (dataStore) => {
-        const controls = [];
-        
-        // If category filter column is selected, show its values
-        // Note: This would require the column to be selected first
-        // For now, we'll add physics controls
-        
-        controls.push({
-            type: "number",
-            name: "link_strength",
-            label: "Link Strength (0-2)",
-            defaultVal: 0.5,
-        });
-        
-        controls.push({
-            type: "number",
-            name: "node_repulsion",
-            label: "Node Repulsion (-1000 to 0)",
-            defaultVal: -400,
-        });
-        
-        return controls;
+        return [];
+        // Note: Physics controls are available in chart settings panel after creation
+        // Extra controls here would require slider type, but those are better in settings
     },
 };
 
