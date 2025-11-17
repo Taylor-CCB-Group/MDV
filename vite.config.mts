@@ -32,7 +32,7 @@ function getRollupOptions(): RollupOptions {
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
-                entryFileNames: 'js/mdv.js',
+                entryFileNames: 'mdv.js',
                 assetFileNames: (assetInfo) => {
                     //todo: match webpack behaviour with assetsDir / css-loader.
                     if (assetInfo?.name?.includes('index.css')) return 'assets/mdv.css';
