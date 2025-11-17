@@ -240,11 +240,11 @@ class FlexibleNetworkChart extends SVGChart {
                 };
             }
             if (!nodeMetadata[targetId]) {
-                // For target nodes that don't appear as source, use current row data
+                // For target nodes that don't appear as source, use the node ID as the type
                 nodeMetadata[targetId] = {
-                    size: nodeSizeCol ? nodeSizeCol.data[i] : 1,
-                    type: nodeTypeCol ? (nodeTypeCol.values ? nodeTypeCol.values[nodeTypeCol.data[i]] : nodeTypeCol.data[i]) : null,
-                    dataIndex: i
+                    size: 1,  // Default size for nodes that don't appear as source
+                    type: nodeTypeCol ? targetId : null,  // Use node ID as its own type
+                    dataIndex: undefined  // No direct data index for target-only nodes
                 };
             }
             
