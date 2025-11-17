@@ -457,7 +457,11 @@ class FlexibleNetworkChart extends SVGChart {
         // Add labels if enabled
         if (c.show_labels) {
             nodes.append("text")
-                .attr("dx", 12)
+                .attr("dx", d => {
+                    // Position label outside node radius + small gap
+                    const nodeRadius = c.param[6] ? this.nodeScale(d.size) : c.node_radius;
+                    return nodeRadius + 4;
+                })
                 .attr("dy", 4)
                 .style("font-size", `${c.label_size}px`)
                 .style("fill", "currentcolor")
