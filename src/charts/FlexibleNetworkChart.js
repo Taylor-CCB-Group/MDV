@@ -89,6 +89,7 @@ class FlexibleNetworkChart extends SVGChart {
         c.label_size = c.label_size || 10;
         c.show_directionality = c.show_directionality || false;
         c.link_opacity = c.link_opacity !== undefined ? c.link_opacity : 0.6;
+        c.node_opacity = c.node_opacity !== undefined ? c.node_opacity : 1.0;
         c.use_pie_nodes = c.use_pie_nodes !== false; // Enable pie chart nodes by default
         
         // Initialize color legend
@@ -393,7 +394,7 @@ class FlexibleNetworkChart extends SVGChart {
                     .attr("fill", arc_d => nodeColors[arc_d.data.type] || "steelblue")
                     .attr("stroke", "#fff")
                     .attr("stroke-width", 1.5)
-                    .style("fill-opacity", d.hasFilteredConnections ? 0.4 : 1.0);
+                    .style("fill-opacity", c.node_opacity);
             } else {
                 // Draw simple circle
                 select(nodeElement)
@@ -411,7 +412,7 @@ class FlexibleNetworkChart extends SVGChart {
                     })
                     .attr("stroke", "#fff")
                     .attr("stroke-width", 1.5)
-                    .style("fill-opacity", d.hasFilteredConnections ? 0.4 : 1.0);
+                    .style("fill-opacity", c.node_opacity);
             }
         });
         
@@ -460,7 +461,7 @@ class FlexibleNetworkChart extends SVGChart {
                 .attr("dy", 4)
                 .style("font-size", `${c.label_size}px`)
                 .style("fill", "currentcolor")
-                .style("fill-opacity", d => d.hasFilteredConnections ? 0.4 : 1.0)
+                .style("fill-opacity", c.node_opacity)
                 .style("pointer-events", "none")
                 .text(d => d.id);
         }
@@ -761,6 +762,20 @@ class FlexibleNetworkChart extends SVGChart {
                 c.link_opacity = x;
                 this.svg.selectAll(".links line")
                     .style("opacity", x);
+            },
+        });
+        
+        settings.push({
+            type: "slider",
+            max: 1,
+            min: 0.1,
+            current_value: c.node_opacity,
+            label: "Node Opacity",
+            func: (x) => {
+                c.node_opacity = x;
+                // Update both circles and pie chart paths
+                this.svg.selectAll(".nodes circle").style("fill-opacity", x);
+                this.svg.selectAll(".nodes path").style("fill-opacity", x);
             },
         });
         
