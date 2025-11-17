@@ -79,7 +79,7 @@ class FlexibleNetworkChart extends SVGChart {
         // Set up node size (param[6] if provided, else constant)
         if (c.param[6]) {
             const sizeQuantile = this.dataStore.getMinMaxForColumn(c.param[6]);
-            this.nodeScale.domain(sizeQuantile).range([5, 20]);
+            this.nodeScale.domain(sizeQuantile).range([6, 15]);
         } else {
             this.nodeScale.domain([1, 1]).range([8, 8]);
         }
@@ -570,7 +570,7 @@ class FlexibleNetworkChart extends SVGChart {
         // Set up node size (param[6] if provided, else constant)
         if (c.param[6]) {
             const sizeQuantile = this.dataStore.getMinMaxForColumn(c.param[6]);
-            this.nodeScale.domain(sizeQuantile).range([5, 20]);
+            this.nodeScale.domain(sizeQuantile).range([6, 15]);
         } else {
             this.nodeScale.domain([1, 1]).range([8, 8]);
         }
@@ -713,7 +713,7 @@ class FlexibleNetworkChart extends SVGChart {
                 } else {
                     // Has node size column - adjust the scale range
                     const domain = this.nodeScale.domain();
-                    this.nodeScale.domain(domain).range([x * 0.5, x * 2]);
+                    this.nodeScale.domain(domain).range([x * 0.6, x * 1.5]);
                 }
                 // Redraw chart to update both circles and pie chart nodes
                 this.drawChart();
