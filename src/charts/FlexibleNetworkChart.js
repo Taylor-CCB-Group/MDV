@@ -76,15 +76,17 @@ class FlexibleNetworkChart extends SVGChart {
                 .range(["darkred", "orange", "lightgray"]);
         }
         
+        // Initialize node_radius first (may be loaded from saved config)
+        c.node_radius = c.node_radius || 8;
+        
         // Set up node size (param[6] if provided, else constant)
         if (c.param[6]) {
             const sizeQuantile = this.dataStore.getMinMaxForColumn(c.param[6]);
-            this.nodeScale.domain(sizeQuantile).range([6, 15]);
+            // Use saved node_radius to set the scale range
+            this.nodeScale.domain(sizeQuantile).range([c.node_radius * 0.6, c.node_radius * 1.5]);
         } else {
-            this.nodeScale.domain([1, 1]).range([8, 8]);
+            this.nodeScale.domain([1, 1]).range([c.node_radius, c.node_radius]);
         }
-        
-        c.node_radius = c.node_radius || 8;
         c.show_labels = c.show_labels !== false;
         c.label_size = c.label_size || 10;
         c.show_directionality = c.show_directionality || false;
@@ -570,9 +572,10 @@ class FlexibleNetworkChart extends SVGChart {
         // Set up node size (param[6] if provided, else constant)
         if (c.param[6]) {
             const sizeQuantile = this.dataStore.getMinMaxForColumn(c.param[6]);
-            this.nodeScale.domain(sizeQuantile).range([6, 15]);
+            // Use current node_radius to set the scale range
+            this.nodeScale.domain(sizeQuantile).range([c.node_radius * 0.6, c.node_radius * 1.5]);
         } else {
-            this.nodeScale.domain([1, 1]).range([8, 8]);
+            this.nodeScale.domain([1, 1]).range([c.node_radius, c.node_radius]);
         }
         
         // Update color legend if node type changed
@@ -667,6 +670,27 @@ class FlexibleNetworkChart extends SVGChart {
         this.svg.transition()
             .duration(750)
             .call(this.zoomBehavior.transform, zoomIdentity);
+    }
+    
+    getConfig() {
+        const config = super.getConfig();
+        // Explicitly preserve all custom properties that may not be in activeQueries
+        const c = this.config;
+        config.node_radius = c.node_radius;
+        config.show_labels = c.show_labels;
+        config.label_size = c.label_size;
+        config.show_directionality = c.show_directionality;
+        config.link_opacity = c.link_opacity;
+        config.node_opacity = c.node_opacity;
+        config.use_pie_nodes = c.use_pie_nodes;
+        config.link_strength = c.link_strength;
+        config.node_repulsion = c.node_repulsion;
+        config.category_filter = c.category_filter;
+        // color_by is handled by BaseChart, but include for completeness
+        if (c.color_by) {
+            config.color_by = c.color_by;
+        }
+        return config;
     }
     
     getSettings() {
