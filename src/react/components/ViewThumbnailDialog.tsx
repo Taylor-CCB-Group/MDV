@@ -33,34 +33,49 @@ export type ViewImageComponentProps = {
 
 export const ViewImageComponent = ({imgSrc, viewName}: ViewImageComponentProps) => {
     const [hasError, setHasError] = useState(!imgSrc);
+    // Define the desired fixed zoom level (e.g., 1.75 = 175%)
+    const fixedZoom = 1.75;
+    // Calculate base width so full width is visible after zoom
+    const baseWidth = `${(100 / fixedZoom)}%`;
 
-    return !hasError ? (
-        <img
-            src={imgSrc}
-            alt={`${viewName} snapshot`}
-            style={{ 
-                objectFit: 'contain', 
-                aspectRatio: 3/2,
-                height: "100%",
+    // The image itself is now wrapped in a centered Box
+    return (
+        <Box 
+            // This Box acts as the centering container and defines the available space
+            sx={{
                 width: "100%",
+                height: "100%",
+                aspectRatio: 3 / 2,
+                display: "flex",          // Enable Flexbox
+                justifyContent: "center", // Center horizontally
+                alignItems: "flex-start", // Align to top
+                overflow: "hidden",       // Clips the image smoothly if it scales outside
             }}
-            onError={() => setHasError(true)}
-        />
-    ) : (
-        <Box sx={{ 
-            width: "100%", 
-            height: "100%", 
-            aspectRatio: 3/2,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center", 
-        }}>
-            <ImageIcon 
-                sx={{ 
-                    fontSize: "5rem",
-                    color: "text.secondary"
-                }} 
-            />
+        >
+            {!hasError ? (
+                <img
+                    src={imgSrc}
+                    alt={`${viewName} snapshot`}
+                    style={{
+                        // Scale base width so full width is visible after transform
+                        width: baseWidth,
+                        height: 'auto',
+                        
+                        // Apply the fixed zoom and shift down to hide bottom bar
+                        transform: `scale(${fixedZoom}) translateY(25%)`,
+                        transition: 'transform 0.2s ease-in-out',
+                        transformOrigin: 'center top', // Ensures scaling focuses on top center
+                    }}
+                    onError={() => setHasError(true)}
+                />
+            ) : (
+                <ImageIcon 
+                    sx={{ 
+                        fontSize: "5rem",
+                        color: "text.secondary"
+                    }} 
+                />
+            )}
         </Box>
     );
 };
