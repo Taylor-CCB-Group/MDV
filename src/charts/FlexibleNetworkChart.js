@@ -94,7 +94,8 @@ class FlexibleNetworkChart extends SVGChart {
         c.node_opacity = c.node_opacity !== undefined ? c.node_opacity : 1.0;
         c.use_pie_nodes = c.use_pie_nodes !== false; // Enable pie chart nodes by default
         
-        // Initialize color legend
+        // Initialize color legend (only if not already set from saved config)
+        const legendWasConfigured = c.color_legend !== undefined;
         if (!c.color_legend) {
             c.color_legend = { display: false };
         }
@@ -110,9 +111,15 @@ class FlexibleNetworkChart extends SVGChart {
             };
             this._addTrimmedColor(c.color_by, conf);
             this.nodeColorFunction = this.dataStore.getColorFunction(c.color_by, conf);
-            c.color_legend.display = true; // Show legend when color_by is set
+            // Only set display = true for NEW charts (not from saved config)
+            if (!legendWasConfigured) {
+                c.color_legend.display = true;
+            }
         } else if (c.param[7]) {
-            c.color_legend.display = true; // Show legend when node type is set
+            // Only set display = true for NEW charts (not from saved config)
+            if (!legendWasConfigured) {
+                c.color_legend.display = true;
+            }
         }
         
         // Set up force simulation
@@ -673,7 +680,11 @@ class FlexibleNetworkChart extends SVGChart {
     }
     
     getConfig() {
+        // Save the original display state before BaseChart mutates it
+        const originalLegendDisplay = this.config.color_legend?.display;
+        
         const config = super.getConfig();
+        
         // Explicitly preserve all custom properties that may not be in activeQueries
         const c = this.config;
         config.node_radius = c.node_radius;
@@ -689,6 +700,16 @@ class FlexibleNetworkChart extends SVGChart {
         // color_by is handled by BaseChart, but include for completeness
         if (c.color_by) {
             config.color_by = c.color_by;
+        }
+        // Preserve color_legend state
+        // BaseChart.getConfig() sets display:true when this.legend exists, overwriting user preference
+        // We need to restore the original display value
+        if (c.color_legend) {
+            if (!config.color_legend) {
+                config.color_legend = {};
+            }
+            config.color_legend.display = originalLegendDisplay;
+            // pos is correctly set by BaseChart if legend was dragged
         }
         return config;
     }
