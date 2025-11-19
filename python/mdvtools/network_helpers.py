@@ -12,7 +12,7 @@ import pandas as pd
 def setup_ligand_network(
     project,
     interaction_datasource: str,
-    cells_datasource: str = "cells",
+    cells_datasource: Optional[str] = "cells",
     ligand_column: str = "ligand_type",
     source_cell_column: str = "source_cell_id",
     target_cell_column: str = "target_cell_id",
@@ -193,7 +193,7 @@ def setup_ligand_network(
 def create_ligand_network_view(
     project,
     interaction_datasource: str,
-    cells_datasource: str = "cells",
+    cells_datasource: Optional[str] = "cells",
     view_name: str = "Ligand Network Analysis",
     include_spatial_panel: bool = True,
     network_panel_width: int = 60,
