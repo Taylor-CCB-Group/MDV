@@ -5,7 +5,6 @@ Run this to create a project with all 3 example networks ready to visualize!
 """
 
 import pandas as pd
-import os
 from pathlib import Path
 
 # Add mdvtools to path if running from examples directory

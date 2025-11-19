@@ -5,8 +5,8 @@ This module provides convenient functions to set up network charts,
 particularly for ligand-receptor interactions and cell-cell communication.
 """
 
-from typing import Optional, List, Dict, Any
-import pandas as pd
+from typing import Optional
+from textwrap import dedent
 
 
 def setup_ligand_network(
@@ -275,24 +275,25 @@ def create_ligand_network_view(
     info_text = {
         "type": "text_box_chart",
         "param": [],
-        "text": (
-            f"<h2>Ligand-Receptor Network</h2>\n"
-            f"<p><b>To add network chart:</b></p>\n"
-            f"<ol>\n"
-            f"  <li>Click 'Add Chart' button</li>\n"
-            f"  <li>Select datasource: <code>{interaction_datasource}</code></li>\n"
-            f"  <li>Chart type: <b>Spatial Connectivity Map</b></li>\n"
-            f"  <li>Select ligand type: {', '.join(ligand_types[:5])}"
-            f"{'...' if len(ligand_types) > 5 else ''}</li>\n"
-            f"  <li>Click 'Add Chart'</li>\n"
-            f"</ol>\n"
-            f"<p><b>Configured visual encoding:</b></p>\n"
-            f"<ul>\n"
-            f"  <li>Link length: {interactions['spatial_connectivity_map']['link_length']}</li>\n"
-            f"  <li>Link thickness: {interactions['spatial_connectivity_map']['link_thickness']}</li>\n"
-            f"  <li>Link color: {interactions['spatial_connectivity_map']['link_color']}</li>\n"
-            f"  <li>Node size: {interactions['spatial_connectivity_map']['node_size']}</li>\n"
-            f"</ul>"
+        "text": dedent(
+            f"""
+            ## Ligand-Receptor Network
+
+            **To add network chart:**
+
+            1. Click 'Add Chart' button
+            2. Select datasource: `{interaction_datasource}`
+            3. Chart type: **Spatial Connectivity Map**
+            4. Select ligand type: {', '.join(ligand_types[:5])}{'...' if len(ligand_types) > 5 else ''}
+            5. Click 'Add Chart'
+
+            **Configured visual encoding:**
+
+            - Link length: {interactions['spatial_connectivity_map']['link_length']}
+            - Link thickness: {interactions['spatial_connectivity_map']['link_thickness']}
+            - Link color: {interactions['spatial_connectivity_map']['link_color']}
+            - Node size: {interactions['spatial_connectivity_map']['node_size']}
+            """
         ),
         "position": [310, 5],
         "size": [500, 350]
@@ -308,10 +309,14 @@ def create_ligand_network_view(
             spatial_info = {
                 "type": "text_box_chart",
                 "param": [],
-                "text": (
-                    f"<h2>Spatial Context</h2>\n"
-                    f"<p>Add centroid plots here to see spatial distribution of interacting cells.</p>\n"
-                    f"<p>Click 'Add Chart' → Select '{cells_datasource}' → Choose spatial region.</p>"
+                "text": dedent(
+                    f"""
+                    ## Spatial Context
+
+                    Add centroid plots here to see spatial distribution of interacting cells.
+
+                    Click 'Add Chart' → Select '{cells_datasource}' → Choose spatial region.
+                    """
                 ),
                 "position": [5, 5],
                 "size": [400, 200]
