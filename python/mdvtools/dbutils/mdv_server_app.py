@@ -31,11 +31,11 @@ oauth = None
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
-    oauth = OAuth()  #Initialize OAuth only if auth is enabled
+    oauth = OAuth()  # Initialize OAuth only if auth is enabled
     
 
 def create_flask_app(config_name=None):
-    """ Create and configure the Flask app."""
+    """Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
 
     if config_name == 'test':
@@ -128,13 +128,28 @@ def create_flask_app(config_name=None):
             logger.exception(f"Error setting up authentication: {e}")
             raise e
 
-    # Register other routes (base routes like /, /projects, etc.)
+    # Register other routes (base routes like /, /projects, /rescan_projects, etc.)
+    # Note: Project management routes are now handled by ProjectManagerExtension
     try:
         # Register routes
-        logger.info("Registering base routes: /, /projects, /create_project, /delete_project")
+        logger.info("Registering base routes: /, /projects, /rescan_projects")
         register_routes(app, ENABLE_AUTH)
     except Exception as e:
         logger.exception(f"Error registering routes: {e}")
+        raise e
+
+    # Register global routes from extensions
+    try:
+        logger.info("Registering global routes from extensions")
+        from mdvtools.dbutils.server_options import get_server_options_for_db_projects
+        options = get_server_options_for_db_projects(app)
+        
+        for extension in options.extensions:
+            if hasattr(extension, 'register_global_routes'):
+                logger.info(f"Registering global routes for extension: {extension.__class__.__name__}")
+                extension.register_global_routes(app, app.config)
+    except Exception as e:
+        logger.exception(f"Error registering global routes from extensions: {e}")
         raise e
 
     return app
@@ -237,6 +252,7 @@ def read_secret(secret_name):
 
 def load_config(app, config_name=None, enable_auth=False):
     try:
+        # todo - as well as the default config stored in the repo, we can have a config.json for a given deployment
         config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
         with open(config_file_path) as config_file:
             config = json.load(config_file)
@@ -245,6 +261,31 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['upload_folder'] = config.get('upload_folder', '')
             app.config['projects_base_dir'] = config.get('projects_base_dir', '')
             app.config['db_host'] = config.get('db_container', '')
+            # Control expensive per-file database sync during project serve
+            sync_env = os.getenv('ENABLE_FILE_SYNC')
+            if sync_env is not None:
+                app.config['ENABLE_FILE_SYNC'] = sync_env.lower() in ["1", "true", "yes"]
+            else:
+                app.config['ENABLE_FILE_SYNC'] = config.get('enable_file_sync', False)
+            # Allow extensions to be configured via user-provided JSON file for deployment flexibility
+            # Check if external config path is provided via environment variable
+            external_config_path = os.getenv('MDV_USER_CONFIG_PATH')
+            if external_config_path:
+                if os.path.exists(external_config_path):
+                    try:
+                        with open(external_config_path) as user_config_file:
+                            user_config = json.load(user_config_file)
+                            app.config['extensions'] = user_config.get('extensions', [])
+                            logger.info(f"Loaded extensions from user config at {external_config_path}: {app.config['extensions']}")
+                    except (json.JSONDecodeError, IOError) as e:
+                        logger.warning(f"Could not load user config from {external_config_path}: {e}. Using default extensions.")
+                        app.config['extensions'] = config.get('extensions', [])
+                else:
+                    logger.warning(f"User config file not found at {external_config_path}. Using default extensions.")
+                    app.config['extensions'] = config.get('extensions', [])
+            else:
+                # No external config path specified, use default extensions from config.json
+                app.config['extensions'] = config.get('extensions', [])
             logger.info("Configuration loaded successfully!")
     except FileNotFoundError:
         logger.exception("Error: Configuration file not found.")
@@ -332,6 +373,8 @@ def is_valid_mdv_project(path: str):
 
 def serve_projects_from_db(app):
     failed_projects: list[tuple[int, str | Exception]] = []
+    failed_project_paths: list[str] = []
+    projects = []
     try:
         # Get all projects from the database
         logger.info("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
@@ -347,28 +390,42 @@ def serve_projects_from_db(app):
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
-                    p.set_editable(True)
+                    # Sync DB access level from state.json if present, then serve with resulting editability
+                    try:
+                        state = p.state or {}
+                        perm = (state.get('permission') or '').lower()
+                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                        if desired_level is not None and desired_level != getattr(project, 'access_level', None):
+                            ProjectService.change_project_access(project.id, desired_level)
+                            is_editable = (desired_level == 'editable')
+                        else:
+                            # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
+                            access_level_val = getattr(project, 'access_level', None)
+                            is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
+                        p.set_editable(is_editable)
+                    except Exception:
+                        # Favor editable by default on unexpected errors
+                        p.set_editable(True)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
 
-                    # Update or add files in the database to reflect the actual files in the filesystem
-                    for root, dirs, files in os.walk(project.path):
-                        for file_name in files:
-                            full_file_path = os.path.join(root, file_name)
+                    # Optionally update/add files in DB to reflect filesystem
+                    if app.config.get('ENABLE_FILE_SYNC', False):
+                        for root, dirs, files in os.walk(project.path):
+                            for file_name in files:
+                                full_file_path = os.path.join(root, file_name)
 
-                            # Use the utility function to add or update the file in the database
-                            try:
-                                # Attempt to add or update the file in the database
-                                FileService.add_or_update_file_in_project(
-                                    file_name=file_name,
-                                    file_path=full_file_path,
-                                    project_id=project.id
-                                )
-                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
-
-                            except RuntimeError as file_error:
-                                logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                                try:
+                                    FileService.add_or_update_file_in_project(
+                                        file_name=file_name,
+                                        file_path=full_file_path,
+                                        project_id=project.id
+                                    )
+                                except RuntimeError as file_error:
+                                    logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                    else:
+                        logger.info("Skipping file sync for project %s (ENABLE_FILE_SYNC disabled)", project.id)
 
 
                 except Exception as e:
@@ -377,20 +434,27 @@ def serve_projects_from_db(app):
                     # but keep track of failed projects & associated errors
                     # nb keeping track via project.id rather than instance of Project, because ORM seems to make that not work
                     failed_projects.append((project.id, e))
+                    failed_project_paths.append(project.path)
             else:
                 e = f"Error serving project #{project.id}: path '{project.path}' does not exist."
                 logger.error(e)
                 failed_projects.append((project.id, e))
+                failed_project_paths.append(project.path)
                
     except Exception as e:
         logger.exception(f"Error serving projects from database: {e}")
-        raise
-    logger.info(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
-    # nb using extend rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
-    # so we really only expect this to run once, and the list to be empty
-    ProjectService.failed_projects.extend(failed_projects)
+        # handle gracefully; do not propagate
+    finally:
+        logger.info(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
+        if failed_project_paths:
+            logger.info(f"Failed project paths: {failed_project_paths}")
+        # nb using extend rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
+        # so we really only expect this to run once, and the list to be empty
+        ProjectService.failed_projects.extend(failed_projects)
 
 def serve_projects_from_filesystem(app, base_dir):
+    created_project_ids: list[int] = []
+    failed_project_paths: list[str] = []
     try:
         logger.info("Serving the projects present in filesystem but missing in database")
         logger.info(f"Scanning base directory: {base_dir}")
@@ -400,7 +464,7 @@ def serve_projects_from_filesystem(app, base_dir):
         logger.info(f"Project paths in DB: {projects_in_db}")
 
         # Get all project directories in the filesystem
-        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))}
+        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and d != 'lost+found'}
         logger.info(f"Project paths in filesystem: {project_paths_in_fs}")
 
         # Determine which project paths are in the filesystem but not in the database
@@ -424,7 +488,14 @@ def serve_projects_from_filesystem(app, base_dir):
                         next_id += 1
 
                     p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
-                    p.set_editable(True)
+                    # Respect existing state.json permission if present; default to editable when unspecified
+                    try:
+                        state = p.state or {}
+                        perm = (state.get('permission') or '').lower()
+                        is_editable = True if perm == 'edit' else False if perm == 'view' else True
+                        p.set_editable(is_editable)
+                    except Exception:
+                        p.set_editable(True)
                     p.serve(options=options) 
                     logger.info(f"Serving project: {project_path}")
 
@@ -434,6 +505,16 @@ def serve_projects_from_filesystem(app, base_dir):
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
                     
                     logger.info(f"Added project to DB: {new_project}")
+                    created_project_ids.append(new_project.id)
+                    # One-time sync: initialize DB access_level from state.json.permission
+                    try:
+                        state = p.state or {}
+                        perm = (state.get('permission') or '').lower()
+                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                        if desired_level is not None:
+                            ProjectService.change_project_access(new_project.id, desired_level)
+                    except Exception:
+                        pass
 
                     # Rename directory to use project ID as folder name
                     """
@@ -469,37 +550,40 @@ def serve_projects_from_filesystem(app, base_dir):
                             logger.exception(f"Error syncing users or caching for {project_name}: {auth_e}")
 
                     
-                    # Add files from the project directory to the database
-                    for root, dirs, files in os.walk(project_path):
-                        for file_name in files:
-                            # Construct the full file path
-                            full_file_path = os.path.join(root, file_name)
-                            
-                            # Use the full file path when adding or updating the file in the database
-                            # Use the utility function to add or update the file in the database
-                            try:
-                                # Attempt to add or update the file in the database
-                                FileService.add_or_update_file_in_project(
-                                    file_name=file_name,
-                                    file_path=full_file_path,
-                                    project_id=new_project.id
-                                )
-                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
-
-                            except RuntimeError as file_error:
-                                logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                    # Optionally add files from the project directory to the database
+                    if app.config.get('ENABLE_FILE_SYNC', False):
+                        for root, dirs, files in os.walk(project_path):
+                            for file_name in files:
+                                full_file_path = os.path.join(root, file_name)
+                                try:
+                                    FileService.add_or_update_file_in_project(
+                                        file_name=file_name,
+                                        file_path=full_file_path,
+                                        project_id=new_project.id
+                                    )
+                                except RuntimeError as file_error:
+                                    logger.exception(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+                    else:
+                        logger.info("Skipping file sync for new project %s (ENABLE_FILE_SYNC disabled)", new_project.id)
                 except Exception as e:
-                    logger.exception(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
-                    raise
+                    logger.exception(f"In serve_projects_from_filesystem: Error creating/serving project at path '{project_path}': {e}")
+                    failed_project_paths.append(project_path)
+                    # continue to next project_path without raising
             else:
-                logger.error(f"In create_projects_from_filesystem: Error - Project path '{project_path}' does not exist.")
-                
+                logger.error(f"In serve_projects_from_filesystem: Error - Project path '{project_path}' does not exist.")
+                failed_project_paths.append(project_path)
     except Exception as e:
-        logger.exception(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
-        raise
+        logger.exception(f"Error in serve_projects_from_filesystem: {e}")
+        # handle gracefully; do not propagate
+    finally:
+        if failed_project_paths:
+            logger.info(f"Failed project paths (filesystem): {failed_project_paths}")
+    # Always return the list of created project IDs, even if errors occurred
+    return created_project_ids
 
 
 # Create the app object at the module level
+app = None
 try:
     app = create_flask_app()
     
@@ -510,7 +594,6 @@ try:
         serve_projects_from_filesystem(app, app.config['projects_base_dir'])
 except Exception as e:
     logger.exception(f"Error during app initialization: {e}")
-    app = None
 
 if __name__ == '__main__':
     logger.info("Inside main..")

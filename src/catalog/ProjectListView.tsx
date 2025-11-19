@@ -24,13 +24,14 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import type { Project } from "./utils/projectUtils";
 import type { ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
+import usePermissions from "./PermissionsContext";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {
@@ -48,9 +49,9 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const theme = useTheme();
+    const { permissions: operationPermissions, isPublicPage } = usePermissions();
 
     const handleMenuClick = useCallback((event: MouseEv, project: Project) => {
         event.stopPropagation();
@@ -67,11 +68,21 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
         window.location.href = `${base}project/${projectId}`;
     }, []);
 
-    const handleModalOpen = useCallback((modalSetter: typeof setIsAccessModalOpen) => {
+    const handleModalOpen = useCallback((modalSetter: React.Dispatch<React.SetStateAction<boolean>>) => {
         handleMenuClose();
         modalSetter(true);
     }, [handleMenuClose]);
 
+    const hasReadme = useCallback((proj: Project) => !!proj.readme, []);
+
+    const hasPermissions = useCallback((proj: Project) => 
+        proj.permissions.edit && (operationPermissions.renameProject ||
+        operationPermissions.deleteProject ||
+        operationPermissions.exportProject ||
+        operationPermissions.shareProject)
+        , [operationPermissions]);
+
+    // todo: Update this component for more cleaner code
     return (
         <>
             <TableContainer component={Paper}>
@@ -80,7 +91,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                         <TableRow>
                             <TableCell>Name</TableCell>
                             <TableCell>Owner</TableCell>
-                            <TableCell>Last Modified</TableCell>
+                            {!isPublicPage && <TableCell>Last Modified</TableCell>}
                             <TableCell>Type</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
@@ -102,17 +113,20 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                     </div>
                                 </TableCell>
                                 <TableCell>{project.owner ? project.owner.join(', ') : ''}</TableCell>
-                                <TableCell>{project.lastModified}</TableCell>
+                                {!isPublicPage && <TableCell>{project.lastModified}</TableCell>}
                                 <TableCell>{project.type}</TableCell>
                                 <TableCell align="right">
-                                    <IconButton
-                                        onClick={(e) =>
-                                            handleMenuClick(e, project)
-                                        }
-                                        size="small"
-                                    >
-                                        <MoreVert />
-                                    </IconButton>
+                                {(hasReadme(project) || hasPermissions(project)) && 
+                                    (
+                                        <IconButton
+                                            onClick={(e) =>
+                                                handleMenuClick(e, project)
+                                            }
+                                            size="small"
+                                        >
+                                            <MoreVert />
+                                        </IconButton>
+                                )}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -120,97 +134,103 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                 </Table>
             </TableContainer>
 
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-            >
-                <MenuItem onClick={() => handleModalOpen(setIsInfoModalOpen)}>
-                    <ListItemIcon>
-                        <Info fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Project Info</ListItemText>
-                </MenuItem>
-                <MenuItem 
-                    onClick={() => handleModalOpen(setIsRenameModalOpen)}
-                    disabled={!selectedProject?.permissions.edit}
-                >
-                    <ListItemIcon>
-                        <DriveFileRenameOutline fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Rename Project</ListItemText>
-                </MenuItem>
-                <MenuItem 
-                    onClick={() => {
-                        if (selectedProject) {
-                            handleMenuClose();
-                            onExport(selectedProject.id, selectedProject.name);
-                        }
-                    }}
-                    disabled={!selectedProject?.permissions.edit}
-                >
-                    <ListItemIcon>
-                        <UploadIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Export Project (as *.mdv.zip)</ListItemText>
-                </MenuItem>
-                <MenuItem 
-                    onClick={() => handleModalOpen(setIsShareModalOpen)} 
-                    disabled={!selectedProject?.permissions.edit}
-                >
-                    <ListItemIcon>
-                        <ShareIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Share Project</ListItemText>
-                </MenuItem>
-                <MenuItem 
-                    onClick={() => handleModalOpen(setIsDeleteModalOpen)} 
-                    sx={{color: theme.palette.error.main}}
-                    disabled={!selectedProject?.permissions.edit}
-                >
-                    <ListItemIcon>
-                        <Delete color="error" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Delete Project</ListItemText>
-                </MenuItem>
-            </Menu>
-
             {selectedProject && (
                 <>
-                    <ProjectInfoModal
+                    <Menu
+                        anchorEl={anchorEl}
+                        open={Boolean(anchorEl)}
+                        onClose={handleMenuClose}
+                    >
+                        {hasReadme(selectedProject) && (
+                            <MenuItem onClick={() => handleModalOpen(setIsInfoModalOpen)}>
+                                <ListItemIcon>
+                                    <Info fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Project Info</ListItemText>
+                            </MenuItem>
+                        )}
+                        {operationPermissions.renameProject && (
+                            <MenuItem 
+                                onClick={() => handleModalOpen(setIsRenameModalOpen)}
+                                disabled={!selectedProject?.permissions.edit}
+                            >
+                                <ListItemIcon>
+                                    <DriveFileRenameOutline fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Rename Project</ListItemText>
+                            </MenuItem>
+                        )}
+                        {operationPermissions.exportProject && (
+                            <MenuItem 
+                                onClick={() => {
+                                    if (selectedProject) {
+                                        handleMenuClose();
+                                        onExport(selectedProject.id, selectedProject.name);
+                                    }
+                                }}
+                                disabled={!selectedProject?.permissions.edit}
+                            >
+                                <ListItemIcon>
+                                    <UploadIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Export Project (as *.mdv.zip)</ListItemText>
+                            </MenuItem>
+                        )}
+                        {operationPermissions.shareProject && (
+                            <MenuItem 
+                                onClick={() => handleModalOpen(setIsShareModalOpen)} 
+                                disabled={!selectedProject?.permissions.edit}
+                            >
+                                <ListItemIcon>
+                                    <ShareIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Share Project</ListItemText>
+                            </MenuItem>
+                        )}
+                        {operationPermissions.deleteProject && (
+                            <MenuItem 
+                                onClick={() => handleModalOpen(setIsDeleteModalOpen)} 
+                                sx={{color: theme.palette.error.main}}
+                                disabled={!selectedProject?.permissions.edit}
+                            >
+                                <ListItemIcon>
+                                    <Delete color="error" fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Delete Project</ListItemText>
+                            </MenuItem>
+                        )}
+                    </Menu>
+
+                    {hasReadme(selectedProject) && (
+                        <ProjectInfoModal
                         open={isInfoModalOpen}
                         onClose={() => setIsInfoModalOpen(false)}
-                        name={selectedProject.name}
-                        createdAt={selectedProject.createdAt}
-                        lastModified={selectedProject.lastModified}
-                        owner={selectedProject.owner}
-                        collaborators={selectedProject.collaborators}
-                        numberOfStructures={selectedProject.numberOfStructures}
-                        numberOfImages={selectedProject.numberOfImages}
+                        readme={selectedProject.readme}
                     />
+                    )}
 
                     {selectedProject.permissions.edit && (
                         <>
-                            <ProjectRenameModal
+                            {operationPermissions.renameProject && <ProjectRenameModal
                                 id={selectedProject.id}
                                 name={selectedProject.name}
                                 open={isRenameModalOpen}
                                 onRename={onRename}
                                 onClose={() => setIsRenameModalOpen(false)}
-                            />
+                            />}
 
-                            <ProjectShareModal
+                            {operationPermissions.shareProject && <ProjectShareModal
                                 open={isShareModalOpen}
                                 onClose={() => setIsShareModalOpen(false)}
                                 projectId={selectedProject.id}
-                            />
+                            />}
 
-                            <ProjectDeleteModal
+                            {operationPermissions.deleteProject && <ProjectDeleteModal
                                 id={selectedProject.id}
                                 open={isDeleteModalOpen}
                                 onDelete={onDelete}
                                 onClose={() => setIsDeleteModalOpen(false)}
-                            />
+                            />}
                         </>
                     )}
                 </>
