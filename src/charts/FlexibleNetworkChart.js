@@ -44,10 +44,15 @@ const color_schemes = {
  */
 class FlexibleNetworkChart extends SVGChart {
     constructor(dataStore, div, config) {
-        config.link_strength = config.link_strength || 0.5;
-        config.node_repulsion = config.node_repulsion || -400;
-        config.title = config.title || "Network Graph";
-        
+        if (config.link_strength === undefined) {
+            config.link_strength = 0.5;
+        }
+        if (config.node_repulsion === undefined) {
+            config.node_repulsion = -400;
+        }
+        if (config.title === undefined) {
+            config.title = "Network Graph";
+        }
         super(dataStore, div, config, {});
         
         const c = this.config;
