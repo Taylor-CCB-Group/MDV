@@ -50,12 +50,13 @@ const useJsonLayer = () => {
             ? new GeoJsonLayer({
                   id: layer_id,
                   data: `${root}/${json}`,
-                  opacity: 0.25,
+                  opacity: 1,
                   filled: true,
                   getFillColor: (f) => [255, 255, 255, 150],
-                  getLineColor: (f) => [f.properties.DN, 255, 255, 150],
+                  getLineColor: (f) => [255, 255, 255, 150],
                   getLineWidth: 2,
                   lineWidthMinPixels: 1,
+                  getPointRadius: 10,
                   pickable: true,
                   autoHighlight: true,
                   //@ts-expect-error GeoJson getText: might think about using zod to type/validate this

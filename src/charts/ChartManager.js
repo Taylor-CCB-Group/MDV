@@ -38,6 +38,7 @@ import "./DensityScatterPlot";
 import "./StackedRowChart";
 import "./TreeDiagram";
 import "./CellNetworkChart";
+import "./FlexibleNetworkChart";
 import "./SingleHeatMap";
 import "./VivScatterPlot";
 import "./DotPlot";

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type RangeDimension from "../datastore/RangeDimension";
 import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
-import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import { CompositeMode, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension2D } from "./hooks";
@@ -11,6 +11,7 @@ import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { action, toJS } from "mobx";
 import { getEmptyFeatureCollection } from "./deck_state";
+import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -23,7 +24,7 @@ export type P = [number, number];
 export type RangeState = {
     rangeDimension: RangeDimension;
     selectionFeatureCollection: FeatureCollection;
-    editableLayer: EditableGeoJsonLayer;
+    editableLayer: MonkeyPatchEditableGeoJsonLayer;
     selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     modelMatrix: Matrix4;
@@ -115,7 +116,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
     const editableLayer = useMemo(() => {
-        return new EditableGeoJsonLayer({
+        return new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection as any,
             mode: selectionMode,
