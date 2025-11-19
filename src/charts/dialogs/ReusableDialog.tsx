@@ -4,7 +4,7 @@ import { Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, I
 export interface ReusableDialogProps {
     open: boolean;
     handleClose: () => void;
-    component: JSX.Element;
+    component: React.JSX.Element;
     isAlertErrorComponent?: boolean;
     isConfirmButton?: boolean;
     confirmText?: string;
