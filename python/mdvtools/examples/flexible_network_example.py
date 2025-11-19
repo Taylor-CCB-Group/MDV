@@ -180,7 +180,6 @@ project.set_view("Gene Regulatory Network", {
     }
 })
 
-project.save()
 
 print("\n" + "="*60)
 print("PROJECT CREATED!")

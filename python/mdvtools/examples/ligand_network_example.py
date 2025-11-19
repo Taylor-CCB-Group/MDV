@@ -133,11 +133,6 @@ config = setup_ligand_network(
     view_name="Ligand-Receptor Network"
 )
 
-# =============================================================================
-# Step 4: Save Project
-# =============================================================================
-
-project.save()
 
 print("\n" + "="*60)
 print("Project created successfully!")
