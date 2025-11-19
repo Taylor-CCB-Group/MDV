@@ -13,7 +13,7 @@ import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Ico
 import Grid from "@mui/material/Grid2";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
 import { action, observable, reaction, toJS } from "mobx";
-import z from "zod";
+import z from "zod/v4";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType, isMultiColumn } from "@/lib/columnTypeHelpers";
@@ -45,7 +45,7 @@ const ChartConfigSchema = z.object({
     type: z.string(),
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
-    extra: z.record(z.unknown()),
+    extra: z.record(z.string(), z.unknown()),
     _updated: z.date(),
 });
 type ChartConfig = z.infer<typeof ChartConfigSchema>;
