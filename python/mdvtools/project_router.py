@@ -170,7 +170,7 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
                     'string': r'([^/]+)',    # Matches anything except / (Flask default)
                     'path': r'(.+)',         # Matches everything including /
                     'int': r'(\d+)',         # Matches integers only
-                    'float': r'(\d+\.?\d*)', # Matches floats (simplified)
+                    'float': r'(\d+\.\d+|\d+\.|\.\d+|\d+)',  # Matches: 123.45, 123., .45, 123
                     'uuid': r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})',
                 }
                 
