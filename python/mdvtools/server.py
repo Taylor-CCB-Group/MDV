@@ -147,6 +147,10 @@ def create_app(
     def get_json_file(file: str):
         if project.dir is None:
             return "Project directory not found", 404
+        # nb - matching on strings ending in json... where the spatial.conversion script named '.geojson',
+        # they were being changed here to '.ge.json' (dot in route is wildcard) and then getting a 404.
+        # also note - flask route vs our project_router behaved differently, so bug didn't appear in single project mode.
+        # Same logic could apply to .b & .gz above, but not wanting to risk changing behaviour without more testing.
         path = safe_join(project.dir, file + ".json")
         # log(f"get_json_file: '{path}' for project {project.id}")
 
