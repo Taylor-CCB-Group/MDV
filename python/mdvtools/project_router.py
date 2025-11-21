@@ -228,7 +228,7 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
                 return method(*match.groups())
         
         # No route matched
-        raise ValueError(f"no matching route for {subpath}")
+        return {"status": "error", "message": f"no matching route for '{subpath}'"}, 404        
 
 
 
