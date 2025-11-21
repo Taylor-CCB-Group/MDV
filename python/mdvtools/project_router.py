@@ -26,20 +26,11 @@ REFACTORING OPTIONS TO CONSIDER:
    - Con: Still need custom dispatching for project-specific routes
    - Effort: Medium (2-3 days)
 
-3. Dynamic Blueprint registration with app reload
-   - Pro: True Flask Blueprints
-   - Con: Requires app restart/reload on project changes
-   - Con: May impact active connections/sessions
-   - Effort: High (need graceful reload strategy)
-
-4. Microservices approach
-   - Pro: Each project could be independent service
-   - Con: Major architectural change
-   - Effort: Very High (weeks/months)
-
 RECOMMENDED APPROACH:
 If refactoring, start with Option 1 (werkzeug.routing.Map) as it provides
 the best balance of proper Flask semantics without major architectural changes.
+
+Note that it will mean any 'server extensions' will also need to be updated to use the new routing system.
 
 TESTS NEEDED BEFORE REFACTORING:
 - Route pattern matching with all converter types
@@ -80,9 +71,7 @@ LIMITATIONS:
 POTENTIAL REFACTORING OPTIONS (for future consideration):
 1. Use Flask's PluggableView/MethodView for more Flask-native approach
 2. Use werkzeug.routing.Map directly instead of custom regex matching
-3. Consider if dynamic project registration is still required - if projects are
-   mostly static, could move back to standard Blueprints with app reload on change
-4. Investigate Flask extensions for dynamic routing (e.g., flask-classful)
+3. Investigate Flask extensions for dynamic routing (e.g., flask-classful)
 
 CURRENT STATUS:
 Works as a drop-in replacement for Blueprint in this codebase, but behavior differs
@@ -249,8 +238,6 @@ class SingleProjectShim(ProjectBlueprintProtocol):
     When serving only one project (no dynamic multi-project support needed),
     this shim allows the same code to work by forwarding route() calls directly
     to Flask's native routing. No custom regex matching needed in this case.
-    
-    This is the "proper" Flask approach - use this pattern when possible.
     """
     def __init__(self, app: Flask) -> None:
         self.app = app
