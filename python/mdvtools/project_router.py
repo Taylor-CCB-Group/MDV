@@ -67,7 +67,9 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
             """
             # would be nice to re-use logic from Flask's routing, but it's a bit complex to use out of context
             # from werkzeug.routing import Rule
-            rule_re = re.compile(re.sub(r"<.*?>", "(.*)", f"^{rule}$"))
+            # Escape literal '.' in the rule to '\.' so that dots match dots, not any character
+            rule_escaped = rule.replace('.', r'\.')
+            rule_re = re.compile(re.sub(r"<.*?>", "(.*)", f"^{rule_escaped}$"))
             # rather than just add the callable f, we add (f, permissionsFlags)
             # where permissionsFlags are something passed in options
             self.routes[rule_re] = (f, options)
