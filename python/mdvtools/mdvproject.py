@@ -135,6 +135,24 @@ class MDVProject:
         c["chat_enabled"] = chat_enabled
         self.state = c
 
+    def get_lineage(self):
+        """
+        Load and return lineage information if available.
+        
+        Returns:
+            Dictionary containing lineage information (source files, parameters,
+            environment, etc.), or None if no lineage file exists.
+            
+        Raises:
+            json.JSONDecodeError: If the lineage file contains invalid JSON
+            IOError: If there's an error reading the lineage file
+        """
+        lineage_file = join(self.dir, "lineage.json")
+        if exists(lineage_file):
+            with open(lineage_file, 'r') as f:
+                return json.load(f)
+        return None
+
     def lock(self, type="read"):
         return self._lock.read_lock() if type == "read" else self._lock.write_lock()
 

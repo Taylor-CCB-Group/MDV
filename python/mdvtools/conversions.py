@@ -20,7 +20,9 @@ def convert_scanpy_to_mdv(
     label: str = "",
     chunk_data: bool = False,
     add_layer_data = True,
-    gene_identifier_column = None
+    gene_identifier_column = None,
+    track_lineage: bool = True,
+    source_file: str = None
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -45,6 +47,10 @@ def convert_scanpy_to_mdv(
         gene_identifier_column: (str, optional) This is the gene column that the user will use to
             identify the gene. If not specified (default) than a column 'name' will be added that is
             created from the index (which is usaully the unique gene name)
+        track_lineage: (bool, optional) If True (default), creates a lineage.json file with
+            provenance information including source files, parameters, and environment details
+        source_file: (str, optional) Path to the original source file (e.g., .h5ad file).
+            If provided and track_lineage is True, the file's SHA256 hash will be computed
     Returns:
         MDVProject: The configured MDV project object with the converted data
 
@@ -80,6 +86,35 @@ def convert_scanpy_to_mdv(
     # Validate input AnnData
     if scanpy_object.n_obs == 0 or scanpy_object.n_vars == 0:
         raise ValueError("Cannot convert empty AnnData object (0 cells or 0 genes)")
+    
+    # Initialize lineage tracking if requested
+    lineage_tracker = None
+    if track_lineage:
+        try:
+            from .umts import LineageTracker
+            lineage_tracker = LineageTracker()
+            
+            # Record source file if provided
+            if source_file and os.path.exists(source_file):
+                lineage_tracker.record_source(source_file)
+            
+            # Record conversion parameters
+            lineage_tracker.record_parameters({
+                'max_dims': max_dims,
+                'delete_existing': delete_existing,
+                'label': label,
+                'chunk_data': chunk_data,
+                'add_layer_data': add_layer_data,
+                'gene_identifier_column': gene_identifier_column,
+                'n_obs': scanpy_object.n_obs,
+                'n_vars': scanpy_object.n_vars
+            }, function_name='convert_scanpy_to_mdv')
+            
+            # Record environment information
+            lineage_tracker.record_environment()
+        except ImportError:
+            # UMTS not available, silently skip lineage tracking
+            lineage_tracker = None
     
     mdv = MDVProject(folder, delete_existing=delete_existing)
 
@@ -178,6 +213,14 @@ def convert_scanpy_to_mdv(
             
             new_views[view_name] = new_view_data
         
+    # Save lineage information if tracking is enabled
+    if lineage_tracker:
+        try:
+            lineage_tracker.save(folder)
+            print(f"Lineage information saved to {folder}/lineage.json")
+        except Exception as e:
+            print(f"Warning: Could not save lineage information: {str(e)}")
+    
     return mdv
 
 def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False, chunk_data=False):
