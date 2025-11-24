@@ -477,10 +477,7 @@ BaseChart.types["VivMdvRegionReact"] = {
         const colorColumn = ds.columnIndex[r.default_color];
         if (!allNumeric([colorColumn])) {
             config.contourParameter = config.color_by;
-        } else {
-            // todo better default category (or handling of undefined)
-            config.contourParamter = r.region_field;
-        }
+        } //else fallback to undefined contourParameter seems ok
         config.param = [...r.position_fields];
         config.background_filter = {
             column: r.region_field,
