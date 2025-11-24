@@ -1809,6 +1809,7 @@ class DataStore {
 
     /**
      * @param {string | undefined} column - the column's field/id
+     * @param {"name_value" | undefined} format - if "name_value", returns `{name: string, value: string}[]` for use in settings 'dropdown' widget
      * @returns {string[]} - the column's values
      */
     getColumnValues(column, format = null) {
