@@ -98,6 +98,7 @@ export function useContour(props: ContourProps) {
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
     // this has a regression... while in the process of loading data, it will return undefined which we don't handle well.
+    // (could do with some more testing but I think this is less problematic now?)
     const contourParameter = useFieldSpec(parameter);
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);

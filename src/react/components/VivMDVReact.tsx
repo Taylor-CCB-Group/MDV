@@ -99,37 +99,20 @@ export type VivMDVReact = VivMdvReact;
 function adaptConfig(originalConfig: VivMdvReactConfig, dataStore: DataStore) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
-    // also need to address 3D case - intention to migrate to a different config schema before then.
-    //@ts-expect-error contourParameter type
-    if (!config.contourParameter) config.contourParameter = config.param[2];
-    if (!config.contourParameter) throw "unexpected: no contourParameter";
-    // **we need to mitigate the risk of this being non-categorical**
-    const column = dataStore.columnIndex[config.contourParameter];
-    if (!column) throw `unexpected: no column for contourParameter '${config.contourParameter}'`;
-    // column type helpers could be more user friendly/comprehensive...
-    if (allNumeric([column])) {
-        console.warn(`contourParameter '${config.contourParameter}' is not categorical, using region field '${dataStore.getColumnName(dataStore.regions?.region_field)}' instead`);
-        const defaultRegionField = dataStore.regions?.region_field;
-        if (!defaultRegionField) throw "no default region field";
-        config.contourParameter = defaultRegionField;
-        config.param[2] = defaultRegionField;
+    if (!dataStore.regions) {
+        throw new Error("unexpected attempt to load spatial chart with no regions in datasource")
     }
-    // if (!config.)
-    // === some dead code ===
-    // if (config.type === 'VivMdvRegionReact') {
-    //     // we don't use viv.image_properties, we use viv.channelsStore et al.
-    //     // if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
-    //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
-    //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
-    // } else if (config.type === 'VivMdvReact') {
-    //     //unused
-    //     if (config.overviewOn === undefined) config.overviewOn = false;
-    //     // if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
-    //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
-    //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
-    // }
-
+    // we now only use param for spatial coordinates, but charts could be saved with param[2] being contourParameter
+    config.param = [...dataStore.regions.position_fields];
+    // contourParameter is optional - but could be saved as something numeric in which case it could corrupt things
+    if (config.contourParameter) {
+        const c = dataStore.columnIndex[config.contourParameter];
+        if (!c || allNumeric([c])) {
+            config.contourParameter = dataStore.regions.region_field;
+        }
+    }
     // consider adapting `channels` from old format to new format...
+    // should be able to handle default_channels better when set
     config.viv = applyDefaultChannelState(config.viv);
     return config;
 }
@@ -186,13 +169,11 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     getSettings() {
         const c = this.config;
-        const { tooltip } = c;
         const cols = this.dataStore.getColumnList();// as DataColumn<DataType>[];
         const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
-        //@ts-expect-error category column values...
-        const ocats = this.dataStore.getColumnValues(c.param[2])?.slice() || [];
+        const ocats = this.dataStore.getColumnValues(c.contourParameter)?.slice() || [];
         const cats = ocats.map((x) => {
             return { t: x };
         });
@@ -328,16 +309,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 type: "dropdown", //todo, make this "column" and fix odd behaviour with showing the value...
                                 //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
                                 label: "Contour parameter",
-                                // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
-                                //@ts-expect-error contourParameter type
-                                current_value: c.contourParameter || c.param[2],
+                                current_value: c.contourParameter || "",
                                 values: [catCols, "name", "field"],
                                 func: (x) => {
                                     if (x === c.contourParameter) return;
                                     // could we change 'cats' and have the dropdowns update?
                                     // was thinking this might mean a more general refactoring of the settings...
                                     if (!isArray(c.param)) throw "expected param array";
-                                    c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
+                                    c.contourParameter = x;
                                     // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
                                     const newCats = (
                                         this.dataStore.getColumnValues(x) || []
@@ -486,12 +465,38 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 }
 
 BaseChart.types["VivMdvRegionReact"] = {
-    ...BaseChart.types["viv_scatter_plot"], //this is doing something that means my default radius isn't being used...
+    ...BaseChart.types["viv_scatter_plot"],
     init: (config, ds, ec) => {
-        const base = BaseChart.types["viv_scatter_plot"];
-        if (!base || !base.init) throw "no base viv_scatter_plot"; //may well want to change this behaviour soon
-        base.init(config, ds, ec);
-        config.radius = scatterDefaults.radius;
+        // let's explicitly do what we actually want here, to avoid `config.param` mixup.
+        // const base = BaseChart.types["viv_scatter_plot"];
+        // if (!base || !base.init) throw "no base viv_scatter_plot"; //may well want to change this behaviour soon
+        // base.init(config, ds, ec);
+        const r = ds.regions;
+        const sr = r.all_regions[ec.region];
+        config.color_by = r.default_color;
+        const colorColumn = ds.columnIndex[r.default_color];
+        if (!allNumeric([colorColumn])) {
+            config.contourParameter = config.color_by;
+        } else {
+            // todo better default category (or handling of undefined)
+            config.contourParamter = r.region_field;
+        }
+        config.param = [...r.position_fields];
+        config.background_filter = {
+            column: r.region_field,
+            category: ec.region,
+        };
+        config.color_legend = { display: false };
+        config.region = ec.region;
+        config.roi = sr.roi; //may not be needed/used
+        config.json = sr.json;
+        config.title = ec.region + (sr.default_image ? `-${sr.default_image}` : "");
+        //config.radius = scatterDefaults.radius; //we spread scatterDefaults in adaptConfig
+        config.viv = {
+            // todo: should be able to handle default_channels better when set
+            // or not - maybe tricky to try supporting this with diverse image inputs?
+            channels: ds.regions.avivator.default_channels,
+        };
     },
     class: VivMdvReact,
     name: "Viv Scatter Plot (react)",

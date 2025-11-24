@@ -1808,11 +1808,16 @@ class DataStore {
     }
 
     /**
-     * @param {string} column - the column's field/id
+     * @param {string | undefined} column - the column's field/id
      * @returns {string[]} - the column's values
      */
     getColumnValues(column, format = null) {
+        if (column === undefined) {
+            console.warn('getColumnValues(undefined)');
+            return [];
+        }
         const v = this.columnIndex[column].values;
+        // could throw here if v is undefined (ie bad column arg)
         if (format === "name_value") {
             const ls = Array.from(v, (x) => ({ name: x, value: x })).sort(
                 (a, b) => a.name.localeCompare(b.name),
