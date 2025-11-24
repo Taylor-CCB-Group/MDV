@@ -25,6 +25,7 @@ import type DataStore from "@/datastore/DataStore";
 import { g, isArray, toArray } from "@/lib/utils";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
+import { allNumeric } from "@/lib/columnTypeHelpers";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -96,11 +97,24 @@ export type VivMdvReactConfig = ScatterPlotConfig &
     VivRoiConfig;
 export type VivMDVReact = VivMdvReact;
 
-function adaptConfig(originalConfig: VivMdvReactConfig) {
+function adaptConfig(originalConfig: VivMdvReactConfig, dataStore: DataStore) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
+    // also need to address 3D case - intention to migrate to a different config schema before then.
     //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
+    if (!config.contourParameter) throw "unexpected: no contourParameter";
+    // **we need to mitigate the risk of this being non-categorical**
+    const column = dataStore.columnIndex[config.contourParameter];
+    if (!column) throw `unexpected: no column for contourParameter '${config.contourParameter}'`;
+    // column type helpers could be more user friendly/comprehensive...
+    if (allNumeric([column])) {
+        console.warn(`contourParameter '${config.contourParameter}' is not categorical, using region field '${dataStore.getColumnName(dataStore.regions?.region_field)}' instead`);
+        const defaultRegionField = dataStore.regions?.region_field;
+        if (!defaultRegionField) throw "no default region field";
+        config.contourParameter = defaultRegionField;
+        config.param[2] = defaultRegionField;
+    }
     // if (!config.)
     // === some dead code ===
     // if (config.type === 'VivMdvRegionReact') {
@@ -135,7 +149,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: VivMdvReactConfig) {
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
-        const config = adaptConfig(originalConfig);
+        const config = adaptConfig(originalConfig, dataStore);
         super(dataStore, div, config, VivScatterChartRoot);
         //@ts-expect-error color_by legacy options
         this.colorByColumn(config.color_by);

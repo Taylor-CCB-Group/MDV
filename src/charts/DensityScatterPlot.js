@@ -370,6 +370,9 @@ BaseChart.types["image_scatter_plot"] = {
         const r = ds.regions;
         const sr = r.all_regions[ec.region];
         config.color_by = r.default_color;
+        // trouble... when default_color is not categorical bad things happen.
+        // for now, we should be able to check whether default_color is categorical and if not, we use the region field.
+        // we need to do this during chart creation for it to work with saved configs.
         config.param = r.position_fields.concat([r.default_color]);
         config.background_filter = {
             column: r.region_field,
