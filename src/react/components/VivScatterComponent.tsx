@@ -39,10 +39,9 @@ export const VivScatter = () => {
     );
 };
 
-const useJsonLayer = () => {
+const useJsonLayer = (showJson: boolean) => {
     const id = useChartID();
     const { root } = useProject();
-    const { showJson } = useConfig<VivRoiConfig>();
     const { json } = useRegion(); // return type is 'any' and we assume 'json' will be a string - but want that to be different in future.
     const layer_id = `json_${getVivId(`${id}detail-react`)}`;
     const layer = useMemo(() => {
@@ -84,7 +83,9 @@ const Main = observer(() => {
     // this isn't updating when we tweak the config...
     const { scatterProps, selectionLayer } = useSpatialLayers();
     const { scatterplotLayer, getTooltip } = scatterProps;
-    const jsonLayer = useJsonLayer();
+    const { showJson } = useConfig<VivRoiConfig>();
+    // passing showJson from here to make use of this being `observer`
+    const jsonLayer = useJsonLayer(showJson);
 
     // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
     const {
