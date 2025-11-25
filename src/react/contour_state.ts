@@ -302,14 +302,17 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                         type: "column", //todo, make this "column" and fix odd behaviour with showing the value...
                         //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
                         label: "Contour parameter",
-                        current_value: c.contourParameter || c.param[2],
+                        current_value: c.contourParameter || "",
                         columnType: "text",
                         func: (x) => {
                             if (x === c.contourParameter) return;
                             if (!isArray(c.param)) throw "expected param array";
-                            c.contourParameter = c.param[2] = x;
+                            c.contourParameter = x;
                             //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
                             //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
+                            //nb - when we switch back to a contourParameter that had categories associated, the GUI state is changing
+                            // back to the old setting (but not updating the state).
+                            // Shouldn't this line mean that it forgets the old categories?
                             c.category1 = c.category2 = [];
                         },
                     }),
