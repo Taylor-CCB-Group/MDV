@@ -300,7 +300,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
                 geojson = _shape_to_geojson(annotated, best_img.transform_to_image)
                 region_id = best_img.region_id
                 # the name may be misleading in xenium case, but avoids other potential naming conflicts.
-                name = f"{region_id}.geojson"
+                name = f"{region_id}.geo.json"
                 path = os.path.join(conversion_args.temp_folder, name)
                 all_regions[region_id]["json"] = f"images/{name}"
                 with open(path, "w") as f:
