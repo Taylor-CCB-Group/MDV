@@ -192,7 +192,11 @@ const Main = observer(() => {
             // },
             controller: {
                 doubleClickZoom: false,
-            }
+            },
+            // deviceProps: {
+            //     // todo - get this working more usefully.
+            //     debugSpectorJS: true,
+            // }
         }),
         [
             scatterplotLayer,
