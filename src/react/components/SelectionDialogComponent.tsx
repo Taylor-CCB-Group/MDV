@@ -67,7 +67,7 @@ const filterOptions = createFilterOptions<any>({ limit: 100 });
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const [open, setOpen] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
-    const ref = useRef<HTMLInputElement>(null);
+    const ref = useRef<HTMLInputElement | null>(null);
     const dim = useDimensionFilter(column);
     const conf = useConfig<SelectionDialogConfig>();
     const { values } = column;
@@ -349,7 +349,7 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
 };
 
 const useBrushX = (
-    ref: React.RefObject<SVGSVGElement>,
+    ref: React.RefObject<SVGSVGElement | null>,
     { value, setValue, minMax, histoWidth, histoHeight }: RangeProps //consider different typing here
 ) => {
     const brushRef = useRef<(ReturnType<typeof d3.brushX>) | null>(null);

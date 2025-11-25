@@ -252,7 +252,7 @@ export const DropdownAutocompleteComponent = observer(({
     // todo review 'virtualization' for large lists
     const id = useId();
     const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLInputElement>(null);
+    const ref = useRef<HTMLInputElement | null>(null);
     // const props = inferDropdownType(propsAmbiguous);
     const multiple = isMultidropdown(props);
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
