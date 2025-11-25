@@ -16,10 +16,17 @@ export type ExtraContourProps = { contourOpacity: number };
 const triangleVs = /*glsl*/ `#version 300 es
 #define SHADER_NAME heatp-map-layer-vertex-shader
 uniform sampler2D maxTexture;
+// NOTE: still pending UBO refactor, will need attention with deck update, this is compatible for now.
 uniform float intensity;
 uniform vec2 colorDomain;
 uniform float threshold;
 uniform float aggregationMode;
+// uniform HeatmapUniforms {
+//     float intensity;
+//     vec2 colorDomain;
+//     float threshold;
+//     float aggregationMode;
+// } heatmapUniforms;
 in vec3 positions;
 in vec2 texCoords;
 out vec2 vTexCoords;
@@ -115,6 +122,15 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
             colorDomain,
             contourOpacity
         });
+        // model.shaderInputs.setProps({
+        //     "Heatmap": {
+        //         intensity,
+        //         threshold,
+        //         aggregationMode,
+        //         colorDomain,
+        //         contourOpacity
+        //     }
+        // });
         model.draw(this.context.renderPass);
     }
 }
