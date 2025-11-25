@@ -150,7 +150,18 @@ USER pn
 
 
 # Command to run Gunicorn
-CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "200", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
+# NOTE: For multi-worker deployments (more than 1 worker), you MUST set REDIS_URL
+# environment variable. Flask-SocketIO requires Redis to share session state across workers.
+# Without Redis, you'll get "KeyError: 'Session is disconnected'" errors.
+# Example: REDIS_URL=redis://redis:6379/0
+# 
+# Single worker (no Redis needed):
+#   -w 1
+# 
+# Multi-worker (Redis required):
+#   -w 4  # or any number > 1
+
+CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 

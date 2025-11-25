@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type RangeDimension from "../datastore/RangeDimension";
 import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
-import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import { CompositeMode, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension2D } from "./hooks";
@@ -10,7 +10,8 @@ import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { action, toJS } from "mobx";
-import { useOuterContainer } from "./screen_state";
+import { getEmptyFeatureCollection } from "./deck_state";
+import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -23,7 +24,7 @@ export type P = [number, number];
 export type RangeState = {
     rangeDimension: RangeDimension;
     selectionFeatureCollection: FeatureCollection;
-    editableLayer: EditableGeoJsonLayer;
+    editableLayer: MonkeyPatchEditableGeoJsonLayer;
     selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     modelMatrix: Matrix4;
@@ -43,14 +44,10 @@ export type SpatialAnnotationState = {
 // Could more usefully be thought of as SpatialContext?
 const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
-export const getEmptyFeatureCollection = () => ({
-    type: "FeatureCollection",
-    features: []
-} as FeatureCollection);
 
 function useSelectionCoords(selection: FeatureCollection) {
     // where should we keep this in config for persisting?
-    const feature = selection.features[0];
+    const feature = selection?.features[0];
     const coords = useMemo(() => {
         if (!feature) return [];
         //these casts are unsafe in a general sense, but should be ok in our editor.
@@ -65,7 +62,11 @@ function useSelectionCoords(selection: FeatureCollection) {
     return coords as [number, number][];
 }
 
-/** for this to be more useful as a hook will depend on state/context... */
+/** 
+ * for this to be more useful as a hook will depend on state/context...
+ * and with proper spatialdata support we should review this so we have proper coordinate system.
+ * hopefully we can move some things around for better HMR editing DX as well.
+ */
 function useScatterModelMatrix() {
     const scale = useRegionScale();
     const s = 1 / scale;
@@ -97,7 +98,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     useEffect(() => {
         console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
-            setSelectionFeatureCollection(getEmptyFeatureCollection());            
+            setSelectionFeatureCollection(getEmptyFeatureCollection());
         }
     }, [chart, setSelectionFeatureCollection]);
     useEffect(() => {
@@ -115,7 +116,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
     const editableLayer = useMemo(() => {
-        return new EditableGeoJsonLayer({
+        return new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection as any,
             mode: selectionMode,

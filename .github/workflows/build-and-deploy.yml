@@ -85,7 +85,7 @@ jobs:
       - name: Build and push linux/amd64 image
         run: |
           echo "Building and pushing image..."
-          docker buildx build --platform linux/amd64,linux/arm64 \
+          docker buildx build --platform linux/amd64 \
             --build-arg GIT_COMMIT_DATE="${{ steps.build_metadata.outputs.git_commit_date }}" \
             --build-arg GIT_BRANCH_NAME="${{ steps.build_metadata.outputs.git_branch_name }}" \
             --build-arg GIT_COMMIT_HASH="${{ steps.build_metadata.outputs.git_commit_hash }}" \
@@ -99,4 +99,6 @@ jobs:
             --label "org.opencontainers.image.description=${{ steps.release_notes.outputs.release_notes }}" \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ steps.build_metadata.outputs.git_commit_hash }} \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
+            --cache-from=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:cache \
+            --cache-to=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:cache,mode=max \
             --push . 

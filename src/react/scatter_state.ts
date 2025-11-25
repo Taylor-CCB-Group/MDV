@@ -22,9 +22,9 @@ import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
-import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { getEmptyFeatureCollection } from "./deck_state";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
@@ -105,6 +105,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_opacity: 0.5,
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
+    // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 
@@ -130,19 +131,25 @@ export function useRegionScale() {
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
     //MDVProject.set_region_scale assumes that all regions have the same scale?
-    if (!metadata) return 1; // / regionScale?; // might want to start using this with non-image data that has real units
+    if (!metadata) return 1 / regionScale; // might want to start using this with non-image data that has real units
+    if (!("Pixels" in metadata)) return 1/regionScale;
     const { Pixels } = metadata;
+    if (!Pixels.PhysicalSizeX) return 1 / regionScale;
     if (Pixels.PhysicalSizeXUnit !== regionUnit)
         console.warn(
             `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
         );
     // if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
-    if (!Pixels.PhysicalSizeX) return 1;
     const scale = Pixels.PhysicalSizeX / regionScale;
     return Number.isFinite(scale) ? scale : 1;
 }
 
-
+/**
+ * This hook is used to fit the scatterplot to the data when data filter changes.
+ * 
+ * It can be a bit janky when reacting to changes originating from the same view,
+ * we should consider a better approach.
+ */
 function useZoomOnFilter(modelMatrix: Matrix4) {
     const config = useConfig<ScatterPlotConfig>();
     const data = useFilteredIndices();
@@ -373,6 +380,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 if (typeof i !== "number") throw new Error("expected index");
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
+                // this `cz?.minMax` doesn't account for the potential of cz existing,
+                // but not being what we anticipated
+                // this shouldn't happen now - config.param should only be coordinates.
                 target[2] = cz?.minMax ? cz.data[i] : 0;
                 return target as unknown as Float32Array; // deck.gl types are wrong AFAICT
             },

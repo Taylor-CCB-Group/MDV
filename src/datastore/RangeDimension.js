@@ -107,8 +107,9 @@ class RangeDimension extends Dimension {
     getBins(callback, column, config = {}) {
         const col = this.parent.columnIndex[column];
         config.bins = config.bins === undefined ? 10 : config.bins;
-        config.min = config.min === undefined ? col.minMax[0] : config.min;
-        config.max = config.max === undefined ? col.minMax[1] : config.max;
+        const [min, max] = this.parent.getMinMaxForColumn(column);
+        config.min = config.min === undefined ? min : config.min;
+        config.max = config.max === undefined ? max : config.max;
 
         const t = performance.now();
         const action = (e) => {

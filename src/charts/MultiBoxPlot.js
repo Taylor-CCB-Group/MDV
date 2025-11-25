@@ -31,9 +31,10 @@ class MultiBoxPlot extends SVGChart {
         const q = this.config.percentile_trim;
         for (let x = 1; x < p.length; x++) {
             const col = this.dataStore.columnIndex[p[x]];
+            const [min, max] = this.dataStore.getMinMaxForColumn(col);
             config.scaleVals.push([
-                q ? col.quantiles[q][0] : col.minMax[0],
-                q ? col.quantiles[q][1] : col.minMax[1],
+                q ? col.quantiles[q][0] : min,
+                q ? col.quantiles[q][1] : max,
             ]);
         }
         this.dim.getMultiBoxPlotData(

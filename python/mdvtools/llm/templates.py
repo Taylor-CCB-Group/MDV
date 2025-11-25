@@ -60,7 +60,12 @@ Your task is to:
 
 packages_functions = """import os
 import pandas as pd
-import scanpy as sc
+try:
+    import scanpy as sc
+    HAS_SCANPY = True
+except Exception:
+    sc = None
+    HAS_SCANPY = False
 from mdvtools.mdvproject import MDVProject
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.charts.density_scatter_plot import DensityScatterPlot
@@ -119,23 +124,27 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
 
     The provided scripts demonstrate how to generate various data visualizations using the `mdvtools` library in Python.
 
-    Each script follows this standard workflow:
+    Each script follows this workflow:
 
     1. Setup:
-        - Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True).
-        - Use `scanpy.read_h5ad(data_path)` to load the AnnData object.
+        - Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True) when creating a new project.
+        - When modifying an existing project (the default in this chat context), do NOT recreate or delete the project.
 
-    2. Data Loading:
-        - Extract `adata.obs` into `data_frame_obs` (cell-level info).
-        - Extract `adata.var` into `data_frame_var` (gene-level info).
-        - Add a `name` column to `data_frame_var`: `adata.var_names.to_list()`
+    2. Data Access (scanpy optional):
+        - If HAS_SCANPY is True and `data_path` points to a valid .h5ad file, you MAY load AnnData:
+            adata = sc.read_h5ad(data_path)
+            data_frame_obs = adata.obs
+            data_frame_var = adata.var.assign(name=adata.var_names.to_list())
+        - OTHERWISE (no scanpy or no .h5ad):
+            - DO NOT use scanpy.
+            - Use the existing MDV datasources already registered in the project:
+                data_frame_obs = project.get_datasource_as_dataframe('cells') if available
+                data_frame_var = project.get_datasource_as_dataframe('genes') if available
+            - If a 'genes' datasource is not available, omit gene-specific logic and charts that require gene wrapping.
 
     3. Datasource Registration:
-        - Add data to the MDV project using:
-            ```python
-            project.add_datasource(datasource_name, data_frame_obs)
-            project.add_datasource(datasource_name_2, data_frame_var)
-            ```
+        - When modifying an existing project, DO NOT call project.add_datasource(...).
+        - Only add datasources when explicitly creating a new project from raw data (not the default).
 
     4. Plot Construction:
         - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected fields.
@@ -145,8 +154,8 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
 
     5. Parameter Handling:
         - The string """+final_answer+""" specifies the field names to use in the `params` list and the chart type to use.
-        - For parameters from `data_frame_obs` (cell-level), use them as-is.
-        - For gene expression values from `data_frame_var`, use this syntax:
+        - For parameters from cell-level data (from data_frame_obs or existing 'cells' datasource), use them as-is.
+        - For gene expression (if a 'genes' datasource or data_frame_var is available), use this syntax to refer to a gene:
             ```python
             param = "GENE_NAME"
             param_index = data_frame_var['name'].tolist().index(param)
@@ -154,10 +163,8 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             ```
 
     6. Gene-Related Queries:
-        If the question involves gene expression, expression comparison, or refers to gene names:
-        - Load both `cells` and `genes` datasources.
-        - Wrap gene names (from `data_frame_var`) using the syntax above.
-        - Only wrap genes—do not apply `get_loc()` or `index` on `data_frame_obs` fields.
+        - Only perform gene wrapping if you have a usable gene names table (data_frame_var or 'genes' datasource with a 'name' column).
+        - If not available, proceed without gene wrapping and prefer non-gene charts.
 
     7. Queries requiring subsetting of the dataset:
         If to answer the question requires a subset of the data or filtering the data, make sure to:
@@ -174,7 +181,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Generate a valid Python script that creates and visualizes the appropriate chart using the MDVProject framework.
         - Update these variables with these values:
             - project_path = '"""+project.dir+"""'
-            - data_path = '"""+path_to_data+"""'
+            - data_path = '"""+path_to_data+"""'  # may be empty; if empty or HAS_SCANPY is False, DO NOT use scanpy.
             - view_name = a string, in double quotes, describing what is being visualized.
             - datasource_name = '"""+datasource_name+"""'
         - The possible charts are given by """+final_answer+""" and should follow the following visualisation guidelines for each type of chart:

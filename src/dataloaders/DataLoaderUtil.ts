@@ -1,4 +1,3 @@
-import { createEl } from "@/utilities/ElementsTyped";
 import {
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
@@ -71,6 +70,12 @@ export function getProjectURL(url: string, trailingSlash = true) {
     if (p.startsWith("/")) return new URL(p, window.location.href).href;
     return p;
 }
+export type DataLoader = {
+    function: (columns: DataColumn<any>[], dataSource: string, size: number) => Promise<ArrayBufferLike>,
+    viewLoader: (view: string) => Promise<any>,
+    rowDataLoader: (dataSource: string, index: string) => Promise<any>,
+    binaryDataLoader: (dataSource: string, name: string) => Promise<ArrayBufferLike>,
+}
 
 export function getDataLoader(
     isStaticFolder: boolean,
@@ -79,8 +84,7 @@ export function getDataLoader(
     url: string,
 ) {
     const root = url.endsWith("/") ? url.substring(0, url.length - 1) : url;
-
-    return isStaticFolder
+    const loader = isStaticFolder
         ? {
               function: getLocalCompressedBinaryDataLoader(datasources, root),
               viewLoader: async (view: string) => views[view],
@@ -93,6 +97,7 @@ export function getDataLoader(
               rowDataLoader: loadRowData,
               binaryDataLoader: loadBinaryData,
           };
+    return loader;
     //PJT - want to clarify /binarydata/ & /rowdata/ folders, and use of .b vs .gz
 
     async function loadRowDataStatic(datasource: string, index: string) {
