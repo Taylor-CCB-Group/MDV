@@ -23,10 +23,7 @@ export class ScatterSquareExtension extends LayerExtension {
                 ////
                 
                 `,
-                "fs:#decl": `uniform float opacity;
-                in float _lineWidthPixels;
-                uniform float lineWidthScale;
-                `,
+                "fs:#decl": "in float _lineWidthPixels;",
                 "fs:#main-end": `
                 //---- ScatterSquareExtension
                 // a bit wasteful to keep the original shader for circle rendering above
