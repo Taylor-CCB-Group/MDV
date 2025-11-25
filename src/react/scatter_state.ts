@@ -384,6 +384,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 if (typeof i !== "number") throw new Error("expected index");
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
+                // this `cz?.minMax` doesn't account for the potential of cz existing,
+                // but not being what we anticipated
+                // this shouldn't happen now - config.param should only be coordinates.
                 target[2] = cz?.minMax ? cz.data[i] : 0;
                 return target as unknown as Float32Array; // deck.gl types are wrong AFAICT
             },

@@ -1808,18 +1808,24 @@ class DataStore {
     }
 
     /**
-     * @param {string} column - the column's field/id
+     * @param {string | undefined} column - the column's field/id
+     * @param {"name_value" | undefined} format - if "name_value", returns `{name: string, value: string}[]` for use in settings 'dropdown' widget
      * @returns {string[]} - the column's values
      */
     getColumnValues(column, format = null) {
         // if the column is not categorical, it will return undefined - that may be ok
         // if the column is a linked field, there is a chance that it won't be in the columnIndex
         // that is a problem because then we throw an error here.
+        if (column === undefined) {
+            console.warn('getColumnValues(undefined)');
+            return [];
+        }
         const v = this.columnIndex[column]?.values;
         if (!v) {
             console.error(`no values for column '${column}' in ds '${this.name}'`);
             return [];
         }
+        // could throw here if v is undefined (ie bad column arg)
         if (format === "name_value") {
             const ls = Array.from(v, (x) => ({ name: x, value: x })).sort(
                 (a, b) => a.name.localeCompare(b.name),

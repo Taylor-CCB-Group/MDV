@@ -18,7 +18,6 @@ import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
-import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
@@ -26,6 +25,7 @@ import { g, toArray } from "@/lib/utils";
 import { getDensitySettings } from "../contour_state";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
+import { allNumeric } from "@/lib/columnTypeHelpers";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -97,26 +97,23 @@ export type VivMdvReactConfig = ScatterPlotConfig &
     VivRoiConfig;
 export type VivMDVReact = VivMdvReact;
 
-function adaptConfig(originalConfig: VivMdvReactConfig) {
+function adaptConfig(originalConfig: VivMdvReactConfig, dataStore: DataStore) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
-    if (!config.contourParameter) config.contourParameter = config.param[2];
-    // if (!config.)
-    // === some dead code ===
-    // if (config.type === 'VivMdvRegionReact') {
-    //     // we don't use viv.image_properties, we use viv.channelsStore et al.
-    //     // if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
-    //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
-    //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
-    // } else if (config.type === 'VivMdvReact') {
-    //     //unused
-    //     if (config.overviewOn === undefined) config.overviewOn = false;
-    //     // if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
-    //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
-    //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
-    // }
-
+    if (!dataStore.regions) {
+        throw new Error("unexpected attempt to load spatial chart with no regions in datasource")
+    }
+    // we now only use param for spatial coordinates, but charts could be saved with param[2] being contourParameter
+    config.param = [...dataStore.regions.position_fields];
+    // contourParameter is optional - but could be saved as something numeric in which case it could corrupt things
+    if (config.contourParameter) {
+        const c = dataStore.columnIndex[config.contourParameter];
+        if (!c || allNumeric([c])) {
+            config.contourParameter = dataStore.regions.region_field;
+        }
+    }
     // consider adapting `channels` from old format to new format...
+    // should be able to handle default_channels better when set
     config.viv = applyDefaultChannelState(config.viv);
     return config;
 }
@@ -135,7 +132,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: VivMdvReactConfig) {
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
-        const config = adaptConfig(originalConfig);
+        const config = adaptConfig(originalConfig, dataStore);
         super(dataStore, div, config, VivScatterChartRoot);
         //@ts-expect-error color_by legacy options
         this.colorByColumn(config.color_by);
@@ -173,12 +170,10 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     getSettings() {
         const c = this.config;
-        const { tooltip } = c;
         const cols = this.dataStore.getColumnList();// as DataColumn<DataType>[];
         const settings = super.getSettings();
 
-        //@ts-expect-error category column values...
-        const ocats = this.dataStore.getColumnValues(c.param[2])?.slice() || [];
+        const ocats = this.dataStore.getColumnValues(c.contourParameter)?.slice() || [];
         const cats = ocats.map((x) => {
             return { t: x };
         });
@@ -371,10 +366,33 @@ BaseChart.types["VivMdvRegionReact"] = {
     ...BaseChart.types["viv_scatter_plot"], //this is doing something that means my default radius isn't being used...
     // configEntriesUsingColumns: ["densityFields"],
     init: (config, ds, ec) => {
-        const base = BaseChart.types["viv_scatter_plot"];
-        if (!base || !base.init) throw "no base viv_scatter_plot"; //may well want to change this behaviour soon
-        base.init(config, ds, ec);
-        config.radius = scatterDefaults.radius;
+        // let's explicitly do what we actually want here, to avoid `config.param` mixup.
+        // const base = BaseChart.types["viv_scatter_plot"];
+        // if (!base || !base.init) throw "no base viv_scatter_plot"; //may well want to change this behaviour soon
+        // base.init(config, ds, ec);
+        const r = ds.regions;
+        const sr = r.all_regions[ec.region];
+        config.color_by = r.default_color;
+        const colorColumn = ds.columnIndex[r.default_color];
+        if (!allNumeric([colorColumn])) {
+            config.contourParameter = config.color_by;
+        } //else fallback to undefined contourParameter seems ok
+        config.param = [...r.position_fields];
+        config.background_filter = {
+            column: r.region_field,
+            category: ec.region,
+        };
+        config.color_legend = { display: false };
+        config.region = ec.region;
+        config.roi = sr.roi; //may not be needed/used
+        config.json = sr.json;
+        config.title = ec.region + (sr.default_image ? `-${sr.default_image}` : "");
+        //config.radius = scatterDefaults.radius; //we spread scatterDefaults in adaptConfig
+        config.viv = {
+            // todo: should be able to handle default_channels better when set
+            // or not - maybe tricky to try supporting this with diverse image inputs?
+            channels: ds.regions.avivator.default_channels,
+        };
     },
     class: VivMdvReact,
     name: "Viv Scatter Plot (react)",

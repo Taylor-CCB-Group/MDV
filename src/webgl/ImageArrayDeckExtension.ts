@@ -14,6 +14,8 @@ export class ImageArrayDeckExtension<
         return "ImageArrayExtension";
     }
     getShaders() {
+        // todo, make tests / test-project for this and review.
+        // clearly will need to change for UBO but not going to do that without checking the results.
         return {
             inject: {
                 "vs:#decl": `
