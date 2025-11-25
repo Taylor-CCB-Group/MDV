@@ -122,6 +122,8 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
             colorDomain,
             contourOpacity
         });
+        // probably also want to implement updateState rather than draw(), but the types are annoying.
+        // refer to contemporary deck.gl triangle-layer (but actually we want something more different anyway)
         // model.shaderInputs.setProps({
         //     "Heatmap": {
         //         intensity,
