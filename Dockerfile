@@ -2,7 +2,7 @@
 # warning - we had an obscure npm error with cross-env not found, and it seems like using an earlier nodejs version fixed it
 # for some reason node_modules/.bin wasn't populated after `RUN npm install` - but manually running it in the container worked
 # not sure if there's a way of pinning a more specific build of the base image. May want to see if we can reproduce this issue outside of docker.
-FROM nikolaik/python-nodejs:python3.12-nodejs20 AS frontend-builder
+FROM nikolaik/python-nodejs:python3.11-nodejs20 AS frontend-builder
 
 # ARG and ENV for build information, to be passed in from the CI pipeline
 ARG GIT_COMMIT_DATE="unknown"
@@ -79,6 +79,9 @@ WORKDIR /app
 # DECISION: Using virtual environments for security and permission isolation,
 # `.bashrc` is used to activate the virtual environment automatically.
 RUN poetry config virtualenvs.in-project true
+
+# Prefer binary wheels to avoid slow/fragile source builds (e.g., numcodecs on arm64)
+ENV PIP_PREFER_BINARY=1
 
 # Install Python dependencies using Poetry
 # this should be early in the process because it's less likely to change
@@ -160,7 +163,6 @@ USER pn
 # 
 # Multi-worker (Redis required):
 #   -w 4  # or any number > 1
-
 CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
