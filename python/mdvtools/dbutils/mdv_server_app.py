@@ -24,7 +24,7 @@ patch_psycopg()
 # Setup logging using the centralized logging module
 logger = get_logger(__name__)
 
-# Read environment flag for authentication
+#Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
 oauth = None
