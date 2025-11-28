@@ -204,25 +204,26 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     console.log(config.type, 'processed config:', config);
     
     // Handle queries - any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap
-    chart.deferredInit(action(() => {
-        const c = config as any;
-        const queries = c.queries;
-        if (!queries) return;
+    // **we need better analysis of conditions under which this is still relevant.**
+    // chart.deferredInit(action(() => {
+    //     const c = config as any;
+    //     const queries = c.queries;
+    //     if (!queries) return;
         
-        for (const method in queries) {
-            const sq = queries[method];
-            if (!sq) {
-                continue;
-            }
-            try {
-                //TODO- this may not be correct wrt to adapting to/from array...
-                //BUT IT SEEMS LIKE WE MIGHT ACTUALLY FINALLY BE ABLE TO DROP THIS SECTION ENTIRELY???
-                (chart as any)[method](sq);
-            } catch (e) {
-                console.error('failed to run query', method, config.type, sq, e);
-            }
-        }
-    }));
+    //     for (const method in queries) {
+    //         const sq = queries[method];
+    //         if (!sq) {
+    //             continue;
+    //         }
+    //         try {
+    //             //TODO- this may not be correct wrt to adapting to/from array...
+    //             //BUT IT SEEMS LIKE WE MIGHT ACTUALLY FINALLY BE ABLE TO DROP THIS SECTION ENTIRELY???
+    //             (chart as any)[method](sq);
+    //         } catch (e) {
+    //             console.error('failed to run query', method, config.type, sq, e);
+    //         }
+    //     }
+    // }));
 
     // makeAutoObservable(config);
     Object.defineProperty(chart, "config", {
