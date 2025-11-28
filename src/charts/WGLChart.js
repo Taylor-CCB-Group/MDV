@@ -285,6 +285,7 @@ class WGLChart extends SVGChart {
                 current_value: c.tooltip.show,
                 func: (x) => {
                     c.tooltip.show = x;
+                    // #297 degrades active link
                     const cl = c.tooltip.column || cols[0].field;
                     this.setToolTipColumn(cl);
                 },
@@ -292,6 +293,7 @@ class WGLChart extends SVGChart {
             {
                 type: "column",
                 label: "Tooltip value",
+                // #297 degrades active link
                 current_value: c.tooltip.column || cols[0].field,
                 // values: [cols, "name", "field"],
                 func: (x) => {

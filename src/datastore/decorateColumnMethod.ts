@@ -40,6 +40,7 @@ export function decorateChartColumnMethods<T extends BaseChart<any>>(chart: T) {
             chart,
         );
     }
+    // only used by vanilla DensityScatterPlot
     if (chart.changeContourParameter) {
         decorateColumnMethod(
             "changeContourParameter",
