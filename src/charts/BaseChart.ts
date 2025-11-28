@@ -109,6 +109,7 @@ class BaseChart<T extends BaseConfig> {
         this.activeQueries = new ColumnQueryMapper(this, {
             setParams: ["param"],
             //! warning - we do still need some manual intervention in deserialisation
+            //- this is under active review now, 28-11-2025 -
             setToolTipColumn: "tooltip.column",
             colorByColumn: "color_by",
         });
@@ -794,6 +795,7 @@ class BaseChart<T extends BaseConfig> {
             colorSettings.push(g({
                 label: "Color By",
                 type: "column",
+                // c.color_by degrades active link here #297
                 //@ts-expect-error LegacyColorBy should be gone by here
                 current_value: c.color_by,
                 columnType: filter,
