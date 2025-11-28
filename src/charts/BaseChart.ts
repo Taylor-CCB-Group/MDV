@@ -198,7 +198,7 @@ class BaseChart<T extends BaseConfig> {
                 icon: "fas fa-copy",
                 func: () =>
                     navigator.clipboard.writeText(
-                        JSON.stringify(this.config, null, 2),
+                        JSON.stringify(this.getConfig(), null, 2),
                     ),
             });
             return menu;
@@ -478,6 +478,7 @@ class BaseChart<T extends BaseConfig> {
 
     setToolTipColumn?(column: FieldSpec): void;
     setBackgroundFilter?(column: FieldName): void;
+    // only used by vanilla DensityScatterPlot
     changeContourParameter?(column: FieldName): void;
     colorByColumn?(c: FieldName): void;
     colorByDefault?(): void;
@@ -1018,6 +1019,9 @@ class BaseChart<T extends BaseConfig> {
     /**
      * Returns a copy of the chart's config in serialized form
      * (todo central place for documentation describing this)
+     * Note that e.g. `RowsAsColsQuery` objects can exist anywhere in the config object
+     * and as long as they implement `toJSON()` correctly they shouldn't need explicit serialisation logic.
+     * We rely on `ColumnQueryMapper` for intercepting values passed to JS methods.
      */
     getConfig() {
         if (this.legend) {
