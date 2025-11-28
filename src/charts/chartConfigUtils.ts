@@ -91,6 +91,40 @@ export function serialiseConfig(config: any) {
  * @returns resulting `config` object if there were no errors, otherwise an object with
  *  the potentially compromised result, and a list of err
  */
+/**
+ * Recursively deserializes a value, handling strings, objects that need deserialization, arrays, and nested objects.
+ */
+function deserialiseValueRecursive(ds: DataStore, value: any): any {
+    // Handle null/undefined
+    if (value == null) {
+        return value;
+    }
+    
+    // Handle primitives (string, number, boolean)
+    if (typeof value !== 'object') {
+        return value;
+    }
+    
+    // Handle arrays - recursively deserialize each element
+    if (isArray(value)) {
+        return value.map(item => deserialiseValueRecursive(ds, item));
+    }
+    
+    // Handle objects that should be deserialized (e.g., RowsAsColsQuery)
+    if (value.type === "RowsAsColsQuery") {
+        return deserialiseParam(ds, value);
+    }
+    
+    // Handle plain objects - recursively deserialize all properties
+    const result: any = {};
+    for (const key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+            result[key] = deserialiseValueRecursive(ds, value[key]);
+        }
+    }
+    return result;
+}
+
 export function deserialiseConfig(ds: DataStore, serialConfig: any) {
     // we need to know which DataSource this is associated with to be able to deserialize
     const exceptions: { error: Error | unknown, key: string, value: any }[] = [];
@@ -135,76 +169,57 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
         config.id = getRandomString();
     }
 
-    //we might introspect this to figure out which config entries are known to use columns...
-    //const chartTypeInfo = BaseChart.types[chart.config.type];
-
-    //or rather than relying on that property we can traverse the config object for any special values
-    //for now, only operating on the param property of the config object
-    //also we move around where actual loading of column data currently done by ChartManager happens
-    //todo process entire config object, not just param<<<
-    //@ts-expect-error todo distinguish type of serialised vs runtime config
-    const param: SerialisedParams = config.param;
-    const processed = param.map(p => deserialiseParam(chart.dataStore, p));
-    config.param = processed;
-    //pending more generic approach to deserialising queries...
-    //we should be doing something like a reverse lookup of the methodToConfigMap
-    //we don't have that yet... although... by the time we setTimeout, we will...
+    // Recursively deserialize the entire config object
+    config = deserialiseValueRecursive(chart.dataStore, config) as C;
+    
+    // Handle special properties that need additional processing beyond deserialization
     if (originalConfig.color_by) {
-        //@ts-expect-error color_by
-        const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
-        config.color_by = undefined;
+        const colorBy = (config as any).color_by;
+        (config as any).color_by = undefined;
         chart.deferredInit(() => {
             if (!chart.colorByColumn) {
                 console.error('chart does not have colorByColumn method, but had color_by in config');
                 return;
             }
-            //@ts-expect-error color_by the method itself takes a string - but our decorated version takes what we're giving it...
-            chart.colorByColumn?.(colorBy);
+            // The method itself takes a string - but our decorated version takes what we're giving it...
+            (chart.colorByColumn as any)?.(colorBy);
         })
     }
+    
     const configWithTooltip = config as unknown as TooltipConfig;
-    const serialisedTooltipColumn = configWithTooltip.tooltip?.column;
-    if (serialisedTooltipColumn) {
-        if (isArray(serialisedTooltipColumn)) {
-            //@ts-expect-error type FieldSpec isn't serialised form, so deserialise complains
-            const tooltipColumn = serialisedTooltipColumn.map((c) => deserialiseParam(chart.dataStore, c));
+    const tooltipColumn = configWithTooltip.tooltip?.column;
+    if (tooltipColumn) {
+        // Convert deserialized tooltip column to concrete field names
+        if (isArray(tooltipColumn)) {
             (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn);
-            // we're not using this method with multi-column, only react charts which aren't so method-based have multicolumn tooltips
-            // chart.deferredInit(() => {
-            //     if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
-            // })            
         } else {
-            //@ts-expect-error type FieldSpec isn't serialised form, so deserialise complains
-            const tooltipColumn = deserialiseParam(chart.dataStore, serialisedTooltipColumn);
-            (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn)[0];
+            const concreteFieldNames = getConcreteFieldNames(tooltipColumn);
+            (config as any).tooltip.column = concreteFieldNames[0];
             chart.deferredInit(() => {
                 if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
             });
         }
     }
+    
     console.log(config.type, 'processed config:', config);
-    //temporary way of prototyping query
-    //any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap will
-    //will be handled here
-    //may return to something like this for non-react charts as it requires less boilerplate & chart specific code
+    
+    // Handle queries - any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap
     chart.deferredInit(action(() => {
         const c = config as any;
         const queries = c.queries;
+        if (!queries) return;
+        
         for (const method in queries) {
-            // if we want to handle multiple arguments that had been provided to some function, this would be the place
-            // this should be more robust than earlier versions of this code...
-            // but most things are avoiding it now, so it's not really tested...        
             const sq = queries[method];
             if (!sq) {
                 continue;
             }
-            const multi = isArray(sq); //! hang on... first argument is the thing we should be processing...
-            const qa = multi ? sq : [sq];
-            const q = qa.map((v: any) => deserialiseParam(chart.dataStore, v));
             try {
-                (chart as any)[method](multi ? q : q[0]);
+                //TODO- this may not be correct wrt to adapting to/from array...
+                //BUT IT SEEMS LIKE WE MIGHT ACTUALLY FINALLY BE ABLE TO DROP THIS SECTION ENTIRELY???
+                (chart as any)[method](sq);
             } catch (e) {
-                console.error('failed to run query', method, config.type, q, e);
+                console.error('failed to run query', method, config.type, sq, e);
             }
         }
     }));
