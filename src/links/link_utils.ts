@@ -319,7 +319,7 @@ export class RowsAsColsQuery implements MultiColumnQuery {
         return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
     }
     /**
-     * @private This should only be called by the `deserializeParam` factory method.
+     * @internal This should only be called by the `deserialiseParam` factory method.
      */
     static fromSerialized(ds: DataStore, serialized: RowsAsColsQuerySerialized) {
         const link = getRowsAsColumnsLinks(ds).find(l => l?.linkedDs.name === serialized.linkedDsName)?.link;
