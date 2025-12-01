@@ -1,0 +1,3082 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "scatter_plot"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "bar_chart"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "histogram"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        },
+        "bins": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "heatmap"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "dot_plot"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "box_plot"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "violin_plot"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "pie_chart"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "table"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "text_box"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param",
+        "text"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "wordcloud"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "sankey"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "multi_line_chart"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        },
+        "stacked": {
+          "type": "boolean"
+        },
+        "band_width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "intervals": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "scaletrim": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "multi_box_plot"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "abundance_box_plot"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "density_scatter"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "row_chart"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "stacked_row_chart"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "row_summary_box"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "selection_dialog"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "param": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "RowsAsColsQuery"
+                  },
+                  "linkedDsName": {
+                    "type": "string"
+                  },
+                  "maxItems": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "linkedDsName",
+                  "maxItems"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "title_color": {
+          "type": "string"
+        },
+        "color_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "datatype": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "double",
+                        "text",
+                        "text16",
+                        "unique",
+                        "multitext",
+                        "int32"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "name",
+                    "datatype"
+                  ],
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "color_legend": {},
+        "log_color_scale": {
+          "type": "boolean"
+        },
+        "trim_color_scale": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "0.05",
+                "0.01",
+                "0.001"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "color_overlay": {
+          "type": "number"
+        },
+        "fallbackOnZero": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "size",
+        "title",
+        "legend",
+        "type",
+        "param"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}
