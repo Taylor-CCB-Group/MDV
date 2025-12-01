@@ -125,7 +125,8 @@ function useZoomOnFilter(data: Uint32Array) {
 const DeckScatter = observer(function DeckScatterComponent() {
     const id = useId();
     const [width, height] = useChartSize();
-    const [cx, cy, cz] = useParamColumns() as LoadedDataColumn<"double">[];
+    const [cx, cy, ...density] = useParamColumns() as LoadedDataColumn<"double">[];
+    const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
     const { opacity, viewState, on_filter, dimension } = config;

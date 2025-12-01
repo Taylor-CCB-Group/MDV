@@ -23,7 +23,6 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, config: SelectionDialogConfig & BaseConfig) {
         if (!config.filters) {
             config.filters = {};
-            //@ts -ignore ! @ts-expect-error is inconsistent between editor & cli???
             for (const col of config.param) {
                 //@ts-expect-error MultiColumnQuery cannot be used as index
                 config.filters[col] = null;
