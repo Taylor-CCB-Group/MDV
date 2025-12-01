@@ -256,6 +256,27 @@ export type RowsAsColsQuerySerialized = {
     type: "RowsAsColsQuery";
 } & RowsAsColsPrefs;
 
+class DeserializedQueryError extends Error {
+    constructor(
+        // maybe something more generic or tailored in future
+        public readonly serialized: RowsAsColsQuerySerialized,
+        public readonly dataStore: DataStore,
+        message: string
+    ) {
+        super(message);
+        this.name = 'DeserializedQueryError';
+    }
+
+    // Helper to suggest fixes in UI (not really useful but something to maybe build on later)
+    getSuggestions() {
+        return {
+            missingLink: this.serialized.linkedDsName,
+            availableAlternatives: getRowsAsColumnsLinks(this.dataStore),
+            // Could even include Levenshtein distance suggestions
+        };
+    }
+}
+
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows
  * in a linked {@link DataSource}. Can be used in place of a {@link string} representing a column {@link FieldName}
@@ -300,8 +321,7 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     static fromSerialized(ds: DataStore, serialized: RowsAsColsQuerySerialized) {
         const link = getRowsAsColumnsLinks(ds).find(l => l?.linkedDs.name === serialized.linkedDsName)?.link;
         if (!link) {
-            console.error(`Link not found for ${serialized.linkedDsName}`);
-            return;
+            throw new DeserializedQueryError(serialized, ds, `Link not found for ${serialized.linkedDsName}`);
         }
         return new RowsAsColsQuery(link, serialized.linkedDsName, serialized.maxItems);
     }
