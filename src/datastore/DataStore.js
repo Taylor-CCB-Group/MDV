@@ -1783,6 +1783,9 @@ class DataStore {
      * `addColumnFromField()`...
      */
     getColumnInfo(column) {
+        if (column === undefined) {
+            throw new Error("getColumnInfo needs a column argument!");
+        }
         if (column.includes("|")) {
             this.addColumnFromField(column);
         }
