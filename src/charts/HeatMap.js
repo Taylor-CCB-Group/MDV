@@ -17,7 +17,7 @@ class HeatMap extends SVGChart {
         });
 
         const p = this.config.param;
-        //! we used this.fieldNames instead of `param[1, ...]` 
+        //! we used this.fieldNames instead of `param[1, ...]`
         // to avoid mutating config - which is observable - in setFields - which may be in an action
         // also note that a lot of this was actually because of the way active links worked during development
         // this is less needed now (although we still have the reaction -> mutation issue)
@@ -155,9 +155,10 @@ class HeatMap extends SVGChart {
                 : this.config.color_scale.trim;
         for (let x = 1; x < p.length; x++) {
             const col = this.dataStore.columnIndex[p[x]];
+            const [min, max] = this.dataStore.getMinMaxForColumn(p[x]);
             config.scaleVals.push([
-                q ? col.quantiles[q][0] : col.minMax[0],
-                q ? col.quantiles[q][1] : col.minMax[1],
+                q ? col.quantiles[q][0] : min,
+                q ? col.quantiles[q][1] : max,
             ]);
         }
 
