@@ -160,7 +160,7 @@ export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
     const [_valueObjectArray, labelKey, valueKey] = useObjectKeys ? values : ["X", "X", "X"];
-    if (!labelKey || !valueKey) throw new Error("DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys");
+    if ((labelKey === undefined) || (valueKey === undefined)) throw new Error("DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys");
     type Option = { label: string, value: string, original: any };
     // might put some more elaborate types here on original at some point
     return (original: string | any): Option => {
