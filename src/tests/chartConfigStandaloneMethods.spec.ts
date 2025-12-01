@@ -1,6 +1,18 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { initialiseChartConfig } from '../charts/chartConfigUtils';
+import { initialiseChartConfig, deserialiseParam } from '../charts/chartConfigUtils';
 import { RowsAsColsQuery } from '../links/link_utils';
+import type DataStore from '../datastore/DataStore';
+
+// Mock the RowsAsColsQuery static method
+vi.mock('../links/link_utils', async () => {
+  const actual = await vi.importActual('../links/link_utils');
+  return {
+    ...actual,
+    RowsAsColsQuery: {
+      fromSerialized: vi.fn(),
+    }
+  };
+});
 
 describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redundancy)', () => {
   let mockDataStore: any;
@@ -25,6 +37,74 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
     };
   });
 
+  describe('deserialiseParam', () => {
+    test('returns string unchanged', () => {
+      const result = deserialiseParam(mockDataStore as DataStore, 'col1');
+      expect(result).toBe('col1');
+    });
+
+    test('deserializes RowsAsColsQuery object', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'genes',
+        maxItems: 10,
+        type: 'RowsAsColsQuery' as const
+      };
+      const mockQueryInstance = {
+        linkedDsName: 'genes',
+        maxItems: 10,
+        fields: ['gene1', 'gene2'],
+      };
+
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+
+      const result = deserialiseParam(mockDataStore as DataStore, mockQuerySerialized);
+
+      expect(result).toBe(mockQueryInstance);
+    });
+
+    test('throws error when deserialization returns null', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'invalid',
+        maxItems: 5,
+        type: 'RowsAsColsQuery' as const
+      };
+
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(null);
+
+      expect(() => {
+        deserialiseParam(mockDataStore as DataStore, mockQuerySerialized);
+      }).toThrow('Failed to deserialise param');
+    });
+
+    test('throws error when deserialization returns undefined', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'invalid',
+        maxItems: 5,
+        type: 'RowsAsColsQuery' as const
+      };
+
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(undefined);
+
+      expect(() => {
+        deserialiseParam(mockDataStore as DataStore, mockQuerySerialized);
+      }).toThrow('Failed to deserialise param');
+    });
+
+    test('error message includes the serialized param for debugging', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'invalid',
+        maxItems: 5,
+        type: 'RowsAsColsQuery' as const
+      };
+
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(null);
+
+      expect(() => {
+        deserialiseParam(mockDataStore as DataStore, mockQuerySerialized);
+      }).toThrow(new RegExp(JSON.stringify(mockQuerySerialized).replace(/[{}]/g, '\\$&')));
+    });
+  });
+
   describe('ImageTableChart scenario - methods only called from UI', () => {
     test('deserializes image_label with RowsAsColsQuery', () => {
       const mockQuerySerialized = {
@@ -38,7 +118,7 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
         fields: ['gene_label'],
       };
 
-      vi.spyOn(RowsAsColsQuery, 'fromSerialized').mockReturnValue(mockQueryInstance as any);
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
 
       const config = {
         id: 'test-image-table',
@@ -74,9 +154,9 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
       const mockInstance1 = { linkedDsName: 'genes', maxItems: 1, fields: ['gene1'] };
       const mockInstance2 = { linkedDsName: 'proteins', maxItems: 1, fields: ['prot1'] };
 
-      vi.spyOn(RowsAsColsQuery, 'fromSerialized')
-        .mockReturnValueOnce(mockInstance1 as any)
-        .mockReturnValueOnce(mockInstance2 as any);
+      (RowsAsColsQuery.fromSerialized as any)
+        .mockReturnValueOnce(mockInstance1)
+        .mockReturnValueOnce(mockInstance2);
 
       const config = {
         id: 'test-image-table',
@@ -110,7 +190,7 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
         fields: ['gene_name'],
       };
 
-      vi.spyOn(RowsAsColsQuery, 'fromSerialized').mockReturnValue(mockQueryInstance as any);
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
 
       const config = {
         id: 'test-genome-browser',
@@ -138,7 +218,7 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
         fields: ['present_col'],
       };
 
-      vi.spyOn(RowsAsColsQuery, 'fromSerialized').mockReturnValue(mockQueryInstance as any);
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
 
       const config = {
         id: 'test-genome-browser',
@@ -168,7 +248,7 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
         fields: ['weight_col'],
       };
 
-      vi.spyOn(RowsAsColsQuery, 'fromSerialized').mockReturnValue(mockQueryInstance as any);
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
 
       const config = {
         id: 'test-cell-radial',
@@ -232,7 +312,7 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
         fields: ['nested_gene'],
       };
 
-      vi.spyOn(RowsAsColsQuery, 'fromSerialized').mockReturnValue(mockQueryInstance as any);
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
 
       const config = {
         id: 'test-chart',
@@ -252,6 +332,103 @@ describe('chartConfigUtils - standalone methodsUsingColumns (no setParams redund
       const result = initialiseChartConfig(config as any, mockChart as any);
 
       expect(result.settings.advanced.column_mapping.special_column).toBe(mockQueryInstance);
+    });
+  });
+
+  describe('Error handling in initialiseChartConfig', () => {
+    test('throws error when param deserialization fails', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'invalid',
+        maxItems: 1,
+        type: 'RowsAsColsQuery' as const,
+      };
+
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(null);
+
+      const config = {
+        id: 'test-chart',
+        title: 'Test Chart',
+        type: 'scatter',
+        param: [mockQuerySerialized],
+        size: [400, 300] as [number, number],
+      };
+
+      expect(() => {
+        initialiseChartConfig(config as any, mockChart as any);
+      }).toThrow('Failed to deserialise param');
+    });
+
+    test('throws error when nested property deserialization fails', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'invalid',
+        maxItems: 1,
+        type: 'RowsAsColsQuery' as const,
+      };
+
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(null);
+
+      const config = {
+        id: 'test-chart',
+        title: 'Test Chart',
+        type: 'custom',
+        param: [],
+        settings: {
+          column: mockQuerySerialized,
+        },
+        size: [400, 300] as [number, number],
+      };
+
+      expect(() => {
+        initialiseChartConfig(config as any, mockChart as any);
+      }).toThrow('Failed to deserialise param');
+    });
+
+    test('throws error when array element deserialization fails', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'invalid',
+        maxItems: 1,
+        type: 'RowsAsColsQuery' as const,
+      };
+
+      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(null);
+
+      const config = {
+        id: 'test-chart',
+        title: 'Test Chart',
+        type: 'custom',
+        param: [],
+        columns: ['col1', mockQuerySerialized, 'col2'],
+        size: [400, 300] as [number, number],
+      };
+
+      expect(() => {
+        initialiseChartConfig(config as any, mockChart as any);
+      }).toThrow('Failed to deserialise param');
+    });
+
+    test('propagates error from RowsAsColsQuery.fromSerialized when it throws', () => {
+      const mockQuerySerialized = {
+        linkedDsName: 'broken',
+        maxItems: 1,
+        type: 'RowsAsColsQuery' as const,
+      };
+
+      const customError = new Error('Custom deserialization error');
+      (RowsAsColsQuery.fromSerialized as any).mockImplementation(() => {
+        throw customError;
+      });
+
+      const config = {
+        id: 'test-chart',
+        title: 'Test Chart',
+        type: 'scatter',
+        param: [mockQuerySerialized],
+        size: [400, 300] as [number, number],
+      };
+
+      expect(() => {
+        initialiseChartConfig(config as any, mockChart as any);
+      }).toThrow('Custom deserialization error');
     });
   });
 });

@@ -318,6 +318,9 @@ export class RowsAsColsQuery implements MultiColumnQuery {
         // I was previously naively using toString() for serialization - now I know better.
         return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
     }
+    /**
+     * @private This should only be called by the `deserializeParam` factory method.
+     */
     static fromSerialized(ds: DataStore, serialized: RowsAsColsQuerySerialized) {
         const link = getRowsAsColumnsLinks(ds).find(l => l?.linkedDs.name === serialized.linkedDsName)?.link;
         if (!link) {
