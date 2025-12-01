@@ -107,6 +107,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig, dataStore: DataStore) {
     config.param = [...dataStore.regions.position_fields];
     // contourParameter is optional - but could be saved as something numeric in which case it could corrupt things
     if (config.contourParameter) {
+        //@ts-expect-error contourParameter handling can improve here (prefer not to be referring to dataStore).
         const c = dataStore.columnIndex[config.contourParameter];
         if (!c || allNumeric([c])) {
             config.contourParameter = dataStore.regions.region_field;
@@ -170,18 +171,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     getSettings() {
         const c = this.config;
-        const cols = this.dataStore.getColumnList();// as DataColumn<DataType>[];
         const settings = super.getSettings();
 
-        const ocats = this.dataStore.getColumnValues(c.contourParameter)?.slice() || [];
-        const cats = ocats.map((x) => {
-            return { t: x };
-        });
-        // could've sworn mobx observable had been working here at some point
-        // (changing contourParameter should immediately update "Contour Category" dropdowns)... it isn't now.
-        // and the type is dodgy - need to get on top of that with mobx in general.
-        const catsValues = observable.array([cats, "t", "t"]) as unknown as [{t: string}[], "t", "t"];
-        // const catsValues = [cats, "t", "t"];
 
         // What I would like is ability to
         // - change selected image at runtime.

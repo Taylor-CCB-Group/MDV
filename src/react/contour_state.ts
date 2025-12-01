@@ -17,6 +17,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { oklch2rgb } from "@/utilities/oklch2rgb";
+// import { DataFilterExtension } from '@deck.gl/extensions';
 
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
@@ -173,8 +174,6 @@ export function useFieldContour(props: FieldContourProps) {
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
     const data = useFilteredIndices();
-    // const getWeight = useContourWeight(contourParameter, category);
-    const colorRange = viridis;
     const { zoom } = useViewState();
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
     //won't be necessary when we implement heatmap differently
@@ -209,6 +208,7 @@ export function useFieldContour(props: FieldContourProps) {
                 //phase shift for each field in shader...
 
                 //normalization pending refactor/design
+                //things to consider: in some circumstances normalise range across all fields
                 const [min, max] = minMax;
                 const range = max - min;
                 const value = fieldData[i];
@@ -220,11 +220,12 @@ export function useFieldContour(props: FieldContourProps) {
             // todo different modes for analogous vs other color ranges...
             // split complementary etc...
             // really need (interactive) legend for this
+            // should be stable for a given field so that it doesn't shift during interaction
             colorRange: [oklch2rgb([200, 220, 360 * index/n])],
-            //! this scale does not adapt well to the data, and it would be nice to have meaningful units
-            radiusPixels: radiusPixels/100,
+            //! this scale does not adapt well to the data, and it would be nice to have meaningful units...
+            radiusPixels: radiusPixels,
             debounce: 1000,
-            weightsTextureSize: 256, //there could be a performance related parameter to tweak
+            weightsTextureSize: 128, //there could be a performance related parameter to tweak
             pickable: false,
             transitions: {
                 getWeight: {
@@ -234,7 +235,11 @@ export function useFieldContour(props: FieldContourProps) {
             },
             updateTriggers: {
                 getWeight: [fieldData],
-            }
+                // getFilterValue: [fieldData]
+            },
+            // not working?
+            // getFilterValue: (i: number) => fieldData[i] === 0,
+            // extensions: [new DataFilterExtension({filterSize: 1})]
         }));
     }, [
         id,
