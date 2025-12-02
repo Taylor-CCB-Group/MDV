@@ -3,5 +3,6 @@
   "db_container": "mdv_db",
   "db_track_modifications": false,
   "upload_folder": "/python",
-  "projects_base_dir": "/app/mdv"
+  "projects_base_dir": "/app/mdv",
+  "extensions": ["chat", "project_manager"]
 }
