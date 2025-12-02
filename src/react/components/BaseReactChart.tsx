@@ -20,7 +20,7 @@ function Fallback() {
     );
 }
 
-export type TComponent<T extends BaseConfig> = () => JSX.Element;
+export type TComponent<T extends BaseConfig> = () => React.JSX.Element;
 
 /**
  * Base class for charts that use React.

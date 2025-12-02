@@ -70,7 +70,7 @@ const ChatDialog = ({
     const maxDrawerWidth = fullscreen ? 1000 : 600;
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [search, setSearch] = useState("")
-    const dialogRef = useRef<HTMLDivElement>(null);
+    const dialogRef = useRef<HTMLDivElement | null>(null);
     const { 
         drawerWidth,
         onMouseDown,

@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite";
 import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
 import type { DataColumn } from "@/charts/charts";
 import { useChartSize, useParamColumns } from "../hooks";
-import { useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
 import * as Axis from "@visx/axis";
 import * as Scale from "@visx/scale";
 
@@ -84,7 +84,10 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
         range: [chartHeight + margin.top, margin.top],
     }), [chartHeight, ranges, margin.top]);
 
-    return { ranges, margin, chartWidth, chartHeight, scaleX, scaleY };
+    return { 
+        ranges, margin, chartWidth, chartHeight, 
+        scaleX, scaleY 
+    };
 }
 
 export default observer(function AxisComponent({ config, unproject, children }: AxisComponentProps) {
@@ -92,7 +95,10 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     const { dimension } = config;
     const is2d = dimension === "2d";
     const [width, height] = useChartSize();
-    const { scaleX, scaleY, margin, chartWidth, chartHeight } = useSynchronizedScales({ config, unproject });
+    const { 
+        scaleX, scaleY, 
+        margin, chartWidth, chartHeight 
+    } = useSynchronizedScales({ config, unproject });
     
     const deckStyle = useMemo(() => ({
         position: "absolute",
@@ -105,7 +111,10 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     //     if (is2d && (config.axis.x.rotate_labels || config.axis.y.rotate_labels)) {
     //         console.warn("Axis rotation not implemented for react charts");
     //     }
-    // }, [is2d]);
+    // }, [is2d, config.axis.x.rotate_labels, config.axis.y.rotate_labels]);
+    useEffect(() => {
+        console.warn("This is a broken chart, visx dependency has been removed");
+    }, []);
     return (
         <>
             <div style={deckStyle}>{children}</div>
