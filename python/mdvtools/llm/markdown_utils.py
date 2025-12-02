@@ -3,6 +3,15 @@ from typing import Optional
 import json
 
 def create_error_markdown(message: str, traceback: Optional[str] = None, extra_metadata: Optional[dict] = None) -> str:
+    """
+    Create a markdown representation of an error.
+    Args:
+        message: The error message
+        traceback: The traceback of the error
+        extra_metadata: Extra metadata about the error
+    Returns:
+        A string containing the markdown representation of the error
+    """
     markdown = f"**Error:** {escape_markdown(message)}\n\n"
     if traceback:
         # Use HTML details tag for collapsable section
@@ -11,16 +20,26 @@ def create_error_markdown(message: str, traceback: Optional[str] = None, extra_m
         markdown += f"<details><summary>Extra Metadata</summary>\n\n```json\n{json.dumps(extra_metadata, indent=2)}\n```\n\n</details>\n\n"
     return markdown
 
-def create_project_markdown(project: MDVProject) -> str:
-    markdown = "\n\n<details>\n\n"
-    markdown += f"<summary>Project Datasources</summary>\n\n"
+def create_project_markdown(project: MDVProject, wrap_in_details: bool = True) -> str:
+    """
+    Create a markdown representation of the project.
+    Args:
+        project: The MDVProject object
+        wrap_in_details: Whether to wrap the markdown in a details tag
+    Returns:
+        A string containing the markdown representation of the project
+    """
+    markdown = ""
+    if wrap_in_details:
+        markdown += "\n\n<details>\n\n"
+        markdown += f"<summary>Project Datasources</summary>\n\n"
     for name in project.get_datasource_names():
         ds = project.get_datasource_metadata(name)
         markdown += f"## **{name}:** ({ds['size']} rows)\n\n"
         # todo - add a summary of the data here
         markdown += create_column_markdown(ds["columns"])
-
-    markdown += "\n\n</details>\n\n"
+    if wrap_in_details:
+        markdown += "\n\n</details>\n\n"
     return markdown
 
 def escape_markdown(text: str) -> str:
@@ -35,6 +54,13 @@ def escape_markdown(text: str) -> str:
     return text
 
 def create_column_markdown(cols: list[dict]) -> str:
+    """
+    Create a markdown representation of the columns in a datasource.
+    Args:
+        cols: A list of dictionaries, each containing the column name and data type
+    Returns:
+        A string containing the markdown representation of the columns
+    """
     numeric_cols = []
     categorical_cols = []
     other_cols = []

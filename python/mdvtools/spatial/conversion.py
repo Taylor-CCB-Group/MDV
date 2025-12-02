@@ -1,7 +1,7 @@
 import argparse
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 import numpy as np
 # nb, main spatialdata import should happen lazily
 # so user doesn't have to wait and see lots of scary unrelated output if they input bad arguments.
@@ -12,22 +12,35 @@ if TYPE_CHECKING:
     from spatialdata import SpatialData
     from spatialdata.models import SpatialElement
     from mdvtools.mdvproject import MDVProject
+    from geopandas import GeoDataFrame
 
-def _process_sdata_path(sdata_path: str):
+@dataclass
+class SpatialDataConversionArgs:
+    spatialdata_path: str
+    output_folder: str
+    temp_folder: str
+    preserve_existing: bool = False
+    output_geojson: bool = False
+    serve: bool = False
+    link: bool = False
+
+def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversionArgs"):
     """Processes a single SpatialData object path."""
     # imports need to be here for the separate process
     from mdvtools.spatial.conversion import _try_read_zarr, _resolve_regions_for_table
+    from mdvtools.spatial.mermaid import sdata_to_mermaid
     import os
 
     sdata_name = os.path.basename(sdata_path)
     sdata = _try_read_zarr(sdata_path)
     if sdata is None:
         return None
-
+    print(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n")
+    print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
     adata_objects = []
     all_regions = {}
     for table_name, adata in sdata.tables.items():
-        _resolve_regions_for_table(sdata, table_name, sdata_name)
+        _resolve_regions_for_table(sdata, table_name, sdata_name, conversion_args)
         adata.obs["spatialdata_path"] = sdata_name
         adata.obs["table_name"] = table_name
         adata_objects.append(adata)
@@ -50,6 +63,62 @@ class ImageEntry:
     is_primary: bool
     region_id: str
 
+def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial_markdown = ""):
+    """
+    Add a README.md file to the project.
+
+    We may consider adding more configuration options etc.
+    """
+    from mdvtools.spatial.mermaid import sdata_to_mermaid
+    from mdvtools.llm.markdown_utils import create_project_markdown
+    from mdvtools.charts.text_box_plot import TextBox
+    import json
+    markdown = initial_markdown
+    markdown += f"# SpatialData conversion information:\n\n"
+    # todo add build information here
+    # markdown += f"### Build information:\n\n"
+    markdown += "## SpatialData objects:\n\n"
+    spatial_dir = os.path.join(mdv.dir, "spatial")
+    for sdata_name in os.listdir(spatial_dir):
+        sdata_path = os.path.join(spatial_dir, sdata_name)
+        if not os.path.exists(sdata_path):
+            continue
+        sdata = _try_read_zarr(sdata_path)
+        if sdata is None:
+            continue
+        sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```"
+        sdata_md += f"\n\n### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
+        markdown += sdata_md
+    
+    markdown += "\n\n---\n\n## Project DataSource summary:\n\n"
+    markdown += create_project_markdown(mdv, False)
+    # todo - add anndata markdown here
+    # if adata is not None:
+    #     markdown += f"\n{create_anndata_markdown(adata)}"
+    with open(os.path.join(mdv.dir, "README.md"), "w") as f:
+        f.write(markdown)
+    print(f"README.md written to {os.path.join(mdv.dir, 'README.md')}")
+    textbox = TextBox(title="SpatialData conversion information", param=[], size=[792, 472], position=[10, 10])
+    textbox.set_text(markdown)
+    mdv.set_view("Data summary", {"initialCharts": {"cells": [textbox.plot_data]}})
+
+def _shape_to_geojson(shape: "GeoDataFrame", transform_to_image: "BaseTransformation") -> str:
+    """
+    Convert a spatial element to a GeoJSON object, with the coordinates transformed by the provided transformation.
+    """
+    axes = ("x", "y")
+    T = transform_to_image.to_affine_matrix(input_axes=axes, output_axes=axes)
+    # The affine matrix T is a 3x3 matrix.
+    # The affine_transform function from geopandas takes a 6-element tuple or list of coefficients:
+    # [a, b, d, e, xoff, yoff]
+    # which correspond to the transformation matrix:
+    # | a  b  xoff |
+    # | d  e  yoff |
+    # | 0  0  1    |
+    # We extract these coefficients from the matrix T.
+    matrix = [T[0, 0], T[0, 1], T[1, 0], T[1, 1], T[0, 2], T[1, 2]]
+    transformed_shape = shape.affine_transform(matrix)
+    return f"{transformed_shape.to_json()}"
 
 
 def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
@@ -100,7 +169,7 @@ def _get_transform_keys(e: "SpatialElement") -> list[str]:
     return list(transformations.keys())
 
 # ---- region resolution ----
-def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name: str):
+def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name: str, conversion_args: "SpatialDataConversionArgs"):
     """
     Internal processing of a table with various side-effects on the provided adata object:
     - the annotated elements for each region (which may be shapes etc) is used to establish an 'image' that should be appropriate for the region.
@@ -108,6 +177,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
       (this is so that current MDV - which isn't able to process transformation from spatialdata - can display the data. The original data is preserved)
     - metadata is added to uns["mdv"]["regions"] in a form that resembles what will be needed for mdv regions
       this is used later to set the region metadata for the mdv project.
+    If conversion_args.output_geojson is True, geojson should be saved to the output folder as <mdv.dir>/spatial/region_id.geojson
     """
     from spatialdata.transformations import get_transformation, get_transformation_between_coordinate_systems
     from spatialdata.models import get_table_keys
@@ -216,6 +286,28 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             },
             "images": {},
         }
+
+        # do we want to save geojson for this region?
+        # nb this will be deprecated once we have spatialdata.js layers with shapes.
+        if conversion_args.output_geojson:
+            from geopandas import GeoDataFrame
+            # xenium hack... we want cell_boundaries, not cell_circles which is the annotated element...
+            if "cell_boundaries" in sdata.shapes:
+                print(f"Xenium hack... using cell_boundaries for geojson output for region '{r}' in '{sdata_name}'")
+                annotated = sdata["cell_boundaries"]
+            
+            if isinstance(annotated, GeoDataFrame):
+                geojson = _shape_to_geojson(annotated, best_img.transform_to_image)
+                region_id = best_img.region_id
+                # the name may be misleading in xenium case, but avoids other potential naming conflicts.
+                name = f"{region_id}.geo.json"
+                path = os.path.join(conversion_args.temp_folder, name)
+                all_regions[region_id]["json"] = f"images/{name}"
+                with open(path, "w") as f:
+                    f.write(geojson)
+                    print(f"Wrote geojson for region '{region_id}' to {path}")
+            else:
+                print(f"WARNING: No geojson output for region '{r}' in '{sdata_name}' because it is not a GeoDataFrame")
         
         region_to_image[r] = best_img
 
@@ -227,12 +319,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
     adata.uns["mdv"].setdefault("regions", all_regions)
 
 
-@dataclass
-class SpatialDataConversionArgs:
-    spatialdata_path: str
-    output_folder: str
-    preserve_existing: bool = False
-    serve: bool = False
+
 
 def _try_read_zarr(path: str):# -> sd.SpatialData | None:
     """
@@ -285,6 +372,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
 
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
+    from mdvtools.llm.markdown_utils import create_project_markdown
+    
 
     # we could do a nicer glob thing here, but I don't want to test that right now.
     sdata_paths = [
@@ -302,7 +391,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     all_regions: dict[str, dict] = {}
     names: set[str] = set()
     with ProcessPoolExecutor() as executor:
-        results = executor.map(_process_sdata_path, sdata_paths)
+        results = executor.map(_process_sdata_path, sdata_paths, [args] * len(sdata_paths))
 
     for result in results:
         if result is None:
@@ -344,12 +433,31 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     mdv = convert_scanpy_to_mdv(
         args.output_folder, merged_adata, delete_existing=not args.preserve_existing
     )
-    os.makedirs(
-        f"{mdv.dir}/spatial", exist_ok=True
-    )  # pretty sure sdata.write will do this anyway
-    for sdata_path, sdata in sdata_objects.items():
-        sdata_name = os.path.basename(sdata_path)
-        sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
+    if args.link:
+        print(f"Linking spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
+        os.symlink(
+            os.path.abspath(args.spatialdata_path), 
+            os.path.join(mdv.dir, "spatial"), target_is_directory=True
+        )
+    else:
+        print(f"Copying spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
+        os.makedirs(
+            f"{mdv.dir}/spatial", exist_ok=True
+        )  # pretty sure sdata.write will do this anyway
+        for sdata_path, sdata in sdata_objects.items():
+            sdata_name = os.path.basename(sdata_path)
+            # pay attention to format specifier here?
+            sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
+    # move contents of temp_folder to output_folder/spatial
+    # nb would probably rather avoid non spatialdata in spatial folder, 
+    # especially if linking (should avoid side-effects in linked folder)
+    if args.output_geojson:
+        import shutil
+        dest_dir = os.path.join(mdv.dir, "images")
+        os.makedirs(dest_dir, exist_ok=True)
+        for f in os.listdir(args.temp_folder):
+            shutil.move(os.path.join(args.temp_folder, f), os.path.join(dest_dir, f))
+
     mdv.set_editable()
 
     # these methods won't do what we actually want... this should be addressed.
@@ -384,7 +492,9 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     }
     mdv.set_datasource_metadata(cells_md)
     _set_default_image_view(mdv)
-
+    print(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n")
+    print(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---")
+    add_readme_to_project(mdv, merged_adata)
     if args.serve:
         print(f"Serving project at {args.output_folder}")
         mdv.serve()
@@ -397,12 +507,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert SpatialData to MDV format")
     parser.add_argument("spatialdata_path", type=str, help="Path to SpatialData data")
     parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
+    parser.add_argument("--link", action="store_true", help="Symlink to the original SpatialData objects")
     parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data")
+    parser.add_argument("--output_geojson", action="store_true", help="Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes)")
     parser.add_argument("--serve", action="store_true", help="Serve the project after conversion")
     args = parser.parse_args()
     print(f"Converting SpatialData from '{args.spatialdata_path}' to {args.output_folder}")
     print(f"Preserving existing project data: {args.preserve_existing}")
     print(f"Serving the project after conversion: {args.serve}")
     print(f"Converting {len(os.listdir(args.spatialdata_path))} potential SpatialData objects")
-
-    mdv = convert_spatialdata_to_mdv(args) # type: ignore argparse->SpatialDataConversionArgs
+    import tempfile
+    with tempfile.TemporaryDirectory() as temp_folder:
+        args.temp_folder = temp_folder
+        convert_spatialdata_to_mdv(args) # type: ignore argparse->SpatialDataConversionArgs
+        

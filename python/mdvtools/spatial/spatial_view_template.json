@@ -85,6 +85,10 @@
           375,
           293
         ],
+        "position": [
+          5,
+          5
+        ],
         "gssize": [
           1,
           2
@@ -106,6 +110,10 @@
           375,
           293
         ],
+        "position": [
+          5,
+          303
+        ],
         "gssize": [
           1,
           2
@@ -125,7 +133,7 @@
     },
     "genes": {
       "panelWidth": 30.9151,
-      "layout": "gridstack"
+      "layout": "absolute"
     }
   }
 }
