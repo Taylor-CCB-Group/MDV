@@ -1,56 +1,156 @@
 import { observer } from "mobx-react-lite";
-import { useCallback, useMemo, useState } from "react";
-import { type Column, type GridOption, SlickgridReact } from "slickgrid-react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { type Column, type GridOption, SlickgridReact, type SlickgridReactInstance } from "slickgrid-react";
+import { useChartID, useConfig, useOrderedParamColumns } from "../hooks";
+import type { TableChartReactConfig } from "./TableChartReactWrapper";
+import SlickGridDataProvider from "../utils/SlickGridDataProvider";
+import { useDataStore } from "../context";
+import { runInAction } from "mobx";
+import useSortedIndices from "../hooks/useSortedIndices";
 
-// todo: Use the useOrderedParamColumns to get the columns
-// Create a data provider probably to provide the data to the grid using index
-// Add filtering, sorting, find and replace and editing functionality
-// The logic would be quite similar to the SlickGridDemo code
-// Modularize the code into different components
-
-//* Trying to fix the styling of the grid by using mock data
+// todo: Add find and replace and editing functionality
+// todo: Fix the styling of the table to have the scroll bars visible
 const TableChartReactComponent = observer(() => {
-    const [columns, setColumns] = useState<Column[]>([]);
-    const [dataset, setDataset] = useState<any[]>([]);
+    const config = useConfig<TableChartReactConfig>();
+    const dataStore = useDataStore();
+    const chartId = useChartID();
+    const orderedParamColumns = useOrderedParamColumns();
+    const filteredIndices = useSortedIndices();
 
-    const gridOptions: GridOption = useMemo(
+    const gridRef = useRef<SlickgridReactInstance | null>(null);
+
+    const columnDefs = useMemo<Column[]>(() => {
+        const cols: Column[] = [];
+
+        if (config.include_index) {
+            cols.push({
+                id: "__index__",
+                field: "__index__",
+                name: "Index",
+                sortable: true,
+                minWidth: config.column_widths?.["__index__"] || 100,
+            });
+        }
+
+        for (const col of orderedParamColumns) {
+            cols.push({
+                id: col.field,
+                field: col.field,
+                name: col.name,
+                sortable: true,
+                minWidth: config.column_widths?.[col.field] || 100,
+            });
+        }
+
+        return cols;
+    }, [config.include_index, config.column_widths, orderedParamColumns]);
+
+    const dataProvider = useMemo(() => {
+        return new SlickGridDataProvider(dataStore, orderedParamColumns, filteredIndices, config.include_index);
+    }, [dataStore, orderedParamColumns, filteredIndices, config.include_index]);
+
+    const options: GridOption = useMemo(
         () => ({
-            // gridHeight: 450,
-            // gridWidth: 800,
-            // todo: fix dark mode to sync with the global mode
-            darkMode: true,
+            autoHeight: false,
+            gridWidth: "100%",
+            darkMode: window?.mdv?.chartManager?.theme === 'dark',
+            enableSorting: true,
+            multiColumnSort: false,
             alwaysShowVerticalScroll: true,
             alwaysAllowHorizontalScroll: true,
         }),
         [],
     );
 
-    const onGridCreated = useCallback(() => {
-        const cols: Column[] = [
-            { id: "id", name: "ID", field: "id", sortable: true, width: 70 },
-            { id: "title", name: "Title", field: "title", sortable: true, width: 100 },
-            { id: "duration", name: "Duration", field: "duration", sortable: true, width: 100 },
-        ];
-        const rows: any[] = [];
-        for (let i = 0; i < 50; i++) {
-            rows.push({
-                id: i+1,
-                title: `Task ${i+1}`,
-                duration: `${i+1} days`,
-            });
+    useEffect(() => {
+        const grid = gridRef.current?.slickGrid;
+        if (grid && dataProvider) {
+            grid.setData(dataProvider, true);
+            grid.render();
+            console.log("Grid updated");
         }
-        setColumns(cols);
-        setDataset(rows);
-    }, []);
+    }, [dataProvider]);
+
+    const handleGridCreated = useCallback((e: CustomEvent<SlickgridReactInstance>) => {
+        console.log("Grid created");
+        gridRef.current = e.detail;
+
+        const grid = e.detail.slickGrid;
+        if (grid && dataProvider) {
+            grid.setData(dataProvider, true);
+            grid.render();
+        }
+    }, [dataProvider]);
+
+    useEffect(() => {
+        const grid = gridRef.current?.slickGrid;
+        if (!grid) return;
+
+        const sortHandler: any = grid.onSort.subscribe((_e, args) => {
+            if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
+                const columnId = args.sortCol.field as string;
+                const sortAsc = args.sortAsc as boolean;
+                console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
+                runInAction(() => {
+                    config.sort = { columnId, ascending: sortAsc };
+                });
+            }
+        })
+
+        const clearSortHandler = grid.getPubSubService()?.subscribe(
+            "onHeaderMenuCommand",
+            (event: { column: Column, command: string }) => {
+                const { column, command } = event;
+                // Remove Sort
+                if (command === "clear-sort") {
+                    console.log("Clear sort");
+                    runInAction(() => {
+                        config.sort = undefined;
+                    });
+                    // Sort Ascending 
+                } else if (command === "sort-asc") {
+                    console.log("Sort Ascending");
+                    runInAction(() => {
+                        config.sort = { columnId: column.field, ascending: true };
+                    });
+                    // Sort Descending 
+                } else if (command === "sort-desc") {
+                    console.log("Sort Descending");
+                    runInAction(() => {
+                        config.sort = { columnId: column.field, ascending: false };
+                    });
+                }
+            }
+        );
+
+        const clearAllSortHandler = grid.getPubSubService()?.subscribe(
+            "onGridMenuCommand",
+            ({ command }: { command: string }) => {
+                if (command === "clear-sorting") {
+                    console.log("Clear All sort");
+                    runInAction(() => {
+                        config.sort = undefined;
+                    });
+                }
+            }
+        );
+
+        return () => {
+            sortHandler?.unsubscribe();
+            clearSortHandler?.unsubscribe();
+            clearAllSortHandler?.unsubscribe();
+        }
+
+    }, [config]);
 
     return (
-        <div className="relative w-[100%] h-[100%]">
+        <div className="w-full h-full">
             <SlickgridReact
-                gridId={"react-table-demo"}
-                columns={columns}
-                dataset={dataset}
-                options={gridOptions}
-                onReactGridCreated={onGridCreated}
+                gridId={`table-${chartId}`}
+                columns={columnDefs}
+                dataset={[]}
+                options={options}
+                onReactGridCreated={handleGridCreated}
             />
         </div>
     );
