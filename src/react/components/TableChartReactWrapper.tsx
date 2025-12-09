@@ -4,7 +4,7 @@ import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import TableChartReactComponent from "./TableChartReactComponent";
 import { g } from "@/lib/utils";
-import { action, extendObservable, runInAction } from "mobx";
+import { action, extendObservable, makeObservable, observable, runInAction } from "mobx";
 
 const TableChartComponent = observer(() => {
     return <TableChartReactComponent />;
@@ -15,26 +15,48 @@ export type TableChartReactConfig = BaseConfig & {
     type: "table_chart_react";
     include_index?: boolean;
     column_widths?: Record<string, number>;
-    sort?: { columnId: string; ascending: boolean; } | undefined;
+    sort?: { columnId: string; ascending: boolean } | undefined;
 };
 
 // todo: Add required functions related to the features
 class TableChartReact extends BaseReactChart<TableChartReactConfig> {
-    constructor(
-        dataStore: DataStore,
-        div: HTMLDivElement,
-        config: TableChartReactConfig,
-    ) {
+    // UI state property (not persisted in config)
+    // isFindReplaceOpen = false;
+
+    constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
         if (!config.column_widths) config.column_widths = {};
         if (config.include_index === undefined || config.include_index === null) config.include_index = false;
 
         super(dataStore, div, config, TableChartComponent);
+
+        // Make UI state observable
+        // makeObservable(this, {
+        //     isFindReplaceOpen: observable,
+        // });
 
         // Extending config to make config.sort observable
         // Doing this is required as it's initialized with undefined and doesn't work if initialized like other properties
         extendObservable(this.config, {
             sort: undefined as { columnId: string; ascending: boolean } | undefined,
         });
+
+        // Add Download menu icon (like the legacy version)
+        this.addMenuIcon("fas fa-download", "Download data", {
+            func: () => {
+                console.log("Download Data");
+                // this.downloadData();
+            },
+        });
+
+        // Add Find & Replace menu icon
+        // this.addMenuIcon("fas fa-search", "Find & Replace", {
+        //     func: () => {
+        //         console.log("Find and Replace");
+        //         runInAction(() => {
+        //             this.isFindReplaceOpen = true;
+        //         });
+        //     },
+        // });
     }
 
     getSettings() {
@@ -79,5 +101,3 @@ BaseChart.types["table_chart_react"] = {
 
 // export for side effect of HMR
 export default 42;
-
-

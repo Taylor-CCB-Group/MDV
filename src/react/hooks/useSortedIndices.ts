@@ -59,31 +59,35 @@ const useSortedIndices = () => {
                 }
 
                 // Sort the indices by comparing decoded strings
-                const sorted = Array.from(indices).sort((a, b) => {
+                indices.sort((a, b) => {
                     const comparison = decodedData[a].localeCompare(decodedData[b]);
                     return ascending ? comparison : -comparison;
                 });
-                setSortedIndices(new Uint32Array(sorted));
+                setSortedIndices(new Uint32Array(indices));
             } else {
-                const sorted = Array.from(indices).sort((a, b) => {
+                indices.sort((a, b) => {
                     const valueA = data?.[a];
                     const valueB = data?.[b];
-
-                    if (!valueA || !valueB) {
-                        return 1;
-                    }
-
+            
+                    // Handle null/undefined (but not 0 or false!)
+                    const aIsNull = valueA == null;
+                    const bIsNull = valueB == null;
+                    if (aIsNull && bIsNull) return 0;
+                    if (aIsNull) return 1;  // null values go to the end
+                    if (bIsNull) return -1;
+            
                     // Handle NaN values
                     const aIsNaN = Number.isNaN(valueA);
                     const bIsNaN = Number.isNaN(valueB);
                     if (aIsNaN && bIsNaN) return 0;
-                    if (aIsNaN) return 1;
+                    if (aIsNaN) return 1;  // NaN values go to the end
                     if (bIsNaN) return -1;
-
+            
+                    // Normal comparison
                     const comparison = valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
                     return ascending ? comparison : -comparison;
                 });
-                setSortedIndices(new Uint32Array(sorted));
+                setSortedIndices(new Uint32Array(indices));
             }
             return;
         });

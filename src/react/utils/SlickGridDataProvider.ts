@@ -6,11 +6,13 @@ class SlickGridDataProvider {
   private indices: Uint32Array;
   private dataStore: DataStore;
   private includeIndex: boolean;
+  private selectedRowIds: Set<number>;
   constructor(dataStore: DataStore, columns: LoadedDataColumn<DataType>[], indices: Uint32Array, includeIndex = false) {
     this.columns = columns;
     this.indices = indices;
     this.dataStore = dataStore;
     this.includeIndex = includeIndex;
+    this.selectedRowIds = new Set();
   }
 
   getLength(): number {
@@ -22,16 +24,18 @@ class SlickGridDataProvider {
       return null;
     }
 
-    const i = this.indices[index]
-    const item: any = {};
+    const dataIndex = this.indices[index];
 
+    // Use getRowAsObject exactly like old DataModel.getItem() does
+    const columnFields = this.columns.map(c => c.field);
+    const item: any = this.dataStore.getRowAsObject(dataIndex, columnFields);
+    if (!item) return null;
+    // Add id for SlickGrid
+    item.id = index;
+
+    // Override __index__ if we're showing the index column
     if (this.includeIndex) {
-      item.__index__ = i + 1;
-    }
-
-    for (const col of this.columns) {
-      //! Make use col.getValue instead of dataStore directly here to get the value. Note that getRowAsObject might not be optimal for large data as stated in it's description.
-      item[col.name] = this.dataStore.getRowText(i, col.field);
+      item.__index__ = dataIndex + 1;
     }
 
     return item;
@@ -40,6 +44,50 @@ class SlickGridDataProvider {
   getItemMetadata(_index: number) {
     return null;
   }
+
+  // Get the data index for a grid row (for highlighting)
+  getDataIndex(gridRow: number): number {
+    return this.indices[gridRow];
+  }
+
+  // // Find grid row for a data index (for external highlighting)
+  // findGridRow(dataIndex: number): number {
+  //   return this.indices.indexOf(dataIndex);
+  // }
+
+  // Required by GridStateService for row selection
+  getAllSelectedIds(): number[] {
+    return Array.from(this.selectedRowIds);
+  }
+
+  // Required by GridStateService for filtered selection
+  getAllSelectedFilteredIds(): number[] {
+    return Array.from(this.selectedRowIds);
+  }
+
+  // Set selected row IDs
+  setSelectedIds(ids: number[]) {
+    this.selectedRowIds = new Set(ids);
+  }
+
+  mapRowsToIds(rows: number[]): number[] {
+    return rows
+        .filter(row => row >= 0 && row < this.indices.length)
+        .map(row => {
+            const item = this.getItem(row);
+            return item?.id ?? row;
+        });
+}
+
+  // // Map row IDs to row indices
+  // mapIdsToRows(ids: number[]): number[] {
+  //   return ids.filter(id => id >= 0 && id < this.indices.length);
+  // }
+
+  // // Map row indices to row IDs
+  // mapRowsToIds(rows: number[]): number[] {
+  //   return rows.filter(row => row >= 0 && row < this.indices.length);
+  // }
 
   // getDataIndex(gridRow: number) {
   //     return this.indices[gridRow];
