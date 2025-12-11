@@ -80,6 +80,9 @@ WORKDIR /app
 # `.bashrc` is used to activate the virtual environment automatically.
 RUN poetry config virtualenvs.in-project true
 
+# Prefer binary wheels to avoid slow/fragile source builds (e.g., numcodecs on arm64)
+ENV PIP_PREFER_BINARY=1
+
 # Install Python dependencies using Poetry
 # this should be early in the process because it's less likely to change
 # copy poetry files first to cache the install step (with correct ownership)
@@ -160,7 +163,6 @@ USER pn
 # 
 # Multi-worker (Redis required):
 #   -w 4  # or any number > 1
-
 CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 

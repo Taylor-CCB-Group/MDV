@@ -31,6 +31,7 @@ function _mdvInit(routeFromTemplate) {
     //get the configs for MDV
     getConfigs(staticFolder).then((resp) => {
         const config = resp.state;
+        
         //is view in the URL
         const urlParams = new URLSearchParams(window.location.search);
         const view = urlParams.get("view");
