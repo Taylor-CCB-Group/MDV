@@ -1,45 +1,17 @@
 import os
 from typing import Any
 from mdvtools.logging_config import get_logger
-from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 logger = get_logger(__name__)
 
 # Module-level constants and functions that can be imported
 REQUIRED_FILES = {"views.json", "state.json", "datasources.json"}
 
-def get_project_thumbnail(project_path):
-    """Extract the first available viewImage from a project's views."""
-    try:
-        from mdvtools.mdvproject import MDVProject
-        mdv_project = MDVProject(project_path)
-        return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
-    except Exception as e:
-        logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
-        return None
-
-def find_root_prefix(names):
-    # Check if all required files are in the root of archive
-    if REQUIRED_FILES.issubset(set(os.path.basename(n) for n in names if "/" not in n)):
-        return ""
-    # Check one level below if required files exist
-    dirs = {n.split("/", 1)[0] for n in names if "/" in n}
-    for d in dirs:
-        files_in_d = {os.path.basename(n) for n in names if n.startswith(f"{d}/")}
-        if REQUIRED_FILES.issubset(files_in_d):
-            return d + "/"
-    return None
 
 def register_routes(app, ENABLE_AUTH):
-    from flask import abort, request, jsonify, session, redirect, url_for, render_template
-    from mdvtools.auth.authutils import active_projects_cache, user_project_cache, user_cache, all_users_cache, cache_user_projects
+    from flask import abort, jsonify, session, redirect, url_for, render_template
+    from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
     from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
-    import os
-    import shutil
-    from mdvtools.mdvproject import MDVProject
-    from mdvtools.project_router import ProjectBlueprint
-    from mdvtools.dbutils.dbmodels import User
-    import tempfile
     
     """Register routes with the Flask app."""
     logger.info("Registering routes...")
