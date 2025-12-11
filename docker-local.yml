@@ -9,7 +9,8 @@ services:
       #- ./python:/app/python
       - mdv-data:/app/mdv
       #- ./app_logs:/app/logs
-      # REQUIRED: Mount external config file for user configuration (outside the image)
+      # REQUIRED FOR DEPLOYMENT: Mount external config file for user configuration (outside the image)
+      # for local development, the default will be to use default config.json from the repo with everything enabled.
       # Uncomment the line below if you want to use custom extensions:
       # - ./config/user_config.json:/config/user_config.json
     env_file:
