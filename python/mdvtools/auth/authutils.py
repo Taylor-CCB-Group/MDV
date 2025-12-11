@@ -5,6 +5,8 @@ from mdvtools.logging_config import get_logger
 logger = get_logger(__name__)
 
 # in_memory_cache.py
+# nb - we should review thread-safety of this: could lead to some uid having wrong value
+# which would be *bad*
 user_cache = {}  # key: auth_id -> user details
 user_project_cache = {}  # key: user_id -> project permissions
 all_users_cache = []  # list of all user summaries

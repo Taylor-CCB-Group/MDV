@@ -36,6 +36,8 @@ def find_root_prefix(names):
 class ProjectManagerExtension(MDVProjectServerExtension):
     def register_global_routes(self, app: Flask, config: dict):
         ENABLE_AUTH = app.config.get('ENABLE_AUTH', False)
+        # nb - would probably prefer this to be declared a bit differently here so we could have better type
+        # not risking changing without proper testing etc.
         session = None
         user_cache = None
         active_projects_cache = []
