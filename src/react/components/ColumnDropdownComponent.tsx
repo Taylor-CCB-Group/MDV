@@ -89,7 +89,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
     const { placeholder, isMultiType, columns, value, setValue } = useColumnDropdownValue(gProps);
     const [selectAll, setSelectAll] = useState(isMultiType && isArray(value) ? columns.length === value?.length : false);
     const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLInputElement>(null);
+    const ref = useRef<HTMLInputElement | null>(null);
 
     useCloseOnIntersection(ref, () => setOpen(false));
     // should we be using a `GuiSpec<"dropdown"> | GuiSpec<"multidropdown">` here?
