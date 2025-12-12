@@ -295,6 +295,7 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     // don't want to introduce extra overhead... but it's probably small.
     // perhaps if rather than just link.observableFields, we have two separate arrays (!or iterators!)
     // and the computed properties can choose between them based on config flags.
+    // (i.e. for highlighted vs filtered data)
     @observable accessor maxItems: number;
     constructor(public link: RowsAsColslink, public linkedDsName: string, maxItems = 1) {
         this.maxItems = maxItems;
