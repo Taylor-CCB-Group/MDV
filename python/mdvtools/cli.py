@@ -1,6 +1,6 @@
 import click
 import scanpy as sc
-#import mudata as mu
+import mudata as mu
 import shutil
 import zipfile
 import os
