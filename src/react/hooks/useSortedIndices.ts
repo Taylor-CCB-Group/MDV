@@ -50,11 +50,26 @@ const useSortedIndices = () => {
                 const textDecoder = new TextDecoder();
                 const length = colInfo.stringLength;
 
+                if (!length || typeof length !== "number" || length <= 0) {
+                    console.error(
+                        `Column ${columnId} of type 'unique' has invalid or missing stringLength: ${length}.`,
+                    );
+                    setSortedIndices(indices);
+                    return;
+                }
+
                 // Decode the data
                 for (let i = 0; i < indices.length; i++) {
                     const dataIndex = indices[i];
+
+                    if (!data || dataIndex * length + length > data.length) {
+                        console.error(`Index out of bounds for the column ${columnId}, skipping.`);
+                        decodedData[dataIndex] = "";
+                        continue;
+                    }
+
                     decodedData[dataIndex] = textDecoder.decode(
-                        data?.slice?.(dataIndex * length, dataIndex * length + length)
+                        data?.slice?.(dataIndex * length, dataIndex * length + length),
                     );
                 }
 
@@ -68,21 +83,21 @@ const useSortedIndices = () => {
                 indices.sort((a, b) => {
                     const valueA = data?.[a];
                     const valueB = data?.[b];
-            
+
                     // Handle null/undefined (but not 0 or false!)
                     const aIsNull = valueA == null;
                     const bIsNull = valueB == null;
                     if (aIsNull && bIsNull) return 0;
-                    if (aIsNull) return 1;  // null values go to the end
+                    if (aIsNull) return 1; // null values go to the end
                     if (bIsNull) return -1;
-            
+
                     // Handle NaN values
                     const aIsNaN = Number.isNaN(valueA);
                     const bIsNaN = Number.isNaN(valueB);
                     if (aIsNaN && bIsNaN) return 0;
-                    if (aIsNaN) return 1;  // NaN values go to the end
+                    if (aIsNaN) return 1; // NaN values go to the end
                     if (bIsNaN) return -1;
-            
+
                     // Normal comparison
                     const comparison = valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
                     return ascending ? comparison : -comparison;
@@ -95,7 +110,6 @@ const useSortedIndices = () => {
     }, [filteredIndices, dataStore, config.sort]);
 
     return sortedIndices;
-
 };
 
 export default useSortedIndices;
