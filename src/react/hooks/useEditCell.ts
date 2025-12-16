@@ -2,11 +2,16 @@ import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { useCallback, useRef } from "react";
 import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs, SlickgridReactInstance } from "slickgrid-react";
 import { replaceMatches } from "../utils/valueReplacementUtil";
+import type DataStore from "@/datastore/DataStore";
 
+/**
+ * 
+ * Custom hook to handle editing of cell in the grid
+ */
 const useEditCell = (
     orderedParamColumnsRef: React.MutableRefObject<LoadedDataColumn<DataType>[]>,
     sortedIndicesRef: React.MutableRefObject<Uint32Array>,
-    dataStore: any,
+    dataStore: DataStore,
     gridRef: React.MutableRefObject<SlickgridReactInstance | null>,
 ) => {
 
@@ -34,7 +39,6 @@ const useEditCell = (
             const oldValue = item[columnName];
 
             if (oldValue !== null && oldValue !== undefined) {
-                console.log("old value: ", typeof oldValue);
                 oldCellValueRef.current = String(oldValue);
             } else {
                 oldCellValueRef.current = null;
@@ -70,9 +74,8 @@ const useEditCell = (
             if (!editedCol || !editedCol?.editable) {
                 return;
             }
-            console.log("params: ", editedCol, oldValue, updatedValue, dataIndex, typeof oldValue, typeof updatedValue);
             const changed = replaceMatches(columnName, editedCol, oldValue as string, updatedValue, dataIndex);
-            console.log("changed value", changed);
+
             if (changed) {
                 dataStore.dataChanged([columnName]);
                 const grid = gridRef.current?.slickGrid;

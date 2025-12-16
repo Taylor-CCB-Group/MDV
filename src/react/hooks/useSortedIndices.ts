@@ -5,6 +5,10 @@ import { useDataStore } from "../context";
 import { autorun, trace } from "mobx";
 
 // This follows a similar approach for sorting as DataModel.sort()
+/**
+ * Custom hook to sort and handle externally filtered indices
+ * @returns the sorted indices
+ */
 const useSortedIndices = () => {
     const config = useConfig<TableChartReactConfig>();
     const filteredIndices = useSimplerFilteredIndices();
@@ -80,11 +84,12 @@ const useSortedIndices = () => {
                 });
                 setSortedIndices(new Uint32Array(indices));
             } else {
+                // All other datatypes
                 indices.sort((a, b) => {
                     const valueA = data?.[a];
                     const valueB = data?.[b];
 
-                    // Handle null/undefined (but not 0 or false!)
+                    // Handle null/undefined (but not 0 or false)
                     const aIsNull = valueA == null;
                     const bIsNull = valueB == null;
                     if (aIsNull && bIsNull) return 0;

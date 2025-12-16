@@ -1,12 +1,25 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 
+/**
+ * Gets or adds the index of the new value in values array
+ * If the new value doesn't exist in the array, it adds and returns the new index
+ * 
+ * @param replaceValue - Replace value to find or add in values array
+ * @param values - Array of unique strings
+ * @param maxValues - Maximum number of values allowed (256 for text, 65536 for text16 or multitext)
+ * @returns index of the new value in values array
+ * @throws Error if length of values array exceeds the maxValues
+ * 
+ */
 const getValueIndex = (replaceValue: string, values: string[], maxValues: number) => {
     let valueIndex = values.indexOf(replaceValue);
 
     if (valueIndex === -1) {
+        // Check if length exceeds the max values of the array
         if (values.length >= maxValues) {
             throw new Error(`Column exceeded ${maxValues} values while adding: ${replaceValue}`);
         }
+        // Create a new value if it doesn't exist in values array
         values.push(replaceValue);
         valueIndex = values.length - 1;
     }
@@ -14,6 +27,21 @@ const getValueIndex = (replaceValue: string, values: string[], maxValues: number
     return valueIndex;
 };
 
+/**
+ * Replaces the current value with the new replace value
+ * 
+ * Text datatype: Get or add replace value index and update the index in data array
+ * Numeric datatype: Replace the value in the data array with the new value
+ * Multitext datatype: Get or add new value index, find current value and replace the index
+ * Unique datatype: Encode the replace value to bytes, update the existing value with new value (in bytes)
+ * 
+ * @param searchColumn - Column name of column in which replace is performed
+ * @param column - Column Object with metadata
+ * @param findValue - Find value
+ * @param replaceValue - Replace value
+ * @param dataIndex - Row index of data array in which replacement should be performed
+ * @returns true if successful, false if not
+ */
 export const replaceMatches = (
     searchColumn: string,
     column: LoadedDataColumn<DataType> | undefined,
@@ -31,6 +59,7 @@ export const replaceMatches = (
         return false;
     }
 
+    // Text datatype
     if (column.datatype === "text" || column.datatype === "text16") {
         if (!column.values) {
             console.error("No values found in the column: ", searchColumn);
@@ -38,15 +67,16 @@ export const replaceMatches = (
         }
         // Based on datasource.md
         const maxValues = column.datatype === "text" ? 256 : 65536;
+        
         const valueIndex = getValueIndex(replaceValue, column.values, maxValues);
         column.data[dataIndex] = valueIndex;
         return true;
     }
 
+    // Numeric datatype
     if (column.datatype === "double" || column.datatype === "int32" || column.datatype === "integer") {
         const replaceNumber = Number.parseFloat(replaceValue);
-        console.log("replace value: ", replaceValue, typeof replaceValue);
-        console.log("replace number: ", replaceNumber, typeof replaceNumber);
+
         if (!Number.isFinite(replaceNumber)) {
             console.error("Non-numeric value: ", searchColumn);
             return false;
@@ -59,6 +89,7 @@ export const replaceMatches = (
         return true;
     }
 
+    // Multitext datatype
     if (column.datatype === "multitext") {
         const { values, data, stringLength } = column;
         if (!values || !stringLength) {
@@ -75,9 +106,19 @@ export const replaceMatches = (
         for (let rowIndex = 0; rowIndex < stringLength; rowIndex++) {
             const index = data[baseIndex + rowIndex];
 
+            // No value check
             if (index === 65535) continue;
+        
+            // Out of bounds check
+            if (index < 0 || index >= values.length) {
+                console.error(`Index out of bounds for column: ${searchColumn}, skipping.`)
+                continue;
+            }
 
             const currentValue = values[index];
+
+            //! Need to take a look at this
+            // Only update the searched value
             if (currentValue.toLowerCase() === findLower) {
                 data[baseIndex + rowIndex] = replaceIndex;
                 replaced = true;
@@ -87,6 +128,7 @@ export const replaceMatches = (
         return replaced;
     }
 
+    // Unique datatype
     if (column.datatype === "unique") {
         const { data, stringLength } = column;
 
@@ -97,7 +139,7 @@ export const replaceMatches = (
 
         const encoder = new TextEncoder();
         const replaceEncoded = encoder.encode(replaceValue);
-        console.log("encoded replace value: ", replaceEncoded);
+
         if (replaceEncoded.length > stringLength) {
             console.error("Value too long for the column: ", searchColumn);
             return false;
@@ -105,20 +147,18 @@ export const replaceMatches = (
 
         const baseIndex = dataIndex * stringLength;
 
+        // Index out of bound check
         if (baseIndex + stringLength > data.length) {
             console.error("Data index out of bounds for the column: ", searchColumn);
             return false;
         }
 
-        console.log("baseIndex: ", baseIndex);
-        console.log("string length: ", stringLength);
-
         for (let i = 0; i < stringLength; i++) {
+            // Update the existing value
             if (i < replaceEncoded.length) {
-                console.log("in if value: ", data[baseIndex + i], replaceEncoded[i]);
                 data[baseIndex + i] = replaceEncoded[i];
             } else {
-                console.log("in else value: ", data[baseIndex + i]);
+                // Add zeros at the end
                 data[baseIndex + i] = 0;
             }
         }

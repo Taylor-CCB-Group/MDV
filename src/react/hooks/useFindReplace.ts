@@ -2,6 +2,7 @@ import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { useCallback, useMemo, useState } from "react";
 import { replaceMatches } from "../utils/valueReplacementUtil";
 import type { SlickgridReactInstance } from "slickgrid-react";
+import type DataStore from "@/datastore/DataStore";
 
 export type FoundMatch = {
     value: string | number;
@@ -11,10 +12,13 @@ export type FoundMatch = {
     dataIndex: number;
 };
 
+/**
+ * Custom hook which handles find and replace logic
+ */
 const useFindReplace = (
     orderedParamColumns: LoadedDataColumn<DataType>[],
     sortedIndices: Uint32Array,
-    dataStore: any,
+    dataStore: DataStore,
     searchColumn: string | null,
     config: { include_index?: boolean },
     gridRef: React.MutableRefObject<SlickgridReactInstance | null>,
