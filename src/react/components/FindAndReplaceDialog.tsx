@@ -27,6 +27,7 @@ export type FindAndReplaceDialogProps = {
     columnName?: string | null; // The column being searched/replaced
     disableFindNext?: boolean;
     disableFindPrev?: boolean;
+    isColumnEditable?: boolean;
 };
 
 const PaperComponent = (props: PaperProps) => {
@@ -54,11 +55,10 @@ const FindAndReplaceDialog = ({
     columnName,
     disableFindNext = false,
     disableFindPrev = false,
+    isColumnEditable = true,
 }: FindAndReplaceDialogProps) => {
     const [findText, setFindText] = useState("");
     const [replaceText, setReplaceText] = useState("");
-
-    console.log("Disabled: ", disableFindNext, disableFindPrev);
 
     // Clear the find and replace text before closing
     const onDialogClose = useCallback(() => {
@@ -72,6 +72,9 @@ const FindAndReplaceDialog = ({
             open={open}
             onClose={onDialogClose}
             PaperComponent={PaperComponent}
+            disableAutoFocus
+            disableEnforceFocus
+            disableRestoreFocus
             fullWidth
             maxWidth="xs"
             hideBackdrop
@@ -110,6 +113,7 @@ const FindAndReplaceDialog = ({
                             sx={{ flexGrow: 1 }}
                         />
                     </Box>
+                    {/* foundMatches || typeof foundMatches === "number" - This condition is for zero */}
                     {findText && (foundMatches || typeof foundMatches === "number") ? (
                         <Typography>{`Found ${foundMatches} matches`}</Typography>
                     ) : (
@@ -150,38 +154,42 @@ const FindAndReplaceDialog = ({
                     </Box>
 
                     {/* Replace Section */}
-                    <Box sx={{ display: "flex", alignItems: "center", mt: 3 }}>
-                        <TextField
-                            label="Replace Text"
-                            variant="outlined"
-                            size="small"
-                            value={replaceText}
-                            onChange={(e) => setReplaceText(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleReplace(findText, replaceText)}
-                            sx={{ flexGrow: 1 }}
-                        />
-                    </Box>
+                    {isColumnEditable && (
+                        <>
+                            <Box sx={{ display: "flex", alignItems: "center", mt: 3 }}>
+                                <TextField
+                                    label="Replace Text"
+                                    variant="outlined"
+                                    size="small"
+                                    value={replaceText}
+                                    onChange={(e) => setReplaceText(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && handleReplace(findText, replaceText)}
+                                    sx={{ flexGrow: 1 }}
+                                />
+                            </Box>
 
-                    <Box sx={{ display: "flex", gap: 3 }}>
-                        <Button
-                            variant="outlined"
-                            onClick={() => handleReplace(findText, replaceText)}
-                            disabled={!replaceText.trim()}
-                            color="inherit"
-                            sx={{ textTransform: "capitalize", fontSize: "0.8rem" }}
-                        >
-                            Replace
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            onClick={() => handleReplaceAll(findText, replaceText)}
-                            disabled={!replaceText.trim()}
-                            color="inherit"
-                            sx={{ textTransform: "capitalize", fontSize: "0.8rem" }}
-                        >
-                            Replace All
-                        </Button>
-                    </Box>
+                            <Box sx={{ display: "flex", gap: 3 }}>
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => handleReplace(findText, replaceText)}
+                                    disabled={!replaceText.trim()}
+                                    color="inherit"
+                                    sx={{ textTransform: "capitalize", fontSize: "0.8rem" }}
+                                >
+                                    Replace
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => handleReplaceAll(findText, replaceText)}
+                                    disabled={!replaceText.trim()}
+                                    color="inherit"
+                                    sx={{ textTransform: "capitalize", fontSize: "0.8rem" }}
+                                >
+                                    Replace All
+                                </Button>
+                            </Box>
+                        </>
+                    )}
                 </Box>
             </DialogContent>
             <DialogActions>
