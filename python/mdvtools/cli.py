@@ -11,6 +11,10 @@ from .conversions import (
     convert_vcf_to_mdv,
     merge_projects,
 )
+from .spatial.conversion import (
+    convert_spatialdata_to_mdv,
+    SpatialDataConversionArgs,
+)
 
 def zip_and_remove(folder):
     """Zip a directory and delete the original."""
@@ -117,6 +121,21 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
     """Merge an existing MDV project into another project."""
     merge_projects(base_project, extra_project, prefix=prefix, view_prefix=view_prefix)
     click.echo(f"Merged '{extra_project}' into '{base_project}'.")
+
+@cli.command("convert-spatial")
+@click.argument('spatialdata_path')
+@click.argument('output_folder')
+@click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data.')
+@click.option('--serve', is_flag=True, help='Serve the project after conversion.')
+def convert_spatial(spatialdata_path, output_folder, preserve_existing, serve):
+    """Convert SpatialData objects to MDV format."""
+    args = SpatialDataConversionArgs(
+        spatialdata_path=spatialdata_path,
+        output_folder=output_folder,
+        preserve_existing=preserve_existing,
+        serve=serve,
+    )
+    convert_spatialdata_to_mdv(args)
 
 if __name__ == '__main__':
     cli()
