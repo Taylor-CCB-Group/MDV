@@ -140,6 +140,14 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
             return send_file(file_name)
         return get_range(file_name, range_header)
 
+    # spatial data files (zarr stores etc.)
+    @app.route("/spatial/<path:path>")
+    def get_spatialdata(path):
+        file_path = safe_join(project.dir, "spatial", path)
+        if file_path is None or not os.path.exists(file_path):
+            return "File not found", 404
+        return send_file(file_path)
+
     @app.route("/save_state", methods=["POST"])
     def save_data():
         success = True

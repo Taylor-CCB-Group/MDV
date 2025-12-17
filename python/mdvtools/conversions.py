@@ -814,11 +814,18 @@ def merge_projects(
     prepared_datasources: List[dict] = []
 
     def rewrite_json_path(value: str) -> str:
-        if not isinstance(value, str) or not value.startswith("json/"):
+        if not isinstance(value, str):
+            return value
+        # Handle both json/ and images/ prefixes for geo.json files
+        if value.startswith("json/"):
+            prefix_dir = "json"
+        elif value.startswith("images/"):
+            prefix_dir = "images"
+        else:
             return value
         filename = value.split("/", 1)[1]
         new_filename = f"{prefix_value}{filename}" if prefix_value else filename
-        new_rel = f"json/{new_filename}"
+        new_rel = f"{prefix_dir}/{new_filename}"
         schedule_file(os.path.join(extra_dir, value), os.path.join(base_dir, new_rel))
         if new_rel != value:
             string_replacements[value] = new_rel
@@ -904,6 +911,53 @@ def merge_projects(
         if isinstance(regions, dict):
             all_regions = regions.get("all_regions", {})
             if isinstance(all_regions, dict) and all_regions:
+                # First pass: collect all actual spatial directory names from metadata
+                # The actual spatial directories are named after sdata_name (e.g., "sample1.zarr"),
+                # not the region names (e.g., "sample1_region1")
+                spatial_dirs_to_copy: Dict[str, str] = {}  # old_spatial_dir -> new_spatial_dir
+                
+                for region_name, region_info in all_regions.items():
+                    if not isinstance(region_info, dict):
+                        continue
+                    # Extract the actual spatial directory name from metadata
+                    spatial_info = region_info.get("spatial")
+                    if isinstance(spatial_info, dict):
+                        spatial_file = spatial_info.get("file")
+                        if isinstance(spatial_file, str):
+                            # Track which spatial directories need to be copied
+                            if spatial_file not in spatial_dirs_to_copy:
+                                new_spatial_dir = (
+                                    f"{prefix_value}{spatial_file}" if prefix_value else spatial_file
+                                )
+                                spatial_dirs_to_copy[spatial_file] = new_spatial_dir
+                
+                # Copy all spatial directories (not just those referenced by region names)
+                # Also scan the actual spatial directory for any directories not in metadata
+                extra_spatial_dir = os.path.join(extra_dir, "spatial")
+                if os.path.isdir(extra_spatial_dir):
+                    for item in os.listdir(extra_spatial_dir):
+                        item_path = os.path.join(extra_spatial_dir, item)
+                        if os.path.isdir(item_path):
+                            # If not already scheduled, add it
+                            if item not in spatial_dirs_to_copy:
+                                new_spatial_dir = (
+                                    f"{prefix_value}{item}" if prefix_value else item
+                                )
+                                spatial_dirs_to_copy[item] = new_spatial_dir
+                
+                # Schedule copying of all spatial directories
+                for old_spatial_dir, new_spatial_dir in spatial_dirs_to_copy.items():
+                    schedule_directory(
+                        os.path.join(extra_dir, "spatial", old_spatial_dir),
+                        os.path.join(base_dir, "spatial", new_spatial_dir),
+                    )
+                    if old_spatial_dir != new_spatial_dir:
+                        string_replacements[f"spatial/{old_spatial_dir}"] = (
+                            f"spatial/{new_spatial_dir}"
+                        )
+                        string_replacements[old_spatial_dir] = new_spatial_dir
+                
+                # Second pass: update region metadata with new names and paths
                 new_all_regions: Dict[str, dict] = {}
                 region_mapping: Dict[str, str] = {}
                 for region_name, region_info in all_regions.items():
@@ -914,21 +968,40 @@ def merge_projects(
                         f"{prefix_value}{region_name}" if prefix_value else region_name
                     )
                     updated_info = copy.deepcopy(region_info)
-                    if (
-                        isinstance(updated_info.get("spatial"), dict)
-                        and updated_info["spatial"].get("file") == region_name
-                    ):
-                        updated_info["spatial"]["file"] = new_region_name
+                    
+                    # Update spatial file reference if it exists
+                    spatial_info = updated_info.get("spatial")
+                    if isinstance(spatial_info, dict):
+                        spatial_file = spatial_info.get("file")
+                        if isinstance(spatial_file, str):
+                            # Update to new spatial directory name if it was renamed
+                            new_spatial_file = spatial_dirs_to_copy.get(spatial_file, spatial_file)
+                            if new_spatial_file != spatial_file:
+                                spatial_info["file"] = new_spatial_file
+                                string_replacements[spatial_file] = new_spatial_file
+                    
+                    # Update viv_image paths
                     viv_image = updated_info.get("viv_image")
                     if isinstance(viv_image, dict):
                         for key in ("file", "url"):
                             if key in viv_image and isinstance(viv_image[key], str):
-                                new_val = _replace_path_segment(
-                                    viv_image[key], region_name, new_region_name
-                                )
-                                if new_val != viv_image[key]:
-                                    string_replacements[viv_image[key]] = new_val
+                                # Update paths that reference old spatial directory names
+                                old_val = viv_image[key]
+                                new_val = old_val
+                                for old_dir, new_dir in spatial_dirs_to_copy.items():
+                                    if old_dir != new_dir and old_dir in old_val:
+                                        new_val = old_val.replace(old_dir, new_dir)
+                                        break
+                                # Also update region name references
+                                if new_val == old_val:
+                                    new_val = _replace_path_segment(
+                                        old_val, region_name, new_region_name
+                                    )
+                                if new_val != old_val:
+                                    string_replacements[old_val] = new_val
                                     viv_image[key] = new_val
+                    
+                    # Update images dictionary paths
                     images_dict = updated_info.get("images")
                     if isinstance(images_dict, dict):
                         for image_meta in images_dict.values():
@@ -936,26 +1009,34 @@ def merge_projects(
                                 continue
                             for key in ("url", "file"):
                                 if key in image_meta and isinstance(image_meta[key], str):
-                                    new_val = _replace_path_segment(
-                                        image_meta[key], region_name, new_region_name
-                                    )
-                                    if new_val != image_meta[key]:
-                                        string_replacements[image_meta[key]] = new_val
+                                    old_val = image_meta[key]
+                                    new_val = old_val
+                                    # Update paths that reference old spatial directory names
+                                    for old_dir, new_dir in spatial_dirs_to_copy.items():
+                                        if old_dir != new_dir and old_dir in old_val:
+                                            new_val = old_val.replace(old_dir, new_dir)
+                                            break
+                                    # Also update region name references
+                                    if new_val == old_val:
+                                        new_val = _replace_path_segment(
+                                            old_val, region_name, new_region_name
+                                        )
+                                    if new_val != old_val:
+                                        string_replacements[old_val] = new_val
                                         image_meta[key] = new_val
+                    
                     json_path = updated_info.get("json")
                     if isinstance(json_path, str):
                         updated_info["json"] = rewrite_json_path(json_path)
+                    
                     new_all_regions[new_region_name] = updated_info
-                    schedule_directory(
-                        os.path.join(extra_dir, "spatial", region_name),
-                        os.path.join(base_dir, "spatial", new_region_name),
-                    )
                     if new_region_name != region_name:
                         region_mapping[region_name] = new_region_name
                         string_replacements[region_name] = new_region_name
                         string_replacements[f"spatial/{region_name}"] = (
                             f"spatial/{new_region_name}"
                         )
+                
                 regions["all_regions"] = new_all_regions
                 if region_mapping:
                     region_field = regions.get("region_field")
@@ -963,6 +1044,15 @@ def merge_projects(
                         region_field_updates.append(
                             (new_name, region_field, region_mapping)
                         )
+                        # Also update the values array in the column metadata
+                        columns = ds_meta.get("columns", [])
+                        for col in columns:
+                            if col.get("name") == region_field or col.get("field") == region_field:
+                                if "values" in col and isinstance(col["values"], list):
+                                    col["values"] = [
+                                        region_mapping.get(v, v) for v in col["values"]
+                                    ]
+                                break
 
         prepared_datasources.append(ds_meta)
 
@@ -1062,6 +1152,10 @@ def merge_projects(
 
     # Merge views
     extra_views = copy.deepcopy(extra_project.views)
+    
+    # DEBUG
+    print(f"DEBUG: extra_views keys: {list(extra_views.keys())}")
+    print(f"DEBUG: view_prefix_value: '{view_prefix_value}'")
 
     def apply_replacements(obj):
         if isinstance(obj, dict):
@@ -1100,6 +1194,8 @@ def merge_projects(
                 f"Provide a different view prefix."
             )
         base_project.set_view(new_view_name, remap_view(view_data))
+        # DEBUG
+        print(f"DEBUG: Added view '{new_view_name}'")
 
     logger.info(
         "Merged %d datasources from '%s' into '%s'.",
