@@ -93,7 +93,6 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     
     markdown += "## SpatialData objects:\n\n"
     spatial_dir = os.path.join(mdv.dir, "spatial")
-    transform_summaries = {}  # sdata_name -> list of transform info
     
     for sdata_name in os.listdir(spatial_dir):
         sdata_path = os.path.join(spatial_dir, sdata_name)
@@ -105,9 +104,6 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```"
         sdata_md += f"\n\n### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
         markdown += sdata_md
-        
-        # Collect transform information for this SpatialData object
-        transform_summaries[sdata_name] = []
     
     # Add point transform strategy section
     if adata is not None and "mdv" in adata.uns and "point_transform" in adata.uns["mdv"]:
