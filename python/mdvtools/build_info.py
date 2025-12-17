@@ -34,13 +34,16 @@ def _get_from_env() -> Optional[Dict[str, Any]]:
 def _get_from_git() -> Optional[Dict[str, Any]]:
     """Try to get build info from git commands."""
     try:
-        # Check if we're in a git repository
+        # Start from the directory where this module is located
+        git_root = os.path.dirname(__file__)
+        
+        # Verify we're in a git repository
         subprocess.run(
             ["git", "rev-parse", "--git-dir"],
             capture_output=True,
             check=True,
             timeout=5,
-            cwd=os.path.dirname(__file__)
+            cwd=git_root
         )
         
         # Get commit hash
@@ -48,7 +51,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             ["git", "rev-parse", "HEAD"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            cwd=git_root
         )
         if result.returncode != 0:
             return None
@@ -59,7 +63,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             ["git", "log", "-1", "--format=%cI"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            cwd=git_root
         )
         git_commit_date = result.stdout.strip() if result.returncode == 0 else None
         
@@ -68,7 +73,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            cwd=git_root
         )
         git_branch = result.stdout.strip() if result.returncode == 0 else None
         
@@ -77,7 +83,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             ["git", "status", "--porcelain"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            cwd=git_root
         )
         git_dirty = len(result.stdout.strip()) > 0
         
