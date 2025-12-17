@@ -89,7 +89,7 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
         git_dirty = len(result.stdout.strip()) > 0
         
         # Use current time as build date
-        build_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        build_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         
         return {
             "git_commit_hash": git_commit_hash,
