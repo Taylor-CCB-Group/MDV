@@ -16,6 +16,7 @@ def _get_from_env() -> Optional[Dict[str, Any]]:
     git_commit_hash = os.environ.get("GIT_COMMIT_HASH")
     git_commit_date = os.environ.get("GIT_COMMIT_DATE")
     git_branch = os.environ.get("GIT_BRANCH_NAME")
+    git_commit_message = os.environ.get("GIT_LAST_COMMIT_MESSAGE")
     build_date = os.environ.get("BUILD_DATE")
     git_dirty = os.environ.get("GIT_DIRTY", "false").lower() == "true"
     
@@ -24,6 +25,7 @@ def _get_from_env() -> Optional[Dict[str, Any]]:
             "git_commit_hash": git_commit_hash,
             "git_commit_date": git_commit_date,
             "git_branch": git_branch,
+            "git_commit_message": git_commit_message,
             "build_date": build_date,
             "git_dirty": git_dirty,
             "source": "environment"
@@ -78,6 +80,16 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
         )
         git_branch = result.stdout.strip() if result.returncode == 0 else None
         
+        # Get commit message
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=git_root
+        )
+        git_commit_message = result.stdout.strip() if result.returncode == 0 else None
+        
         # Check if working directory is dirty
         result = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -95,6 +107,7 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             "git_commit_hash": git_commit_hash,
             "git_commit_date": git_commit_date,
             "git_branch": git_branch,
+            "git_commit_message": git_commit_message,
             "build_date": build_date,
             "git_dirty": git_dirty,
             "source": "git"
@@ -111,6 +124,7 @@ def get_build_info() -> Dict[str, Any]:
         Dictionary with build information:
         - git_commit_hash: Full commit hash
         - git_commit_date: ISO format commit date
+        - git_commit_message: Commit message (subject line)
         - git_branch: Branch name
         - build_date: Build timestamp
         - git_dirty: Whether working directory has uncommitted changes
@@ -130,6 +144,7 @@ def get_build_info() -> Dict[str, Any]:
     return {
         "git_commit_hash": None,
         "git_commit_date": None,
+        "git_commit_message": None,
         "git_branch": None,
         "build_date": None,
         "git_dirty": None,
@@ -154,6 +169,8 @@ def build_info_to_markdown(info: Dict[str, Any]) -> str:
     
     if info["git_commit_hash"]:
         lines.append(f"- **Commit hash**: `{info['git_commit_hash']}`")
+    if info["git_commit_message"]:
+        lines.append(f"- **Commit message**: {info['git_commit_message']}")
     if info["git_commit_date"]:
         lines.append(f"- **Commit date**: {info['git_commit_date']}")
     if info["git_branch"]:
