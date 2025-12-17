@@ -39,7 +39,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             ["git", "rev-parse", "--git-dir"],
             capture_output=True,
             check=True,
-            timeout=5
+            timeout=5,
+            cwd=os.path.dirname(__file__)
         )
         
         # Get commit hash
