@@ -207,7 +207,7 @@ const Main = observer(() => {
         ],
     );
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
-    if (import.meta.env.DEV) trace();
+    // if (import.meta.env.DEV) trace();
     return (
         <>
             <SelectionOverlay />
