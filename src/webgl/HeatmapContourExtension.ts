@@ -13,6 +13,7 @@ log.level = 0;
 export type ExtraContourProps = { 
     contourOpacity: number;
     contourFill: number;
+    fillOpacity: number;
 };
 
 // ---------- copied from deck.gl triangle-layer
@@ -117,7 +118,7 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
 
     draw({ uniforms }: { uniforms: any }): void {
         const { model } = this.state;
-        const { intensity, threshold, aggregationMode, colorDomain, contourOpacity, contourFill } = this.props;
+        const { intensity, threshold, aggregationMode, colorDomain, contourOpacity, contourFill, fillOpacity } = this.props;
         // deprecated, "use uniform buffers for portability".
         // Sounds good. How do we do that?
         model.setUniforms({
@@ -127,7 +128,8 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
             aggregationMode,
             colorDomain,
             contourOpacity,
-            contourFill
+            contourFill,
+            fillOpacity
         });
         // probably also want to implement updateState rather than draw(), but the types are annoying.
         // refer to contemporary deck.gl triangle-layer (but actually we want something more different anyway)

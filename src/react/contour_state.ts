@@ -134,7 +134,7 @@ export function useCategoryContour(props: CategoryContourProps) {
         return {
             id,
             data,
-            opacity: fill ? intensity : 0,
+            fillOpacity: intensity,
             contourOpacity: opacity,
             getPosition: (
                 i: number,
@@ -192,8 +192,9 @@ export function useFieldContour(props: FieldContourProps) {
         return fields.map(({ name, data: fieldData, minMax }, index) => ({
             id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
             data, //todo filter sparse data
-            opacity: fill ? intensity : 0,
+            fillOpacity: intensity,
             contourOpacity: opacity,
+            // when fill is disabled, this is some arbitrary large value, otherwise should be tweakable threshold
             contourFill: fill ? 2 : 10000,
             getPosition: (
                 i: number,
@@ -212,6 +213,7 @@ export function useFieldContour(props: FieldContourProps) {
                 //things to consider: in some circumstances normalise range across all fields
                 const [min, max] = minMax;
                 const range = max - min;
+                if (range === 0) return 0;
                 const value = fieldData[i];
                 if (value < min) return 0;
                 if (value > max) return 1;
@@ -369,7 +371,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
     return [
         g({
             type: "slider",
-            max: 25,
+            max: 50,
             min: 1,
 
             // doc: this.__doc__, //why?

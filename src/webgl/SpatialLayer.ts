@@ -122,6 +122,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                             "triangle-layer": {
                                 contourOpacity: p.contourOpacity,
                                 contourFill: p.contourFill,
+                                fillOpacity: p.fillOpacity,
                             },
                         },
                     });
