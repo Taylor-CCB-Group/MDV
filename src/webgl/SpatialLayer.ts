@@ -57,7 +57,10 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     /** "usually not needed for composite layers" but I think this is the right place to setup framebuffers */
     initializeState(context: LayerContext): void {
         super.initializeState(context);
-        if (!SpatialLayer.bufferExperiment) return;
+        if (!SpatialLayer.bufferExperiment) {
+            // console.log('longing for the day we render field density sensibly - should be much more efficient');
+            return;
+        }
         // this will change with new deck.gl version, context.device rather than context.gl...
         // still considering how to structure coomposite layers...
         // const framebuffer = new Framebuffer(context.gl, {});
@@ -118,6 +121,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                             },
                             "triangle-layer": {
                                 contourOpacity: p.contourOpacity,
+                                contourFill: p.contourFill,
                             },
                         },
                     });

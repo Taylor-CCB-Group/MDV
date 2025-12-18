@@ -194,6 +194,7 @@ export function useFieldContour(props: FieldContourProps) {
             data, //todo filter sparse data
             opacity: fill ? intensity : 0,
             contourOpacity: opacity,
+            contourFill: fill ? 2 : 10000,
             getPosition: (
                 i: number,
                 { target }: { target: number[] | Float32Array },
@@ -423,7 +424,7 @@ export function useLegacyDualContour(): ContourLayerProps[] {
     // breaking rule of hooks etc, should be fixed
     const commonProps = {
         parameter: config.contourParameter,
-        fill: config.contour_fill || true,
+        fill: config.contour_fill,
         bandwidth: config.contour_bandwidth || 10,
         intensity: config.contour_intensity || 0.1,
         opacity: config.contour_opacity || 0.2,
