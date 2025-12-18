@@ -153,6 +153,7 @@
     "typedoc-plugin-rename-defaults": "^0.7.3",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
+    "vite-plugin-glsl": "^1.5.5",
     "vitest": "^3.2.4"
   },
   "optionalDependencies": {

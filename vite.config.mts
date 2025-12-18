@@ -1,6 +1,7 @@
 import { defineConfig, type ProxyOptions } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react from '@vitejs/plugin-react';
+import glsl from 'vite-plugin-glsl';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -180,6 +181,7 @@ export default defineConfig(env => {
         },
     },
     plugins: [
+        glsl(),
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
             babel: {

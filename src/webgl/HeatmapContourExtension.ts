@@ -4,7 +4,7 @@ import { Model } from '@luma.gl/engine';
 import { type LayerContext, project32 } from '@deck.gl/core';
 import type { _ConstructorOf } from "@deck.gl/core/";
 
-import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl?raw";
+import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl";
 
 import { log } from '@luma.gl/core';
 // log.enable();
@@ -69,6 +69,9 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
     };
 
     getShaders() {
+        // I see warnings about various moules not being found 
+        // (picking - also layer, shadow, lighting, phongMaterial, gouraudMaterial), as well as
+        // > Ignoring constant supplied for unknown attribute "instancePickingColors"
         return { vs: triangleVs, fs: heatmapPresentationFS, modules: [project32] };
     }
 
