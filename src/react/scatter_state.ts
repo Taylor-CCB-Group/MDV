@@ -261,7 +261,8 @@ export function useScatterRadius() {
     // y_scale = [0, 400 / whRatio];
     // x_scale = [0, 400];
 
-    const radiusScale = (radius * course_radius) / scale;
+    const safeScale = scale || 1; // avoid /0 (although - I don't _think_ useRegionScale() would return 0).
+    const radiusScale = (radius * course_radius) / safeScale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {
             const xRange = cx.minMax[1] - cx.minMax[0];
@@ -299,6 +300,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     // const [cx, cy, contourParameter] = useParamColumns();
     const params = useParamColumns();
     const [cx, cy, cz] = params;
+    const scale = useRegionScale();
     const hoverInfoRef = useRef<PickingInfo | null>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
@@ -307,7 +309,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             if (typeof i !== "number") throw new Error("expected index");
             return i === highlightedIndex ? (0.2 * radiusScale) / scale : 0.0;
         },
-        [radiusScale, highlightedIndex],
+        [radiusScale, highlightedIndex, scale],
     );
     const contourLayers = useLegacyDualContour();
 
@@ -351,7 +353,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
 
-    const scale = useRegionScale();
     // const { modelMatrix, setModelMatrix } = useScatterModelMatrix();
     const viewState = useZoomOnFilter(modelMatrix);
     const { point_shape } = config;
