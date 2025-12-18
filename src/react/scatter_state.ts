@@ -103,6 +103,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_bandwidth: 0.1,
     contour_intensity: 1,
     contour_opacity: 0.5,
+    contour_fillThreshold: 2,
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
     // todo omit this so we can have better HMR...

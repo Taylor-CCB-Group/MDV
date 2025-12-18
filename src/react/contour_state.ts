@@ -34,6 +34,7 @@ export type CategoryContourProps = {
     bandwidth: number;
     intensity: number;
     opacity: number;
+    fillThreshold: number;
 };
 export type FieldContourProps = {
     id: string;
@@ -41,6 +42,7 @@ export type FieldContourProps = {
     bandwidth: number;
     intensity: number;
     opacity: number;
+    fillThreshold: number;
     fields?: LoadedDataColumn<"double">[];
 }
 function rgb(
@@ -106,7 +108,7 @@ function useColorRange(
 }
 
 export function useCategoryContour(props: CategoryContourProps) {
-    const { id, parameter, category, fill, bandwidth, intensity, opacity } =
+    const { id, parameter, category, fill, bandwidth, intensity, opacity, fillThreshold } =
         props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
@@ -136,6 +138,8 @@ export function useCategoryContour(props: CategoryContourProps) {
             data,
             fillOpacity: intensity,
             contourOpacity: opacity,
+            // when fill is disabled, this is some arbitrary large value, otherwise use the tweakable threshold
+            contourFill: fill ? fillThreshold : 10000,
             getPosition: (
                 i: number,
                 { target }: { target: number[] | Float32Array },
@@ -163,12 +167,13 @@ export function useCategoryContour(props: CategoryContourProps) {
         bandwidth,
         fill,
         opacity,
+        fillThreshold,
     ]);
 }
 /** pending better definition */
 export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
 export function useFieldContour(props: FieldContourProps) {
-    const { id, fill, bandwidth, intensity, opacity, fields } =
+    const { id, fill, bandwidth, intensity, opacity, fillThreshold, fields } =
         props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
@@ -194,8 +199,8 @@ export function useFieldContour(props: FieldContourProps) {
             data, //todo filter sparse data
             fillOpacity: intensity,
             contourOpacity: opacity,
-            // when fill is disabled, this is some arbitrary large value, otherwise should be tweakable threshold
-            contourFill: fill ? 2 : 10000,
+            // when fill is disabled, this is some arbitrary large value, otherwise use the tweakable threshold
+            contourFill: fill ? fillThreshold : 10000,
             getPosition: (
                 i: number,
                 { target }: { target: number[] | Float32Array },
@@ -254,12 +259,14 @@ export function useFieldContour(props: FieldContourProps) {
         bandwidth,
         fill,
         opacity,
+        fillThreshold,
         fields,
     ]);
 }
 
 export type ContourVisualConfig = {
     contour_fill: boolean;
+    contour_fillThreshold: number;
     /** KDE bandwidth/radius. todo: units */
     contour_bandwidth: number;
     contour_intensity: number;
@@ -403,6 +410,17 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
         }),
         g({
             type: "slider",
+            max: 5,
+            min: 0.1,
+            current_value: c.contour_fillThreshold,
+            continuous: true,
+            label: "Fill Threshold",
+            func(x) {
+                c.contour_fillThreshold = x;
+            },
+        }),
+        g({
+            type: "slider",
             max: 1,
             min: 0,
             current_value: c.contour_opacity,
@@ -430,6 +448,7 @@ export function useLegacyDualContour(): ContourLayerProps[] {
         bandwidth: config.contour_bandwidth || 10,
         intensity: config.contour_intensity || 0.1,
         opacity: config.contour_opacity || 0.2,
+        fillThreshold: config.contour_fillThreshold || 2,
     };
     const fields = useFieldSpecs(config.densityFields);
     const fieldContours = useFieldContour({
