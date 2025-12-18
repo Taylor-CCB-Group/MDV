@@ -19,6 +19,7 @@ export interface Project {
     numberOfImages: string;
     permissions: Permissions;
     thumbnail?: string;
+    readme?: string;
 }
 
 export const sortProjects = (

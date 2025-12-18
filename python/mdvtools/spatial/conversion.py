@@ -23,6 +23,7 @@ class SpatialDataConversionArgs:
     output_geojson: bool = False
     serve: bool = False
     link: bool = False
+    point_transform: str = "auto"
 
 def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversionArgs"):
     """Processes a single SpatialData object path."""
@@ -63,7 +64,7 @@ class ImageEntry:
     is_primary: bool
     region_id: str
 
-def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial_markdown = ""):
+def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], conversion_args: Optional["SpatialDataConversionArgs"] = None, initial_markdown = ""):
     """
     Add a README.md file to the project.
 
@@ -72,13 +73,27 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial
     from mdvtools.spatial.mermaid import sdata_to_mermaid
     from mdvtools.llm.markdown_utils import create_project_markdown
     from mdvtools.charts.text_box_plot import TextBox
+    from mdvtools.build_info import get_build_info_markdown
     import json
     markdown = initial_markdown
     markdown += f"# SpatialData conversion information:\n\n"
-    # todo add build information here
-    # markdown += f"### Build information:\n\n"
+    
+    # Add build information
+    markdown += get_build_info_markdown()
+    
+    # Add conversion arguments summary
+    if conversion_args is not None:
+        markdown += "### Conversion arguments:\n\n"
+        markdown += f"- **Point transform mode**: `{conversion_args.point_transform}`\n"
+        markdown += f"- **Preserve existing**: {conversion_args.preserve_existing}\n"
+        markdown += f"- **Output GeoJSON**: {conversion_args.output_geojson}\n"
+        markdown += f"- **Link spatial data**: {conversion_args.link}\n"
+        markdown += f"- **SpatialData path**: `{conversion_args.spatialdata_path}`\n"
+        markdown += "\n"
+    
     markdown += "## SpatialData objects:\n\n"
     spatial_dir = os.path.join(mdv.dir, "spatial")
+    
     for sdata_name in os.listdir(spatial_dir):
         sdata_path = os.path.join(spatial_dir, sdata_name)
         if not os.path.exists(sdata_path):
@@ -89,6 +104,23 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], initial
         sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```"
         sdata_md += f"\n\n### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
         markdown += sdata_md
+    
+    # Add point transform strategy section
+    if adata is not None and "mdv" in adata.uns and "point_transform" in adata.uns["mdv"]:
+        markdown += "\n\n---\n\n## Point transform strategy:\n\n"
+        markdown += "The following point transform strategies were used for coordinate conversion:\n\n"
+        
+        point_transform_info = adata.uns["mdv"]["point_transform"]
+        if isinstance(point_transform_info, dict):
+            for region_id, transform_meta in point_transform_info.items():
+                xenium_note = " (Xenium detected)" if transform_meta.get("xenium_detected", False) else ""
+                markdown += f"- **{region_id}**:\n"
+                markdown += f"  - Mode: `{transform_meta['mode']}`{xenium_note}\n"
+                markdown += f"  - Source element: `{transform_meta['source_element']}`\n"
+                markdown += f"  - Target element: `{transform_meta['target_element']}`\n"
+                markdown += f"  - Transform type: `{transform_meta['transform_type']}`\n"
+        
+        markdown += "\n"
     
     markdown += "\n\n---\n\n## Project DataSource summary:\n\n"
     markdown += create_project_markdown(mdv, False)
@@ -126,6 +158,7 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
     Transform the coordinates of an AnnData table to the coordinates of the images associated with the regions.
     """
     from spatialdata.models import get_table_keys
+    from spatialdata.transformations import Identity
     if "spatial" not in adata.obsm:
         # todo: proper support for non-spatial tables, add tests.
         print(f"WARNING: No spatial coordinates found in obsm['spatial']")
@@ -148,9 +181,14 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
         if not np.any(mask):
             continue
 
-        T = entry.transform_to_image.to_affine_matrix(input_axes=axes, output_axes=axes)
-        transformed_coords_homogeneous = coords_homogeneous[mask] @ T.T
-        transformed_coords[mask, :] = transformed_coords_homogeneous[:, :-1]
+        # Handle Identity transform specially (just copy coordinates)
+        if isinstance(entry.transform_to_image, Identity):
+            transformed_coords[mask, :] = adata.obsm["spatial"][mask, :]
+        else:
+            T = entry.transform_to_image.to_affine_matrix(input_axes=axes, output_axes=axes)
+            transformed_coords_homogeneous = coords_homogeneous[mask] @ T.T
+            transformed_coords[mask, :] = transformed_coords_homogeneous[:, :-1]
+        
         region_ids[mask] = entry.region_id
 
     adata.obs["x"] = transformed_coords[:, 0]
@@ -167,6 +205,204 @@ def _get_transform_keys(e: "SpatialElement") -> list[str]:
     if not isinstance(transformations, dict):
         raise ValueError(f"This should be unreachable, get_transformation with get_all=True should always return a dict")
     return list(transformations.keys())
+
+
+def _is_xenium_like(sdata: "SpatialData") -> bool:
+    """
+    Check if SpatialData object appears to be Xenium data.
+    
+    Detection is based on presence of 'morphology_focus' image, which is
+    a robust indicator of Xenium data.
+    """
+    return "morphology_focus" in sdata.images
+
+
+def _find_xenium_shape(sdata: "SpatialData") -> Optional[tuple[str, "SpatialElement"]]:
+    """
+    Find a Xenium shape element (cell_circles, cell_boundaries, or nucleus_boundaries).
+    
+    Returns:
+        Tuple of (name, element) if found, None otherwise.
+    """
+    xenium_shapes = ["cell_circles", "cell_boundaries", "nucleus_boundaries"]
+    for shape_name in xenium_shapes:
+        if shape_name in sdata.shapes:
+            return (shape_name, sdata.shapes[shape_name])
+    return None
+
+
+def _describe_transform_type(transform: "BaseTransformation") -> str:
+    """
+    Get a human-readable description of a transformation.
+    
+    Args:
+        transform: The transformation to describe
+        
+    Returns:
+        String description of the transform type
+    """
+    from spatialdata.transformations import Identity, Scale
+    
+    if isinstance(transform, Identity):
+        return "Identity"
+    elif isinstance(transform, Scale):
+        scale = transform.scale
+        if len(scale) == 2:
+            if scale[0] == scale[1]:
+                return f"Scale({scale[0]:.2f})"
+            else:
+                return f"Scale({scale[0]:.2f}, {scale[1]:.2f})"
+    return type(transform).__name__
+
+
+def _get_xenium_transform(
+    sdata: "SpatialData",
+    img_obj: "SpatialElement",
+    img_name: str,
+    sdata_name: str,
+    require: bool = False
+) -> Optional[tuple["BaseTransformation", str]]:
+    """
+    Get transform from Xenium shape to image, if Xenium data is detected.
+    
+    Args:
+        sdata: SpatialData object
+        img_obj: Image element to transform to
+        img_name: Name of the image element
+        sdata_name: Optional name for error messages
+        require: If True, raise errors if Xenium not found; if False, return None
+        
+    Returns:
+        Tuple of (transform, shape_name) if found, None otherwise
+    """
+    from spatialdata.transformations import get_transformation_between_coordinate_systems
+    
+    if not _is_xenium_like(sdata):
+        if require:
+            context = f" in '{sdata_name}'" if sdata_name else ""
+            raise ValueError(
+                f"Xenium mode specified but 'morphology_focus' image not found{context}. "
+                f"This mode requires Xenium data structure."
+            )
+        return None
+    
+    xenium_shape = _find_xenium_shape(sdata)
+    if xenium_shape is None:
+        if require:
+            context = f" in '{sdata_name}'" if sdata_name else ""
+            raise ValueError(
+                f"Xenium mode specified but no Xenium shapes (cell_circles, cell_boundaries, "
+                f"nucleus_boundaries) found{context}."
+            )
+        return None
+    
+    shape_name, shape_element = xenium_shape
+    transform = get_transformation_between_coordinate_systems(sdata, shape_element, img_obj)
+    if transform is None:
+        if require:
+            context = f" in '{sdata_name}'" if sdata_name else ""
+            raise ValueError(
+                f"Could not compute transform from Xenium shape '{shape_name}' to image '{img_name}'{context}."
+            )
+        return None
+    
+    return (transform, shape_name)
+
+
+def _choose_point_transform(
+    sdata: "SpatialData",
+    annotated_element: "SpatialElement",
+    annotated_name: str,
+    img_obj: "SpatialElement",
+    img_name: str,
+    mode: str,
+    sdata_name: str = ""
+) -> tuple[Optional["BaseTransformation"], dict]:
+    """
+    Choose the appropriate point transform based on the specified mode.
+    
+    Args:
+        sdata: SpatialData object
+        annotated_element: The element annotated by the table
+        annotated_name: Name of the annotated element
+        img_obj: Image element to transform to
+        img_name: Name of the image element
+        mode: Transform mode ('image', 'auto', 'xenium', 'identity', 'annotated-element')
+        sdata_name: Optional name of the SpatialData object (for error messages)
+        
+    Returns:
+        Tuple of (transform, metadata_dict) where metadata contains:
+        - mode: the strategy used
+        - source_element: name of element used
+        - target_element: name of image used
+        - transform_type: brief description
+        - xenium_detected: boolean if auto-mode detected Xenium
+    """
+    from spatialdata.transformations import get_transformation_between_coordinate_systems
+    
+    metadata = {
+        "mode": mode,
+        "source_element": annotated_name,
+        "target_element": img_name,
+        "transform_type": None,
+        "xenium_detected": False
+    }
+    
+    # Handle identity mode
+    if mode == "identity":
+        metadata["transform_type"] = "Identity"
+        return None, metadata
+    
+    # Handle xenium mode (explicit)
+    if mode == "xenium":
+        result = _get_xenium_transform(sdata, img_obj, img_name, sdata_name, require=True)
+        if result is None:
+            raise ValueError("Unexpected: _get_xenium_transform returned None with require=True")
+        transform, shape_name = result
+        metadata.update({
+            "source_element": shape_name,
+            "transform_type": _describe_transform_type(transform),
+            "xenium_detected": True
+        })
+        return transform, metadata
+    
+    # Handle auto mode (detect Xenium, fallback to image)
+    if mode == "auto":
+        result = _get_xenium_transform(sdata, img_obj, img_name, sdata_name, require=False)
+        if result is not None:
+            transform, shape_name = result
+            metadata.update({
+                "mode": "auto (xenium)",
+                "source_element": shape_name,
+                "transform_type": _describe_transform_type(transform),
+                "xenium_detected": True
+            })
+            return transform, metadata
+        # Fallback to image mode
+        mode = "image"
+        metadata["mode"] = "auto (image)"
+    
+    # Handle annotated-element mode
+    if mode == "annotated-element":
+        # Note: This transform is from the element's coordinate system, not to image
+        # We still need to get the transform to the image
+        transform = get_transformation_between_coordinate_systems(sdata, annotated_element, img_obj)
+        if transform is None:
+            metadata["transform_type"] = "None (no transform to image found)"
+        else:
+            metadata["transform_type"] = _describe_transform_type(transform)
+        return transform, metadata
+    
+    # Handle image mode (default)
+    if mode == "image":
+        transform = get_transformation_between_coordinate_systems(sdata, annotated_element, img_obj)
+        if transform is None:
+            metadata["transform_type"] = "None (no transform found)"
+        else:
+            metadata["transform_type"] = _describe_transform_type(transform)
+        return transform, metadata
+    
+    raise ValueError(f"Unknown point_transform mode: '{mode}'")
 
 # ---- region resolution ----
 def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name: str, conversion_args: "SpatialDataConversionArgs"):
@@ -208,6 +444,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
     all_regions: dict[str, dict] = {}
 
     region_to_image: dict[str, ImageEntry] = {}
+    transform_provenance: dict[str, dict] = {}  # region_id -> provenance metadata
     
     for r in regions:
         annotated = sdata[r]  # shapes/points/labels/image ... probably shapes, but we need to find an appropriate image.
@@ -229,10 +466,17 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
 
         img_entries: list[ImageEntry] = []
         best_idx = 0
+        best_transform_metadata = None
+        
         for i, (img_path, img_obj) in enumerate(img_candidates):
-            T = get_transformation_between_coordinate_systems(sdata, annotated, img_obj)
-            if T is None:
+            # Use the chosen transform strategy
+            T, transform_metadata = _choose_point_transform(
+                sdata, annotated, r, img_obj, img_path,
+                conversion_args.point_transform, sdata_name
+            )
+            if T is None and conversion_args.point_transform != "identity":
                 continue
+            
             # try to extract pixel size / extent if available
             # nb, this is wrong, it was written by an LLM.
             # not really used anyway so just putting some arbitrary defaults.
@@ -245,6 +489,12 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             #     wh = (1000, 1000)
             wh = (1000, 1000)
 
+            # For identity mode, we still need a transform object for ImageEntry
+            # but we'll handle it specially in _transform_table_coordinates
+            if T is None:
+                from spatialdata.transformations import Identity
+                T = Identity()
+
             img_entries.append(ImageEntry(
                 path=img_path,
                 transform_to_image=T,
@@ -252,10 +502,16 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
                 is_primary=False,
                 region_id=f"{sdata_name}_{r}"
             ))
+            
+            # Store metadata for the first viable transform (we'll use best_idx later)
+            if best_transform_metadata is None:
+                best_transform_metadata = transform_metadata
+            
             # primary selection heuristic: first viable with largest area
             prev = img_entries[best_idx].extent_px
             if wh and prev and (wh[0]*wh[1] > prev[0]*prev[1]):
                 best_idx = len(img_entries)-1
+                best_transform_metadata = transform_metadata
 
 
         if not img_entries:
@@ -269,6 +525,17 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
         # todo - also add images that aren't the primary image...
         best_img = img_entries[best_idx]
         region_id = best_img.region_id
+        
+        # Store provenance metadata
+        if best_transform_metadata:
+            transform_provenance[region_id] = best_transform_metadata
+            # Log the transform decision
+            xenium_note = " (Xenium detected)" if best_transform_metadata.get("xenium_detected", False) else ""
+            print(
+                f"INFO: Table '{table_name}' region '{r}' using point_transform mode '{best_transform_metadata['mode']}'"
+                f"{xenium_note}: {best_transform_metadata['source_element']} -> {best_transform_metadata['target_element']} "
+                f"({best_transform_metadata['transform_type']})"
+            )
         all_regions[region_id] = {
             "spatial": {
                 "coordinate_system": cs,
@@ -317,6 +584,8 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
     # store in uns for this table
     adata.uns.setdefault("mdv", {})
     adata.uns["mdv"].setdefault("regions", all_regions)
+    # Store transform provenance
+    adata.uns["mdv"]["point_transform"] = transform_provenance
 
 
 
@@ -373,6 +642,14 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
     from mdvtools.llm.markdown_utils import create_project_markdown
+    from mdvtools.build_info import get_build_info
+    
+    # Print version banner if build info is available
+    build_info = get_build_info()
+    if build_info["source"] != "unknown" and build_info["git_commit_hash"]:
+        commit_short = build_info["git_commit_hash"][:8]
+        date_str = build_info["git_commit_date"] or build_info["build_date"] or "unknown"
+        print(f"MDV conversion (commit: {commit_short}, date: {date_str})")
     
 
     # we could do a nicer glob thing here, but I don't want to test that right now.
@@ -494,7 +771,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     _set_default_image_view(mdv)
     print(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n")
     print(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---")
-    add_readme_to_project(mdv, merged_adata)
+    add_readme_to_project(mdv, merged_adata, args)
     if args.serve:
         print(f"Serving project at {args.output_folder}")
         mdv.serve()
@@ -511,6 +788,20 @@ if __name__ == "__main__":
     parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data")
     parser.add_argument("--output_geojson", action="store_true", help="Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes)")
     parser.add_argument("--serve", action="store_true", help="Serve the project after conversion")
+    parser.add_argument(
+        "--point-transform",
+        type=str,
+        default="auto",
+        choices=["image", "auto", "xenium", "identity", "annotated-element"],
+        help=(
+            "Strategy for transforming point coordinates in tables to image coordinates. "
+            "Options: 'image' (use annotated element to image transform), "
+            "'auto' (detect Xenium and use shape-based transform, else fallback to 'image'), "
+            "'xenium' (explicitly treat as Xenium, error if not found), "
+            "'identity' (no transform, copy coordinates directly), "
+            "'annotated-element' (use transformation from annotated element itself)."
+        )
+    )
     args = parser.parse_args()
     print(f"Converting SpatialData from '{args.spatialdata_path}' to {args.output_folder}")
     print(f"Preserving existing project data: {args.preserve_existing}")

@@ -357,17 +357,32 @@ def _set_xenium_sdata_image(mdv: MDVProject, sdata: sd.SpatialData):
     for img_name in sdata.images:
         print(f"Found image in sdata: {img_name}")
 
-    # assume "cell_circles" in various ways while we figure this out...
-    # we expect this to have a Scale transform appropriate for putting points on the image
-    cell_circles = sdata["cell_circles"]
-    if isinstance(cell_circles, AnnData):
-        # todo: handle this case
-        raise ValueError("unexpected AnnData in cell_circles")
-    transform = get_transformation(cell_circles)
-    assert isinstance(transform, Scale), "Expected a Scale transform"
+    # Find Xenium shape element (cell_circles, cell_boundaries, or nucleus_boundaries)
+    xenium_shapes = ["cell_circles", "cell_boundaries", "nucleus_boundaries"]
+    xenium_shape = None
+    shape_name = None
+    for name in xenium_shapes:
+        if name in sdata.shapes:
+            xenium_shape = sdata.shapes[name]
+            shape_name = name
+            break
+    
+    if xenium_shape is None:
+        raise ValueError(
+            f"No Xenium shape element found. Expected one of: {', '.join(xenium_shapes)}"
+        )
+    
+    if isinstance(xenium_shape, AnnData):
+        raise ValueError(f"Unexpected AnnData in '{shape_name}'")
+    
+    transform = get_transformation(xenium_shape)
+    if not isinstance(transform, Scale):
+        raise ValueError(f"Expected a Scale transform for '{shape_name}', got {type(transform).__name__}")
     scale = transform.scale
-    assert len(scale) == 2, "Expected a 2D scale transform"
-    assert scale[0] == scale[1], "Expected a square scale transform"
+    if len(scale) != 2:
+        raise ValueError(f"Expected a 2D scale transform for '{shape_name}', got {len(scale)}D")
+    if scale[0] != scale[1]:
+        raise ValueError(f"Expected a square scale transform for '{shape_name}', got ({scale[0]}, {scale[1]})")
 
     ds["regions"] = {
         "position_fields": ["x", "y"],
