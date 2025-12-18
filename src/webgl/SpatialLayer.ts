@@ -16,10 +16,10 @@ type DensityLayerProps = ScatterplotLayerProps & {
 };
 class DensityLayer extends Layer<DensityLayerProps> {
     layerName = "DensityLayer";
-    defaultProps = {};
+    static defaultProps = {};
     constructor(props: DensityLayerProps) {
         super(props);
-        if (false) console.log("DensityLayer constructor, very much under construction");
+        console.log("DensityLayer constructor, very much under construction");
     }
     initializeState(context: LayerContext) {
         const { device } = context;
@@ -49,6 +49,7 @@ class DensityLayer extends Layer<DensityLayerProps> {
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = "SpatialLayer";
     static defaultProps = ScatterplotLayer.defaultProps;
+    static bufferExperiment = false;
     // biome-ignore lint/complexity/noUselessConstructor: tsc error if we remove this?
     constructor(props: SpatialLayerProps) {
         super(props);
@@ -56,6 +57,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     /** "usually not needed for composite layers" but I think this is the right place to setup framebuffers */
     initializeState(context: LayerContext): void {
         super.initializeState(context);
+        if (!SpatialLayer.bufferExperiment) return;
         // this will change with new deck.gl version, context.device rather than context.gl...
         // still considering how to structure coomposite layers...
         // const framebuffer = new Framebuffer(context.gl, {});
