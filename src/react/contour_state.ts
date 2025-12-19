@@ -289,7 +289,16 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
     // empty array will be replaced with the new values
     const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
     // this autorun will be disposed when the chart is disposed... really it should be tied to the settings dialog
-    // it will leak if we open the settings dialog multiple times...
+    // it will leak if we open the settings dialog multiple times, which could lead to nasty race conditions
+    // as there could end up being indirect side-effects, mutating config... so that kinda seems like it might matter.
+    // (I think that all will happen is that the 'multidropdown's for contour categories will get new `values` and nothing
+    // too terrible would happen as a result - but I've been wrong before and it's definitely not correct behaviour)
+    // maybe the spec objects themselves can have a property for disposers, and indeed some way of managing things like
+    // more complex conditional state (like only showing 'fill' controls when 'fill' is enabled)...
+    
+    // If we have a "category_selection" widget and it properly observed `c.contourParameter`,
+    // we wouldn't need the `chart.mobxAutorun` here.
+    // this is related to existing selection dialog widget - both should be able to understand multitext better.
     chart.mobxAutorun(() => {
         if (typeof c.contourParameter !== "string") {
             // as of now, categorical parameter like this is expected to be a string here
@@ -316,6 +325,7 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                     g({
                         type: "column", //todo, make this "column" and fix odd behaviour with showing the value...
                         //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
+                        //^^ maybe get Furquan to work on this.
                         label: "Contour parameter",
                         current_value: c.contourParameter || "",
                         columnType: "text",
