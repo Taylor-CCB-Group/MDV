@@ -1,8 +1,7 @@
 import { describe, test, expect, vi } from 'vitest';
 import { g } from '@/lib/utils';
-import type { AnyGuiSpec } from '@/charts/charts';
+import type { AnyGuiSpec, Disposer } from '@/charts/charts';
 import { collectDisposers } from './SettingsDialogComponent';
-import type { IReactionDisposer } from 'mobx';
 
 // We need to export collectDisposers for testing
 // Since it's not exported, we'll test it indirectly through the component
@@ -10,8 +9,8 @@ import type { IReactionDisposer } from 'mobx';
 
 describe('Settings Dialog Disposer Management', () => {
     test('collectDisposers collects disposers from flat specs', () => {
-        const disposer1 = vi.fn() as unknown as IReactionDisposer;
-        const disposer2 = vi.fn() as unknown as IReactionDisposer;
+        const disposer1 = vi.fn() as Disposer;
+        const disposer2 = vi.fn() as Disposer;
         
         const specs: AnyGuiSpec[] = [
             g({
@@ -35,9 +34,9 @@ describe('Settings Dialog Disposer Management', () => {
     });
     
     test('collectDisposers collects disposers from nested folders', () => {
-        const disposer1 = vi.fn() as unknown as IReactionDisposer;
-        const disposer2 = vi.fn() as unknown as IReactionDisposer;
-        const disposer3 = vi.fn() as unknown as IReactionDisposer;
+        const disposer1 = vi.fn() as Disposer;
+        const disposer2 = vi.fn() as Disposer;
+        const disposer3 = vi.fn() as Disposer;
         
         const specs: AnyGuiSpec[] = [
             g({
@@ -74,7 +73,7 @@ describe('Settings Dialog Disposer Management', () => {
     });
     
     test('collectDisposers handles specs without disposers', () => {
-        const disposer1 = vi.fn() as unknown as IReactionDisposer;
+        const disposer1 = vi.fn() as Disposer;
         
         const specs: AnyGuiSpec[] = [
             g({
@@ -115,9 +114,9 @@ describe('Settings Dialog Disposer Management', () => {
     });
     
     test('collectDisposers collects multiple disposers from same spec', () => {
-        const disposer1 = vi.fn() as unknown as IReactionDisposer;
-        const disposer2 = vi.fn() as unknown as IReactionDisposer;
-        const disposer3 = vi.fn() as unknown as IReactionDisposer;
+        const disposer1 = vi.fn() as Disposer;
+        const disposer2 = vi.fn() as Disposer;
+        const disposer3 = vi.fn() as Disposer;
         
         const specs: AnyGuiSpec[] = [
             g({
@@ -136,9 +135,9 @@ describe('Settings Dialog Disposer Management', () => {
     });
     
     test('collectDisposers handles deeply nested folder structures', () => {
-        const disposers: IReactionDisposer[] = [];
+        const disposers: Disposer[] = [];
         for (let i = 0; i < 5; i++) {
-            disposers.push(vi.fn() as unknown as IReactionDisposer);
+            disposers.push(vi.fn() as Disposer);
         }
         
         const specs: AnyGuiSpec[] = [

@@ -7,7 +7,12 @@
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
-import type { IReactionDisposer } from "mobx";
+
+/**
+ * A cleanup function that can be called to dispose of resources.
+ * Used for managing lifecycle of reactive subscriptions, autoruns, etc.
+ */
+export type Disposer = () => void;
 // import type { DataType } from "../datatypes";
 /**
  * The are the names used to refer to the types of data can be stored in a column.
@@ -218,7 +223,7 @@ export type GuiValueTypes = {
     column: FieldSpec;
     multicolumn: FieldSpecs; //easier to have distinct 'multicolumn' type than overly generic 'column'?
     /** Internal type for managing disposers that should be cleaned up when the settings dialog closes */
-    _disposers: IReactionDisposer[];
+    _disposers: Disposer[];
 };
 export type GuiSpecType = keyof GuiValueTypes;
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
@@ -293,7 +298,7 @@ export type GuiSpec<T extends GuiSpecType> = {
     /** Optional array of disposers that should be cleaned up when the settings dialog closes.
      * This allows settings specs to register autoruns or other reactive disposables that are tied
      * to the dialog's lifetime rather than the chart's lifetime. */
-    _disposers?: IReactionDisposer[];
+    _disposers?: Disposer[];
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
 /**

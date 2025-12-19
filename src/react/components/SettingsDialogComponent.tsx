@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { useMemo, useId, useCallback, useState, useRef, useEffect } from "react";
-import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
-import { action, makeAutoObservable, type IReactionDisposer } from "mobx";
+import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
+import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
     Accordion,
@@ -524,8 +524,8 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
  * Recursively collects all disposers from a GuiSpec tree.
  * Handles nested folders and collects disposers from all specs in the tree.
  */
-export function collectDisposers(specs: AnyGuiSpec[]): IReactionDisposer[] {
-    const disposers: IReactionDisposer[] = [];
+export function collectDisposers(specs: AnyGuiSpec[]): Disposer[] {
+    const disposers: Disposer[] = [];
     
     function traverse(spec: AnyGuiSpec) {
         // Collect disposers from this spec if it has any

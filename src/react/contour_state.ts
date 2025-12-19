@@ -12,7 +12,7 @@ import { useDataStore } from "./context";
 import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
 import { g, isArray, toArray } from "@/lib/utils";
-import { observable, autorun, type IReactionDisposer } from "mobx";
+import { observable, autorun } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
