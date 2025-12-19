@@ -126,7 +126,7 @@ export function useCategoryContour(props: CategoryContourProps) {
     const [debounceZoom] = useDebounce(zoom, 500);
 
     return useMemo(() => {
-        if (!category) return undefined;
+        if (!category || !contourParameter) return undefined;
         //If I return a layer here rather than props, will it behave as expected?
         //not really - we want to pass this into getSublayerProps() so the id is used correctly
         const radiusPixels = 30 * bandwidth * 2 ** debounceZoom;
@@ -159,6 +159,7 @@ export function useCategoryContour(props: CategoryContourProps) {
         id,
         data,
         category,
+        contourParameter,
         intensity,
         cx,
         cy,
@@ -470,8 +471,6 @@ export function useLegacyDualContour(): ContourLayerProps[] {
         id: "fieldContours",
         fields: fields.filter(field => field.datatype === "double") as LoadedDataColumn<"double">[],
     });
-    //@ts-expect-error Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer'?
-    if (!config.contourParameter) return fieldContours;
     const contour1 = useCategoryContour({
         ...commonProps,
         id: "contour1",
