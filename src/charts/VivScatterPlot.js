@@ -337,6 +337,7 @@ BaseChart.types["viv_scatter_plot"] = {
     required: (ds) => {
         return ds.regions?.avivator;
     },
+    allow_user_add: false,
     extra_controls: (ds) => {
         const vals = [];
         for (const x in ds.regions.all_regions) {

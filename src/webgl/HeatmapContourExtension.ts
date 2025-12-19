@@ -4,13 +4,17 @@ import { Model } from '@luma.gl/engine';
 import { type LayerContext, project32 } from '@deck.gl/core';
 import type { _ConstructorOf } from "@deck.gl/core/";
 
-import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl?raw";
+import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl";
 
 import { log } from '@luma.gl/core';
 // log.enable();
 log.level = 0;
 
-export type ExtraContourProps = { contourOpacity: number };
+export type ExtraContourProps = { 
+    contourOpacity: number;
+    contourFill: number;
+    fillOpacity: number;
+};
 
 // ---------- copied from deck.gl triangle-layer
 const triangleVs = /*glsl*/ `#version 300 es
@@ -69,6 +73,9 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
     };
 
     getShaders() {
+        // I see warnings about various moules not being found 
+        // (picking - also layer, shadow, lighting, phongMaterial, gouraudMaterial), as well as
+        // > Ignoring constant supplied for unknown attribute "instancePickingColors"
         return { vs: triangleVs, fs: heatmapPresentationFS, modules: [project32] };
     }
 
@@ -111,7 +118,7 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
 
     draw({ uniforms }: { uniforms: any }): void {
         const { model } = this.state;
-        const { intensity, threshold, aggregationMode, colorDomain, contourOpacity } = this.props;
+        const { intensity, threshold, aggregationMode, colorDomain, contourOpacity, contourFill, fillOpacity } = this.props;
         // deprecated, "use uniform buffers for portability".
         // Sounds good. How do we do that?
         model.setUniforms({
@@ -120,7 +127,9 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
             threshold,
             aggregationMode,
             colorDomain,
-            contourOpacity
+            contourOpacity,
+            contourFill,
+            fillOpacity
         });
         // probably also want to implement updateState rather than draw(), but the types are annoying.
         // refer to contemporary deck.gl triangle-layer (but actually we want something more different anyway)
