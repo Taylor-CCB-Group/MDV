@@ -309,9 +309,13 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
         }
         // getColumnValues() may throw or return undefined, especially with linked data...
         // actually, there is another issue when we don't really have a categorical column...
-        const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
-        const cats = ocats.map((x) => ({ t: x }));
-        catsValues[0] = cats;
+        try {
+            const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
+            const cats = ocats.map((x) => ({ t: x }));
+            catsValues[0] = cats;
+        } catch (e) {
+            console.error(`error updating contour values with '${c.contourParameter}' (${e})`);
+        }
     });
     return g({
         type: "folder",
