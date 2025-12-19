@@ -20,8 +20,8 @@ function hashString(str: string): number {
  * The same field will always get the same color, regardless of order or other fields.
  * 
  * Uses OKLCH color space with:
- * - Lightness: 200 (0-255 scale, converted to 0-1 for OKLCH)
- * - Chroma: 220 (0-255 scale, converted to 0-1 for OKLCH)
+ * - Lightness: 0.7 (70% - good visibility)
+ * - Chroma: 0.2 (moderate saturation for vibrant but not overly intense colors)
  * - Hue: Determined by hashing the field identifier, distributed across 0-360 degrees
  * 
  * @param field - The field identifier (FieldName) to get a color for
@@ -35,23 +35,21 @@ export function getFieldColor(field: FieldName): [number, number, number] {
     // Using modulo to wrap around the hue circle
     const hue = hash % 360;
     
-    // Use consistent lightness and chroma values matching the original implementation
-    // Original used [200, 220, ...] - matching that pattern exactly
-    // Based on the original code: oklch2rgb([200, 220, 360 * index/n])
-    // Note: The scale for L and C in oklch2rgb appears non-standard (using 0-255 instead of 0-1)
-    // but we match the original pattern to maintain consistency
-    const lightness = 200;
-    const chroma = 220;
+    // Use standard OKLCH values for better color quality
+    // Lightness: 0.7 (70%) provides good visibility
+    // Chroma: 0.2 provides vibrant but not overly saturated colors
+    const lightness = 0.7;
+    const chroma = 0.2;
     
-    // Convert OKLCH to RGB - matching the original pattern exactly
+    // Convert OKLCH to RGB
+    // oklch2rgb returns RGB values in 0-1 range
     const rgb = oklch2rgb([lightness, chroma, hue]);
     
-    // The original code uses the result directly: colorRange: [oklch2rgb(...)]
+    // Convert from 0-1 range to 0-255 range and clamp to valid RGB values
     // oklch2rgb may return values out of bounds, so we clamp them
-    // Handle both 0-1 and 0-255 output scales
-    const r = Math.max(0, Math.min(255, Math.round(rgb[0] > 1 ? rgb[0] : rgb[0] * 255)));
-    const g = Math.max(0, Math.min(255, Math.round(rgb[1] > 1 ? rgb[1] : rgb[1] * 255)));
-    const b = Math.max(0, Math.min(255, Math.round(rgb[2] > 1 ? rgb[2] : rgb[2] * 255)));
+    const r = Math.max(0, Math.min(255, Math.round(rgb[0] * 255)));
+    const g = Math.max(0, Math.min(255, Math.round(rgb[1] * 255)));
+    const b = Math.max(0, Math.min(255, Math.round(rgb[2] * 255)));
     
     return [r, g, b];
 }
