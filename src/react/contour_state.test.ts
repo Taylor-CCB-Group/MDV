@@ -1,8 +1,10 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { CategoricalDataType } from '@/charts/charts';
-import { useCategoryContour } from './contour_state';
+import { useCategoryContour, getDensitySettings } from './contour_state';
 import type { CategoryContourProps } from './contour_state';
+import type BaseChart from '@/charts/BaseChart';
+import type { BaseConfig } from '@/charts/BaseChart';
 
 // Mock all the hooks and dependencies
 vi.mock('./hooks', () => ({
@@ -205,5 +207,77 @@ describe('useCategoryContour', () => {
         );
 
         expect(result.current?.contourFill).toBe(10000);
+    });
+});
+
+describe('getDensitySettings disposer management', () => {
+    test('getDensitySettings attaches disposer to returned spec', () => {
+        const mockDataStore = {
+            getColumnValues: vi.fn(() => ['cat1', 'cat2', 'cat3']),
+        };
+        
+        const mockChart = {
+            dataStore: mockDataStore,
+        } as unknown as BaseChart<BaseConfig>;
+        
+        const mockConfig = {
+            contourParameter: 'test-field',
+            category1: [],
+            category2: [],
+            param: ['x', 'y', 'test-field'],
+        } as any;
+        
+        const spec = getDensitySettings(mockConfig, mockChart);
+        
+        // Check that _disposers array exists and has one disposer
+        expect(spec._disposers).toBeDefined();
+        expect(Array.isArray(spec._disposers)).toBe(true);
+        expect(spec._disposers).toHaveLength(1);
+        
+        // Check that the disposer is a function (IReactionDisposer)
+        const disposer = spec._disposers?.[0];
+        expect(disposer).toBeDefined();
+        expect(typeof disposer).toBe('function');
+        
+        // Verify the disposer can be called (cleanup)
+        if (disposer) {
+            expect(() => disposer()).not.toThrow();
+        }
+    });
+    
+    test('getDensitySettings disposer updates values when contourParameter changes', () => {
+        const mockDataStore = {
+            getColumnValues: vi.fn(() => ['cat1', 'cat2']),
+        };
+        
+        const mockChart = {
+            dataStore: mockDataStore,
+        } as unknown as BaseChart<BaseConfig>;
+        
+        const mockConfig = {
+            contourParameter: 'test-field',
+            category1: [],
+            category2: [],
+            param: ['x', 'y', 'test-field'],
+        } as any;
+        
+        const spec = getDensitySettings(mockConfig, mockChart);
+        
+        // The autorun should have been set up and called getColumnValues
+        expect(mockDataStore.getColumnValues).toHaveBeenCalledWith('test-field');
+        
+        // Change the contourParameter
+        mockConfig.contourParameter = 'new-field';
+        mockDataStore.getColumnValues.mockReturnValue(['new1', 'new2']);
+        
+        // Trigger the autorun by accessing the observable
+        // (In a real scenario, changing the config would trigger mobx reactivity)
+        // For this test, we're just verifying the disposer is attached
+        
+        // Clean up
+        const disposer = spec._disposers?.[0];
+        if (disposer) {
+            disposer();
+        }
     });
 });

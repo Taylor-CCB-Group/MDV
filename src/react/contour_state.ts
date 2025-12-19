@@ -12,7 +12,7 @@ import { useDataStore } from "./context";
 import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
 import { g, isArray, toArray } from "@/lib/utils";
-import { observable } from "mobx";
+import { observable, autorun } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -289,18 +289,11 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
     // make it so that if we change the parameter, we get the new values in the dropdowns
     // empty array will be replaced with the new values
     const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
-    // this autorun will be disposed when the chart is disposed... really it should be tied to the settings dialog
-    // it will leak if we open the settings dialog multiple times, which could lead to nasty race conditions
-    // as there could end up being indirect side-effects, mutating config... so that kinda seems like it might matter.
-    // (I think that all will happen is that the 'multidropdown's for contour categories will get new `values` and nothing
-    // too terrible would happen as a result - but I've been wrong before and it's definitely not correct behaviour)
-    // maybe the spec objects themselves can have a property for disposers, and indeed some way of managing things like
-    // more complex conditional state (like only showing 'fill' controls when 'fill' is enabled)...
     
-    // If we have a "category_selection" widget and it properly observed `c.contourParameter`,
-    // we wouldn't need the `chart.mobxAutorun` here.
-    // this is related to existing selection dialog widget - both should be able to understand multitext better.
-    chart.mobxAutorun(() => {
+    // Create autorun that will be disposed when the settings dialog closes
+    // The disposer is stored in the _disposers array on the returned GuiSpec
+    // so it gets cleaned up properly when the dialog closes
+    const disposer = autorun(() => {
         if (typeof c.contourParameter !== "string") {
             // as of now, categorical parameter like this is expected to be a string here
             // we would like to be operating on a version of state that just had a column object
@@ -318,7 +311,11 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
             console.error(`error updating contour values with '${c.contourParameter}' (${e})`);
         }
     });
-    return g({
+    
+    // If we have a "category_selection" widget and it properly observed `c.contourParameter`,
+    // we wouldn't need this autorun here.
+    // this is related to existing selection dialog widget - both should be able to understand multitext better.
+    const folderSpec = g({
         type: "folder",
         label: "Density Visualisation",
         current_value: [
@@ -381,6 +378,10 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
             ...getContourVisualSettings(c)
         ],
     });
+    
+    // Attach the disposer to the spec so it gets cleaned up when the settings dialog closes
+    folderSpec._disposers = [disposer];
+    return folderSpec;
 }
 
 /**

@@ -7,6 +7,12 @@
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+
+/**
+ * A cleanup function that can be called to dispose of resources.
+ * Used for managing lifecycle of reactive subscriptions, autoruns, etc.
+ */
+export type Disposer = () => void;
 // import type { DataType } from "../datatypes";
 /**
  * The are the names used to refer to the types of data can be stored in a column.
@@ -287,6 +293,10 @@ export type GuiSpec<T extends GuiSpecType> = {
      * or other form like `"_multi_column:number" | "number"`.
      */
     columnType?: T extends ("column" | "multicolumn") ? CTypes : never;
+    /** Optional array of disposers that should be cleaned up when the settings dialog closes.
+     * This allows settings specs to register autoruns or other reactive disposables that are tied
+     * to the dialog's lifetime rather than the chart's lifetime. */
+    _disposers?: Disposer[];
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
 /**
