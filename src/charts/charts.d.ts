@@ -222,8 +222,6 @@ export type GuiValueTypes = {
     // number or a column (with modifiers) - this is where the node editor comes in...
     column: FieldSpec;
     multicolumn: FieldSpecs; //easier to have distinct 'multicolumn' type than overly generic 'column'?
-    /** Internal type for managing disposers that should be cleaned up when the settings dialog closes */
-    _disposers: Disposer[];
 };
 export type GuiSpecType = keyof GuiValueTypes;
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
