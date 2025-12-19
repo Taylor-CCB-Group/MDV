@@ -8,6 +8,9 @@ import { useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
+import FieldContourLegend from "./FieldContourLegend";
+import { useFieldContourLegend } from "../contour_state";
+import type { DualContourLegacyConfig } from "../contour_state";
 import {
     useLoader,
     type OME_TIFF,
@@ -86,6 +89,10 @@ const Main = observer(() => {
     const { showJson } = useConfig<VivRoiConfig>();
     // passing showJson from here to make use of this being `observer`
     const jsonLayer = useJsonLayer(showJson);
+    
+    // Get field contour legend data
+    const config = useConfig<DualContourLegacyConfig>();
+    const legendFields = useFieldContourLegend(config.densityFields);
 
     // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
     const {
@@ -211,6 +218,9 @@ const Main = observer(() => {
     return (
         <>
             <SelectionOverlay />
+            {legendFields.length > 0 && (
+                <FieldContourLegend fields={legendFields} />
+            )}
             <MDVivViewer
                 outerContainer={outerContainer}
                 selectionLayer={selectionLayer}

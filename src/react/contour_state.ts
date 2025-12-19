@@ -17,6 +17,8 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { oklch2rgb } from "@/utilities/oklch2rgb";
+import { getFieldColor } from "./fieldColorManager";
+import type { FieldLegendItem } from "./components/FieldContourLegend";
 // import { DataFilterExtension } from '@deck.gl/extensions';
 
 /** need to be clearer on which prop types are for which parts of layer spec...
@@ -193,9 +195,8 @@ export function useFieldContour(props: FieldContourProps) {
         // console.log('radiusPixels', radiusPixels);
         // there is an issue of the scaling of these layers e.g. with images that have been resized...
         // what is different about how we scale these layers vs other scatterplot layer?
-        const n = fields.length;
         //const fieldStats = fields.reduce((field) => { ... });
-        return fields.map(({ name, data: fieldData, minMax }, index) => ({
+        return fields.map(({ name, field: fieldId, data: fieldData, minMax }) => ({
             id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
             data, //todo filter sparse data
             fillOpacity: intensity,
@@ -226,11 +227,8 @@ export function useFieldContour(props: FieldContourProps) {
                 const normalizedValue = (value - min) / range;
                 return normalizedValue;
             },
-            // todo different modes for analogous vs other color ranges...
-            // split complementary etc...
-            // really need (interactive) legend for this
-            // should be stable for a given field so that it doesn't shift during interaction
-            colorRange: [oklch2rgb([200, 220, 360 * index/n])],
+            // Stable color assignment based on field identifier, not index
+            colorRange: [getFieldColor(fieldId)],
             //! this scale does not adapt well to the data, and it would be nice to have meaningful units...
             radiusPixels: radiusPixels,
             debounce: 1000,
@@ -488,4 +486,26 @@ export function useLegacyDualContour(): ContourLayerProps[] {
     );
     //@ts-expect-error Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer'?
     return stableArray;
+}
+
+/**
+ * Hook that provides legend data for field contours.
+ * Returns an array of field information with their stable colors for display in a legend.
+ * 
+ * @param densityFields - The densityFields config from DualContourLegacyConfig
+ * @returns Array of FieldLegendItem objects with name, field identifier, and color
+ */
+export function useFieldContourLegend(densityFields?: FieldSpecs): FieldLegendItem[] {
+    const fields = useFieldSpecs(densityFields);
+    
+    return useMemo(() => {
+        // Filter to only double fields (matching the filter in useLegacyDualContour)
+        const doubleFields = fields.filter(field => field.datatype === "double");
+        
+        return doubleFields.map(field => ({
+            name: field.name,
+            field: field.field,
+            color: getFieldColor(field.field),
+        }));
+    }, [fields]);
 }
