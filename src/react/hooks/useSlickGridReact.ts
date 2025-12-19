@@ -8,21 +8,6 @@ import { type Column, Editors, type GridOption, type SlickgridReactInstance } fr
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { runInAction } from "mobx";
 
-// function getColumnEditor(col: LoadedDataColumn<DataType>) {
-//     if (!col.editable) return undefined; // not editable at all
-
-//     switch (col.datatype) {
-//         case "integer":
-//         case "int32":
-//             // return { model: Editors.integer };
-//         case "double":
-//             return { model: Editors.float };
-//         default:
-//             // basic text editor is fine, we’ll convert in our write logic
-//             return { model: Editors.text };
-//     }
-// }
-
 const useSlickGridReact = () => {
 
     // Hooks
@@ -67,7 +52,6 @@ const useSlickGridReact = () => {
         }
 
         for (const col of orderedParamColumns) {
-            // const editor = getColumnEditor(col);
             const isColumnEditable = col?.editable ?? false;
             cols.push({
                 id: col.field,

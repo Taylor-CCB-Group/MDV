@@ -103,6 +103,12 @@
 :root {
     font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
     --button_color: #1266f1;
+    --background_color_success: #eefded;
+    --background_color_info: #edf5fd;
+    --background_color_warning: #fdfded;
+    --text_color_success: #215f26;
+    --text_color_info: #21425f;
+    --text_color_warning: #5f5f21;
 }
 .dark a {
     color: #1266f1;

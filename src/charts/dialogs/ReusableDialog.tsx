@@ -1,5 +1,10 @@
-import { Close } from "@mui/icons-material";
-import { Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper } from "@mui/material";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
+import {
+    Button,
+    Container,
+    Dialog,
+    DialogActions,
+} from "@mui/material";
 
 export interface ReusableDialogProps {
     open: boolean;
@@ -21,18 +26,26 @@ const ReusableDialog = ({
     onConfirmClick,
 }: ReusableDialogProps) => {
     return (
-        <Dialog open={open} onClose={handleClose} disableRestoreFocus fullWidth maxWidth={isAlertErrorComponent ? "sm" : "md"}>
-            <DialogContent dividers>
-                <div className="flex items-center justify-center">
-                    <Container>{component}</Container>
-                </div>
-            </DialogContent>
-            <DialogActions>
-                {isConfirmButton && <Button onClick={() => onConfirmClick?.()}>{confirmText ?? "Confirm"}</Button>}
-                <Button onClick={handleClose} color="error">
-                    Close
-                </Button>
-            </DialogActions>
+        <Dialog
+            open={open}
+            onClose={handleClose}
+            disableRestoreFocus
+            fullWidth
+            maxWidth={isAlertErrorComponent ? "sm" : "md"}
+            PaperProps={{
+                sx: {
+                    padding: 0,
+                    overflow: "hidden",
+                },
+            }}
+        >
+            <DialogCloseIconButton onClose={handleClose} />
+            <Container sx={{ mt: 1 }}>{component}</Container>
+            {isConfirmButton && (
+                <DialogActions>
+                    <Button onClick={() => onConfirmClick?.()}>{confirmText ?? "Confirm"}</Button>
+                </DialogActions>
+            )}
         </Dialog>
     );
 };
