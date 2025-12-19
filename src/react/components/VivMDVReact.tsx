@@ -355,6 +355,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
 BaseChart.types["VivMdvRegionReact"] = {
     ...BaseChart.types["viv_scatter_plot"], //this is doing something that means my default radius isn't being used...
+    allow_user_add: true,
     // configEntriesUsingColumns: ["densityFields"],
     init: (config, ds, ec) => {
         // let's explicitly do what we actually want here, to avoid `config.param` mixup.
