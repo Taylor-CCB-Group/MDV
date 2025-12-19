@@ -7,6 +7,7 @@
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+import type { IReactionDisposer } from "mobx";
 // import type { DataType } from "../datatypes";
 /**
  * The are the names used to refer to the types of data can be stored in a column.
@@ -216,6 +217,8 @@ export type GuiValueTypes = {
     // number or a column (with modifiers) - this is where the node editor comes in...
     column: FieldSpec;
     multicolumn: FieldSpecs; //easier to have distinct 'multicolumn' type than overly generic 'column'?
+    /** Internal type for managing disposers that should be cleaned up when the settings dialog closes */
+    _disposers: IReactionDisposer[];
 };
 export type GuiSpecType = keyof GuiValueTypes;
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
@@ -287,6 +290,10 @@ export type GuiSpec<T extends GuiSpecType> = {
      * or other form like `"_multi_column:number" | "number"`.
      */
     columnType?: T extends ("column" | "multicolumn") ? CTypes : never;
+    /** Optional array of disposers that should be cleaned up when the settings dialog closes.
+     * This allows settings specs to register autoruns or other reactive disposables that are tied
+     * to the dialog's lifetime rather than the chart's lifetime. */
+    _disposers?: IReactionDisposer[];
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
 /**
