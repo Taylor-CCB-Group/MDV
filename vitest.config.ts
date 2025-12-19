@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import glsl from 'vite-plugin-glsl';
 import * as path from 'node:path';
 // This is the script that runs in Node.js and starts the browser
 // needs to be revisited - haven't had time to get it working yet.
@@ -15,6 +16,7 @@ import * as path from 'node:path';
 
 export default defineConfig({
   plugins: [
+    glsl(), // Handle GLSL shader imports in tests
     react({
       include: [/\.tsx?$/, /\.jsx?$/],
       babel: {
