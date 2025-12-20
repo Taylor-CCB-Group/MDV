@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FieldName } from "@/charts/charts";
 import { makeDraggable, makeResizable } from "@/utilities/Elements";
 
@@ -13,20 +13,26 @@ export interface FieldContourLegendProps {
     label?: string;
     position?: { x: number; y: number };
     onPositionChange?: (position: { x: number; y: number }) => void;
+    onFieldHover?: (fieldId: FieldName | null) => void;
 }
 
 /**
  * React component for displaying a legend of field contours with their colors.
  * The legend is draggable and resizable, similar to the existing getColorLegend utility.
+ * 
+ * Note: SVG is used for the legend content to ensure compatibility with figure export
+ * functionality, allowing legends to be included in exported visualizations.
  */
 export default function FieldContourLegend({
     fields,
     label = "Density Fields",
     position,
     onPositionChange,
+    onFieldHover,
 }: FieldContourLegendProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
+    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -40,7 +46,8 @@ export default function FieldContourLegend({
 
         // Apply draggable and resizable functionality
         // Using the same utilities as the existing legend system
-        const dragConfig: any = { handle: ".legend-body" };
+        // Header (legend-title) is draggable for better UX
+        const dragConfig: any = { handle: ".legend-title" };
         
         // Track position changes when dragging ends
         if (onPositionChange) {
@@ -81,68 +88,70 @@ export default function FieldContourLegend({
         return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
     };
 
+    const handleMouseEnter = (fieldId: FieldName) => {
+        setHoveredField(fieldId);
+        onFieldHover?.(fieldId);
+    };
+
+    const handleMouseLeave = () => {
+        setHoveredField(null);
+        onFieldHover?.(null);
+    };
+
     return (
         <div
             ref={containerRef}
-            className="legend-container"
+            className="legend-container absolute border-[0.5px] border-current z-[2]"
             style={{
                 width: "120px",
                 height: `${containerHeight}px`,
-                position: "absolute",
-                border: "0.5px solid currentcolor",
-                zIndex: 2,
             }}
         >
             <div
-                className="legend-title"
-                style={{
-                    height: "20px",
-                    whiteSpace: "nowrap",
-                    padding: "2px 4px",
-                    fontSize: "12px",
-                    fontWeight: "bold",
-                    color: "currentcolor",
-                }}
+                className="legend-title h-5 whitespace-nowrap px-1 text-xs font-bold text-current cursor-move"
             >
                 {label}
             </div>
             <div
                 ref={bodyRef}
-                className="legend-body"
+                className="legend-body overflow-y-auto overflow-x-hidden w-full"
                 style={{
-                    overflowY: "auto",
-                    overflowX: "hidden",
                     height: "calc(100% - 25px)",
-                    width: "100%",
                 }}
             >
                 <svg
                     height={height}
                     width={180}
-                    style={{
-                        position: "relative",
-                    }}
+                    className="relative"
                 >
                     <g>
                         {fields.map((field, i) => {
                             const y = (i + 1) * 2 + i * h_fac;
                             const color = rgbToCss(field.color);
+                            const isHovered = hoveredField === field.field;
                             return (
-                                <g key={field.field}>
+                                <g 
+                                    key={field.field}
+                                    onMouseEnter={() => handleMouseEnter(field.field)}
+                                    onMouseLeave={handleMouseLeave}
+                                    className="cursor-pointer"
+                                    style={{
+                                        opacity: isHovered ? 1 : hoveredField ? 0.4 : 1,
+                                    }}
+                                >
                                     <rect
                                         y={y}
                                         x={2}
                                         height="10"
                                         width="10"
                                         fill={color}
+                                        stroke={isHovered ? "currentColor" : "none"}
+                                        strokeWidth={isHovered ? 2 : 0}
                                     />
                                     <text
                                         y={y + 6 + 3}
                                         x={14}
-                                        style={{
-                                            fontSize: "12px",
-                                            fill: "currentcolor",
-                                        }}
+                                        className="text-xs fill-current"
                                     >
                                         {field.name === "" ? "none" : field.name}
                                     </text>

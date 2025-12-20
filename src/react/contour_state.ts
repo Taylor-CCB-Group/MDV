@@ -1,4 +1,4 @@
-import type { CategoricalDataType, DataColumn, LoadedDataColumn } from "@/charts/charts";
+import type { CategoricalDataType, DataColumn, LoadedDataColumn, FieldName } from "@/charts/charts";
 import { useMemo } from "react";
 import {
     useCategoryFilterIndices,
@@ -46,6 +46,7 @@ export type FieldContourProps = {
     opacity: number;
     fillThreshold: number;
     fields?: LoadedDataColumn<"double">[];
+    hoveredFieldId?: FieldName | null;
 }
 function rgb(
     r: number,
@@ -176,7 +177,7 @@ export function useCategoryContour(props: CategoryContourProps) {
 /** pending better definition */
 export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
 export function useFieldContour(props: FieldContourProps) {
-    const { id, fill, bandwidth, intensity, opacity, fillThreshold, fields } =
+    const { id, fill, bandwidth, intensity, opacity, fillThreshold, fields, hoveredFieldId } =
         props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
@@ -196,11 +197,30 @@ export function useFieldContour(props: FieldContourProps) {
         // there is an issue of the scaling of these layers e.g. with images that have been resized...
         // what is different about how we scale these layers vs other scatterplot layer?
         //const fieldStats = fields.reduce((field) => { ... });
-        return fields.map(({ name, field: fieldId, data: fieldData, minMax }) => ({
+        return fields.map(({ name, field: fieldId, data: fieldData, minMax }) => {
+            // Adjust opacity based on hover state
+            const isHovered = hoveredFieldId === fieldId;
+            const hasHover = hoveredFieldId !== null && hoveredFieldId !== undefined;
+            
+            // Hovered field: increase opacity (clamped to 1.0)
+            // Non-hovered fields: reduce opacity when another field is hovered
+            const adjustedOpacity = isHovered 
+                ? Math.min(1.0, opacity * 1.5)
+                : hasHover 
+                    ? opacity * 0.3 
+                    : opacity;
+            
+            const adjustedIntensity = isHovered 
+                ? Math.min(1.0, intensity * 1.5)
+                : hasHover 
+                    ? intensity * 0.3 
+                    : intensity;
+            
+            return {
             id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
             data, //todo filter sparse data
-            fillOpacity: intensity,
-            contourOpacity: opacity,
+            fillOpacity: adjustedIntensity,
+            contourOpacity: adjustedOpacity,
             // when fill is disabled, this is some arbitrary large value, otherwise use the tweakable threshold
             contourFill: fill ? fillThreshold : 10000,
             getPosition: (
@@ -247,7 +267,8 @@ export function useFieldContour(props: FieldContourProps) {
             // not working?
             // getFilterValue: (i: number) => fieldData[i] === 0,
             // extensions: [new DataFilterExtension({filterSize: 1})]
-        }));
+        };
+        });
     }, [
         id,
         data,
@@ -260,6 +281,7 @@ export function useFieldContour(props: FieldContourProps) {
         opacity,
         fillThreshold,
         fields,
+        hoveredFieldId,
     ]);
 }
 
@@ -473,7 +495,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
  * Dual-contour is a special case of this - may be useful in terms
  * of how it relates to cell-pair interation links
  */
-export function useLegacyDualContour(): ContourLayerProps[] {
+export function useLegacyDualContour(hoveredFieldId?: FieldName | null): ContourLayerProps[] {
     const config = useConfig<DualContourLegacyConfig>();
     // todo: this is currently short-circuiting for non-viv deck scatter...
     // breaking rule of hooks etc, should be fixed
@@ -490,6 +512,7 @@ export function useLegacyDualContour(): ContourLayerProps[] {
         ...commonProps,
         id: "fieldContours",
         fields: fields.filter(field => field.datatype === "double") as LoadedDataColumn<"double">[],
+        hoveredFieldId,
     });
     const contour1 = useCategoryContour({
         ...commonProps,
