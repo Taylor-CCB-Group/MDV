@@ -383,7 +383,7 @@ class MDVProgress {
  * Make an element draggable
  * @param {HTMLElement} el - the element to be made draggable
  * @param {object} config
- * @param {HTMLElement} [config.handle] - the element that will be used to drag the main element
+ * @param {HTMLElement | string} [config.handle] - the element (or selector string) that will be used to drag the main element
  * @param {HTMLElement} [config.contain] - the element that will contain the draggable element
  * @param {string} [config.y_axis] - if set, the element will only be draggable on the y-axis
  * @param {function} [config.ondragstart] - a function that is called when dragging starts

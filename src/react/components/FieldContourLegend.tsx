@@ -115,7 +115,7 @@ export default function FieldContourLegend({
                                     <text
                                         y={y + 6 + 3}
                                         x={14}
-                                        alignmentBaseline="center"
+                                        alignmentBaseline="central"
                                         style={{
                                             fontSize: "12px",
                                             fill: "currentcolor",
