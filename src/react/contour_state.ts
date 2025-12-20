@@ -207,13 +207,13 @@ export function useFieldContour(props: FieldContourProps) {
             const adjustedOpacity = isHovered 
                 ? Math.min(1.0, opacity * 1.5)
                 : hasHover 
-                    ? opacity * 0.3 
+                    ? opacity * 0.8
                     : opacity;
             
             const adjustedIntensity = isHovered 
                 ? Math.min(1.0, intensity * 1.5)
                 : hasHover 
-                    ? intensity * 0.3 
+                    ? intensity * 0.8
                     : intensity;
             
             return {
