@@ -12,6 +12,7 @@ export interface FieldContourLegendProps {
     fields: FieldLegendItem[];
     label?: string;
     position?: { x: number; y: number };
+    onPositionChange?: (position: { x: number; y: number }) => void;
 }
 
 /**
@@ -22,6 +23,7 @@ export default function FieldContourLegend({
     fields,
     label = "Density Fields",
     position,
+    onPositionChange,
 }: FieldContourLegendProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
@@ -30,17 +32,39 @@ export default function FieldContourLegend({
         const container = containerRef.current;
         if (!container) return;
 
-        // Apply draggable and resizable functionality
-        // Using the same utilities as the existing legend system
-        makeDraggable(container, { handle: ".legend-body" });
-        makeResizable(container);
-
         // Set initial position if provided
         if (position) {
             container.style.left = `${position.x}px`;
             container.style.top = `${position.y}px`;
         }
-    }, [position]);
+
+        // Apply draggable and resizable functionality
+        // Using the same utilities as the existing legend system
+        const dragConfig: any = { handle: ".legend-body" };
+        
+        // Track position changes when dragging ends
+        if (onPositionChange) {
+            dragConfig.ondragend = () => {
+                // Get position from the container element
+                const currentContainer = containerRef.current;
+                if (currentContainer) {
+                    onPositionChange({
+                        x: currentContainer.offsetLeft,
+                        y: currentContainer.offsetTop,
+                    });
+                }
+            };
+        }
+        
+        makeDraggable(container, dragConfig);
+        makeResizable(container);
+        
+        // Cleanup function to remove event listeners if needed
+        return () => {
+            // makeDraggable doesn't provide a cleanup function, but the element
+            // will be cleaned up when the component unmounts
+        };
+    }, [position, onPositionChange]);
 
     if (fields.length === 0) {
         return null;
@@ -115,7 +139,6 @@ export default function FieldContourLegend({
                                     <text
                                         y={y + 6 + 3}
                                         x={14}
-                                        alignmentBaseline="central"
                                         style={{
                                             fontSize: "12px",
                                             fill: "currentcolor",

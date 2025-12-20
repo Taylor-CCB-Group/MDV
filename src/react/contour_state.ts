@@ -280,6 +280,10 @@ export type DualContourLegacyConfig = {
     category1?: string | string[];
     category2?: string | string[];
     densityFields?: FieldSpecs; // don't have a way of specifying datatype here
+    field_legend?: {
+        display?: boolean;
+        pos?: [number, number];
+    };
 } & ContourVisualConfig;
 
 export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
@@ -373,7 +377,24 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                     })
                 ],
             }),
-            ...getContourVisualSettings(c)
+            ...getContourVisualSettings(c),
+            g({
+                type: "folder",
+                label: "Legend",
+                current_value: [
+                    g({
+                        type: "check",
+                        label: "Show Field Legend",
+                        current_value: c.field_legend?.display ?? true,
+                        func: (x) => {
+                            if (!c.field_legend) {
+                                c.field_legend = {};
+                            }
+                            c.field_legend.display = x;
+                        },
+                    }),
+                ],
+            }),
         ],
     });
     

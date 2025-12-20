@@ -6,6 +6,7 @@ import {
 import { observer } from "mobx-react-lite";
 import { useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
+import { action } from "mobx";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
 import FieldContourLegend from "./FieldContourLegend";
@@ -93,6 +94,19 @@ const Main = observer(() => {
     // Get field contour legend data
     const config = useConfig<DualContourLegacyConfig>();
     const legendFields = useFieldContourLegend(config.densityFields);
+    
+    // Legend visibility and position - TODO refactor so it's common with non-viv density
+    const showLegend = config.field_legend?.display !== false; // default to true
+    const legendPosition = config.field_legend?.pos 
+        ? { x: config.field_legend.pos[0], y: config.field_legend.pos[1] }
+        : undefined;
+    
+    const handleLegendPositionChange = action((position: { x: number; y: number }) => {
+        if (!config.field_legend) {
+            config.field_legend = {};
+        }
+        config.field_legend.pos = [position.x, position.y];
+    });
 
     // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
     const {
@@ -218,8 +232,12 @@ const Main = observer(() => {
     return (
         <>
             <SelectionOverlay />
-            {legendFields.length > 0 && (
-                <FieldContourLegend fields={legendFields} />
+            {showLegend && legendFields.length > 0 && (
+                <FieldContourLegend 
+                    fields={legendFields} 
+                    position={legendPosition}
+                    onPositionChange={handleLegendPositionChange}
+                />
             )}
             <MDVivViewer
                 outerContainer={outerContainer}
