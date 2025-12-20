@@ -4,10 +4,15 @@ import {
     DetailView,
 } from "@vivjs-experimental/viv";
 import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
+import { action } from "mobx";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
+import FieldContourLegend from "./FieldContourLegend";
+import { useFieldContourLegend } from "../contour_state";
+import type { DualContourLegacyConfig } from "../contour_state";
+import type { FieldName } from "@/charts/charts";
 import {
     useLoader,
     type OME_TIFF,
@@ -32,9 +37,15 @@ export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move
 /** somewhat comparable to avivator `<Viewer />` */
 export const VivScatter = () => {
     const chart = useChart();
+    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    
     return (
-        <SpatialAnnotationProvider chart={chart}>
-            <Main />
+        <SpatialAnnotationProvider 
+            chart={chart}
+            hoveredFieldId={hoveredField}
+            setHoveredFieldId={setHoveredField}
+        >
+            <Main hoveredField={hoveredField} setHoveredField={setHoveredField} />
         </SpatialAnnotationProvider>
     );
 };
@@ -70,7 +81,13 @@ const useJsonLayer = (showJson: boolean) => {
     return layer;
 };
 
-const Main = observer(() => {
+const Main = observer(({ 
+    hoveredField, 
+    setHoveredField 
+}: { 
+    hoveredField: FieldName | null;
+    setHoveredField: (fieldId: FieldName | null) => void;
+}) => {
     // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
     const ome = useLoader() as OME_TIFF["data"]; // useOmeTiff();
 
@@ -86,6 +103,35 @@ const Main = observer(() => {
     const { showJson } = useConfig<VivRoiConfig>();
     // passing showJson from here to make use of this being `observer`
     const jsonLayer = useJsonLayer(showJson);
+    
+    // Get field contour legend data
+    const config = useConfig<DualContourLegacyConfig>();
+    const legendFields = useFieldContourLegend(config.densityFields);
+    
+    // Legend visibility and position - TODO refactor so it's common with non-viv density
+    const showLegend = config.field_legend?.display !== false; // default to true
+    
+    // Calculate default bottom-left position if not explicitly set
+    const legendPosition = useMemo(() => {
+        if (config.field_legend?.pos) {
+            return { x: config.field_legend.pos[0], y: config.field_legend.pos[1] };
+        }
+        // Default to bottom-left: 10px from left, 10px from bottom
+        // Estimate container height (will be calculated in component)
+        const estimatedHeight = 200; // approximate height
+        return { x: 10, y: height - estimatedHeight - 10 };
+    }, [config.field_legend?.pos, height]);
+    
+    const handleLegendPositionChange = action((position: { x: number; y: number }) => {
+        if (!config.field_legend) {
+            config.field_legend = {};
+        }
+        config.field_legend.pos = [position.x, position.y];
+    });
+    
+    const handleFieldHover = (fieldId: FieldName | null) => {
+        setHoveredField(fieldId);
+    };
 
     // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
     const {
@@ -211,6 +257,14 @@ const Main = observer(() => {
     return (
         <>
             <SelectionOverlay />
+            {showLegend && legendFields.length > 0 && (
+                <FieldContourLegend 
+                    fields={legendFields} 
+                    position={legendPosition}
+                    onPositionChange={handleLegendPositionChange}
+                    onFieldHover={handleFieldHover}
+                />
+            )}
             <MDVivViewer
                 outerContainer={outerContainer}
                 selectionLayer={selectionLayer}
