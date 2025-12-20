@@ -255,6 +255,13 @@ export function useFieldContour(props: FieldContourProps) {
             weightsTextureSize: 128, //there could be a performance related parameter to tweak
             pickable: false,
             transitions: {
+                // nb - failed to get this working
+                // will need changes to the HeatmapContourExtension implementation
+                // (updateState vs draw, props vs state) but attempts thus far have been fruitless
+                // plan to implement that differently anyway.
+                // fillOpacity: 500,
+                // contourOpacity: 500
+                /// getWeight transition not working either
                 getWeight: {
                     duration: 1000,
                     // easing: t => t,
