@@ -126,7 +126,8 @@ export function useCategoryContour(props: CategoryContourProps) {
     const { zoom } = useViewState();
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
     //won't be necessary when we implement heatmap differently
-    const [debounceZoom] = useDebounce(zoom, 500);
+    // const [debounceZoom] = useDebounce(zoom, 500);
+    const debounceZoom = zoom; //actually - re-evaluating memo was never a bottleneck
 
     return useMemo(() => {
         if (!category || !contourParameter) return undefined;
@@ -186,7 +187,8 @@ export function useFieldContour(props: FieldContourProps) {
     const { zoom } = useViewState();
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
     //won't be necessary when we implement heatmap differently
-    const [debounceZoom] = useDebounce(zoom, 500);
+    // const [debounceZoom] = useDebounce(zoom, 500);
+    const debounceZoom = zoom; //actually - re-evaluating memo was never a bottleneck
 
     return useMemo(() => {
         if (!fields) return [];
