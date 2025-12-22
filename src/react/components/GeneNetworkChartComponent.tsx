@@ -140,7 +140,7 @@ export const GeneNetworkChartComponent = observer(() => {
     }, [displayMode, highlightedIndex, filteredIndices, column]);
 
     return (
-        <div className="text-sm h-full flex flex-col">
+        <div className="p-3 absolute w-[100%] h-[100%] overflow-y-auto text-sm h-full flex flex-col">
             {displayMode === "highlighted" ? (
                 <>
                     {highlightedIndex >= 0 ? (
