@@ -1,10 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { CategoricalDataType } from '@/charts/charts';
-import { useCategoryContour, getDensitySettings } from './contour_state';
+import { useCategoryContour, getDensitySettings, type DualContourLegacyConfig } from './contour_state';
 import type { CategoryContourProps } from './contour_state';
 import type BaseChart from '@/charts/BaseChart';
 import type { BaseConfig } from '@/charts/BaseChart';
+import { scatterDefaults } from './scatter_state';
 
 // Mock all the hooks and dependencies
 vi.mock('./hooks', () => ({
@@ -19,6 +20,10 @@ vi.mock('./context', () => ({
 
 vi.mock('./deck_state', () => ({
     useViewState: vi.fn(),
+    getEmptyFeatureCollection: vi.fn(() => ({
+        type: 'FeatureCollection',
+        features: [],
+    })),
 }));
 
 vi.mock('use-debounce', () => ({
@@ -220,13 +225,18 @@ describe('getDensitySettings disposer management', () => {
             dataStore: mockDataStore,
         } as unknown as BaseChart<BaseConfig>;
         
-        const mockConfig = {
+        const mockConfig: DualContourLegacyConfig & BaseConfig = {
+            ...scatterDefaults,
+            id: 'test-chart',
+            size: [800, 600],
+            title: 'Test Chart',
+            legend: '',
+            type: 'scatter',
+            param: ['x', 'y', 'test-field'],
             contourParameter: 'test-field',
             category1: [],
             category2: [],
-            param: ['x', 'y', 'test-field'],
-            field_legend: { display: true },
-        } as any;
+        };
         
         const spec = getDensitySettings(mockConfig, mockChart);
         
@@ -255,13 +265,18 @@ describe('getDensitySettings disposer management', () => {
             dataStore: mockDataStore,
         } as unknown as BaseChart<BaseConfig>;
         
-        const mockConfig = {
+        const mockConfig: DualContourLegacyConfig & BaseConfig = {
+            ...scatterDefaults,
+            id: 'test-chart',
+            size: [800, 600],
+            title: 'Test Chart',
+            legend: '',
+            type: 'scatter',
+            param: ['x', 'y', 'test-field'],
             contourParameter: 'test-field',
             category1: [],
             category2: [],
-            param: ['x', 'y', 'test-field'],
-            field_legend: { display: true },
-        } as any;
+        };
         
         const spec = getDensitySettings(mockConfig, mockChart);
         
