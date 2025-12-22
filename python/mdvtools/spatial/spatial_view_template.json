@@ -4,16 +4,16 @@
       {
         "course_radius": 1,
         "radius": 10,
-        "opacity": 1,
+        "opacity": 0.25,
         "tooltip": {
           "show": false
         },
         "category_filters": [],
         "zoom_on_filter": false,
         "point_shape": "circle",
-        "contour_fill": false,
-        "contour_bandwidth": 0.1,
-        "contour_intensity": 1,
+        "contour_fill": true,
+        "contour_bandwidth": 30,
+        "contour_intensity": 0.7,
         "contour_opacity": 0.5,
         "dimension": "2d",
         "on_filter": "hide",
@@ -35,6 +35,13 @@
           "maxItems": 1,
           "type": "RowsAsColsQuery"
         },
+        "densityFields": [
+          {
+            "linkedDsName": "genes",
+            "maxItems": 15,
+            "type": "RowsAsColsQuery"
+          }       
+        ],
         "background_filter": {
           "column": "spatial_region",
           "category": "<SPATIAL_REGION_NAME>"
