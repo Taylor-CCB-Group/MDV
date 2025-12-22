@@ -443,10 +443,44 @@ class DataStore {
         /** @type {Column} */
         const c = {
             ...column, //may be useful to get any other properties we didn't explicitly copy before.
-            getValue: (i) => {
-                //this could be more efficient if the logic was inverted;
-                //i.e. getRowAsObject would call this method on all columns...
-                return this.getRowAsObject(i, [column.field])[column.field];
+            getValue: (index) => {
+                const col = this.columnIndex[column.field];
+                if (!col.data) {
+                    console.error(`Column ${c} has no data`);
+                    return;
+                }
+                let v = col.data[index];
+                if (col.datatype === "text" || col.datatype === "text16") {
+                    v = col.values[v];
+                } else if (
+                    col.datatype === "double" ||
+                    col.datatype === "integer" ||
+                    col.datatype === "int32"
+                ) {
+                    if (Number.isNaN(v)) {
+                        v = "missing";
+                    }
+                }
+                //multitext displayed as comma delimited values
+                else if (col.datatype === "multitext") {
+                    const delim = ", ";
+                    const d = col.data.slice(
+                        index * col.stringLength,
+                        index * col.stringLength + col.stringLength,
+                    );
+                    v = Array.from(d.filter((x) => x !== 65535))
+                        .map((x) => col.values[x])
+                        .join(delim);
+                } else {
+                    v = this.textDecoder.decode(
+                        col.data.slice(
+                            index * col.stringLength,
+                            index * col.stringLength + col.stringLength,
+                        ),
+                    );
+                    v = v.replaceAll("\0", "");
+                }
+                return v;
             },
             subgroup: column.subgroup,
         };
@@ -741,44 +775,7 @@ class DataStore {
         }
         const obj = {}; // pjt consider using Map if this is a bottleneck
         for (const c of columns) {
-            //todo invert this to use col.getValue(index)
-            const col = this.columnIndex[c];
-            if (!col.data) {
-                console.error(`Column ${c} has no data`);
-                continue;
-            }
-            let v = col.data[index];
-            if (col.datatype === "text" || col.datatype === "text16") {
-                v = col.values[v];
-            } else if (
-                col.datatype === "double" ||
-                col.datatype === "integer" ||
-                col.datatype === "int32"
-            ) {
-                if (Number.isNaN(v)) {
-                    v = "missing";
-                }
-            }
-            //multitext displayed as comma delimited values
-            else if (col.datatype === "multitext") {
-                const delim = ", ";
-                const d = col.data.slice(
-                    index * col.stringLength,
-                    index * col.stringLength + col.stringLength,
-                );
-                v = Array.from(d.filter((x) => x !== 65535))
-                    .map((x) => col.values[x])
-                    .join(delim);
-            } else {
-                v = this.textDecoder.decode(
-                    col.data.slice(
-                        index * col.stringLength,
-                        index * col.stringLength + col.stringLength,
-                    ),
-                );
-                v = v.replaceAll("\0", "");
-            }
-            obj[c] = v;
+            obj[c] = this.columnIndex[c].getValue(index);
         }
         obj["__index__"] = index;
         return obj;
