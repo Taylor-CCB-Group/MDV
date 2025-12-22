@@ -108,6 +108,9 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     on_filter: "hide", //safer in case of large datasets
     // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
+    field_legend: {
+        display: true
+    }
 };
 
 export const scatterAxisDefaults: AxisConfig2D = {

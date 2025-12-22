@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { FieldName } from "@/charts/charts";
-import { makeDraggable, makeResizable } from "@/utilities/Elements";
 
 export interface FieldLegendItem {
     name: string;
@@ -12,13 +11,12 @@ export interface FieldContourLegendProps {
     fields: FieldLegendItem[];
     label?: string;
     position?: { x: number; y: number };
-    onPositionChange?: (position: { x: number; y: number }) => void;
     onFieldHover?: (fieldId: FieldName | null) => void;
 }
 
 /**
  * React component for displaying a legend of field contours with their colors.
- * The legend is draggable and resizable, similar to the existing getColorLegend utility.
+ * The legend is fixed in position (typically bottom-left).
  * 
  * Note: SVG is used for the legend content to ensure compatibility with figure export
  * functionality, allowing legends to be included in exported visualizations.
@@ -27,7 +25,6 @@ export default function FieldContourLegend({
     fields,
     label = "Density Fields",
     position,
-    onPositionChange,
     onFieldHover,
 }: FieldContourLegendProps) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -38,40 +35,12 @@ export default function FieldContourLegend({
         const container = containerRef.current;
         if (!container) return;
 
-        // Set initial position if provided
+        // Set fixed position if provided
         if (position) {
             container.style.left = `${position.x}px`;
-            container.style.top = `${position.y}px`;
+            container.style.bottom = `${position.y}px`;
         }
-
-        // Apply draggable and resizable functionality
-        // Using the same utilities as the existing legend system
-        // Header (legend-title) is draggable for better UX
-        const dragConfig: any = { handle: ".legend-title" };
-        
-        // Track position changes when dragging ends
-        if (onPositionChange) {
-            dragConfig.ondragend = () => {
-                // Get position from the container element
-                const currentContainer = containerRef.current;
-                if (currentContainer) {
-                    onPositionChange({
-                        x: currentContainer.offsetLeft,
-                        y: currentContainer.offsetTop,
-                    });
-                }
-            };
-        }
-        
-        makeDraggable(container, dragConfig);
-        makeResizable(container);
-        
-        // Cleanup function to remove event listeners if needed
-        return () => {
-            // makeDraggable doesn't provide a cleanup function, but the element
-            // will be cleaned up when the component unmounts
-        };
-    }, [position, onPositionChange]);
+    }, [position]);
 
     if (fields.length === 0) {
         return null;
@@ -108,7 +77,7 @@ export default function FieldContourLegend({
             }}
         >
             <div
-                className="legend-title h-5 whitespace-nowrap px-1 text-xs font-bold text-current cursor-move"
+                className="legend-title h-5 whitespace-nowrap px-1 text-xs font-bold text-current"
             >
                 {label}
             </div>

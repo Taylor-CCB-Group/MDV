@@ -6,7 +6,6 @@ import {
 import { observer } from "mobx-react-lite";
 import { useMemo, useEffect, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
-import { action } from "mobx";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
 import FieldContourLegend from "./FieldContourLegend";
@@ -108,26 +107,11 @@ const Main = observer(({
     const config = useConfig<DualContourLegacyConfig>();
     const legendFields = useFieldContourLegend(config.densityFields);
     
-    // Legend visibility and position - TODO refactor so it's common with non-viv density
-    const showLegend = config.field_legend?.display !== false; // default to true
+    // Legend visibility - fixed position in bottom-left
+    const showLegend = config.field_legend.display;
     
-    // Calculate default bottom-left position if not explicitly set
-    const legendPosition = useMemo(() => {
-        if (config.field_legend?.pos) {
-            return { x: config.field_legend.pos[0], y: config.field_legend.pos[1] };
-        }
-        // Default to bottom-left: 10px from left, 10px from bottom
-        // Estimate container height (will be calculated in component)
-        const estimatedHeight = 200; // approximate height
-        return { x: 10, y: height - estimatedHeight - 10 };
-    }, [config.field_legend?.pos, height]);
-    
-    const handleLegendPositionChange = action((position: { x: number; y: number }) => {
-        if (!config.field_legend) {
-            config.field_legend = {};
-        }
-        config.field_legend.pos = [position.x, position.y];
-    });
+    // Fixed bottom-left position: 10px from left, 10px from bottom
+    const legendPosition = { x: 10, y: 10 };
     
     const handleFieldHover = (fieldId: FieldName | null) => {
         setHoveredField(fieldId);
@@ -261,7 +245,6 @@ const Main = observer(({
                 <FieldContourLegend 
                     fields={legendFields} 
                     position={legendPosition}
-                    onPositionChange={handleLegendPositionChange}
                     onFieldHover={handleFieldHover}
                 />
             )}

@@ -330,9 +330,9 @@ export type DualContourLegacyConfig = {
     category1?: string | string[];
     category2?: string | string[];
     densityFields?: FieldSpecs; // don't have a way of specifying datatype here
-    field_legend?: {
-        display?: boolean;
-        pos?: [number, number];
+    field_legend: {
+        display: boolean;
+        // todo - more legend configuration options
     };
 } & ContourVisualConfig;
 
@@ -435,11 +435,8 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                     g({
                         type: "check",
                         label: "Show Field Legend",
-                        current_value: c.field_legend?.display ?? true,
+                        current_value: c.field_legend.display,
                         func: (x) => {
-                            if (!c.field_legend) {
-                                c.field_legend = {};
-                            }
                             c.field_legend.display = x;
                         },
                     }),
