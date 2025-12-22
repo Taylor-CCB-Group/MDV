@@ -487,38 +487,8 @@ class DataStore {
         if (!c.field) {
             c.field = column.name;
         }
-        if (column.colors) {
-            c.colors = column.colors;
-        }
-        if (column.editable) {
-            c.editable = true;
-        }
-        if (column.is_url) {
-            c.is_url = true;
-        }
-
-        if (column.subgroup) {
-            c.subgroup = column.subgroup;
-            c.sgindex = column.sgindex;
-            c.sgtype = column.sgtype;
-        }
-        if (isColumnText(column)) {
-            c.stringLength = column.stringLength;
-            if (column.delimiter) {
-                c.delimiter = column.delimiter;
-            }
-            c.values = column.values || [""];
-        } else if (isColumnNumeric(column)) {
-            c.colorLogScale = column.colorLogScale;
-            // if (!column.minMax) {
-                // this will probably happen any time a linked column is used...
-                // probably don't want a warning every time!
-                // console.warn(`Column ${column.name} has no minMax`, column);
-            // }
-            c.minMax = column.minMax;
-            c.quantiles = column.quantiles;
-        } else {
-            c.stringLength = column.stringLength;
+        if (isColumnText(column) && !c.values) {
+            c.values = [""];
         }
         this.columns.push(c);
         this.columnIndex[c.field] = c;
