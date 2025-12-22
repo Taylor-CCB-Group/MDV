@@ -227,6 +227,16 @@ export function useFieldContour(props: FieldContourProps) {
         // there is an issue of the scaling of these layers e.g. with images that have been resized...
         // what is different about how we scale these layers vs other scatterplot layer?
         //const fieldStats = fields.reduce((field) => { ... });
+        // Sort fields so that hovered field is drawn last (on top)
+        // maybe too strong - could have more fine-tuning of boost/attenuation...
+        // maybe want a copy of hoveredField drawn on top with different parameters (animation...)
+        // const sortedFields = [...fields].sort((a, b) => {
+        //     const aIsHovered = hoveredFieldId === a.field;
+        //     const bIsHovered = hoveredFieldId === b.field;
+        //     if (aIsHovered && !bIsHovered) return 1; // a goes after b
+        //     if (!aIsHovered && bIsHovered) return -1; // a goes before b
+        //     return 0; // maintain original order for non-hovered fields
+        // });
         return fields.map(({ name, field: fieldId, data: fieldData, minMax }) => {
             // Adjust opacity based on hover state
             const isHovered = hoveredFieldId === fieldId;
@@ -481,17 +491,6 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
         }),
         g({
             type: "slider",
-            max: 1,
-            min: 0,
-            current_value: c.contour_intensity,
-            continuous: true,
-            label: "Fill Intensity",
-            func(x) {
-                c.contour_intensity = x;
-            },
-        }),
-        g({
-            type: "slider",
             max: 5,
             min: 0.1,
             current_value: c.contour_fillThreshold,
@@ -505,11 +504,22 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
             type: "slider",
             max: 1,
             min: 0,
+            current_value: c.contour_intensity,
+            continuous: true,
+            label: "Fill Opacity",
+            func(x) {
+                c.contour_intensity = x ** (1/3);
+            },
+        }),
+        g({
+            type: "slider",
+            max: 1,
+            min: 0,
             current_value: c.contour_opacity,
             continuous: false, //why so slow?
-            label: "Contour opacity",
+            label: "Contour Opacity",
             func(x) {
-                c.contour_opacity = x ** 3;
+                c.contour_opacity = x ** (1/3);
             },
         }),
     ]
