@@ -9,6 +9,8 @@ arr.push(SideEffect);
 // arr.push(addChart);
 import hfc from "./components/HighlightedFeatureChart";
 arr.push(hfc);
+import gnc from "./components/GeneNetworkChart";
+arr.push(gnc);
 import "./components/SelectionDialogReact";
 import "../charts/dialogs/AddColumnsFromRowsDialogReact";
 
