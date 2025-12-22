@@ -9,14 +9,13 @@ import {
     useFieldSpecs,
 } from "./hooks";
 import { useDataStore } from "./context";
-import { useDebounce } from "use-debounce";
+// import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
 import { g, isArray, toArray } from "@/lib/utils";
 import { observable, autorun } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
-import { oklch2rgb } from "@/utilities/oklch2rgb";
 import { getFieldColor } from "./fieldColorManager";
 import type { FieldLegendItem } from "./components/FieldContourLegend";
 // import { DataFilterExtension } from '@deck.gl/extensions';
@@ -110,6 +109,46 @@ function useColorRange(
     return colorRange;
 }
 
+
+/**
+ * Creates base layer props shared between field and categorical contour hooks.
+ */
+function createBaseContourLayerProps(params: {
+    id: string;
+    data: any;
+    cx: { data: ArrayLike<number> };
+    cy: { data: ArrayLike<number> };
+    radiusPixels: number;
+    fillOpacity: number;
+    contourOpacity: number;
+    contourFill: number;
+    colorRange: readonly (readonly number[])[];
+}) {
+    const { id, data, cx, cy, radiusPixels, fillOpacity, contourOpacity, contourFill, colorRange } = params;
+    
+    return {
+        id,
+        data,
+        fillOpacity,
+        contourOpacity,
+        contourFill,
+        getPosition: (
+            i: number,
+            { target }: { target: number[] | Float32Array },
+        ) => {
+            target[0] = cx.data[i];
+            target[1] = cy.data[i];
+            target[2] = 0;
+            return target;
+        },
+        colorRange,
+        radiusPixels,
+        debounce: 1000,
+        weightsTextureSize: 256, // Intermediate value for balanced performance and quality
+        pickable: false,
+    };
+}
+
 export function useCategoryContour(props: CategoryContourProps) {
     const { id, parameter, category, fill, bandwidth, intensity, opacity, fillThreshold } =
         props;
@@ -137,28 +176,17 @@ export function useCategoryContour(props: CategoryContourProps) {
         // console.log('radiusPixels', radiusPixels);
         // there is an issue of the scaling of these layers e.g. with images that have been resized...
         // what is different about how we scale these layers vs other scatterplot layer?
-        return {
+        return createBaseContourLayerProps({
             id,
             data,
+            cx,
+            cy,
+            radiusPixels,
             fillOpacity: intensity,
             contourOpacity: opacity,
-            // when fill is disabled, this is some arbitrary large value, otherwise use the tweakable threshold
             contourFill: fill ? fillThreshold : 10000,
-            getPosition: (
-                i: number,
-                { target }: { target: number[] | Float32Array },
-            ) => {
-                target[0] = cx.data[i];
-                target[1] = cy.data[i];
-                target[2] = 0;
-                return target;
-            },
             colorRange,
-            radiusPixels,
-            debounce: 1000,
-            weightsTextureSize: 512, //there could be a performance related parameter to tweak
-            pickable: false,
-        };
+        });
     }, [
         id,
         data,
@@ -218,65 +246,56 @@ export function useFieldContour(props: FieldContourProps) {
                     ? intensity * 0.8
                     : intensity;
             
+            const baseProps = createBaseContourLayerProps({
+                id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
+                data, //todo filter sparse data
+                cx,
+                cy,
+                radiusPixels,
+                fillOpacity: adjustedIntensity,
+                contourOpacity: adjustedOpacity,
+                contourFill: fill ? fillThreshold : 10000,
+                colorRange: [getFieldColor(fieldId)],
+            });
+            
             return {
-            id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
-            data, //todo filter sparse data
-            fillOpacity: adjustedIntensity,
-            contourOpacity: adjustedOpacity,
-            // when fill is disabled, this is some arbitrary large value, otherwise use the tweakable threshold
-            contourFill: fill ? fillThreshold : 10000,
-            getPosition: (
-                i: number,
-                { target }: { target: number[] | Float32Array },
-            ) => {
-                target[0] = cx.data[i];
-                target[1] = cy.data[i];
-                target[2] = 0;
-                return target;
-            },
-            getWeight: (i: number) => {
-                //potential for this to be animated in fun ways...
-                //phase shift for each field in shader...
+                ...baseProps,
+                getWeight: (i: number) => {
+                    //potential for this to be animated in fun ways...
+                    //phase shift for each field in shader...
 
-                //normalization pending refactor/design
-                //things to consider: in some circumstances normalise range across all fields
-                const [min, max] = minMax;
-                const range = max - min;
-                if (range === 0) return 0;
-                const value = fieldData[i];
-                if (value < min) return 0;
-                if (value > max) return 1;
-                const normalizedValue = (value - min) / range;
-                return normalizedValue;
-            },
-            // Stable color assignment based on field identifier, not index
-            colorRange: [getFieldColor(fieldId)],
-            //! this scale does not adapt well to the data, and it would be nice to have meaningful units...
-            radiusPixels: radiusPixels,
-            debounce: 1000,
-            weightsTextureSize: 128, //there could be a performance related parameter to tweak
-            pickable: false,
-            transitions: {
-                // nb - failed to get this working
-                // will need changes to the HeatmapContourExtension implementation
-                // (updateState vs draw, props vs state) but attempts thus far have been fruitless
-                // plan to implement that differently anyway.
-                // fillOpacity: 500,
-                // contourOpacity: 500
-                /// getWeight transition not working either
-                getWeight: {
-                    duration: 1000,
-                    // easing: t => t,
+                    //normalization pending refactor/design
+                    //things to consider: in some circumstances normalise range across all fields
+                    const [min, max] = minMax;
+                    const range = max - min;
+                    if (range === 0) return 0;
+                    const value = fieldData[i];
+                    if (value < min) return 0;
+                    if (value > max) return 1;
+                    const normalizedValue = (value - min) / range;
+                    return normalizedValue;
                 },
-            },
-            updateTriggers: {
-                getWeight: [fieldData],
-                // getFilterValue: [fieldData]
-            },
-            // not working?
-            // getFilterValue: (i: number) => fieldData[i] === 0,
-            // extensions: [new DataFilterExtension({filterSize: 1})]
-        };
+                transitions: {
+                    // nb - failed to get this working
+                    // will need changes to the HeatmapContourExtension implementation
+                    // (updateState vs draw, props vs state) but attempts thus far have been fruitless
+                    // plan to implement that differently anyway.
+                    // fillOpacity: 500,
+                    // contourOpacity: 500
+                    /// getWeight transition not working either
+                    getWeight: {
+                        duration: 1000,
+                        // easing: t => t,
+                    },
+                },
+                updateTriggers: {
+                    getWeight: [fieldData],
+                    // getFilterValue: [fieldData]
+                },
+                // not working?
+                // getFilterValue: (i: number) => fieldData[i] === 0,
+                // extensions: [new DataFilterExtension({filterSize: 1})]
+            };
         });
     }, [
         id,
@@ -537,7 +556,6 @@ export function useLegacyDualContour(hoveredFieldId?: FieldName | null): Contour
         () => [contour1, contour2, ...fieldContours].filter(v => v !== undefined),
         [contour1, contour2, fieldContours],
     );
-    //@ts-expect-error Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer'?
     return stableArray;
 }
 
