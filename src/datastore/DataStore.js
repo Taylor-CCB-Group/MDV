@@ -446,7 +446,7 @@ class DataStore {
             getValue: (index) => {
                 const col = this.columnIndex[column.field];
                 if (!col.data) {
-                    console.error(`Column ${c} has no data`);
+                    console.error(`Column ${column.field} has no data`);
                     return;
                 }
                 let v = col.data[index];
