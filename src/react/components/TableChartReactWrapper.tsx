@@ -20,19 +20,12 @@ export type TableChartReactConfig = BaseConfig & {
 
 // todo: Add required functions related to the features
 class TableChartReact extends BaseReactChart<TableChartReactConfig> {
-    // UI state property (not persisted in config)
-    // isFindReplaceOpen = false;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
+        super(dataStore, div, config, TableChartComponent);
+        
         if (!config.column_widths) config.column_widths = {};
         if (config.include_index === undefined || config.include_index === null) config.include_index = false;
-
-        super(dataStore, div, config, TableChartComponent);
-
-        // Make UI state observable
-        // makeObservable(this, {
-        //     isFindReplaceOpen: observable,
-        // });
 
         // Extending config to make config.sort observable
         // Doing this is required as it's initialized with undefined and doesn't work if initialized like other properties
@@ -41,20 +34,10 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         });
 
         // Add Download menu icon (like the legacy version)
-        this.addMenuIcon("fas fa-download", "Download data", {
-            func: () => {
-                console.log("Download Data");
-                // this.downloadData();
-            },
-        });
-
-        // Add Find & Replace menu icon
-        // this.addMenuIcon("fas fa-search", "Find & Replace", {
+        // this.addMenuIcon("fas fa-download", "Download data", {
         //     func: () => {
-        //         console.log("Find and Replace");
-        //         runInAction(() => {
-        //             this.isFindReplaceOpen = true;
-        //         });
+        //         console.log("Download Data");
+        //         // this.downloadData();
         //     },
         // });
     }

@@ -1,5 +1,5 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { replaceMatches, replaceValueInString } from "../utils/valueReplacementUtil";
 import type { SlickgridReactInstance } from "slickgrid-react";
 import type DataStore from "@/datastore/DataStore";
@@ -29,6 +29,17 @@ const useFindReplace = (
     const [foundMatches, setFoundMatches] = useState<FoundMatch[]>([]);
     const [matchCount, setMatchCount] = useState<number | null>(null);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
+    const selectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+
+    useEffect(() => {
+        return () => {
+            if (selectionTimeoutRef.current !== null) {
+                clearTimeout(selectionTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const disableFindPrev = useMemo(() => {
         return foundMatches.length === 0 || (foundMatches.length > 0 && currentMatchIndex <= 0);
@@ -71,25 +82,19 @@ const useFindReplace = (
 
                     const value = dataStore.getRowText(dataIndex, column.field);
 
-                    if (value) {
-                        //? Should this be case-insensitive and partial match?
-                        if (typeof value === "string" && value.toLowerCase().includes(findText.toLowerCase())) {
-                            matches.push({
-                                rowIndex: row,
-                                dataIndex,
-                                column: column.field,
-                                columnIndex: colIndex + (config.include_index ? 1 : 0),
-                                value,
-                            });
-                        } else if (typeof value === "number" && String(value).includes(findText)) {
-                            matches.push({
-                                rowIndex: row,
-                                dataIndex,
-                                column: column.field,
-                                columnIndex: colIndex + (config.include_index ? 1 : 0),
-                                value,
-                            });
-                        }
+                    if (value === null) continue;
+
+                    const displayedValue = String(value);
+                    const lowerDisplayedValue = displayedValue.toLowerCase();
+                    
+                    if (lowerDisplayedValue.includes(findText.toLowerCase())) {
+                        matches.push({
+                            rowIndex: row,
+                            dataIndex,
+                            column: column.field,
+                            columnIndex: colIndex + (config.include_index ? 1 : 0),
+                            value: displayedValue,
+                        });
                     }
                 }
 
@@ -106,9 +111,16 @@ const useFindReplace = (
                         isSelectingRef.current = true;
 
                         grid.gotoCell(match.rowIndex, match.columnIndex, false);
+
+                        // Clear any existing timeout before scheduling a new one
+                        if (selectionTimeoutRef.current !== null) {
+                            clearTimeout(selectionTimeoutRef.current);
+                        }
+
                         // Reset flag after delay
-                        setTimeout(() => {
+                        selectionTimeoutRef.current = setTimeout(() => {
                             isSelectingRef.current = false;
+                            selectionTimeoutRef.current = null;
                         }, 100);
                     }
                 } else {
@@ -159,9 +171,15 @@ const useFindReplace = (
 
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
 
+            // Clear any existing timeout before scheduling a new one
+            if (selectionTimeoutRef.current !== null) {
+                clearTimeout(selectionTimeoutRef.current);
+            }
+
             // Reset flag after delay
-            setTimeout(() => {
+            selectionTimeoutRef.current = setTimeout(() => {
                 isSelectingRef.current = false;
+                selectionTimeoutRef.current = null;
             }, 100);
         }
 
@@ -185,9 +203,15 @@ const useFindReplace = (
 
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
 
+            // Clear any existing timeout before scheduling a new one
+            if (selectionTimeoutRef.current !== null) {
+                clearTimeout(selectionTimeoutRef.current);
+            }
+
             // Reset flag after delay
-            setTimeout(() => {
+            selectionTimeoutRef.current = setTimeout(() => {
                 isSelectingRef.current = false;
+                selectionTimeoutRef.current = null;
             }, 100);
         }
 
