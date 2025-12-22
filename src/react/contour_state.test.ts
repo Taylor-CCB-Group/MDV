@@ -225,6 +225,7 @@ describe('getDensitySettings disposer management', () => {
             category1: [],
             category2: [],
             param: ['x', 'y', 'test-field'],
+            field_legend: { display: true },
         } as any;
         
         const spec = getDensitySettings(mockConfig, mockChart);
@@ -259,6 +260,7 @@ describe('getDensitySettings disposer management', () => {
             category1: [],
             category2: [],
             param: ['x', 'y', 'test-field'],
+            field_legend: { display: true },
         } as any;
         
         const spec = getDensitySettings(mockConfig, mockChart);
