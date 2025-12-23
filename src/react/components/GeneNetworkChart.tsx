@@ -24,7 +24,7 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
     }
     getSettings() {
         const c = this.config;
-        if (!isArray(this.config.param)) throw "expected param array";
+        if (!isArray(this.config.param)) throw new Error("expected param array");
         return [
             ...super.getSettings(),
             // g({
