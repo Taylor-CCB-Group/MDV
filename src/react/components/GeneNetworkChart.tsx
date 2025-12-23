@@ -69,6 +69,3 @@ BaseChart.types["geneNetwork"] = {
         },
     ]
 };
-
-export default 42;
-
