@@ -27,22 +27,22 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
         if (!isArray(this.config.param)) throw "expected param array";
         return [
             ...super.getSettings(),
-            g({
-                type: "dropdown",
-                label: "Display Mode",
-                current_value: c.mode || "filtered",
-                values: [
-                    [
-                        { name: "Filtered (with highlights)", value: "filtered" },
-                        { name: "ObservableFields-like", value: "observableFields" },
-                    ],
-                    "name",
-                    "value",
-                ],
-                func: (v) => {
-                    c.mode = v as "filtered" | "observableFields";
-                },
-            }),
+            // g({
+            //     type: "dropdown",
+            //     label: "Display Mode",
+            //     current_value: c.mode || "filtered",
+            //     values: [
+            //         [
+            //             { name: "Filtered (with highlights)", value: "filtered" },
+            //             { name: "ObservableFields-like", value: "observableFields" },
+            //         ],
+            //         "name",
+            //         "value",
+            //     ],
+            //     func: (v) => {
+            //         c.mode = v as "filtered" | "observableFields";
+            //     },
+            // }),
             g({
                 type: "spinner",
                 label: "Max genes to show",

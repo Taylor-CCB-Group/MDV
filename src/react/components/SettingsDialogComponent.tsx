@@ -92,6 +92,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
     <>
         <MLabel props={props} />
         <input
+            className="p-1"
             type="number"
             value={props.current_value}
             min={props.min || 0}
