@@ -7,8 +7,7 @@ import "./components/HighlightedFeatureChart";
 import "./components/GeneNetworkChart";
 import "./components/SelectionDialogReact";
 import "../charts/dialogs/AddColumnsFromRowsDialogReact";
-import tSideEffect from "../react/components/TableChartReactWrapper";
-arr.push(tSideEffect);
+import "../react/components/TableChartReactWrapper";
 
 /**
  * Charts are registered with ChartManager by being added to a BaseChart.types object,
