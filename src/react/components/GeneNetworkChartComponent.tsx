@@ -24,22 +24,13 @@ function getTextValue(column: any, index: number): string {
 
 export const GeneNetworkChartComponent = observer(() => {
     const chart = useChart<GeneNetworkConfig>();
-    const columns = useParamColumns();
+    const [column] = useParamColumns();
     const highlightedIndices = useHighlightedIndices();
     const filteredIndices = useSimplerFilteredIndices();
     const highlightRows = useHighlightRows();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const geneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
-
-    if (columns.length === 0) {
-        return <div>No column selected. Please configure the chart.</div>;
-    }
-
-    const column = columns[0];
-    if (!isColumnLoaded(column)) {
-        return <div>Loading column data...</div>;
-    }
 
     const mode = chart.config.mode || "filtered";
     const maxGenes = chart.config.maxGenes ?? 100;
