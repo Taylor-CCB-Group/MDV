@@ -271,7 +271,7 @@ export const replaceMatches = (
     try {
         currentValue = getCurrentCellValue(column, dataIndex);
     } catch (error) {
-        console.error("Could not get current cell value:", error);
+        console.error(`Failed to get current cell value in column "${searchColumn}": ${error instanceof Error ? error.message : String(error)}`);
         throw new Error(
             `Failed to get current cell value in column "${searchColumn}": ${error instanceof Error ? error.message : String(error)}`,
         );
