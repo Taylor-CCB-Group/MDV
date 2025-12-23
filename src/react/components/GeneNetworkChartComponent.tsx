@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useLayoutEffect, useState, type MouseEvent, type KeyboardEvent } from "react";
+import { useMemo, useRef, useLayoutEffect, useState, type MouseEvent, type KeyboardEvent } from "react";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import { useParamColumns } from "../hooks";
