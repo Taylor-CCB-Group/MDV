@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Paper, Typography, Link } from "@mui/material";
 import z from "zod";
 
 // Zod schema for GeneNetwork API response
@@ -130,57 +131,66 @@ export function GeneNetworkInfoComponent({ geneId }: GeneNetworkInfoComponentPro
             };
         },
         enabled: isVisible && !!geneId,
-        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        // staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     });
 
     return (
-        <div
+        <Paper
             ref={containerRef}
-            style={{
-                margin: "0.5em 0",
-                padding: "0.5em",
-                border: "1px solid #ccc",
-                borderRadius: "0.5em",
-                minHeight: "100px",
+            variant="outlined"
+            sx={{
+                my: 1,
+                p: 1.5,
+                borderRadius: 1,
+                minHeight: 100,
             }}
         >
-            {!isVisible && <div>Scroll to load gene info...</div>}
+            {!isVisible && (
+                <Typography variant="body2" color="text.secondary">
+                    Scroll to load gene info...
+                </Typography>
+            )}
             {isVisible && isLoading && (
-                <div>Loading gene info for {geneId}...</div>
+                <Typography variant="body2">
+                    Loading gene info for {geneId}...
+                </Typography>
             )}
             {isVisible && error && (
-                <div style={{ color: "red" }}>
+                <Typography variant="body2" color="error">
                     Error fetching gene info:{" "}
                     {error instanceof Error ? error.message : "Unknown error"}
-                </div>
+                </Typography>
             )}
             {isVisible && geneInfo && (
                 <>
-                    <h4>Gene Information for {geneInfo.geneName}</h4>
-                    <p>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                        Gene Information for {geneInfo.geneName}
+                    </Typography>
+                    <Typography variant="body2">
                         <strong>Gene ID:</strong> {geneInfo.geneId}
-                    </p>
-                    <p>
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
                         <strong>Description:</strong> {geneInfo.geneDescription}
-                    </p>
-                    {geneInfo.geneProperties?.alias && geneInfo.geneProperties.alias.length > 0 && (
-                        <p>
-                            <strong>Aliases:</strong>{" "}
-                            {geneInfo.geneProperties.alias.join(", ")}
-                        </p>
-                    )}
-                    <p>
-                        <a
+                    </Typography>
+                    {geneInfo.geneProperties?.alias &&
+                        geneInfo.geneProperties.alias.length > 0 && (
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                <strong>Aliases:</strong>{" "}
+                                {geneInfo.geneProperties.alias.join(", ")}
+                            </Typography>
+                        )}
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                        <Link
                             href={`https://www.genenetwork.nl/gene/${geneInfo.geneId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                         >
                             More info on GeneNetwork
-                        </a>
-                    </p>
+                        </Link>
+                    </Typography>
                 </>
             )}
-        </div>
+        </Paper>
     );
 }
 

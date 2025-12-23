@@ -63,7 +63,7 @@ function VirtualizedGeneList({
     return (
         <div
             ref={containerRef}
-            className="h-full overflow-y-auto border border-gray-300 rounded-lg"
+            className="h-full overflow-y-auto"
             onScroll={handleScroll}
         >
             <div style={{ height: `${totalHeight}px`, position: "relative" }}>
@@ -140,17 +140,11 @@ export const GeneNetworkChartComponent = observer(() => {
     }, [displayMode, highlightedIndex, filteredIndices, column]);
 
     return (
-        <div className="p-3 absolute w-[100%] h-[100%] overflow-y-auto text-sm h-full flex flex-col">
+        <div className="absolute w-[100%] h-[100%] overflow-y-auto text-sm h-full flex flex-col">
             {displayMode === "highlighted" ? (
                 <>
                     {highlightedIndex >= 0 ? (
                         <>
-                            <p>
-                                <em>
-                                    Showing gene info for highlighted row (index:{" "}
-                                    {highlightedIndex})
-                                </em>
-                            </p>
                             {geneIds.length > 0 ? (
                                 <GeneNetworkInfoComponent geneId={geneIds[0]} />
                             ) : (
@@ -163,12 +157,6 @@ export const GeneNetworkChartComponent = observer(() => {
                 </>
             ) : (
                 <>
-                    <p>
-                        <em>
-                            Showing gene info for {geneIds.length} unique gene(s) in
-                            filtered data ({filteredIndices.length} total filtered rows)
-                        </em>
-                    </p>
                     {geneIds.length > 0 ? (
                         <div className="flex-1 min-h-0">
                             <VirtualizedGeneList geneIds={geneIds} />
