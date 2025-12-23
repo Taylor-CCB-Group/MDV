@@ -94,7 +94,8 @@ class ViolinPlot extends WGLChart {
     // }
 
     // @loadColumnData
-    setValueField(field) {        
+    setValueField(field) {
+        // there exists the possibility of reaching here without proper column.minMax metadata?
         //this.config.param[1] = field; //NO - don't call us, we'll call you
         if (!field) {
             console.warn("No field provided for setValueField");

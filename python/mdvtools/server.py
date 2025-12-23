@@ -28,6 +28,19 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 import threading
+# Configure Numba caching before importing libraries that depend on it (e.g. scanpy)
+# In some deployment environments (zip/venv layers), Numba cannot locate source files for caching
+# which raises: "cannot cache function: no locator available". Disabling caching or providing a
+# writable cache directory avoids this during import time.
+_numba_cache_dir = os.environ.get("NUMBA_CACHE_DIR", "/tmp/numba_cache")
+try:
+    os.makedirs(_numba_cache_dir, exist_ok=True)
+except Exception:
+    # Best-effort only; if this fails, we still disable caching below
+    pass
+os.environ.setdefault("NUMBA_CACHE_DIR", _numba_cache_dir)
+os.environ.setdefault("NUMBA_DISABLE_CACHING", "1")
+
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.socketio_upload import initialize_socketio_upload, register_project_for_upload
@@ -119,6 +132,14 @@ def create_app(
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
         return render_template("page.html", route=route, backend=options.backend_db)
 
+    @project_bp.route("/spatial/<path:file>")
+    def get_spatialdata(file):
+        path = safe_join(project.dir, "spatial", file)
+        if path is None or not os.path.exists(path):
+            return "File not found", 404
+        # consider allowing directory listing here if it's not a file?
+        return send_file(path)
+    
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
@@ -139,6 +160,10 @@ def create_app(
     def get_json_file(file: str):
         if project.dir is None:
             return "Project directory not found", 404
+        # nb - matching on strings ending in json... where the spatial.conversion script named '.geojson',
+        # they were being changed here to '.ge.json' (dot in route is wildcard) and then getting a 404.
+        # also note - flask route vs our project_router behaved differently, so bug didn't appear in single project mode.
+        # Same logic could apply to .b & .gz above, but not wanting to risk changing behaviour without more testing.
         path = safe_join(project.dir, file + ".json")
         # log(f"get_json_file: '{path}' for project {project.id}")
 
@@ -183,9 +208,22 @@ def create_app(
     @project_bp.route("/images/<path:path>")
     def images(path):
         try:
-            return send_file(project.get_image(path))
+            file_path = project.get_image(path)
         except Exception:
-            return send_file(safe_join(project.imagefolder, path))
+            file_path = safe_join(project.imagefolder, path)
+
+        range_header = request.headers.get("Range", None)
+        if range_header:
+            response = get_range(file_path, range_header)
+        else:
+            response = send_file(file_path)
+
+        # Add long-lived cache headers for static images
+        try:
+            response.headers["Cache-Control"] = "public, max-age=31536000"
+        except Exception:
+            pass
+        return response
 
     # All the project's metadata
     @project_bp.route("/get_configs", methods=["GET", "POST"])

@@ -399,7 +399,7 @@ class ProjectChat(ProjectChatProtocol):
                 csv_file = None
                 h5ad_file = None
 
-                # Identify the CSV or H5AD file
+                # Identify the CSV or H5AD file (optional)
                 # subject to review...
                 for file in files_in_dir:
                     if file.endswith(".csv"):
@@ -407,13 +407,13 @@ class ProjectChat(ProjectChatProtocol):
                     elif file.endswith(".h5ad"):
                         h5ad_file = file
 
-                # Determine the path_to_data
-                if csv_file:
-                    path_to_data = os.path.join(self.project.dir, csv_file)
-                elif h5ad_file:
+                # Determine the path_to_data (optional)
+                if h5ad_file:
                     path_to_data = os.path.join(self.project.dir, h5ad_file)
+                elif csv_file:
+                    path_to_data = os.path.join(self.project.dir, csv_file)
                 else:
-                    raise FileNotFoundError("No CSV or H5AD file found in the directory.")
+                    path_to_data = ""  # fallback: no external file; operate on existing project datasources
 
                 datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
 

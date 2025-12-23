@@ -4,10 +4,14 @@ import {
     DetailView,
 } from "@vivjs-experimental/viv";
 import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
+import FieldContourLegend from "./FieldContourLegend";
+import { useFieldContourLegend } from "../contour_state";
+import type { DualContourLegacyConfig } from "../contour_state";
+import type { FieldName } from "@/charts/charts";
 import {
     useLoader,
     type OME_TIFF,
@@ -32,17 +36,22 @@ export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move
 /** somewhat comparable to avivator `<Viewer />` */
 export const VivScatter = () => {
     const chart = useChart();
+    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    
     return (
-        <SpatialAnnotationProvider chart={chart}>
-            <Main />
+        <SpatialAnnotationProvider 
+            chart={chart}
+            hoveredFieldId={hoveredField}
+            setHoveredFieldId={setHoveredField}
+        >
+            <Main hoveredField={hoveredField} setHoveredField={setHoveredField} />
         </SpatialAnnotationProvider>
     );
 };
 
-const useJsonLayer = () => {
+const useJsonLayer = (showJson: boolean) => {
     const id = useChartID();
     const { root } = useProject();
-    const { showJson } = useConfig<VivRoiConfig>();
     const { json } = useRegion(); // return type is 'any' and we assume 'json' will be a string - but want that to be different in future.
     const layer_id = `json_${getVivId(`${id}detail-react`)}`;
     const layer = useMemo(() => {
@@ -50,12 +59,13 @@ const useJsonLayer = () => {
             ? new GeoJsonLayer({
                   id: layer_id,
                   data: `${root}/${json}`,
-                  opacity: 0.25,
+                  opacity: 1,
                   filled: true,
                   getFillColor: (f) => [255, 255, 255, 150],
-                  getLineColor: (f) => [f.properties.DN, 255, 255, 150],
+                  getLineColor: (f) => [255, 255, 255, 150],
                   getLineWidth: 2,
                   lineWidthMinPixels: 1,
+                  getPointRadius: 10,
                   pickable: true,
                   autoHighlight: true,
                   //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
@@ -70,7 +80,13 @@ const useJsonLayer = () => {
     return layer;
 };
 
-const Main = observer(() => {
+const Main = observer(({ 
+    hoveredField, 
+    setHoveredField 
+}: { 
+    hoveredField: FieldName | null;
+    setHoveredField: (fieldId: FieldName | null) => void;
+}) => {
     // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
     const ome = useLoader() as OME_TIFF["data"]; // useOmeTiff();
 
@@ -83,7 +99,23 @@ const Main = observer(() => {
     // this isn't updating when we tweak the config...
     const { scatterProps, selectionLayer } = useSpatialLayers();
     const { scatterplotLayer, getTooltip } = scatterProps;
-    const jsonLayer = useJsonLayer();
+    const { showJson } = useConfig<VivRoiConfig>();
+    // passing showJson from here to make use of this being `observer`
+    const jsonLayer = useJsonLayer(showJson);
+    
+    // Get field contour legend data
+    const config = useConfig<DualContourLegacyConfig>();
+    const legendFields = useFieldContourLegend(config.densityFields);
+    
+    // Legend visibility - fixed position in bottom-left
+    const showLegend = config.field_legend.display;
+    
+    // Fixed bottom-left position: 10px from left, 10px from bottom
+    const legendPosition = { x: 10, y: 10 };
+    
+    const handleFieldHover = (fieldId: FieldName | null) => {
+        setHoveredField(fieldId);
+    };
 
     // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
     const {
@@ -181,13 +213,20 @@ const Main = observer(() => {
             //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
             layers: [jsonLayer, scatterplotLayer, selectionLayer],
             id: `${id}deck`,
-            glOptions: {
-                // no longer working with new deck.gl version?
-                preserveDrawingBuffer: true,
-            },
+            // deviceProps: {
+            //     webgl: {                    
+            //         depth: true,
+            //         preserveDrawingBuffer: true,
+            //         antialias: true,
+            //     },
+            // },
             controller: {
                 doubleClickZoom: false,
-            }
+            },
+            // deviceProps: {
+            //     // todo - get this working more usefully.
+            //     debugSpectorJS: true,
+            // }
         }),
         [
             scatterplotLayer,
@@ -198,10 +237,17 @@ const Main = observer(() => {
         ],
     );
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
-    if (import.meta.env.DEV) trace();
+    // if (import.meta.env.DEV) trace();
     return (
         <>
             <SelectionOverlay />
+            {showLegend && legendFields.length > 0 && (
+                <FieldContourLegend 
+                    fields={legendFields} 
+                    position={legendPosition}
+                    onFieldHover={handleFieldHover}
+                />
+            )}
             <MDVivViewer
                 outerContainer={outerContainer}
                 selectionLayer={selectionLayer}

@@ -348,7 +348,18 @@ export const useLoader = () => {
     return Array.isArray(fullLoader[0]) ? fullLoader[image] : fullLoader;
 };
 //! todo review the typing here...
-export type Metadata = OME_TIFF['metadata'];// | OME_ZARR['metadata'] | BIO_ZARR['metadata'];
+type OME_METADATA = OME_ZARR['metadata'] & {
+    // in practice, we seem to get something that looks like this...
+    // at least, that was true for the first sample I looked at...
+    // and at least that allows us to remove some ts-expect-error
+    Pixels: {
+        Channels: Array<{Name: string, SamplesPerPixel: number, Color?: any}>,
+        //! I don't think we actually do see these on OME-ZARR
+        PhysicalSizeX?: number;
+        PhysicalSizeXUnit?: string;
+    }
+}
+export type Metadata = OME_TIFF['metadata'] | OME_METADATA | BIO_ZARR['metadata'];
 //export type Metadata = TiffPreviewProps["metadata"];
 export const useMetadata = (): Metadata | undefined | null => {
     try {

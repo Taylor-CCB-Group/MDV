@@ -80,6 +80,7 @@ class MDVProject:
         self.datasourcesfile = join(dir, "datasources.json")
         self.statefile = join(dir, "state.json")
         self.viewsfile = join(dir, "views.json")
+        self.readmefile = join(dir, 'README.md')
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
         if not exists(dir):
@@ -106,6 +107,14 @@ class MDVProject:
     @datasources.setter
     def datasources(self, value):
         save_json(self.datasourcesfile, value, self.safe_file_save)
+    
+    @property
+    def readme(self):
+        if not exists(self.readmefile): 
+            return None
+        with open(self.readmefile, 'r') as f:
+            markdown_string = f.read()
+        return markdown_string
 
     @property
     def views(self):
@@ -124,7 +133,7 @@ class MDVProject:
     def state(self, value):
         save_json(self.statefile, value ,self.safe_file_save)
 
-    def set_editable(self, edit):
+    def set_editable(self, edit=True):
         c = self.state
         c["permission"] = "edit" if edit else "view"
         self.state = c
@@ -294,6 +303,7 @@ class MDVProject:
     def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file):
         """Add or update an image datasource in datasources.json
         returns the name of the added view so the user can navigate to it"""
+        # todo consider moving this elsewhere & generally review the methods for adding spatial data
         # Load current datasources
         datasources = self.datasources
         # Check if the datasource exists
@@ -941,7 +951,7 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | pandas.Series | str,
+        dataframe: pandas.DataFrame | str, # could we add xarray here - we pass things from anndata which may not be DataFrame.
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
@@ -1441,13 +1451,6 @@ class MDVProject:
             # `options` was not provided, create it from kwargs.
             options = MDVServerOptions(**kwargs)
         
-        if options.websocket:
-            # I swear I'm going to clean up this logic soon...
-            from mdvtools.llm.chat_server_extension import chat_extension
-            if chat_extension not in options.extensions:
-                options.extensions.append(chat_extension)
-
-
         create_app(self, options=options)
         
 
@@ -1460,6 +1463,7 @@ class MDVProject:
             "datasources": self.datasources,
             "state": self.state,
         }
+        
         # legacy
         hyperion_conf = join(self.dir, "hyperion_config.json")
         if os.path.exists(hyperion_conf):

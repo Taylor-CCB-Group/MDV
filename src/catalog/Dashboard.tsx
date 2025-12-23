@@ -1,15 +1,11 @@
 import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
-    Cloud,
-    CloudUpload,
     Download as DownloadIcon,
     ExpandMore,
-    Folder,
     GridView,
     Reorder as ReorderIcon,
     Search,
-    Upload,
 } from "@mui/icons-material";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
@@ -33,7 +29,7 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
 import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
@@ -47,11 +43,16 @@ import {
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
+import usePermissions from "./PermissionsContext";
+import useAuthEnabled from "./hooks/useAuthEnabled";
+import { RefreshCwIcon } from "lucide-react";
 
+// todo: Refactor the code into different components and hooks for cleaner and readable code
+// Maybe use a design pattern? As displaying certain components depend on some states
 const Dashboard: React.FC = () => {
     const {
         projects,
-        isLoading,
+        isLoading: projectsLoading,
         error,
         isErrorModalOpen,
         closeErrorModal,
@@ -62,8 +63,12 @@ const Dashboard: React.FC = () => {
         changeProjectType,
         setFilter,
         exportProject,
+        rescanProjects,
     } = useProjects();
+    const { permissions, isLoading: permissionsLoading, isPublicPage } = usePermissions();
 
+    // Check if auth is enabled
+    const authEnabled = useAuthEnabled();
     const { mode, toggleColorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [sortBy, setSortBy] = useState<SortBy>("lastModified");
@@ -72,9 +77,18 @@ const Dashboard: React.FC = () => {
     const [open, setOpen] = useState(false);
     const theme = useTheme();
 
+    const isLoading = projectsLoading || permissionsLoading;
+
     React.useEffect(() => {
         fetchProjects();
     }, [fetchProjects]);
+
+    useEffect(() => {
+        if (!permissionsLoading && isPublicPage) {
+            setSortBy("name");
+            setSortOrder("asc");
+        }
+    }, [isPublicPage, permissionsLoading]);
 
     const handleCreateProject = async () => {
         try {
@@ -110,6 +124,12 @@ const Dashboard: React.FC = () => {
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
     };
+
+    const onRescanClick = useCallback(
+        async () => {
+            await rescanProjects();
+        }, [rescanProjects]
+    );
 
     return (
         <>
@@ -156,7 +176,7 @@ const Dashboard: React.FC = () => {
                                 <Search />
                             </IconButton>
                         </Paper>
-                        <UserProfile />
+                        {authEnabled && <UserProfile />}
                         <IconButton
                             sx={{ ml: 1 }}
                             onClick={toggleColorMode}
@@ -174,66 +194,70 @@ const Dashboard: React.FC = () => {
 
                 <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
                     <Grid container spacing={3} sx={{ mb: 4 }}>
-                        <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
-                            <ButtonBase
-                                sx={{
-                                    width: "100%",
-                                    display: "block",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <Paper
+                        {permissions.createProject && (
+                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                                <ButtonBase
                                     sx={{
-                                        p: 2,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
+                                        width: "100%",
+                                        display: "block",
+                                        textAlign: "center",
                                     }}
-                                    onClick={() => handleCreateProject()}
                                 >
-                                    <Add
+                                    <Paper
                                         sx={{
-                                            fontSize: 40,
-                                            color: "primary.main",
-                                            mb: 1,
+                                            p: 2,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
                                         }}
-                                    />
-                                    <Typography variant="subtitle1" align="center">
-                                        Create new project
-                                    </Typography>
-                                </Paper>
-                            </ButtonBase>
-                        </Grid>
-                        <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
-                            <ButtonBase
-                                sx={{
-                                    width: "100%",
-                                    display: "block",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <Paper
+                                        onClick={() => handleCreateProject()}
+                                    >
+                                        <Add
+                                            sx={{
+                                                fontSize: 40,
+                                                color: "primary.main",
+                                                mb: 1,
+                                            }}
+                                        />
+                                        <Typography variant="subtitle1" align="center">
+                                            Create new project
+                                        </Typography>
+                                    </Paper>
+                                </ButtonBase>
+                            </Grid>
+                        )}
+                        {permissions.importProject && (
+                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                                <ButtonBase
                                     sx={{
-                                        p: 2,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
+                                        width: "100%",
+                                        display: "block",
+                                        textAlign: "center",
                                     }}
-                                    onClick={() => setOpen(true)}
                                 >
-                                    <DownloadIcon
+                                    <Paper
                                         sx={{
-                                            fontSize: 40,
-                                            color: "primary.main",
-                                            mb: 1,
+                                            p: 2,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
                                         }}
-                                    />
-                                    <Typography variant="subtitle1" align="center" sx={{}}>
-                                        Import an existing project
-                                    </Typography>
-                                </Paper>
-                            </ButtonBase>
-                        </Grid>
+                                        onClick={() => setOpen(true)}
+                                    >
+                                        <DownloadIcon
+                                            sx={{
+                                                fontSize: 40,
+                                                color: "primary.main",
+                                                mb: 1,
+                                            }}
+                                        />
+                                        <Typography variant="subtitle1" align="center" sx={{}}>
+                                            Import an existing project
+                                        </Typography>
+                                    </Paper>
+                                </ButtonBase>
+                            </Grid>
+                        )}
                     </Grid>
 
                     <Box
@@ -244,12 +268,46 @@ const Dashboard: React.FC = () => {
                             mb: 1,
                         }}
                     >
-                        <Typography variant="h5">Recent Projects</Typography>
+                        <Typography variant="h5">{authEnabled ? "Recent Projects" : "Published Projects"}</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
+                            {/* Hide rescan projects on public page */}
+                            {!isPublicPage && (
+                                <Paper
+                                    elevation={1}
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        borderRadius: "4px",
+                                        bgcolor: "background.paper",
+                                        marginRight: 2,
+                                        height: "50px",
+                                    }}
+                                >
+                                    <Button
+                                        sx={{
+                                            padding: 1,
+                                            display: "flex",
+                                            justifyContent: "space-around",
+                                            height: "100%",
+                                            width: "100%"
+                                        }}
+                                        onClick={onRescanClick}
+                                    >
+                                        <RefreshCwIcon />
+                                        <Typography 
+                                            sx={{
+                                                marginLeft: 1
+                                            }}
+                                        >
+                                            Rescan Projects
+                                        </Typography>
+                                    </Button>
+                                </Paper>
+                            )}
                             <Paper
                                 elevation={1}
                                 sx={{
-                                    padding: "8px",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -263,6 +321,7 @@ const Dashboard: React.FC = () => {
                                     endIcon={<ExpandMore />}
                                     onClick={toggleDropdown}
                                     sx={{
+                                        padding: 1,
                                         textTransform: "none",
                                         width: "100%",
                                         height: "100%",
@@ -277,10 +336,15 @@ const Dashboard: React.FC = () => {
                                             alignItems: "center",
                                         }}
                                     >
+                                        {/* Hide last modified on public page */}
                                         Sort by:{" "}
-                                        {sortBy === "lastModified"
-                                            ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
-                                            : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`}
+                                        {!isPublicPage ? 
+                                            sortBy === "lastModified"
+                                                ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
+                                                : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
+                                            :
+                                            `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
+                                        }
                                     </Box>
                                 </Button>
                             </Paper>
@@ -311,24 +375,27 @@ const Dashboard: React.FC = () => {
                             open={Boolean(anchorEl)}
                             onClose={() => setAnchorEl(null)}
                         >
-                            <MenuItem
-                                onClick={() => handleSort("lastModified")}
-                                sx={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    width: "200px",
-                                    gap: 1,
-                                }}
-                            >
-                                <span>Last modified</span>
-                                {sortBy === "lastModified" && (
-                                    <span>
-                                        {sortOrder === "desc"
-                                            ? "Newest first"
-                                            : "Oldest first"}
-                                    </span>
-                                )}
-                            </MenuItem>
+                            {!isPublicPage && 
+                                (<MenuItem
+                                    onClick={() => handleSort("lastModified")}
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        width: "200px",
+                                        gap: 1,
+                                    }}
+                                >
+                                    <span>Last modified</span>
+                                    {sortBy === "lastModified" && (
+                                        <span>
+                                            {sortOrder === "desc"
+                                                ? "(Oldest first)"
+                                                : "(Newest first)"
+                                            }
+                                        </span>
+                                    )}
+                                </MenuItem>)
+                            }
                             <MenuItem
                                 onClick={() => handleSort("name")}
                                 sx={{
@@ -341,7 +408,7 @@ const Dashboard: React.FC = () => {
                                 <span>Name</span>
                                 {sortBy === "name" && (
                                     <span>
-                                        {sortOrder === "desc" ? "Z to A" : "A to Z"}
+                                        {sortOrder === "desc" ? "A to Z" : "Z to A"}
                                     </span>
                                 )}
                             </MenuItem>
@@ -395,12 +462,15 @@ const Dashboard: React.FC = () => {
                         }
                     />
                 )}
-                {open && (
+                {open && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
                 )}
             </Box>
-            {isLoading && (    
-                <Backdrop open={isLoading} sx={{zIndex: theme.zIndex.modal + 1}}>
+            {isLoading && (
+                <Backdrop
+                    open={isLoading}
+                    sx={{ zIndex: theme.zIndex.modal + 1 }}
+                >
                     <CircularProgress color="inherit" />
                 </Backdrop>
             )}

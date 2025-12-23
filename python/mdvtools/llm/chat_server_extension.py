@@ -169,5 +169,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         was_enabled = state_json.get("chat_enabled", not auth_enabled)
         state_json["chat_enabled"] = chat_enabled and was_enabled
         
-
-chat_extension = MDVProjectChatServerExtension()
+    def get_session_config(self):
+        return {
+            "chat_enabled": chat_enabled
+        }

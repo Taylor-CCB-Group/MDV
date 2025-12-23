@@ -35,13 +35,8 @@ export const useViewStateLink = () => {
         const unsubscribe = viewerStore.subscribe(({ viewState }) => {
             thisChart.ignoreStateUpdate = true; //<< add a setting for this, make sure we get the logic right
             const originalZoom = viewState.zoom as number;
-            const ourPhysicalSize = metadata?.Pixels.PhysicalSizeX;
-            if (!ourPhysicalSize) {
-                //! todo - allow this link to work without physical size/viv context.
-                console.warn("no physical size in metadata, unexpected metadata format, or used outside viv context?");
-                return;
-            }
-            const ourUnits = metadata.Pixels.PhysicalSizeXUnit;
+            const ourPhysicalSize = metadata?.Pixels.PhysicalSizeX ?? 1;
+            const ourUnits = metadata?.Pixels.PhysicalSizeXUnit ?? undefined;
             // should we consider viewerStore.useLinkedView?
             // best to be clear about what is and isn't similar to Avivator.
             vsLinks.forEach((link: ViewStateLink) => {
@@ -57,10 +52,8 @@ export const useViewStateLink = () => {
                     // might entail some extra garbage collection, making a new object each time. So it goes I guess.
                     const otherMeta =
                         c.vivStores?.viewerStore.getState().metadata;
-                    if (!otherMeta) return;
-                    const otherPhysicalSize = otherMeta.Pixels.PhysicalSizeX;
-                    if (!otherPhysicalSize) return;
-                    const otherUnits = otherMeta.Pixels.PhysicalSizeXUnit;
+                    const otherPhysicalSize = otherMeta?.Pixels.PhysicalSizeX ?? 1;
+                    const otherUnits = otherMeta?.Pixels.PhysicalSizeXUnit ?? undefined;
                     if (otherUnits !== ourUnits)
                         throw "physical size units do not match"; //we could probably convert if this is a common case
                     const zoomRatio = ourPhysicalSize / otherPhysicalSize;

@@ -7,6 +7,12 @@
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+
+/**
+ * A cleanup function that can be called to dispose of resources.
+ * Used for managing lifecycle of reactive subscriptions, autoruns, etc.
+ */
+export type Disposer = () => void;
 // import type { DataType } from "../datatypes";
 /**
  * The are the names used to refer to the types of data can be stored in a column.
@@ -145,6 +151,16 @@ export type DataSourceLinks = Record<
 >;
 
 /**
+ * This is a very provisional type for a way of specifying a zarr store that can be used to load data.
+ * 
+ * I would prefer the definition for this to be in a schema, will need to get back to this later.
+ */
+export type ExperimentalZarrStore = {
+    path: string,
+    type: "xe_cells" | "xe_transcripts" | "xe_analysis"
+}
+
+/**
  * nb - there should be a type for the entries in `datasources.json`...
  * *but this is not that type!* even though it is being used in places where that type is expected.
  * There is some confusion here about the internal representation in `ChartManager` of a panel with
@@ -153,7 +169,7 @@ export type DataSourceLinks = Record<
  */
 export type DataSource = {
     name: DataSourceName;
-    charts: Chart[];
+    charts: Chart[]; //what's this? probably an artifact of me not understanding when I first wrote this...
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
@@ -162,7 +178,8 @@ export type DataSource = {
     links?: DataSourceLinks;
     size: number;
     columns: DataColumn<DataType>[];
-};
+};// | ExperimentalZarrStore; ? something something spatialdata.js ...
+// maybe that the
 
 type DropdownMappedValue<T extends string, V extends string> = {
     [P in T]: string;
@@ -276,6 +293,10 @@ export type GuiSpec<T extends GuiSpecType> = {
      * or other form like `"_multi_column:number" | "number"`.
      */
     columnType?: T extends ("column" | "multicolumn") ? CTypes : never;
+    /** Optional array of disposers that should be cleaned up when the settings dialog closes.
+     * This allows settings specs to register autoruns or other reactive disposables that are tied
+     * to the dialog's lifetime rather than the chart's lifetime. */
+    _disposers?: Disposer[];
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
 /**

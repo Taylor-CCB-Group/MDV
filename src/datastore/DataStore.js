@@ -20,7 +20,7 @@ class DataStore {
     /**
      * Creates a data store object based on the given configuration. Does not
      * initially load any data, but will hold references to column data once loaded.
-     * 
+     *
      * [Data Source](../../docs/extradocs/datasource.md)
      * @typedef {import("@/charts/charts").DataSource} DataSource
      * @param {number} size - the number of rows(items) of the data structure
@@ -33,7 +33,7 @@ class DataStore {
      * links with other DataStore
      * @param {Object} [config.images] - an object describing thumbnails which
      * are associated with each item/row in the DataStore
-     * @param {Object} [config.large_iamges] - an object describing large images which
+     * @param {Object} [config.large_images] - an object describing large images which
      * are associated with each item/row in the DataStore
      * @param {Object} [config.offsets] - an object specifying which columns can
      * have values that can be transformed and rotated and any transformations/
@@ -443,43 +443,52 @@ class DataStore {
         /** @type {Column} */
         const c = {
             ...column, //may be useful to get any other properties we didn't explicitly copy before.
-            getValue: (i) => {
-                //this could be more efficient if the logic was inverted;
-                //i.e. getRowAsObject would call this method on all columns...
-                return this.getRowAsObject(i, [column.field])[column.field];
+            getValue: (index) => {
+                const col = this.columnIndex[column.field];
+                if (!col.data) {
+                    console.error(`Column ${column.field} has no data`);
+                    return;
+                }
+                let v = col.data[index];
+                if (col.datatype === "text" || col.datatype === "text16") {
+                    v = col.values[v];
+                } else if (
+                    col.datatype === "double" ||
+                    col.datatype === "integer" ||
+                    col.datatype === "int32"
+                ) {
+                    if (Number.isNaN(v)) {
+                        v = "missing";
+                    }
+                }
+                //multitext displayed as comma delimited values
+                else if (col.datatype === "multitext") {
+                    const delim = ", ";
+                    const d = col.data.slice(
+                        index * col.stringLength,
+                        index * col.stringLength + col.stringLength,
+                    );
+                    v = Array.from(d.filter((x) => x !== 65535))
+                        .map((x) => col.values[x])
+                        .join(delim);
+                } else {
+                    v = this.textDecoder.decode(
+                        col.data.slice(
+                            index * col.stringLength,
+                            index * col.stringLength + col.stringLength,
+                        ),
+                    );
+                    v = v.replaceAll("\0", "");
+                }
+                return v;
             },
             subgroup: column.subgroup,
         };
         if (!c.field) {
             c.field = column.name;
         }
-        if (column.colors) {
-            c.colors = column.colors;
-        }
-        if (column.editable) {
-            c.editable = true;
-        }
-        if (column.is_url) {
-            c.is_url = true;
-        }
-
-        if (column.subgroup) {
-            c.subgroup = column.subgroup;
-            c.sgindex = column.sgindex;
-            c.sgtype = column.sgtype;
-        }
-        if (isColumnText(column)) {
-            c.stringLength = column.stringLength;
-            if (column.delimiter) {
-                c.delimiter = column.delimiter;
-            }
-            c.values = column.values || [""];
-        } else if (isColumnNumeric(column)) {
-            c.colorLogScale = column.colorLogScale;
-            c.minMax = column.minMax;
-            c.quantiles = column.quantiles;
-        } else {
-            c.stringLength = column.stringLength;
+        if (isColumnText(column) && !c.values) {
+            c.values = [""];
         }
         this.columns.push(c);
         this.columnIndex[c.field] = c;
@@ -736,44 +745,7 @@ class DataStore {
         }
         const obj = {}; // pjt consider using Map if this is a bottleneck
         for (const c of columns) {
-            //todo invert this to use col.getValue(index)
-            const col = this.columnIndex[c];
-            if (!col.data) {
-                console.error(`Column ${c} has no data`);
-                continue;
-            }
-            let v = col.data[index];
-            if (col.datatype === "text" || col.datatype === "text16") {
-                v = col.values[v];
-            } else if (
-                col.datatype === "double" ||
-                col.datatype === "integer" ||
-                col.datatype === "int32"
-            ) {
-                if (Number.isNaN(v)) {
-                    v = "missing";
-                }
-            }
-            //multitext displayed as comma delimited values
-            else if (col.datatype === "multitext") {
-                const delim = ", ";
-                const d = col.data.slice(
-                    index * col.stringLength,
-                    index * col.stringLength + col.stringLength,
-                );
-                v = Array.from(d.filter((x) => x !== 65535))
-                    .map((x) => col.values[x])
-                    .join(delim);
-            } else {
-                v = this.textDecoder.decode(
-                    col.data.slice(
-                        index * col.stringLength,
-                        index * col.stringLength + col.stringLength,
-                    ),
-                );
-                v = v.replaceAll("\0", "");
-            }
-            obj[c] = v;
+            obj[c] = this.columnIndex[c].getValue(index);
         }
         obj["__index__"] = index;
         return obj;
@@ -1223,6 +1195,7 @@ class DataStore {
                     ? new Int32Array(buffer)
                     : new Float32Array(buffer));
             if (!c.minMax) {
+                console.log(`Calculating min/max for ${c.name}`);
                 let min = Number.MAX_VALUE;
                 let max = Number.MIN_VALUE;
                 for (let i = 0; i < dataArray.length; i++) {
@@ -1559,12 +1532,13 @@ class DataStore {
             c.datatype === "double" ||
             c.datatype === "int32"
         ) {
-            let range = c.minMaX;
+            const [min, max] = this.getMinMaxForColumn(column);
+            let range = [min, max];
             if (config.overideValues) {
                 const ov = config.overideValues;
                 range = [
-                    ov.min == null ? c.minMax[0] : ov.min,
-                    ov.max == null ? c.minMax[1] : ov.max,
+                    ov.min == null ? min : ov.min,
+                    ov.max == null ? max : ov.max,
                 ];
             }
             return getColorBar(colors, { range: range, label: name });
@@ -1742,19 +1716,33 @@ class DataStore {
         if (!isDatatypeNumeric(c.datatype)) {
             throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
         }
+        // columns loaded via rows_as_columns_link may not automatically have this metadata, so we can compute here.
         if (!c.minMax) {
-            throw new Error(`no minMax for column '${column}' ${c}`);
+            if (!c.data) {
+                throw new Error(`Attempting to compute minMax for column '${column}' which is not loaded...`);
+                //considered returning some default vals here
+                // return [0, 1];
+            }
+            // Return the calculated min and max values
+            let min = Number.MAX_VALUE;
+            let max = Number.MIN_VALUE;
+            for (let i = 0; i < c.data.length; i++) {
+                const value = c.data[i];
+                if (Number.isNaN(value)) {
+                    continue;
+                }
+                min = value < min ? value : min;
+                max = value > max ? value : max;
+            }
+            c.minMax = [min, max]
+            return c.minMax;
         }
         return c.minMax;
     }
 
     getColumnRange(column) {
-        const c = this.columnIndex[column];
-        if (!c.minMax) {
-            console.error(`unknown minMax for column ${column}`);
-            return [0, 50];
-        }
-        return c.minMax[1] - c.minMax[0];
+        const [min, max] = this.getMinMaxForColumn(column);
+        return max - min;
     }
 
     /**
@@ -1762,6 +1750,9 @@ class DataStore {
      * `addColumnFromField()`...
      */
     getColumnInfo(column) {
+        if (column === undefined) {
+            throw new Error("getColumnInfo needs a column argument!");
+        }
         if (column.includes("|")) {
             this.addColumnFromField(column);
         }
@@ -1787,11 +1778,24 @@ class DataStore {
     }
 
     /**
-     * @param {string} column - the column's field/id
+     * @param {string | undefined} column - the column's field/id
+     * @param {"name_value" | undefined} format - if "name_value", returns `{name: string, value: string}[]` for use in settings 'dropdown' widget
      * @returns {string[]} - the column's values
      */
     getColumnValues(column, format = null) {
-        const v = this.columnIndex[column].values;
+        // if the column is not categorical, it will return undefined - that may be ok
+        // if the column is a linked field, there is a chance that it won't be in the columnIndex
+        // that is a problem because then we throw an error here.
+        if (column === undefined) {
+            console.warn('getColumnValues(undefined)');
+            return [];
+        }
+        const v = this.columnIndex[column]?.values;
+        if (!v) {
+            console.error(`no values for column '${column}' in ds '${this.name}'`);
+            return [];
+        }
+        // could throw here if v is undefined (ie bad column arg)
         if (format === "name_value") {
             const ls = Array.from(v, (x) => ({ name: x, value: x })).sort(
                 (a, b) => a.name.localeCompare(b.name),

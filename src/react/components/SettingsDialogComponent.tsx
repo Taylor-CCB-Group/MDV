@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
-import { useMemo, useId, useCallback, useState, useRef } from "react";
-import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
+import { useMemo, useId, useCallback, useState, useRef, useEffect } from "react";
+import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
@@ -92,6 +92,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
     <>
         <MLabel props={props} />
         <input
+            className="p-1"
             type="number"
             value={props.current_value}
             min={props.min || 0}
@@ -160,7 +161,7 @@ export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
     const [_valueObjectArray, labelKey, valueKey] = useObjectKeys ? values : ["X", "X", "X"];
-    if (!labelKey || !valueKey) throw new Error("DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys");
+    if ((labelKey === undefined) || (valueKey === undefined)) throw new Error("DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys");
     type Option = { label: string, value: string, original: any };
     // might put some more elaborate types here on original at some point
     return (original: string | any): Option => {
@@ -520,6 +521,29 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     );
 };
 
+/**
+ * Recursively collects all disposers from a GuiSpec tree.
+ * Handles nested folders and collects disposers from all specs in the tree.
+ */
+export function collectDisposers(specs: AnyGuiSpec[]): Disposer[] {
+    const disposers: Disposer[] = [];
+    
+    function traverse(spec: AnyGuiSpec) {
+        // Collect disposers from this spec if it has any
+        if (spec._disposers && Array.isArray(spec._disposers)) {
+            disposers.push(...spec._disposers);
+        }
+        
+        // If this is a folder, recursively traverse its contents
+        if (spec.type === "folder" && Array.isArray(spec.current_value)) {
+            spec.current_value.forEach(traverse);
+        }
+    }
+    
+    specs.forEach(traverse);
+    return disposers;
+}
+
 const Components: {
     [K in GuiSpecType]: React.FC<{ props: GuiSpec<K> }>;
 } = {
@@ -586,17 +610,38 @@ export const AbstractComponent = observer(
 );
 
 export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
+    // Get the raw settings first so we can collect disposers from the same objects
+    const rawSettings = useMemo(() => {
+        return chart.getSettings();
+    }, [chart]);
+    
     const settings = useMemo(() => {
         // is the id just for a key in this component, or should the type passed to the component recognise it?
         // for now, I don't think there's a benefit to including it in the type.
         // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
-        const settings = chart //todo: fix this typecast, resolve `Chart` vs `BaseChart`...
-            .getSettings()
-            .map((setting) => ({ setting, id: uuid() }));
+        const settings = rawSettings.map((setting) => ({ setting, id: uuid() }));
         const wrap = { settings };
         makeAutoObservable(wrap);
         return wrap.settings;
-    }, [chart]);
+    }, [rawSettings]);
+    
+    // Collect and dispose all disposers when the component unmounts
+    // Use the same rawSettings that are used for rendering
+    useEffect(() => {
+        const disposers = collectDisposers(rawSettings);
+        
+        // Cleanup function: dispose all collected disposers when dialog closes
+        return () => {
+            disposers.forEach((disposer) => {
+                try {
+                    disposer();
+                } catch (e) {
+                    console.error("Error disposing reaction:", e);
+                }
+            });
+        };
+    }, [rawSettings]);
+    
     return (
         <ChartProvider chart={chart}>
             <div className="w-full max-h-[80vh]">
