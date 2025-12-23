@@ -266,7 +266,7 @@ export const GeneNetworkChartComponent = observer(() => {
                                     <div className="relative">
                                         <GeneNetworkInfoComponent
                                             geneId={geneId}
-                                            highlightCount={highlightCount}
+                                            // highlightCount={highlightCount}
                                             isHighlighted={isHighlighted}
                                             onCardClick={(event) => handleGeneClick(geneId, event)}
                                             onCardKeyDown={(event) => handleGeneKeyDown(geneId, event)}

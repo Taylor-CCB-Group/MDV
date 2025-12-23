@@ -68,7 +68,7 @@ export interface GeneInfo {
 
 interface GeneNetworkInfoComponentProps {
     geneId: string;
-    highlightCount?: number;
+    // highlightCount?: number;
     isHighlighted?: boolean;
     onCardClick?: (event: MouseEvent<HTMLDivElement>) => void;
     onCardKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
@@ -200,7 +200,7 @@ export function GeneNetworkInfoComponent({
                 <Link
                     href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneId}`}
                     target="_blank"
-                    rel="noopener noreferer"
+                    rel="noopener noreferrer"
                     tabIndex={-1}
                 >
                     Try opening on genecards.org
@@ -233,7 +233,7 @@ export function GeneNetworkInfoComponent({
                         <Link
                             href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneId}`}
                             target="_blank"
-                            rel="noopener noreferer"
+                            rel="noopener noreferrer"
                             tabIndex={-1}
                         >
                             Open on genecards.org
