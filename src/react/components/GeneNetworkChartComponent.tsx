@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useLayoutEffect, useState, type MouseEvent } from "react";
+import { useMemo, useRef, useEffect, useLayoutEffect, useState, type MouseEvent, type KeyboardEvent } from "react";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import { useParamColumns } from "../hooks";
@@ -7,7 +7,6 @@ import { useSimplerFilteredIndices } from "../hooks";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { GeneNetworkInfoComponent } from "./GeneNetworkInfoComponent";
 import type { GeneNetworkConfig } from "./GeneNetworkChart";
-import { Chip } from "@mui/material";
 
 /**
  * Get text value from a column at a given index.
@@ -100,7 +99,10 @@ export const GeneNetworkChartComponent = observer(() => {
     const hasMore = geneIds.length > maxGenes;
 
     // Auto-scroll to highlighted genes
+    // always disabled at the moment, pending better behaviour.
+    const { autoScroll } = chart.config;
     useLayoutEffect(() => {
+        if (!autoScroll) return;
         if (highlightedIndices.length === 0 || visibleGeneIds.length === 0) return;
         if (!scrollContainerRef.current) return;
 
@@ -140,7 +142,7 @@ export const GeneNetworkChartComponent = observer(() => {
                 }
             }
         }
-    }, [highlightedIndices, visibleGeneIds, column]);
+    }, [highlightedIndices, visibleGeneIds, column, autoScroll]);
 
     const setGeneRef = (geneId: string, element: HTMLDivElement | null) => {
         if (element) {
@@ -166,17 +168,15 @@ export const GeneNetworkChartComponent = observer(() => {
         return indices;
     };
 
-    const handleGeneClick = (geneId: string, event: MouseEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
-
+    const handleGeneSelection = (
+        geneId: string,
+        isToggle: boolean,
+        isRange: boolean,
+    ) => {
         const geneRowIndices = getIndicesForGeneId(geneId);
         if (geneRowIndices.length === 0) return;
 
-        const isToggle = event.ctrlKey || event.metaKey;
-        const isRange = event.shiftKey;
-
-        // Shift-click: select a continuous range of row indices
+        // Shift: select a continuous range of row indices
         if (isRange) {
             const currentIndex = Math.min(...geneRowIndices);
 
@@ -200,7 +200,7 @@ export const GeneNetworkChartComponent = observer(() => {
             return;
         }
 
-        // Ctrl/Cmd-click: toggle this gene's rows in the current selection
+        // Ctrl/Cmd: toggle this gene's rows in the current selection
         if (isToggle) {
             const currentSet = new Set(highlightedIndices);
             const allSelected = geneRowIndices.every((idx) => currentSet.has(idx));
@@ -217,9 +217,40 @@ export const GeneNetworkChartComponent = observer(() => {
             return;
         }
 
-        // Plain click: replace selection with this gene's rows
+        // Plain: replace selection with this gene's rows
         highlightRows(geneRowIndices);
         setLastClickedIndex(Math.min(...geneRowIndices));
+    };
+
+    const handleGeneClick = (geneId: string, event: MouseEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const isToggle = event.ctrlKey || event.metaKey;
+        const isRange = event.shiftKey;
+        handleGeneSelection(geneId, isToggle, isRange);
+    };
+
+    const handleGeneKeyDown = (geneId: string, event: KeyboardEvent<HTMLDivElement>) => {
+        // Only handle Space key for selection
+        if (event.key !== " " && event.key !== "Spacebar") {
+            return;
+        }
+
+        // Avoid interfering with OS-level shortcuts (e.g. meta+space)
+        if (event.metaKey || event.ctrlKey) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Keyboard Space:
+        // - plain Space toggles this gene
+        // - Shift+Space selects a range (like Shift-click)
+        const isRange = event.shiftKey;
+        const isToggle = !isRange;
+        handleGeneSelection(geneId, isToggle, isRange);
     };
 
     return (
@@ -247,6 +278,7 @@ export const GeneNetworkChartComponent = observer(() => {
                                             highlightCount={highlightCount}
                                             isHighlighted={isHighlighted}
                                             onCardClick={(event) => handleGeneClick(geneId, event)}
+                                            onCardKeyDown={(event) => handleGeneKeyDown(geneId, event)}
                                         />
                                     </div>
                                 </div>

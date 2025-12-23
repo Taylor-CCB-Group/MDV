@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Paper, Typography, Link } from "@mui/material";
 import z from "zod";
@@ -71,6 +71,7 @@ interface GeneNetworkInfoComponentProps {
     highlightCount?: number;
     isHighlighted?: boolean;
     onCardClick?: (event: MouseEvent<HTMLDivElement>) => void;
+    onCardKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
 /**
@@ -82,6 +83,7 @@ export function GeneNetworkInfoComponent({
     highlightCount = 0,
     isHighlighted = false,
     onCardClick,
+    onCardKeyDown,
 }: GeneNetworkInfoComponentProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -144,11 +146,23 @@ export function GeneNetworkInfoComponent({
         onCardClick?.(event);
     };
 
+    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        // Handle Space key for selection (prevent default scrolling)
+        if (event.key === " " || event.key === "Spacebar") {
+            event.preventDefault();
+            onCardKeyDown?.(event);
+            return;
+        }
+        // Allow other keys to bubble up (e.g., Tab for navigation)
+        onCardKeyDown?.(event);
+    };
+
     return (
         <Paper
             ref={containerRef}
             variant={isHighlighted ? "elevation" : "outlined"}
             elevation={isHighlighted ? 2 : 0}
+            tabIndex={onCardClick || onCardKeyDown ? 0 : undefined}
             sx={{
                 my: 1,
                 p: 1.5,
@@ -157,8 +171,15 @@ export function GeneNetworkInfoComponent({
                 border: isHighlighted ? "2px solid" : undefined,
                 borderColor: isHighlighted ? "primary.main" : undefined,
                 cursor: onCardClick ? "pointer" : "default",
+                outline: "none",
+                "&:focus-visible": {
+                    outline: "2px solid",
+                    outlineColor: "primary.main",
+                    outlineOffset: "2px",
+                },
             }}
             onClick={handleCardClick}
+            onKeyDown={handleKeyDown}
         >
             {!isVisible && (
                 <Typography variant="body2" color="text.secondary">
@@ -194,6 +215,7 @@ export function GeneNetworkInfoComponent({
                             href={`https://www.genenetwork.nl/gene/${geneInfo.geneId}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            tabIndex={-1}
                         >
                             More info on GeneNetwork
                         </Link>

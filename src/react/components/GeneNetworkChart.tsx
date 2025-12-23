@@ -7,6 +7,7 @@ import { g, isArray } from "@/lib/utils";
 export type GeneNetworkConfig = {
     mode?: "filtered" | "observableFields";
     maxGenes?: number;
+    autoScroll?: boolean;
 } & BaseConfig;
 
 const DEFAULT_MAX_GENES = 100;
