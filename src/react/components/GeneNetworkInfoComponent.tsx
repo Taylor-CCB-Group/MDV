@@ -80,7 +80,6 @@ interface GeneNetworkInfoComponentProps {
  */
 export function GeneNetworkInfoComponent({
     geneId,
-    highlightCount = 0,
     isHighlighted = false,
     onCardClick,
     onCardKeyDown,
@@ -165,8 +164,8 @@ export function GeneNetworkInfoComponent({
             elevation={isHighlighted ? 2 : 0}
             tabIndex={onCardClick || onCardKeyDown ? 0 : undefined}
             sx={{
-                my: 1,
                 p: 1.5,
+                m: 1,
                 borderRadius: 1,
                 minHeight: 100,
                 border: isHighlighted ? "2px solid" : undefined,
