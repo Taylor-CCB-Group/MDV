@@ -20,7 +20,7 @@ import {
 } from "../webgl/ScatterDeckExtension";
 import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
-import type { ColumnName } from "@/charts/charts";
+import type { ColumnName, FieldName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -108,6 +108,9 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     on_filter: "hide", //safer in case of large datasets
     // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
+    field_legend: {
+        display: true
+    }
 };
 
 export const scatterAxisDefaults: AxisConfig2D = {
@@ -283,7 +286,7 @@ export type P = [number, number];
  * As of now, charts with appropriate spatial context can call `useSpatialLayers()` at any point
  * to access the scatterplot layer, and the tooltip function.
  */
-export function useScatterplotLayer(modelMatrix: Matrix4) {
+export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: FieldName | null) {
     const id = useChartID();
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
@@ -311,7 +314,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         },
         [radiusScale, highlightedIndex, scale],
     );
-    const contourLayers = useLegacyDualContour();
+    const contourLayers = useLegacyDualContour(hoveredFieldId);
 
     // todo - Tooltip should be a separate component
     // would rather not even need to call a hook here, but just have some

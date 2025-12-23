@@ -12,6 +12,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import { action, toJS } from "mobx";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
+import type { FieldName } from "@/charts/charts";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -39,6 +40,8 @@ export type SpatialAnnotationState = {
     rectRange: RangeState;
     measure: MeasureState;
     scatterProps: ReturnType<typeof useScatterplotLayer>;
+    hoveredFieldId?: FieldName | null;
+    setHoveredFieldId?: (fieldId: FieldName | null) => void;
 };
 
 // Could more usefully be thought of as SpatialContext?
@@ -174,24 +177,31 @@ function useCreateMeasure() {
     return { startPixels, setStart, endPixels, setEnd };
 }
 //add generic that extends SpatialConfig?
-function useCreateSpatialAnnotationState(chart: BaseChart<any>) {
+function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?: FieldName | null) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
+    const scatterProps = useScatterplotLayer(rectRange.modelMatrix, hoveredFieldId);
     return { rectRange, measure, scatterProps };
 }
 
 export const SpatialAnnotationProvider = observer(function SpatialAnnotationProvider({
     chart,
     children,
+    hoveredFieldId,
+    setHoveredFieldId,
     //add generic that extends SpatialConfig?
-}: { chart: BaseChart<any> } & React.PropsWithChildren) {
-    const annotationState = useCreateSpatialAnnotationState(chart);
+}: { 
+    chart: BaseChart<any>;
+    hoveredFieldId?: FieldName | null;
+    setHoveredFieldId?: (fieldId: FieldName | null) => void;
+} & React.PropsWithChildren) {
+    const annotationState = useCreateSpatialAnnotationState(chart, hoveredFieldId);
+    const stateWithHover = { ...annotationState, hoveredFieldId, setHoveredFieldId };
     return (
-        <SpatialAnnotationState.Provider value={annotationState}>
+        <SpatialAnnotationState.Provider value={stateWithHover}>
             {children}
         </SpatialAnnotationState.Provider>
     );

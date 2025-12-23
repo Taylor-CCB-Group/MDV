@@ -37,6 +37,16 @@ float smoothContour(float value) {
     // return contour(value);
 }
 
+float smoothEdge(float value, float threshold) {
+    // Create a smooth edge at the threshold boundary
+    float edgeWidth = 1.5; // Edge width in screen space
+    float w = edgeWidth * fwidth(value);
+    // Create a smooth transition around the threshold
+    // Returns 1.0 when value is at threshold, fading to 0.0 away from threshold
+    float dist = abs(value - threshold);
+    return 1.0 - smoothstep(0.0, w, dist);
+}
+
 
 vec4 getLinearColor(float value) {
   float factor = clamp(value * vIntensityMax, 0., 1.);
@@ -82,9 +92,22 @@ void main(void) {
   fillColor.a *= fillStrength;
   fillColor.rgb *= fillStrength; // Apply fillOpacity to RGB for proper blending
   
-  // Combine: fill is base, contour overlays on top
-  // When contourShape is 0, contourColor.a is 0, so we only see fillColor
-  // When contourShape > 0, contourColor overlays on fillColor
-  fragColor.rgb = fillColor.rgb * (1.0 - contourColor.a) + contourColor.rgb * contourColor.a;
-  fragColor.a = fillColor.a * (1.0 - contourColor.a) + contourColor.a;
+  // Edge contribution: create an edge at the fill boundary using smoothContour-like function
+  float edgeShape = smoothEdge(weight, contourFill);
+  float edgeStrength = edgeShape * fillOpacity * 1.3;
+  vec4 edgeColor = fullColor;
+  edgeColor.a = edgeStrength * 2.0; // Boost alpha for visibility
+  
+  // Combine: fill is base, edge overlays on fill, contour overlays on top
+  // When edgeShape is 0, edgeColor.a is 0, so we only see fillColor
+  // When edgeShape > 0, edgeColor overlays on fillColor
+  vec4 fillWithEdge;
+  fillWithEdge.rgb = fillColor.rgb * (1.0 - edgeColor.a) + edgeColor.rgb * edgeColor.a;
+  fillWithEdge.a = fillColor.a * (1.0 - edgeColor.a) + edgeColor.a;
+  
+  // Finally, overlay contour on top of fill+edge
+  // When contourShape is 0, contourColor.a is 0, so we only see fillWithEdge
+  // When contourShape > 0, contourColor overlays on fillWithEdge
+  fragColor.rgb = fillWithEdge.rgb * (1.0 - contourColor.a) + contourColor.rgb * contourColor.a;
+  fragColor.a = fillWithEdge.a * (1.0 - contourColor.a) + contourColor.a;
 }

@@ -1,23 +1,55 @@
-import { useEffect, useState } from "react";
-import { useChart } from "./context";
+import { useEffect, useState, useCallback, useId } from "react";
+import { useChart, useDataStore } from "./context";
 
 /**
  * Hook to get the index of the highlighted data point.
- * May want to change how this works in terms of context etc, current implementation is simple
- * will not behave well if used multiple times by the same chart, etc.
+ * Delegates to useHighlightedIndices() and returns the first index.
  */
 export function useHighlightedIndex() {
-    const chart = useChart();
-    // const { highlightedData } = chart.dataStore;
-    const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+    const highlightedIndices = useHighlightedIndices();
+    return highlightedIndices[0] ?? -1;
+}
+
+/**
+ * Hook to get all highlighted indices as an array.
+ * Supports multiple highlighted rows.
+ */
+export function useHighlightedIndices() {
+    const dataStore = useDataStore();
+    const [highlightedIndices, setHighlightedIndices] = useState<number[]>([]);
+    const listenerId = useId();
 
     useEffect(() => {
-        console.log("useHighlightedIndex effect");
-        // todo check the type - but it's definitely indexable by number, returning number
-        chart.onDataHighlighted = ({ indexes }: { indexes: { [k: number]: number } }) => {
-            setHighlightedIndex(indexes[0]);
+        const listener = (type: string, data: { indexes: number[] | { [k: number]: number } }) => {
+            if (type === "data_highlighted") {
+                // Handle both array and object formats
+                const indices = Array.isArray(data.indexes) 
+                    ? data.indexes 
+                    : Object.values(data.indexes);
+                setHighlightedIndices(indices);
+            }
         };
-    }, [chart]);
 
-    return highlightedIndex;
+        dataStore.addListener(listenerId, listener);
+
+        return () => {
+            dataStore.removeListener(listenerId);
+        };
+    }, [dataStore, listenerId]);
+
+    return highlightedIndices;
+}
+
+/**
+ * Hook that returns a function to highlight rows.
+ * The returned function calls dataStore.dataHighlighted with the provided row indices.
+ */
+export function useHighlightRows() {
+    const chart = useChart();
+    const dataStore = useDataStore();
+    
+    return useCallback((rowIndexes: number[]) => {
+        // dataHighlighted expects an array of numbers
+        dataStore.dataHighlighted(rowIndexes, chart);
+    }, [chart, dataStore]);
 }
