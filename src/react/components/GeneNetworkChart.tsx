@@ -60,7 +60,7 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
 
 BaseChart.types["geneNetwork"] = {
     class: GeneNetworkChartWrapper,
-    name: "Gene Network Info",
+    name: "Gene Info",
     allow_user_add: true,
     params: [
         {
