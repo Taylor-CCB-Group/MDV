@@ -64,9 +64,6 @@ export interface GeneInfo {
     geneId: string;
     geneName: string;
     geneDescription: string;
-    geneProperties?: {
-        alias?: string[];
-    };
 }
 
 interface GeneNetworkInfoComponentProps {
@@ -124,10 +121,6 @@ export function GeneNetworkInfoComponent({ geneId }: GeneNetworkInfoComponentPro
                 geneId: parsed.gene.id,
                 geneName: parsed.gene.name,
                 geneDescription: parsed.gene.description,
-                geneProperties: {
-                    // Aliases not present in API response, but keeping structure for future use
-                    alias: undefined,
-                },
             };
         },
         enabled: isVisible && !!geneId,
@@ -172,13 +165,6 @@ export function GeneNetworkInfoComponent({ geneId }: GeneNetworkInfoComponentPro
                     <Typography variant="body2" sx={{ mt: 0.5 }}>
                         <strong>Description:</strong> {geneInfo.geneDescription}
                     </Typography>
-                    {geneInfo.geneProperties?.alias &&
-                        geneInfo.geneProperties.alias.length > 0 && (
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                <strong>Aliases:</strong>{" "}
-                                {geneInfo.geneProperties.alias.join(", ")}
-                            </Typography>
-                        )}
                     <Typography variant="body2" sx={{ mt: 1 }}>
                         <Link
                             href={`https://www.genenetwork.nl/gene/${geneInfo.geneId}`}
