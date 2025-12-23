@@ -5,8 +5,11 @@ import { GeneNetworkChartComponent } from "./GeneNetworkChartComponent";
 import { g, isArray } from "@/lib/utils";
 
 export type GeneNetworkConfig = {
-    displayMode?: "highlighted" | "filtered";
+    mode?: "filtered" | "observableFields";
+    maxGenes?: number;
 } & BaseConfig;
+
+const DEFAULT_MAX_GENES = 100;
 
 class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
     constructor(
@@ -14,7 +17,8 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
         div: string | HTMLDivElement,
         config: GeneNetworkConfig & BaseConfig,
     ) {
-        if (!config.displayMode) config.displayMode = "highlighted";
+        if (!config.mode) config.mode = "filtered";
+        if (!config.maxGenes) config.maxGenes = DEFAULT_MAX_GENES;
         super(dataStore, div, config, GeneNetworkChartComponent);
     }
     getSettings() {
@@ -25,19 +29,30 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
             g({
                 type: "dropdown",
                 label: "Display Mode",
-                current_value: c.displayMode || "highlighted",
+                current_value: c.mode || "filtered",
                 values: [
                     [
-                        { name: "Highlighted", value: "highlighted" },
-                        { name: "Filtered", value: "filtered" },
+                        { name: "Filtered (with highlights)", value: "filtered" },
+                        { name: "ObservableFields-like", value: "observableFields" },
                     ],
                     "name",
                     "value",
                 ],
                 func: (v) => {
-                    c.displayMode = v as "highlighted" | "filtered";
+                    c.mode = v as "filtered" | "observableFields";
                 },
-            })
+            }),
+            g({
+                type: "spinner",
+                label: "Max genes to show",
+                current_value: c.maxGenes ?? DEFAULT_MAX_GENES,
+                min: 10,
+                max: 1000,
+                step: 10,
+                func: (v) => {
+                    c.maxGenes = v;
+                },
+            }),
         ];
     }
 }

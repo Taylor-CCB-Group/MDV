@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Paper, Typography, Link } from "@mui/material";
 import z from "zod";
@@ -68,13 +68,21 @@ export interface GeneInfo {
 
 interface GeneNetworkInfoComponentProps {
     geneId: string;
+    highlightCount?: number;
+    isHighlighted?: boolean;
+    onCardClick?: (event: MouseEvent<HTMLDivElement>) => void;
 }
 
 /**
  * Component that fetches and displays gene information from GeneNetwork.nl.
  * Uses lazy loading with IntersectionObserver to only query when visible.
  */
-export function GeneNetworkInfoComponent({ geneId }: GeneNetworkInfoComponentProps) {
+export function GeneNetworkInfoComponent({
+    geneId,
+    highlightCount = 0,
+    isHighlighted = false,
+    onCardClick,
+}: GeneNetworkInfoComponentProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isVisible, setIsVisible] = useState(false);
 
@@ -127,16 +135,30 @@ export function GeneNetworkInfoComponent({ geneId }: GeneNetworkInfoComponentPro
         // staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     });
 
+    const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
+        // Don't trigger selection when clicking on links within the card
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("a")) {
+            return;
+        }
+        onCardClick?.(event);
+    };
+
     return (
         <Paper
             ref={containerRef}
-            variant="outlined"
+            variant={isHighlighted ? "elevation" : "outlined"}
+            elevation={isHighlighted ? 2 : 0}
             sx={{
                 my: 1,
                 p: 1.5,
                 borderRadius: 1,
                 minHeight: 100,
+                border: isHighlighted ? "2px solid" : undefined,
+                borderColor: isHighlighted ? "primary.main" : undefined,
+                cursor: onCardClick ? "pointer" : "default",
             }}
+            onClick={handleCardClick}
         >
             {!isVisible && (
                 <Typography variant="body2" color="text.secondary">
@@ -156,9 +178,11 @@ export function GeneNetworkInfoComponent({ geneId }: GeneNetworkInfoComponentPro
             )}
             {isVisible && geneInfo && (
                 <>
-                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                        Gene Information for {geneInfo.geneName}
-                    </Typography>
+                    <div className="flex items-start justify-between">
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                            Gene Information for {geneInfo.geneName}
+                        </Typography>
+                    </div>
                     <Typography variant="body2">
                         <strong>Gene ID:</strong> {geneInfo.geneId}
                     </Typography>

@@ -1,12 +1,13 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useRef, useEffect, useLayoutEffect, useState, type MouseEvent } from "react";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import { useParamColumns } from "../hooks";
-import { useHighlightedIndex } from "../selectionHooks";
+import { useHighlightedIndices, useHighlightRows } from "../selectionHooks";
 import { useSimplerFilteredIndices } from "../hooks";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { GeneNetworkInfoComponent } from "./GeneNetworkInfoComponent";
 import type { GeneNetworkConfig } from "./GeneNetworkChart";
+import { Chip } from "@mui/material";
 
 /**
  * Get text value from a column at a given index.
@@ -22,80 +23,15 @@ function getTextValue(column: any, index: number): string {
     return String(value);
 }
 
-/**
- * Simple virtualized list component for displaying filtered gene info.
- * Only renders items that are visible in the viewport.
- */
-function VirtualizedGeneList({ 
-    geneIds, 
-    itemHeight = 200 
-}: { 
-    geneIds: string[];
-    itemHeight?: number;
-}) {
-    const [scrollTop, setScrollTop] = useState(0);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        setScrollTop(e.currentTarget.scrollTop);
-    }, []);
-
-    const visibleRange = useMemo(() => {
-        const containerHeight = containerRef.current?.clientHeight || 600;
-        const start = Math.floor(scrollTop / itemHeight);
-        const end = Math.min(
-            geneIds.length,
-            Math.ceil((scrollTop + containerHeight) / itemHeight) + 1,
-        );
-        return { start, end };
-    }, [scrollTop, itemHeight, geneIds.length]);
-
-    const visibleItems = useMemo(() => {
-        return geneIds.slice(visibleRange.start, visibleRange.end).map((geneId, i) => ({
-            geneId,
-            index: visibleRange.start + i,
-        }));
-    }, [geneIds, visibleRange]);
-
-    const totalHeight = geneIds.length * itemHeight;
-    const offsetY = visibleRange.start * itemHeight;
-
-    return (
-        <div
-            ref={containerRef}
-            className="h-full overflow-y-auto"
-            onScroll={handleScroll}
-        >
-            <div style={{ height: `${totalHeight}px`, position: "relative" }}>
-                <div
-                    style={{
-                        transform: `translateY(${offsetY}px)`,
-                        position: "absolute",
-                        width: "100%",
-                    }}
-                >
-                    {visibleItems.map(({ geneId, index }) => (
-                        <div
-                            key={`${geneId}-${index}`}
-                            style={{
-                                height: `${itemHeight}px`,
-                                padding: "0.5em",
-                            }}
-                        >
-                            <GeneNetworkInfoComponent geneId={geneId} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export const GeneNetworkChartComponent = observer(() => {
     const chart = useChart<GeneNetworkConfig>();
     const columns = useParamColumns();
-    const highlightedIndex = useHighlightedIndex();
+    const highlightedIndices = useHighlightedIndices();
     const filteredIndices = useSimplerFilteredIndices();
+    const highlightRows = useHighlightRows();
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const geneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
 
     if (columns.length === 0) {
         return <div>No column selected. Please configure the chart.</div>;
@@ -106,65 +42,224 @@ export const GeneNetworkChartComponent = observer(() => {
         return <div>Loading column data...</div>;
     }
 
-    const displayMode = chart.config.displayMode || "highlighted";
+    const mode = chart.config.mode || "filtered";
+    const maxGenes = chart.config.maxGenes ?? 100;
 
     // Get gene IDs based on display mode
-    const geneIds = useMemo(() => {
-        if (displayMode === "highlighted") {
-            if (highlightedIndex >= 0) {
-                try {
-                    const geneId = getTextValue(column, highlightedIndex);
-                    return geneId ? [geneId] : [];
-                } catch (e) {
-                    console.error("Error getting highlighted gene ID:", e);
-                    return [];
-                }
-            }
-            return [];
-        } else {
-            // Filtered mode: get unique gene IDs from filtered indices
-            const geneIdSet = new Set<string>();
+    const { geneIds, geneHighlightCounts } = useMemo(() => {
+        const highlightCounts = new Map<string, number>();
+        
+        // First, count how many highlighted rows each gene has
+        const highlightedGeneIds = new Set<string>();
+        for (let i = 0; i < highlightedIndices.length; i++) {
+            const index = highlightedIndices[i];
             try {
-                for (let i = 0; i < filteredIndices.length; i++) {
-                    const index = filteredIndices[i];
-                    const geneId = getTextValue(column, index);
-                    if (geneId) {
-                        geneIdSet.add(geneId);
-                    }
+                const geneId = getTextValue(column, index);
+                if (geneId) {
+                    highlightedGeneIds.add(geneId);
+                    highlightCounts.set(geneId, (highlightCounts.get(geneId) || 0) + 1);
                 }
             } catch (e) {
-                console.error("Error getting filtered gene IDs:", e);
+                // Skip invalid indices
             }
-            return Array.from(geneIdSet);
         }
-    }, [displayMode, highlightedIndex, filteredIndices, column]);
+
+        if (mode === "observableFields") {
+            // ObservableFields mode: show highlighted if any, otherwise filtered
+            if (highlightedIndices.length > 0) {
+                return {
+                    geneIds: Array.from(highlightedGeneIds),
+                    geneHighlightCounts: highlightCounts,
+                };
+            }
+            // Fall through to filtered logic
+        }
+
+        // Filtered mode: get unique gene IDs from filtered indices
+        const geneIdSet = new Set<string>();
+        try {
+            for (let i = 0; i < filteredIndices.length; i++) {
+                const index = filteredIndices[i];
+                const geneId = getTextValue(column, index);
+                if (geneId) {
+                    geneIdSet.add(geneId);
+                }
+            }
+        } catch (e) {
+            console.error("Error getting filtered gene IDs:", e);
+        }
+        
+        return {
+            geneIds: Array.from(geneIdSet),
+            geneHighlightCounts: highlightCounts,
+        };
+    }, [mode, highlightedIndices, filteredIndices, column]);
+
+    // Apply cap
+    const visibleGeneIds = geneIds.slice(0, maxGenes);
+    const hasMore = geneIds.length > maxGenes;
+
+    // Auto-scroll to highlighted genes
+    useLayoutEffect(() => {
+        if (highlightedIndices.length === 0 || visibleGeneIds.length === 0) return;
+        if (!scrollContainerRef.current) return;
+
+        // Find which genes correspond to highlighted rows
+        const highlightedGeneIds = new Set<string>();
+        for (let i = 0; i < highlightedIndices.length; i++) {
+            const index = highlightedIndices[i];
+            try {
+                const geneId = getTextValue(column, index);
+                if (geneId && visibleGeneIds.includes(geneId)) {
+                    highlightedGeneIds.add(geneId);
+                }
+            } catch (e) {
+                // Skip invalid indices
+            }
+        }
+
+        // Scroll to the first highlighted gene that's not visible
+        for (const geneId of highlightedGeneIds) {
+            const geneElement = geneRefs.current.get(geneId);
+            if (geneElement) {
+                const container = scrollContainerRef.current;
+                const containerRect = container.getBoundingClientRect();
+                const elementRect = geneElement.getBoundingClientRect();
+
+                // Check if element is not fully visible
+                const isVisible =
+                    elementRect.top >= containerRect.top &&
+                    elementRect.bottom <= containerRect.bottom;
+
+                if (!isVisible) {
+                    geneElement.scrollIntoView({
+                        behavior: "smooth",
+                        block: "nearest",
+                    });
+                    break; // Only scroll to first one
+                }
+            }
+        }
+    }, [highlightedIndices, visibleGeneIds, column]);
+
+    const setGeneRef = (geneId: string, element: HTMLDivElement | null) => {
+        if (element) {
+            geneRefs.current.set(geneId, element);
+        } else {
+            geneRefs.current.delete(geneId);
+        }
+    };
+
+    const getIndicesForGeneId = (geneId: string): number[] => {
+        const indices: number[] = [];
+        for (let i = 0; i < filteredIndices.length; i++) {
+            const index = filteredIndices[i];
+            try {
+                const value = getTextValue(column, index);
+                if (value === geneId) {
+                    indices.push(index);
+                }
+            } catch {
+                // Skip invalid indices
+            }
+        }
+        return indices;
+    };
+
+    const handleGeneClick = (geneId: string, event: MouseEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const geneRowIndices = getIndicesForGeneId(geneId);
+        if (geneRowIndices.length === 0) return;
+
+        const isToggle = event.ctrlKey || event.metaKey;
+        const isRange = event.shiftKey;
+
+        // Shift-click: select a continuous range of row indices
+        if (isRange) {
+            const currentIndex = Math.min(...geneRowIndices);
+
+            if (lastClickedIndex == null) {
+                highlightRows(geneRowIndices);
+                setLastClickedIndex(currentIndex);
+                return;
+            }
+
+            const start = Math.min(lastClickedIndex, currentIndex);
+            const end = Math.max(lastClickedIndex, currentIndex);
+            const rangeIndices: number[] = [];
+            for (let i = 0; i < filteredIndices.length; i++) {
+                const idx = filteredIndices[i];
+                if (idx >= start && idx <= end) {
+                    rangeIndices.push(idx);
+                }
+            }
+            highlightRows(rangeIndices);
+            setLastClickedIndex(currentIndex);
+            return;
+        }
+
+        // Ctrl/Cmd-click: toggle this gene's rows in the current selection
+        if (isToggle) {
+            const currentSet = new Set(highlightedIndices);
+            const allSelected = geneRowIndices.every((idx) => currentSet.has(idx));
+
+            if (allSelected) {
+                geneRowIndices.forEach((idx) => currentSet.delete(idx));
+            } else {
+                geneRowIndices.forEach((idx) => currentSet.add(idx));
+            }
+
+            const newIndices = Array.from(currentSet).sort((a, b) => a - b);
+            highlightRows(newIndices);
+            setLastClickedIndex(Math.min(...geneRowIndices));
+            return;
+        }
+
+        // Plain click: replace selection with this gene's rows
+        highlightRows(geneRowIndices);
+        setLastClickedIndex(Math.min(...geneRowIndices));
+    };
 
     return (
         <div className="absolute w-[100%] h-[100%] overflow-y-auto text-sm h-full flex flex-col">
-            {displayMode === "highlighted" ? (
+            {visibleGeneIds.length > 0 ? (
                 <>
-                    {highlightedIndex >= 0 ? (
-                        <>
-                            {geneIds.length > 0 ? (
-                                <GeneNetworkInfoComponent geneId={geneIds[0]} />
-                            ) : (
-                                <div>No gene ID found for highlighted row.</div>
-                            )}
-                        </>
-                    ) : (
-                        <div>No row highlighted. Click on a data point to highlight it.</div>
+                    {hasMore && (
+                        <div className="p-3 mb-2 text-xs text-gray-500">
+                            Showing first {maxGenes} of {geneIds.length} genes (adjust cap in settings)
+                        </div>
                     )}
+                    <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto">
+                        {visibleGeneIds.map((geneId) => {
+                            const highlightCount = geneHighlightCounts.get(geneId) || 0;
+                            const isHighlighted = highlightCount > 0;
+                            return (
+                                <div
+                                    key={geneId}
+                                    ref={(el) => setGeneRef(geneId, el)}
+                                    data-gene-id={geneId}
+                                >
+                                    <div className="relative">
+                                        <GeneNetworkInfoComponent
+                                            geneId={geneId}
+                                            highlightCount={highlightCount}
+                                            isHighlighted={isHighlighted}
+                                            onCardClick={(event) => handleGeneClick(geneId, event)}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </>
             ) : (
-                <>
-                    {geneIds.length > 0 ? (
-                        <div className="flex-1 min-h-0">
-                            <VirtualizedGeneList geneIds={geneIds} />
-                        </div>
-                    ) : (
-                        <div>No gene IDs found in filtered data.</div>
-                    )}
-                </>
+                <div>
+                    {mode === "observableFields" && highlightedIndices.length === 0
+                        ? "No filtered data. Apply filters to see genes."
+                        : "No gene IDs found."}
+                </div>
             )}
         </div>
     );
