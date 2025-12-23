@@ -134,6 +134,7 @@ export function GeneNetworkInfoComponent({
             };
         },
         enabled: isVisible && !!geneId,
+        retry: false,
         // staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     });
 
@@ -192,10 +193,20 @@ export function GeneNetworkInfoComponent({
                 </Typography>
             )}
             {isVisible && error && (
+                <>
                 <Typography variant="body2" color="error">
                     Error fetching gene info:{" "}
                     {error instanceof Error ? error.message : "Unknown error"}
                 </Typography>
+                <Link
+                    href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneId}`}
+                    target="_blank"
+                    rel="noopener noreferer"
+                    tabIndex={-1}
+                >
+                    Try opening on genecards.org
+                </Link>
+                </>
             )}
             {isVisible && geneInfo && (
                 <>
@@ -218,6 +229,15 @@ export function GeneNetworkInfoComponent({
                             tabIndex={-1}
                         >
                             More info on GeneNetwork
+                        </Link>
+                        {" - "}
+                        <Link
+                            href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneId}`}
+                            target="_blank"
+                            rel="noopener noreferer"
+                            tabIndex={-1}
+                        >
+                            Open on genecards.org
                         </Link>
                     </Typography>
                 </>
