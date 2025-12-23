@@ -521,7 +521,7 @@ export function useRangeDimension2D() {
 }
 
 
-export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClose: () => void) => {
+export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement | null>, onClose: () => void) => {
     useEffect(() => {
         if (!ref.current) return;
         // Observer to observe the an element and close it when it intersects the parent element (most likely while scrolling)
@@ -615,7 +615,7 @@ export const usePasteHandler = <T, V = T>({
  * Hook that provides the resize logic for a drawer
  */
 export const useResizeDrawer = (
-    dialogRef: React.RefObject<HTMLDivElement>, 
+    dialogRef: React.RefObject<HTMLDivElement | null>, 
     defaultDrawerWidth: number, 
     minDrawerWidth: number, 
     maxDrawerWidth: number

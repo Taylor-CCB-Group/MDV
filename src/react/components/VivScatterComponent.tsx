@@ -148,7 +148,7 @@ const Main = observer(({
 
     const viewState = useViewerStore((store) => store.viewState);
     useViewStateLink();
-    const vsRef = useRef<ViewState>();
+    const vsRef = useRef<ViewState | null>(null);
     const vsDebugDivRef = useRef<HTMLPreElement>(null);
 
     useEffect(() => {
