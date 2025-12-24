@@ -96,6 +96,28 @@ describe("useFindReplace", () => {
             expect(mockGrid.gotoCell).toHaveBeenCalledWith(0, 1, false);
         });
 
+        test("should find matches case-insensitively", () => {
+            const { result } = renderHook(() =>
+                useFindReplace(
+                    orderedParamColumns,
+                    sortedIndices,
+                    dataStore,
+                    searchColumn,
+                    config,
+                    gridRef,
+                    isSelectingRef,
+                    setFeedbackAlert,
+                ),
+            );
+        
+            act(() => {
+                result.current.handleFind("B CELLS");  // uppercase search
+            });
+        
+            expect(result.current.foundMatches).toHaveLength(1);
+            expect(result.current.foundMatches[0].value).toBe("B cells");
+        });
+
         test("should find no matches for non-existent text", () => {
             const { result } = renderHook(() =>
                 useFindReplace(
@@ -170,13 +192,13 @@ describe("useFindReplace", () => {
         });
 
         test("should find matches in numeric column", () => {
-            searchColumn = "sample_count";
+            const testSearchColumn = "sample_count";
             const { result } = renderHook(() =>
                 useFindReplace(
                     orderedParamColumns,
                     sortedIndices,
                     dataStore,
-                    searchColumn,
+                    testSearchColumn,
                     config,
                     gridRef,
                     isSelectingRef,

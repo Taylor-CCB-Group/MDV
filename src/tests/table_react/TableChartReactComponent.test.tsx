@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { observable } from "mobx";
 
-// todo: add more integration tests using playwright to test the working of this component
 // Mock SlickgridReact to avoid browser API issues
 vi.mock("slickgrid-react", () => ({
     SlickgridReact: ({ gridId }: { gridId: string }) => (

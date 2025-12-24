@@ -63,6 +63,24 @@ describe("useEditCell", () => {
         setFeedbackAlert = vi.fn();
     });
 
+    test("should handle null grid reference gracefully", () => {
+        const gridRefWithNull = { current: null } as any;
+        
+        const { result } = renderHook(() =>
+            useEditCell(
+                orderedParamColumnsRef,
+                sortedIndicesRef,
+                dataStore,
+                gridRefWithNull,
+                setFeedbackAlert,
+            ),
+        );
+    
+        // Should not crash when grid is null
+        expect(result.current.handleBeforeEditCell).toBeDefined();
+        expect(result.current.handleCellChange).toBeDefined();
+    });
+
     describe("handleBeforeEditCell", () => {
         test("should store old cell value", () => {
             const { result } = renderHook(() =>

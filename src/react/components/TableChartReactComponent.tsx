@@ -48,6 +48,8 @@ const FeedbackAlertComponent = ({ feedbackAlert }: FeedbackAlertComponentType) =
     }
 };
 
+// todo: add integration tests using playwright to test the working of this component
+// playwright would be more suitable to test this component rather than vitest which would require a lot of mocks
 const TableChartReactComponent = observer(() => {
     const [alertDialogOpen, setAlertDialogOpen] = useState(false);
     const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
