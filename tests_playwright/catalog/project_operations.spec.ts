@@ -47,7 +47,6 @@ test.describe("Project operations", () => {
         await page.getByTestId("project_menu_p1").click();
         await page.getByTestId("project_export_p1").click();
         const dl = await downloadPromise;
-        console.log("dl", dl.suggestedFilename());
         expect(dl.suggestedFilename()).toContain(".zip");
         expect(dl.suggestedFilename()).toEqual("Alpha.mdv.zip");
     });
