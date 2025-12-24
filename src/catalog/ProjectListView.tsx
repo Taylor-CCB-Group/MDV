@@ -103,6 +103,9 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 hover
                                 onClick={() => handleRowClick(project.id)}
                                 sx={{ cursor: "pointer" }}
+                                data-testid="project_list_row"
+                                data-project-id={project.id}
+                                aria-label={`open project ${project.name} (${project.id})`}
                             >
                                 <TableCell>
                                     <div className="flex items-center gap-3">
@@ -123,6 +126,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                                 handleMenuClick(e, project)
                                             }
                                             size="small"
+                                            data-testid={`project_menu_${project.id}`}
                                         >
                                             <MoreVert />
                                         </IconButton>
