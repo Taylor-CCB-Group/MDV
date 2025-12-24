@@ -10,6 +10,7 @@
 - Before running the tests, ```open the dev container to run the app, and open the project outside the container in another window to run the tests```. (This is required because we need the app running to access the app, which can be done via dev container at the moment)
 - To run the tests, we can either run the `playwright-test` script or run them using the vscode playwright extension.
 - The vscode playwright extension is recommended for running tests as it is easy and provides more features.
+- Run the catalog and project folder tests separately as there was some weird behaviour of tests failing when done simultaneously.
 
 ### Current progress
 - The tests in `/catalog` contains the tests related to the catalog view. It consists of tests to test the operations in the catalog view by mocking the backend APIs.

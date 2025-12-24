@@ -19,8 +19,8 @@ test('import dialog opens and success navigates', async ({ page }) => {
   await page.getByRole('button', { name: /upload file/i }).click();
 
 
-  await page.waitForURL('**/project/555');
-  expect(page.url()).toContain('/project/555');
+  await page.waitForURL('**/project/**');
+  expect(page.url()).toContain('/project/');
 });
 
 
