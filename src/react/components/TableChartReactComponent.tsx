@@ -133,28 +133,32 @@ const TableChartReactComponent = observer(() => {
                 onCellChange={handleCellChange}
             />
 
-            <FindAndReplaceDialog
-                open={isFindReplaceOpen}
-                onClose={onClose}
-                handleFind={handleFind}
-                handleFindPrev={handleFindPrev}
-                handleFindNext={handleFindNext}
-                handleReplace={handleReplace}
-                handleReplaceAll={handleReplaceAll}
-                foundMatches={matchCount}
-                columnName={searchColumn}
-                disableFindPrev={disableFindPrev}
-                disableFindNext={disableFindNext}
-                isColumnEditable={isColumnEditable}
-            />
+            <div data-testid="find-replace-dialog-wrapper">
+                <FindAndReplaceDialog
+                    open={isFindReplaceOpen}
+                    onClose={onClose}
+                    handleFind={handleFind}
+                    handleFindPrev={handleFindPrev}
+                    handleFindNext={handleFindNext}
+                    handleReplace={handleReplace}
+                    handleReplaceAll={handleReplaceAll}
+                    foundMatches={matchCount}
+                    columnName={searchColumn}
+                    disableFindPrev={disableFindPrev}
+                    disableFindNext={disableFindNext}
+                    isColumnEditable={isColumnEditable}
+                />
+            </div>
 
             {feedbackAlert && (
-                <ReusableDialog
-                    open={alertDialogOpen}
-                    handleClose={onFeedbackDialogClose}
-                    component={<FeedbackAlertComponent feedbackAlert={feedbackAlert} />}
-                    isAlertErrorComponent={!feedbackAlert.metadata || feedbackAlert.type !== "error"}
-                />
+                <div data-testid="feedback-alert-dialog">
+                    <ReusableDialog
+                        open={alertDialogOpen}
+                        handleClose={onFeedbackDialogClose}
+                        component={<FeedbackAlertComponent feedbackAlert={feedbackAlert} />}
+                        isAlertErrorComponent={!feedbackAlert.metadata || feedbackAlert.type !== "error"}
+                    />
+                </div>
             )}
         </div>
     );
