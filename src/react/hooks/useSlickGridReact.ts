@@ -4,18 +4,24 @@ import { useChart, useDataStore } from "../context";
 import { useChartID, useConfig, useOrderedParamColumns } from "../hooks";
 import { useHighlightedIndex } from "../selectionHooks";
 import useSortedIndices from "./useSortedIndices";
-import { type Column, Editors, type GridOption, type SlickgridReactInstance } from "slickgrid-react";
+import {
+    type Column,
+    Editors,
+    type GridOption,
+    type OnColumnsReorderedEventArgs,
+    type OnColumnsResizedEventArgs,
+    type SlickgridReactInstance,
+} from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { runInAction } from "mobx";
 
 const useSlickGridReact = () => {
-
     // Hooks
     const config = useConfig<TableChartReactConfig>();
     const dataStore = useDataStore();
     const chartId = useChartID();
     const chart = useChart<TableChartReactConfig>();
-    const orderedParamColumns = useOrderedParamColumns();
+    const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
     const sortedIndices = useSortedIndices();
     const highlightedIndex = useHighlightedIndex();
 
@@ -45,7 +51,7 @@ const useSlickGridReact = () => {
             cols.push({
                 id: "__index__",
                 field: "__index__",
-                name: "Index",
+                name: "index",
                 sortable: true,
                 minWidth: config.column_widths?.["__index__"] || 100,
             });
@@ -59,7 +65,7 @@ const useSlickGridReact = () => {
                 name: col.name,
                 sortable: true,
                 minWidth: config.column_widths?.[col.field] || 100,
-                editor: isColumnEditable ? {model: Editors.text} : null,
+                editor: isColumnEditable ? { model: Editors.text } : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
                     menu: {
@@ -189,11 +195,50 @@ const useSlickGridReact = () => {
                 }
             });
 
+        const resizeHandler: any = grid.onColumnsResized?.subscribe((_e, args: OnColumnsResizedEventArgs) => {
+            console.log("resize handler");
+            const columns = args.grid.getColumns();
+            runInAction(() => {
+                if (!config.column_widths) {
+                    config.column_widths = {};
+                }
+                // reassigning config.column_widths to local variable to avoid undefined type error
+                const columnWidths = config.column_widths;
+                columns.forEach((col: Column) => {
+                    if (col.width && col.width !== 100) {
+                        columnWidths[col.field] = col.width;
+                    } else if (columnWidths[col.field]) {
+                        // Remove if reset to default
+                        delete columnWidths[col.field];
+                    }
+                });
+            });
+        });
+
+        const reorderHandler: any = grid.onColumnsReordered?.subscribe((_e, args: OnColumnsReorderedEventArgs) => {
+            console.log("reorder handler");
+            const impactedColumns = args.impactedColumns;
+            runInAction(() => {
+                // Initialize order if it doesn't exist
+                if (!config.order) {
+                    config.order = {};
+                }
+                // reassigning config.order to local variable to avoid undefined type error
+                const order = config.order;
+                const cols = impactedColumns.filter((col) => col.field !== "__index__");
+                cols.forEach((col, index) => {
+                    order[col.field] = index;
+                });
+            });
+        });
+
         return () => {
             selectionHandler?.unsubscribe();
             sortHandler?.unsubscribe();
             headerMenuHandler?.unsubscribe();
             gridMenuHandler?.unsubscribe();
+            resizeHandler?.unsubscribe();
+            reorderHandler?.unsubscribe();
         };
     }, [config]);
 
@@ -219,7 +264,6 @@ const useSlickGridReact = () => {
             }, 100);
         }
     }, [highlightedIndex]);
-
 
     const options: GridOption = useMemo(
         () => ({

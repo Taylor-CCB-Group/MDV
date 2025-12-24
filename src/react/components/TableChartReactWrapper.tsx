@@ -15,6 +15,7 @@ export type TableChartReactConfig = BaseConfig & {
     type: "table_chart_react";
     include_index?: boolean;
     column_widths?: Record<string, number>;
+    order?: Record<string, number>;
     sort?: { columnId: string; ascending: boolean } | undefined;
 };
 
@@ -25,6 +26,7 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         super(dataStore, div, config, TableChartComponent);
         
         if (!config.column_widths) config.column_widths = {};
+        if (!config.order) config.order = {};
         if (config.include_index === undefined || config.include_index === null) config.include_index = false;
 
         // Extending config to make config.sort observable
@@ -40,6 +42,11 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         //         // this.downloadData();
         //     },
         // });
+    }
+
+    getConfig() {
+        const config = super.getConfig();
+        return config;
     }
 
     getSettings() {

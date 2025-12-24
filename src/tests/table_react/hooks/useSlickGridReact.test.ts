@@ -62,6 +62,7 @@ describe("useSlickGridReact", () => {
         mockConfig = observable({
             include_index: false,
             column_widths: {},
+            order: {},
             sort: undefined as { columnId: string; ascending: boolean } | undefined,
         }) as any;
 
