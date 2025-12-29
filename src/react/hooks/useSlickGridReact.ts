@@ -85,8 +85,8 @@ const useSlickGridReact = () => {
     }, [config.include_index, config.column_widths, orderedParamColumns]);
 
     const dataProvider = useMemo(() => {
-        return new SlickGridDataProvider(dataStore, orderedParamColumns, sortedIndices, config.include_index);
-    }, [dataStore, orderedParamColumns, sortedIndices, config.include_index]);
+        return new SlickGridDataProvider(orderedParamColumns, sortedIndices, config.include_index);
+    }, [orderedParamColumns, sortedIndices, config.include_index]);
 
     const isColumnEditable = useMemo(() => {
         const column = orderedParamColumns.find((col) => col.field === searchColumn);

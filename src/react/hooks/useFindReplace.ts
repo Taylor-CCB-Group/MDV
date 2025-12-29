@@ -80,7 +80,7 @@ const useFindReplace = (
                 for (let row = 0; row < sortedIndices.length; row++) {
                     const dataIndex = sortedIndices[row];
 
-                    const value = dataStore.getRowText(dataIndex, column.field);
+                    const value = column.getValue(dataIndex);
 
                     if (value === null) continue;
 
@@ -146,7 +146,6 @@ const useFindReplace = (
         [
             sortedIndices,
             orderedParamColumns,
-            dataStore,
             config.include_index,
             searchColumn,
             gridRef,

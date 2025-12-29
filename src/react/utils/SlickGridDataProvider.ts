@@ -4,13 +4,11 @@ import type DataStore from "@/datastore/DataStore";
 class SlickGridDataProvider {
   private columns: LoadedDataColumn<DataType>[];
   private indices: Uint32Array;
-  private dataStore: DataStore;
   private includeIndex: boolean;
   private selectedRowIds: Set<number>;
-  constructor(dataStore: DataStore, columns: LoadedDataColumn<DataType>[], indices: Uint32Array, includeIndex = false) {
+  constructor(columns: LoadedDataColumn<DataType>[], indices: Uint32Array, includeIndex = false) {
     this.columns = columns;
     this.indices = indices;
-    this.dataStore = dataStore;
     this.includeIndex = includeIndex;
     this.selectedRowIds = new Set();
   }
@@ -26,9 +24,12 @@ class SlickGridDataProvider {
 
     const dataIndex = this.indices[index];
 
-    // Use getRowAsObject exactly like old DataModel.getItem() does
-    const columnFields = this.columns.map(c => c.field);
-    const item: any = this.dataStore.getRowAsObject(dataIndex, columnFields);
+    const item: any = {};
+    for (const column of this.columns) {
+      if (column)
+        item[column.field] = column.getValue(dataIndex);
+    }
+
     if (!item) return null;
     // Add id for SlickGrid
     item.id = index;
@@ -49,11 +50,6 @@ class SlickGridDataProvider {
   getDataIndex(gridRow: number): number {
     return this.indices[gridRow];
   }
-
-  // // Find grid row for a data index (for external highlighting)
-  // findGridRow(dataIndex: number): number {
-  //   return this.indices.indexOf(dataIndex);
-  // }
 
   // Required by GridStateService for row selection
   getAllSelectedIds(): number[] {
@@ -78,24 +74,6 @@ class SlickGridDataProvider {
             return item?.id ?? row;
         });
 }
-
-  // // Map row IDs to row indices
-  // mapIdsToRows(ids: number[]): number[] {
-  //   return ids.filter(id => id >= 0 && id < this.indices.length);
-  // }
-
-  // // Map row indices to row IDs
-  // mapRowsToIds(rows: number[]): number[] {
-  //   return rows.filter(row => row >= 0 && row < this.indices.length);
-  // }
-
-  // getDataIndex(gridRow: number) {
-  //     return this.indices[gridRow];
-  // }
-
-  // findGridRow(dataIndex: number) {
-  //     return this.indices.indexOf(dataIndex);
-  // }
 
   // Avoid calling the default methods for sorting and filtering
   sort() {
