@@ -200,10 +200,10 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
 /**
  * version of {@link useParamColumns} which returns a sorted column array based on config.order
  */
-export function useOrderedParamColumns(): LoadedDataColumn<DataType>[] {
+export function useOrderedParamColumns<T extends { order?: Record<string, number> } = SelectionDialogConfig>(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
-    const config = useConfig<SelectionDialogConfig>();
+    const config = useConfig<T>();
     const [orderedParams, setOrderedParams] = useState<LoadedDataColumn<DataType>[]>([]);
 
     useEffect(() => {

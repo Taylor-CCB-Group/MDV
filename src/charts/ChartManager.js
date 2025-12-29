@@ -1111,10 +1111,53 @@ export class ChartManager {
                 editable: true,
                 field: cl.field,
             };
-            const arr = new Array(cl.data.length);
-            for (let i = 0; i < cl.data.length; i++) {
-                arr[i] = cl.data[i];
+            
+            // Add stringLength to metadata for unique columns (required by server)
+            if (cl.datatype === "unique" && cl.stringLength) {
+                md.stringLength = cl.stringLength;
             }
+            
+            let arr;
+            if (cl.datatype === "unique") {
+                // For unique columns, convert Uint8Array to array of strings (expected by server)
+                const textDecoder = new TextDecoder();
+                const stringLength = cl.stringLength;
+
+                if (!stringLength || typeof stringLength !== "number" || stringLength <= 0) {
+                    console.error(
+                        `Column ${c} has invalid or missing stringLength: ${stringLength}.`
+                    );
+                    // Fallback as empty array for now
+                    return { metadata: md, data: [] };
+                }
+
+                const numRows = dataStore.size;
+                arr = new Array(numRows);
+                
+                for (let i = 0; i < numRows; i++) {
+                    const baseIndex = i * stringLength;
+
+                    if (!cl.data || baseIndex + stringLength > cl.data.length) {
+                        console.error(
+                            `Index out of bounds for column ${c} at row ${i}. Skipping.`
+                        );
+                        arr[i] = "";
+                        continue;
+                    }
+
+                    const rowBytes = cl.data.slice(baseIndex, baseIndex + stringLength);
+                    const decoded = textDecoder.decode(rowBytes);
+                    // Remove null padding characters
+                    arr[i] = decoded.replace(/\0/g, '');
+                }
+            } else {
+                // For other datatypes, get the values from data array
+                arr = new Array(cl.data.length);
+                for (let i = 0; i < cl.data.length; i++) {
+                    arr[i] = cl.data[i];
+                }
+            }
+            
             return { metadata: md, data: arr };
         }
     }
