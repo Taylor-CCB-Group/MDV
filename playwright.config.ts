@@ -26,8 +26,9 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    // Update this to match the port of the server you are running
-    baseURL: 'http://localhost:5055/',
+    // Use TEST_BASE_URL env var if set, otherwise default to test container on port 5056
+    // Dev container runs on 5055, test container runs on 5056
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:5056/',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',

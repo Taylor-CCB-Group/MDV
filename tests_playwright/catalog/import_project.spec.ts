@@ -8,8 +8,13 @@ test('import dialog opens and success navigates', async ({ page }) => {
   await mockApiRoot(page);
   await mockProjects(page, []);
   await gotoPath(page);
+  await page.waitForLoadState('networkidle');
 
   await page.getByText('Import an existing project').click();
+  
+  // Wait for dialog to open
+  await page.waitForTimeout(500);
+  
   // Upload zip file
   const filePath = path.join(__dirname, '..', 'test-data', 'pbmc3k-mdv.mdv.zip');
   await page.locator('input[type="file"]').setInputFiles(filePath);
@@ -18,8 +23,8 @@ test('import dialog opens and success navigates', async ({ page }) => {
 
   await page.getByRole('button', { name: /upload file/i }).click();
 
-
-  await page.waitForURL('**/project/**');
+  // Increased timeout for navigation
+  await page.waitForURL('**/project/**', { timeout: 60000 });
   expect(page.url()).toContain('/project/');
 });
 

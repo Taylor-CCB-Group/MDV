@@ -35,8 +35,15 @@
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
     "test": "vitest",
+    "test:container:up": "docker compose -f docker-test.yml up -d",
+    "test:container:down": "docker compose -f docker-test.yml down",
+    "test:container:clean": "docker compose -f docker-test.yml down -v",
+    "test:container:logs": "docker compose -f docker-test.yml logs -f",
+    "test:container:restart": "npm run test:container:clean && npm run test:container:up",
     "playwright-test": "npx playwright test",
-    "playwright-test-ui": "npx playwright test --ui"
+    "playwright-test-ui": "npx playwright test --ui",
+    "test:e2e": "npm run test:container:up && npx playwright test; npm run test:container:down",
+    "test:e2e:clean": "npm run test:container:clean && npm run test:container:up && npx playwright test; npm run test:container:down"
   },
   "repository": {
     "type": "git",
