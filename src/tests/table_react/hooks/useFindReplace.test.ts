@@ -34,6 +34,9 @@ describe("useFindReplace", () => {
                 datatype: "integer",
                 data: new Uint32Array([10, 20, 30]),
                 editable: true,
+                getValue: vi.fn((dataIndex: number) => {
+                    return orderedParamColumns[0].data[dataIndex];
+                })
             },
             {
                 field: "cell_type",
@@ -41,6 +44,11 @@ describe("useFindReplace", () => {
                 data: new Uint8Array([0, 1, 2]),
                 values: ["T cells", "B cells", "NK cells"],
                 editable: true,
+                getValue: vi.fn((dataIndex: number) => {
+                    const column = orderedParamColumns[1];
+                    const valueIndex = column.data[dataIndex];
+                    return column.values[valueIndex] || null;
+                })
             },
         ] as any;
 
@@ -50,19 +58,6 @@ describe("useFindReplace", () => {
 
         // Mock DataStore
         dataStore = {
-            getRowText: vi.fn((dataIndex: number, field: string) => {
-                const column = orderedParamColumns.find((col) => col.field === field);
-                if (!column) return null;
-                
-                if (column.datatype === "text" && column.values) {
-                    const valueIndex = column.data[dataIndex];
-                    return column.values[valueIndex] || null;
-                }
-                if (column.datatype === "integer" || column.datatype === "double") {
-                    return String(column.data[dataIndex]);
-                }
-                return null;
-            }),
             dataChanged: vi.fn(),
         } as any;
 
