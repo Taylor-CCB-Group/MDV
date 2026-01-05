@@ -171,6 +171,15 @@ export default defineConfig(env => {
         port,
         strictPort: true,
         proxy,
+        watch: {
+            // Exclude Python templates from file watching
+            ignored: ['**/python/**'],
+        },
+        fs: {
+            // Deny access to Python templates directory - they're Flask templates
+            // with references to built assets that don't exist in dev mode
+            deny: ['.git', 'python/mdvtools/templates'],
+        },
     },
     publicDir: 'examples', //used for netlify.toml??... the rest is noise.
     build: {

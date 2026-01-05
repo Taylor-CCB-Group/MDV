@@ -79,8 +79,8 @@ def main():
     }
 
     axis_settings = {
-        "x" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8, 'rotate_labels' : True},
-        "y" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8, 'rotate_labels' : True}
+        "x" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8, 'rotate_status' : True},
+        "y" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8, 'rotate_status' : True}
     }
     
     # Create plot

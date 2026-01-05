@@ -143,8 +143,8 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         project = convert_scanpy_to_mdv(project_path, adata)
 
     logger.info("Setting up LLM interaction...")
-    code_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
-    dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
+    code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
+    dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
     
     if len(project.datasources) >= 2:
         df_list = [project.get_datasource_as_dataframe(ds['name']) for ds in project.datasources[:2]]

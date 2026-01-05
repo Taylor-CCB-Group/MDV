@@ -23,11 +23,26 @@ export async function fetchJsonConfig(url: string, root: string, createErrorComp
         return config;
     } catch (error: any) {
         if (createErrorComponent) {
-            //todo less hacky CSS - also consider making the dialog open by default
-            document.body.style.display = "flex";
-            document.body.style.justifyContent = "center";
-            document.body.style.alignItems = "center";
-            createMdvPortal(ErrorComponentReactWrapper({ error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
+            // Use a dedicated container instead of document.body to avoid React warnings
+            let errorContainer = document.getElementById("mdv-error-container");
+            if (!errorContainer) {
+                errorContainer = document.createElement("div");
+                errorContainer.id = "mdv-error-container";
+                document.body.appendChild(errorContainer);
+            }
+            // Basic styling for the error container
+            errorContainer.style.position = "fixed";
+            errorContainer.style.top = "0";
+            errorContainer.style.left = "0";
+            errorContainer.style.width = "100%";
+            errorContainer.style.height = "100%";
+            errorContainer.style.display = "flex";
+            errorContainer.style.justifyContent = "center";
+            errorContainer.style.alignItems = "center";
+            errorContainer.style.zIndex = "9999";
+            errorContainer.style.backgroundColor = "rgba(0,0,0,0.1)";
+
+            createMdvPortal(ErrorComponentReactWrapper({ error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), errorContainer);
         }
         console.error(`Error fetching ${url}: ${error}`);
         throw error;

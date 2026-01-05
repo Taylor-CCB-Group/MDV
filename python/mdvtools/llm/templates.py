@@ -92,6 +92,9 @@ from mdvtools.charts.sankey_plot import SankeyPlot
 import json
 import numpy as np
 import sys
+
+# Ensure all charts are available in the local namespace even if ruff tries to be clever
+_ = [MDVProject, DensityScatterPlot, HeatmapPlot, HistogramPlot, DotPlot, BoxPlot, ScatterPlot3D, RowChart, ScatterPlot, AbundanceBoxPlot, StackedRowChart, RingChart, PieChart, ViolinPlot, MultiLinePlot, TablePlot, WordcloudPlot, TextBox, RowSummaryBox, SelectionDialogPlot, SankeyPlot]
 """
 # def load_data(path):
 #     #Load data from the specified CSV file.
@@ -159,7 +162,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             ```python
             param = "GENE_NAME"
             param_index = data_frame_var['name'].tolist().index(param)
-            f"gs|{{{{param}}}}(gs)|{{{{param_index}}}}"
+            f"gs|{{param}}(gs)|{{param_index}}"
             ```
 
     6. Gene-Related Queries:

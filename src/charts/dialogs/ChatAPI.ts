@@ -10,14 +10,14 @@ const completedChatResponseSchema = z.object({
     /** 
      * This should be a string that identifies newly created views.
      */
-    view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
+    view: z.string().optional().nullable().describe('The name of the newly created view, if a view was created'),
     // timestamp: z.string(),
-    error: z.boolean().optional(),
+    error: z.boolean().optional().nullable(),
 });
 const chatInitResponseSchema = z.object({
     message: z.string(),
-    suggested_questions: z.array(z.string()).optional(),
-    error: z.boolean().optional(),
+    suggested_questions: z.array(z.string()).optional().nullable(),
+    error: z.boolean().optional().nullable(),
 });
 type ChatInitResponse = z.infer<typeof chatInitResponseSchema>;
 
@@ -25,7 +25,7 @@ const chatProgressSchema = z.object({
     id: z.string().describe('The ID of the message this progress is associated with'),
     progress: z.number(),
     delta: z.number(),
-    message: z.string(),
+    message: z.string().optional().nullable(),
 });
 
 export type ChatProgress = z.infer<typeof chatProgressSchema>;
@@ -46,9 +46,9 @@ const chatLogItemSchema = z.object({
     //the offending code was never merged so that is just for testing
     //these fields are expected to always be present on actual 
     conversation_id: z.string().optional().nullable(),
-    timestamp: z.string().optional(),
+    timestamp: z.string().optional().nullable(),
     view_name: z.string().optional().nullable(),
-    error: z.boolean().optional(),
+    error: z.boolean().optional().nullable(),
 });
 // this is possible - may consider it at some point.
 // .transform((data) => ({

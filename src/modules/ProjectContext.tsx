@@ -46,9 +46,9 @@ export function getProjectInfo(): ProjectInfo {
     const staticFolder = urlParams.get("static") !== null;
     // this is really projectID in the current implementation - would be good to have name as well (and be able to change it)
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
-    const { chartManager } = window.mdv;
+    const { chartManager } = window.mdv || {};
     //! might need to be a bit careful if we end up using this
-    const mainApiRoute = chartManager.config.mdv_api_root || "/";
+    const mainApiRoute = chartManager?.config?.mdv_api_root || "/";
     // const root = mainApiRoute; // todo establish that we have an actual consistent logic for this
     //! only applies when running with the associated project API routing...
     const projectApiRoute = `${mainApiRoute}/project/${projectName}/`.replace('//', '/');

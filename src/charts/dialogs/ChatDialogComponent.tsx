@@ -82,13 +82,16 @@ const SuggestedQuestions = ({ onSelect, suggestedQuestions }: { onSelect: (q: st
     </div>
 );
 
-const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQuestions }: ChatMessage & MessageType) => {
+const Message = ({ text: originalText, sender, view, onClose, error, updateInput, suggestedQuestions }: ChatMessage & MessageType) => {
     const isUser = sender === 'user';
     const [copied, setCopied] = useState(false);
-    const pythonSections = extractPythonSections(text);
+    const pythonSections = extractPythonSections(originalText);
+    
+    let displayContent: any = originalText;
     try {
-        text = JSON.parse(text);
+        displayContent = JSON.parse(originalText);
     } catch (e) {
+        // Not JSON, keep as original text
     }
 
     const messageStyle = isUser ? 
@@ -101,9 +104,11 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
     const messageIcon = error ?
             <CircleAlert color='red' /> :
             isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />;
+    
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(typeof text === 'string' ? text : JSON.stringify(text, null, 2));
+            const copyText = typeof displayContent === 'string' ? displayContent : JSON.stringify(displayContent, null, 2);
+            await navigator.clipboard.writeText(copyText);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
@@ -115,7 +120,6 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
         <div className='selectable mt-4'>
             <div>{messageIcon}</div>
             <div className={`mb-2 p-4 rounded-lg ${messageStyle} relative markdown-body`}>
-                {/* <JsonView src={text} /> */}
                 {(sender === "bot" || error) && (
                     <IconButton
                         size="small"
@@ -130,7 +134,11 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
                         )}
                     </IconButton>
                 )}
-                <MessageMarkdown text={text} />
+                {typeof displayContent === 'object' && displayContent !== null ? (
+                    <JsonView src={displayContent} />
+                ) : (
+                    <MessageMarkdown text={displayContent} />
+                )}
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
@@ -227,8 +235,8 @@ const PythonCode = ({ code }: { code: string }) => {
     );
 }
 
-const MessageMarkdown = ({ text }: { text: string }) => {
-    const markdown = text;
+const MessageMarkdown = ({ text }: { text: string | any }) => {
+    const markdown = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
     // nb, I asked the bot for a markdown test, and a few things were in this markdown rendering
     // ~~strikethrough~~, tables, task-lists, and footnotes. Would be possible to use a plugin for that.
     // Also the example image, but that was probably because it was a bad link.

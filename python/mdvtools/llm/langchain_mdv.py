@@ -36,6 +36,7 @@ from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
+from .mcp_tools import get_mcp_tools, init_mcp_tools, is_mcp_available
 
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
@@ -167,6 +168,18 @@ class ProjectChat(ProjectChatProtocol):
             "Hello, I'm an AI assistant that has access to the data in this project "
             "and is designed to help build views for visualising it. What can I help you with?"
         )
+        
+        # Initialize MCP tools with project reference
+        try:
+            init_mcp_tools(project)
+            self.mcp_available = is_mcp_available()
+            if self.mcp_available:
+                logger.info("MCP-Bio server is available")
+            else:
+                logger.info("MCP-Bio server not available - MCP tools disabled")
+        except Exception as e:
+            logger.warning(f"Could not initialize MCP tools: {e}")
+            self.mcp_available = False
 
         # rather than assign socket_api.logger to self.log, we can distinguish this global logger
         # from the one used during a chat request.
@@ -195,7 +208,7 @@ class ProjectChat(ProjectChatProtocol):
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
-                    llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
+                    llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
                     structured_llm = llm.with_structured_output(SuggestedQuestions)
                     prompt_text = create_suggested_questions_prompt(self.project)
                     messages = [HumanMessage(content=prompt_text)]
@@ -239,6 +252,7 @@ class ProjectChat(ProjectChatProtocol):
     def create_custom_pandas_agent(self, llm, dfs: dict, prompt_data, memory, verbose=False):
         """
         Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
+        Also includes MCP-Bio tools for bioinformatics analyses if available.
         """
         # Step 1: Create the Python REPL Tool
         python_tool = PythonAstREPLTool()
@@ -251,6 +265,36 @@ class ProjectChat(ProjectChatProtocol):
         
         # New fixes:
         python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
+
+        # Step 2: Gather all tools (Python REPL + MCP tools)
+        all_tools = [python_tool]
+        
+        # Add MCP-Bio tools info
+        if getattr(self, 'mcp_available', False):
+            mcp_tools = get_mcp_tools()
+            all_tools.extend(mcp_tools)
+            # #region agent log
+            log_debug("H1", "Tools registered with agent", {"tools": [t.name if hasattr(t, 'name') else str(t) for t in all_tools]})
+            # #endregion
+            mcp_tools_info = """
+
+**Analysis Tools** (from MCP-Bio server):
+- `list_analysis_tools`: See available bioinformatics analyses (UMAP, clustering, etc.)
+- `run_umap`: Run UMAP dimensionality reduction
+- `run_clustering`: Run Leiden clustering to group cells
+
+For UMAP, clustering, or other bioinformatics analyses, use the analysis tools.
+After running an analysis, tell the user to reload the page to see the new columns.
+"""
+            logger.info(f"Added {len(mcp_tools)} MCP tools to agent")
+        else:
+            mcp_tools_info = """
+
+**Analysis Tools Status**: The MCP-Bio server is currently **OFFLINE** or unreachable at http://localhost:8000. 
+If the user asks about available analysis tools (like UMAP, clustering, etc.), you must inform them that the MCP-Bio server is down and these tools are currently unavailable. 
+**CRITICAL**: In this case, do NOT provide "fields" and "charts" lines in your output. Just explain that the server is offline. Do NOT try to generate data exploration code or charts as a substitute.
+"""
+            logger.info("MCP-Bio server not available - MCP tools disabled in prompt")
 
         # Step 3: Define Contextualization Chain
         contextualize_q_system_prompt = """Given a chat history and the latest user question \
@@ -267,14 +311,21 @@ class ProjectChat(ProjectChatProtocol):
         # Use RunnableSequence, e.g., `prompt | llm` instead.
         contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
 
-        # Step 3: Define the Agent Prompt
-        prompt_data_template = f"""You have access to the following Pandas DataFrames: 
-        {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
-        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
-        Use these to correct the column names mentioned by the user.
-        You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
-        Use `df.info()` or `df.index()`.
-        Before running any code, check available variables using `list_globals()`.""" + prompt_data
+        # Step 4: Define the Agent Prompt (updated to include MCP tools)
+        prompt_data_template = f"""You are an AI assistant for biological data analysis.
+
+**Data Exploration Tools:**
+You have access to the following Pandas DataFrames: {', '.join(dfs.keys())}. 
+These are preloaded, so do not redefine them.
+
+If the user is asking for a list of available tools or to run a specific analysis (like UMAP or clustering), use the Analysis Tools immediately. 
+Otherwise, for data exploration questions, you must first run `df1.columns` and `df2.columns` to inspect available fields before answering. 
+Use these to correct the column names mentioned by the user.
+You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
+Use `df.info()` or `df.index()`.
+Before running any code, check available variables using `list_globals()`.
+{mcp_tools_info}
+""" + prompt_data
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", prompt_data_template),
@@ -283,11 +334,11 @@ class ProjectChat(ProjectChatProtocol):
             ("ai", "{agent_scratchpad}"),
         ])
 
-        # Step 4: Create the Agent
-        agent = create_openai_functions_agent(llm, [python_tool], prompt)
+        # Step 5: Create the Agent with all tools
+        agent = create_openai_functions_agent(llm, all_tools, prompt)
 
-        # Step 5: Wrap in an Agent Executor (Finalized Agent)
-        agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose, return_intermediate_steps=True)
+        # Step 6: Wrap in an Agent Executor (Finalized Agent)
+        agent_executor = AgentExecutor(agent=agent, tools=all_tools, memory=memory, verbose=verbose, return_intermediate_steps=True)
 
         # Step 6: Wrapper Function to Use Contextualization and Preserve Memory
         def agent_with_contextualization(question):
@@ -318,6 +369,9 @@ class ProjectChat(ProjectChatProtocol):
         
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room, conversation_id)
+        # #region agent log
+        log_debug("H2", "ask_question called", {"question": chat_request.get("message")})
+        # #endregion
         log = socket_api.log
         log(f"Asking question: {question}")
 
@@ -337,14 +391,14 @@ class ProjectChat(ProjectChatProtocol):
         with time_block("b6: Initialising LLM for RAG"):
             code_llm = ChatOpenAI(
                 temperature=0.1, 
-                model="gpt-4.1",
+                model="gpt-4o",
                 callbacks=[langchain_logging_handler]
             )
         
         with time_block("b7: Initialising LLM for agent"):
             dataframe_llm = ChatOpenAI(
                 temperature=0.1, 
-                model="gpt-4.1",
+                model="gpt-4o",
                 callbacks=[langchain_logging_handler]
             )
         # there is a risk that these are out of date by the time we get here...
@@ -386,8 +440,51 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 progress += 31
                 response = agent(question)
+                # #region agent log
+                steps = []
+                if "intermediate_steps" in response:
+                    for action, obs in response["intermediate_steps"]:
+                        steps.append({"tool": action.tool, "input": action.tool_input, "output": str(obs)[:100]})
+                log_debug("H4", "Agent execution completed", {
+                    "output": response.get("output"), 
+                    "steps": steps
+                })
+                # #endregion
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
             
+            # If the response is from an MCP tool (using markers or checking intermediate steps)
+            agent_output = response.get("output", "")
+            mcp_tool_used = False
+            if "intermediate_steps" in response:
+                for action, _ in response["intermediate_steps"]:
+                    # If any tool other than the python REPL was used, consider it an MCP/Analysis tool
+                    if action.tool != "python_repl_ast":
+                        mcp_tool_used = True
+                        break
+            
+            # Stricter early exit for MCP-Bio related queries to avoid hallucinated charts
+            is_mcp_query = "mcp-bio" in question.lower() or "analysis tool" in question.lower()
+            if mcp_tool_used or (is_mcp_query and "mcp-bio" in agent_output.lower()) or any(marker in agent_output for marker in ["**Available Analysis Tools:**", "**UMAP Complete!**", "**Clustering Complete!**", "**UMAP Failed:**", "**Clustering Failed:**", "**Error**:", "MCP-Bio server is currently offline"]):
+                # If the output is a JSON string (typical for read_h5ad), wrap it in a code block
+                if agent_output.strip().startswith("{") and agent_output.strip().endswith("}"):
+                    agent_output = f"```json\n{agent_output}\n```"
+                
+                # During debug, provide more info in chat
+                steps_info = ""
+                if "steps" in locals() and steps:
+                    steps_info = "\n\n**Debug - Tool Steps:**\n"
+                    for s in steps:
+                        steps_info += f"- Tool: `{s['tool']}`\n  - Input: `{s['input']}`\n  - Output: `{s['output']}`\n"
+                
+                # Check for path-related errors and suggest troubleshooting
+                if "File not found" in agent_output:
+                    steps_info += "\n\n**Troubleshooting:**\n- The MCP server is on your host, while the app is in Docker.\n- We tried relative path (from mdv root) and absolute path (from container root).\n- Check if the MCP server was started in the same directory that contains the `2` folder."
+                
+                final_response = f"{agent_output}{steps_info}"
+                log(final_response)
+                socket_api.update_chat_progress("Finished processing analysis query", id, 100, 0)
+                return {"code": final_response, "view_name": None, "error": False, "message": "Success"}
+
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 socket_api.update_chat_progress(
                     "RAG prompt preparation...", id, progress, 1
@@ -539,3 +636,24 @@ class ProjectChat(ProjectChatProtocol):
             )
             handle_error(e)
             return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {error_message}"}
+
+# #region agent log
+import json
+import time
+def log_debug(hypothesis_id, message, data=None):
+    log_entry = {
+        "id": f"log_{int(time.time())}_{hypothesis_id}",
+        "timestamp": int(time.time() * 1000),
+        "location": "langchain_mdv.py",
+        "message": message,
+        "data": data or {},
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": hypothesis_id
+    }
+    try:
+        with open("/app/.cursor/debug.log", "a") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception:
+        pass
+# #endregion

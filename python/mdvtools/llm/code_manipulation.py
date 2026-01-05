@@ -53,28 +53,12 @@ def prepare_code(result: str, data: Optional[str | pd.DataFrame], project: MDVPr
 
     # log("# Apply the reorder transformation")
     # modified_script = reorder_parameters(original_script, data)
-    lines = original_script.splitlines()
+    
+    # We want to keep the agent's code mostly as is, but ensure it's integrated correctly.
+    # Previously we were stripping imports, but that's risky if the agent uses something not in packages_functions.
+    captured_lines = original_script
 
-    # Find the starting line index
-    start_index = next(
-        (i for i, line in enumerate(lines) if not line.strip().startswith(('import', 'from'))), None
-    )
-
-    if start_index is not None:
-        # Capture all lines starting from the first 'def'
-        captured_lines = "\n".join(lines[start_index:])
-    else:
-        log("Pattern not found")
-        # this seems like it may actually be an error - and maybe not recoverable at this point
-        # I am adding this line to placate pyright which is complaining about `captured_lines` being possibly unbound
-        captured_lines = "# WARNING:::: No code captured from the response when calling prepare_code().\n"
-
-    # Log the prompt and the output of the LLM to the google sheets
-    # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
-
-    # logger('# Run the saved Python file. This will start a server on localhost:5050, open the browser and display the plot with the server continuing to run in the background.')
-    # %run temp_code_3.pyc
-    log("# Executing the code...")
+    # log("# Executing the code...")
     # - in order to get this to run in a chat context, we might want to get rid of the call to `p.add_datasource`
     final_code = f"""{packages_functions}\n{captured_lines}
 else:
@@ -120,10 +104,10 @@ def _lint_code_with_ruff(code: str, log=print):
             temp_file.write(code)
             temp_file_path = temp_file.name
 
-        log("# Running ruff linting and fixing...")
-        # Use --exit-zero to avoid raising an error if there are unfixable lint issues.
+        log("# Running ruff formatting...")
+        # Use format instead of check --fix to avoid removing "unused" imports that are needed by the agent
         ruff_result = subprocess.run(
-            ['ruff', 'check', temp_file_path, '--fix', '--exit-zero'],
+            ['ruff', 'format', temp_file_path],
             capture_output=True, text=True
         )
 
