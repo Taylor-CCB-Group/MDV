@@ -326,7 +326,8 @@ def get_mcp_tools() -> List:
         List of LangChain tool functions
     """
     from .mcp_client import get_mcp_client
-    from pydantic import create_model
+    from pydantic import create_model, Field as PydanticField
+    from typing import Optional, Any
     import json
 
     tools = [list_analysis_tools, run_umap, run_clustering]
@@ -348,11 +349,41 @@ def get_mcp_tools() -> List:
             schema = t.get('inputSchema', {})
             
             # Use a closure to capture the tool name
-            def make_tool_func(tool_name, tool_schema):
-                # Extract expected properties from schema
-                expected_props = tool_schema.get("properties", {}).keys()
+            def make_tool_func(tool_name, tool_schema, tool_desc):
+                # Extract properties from schema and create a dynamic Pydantic model
+                properties = tool_schema.get("properties", {})
+                required = tool_schema.get("required", [])
                 
-                @tool(tool_name)
+                # Build field definitions for Pydantic create_model
+                field_definitions = {}
+                for prop_name, prop_info in properties.items():
+                    prop_type = prop_info.get("type", "string")
+                    prop_desc = prop_info.get("description", "")
+                    
+                    # Map JSON schema types to Python types
+                    type_map = {
+                        "string": str,
+                        "integer": int,
+                        "number": float,
+                        "boolean": bool,
+                        "array": list,
+                        "object": dict
+                    }
+                    python_type = type_map.get(prop_type, str)
+                    
+                    # Make optional if not required
+                    if prop_name in required:
+                        field_definitions[prop_name] = (python_type, PydanticField(description=prop_desc))
+                    else:
+                        field_definitions[prop_name] = (Optional[python_type], PydanticField(default=None, description=prop_desc))
+                
+                # Create dynamic Pydantic model for this tool's parameters
+                if field_definitions:
+                    DynamicSchema = create_model(f"{tool_name}_params", **field_definitions)
+                else:
+                    DynamicSchema = None
+                
+                @tool(tool_name, args_schema=DynamicSchema)
                 def dynamic_tool(**kwargs) -> str:
                     """Dynamic tool wrapper for MCP."""
                     _check_initialized()
@@ -412,15 +443,16 @@ def get_mcp_tools() -> List:
                             current_kwargs = kwargs.copy()
                             
                             # Inject path into expected arguments if not provided by agent
-                            if "file_path" in expected_props and ("file_path" not in current_kwargs or not current_kwargs["file_path"]):
+                            if "file_path" in properties and ("file_path" not in current_kwargs or not current_kwargs["file_path"]):
                                 current_kwargs["file_path"] = attempt_path
-                            if "input_path" in expected_props and ("input_path" not in current_kwargs or not current_kwargs["input_path"]):
+                            if "input_path" in properties and ("input_path" not in current_kwargs or not current_kwargs["input_path"]):
                                 current_kwargs["input_path"] = attempt_path
-                            if "output_path" in expected_props and ("output_path" not in current_kwargs or not current_kwargs["output_path"]):
+                            if "output_path" in properties and ("output_path" not in current_kwargs or not current_kwargs["output_path"]):
                                 current_kwargs["output_path"] = attempt_path.replace(".h5ad", f"_{tool_name}_result.h5ad")
 
-                            # Filter kwargs to only include what's expected
-                            filtered_kwargs = {k: v for k, v in current_kwargs.items() if k in expected_props}
+                            # FIXED: Pass ALL kwargs through - don't filter out agent-provided parameters.
+                            # The MCP server will validate. Only path injection happens above.
+                            filtered_kwargs = current_kwargs
 
                             # #region agent log
                             log_debug("H10", f"Attempting {tool_name}", {"path": attempt_path, "kwargs": filtered_kwargs})
@@ -477,10 +509,10 @@ def get_mcp_tools() -> List:
                         return f"Error: {str(e)}"
                 
                 # Update the docstring to match the MCP tool's description
-                dynamic_tool.description = f"{tool_name}: {desc}"
+                dynamic_tool.description = f"{tool_name}: {tool_desc}"
                 return dynamic_tool
             
-            tools.append(make_tool_func(name, schema))
+            tools.append(make_tool_func(name, schema, desc))
             
     except Exception as e:
         logger.warning(f"Could not load dynamic MCP tools: {e}")
