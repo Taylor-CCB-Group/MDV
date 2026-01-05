@@ -24,7 +24,7 @@ class ChatRequest(TypedDict):
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
     def log(self, msg: str, *args: Any) -> None: ...
-
+    def get_suggested_questions(self) -> list[str]: ...
     def ask_question(
             self, 
             chat_request: ChatRequest,
@@ -51,6 +51,9 @@ except Exception as e:
 
         def log(self, msg, *args):
             print("[dummy bot]: " + (msg % args if args else msg))
+
+        def get_suggested_questions(self):
+            return []
 
         def ask_question(self, chat_request: ChatRequest):
             handle_error = chat_request["handle_error"]

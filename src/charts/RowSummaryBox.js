@@ -6,8 +6,7 @@ import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
 class RowSummaryBox extends BaseChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
-
-        if (config.image) {
+        if (config.image || config.image_set) {
             const d = createEl(
                 "div",
                 {
@@ -16,7 +15,23 @@ class RowSummaryBox extends BaseChart {
                 },
                 this.contentDiv,
             );
+            if (config.image_set){
+                this.img_data =  JSON.parse(JSON.stringify(dataStore.large_images[config.image_set]));
+            }
+            //legacy - images defined in config
+            else{
+                this.img_data =  JSON.parse(JSON.stringify(config.image));
+                this.img_data.key_column = this.config.param[this.img_data.param];
+            }
+            //base url may be stub e.g /project/data/im
+            //in which case trailing / added by getProjectURL needs to be removed
+            let base_url  = getProjectURL(this.img_data.base_url);
+            if (!this.img_data.base_url.endsWith("/")) {
+                base_url = base_url.replace(/\/+$/, "");
+            }
+            this.img_data.base_url = base_url;
             this.imViewer = new ImagePanZoom(d, this._getImage(0));
+            
         }
         this.paramHolders = {};
         const sectionDiv = createEl("div", {}, this.contentDiv);
@@ -65,11 +80,8 @@ class RowSummaryBox extends BaseChart {
     }
 
     _getImage(index) {
-        const c = this.config;
-        const p = c.param[c.image.param];
-        this.img_param = p;
-        const data = this.dataStore.getRowText(index, p);
-        return getProjectURL(`${c.image.base_url}${data}.${c.image.type}`);
+        const data = this.dataStore.getRowText(index, this.img_data.key_column);
+        return `${this.img_data.base_url}${data}.${this.img_data.type}`;
     }
 
     setSize(x, y) {

@@ -55,9 +55,7 @@ def main():
     dot_size = [800, 250]
     dot_position = [10, 500]
 
-    dot_colorscale = {
-        'log': False
-    }
+    dot_colorscale = {'log': False}
     
     # Create dot plot
     dot_plot = create_dot_plot(dot_title, dot_params, dot_size, dot_position, dot_colorscale)

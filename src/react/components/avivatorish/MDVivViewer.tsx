@@ -387,7 +387,11 @@ class MDVivViewerWrapper extends React.PureComponent<
         const otherLayers = vivLayers.filter((layer: any) => layer !== scaleBarLayer);
         const layers = deckProps?.layers === undefined
             ? [vivLayers]
-            : [otherLayers, ...deckProps.layers, scaleBarLayer];
+            : [otherLayers, ...deckProps.layers];
+        // XXX: including an undefined scaleBarLayer above causes some other layers to not render
+        if (scaleBarLayer) {
+            layers.push(scaleBarLayer);
+        }
         return (
             <DeckGL
                 // MDV: we mess with deck internals via ref to get eventManager to work in popouts

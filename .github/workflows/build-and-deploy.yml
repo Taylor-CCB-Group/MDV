@@ -6,11 +6,11 @@ on:
   workflow_dispatch: {}
   push:
     branches:
-      - dev
+      - main
   pull_request:
     types: [closed]
     branches:
-      - dev
+      - main
 
 jobs:
   build-and-deploy:
@@ -33,7 +33,7 @@ jobs:
         id: last_successful_commit
         run: |
           LAST_SUCCESSFUL_COMMIT=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs?status=success&branch=dev&per_page=1" | jq -r '.workflow_runs[0].head_sha')
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs?status=success&branch=main&per_page=1" | jq -r '.workflow_runs[0].head_sha')
           echo "Last successful commit: $LAST_SUCCESSFUL_COMMIT"
           echo "last_commit_sha=$LAST_SUCCESSFUL_COMMIT" >> $GITHUB_OUTPUT
 
@@ -42,7 +42,7 @@ jobs:
         id: latest_commit
         run: |
           LATEST_COMMIT=$(git rev-parse HEAD)
-          echo "Latest commit on dev: $LATEST_COMMIT"
+          echo "Latest commit on main: $LATEST_COMMIT"
           echo "latest_commit_sha=$LATEST_COMMIT" >> $GITHUB_OUTPUT
 
       - name: Check for new commits before building on schedule
@@ -97,6 +97,8 @@ jobs:
             --label "org.opencontainers.image.created=${{ steps.build_metadata.outputs.build_date }}" \
             --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
             --label "org.opencontainers.image.description=${{ steps.release_notes.outputs.release_notes }}" \
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ steps.build_metadata.outputs.git_commit_hash }} \
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
-            --push . 
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv:${{ steps.build_metadata.outputs.git_commit_hash }} \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv:latest \
+            --cache-from=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv:cache \
+            --cache-to=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv:cache,mode=max \
+            --push .

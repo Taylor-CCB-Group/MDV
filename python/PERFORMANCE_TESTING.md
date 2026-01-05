@@ -23,13 +23,13 @@ Performance tests are resource-intensive and are separated from regular CI to co
 ## CI Workflow
 
 ### Regular CI (`py_ci.yml`)
-- Runs on every push/PR to `dev` branch
+- Runs on every push/PR to `main` branch
 - Excludes performance tests using `-m "not performance"`
 - Includes pytest and pyright checks
 
 ### Performance CI (`py_performance.yml`)
 - Runs only when triggered
-- Works on all branches (not just dev/main)
+- Works on all branches (not just main/main)
 - Runs on any file changes (not just python/**)
 - Includes all performance tests
 - Uploads test results as artifacts
@@ -71,7 +71,7 @@ Add new conversion feature [perf-test]
 - Edge case handling
 - Data validation
 
-## Local Development
+## Local mainelopment
 
 ### Running Tests Locally
 
@@ -130,7 +130,7 @@ Performance tests require significant memory:
 ### Workflow Not Triggering
 If performance tests are not running despite having `[perf-test]` in your commit message:
 
-1. **Check your branch**: The workflow now runs on all branches (not just dev/main)
+1. **Check your branch**: The workflow now runs on all branches (not just main/main)
 2. **Verify commit message**: Make sure `[perf-test]` is exactly as shown (case-sensitive)
 3. **Check file changes**: The workflow runs on any file changes (not just python files)
 4. **Debug locally**: Check the workflow logs for debugging information

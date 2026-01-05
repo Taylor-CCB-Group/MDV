@@ -28,10 +28,25 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 import threading
+# Configure Numba caching before importing libraries that depend on it (e.g. scanpy)
+# In some deployment environments (zip/venv layers), Numba cannot locate source files for caching
+# which raises: "cannot cache function: no locator available". Disabling caching or providing a
+# writable cache directory avoids this during import time.
+_numba_cache_dir = os.environ.get("NUMBA_CACHE_DIR", "/tmp/numba_cache")
+try:
+    os.makedirs(_numba_cache_dir, exist_ok=True)
+except Exception:
+    # Best-effort only; if this fails, we still disable caching below
+    pass
+os.environ.setdefault("NUMBA_CACHE_DIR", _numba_cache_dir)
+os.environ.setdefault("NUMBA_DISABLE_CACHING", "1")
+
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
-from mdvtools.llm.chat_server_extension import chat_extension
+from mdvtools.socketio_upload import initialize_socketio_upload, register_project_for_upload
+from mdvtools.server_extension import MDVServerOptions
 from mdvtools.logging_config import get_logger
+
 
 logger = get_logger(__name__)
 logger.info("server.py module loaded")
@@ -51,17 +66,12 @@ routes = set()
 
 def create_app(
     project: MDVProject,
-    open_browser=True,
-    port=5050,
-    # todo: another way of specifying that we are using chat... also, use socket for other things.
-    websocket=True, # todo - pass something back to client in `state.json` that indicates whether this is enabled.
-    use_reloader=False,
-    app: Optional[Flask] = None,
-    # would like to redesign this a bit... this relates mostly to the ProjectBlueprint "_v2" thing
-    # and also some BS about adding headers to cope with server misconfiguration (as I recall).
-    backend_db=False,
+    options: Optional[MDVServerOptions] = None,
 ):
-    if app is None:
+    if options is None:
+        options = MDVServerOptions()
+
+    if options.app is None:
         route = ""
         # route = "/project/" + project.name # for testing new API with simple app...
         app = Flask(__name__)
@@ -70,7 +80,7 @@ def create_app(
         app.after_request(add_safe_headers)
         project_bp = SingleProjectShim(app)
         multi_project = False
-        if websocket:
+        if options.websocket:
             # reviewing this... thinking about hooking up to ProjectChat logger...
             #! nb - we're in 'single project' mode here.
             # thinking about syncronising list of views via SocketIO rather than polling... 
@@ -78,6 +88,7 @@ def create_app(
             # maybe we have some abstraction around how we create the Flask instance.
             mdv_socketio(app)
     else:
+        app = options.app
         ## nb - previous use of flask.Blueprint was not allowing new projects at runtime
         ## we substitute this with our own ProjectBlueprint class, which is a drop-in replacement
         ## but we should add more tests to ensure it behaves as expected...
@@ -88,10 +99,10 @@ def create_app(
         route = "/project/" + project.id + "/"
         
 
-        if backend_db:
-            from mdvtools.project_router import ProjectBlueprint_v2 as Blueprint_v2
-            log("backend_db is True")
-            project_bp = Blueprint_v2(project.id, __name__, url_prefix=route)
+        if options.backend_db:
+            project_bp = Blueprint(project.id, __name__, url_prefix=route)
+            from mdvtools.auth.project_auth import project_pre_dispatch_checks
+            project_bp.before_request(project_pre_dispatch_checks)
         else:
             project_bp = Blueprint(project.id, __name__, url_prefix=route)
 
@@ -99,17 +110,17 @@ def create_app(
     #     raise Exception(
     #         "Route already exists - can't have two projects with the same name"
     #     )
+
+        # SocketIO upload initialization
+        initialize_socketio_upload(app)
+        register_project_for_upload(project.id, project)
+
+
+
     routes.add(route)
 
-    if websocket:
-        """
-        current prototype using 'websocket' as a flag that we interpret as 'enable chatMDV' for now.
-        we might avoid having this logic in here, or at least change that semantic.
-        rather than pass in `app: Optional[Flask]`, we could pass in a configuration object
-        that includes that app and any extensions we want to use.
-        for now, the code has been rearranged, but the logic for calling it is similar...
-        """
-        chat_extension.register_routes(project, project_bp)
+    for extension in options.extensions:
+        extension.register_routes(project, project_bp)
 
 
     @project_bp.route("/")
@@ -119,8 +130,16 @@ def create_app(
         # some requests were being downgraded to http, which caused problems with the backend
         # but if we always add the header it messes up localhost development.
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
-        return render_template("page.html", route=route, backend=backend_db)
+        return render_template("page.html", route=route, backend=options.backend_db)
 
+    @project_bp.route("/spatial/<path:file>")
+    def get_spatialdata(file):
+        path = safe_join(project.dir, "spatial", file)
+        if path is None or not os.path.exists(path):
+            return "File not found", 404
+        # consider allowing directory listing here if it's not a file?
+        return send_file(path)
+    
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
@@ -141,6 +160,10 @@ def create_app(
     def get_json_file(file: str):
         if project.dir is None:
             return "Project directory not found", 404
+        # nb - matching on strings ending in json... where the spatial.conversion script named '.geojson',
+        # they were being changed here to '.ge.json' (dot in route is wildcard) and then getting a 404.
+        # also note - flask route vs our project_router behaved differently, so bug didn't appear in single project mode.
+        # Same logic could apply to .b & .gz above, but not wanting to risk changing behaviour without more testing.
         path = safe_join(project.dir, file + ".json")
         # log(f"get_json_file: '{path}' for project {project.id}")
 
@@ -152,10 +175,11 @@ def create_app(
                 try:
                     state = json.load(f)
                     # do we want this to always be true/not a flag we pass?
-                    state["websocket"] = websocket
+                    state["websocket"] = options.websocket
                     # in future, we could iterate over a list of extensions.
                     # we should alter permissions based on the permission of the user...
-                    chat_extension.mutate_state_json(state, project, app)
+                    for extension in options.extensions:
+                        extension.mutate_state_json(state, project, app)
                     
                     state['mdv_api_root'] = os.environ.get('MDV_API_ROOT', '/')
                     return state
@@ -184,9 +208,22 @@ def create_app(
     @project_bp.route("/images/<path:path>")
     def images(path):
         try:
-            return send_file(project.get_image(path))
+            file_path = project.get_image(path)
         except Exception:
-            return send_file(safe_join(project.imagefolder, path))
+            file_path = safe_join(project.imagefolder, path)
+
+        range_header = request.headers.get("Range", None)
+        if range_header:
+            response = get_range(file_path, range_header)
+        else:
+            response = send_file(file_path)
+
+        # Add long-lived cache headers for static images
+        try:
+            response.headers["Cache-Control"] = "public, max-age=31536000"
+        except Exception:
+            pass
+        return response
 
     # All the project's metadata
     @project_bp.route("/get_configs", methods=["GET", "POST"])
@@ -624,8 +661,8 @@ def create_app(
         metadata = project.get_datasource_metadata(name)
         return jsonify({"success": success, "metadata": metadata})
 
-    if open_browser:
-        webbrowser.open(f"http://localhost:{port}/{route}")
+    if options.open_browser:
+        webbrowser.open(f"http://localhost:{options.port}/{route}")
 
     if multi_project:
         assert(isinstance(app, Flask))
@@ -633,14 +670,14 @@ def create_app(
             log(f"there is already a blueprint at {route}")
         log(f"Adding project {project.id} to existing app")
         ## nb - uncomment this if not using ProjectBlueprint refactor...
-        # app.register_bluelog(project_bp)
+        # app.register_blueprint(project_bp)
     else:
         # user_reloader=False, allows the server to work within jupyter
 
         # app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
         ## todo - gevent for mdvlite / non-optional dependency
         from gevent.pywsgi import WSGIServer
-        http_server = WSGIServer(("127.0.0.1", port), app)
+        http_server = WSGIServer(("127.0.0.1", options.port), app)
         http_server.serve_forever()
 
 

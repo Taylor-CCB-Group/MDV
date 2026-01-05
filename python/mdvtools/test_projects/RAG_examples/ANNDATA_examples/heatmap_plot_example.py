@@ -23,7 +23,9 @@ def create_heatmap_plot(title, params, size, position, colorscale, x_axis_settin
                 xsize=axis_settings["x"]["size"],
                 ysize=axis_settings["y"]["size"],
                 xtickfont=axis_settings["x"]["tickfont"],
-                ytickfont=axis_settings["y"]["tickfont"]
+                ytickfont=axis_settings["y"]["tickfont"],
+                xrotate_status=axis_settings["x"]["rotate_status"],
+                yrotate_status=axis_settings["y"]["rotate_status"]
             )
 
     
@@ -77,8 +79,8 @@ def main():
     }
 
     axis_settings = {
-        "x" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8},
-        "y" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8}
+        "x" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8, 'rotate_labels' : True},
+        "y" : {'textSize' : 8, 'size' : 110, 'tickfont' : 8, 'rotate_labels' : True}
     }
     
     # Create plot

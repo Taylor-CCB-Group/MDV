@@ -5,6 +5,8 @@ from mdvtools.logging_config import get_logger
 logger = get_logger(__name__)
 
 # in_memory_cache.py
+# nb - we should review thread-safety of this: could lead to some uid having wrong value
+# which would be *bad*
 user_cache = {}  # key: auth_id -> user details
 user_project_cache = {}  # key: user_id -> project permissions
 all_users_cache = []  # list of all user summaries
@@ -14,47 +16,69 @@ active_projects_cache = []
 cache_last_updated = None
 CACHE_REFRESH_INTERVAL = 300  # 5 minutes
 
-def get_auth_provider():
-    # Try to fetch the authentication method from session first
-
-    if has_request_context():
-        auth_method = session.get("auth_method", None)
-    else:
-        auth_method = None
-    
-    if not auth_method:
-        # If no auth method is found in the session, use the default from app config
-        auth_method = current_app.config.get("DEFAULT_AUTH_METHOD", "dummy")
-    
-    if not auth_method:
-        raise ValueError("Authentication method is not specified in session or config.")
-    
-    
+def create_auth_provider(auth_method: str, app):
+    """Factory function to create an authentication provider."""
     auth_method = auth_method.lower()
 
     if auth_method == "auth0":
         from mdvtools.auth.auth0_provider import Auth0Provider
         from mdvtools.dbutils.mdv_server_app import oauth
         return Auth0Provider(
-            current_app,
+            app,
             oauth=oauth,
-            client_id=current_app.config['AUTH0_CLIENT_ID'],
-            client_secret=current_app.config['AUTH0_CLIENT_SECRET'],
-            domain=current_app.config['AUTH0_DOMAIN']
+            client_id=app.config['AUTH0_CLIENT_ID'],
+            client_secret=app.config['AUTH0_CLIENT_SECRET'],
+            domain=app.config['AUTH0_DOMAIN']
         )
     
     elif auth_method == "dummy":
         from mdvtools.auth.dummy_provider import DummyAuthProvider
-        return DummyAuthProvider(current_app)
+        return DummyAuthProvider(app)
+    
     elif auth_method == "shibboleth":
-        # If default method is 'dummy', force dummy provider even if 'shibboleth' was requested
-        if current_app.config.get("DEFAULT_AUTH_METHOD", "").lower() == "dummy":
-            from mdvtools.auth.dummy_provider import DummyAuthProvider
-            return DummyAuthProvider(current_app)
         from mdvtools.auth.shibboleth_provider import ShibbolethProvider
-        return ShibbolethProvider(current_app)
+        return ShibbolethProvider(app)
+    
     else:
         raise ValueError(f"Unsupported auth method: {auth_method}")
+
+def get_auth_provider():
+    """
+    Determines the correct authentication method and returns an instance of the
+    corresponding auth provider.
+
+    The resolution order is:
+    1. If DEFAULT_AUTH_METHOD in the app config is explicitly set to 'dummy',
+       the DummyAuthProvider is ALWAYS used. This is a developer override for
+       safe local testing.
+    2. If 'auth_method' is present in the session, that method is used.
+    3. Otherwise, the value from the required DEFAULT_AUTH_METHOD app
+       configuration is used.
+
+    Raises:
+        ValueError: If DEFAULT_AUTH_METHOD is not configured in the application.
+    """
+    # Fail loudly if the default auth method is not explicitly configured.
+    # This prevents silently falling back to an insecure 'dummy' mode.
+    try:
+        default_method = current_app.config["DEFAULT_AUTH_METHOD"]
+    except KeyError:
+        raise ValueError("Security risk: DEFAULT_AUTH_METHOD must be explicitly configured.")
+
+    # 1. Check for the developer override.
+    if default_method.lower() == 'dummy':
+        return create_auth_provider('dummy', current_app)
+
+    # 2. Check for a method specified in the session.
+    auth_method = None
+    if has_request_context():
+        auth_method = session.get("auth_method")
+    
+    # 3. Fall back to the configured default method.
+    if not auth_method:
+        auth_method = default_method
+    
+    return create_auth_provider(auth_method, current_app)
 
 def is_authenticated():
     """Validate the current user via Auth0 or Shibboleth."""

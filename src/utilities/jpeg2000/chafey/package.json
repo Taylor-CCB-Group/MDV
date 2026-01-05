@@ -1,0 +1,12 @@
+{
+  "name": "openjpegjs",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "openjpegjs.js",
+  "types": "openjpegjs.d.ts",
+  "files": [
+    "openjpegjs.js",
+    "openjpegjs.wasm",
+    "openjpegjs.d.ts"
+  ]
+} 

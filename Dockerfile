@@ -80,6 +80,9 @@ WORKDIR /app
 # `.bashrc` is used to activate the virtual environment automatically.
 RUN poetry config virtualenvs.in-project true
 
+# Prefer binary wheels to avoid slow/fragile source builds (e.g., numcodecs on arm64)
+ENV PIP_PREFER_BINARY=1
+
 # Install Python dependencies using Poetry
 # this should be early in the process because it's less likely to change
 # copy poetry files first to cache the install step (with correct ownership)
@@ -140,12 +143,27 @@ RUN npm config set script-shell "/bin/bash"
 RUN echo 'cd /app/python && $(poetry env activate)' >> ~/.bashrc && \
     echo 'cd /app' >> ~/.bashrc
 
+#USER root
+#RUN mkdir -p /app/logs && chown -R pn:pn /app/logs
+#USER pn
+
 USER root
-RUN mkdir -p /app/logs && chown -R pn:pn /app/logs
+RUN mkdir -p /app/mdv && chown -R pn:pn /app/mdv
 USER pn
 
+
 # Command to run Gunicorn
-CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "200", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]
+# NOTE: For multi-worker deployments (more than 1 worker), you MUST set REDIS_URL
+# environment variable. Flask-SocketIO requires Redis to share session state across workers.
+# Without Redis, you'll get "KeyError: 'Session is disconnected'" errors.
+# Example: REDIS_URL=redis://redis:6379/0
+# 
+# Single worker (no Redis needed):
+#   -w 1
+# 
+# Multi-worker (Redis required):
+#   -w 4  # or any number > 1
+CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 

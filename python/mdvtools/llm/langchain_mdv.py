@@ -1,9 +1,11 @@
 import time
 import logging
+import re
 from contextlib import contextmanager
 import os
 import traceback
-from typing import Callable
+import html
+from typing import List
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
@@ -15,6 +17,9 @@ from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain.schema import HumanMessage
+from .markdown_utils import create_suggested_questions_prompt
 
 # from langchain.prompts import PromptTemplate
 
@@ -28,7 +33,7 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import parse_view_name, prepare_code
+from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
@@ -67,6 +72,12 @@ chat_debug_handler.setFormatter(formatter)
 
 # attach the handler
 chat_debug_logger.addHandler(chat_debug_handler)
+
+class SuggestedQuestions(BaseModel):
+    """A list of suggested questions to ask about the data."""
+    questions: List[str] = Field(
+        description="A list of 5 suggested questions based on the provided data context. Each question should be a single, complete sentence."
+    )
 
 @contextmanager
 def time_block(name):
@@ -163,7 +174,7 @@ class ProjectChat(ProjectChatProtocol):
         
         # Store conversation memories for persistence across requests
         self.conversation_memories = {}  # Dict to store ConversationBufferMemory for each conversation
-        
+        self.suggested_questions: list[str] = []
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
         elif len(project.datasources) > 1: # remove? or make it == 1 ?
@@ -182,6 +193,19 @@ class ProjectChat(ProjectChatProtocol):
             else:
                 self.df_list = [self.project.get_datasource_as_dataframe(self.project.datasources[0]['name'])]
 
+            try:
+                with time_block("b_suggest: Generating suggested questions"):
+                    llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
+                    structured_llm = llm.with_structured_output(SuggestedQuestions)
+                    prompt_text = create_suggested_questions_prompt(self.project)
+                    messages = [HumanMessage(content=prompt_text)]
+                    result = structured_llm.invoke(messages)
+                    self.suggested_questions = result.questions # type: ignore
+                    self.log(f"Generated suggested questions: {self.suggested_questions}")
+            except Exception as e:
+                self.log(f"Could not generate suggested questions: {e}")
+                self.suggested_questions = [str(e)]
+
             self.init_error = False
         except Exception as e:
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
@@ -190,6 +214,13 @@ class ProjectChat(ProjectChatProtocol):
             self.error_message = error_message
             self.init_error = True
 
+    def get_suggested_questions(self):
+        if self.init_error:
+            return []
+        if self.suggested_questions:
+            return self.suggested_questions
+        return ["This should be unreachable"]
+    
     def get_or_create_memory(self, conversation_id: str):
         """Get or create conversation memory for a specific conversation"""
         if conversation_id not in self.conversation_memories:
@@ -221,11 +252,12 @@ class ProjectChat(ProjectChatProtocol):
         # New fixes:
         python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
 
-        # Step 2: Define Contextualization Chain
+        # Step 3: Define Contextualization Chain
         contextualize_q_system_prompt = """Given a chat history and the latest user question \
         which might reference context in the chat history, formulate a standalone question \
         which can be understood without the chat history. Do NOT answer the question, \
-        just reformulate it if needed and otherwise return it as is."""
+        just reformulate it if needed and otherwise return it as is. \
+        """
 
         contextualize_prompt = ChatPromptTemplate.from_messages([
             ("system", contextualize_q_system_prompt),
@@ -240,7 +272,8 @@ class ProjectChat(ProjectChatProtocol):
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
         Use these to correct the column names mentioned by the user.
-        If you need to check their structure, use `df.info()` or `df.head()`. 
+        You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
+        Use `df.info()` or `df.index()`.
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
         prompt = ChatPromptTemplate.from_messages([
@@ -366,7 +399,7 @@ class ProjectChat(ProjectChatProtocol):
                 csv_file = None
                 h5ad_file = None
 
-                # Identify the CSV or H5AD file
+                # Identify the CSV or H5AD file (optional)
                 # subject to review...
                 for file in files_in_dir:
                     if file.endswith(".csv"):
@@ -374,13 +407,13 @@ class ProjectChat(ProjectChatProtocol):
                     elif file.endswith(".h5ad"):
                         h5ad_file = file
 
-                # Determine the path_to_data
-                if csv_file:
-                    path_to_data = os.path.join(self.project.dir, csv_file)
-                elif h5ad_file:
+                # Determine the path_to_data (optional)
+                if h5ad_file:
                     path_to_data = os.path.join(self.project.dir, h5ad_file)
+                elif csv_file:
+                    path_to_data = os.path.join(self.project.dir, csv_file)
                 else:
-                    raise FileNotFoundError("No CSV or H5AD file found in the directory.")
+                    path_to_data = ""  # fallback: no external file; operate on existing project datasources
 
                 datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
 
@@ -390,7 +423,7 @@ class ProjectChat(ProjectChatProtocol):
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
                 prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], response['input'])
-                chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
+                chat_debug_logger.info(f"=== RAG Base Prompt (before context injection) ===\n{prompt_RAG}\n=== End Base Prompt ===")
 
                 prompt_RAG_template = PromptTemplate(
                      template=prompt_RAG,
@@ -402,13 +435,21 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 progress += 60
 
+                match = re.search(r'charts\s+(.*)', response['output'])
+                charts_part = match.group(1) if match else response['output']
+
                 qa_chain = RetrievalQA.from_llm(
                     llm=code_llm, 
                     prompt=prompt_RAG_template, 
                     retriever=retriever,
                     return_source_documents=True,
                 )
-                output_qa = qa_chain.invoke({"query": response['input']})
+                output_qa = qa_chain.invoke({"query": charts_part})
+                # Log the complete prompt after context injection
+                if "source_documents" in output_qa:
+                    retrieved_context = "\n".join(doc.page_content for doc in output_qa["source_documents"])
+                    complete_prompt = prompt_RAG_template.format(context=retrieved_context, question=charts_part)
+                    chat_debug_logger.info(f"=== Complete RAG Prompt (with injected context) ===\n{complete_prompt}\n=== End Complete Prompt ===")
                 result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time
@@ -447,9 +488,42 @@ class ProjectChat(ProjectChatProtocol):
                 log(f"view_name: {view_name}")
                 
             with time_block("b16: Log chat item"):
-                final_code_updated = f"I ran some code for you:\n\n```python\n{final_code}\n```"
+                 # Extract the explanation section from the LLM's response (removing code blocks)
+                explanation = extract_explanation_from_response(output_qa["result"])
+                # Extract the context information from the response
+                context_information = output_qa['source_documents']
+                context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+                context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+                context_information_metadata_name = [s for s in context_information_metadata_url]
+                context = str(context_information_metadata_name)
+                context_files = (
+                    "<br><br>"
+                    "The context used to generate the above code has been augmented by the following files:\n\n"
+                    # Prevent XSS by adding html.escape (Suggested by coderabbit)
+                    + "\n".join(f"- `{html.escape(name)}`" for name in context_information_metadata_name)
+                    + "\n\n"
+                )
+                final_code_updated = (
+                    "I ran some code for you:\n\n"
+                    "```python\n"
+                    f"{final_code}\n"
+                    "```\n\n"
+                    "<br><br>"
+                    f"{html.escape(explanation)}"
+                    "\n\n"
+                    f"{context_files}"
+                )
                 # Log successful code execution
-                log_chat_item(self.project, question, output_qa, prompt_RAG, final_code_updated, conversation_id, view_name)
+                log_chat_item(
+                    project=self.project, 
+                    question=question, 
+                    output=output_qa, 
+                    prompt_template=prompt_RAG, 
+                    response=final_code_updated, 
+                    conversation_id=conversation_id, 
+                    context=context, 
+                    view_name=view_name
+                )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0

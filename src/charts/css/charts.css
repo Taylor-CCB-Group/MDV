@@ -19,6 +19,9 @@
         --menu-gradient: linear-gradient(#444, #222);
         --tooltip_background_color: #f5f5f5;
         --tooltip_text_color: #222;
+        --title_bar_height: 31px;
+        --resizer-size: 10px;
+        --resizer-offset: -10px;
     }
 }
 @media (prefers-color-scheme: light) {
@@ -41,6 +44,9 @@
         --menu-gradient: linear-gradient(white, darkgray);
         --tooltip_background_color: #222;
         --tooltip_text_color: #f5f5f5;
+        --title_bar_height: 31px;
+        --resizer-size: 10px;
+        --resizer-offset: -10px;
     }
 }
 
@@ -175,6 +181,57 @@ select, input, textarea {
     overflow-x: hidden !important;
 }
 
+/* Overriding grid stack resizer styling to replicate absolute view */
+.grid-stack .ui-resizable-n { 
+    position: absolute !important;
+    top: var(--resizer-offset) !important;
+    left: 0 !important;
+    right: 0 !important;
+}
+.grid-stack .ui-resizable-s { 
+    position: absolute !important;
+    bottom: var(--resizer-offset) !important;
+    left: 0 !important;
+    right: 0 !important;
+ }
+.grid-stack .ui-resizable-e { 
+    position: absolute !important;
+    top: var(--title_bar_height) !important;
+    right: var(--resizer-offset) !important;
+    bottom: 0 !important;
+    height: calc(100% - var(--title_bar_height)) !important;
+}
+.grid-stack .ui-resizable-w { 
+    position: absolute !important;
+    top: var(--title_bar_height) !important;
+    left: var(--resizer-offset) !important;
+    bottom: 0 !important;
+    height: calc(100% - var(--title_bar_height)) !important;
+ }
+ .grid-stack .ui-resizable-ne { 
+     position: absolute !important;
+     top: var(--resizer-offset) !important;
+     right: var(--resizer-offset) !important;
+  }
+ .grid-stack .ui-resizable-nw { 
+     position: absolute !important;
+     top: var(--resizer-offset) !important;
+     left: var(--resizer-offset) !important;
+  }
+.grid-stack .ui-resizable-se { 
+    position: absolute !important;
+    bottom: var(--resizer-offset) !important;
+    right: var(--resizer-offset) !important;
+    /* To hide the duplicate resize handles at the bottom */
+    background: transparent !important;
+ }
+.grid-stack .ui-resizable-sw { 
+    position: absolute !important;
+    bottom: var(--resizer-offset) !important;
+    left: var(--resizer-offset) !important;
+    background: transparent !important;
+ }
+
 .dark .gridLock {
     border-color: #101010;
 }
@@ -189,13 +246,14 @@ select, input, textarea {
     box-shadow: 0 0 1em var(--shadow_color);
 }
 
+/* Resize handlers */
 /* Top */
 .resizer-n {
     position: absolute;
-    top: 0;
+    top: var(--resizer-offset);
     left: 0;
     width: 100%;
-    height: 5px;
+    height: var(--resizer-size);
     cursor: n-resize;
     background: transparent;
     z-index: 2;
@@ -204,22 +262,23 @@ select, input, textarea {
   /* Bottom */
   .resizer-s {
     position: absolute;
-    bottom: 0;
+    bottom: var(--resizer-offset);
     left: 0;
     width: 100%;
-    height: 10px;
+    height: var(--resizer-size);
     cursor: s-resize;
     background: transparent;
     z-index: 2;
   }
   
   /* Right */
+  /* Hardcoding the height of ciview-chart-titlebar (31px) to avoid drag and resize overlap */
   .resizer-e {
     position: absolute;
-    top: 31px;
-    right: 0;
-    width: 5px;
-    height: 100%;
+    top: var(--title_bar_height);
+    right: var(--resizer-offset);
+    width: var(--resizer-size);
+    height: calc(100% - var(--title_bar_height));
     cursor: e-resize;
     background: transparent;
     z-index: 2;
@@ -228,10 +287,10 @@ select, input, textarea {
   /* Left */
   .resizer-w {
     position: absolute;
-    top: 31px;
-    left: 0;
-    width: 5px;
-    height: 100%;
+    top: var(--title_bar_height);
+    left: var(--resizer-offset);
+    width: var(--resizer-size);
+    height: calc(100% - var(--title_bar_height));
     cursor: w-resize;
     background: transparent;
     z-index: 2;
@@ -240,10 +299,10 @@ select, input, textarea {
   /* Top-right */
   .resizer-ne {
     position: absolute;
-    top: 0;
-    right: 0;
-    width: 10px;
-    height: 10px;
+    top: var(--resizer-offset);
+    right: var(--resizer-offset);
+    width: var(--resizer-size);
+    height: var(--resizer-size);
     cursor: ne-resize;
     background: transparent;
     z-index: 2;
@@ -252,10 +311,10 @@ select, input, textarea {
   /* Top-left */
   .resizer-nw {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 10px;
-    height: 10px;
+    top: var(--resizer-offset);
+    left: var(--resizer-offset);
+    width: var(--resizer-size);
+    height: var(--resizer-size);
     cursor: nw-resize;
     background: transparent;
     z-index: 2;
@@ -264,22 +323,22 @@ select, input, textarea {
   /* Bottom-right */
   .resizer-se {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 10px;
-    height: 10px;
+    bottom: var(--resizer-offset);
+    right: var(--resizer-offset);
+    width: var(--resizer-size);
+    height: var(--resizer-size);
     cursor: se-resize;
     background: transparent;
     z-index: 2;
   }
   
   /* Bottom-left */
-  .resizer-sw {
+    .resizer-sw {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 10px;
-    height: 10px;
+    bottom: var(--resizer-offset);
+    left: var(--resizer-offset);
+    width: var(--resizer-size);
+    height: var(--resizer-size);
     cursor: sw-resize;
     background: transparent;
     z-index: 2;
@@ -292,6 +351,7 @@ select, input, textarea {
     background-color: var(--background_color);
     flex:0 0 auto;
     font-size:14px;
+    overflow:hidden;
     border: 1px solid rgba(120,120,120, 0.2); /* Add a subtle border */
 }
 
@@ -325,6 +385,7 @@ select, input, textarea {
     min-height:1px;
     background-color: var(--main_panel_color);
     color: var(--text_color);
+    overflow: hidden;
 }
 
 .legend-container {
@@ -537,26 +598,29 @@ select, input, textarea {
 .markdown-body table {
     font-size: small;
     border-collapse: collapse;
-    display: inline-block;
+    display: block;
     max-height: 250px;
-    overflow: scroll;
+    overflow: auto;
     text-align: center;
-    width: 50%;
     border: 1px solid var(--border_menu_bar_color);
 }
 
 .markdown-body thead, .markdown-body tbody {
-    display: table;
     width: 100%;
 }
 
 .markdown-body td {
     border: 1px solid var(--menu_bar_color);
+    min-width: 5rem;
     padding: 4px 8px;
 }
 
 .markdown-body th {
-    display: none;
+    /* display: none; */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: bold;
 }
 
 .markdown-body tr:nth-child(odd) {
@@ -565,4 +629,13 @@ select, input, textarea {
 
 .markdown-body tr:nth-child(even) {
     background-color: var(--background_color)
+}
+
+.tippy-content{
+    background: var(--tooltip_background_color);
+    color: var(--tooltip_text_color);
+}
+
+.tippy-arrow:before {
+   color: var(--tooltip_background_color);
 }

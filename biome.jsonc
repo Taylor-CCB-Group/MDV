@@ -56,7 +56,8 @@
 			"./src/table/css/slick*",
 			"./src/tailwind.css",
 			"./src/utilities/css/**/*",
-			"./src/css/**/*"
+			"./src/css/**/*",
+			"./src/utilities/jpeg2000/chafey/**/*"
 		]
 	}
 }

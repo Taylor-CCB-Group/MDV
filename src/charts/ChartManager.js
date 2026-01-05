@@ -38,6 +38,7 @@ import "./DensityScatterPlot";
 import "./StackedRowChart";
 import "./TreeDiagram";
 import "./CellNetworkChart";
+import "./FlexibleNetworkChart";
 import "./SingleHeatMap";
 import "./VivScatterPlot";
 import "./DotPlot";
@@ -912,6 +913,10 @@ export class ChartManager {
         new ViewDialogWrapper("add");
     }
 
+    /**
+     * @param {()=>void=} action
+     * @param {string=} content
+     */
     showSaveViewDialog(action, content) {
         new ViewDialogWrapper("save", action, content);
     }

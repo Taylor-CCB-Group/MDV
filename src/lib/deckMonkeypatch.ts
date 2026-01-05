@@ -1,7 +1,7 @@
 import { EventManager, InputDirection, Pan, Pinch, Tap } from 'mjolnir.js';
 // import { EVENT_HANDLERS, RECOGNIZERS } from '@deck.gl/core/dist/lib/constants';
 import { Deck } from '@deck.gl/core';
-import type { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
+import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
 
 // we don't need the keys; we'll break in.
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
@@ -14,8 +14,57 @@ class MonkeyPatchDeck extends Deck<any> {
     declare public canvas;
 }
 
+/**
+In editable-layers.js, click and dblclick events weren't being handled possibly because of a dependency mismatch?
+
+This should be removed when we next update deck.gl et al.
+
+```typescript
+const EVENT_TYPES = ['anyclick', 'pointermove', 'panstart', 'panmove', 'panend', 'keyup'];
+
+class EditableLayer {
+    _addEventHandlers() {
+        // @ts-expect-error accessing protected props
+        const { eventManager } = this.context.deck;
+        const { eventHandler } = this.state._editableLayerState;
+        for (const eventType of EVENT_TYPES) {
+            eventManager.on(eventType, eventHandler, {
+                // give nebula a higher priority so that it can stop propagation to deck.gl's map panning handlers
+                priority: 100
+            });
+        }
+    }
+    _forwardEventToCurrentLayer(event) {
+        const currentLayer = this.getCurrentLayer();
+        // Use a naming convention to find the event handling function for this event type
+        const func = currentLayer[`_on${event.type}`].bind(currentLayer);
+        //...
+    }
+}
+```
+*/
+
+export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
+    override _addEventHandlers() {
+        super._addEventHandlers();
+        // @ts-expect-error accessing protected props
+        const { eventManager } = this.context.deck;
+        const { eventHandler } = this.state._editableLayerState;
+        console.warn('---monkey patch adding click -> anyclick handler to editable layer pending deck update---');
+        eventManager.on('click', eventHandler, { priority: 100 });
+        eventManager.on('dblclick', eventHandler, { priority: 100 });
+    }
+    _onclick(event: any) {
+        this._onanyclick(event);
+    }
+    _ondblclick(event: any) {
+        this._onanyclick(event);
+    }
+}
+
 const EVENT_HANDLERS: { [eventName: string]: string } = {
-    click: 'onClick',
+    click: 'onClick', //is onClick a thing?
+    anyclick: 'onClick',
     panstart: 'onDragStart',
     panmove: 'onDrag',
     panend: 'onDragEnd'
@@ -26,7 +75,9 @@ const RECOGNIZERS = {
     pinch: [Pinch, {}, null, ['multipan']],
     pan: [Pan, { threshold: 1 }, ['pinch'], ['multipan']],
     dblclick: [Tap, { event: 'dblclick', taps: 2 }],
-    click: [Tap, { event: 'click' }, null, ['dblclick']]
+    // pointerdown is being handled by deck.js _onPointerDown which does picking...
+    // and then we miss out.
+    click: [Tap, { event: 'click' }, null, ['dblclick']],
 } as const;
 
 

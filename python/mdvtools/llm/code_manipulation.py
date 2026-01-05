@@ -17,13 +17,24 @@ def extract_code_from_response(response: str):
     """Extracts Python code from a markdown string response."""
     # Use a regex pattern to match content between triple backticks
     code_pattern = r"```python(.*?)```"
+    #matches = re.findall(code_pattern, response, re.DOTALL)
     match = re.search(code_pattern, response, re.DOTALL)
 
     if match:
         # Extract the matched code and strip any leading/trailing whitespaces
-        return f"{match.group(1).strip()}"
+       return f"{match.group(1).strip()}"
     # we should at least issue a warning here, no good will come of this...
     return ""
+    # if not matches:
+    #     return ""
+    # return matches[-1].strip()
+
+
+def extract_explanation_from_response(response: str):
+    """Extracts the explanation text by removing code blocks from the response."""
+    # Remove all code blocks (```python...``` or ```...```)
+    explanation = re.sub(r"```.*?```", "", response, flags=re.DOTALL)
+    return explanation.strip()
 
 
 def prepare_code(result: str, data: Optional[str | pd.DataFrame], project: MDVProject, log = print, 
@@ -149,8 +160,8 @@ def patch_viewname(code: str, project: MDVProject):
     if view_name not in existing_views:
         # just in case the view_name isn't a duplicate, but might have had quotes in it
         print(f'patched view_name: {escaped_view_name}')
-        complete_view_name = "view_name = \"" + view_name + "\""
-        escaped_complete_view_name = "view_name = \"" + escaped_view_name + "\""
+        complete_view_name = f"view_name = \"{view_name}\""
+        escaped_complete_view_name = f"view_name = \"{escaped_view_name}\""
         return code.replace(complete_view_name, escaped_complete_view_name)
         #return code.replace(view_name, escaped_view_name)
     n = 1
@@ -159,8 +170,8 @@ def patch_viewname(code: str, project: MDVProject):
         n += 1
         new_view_name = f"{escaped_view_name} ({n})"
     print(f'patched view_name: {new_view_name}')
-    complete_view_name = "view_name = \"" + view_name + "\""
-    new_complete_view_name = "view_name = \"" + new_view_name + "\""
+    complete_view_name = f"view_name = \"{view_name}\""
+    new_complete_view_name = f"view_name = \"{new_view_name}\""
     return code.replace(complete_view_name, new_complete_view_name)
     #return code.replace(view_name, new_view_name)
 
@@ -175,11 +186,8 @@ def parse_view_name(code: str):
                 # We are looking for a simple assignment, e.g. view_name = "..."
                 if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'view_name':
                     # The value should be a string literal
-                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str): # Python 3.8+
+                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
                         view_name = node.value.value
-                        return view_name
-                    elif isinstance(node.value, ast.Str): # Python < 3.8
-                        view_name = node.value.s
                         return view_name
     except SyntaxError:
         # print("Failed to parse code with AST. It might contain a syntax error.")

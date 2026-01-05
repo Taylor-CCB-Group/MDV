@@ -10,8 +10,8 @@ Previously, the repository contained multiple, overlapping GitHub Actions workfl
 
 This new workflow handles all build and deployment logic and is triggered by:
 - A daily schedule at midnight.
-- A push to the `dev` branch with `[deploy]` in the commit message.
-- A pull request being merged into the `dev` branch.
+- A push to the `main` branch with `[deploy]` in the commit message.
+- A pull request being merged into the `main` branch.
 - Manual dispatch via the GitHub Actions UI.
 
 ## 2. Enhanced Security
@@ -48,9 +48,9 @@ It was difficult to get consistent build information between local development a
 
 This ensures that the `useBuildInfo()` hook in the frontend receives the same data structure, whether running locally or from a deployed container.
 
-## 5. Local Development and Building
+## 5. Local development and Building
 
 To ensure build information is consistent during development, the following approach is used:
 
-- **Live Development:** When running the Vite dev server inside the dev container (`npm run dev`), the `vite.config.mts` file automatically detects the mounted `.git` directory and injects the current Git status into the application.
+- **Live development:** When running the Vite dev server inside the devcontainer (`npm run dev`), the `vite.config.mts` file automatically detects the mounted `.git` directory and injects the current Git status into the application.
 - **Building a Local Image:** To build a production-like Docker image locally that contains the correct Git metadata, the configuration is handled by `docker-compose`. The `docker-secrets.yml` file (used by the dev container) is configured to pass build arguments from the host environment to the Docker build process. You can build the image by running `docker compose -f docker-secrets.yml build` in your terminal, which will automatically pass the necessary environment variables. 

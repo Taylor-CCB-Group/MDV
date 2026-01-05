@@ -1,5 +1,5 @@
 import traceback
-from typing import Optional, Protocol, Union
+from typing import Optional, Union
 from mdvtools.benchmarking.memory import log_memory_usage
 from mdvtools.llm.chat_protocol import (
   ChatRequest,
@@ -15,36 +15,12 @@ from flask import Flask, request
 from flask_socketio import join_room, leave_room
 from mdvtools.logging_config import get_logger
 from mdvtools.llm.chatlog import log_chat_item
+from mdvtools.server_extension import MDVProjectServerExtension
+from mdvtools.auth.authutils import is_authenticated
 
 logger = get_logger(__name__)
 logger.info("chat server extension loading...")
 
-
-class MDVProjectServerExtension(Protocol):
-    """
-    A protocol for server extensions that can be used with MDV projects.
-
-    We might use this for blocks of other functionality that aren't totally core mdv functionality,
-    integrating other services/libraries/functionality.
-    We might also re-arrange so that some things like the add_anndata routes are moved into an extension.
-
-    Maybe rather than pass a Flask app to `server.py`, we pass something representing MDV app configuration,
-    including a Flask app, these extensions, auth provider etc...
-    Flask becomes an implementation detail that we abstract away somewhat.
-    """
-    def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
-        """
-        Assign any extra `/project/<project_id>/<path>` routes to the blueprint for this project instance.
-        """
-        ...
-    def mutate_state_json(self, state_json: dict, project: MDVProject, app: Flask):
-        """
-        Mutate the state.json before returning it as a request response,
-        e.g. to add information about the extension.
-
-        Don't really want to pass flask app here, doing so for now to allow access to config.
-        """
-        ...
 
 
 class MDVProjectChatServerExtension(MDVProjectServerExtension):
@@ -63,6 +39,8 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             We should check authentication here,
             **nb the coupling of sockets and "chat" should be removed.**
             """
+            if not is_authenticated():
+                return False
             # todo - check access level, whether chat is enabled etc
             # at the time you connect, flask_socketio session by default is "forked from http session"
             # if we made SocketIO instance with manage_session=False, then they would reference the same session.
@@ -94,16 +72,23 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 
             bot.log(f"Markdown: {markdown}")
             detailed_message = bot.welcome + markdown
-            return {"message": detailed_message}
+            # we want some suggested questions here.
+            suggested_questions = bot.get_suggested_questions()
+            logger.info(f"Suggested questions: {suggested_questions}")
+            return {"message": detailed_message, "suggested_questions": suggested_questions}
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):
+            if not is_authenticated():
+                return
+
             nonlocal bot
             sid = request.sid # type: ignore - flask_socketio.request.sid
             # todo - auth (via custom decorator? see comments above)
 
             message = data.get("message")
             id = data.get("id")
+            conversation_id = data.get("conversation_id")
             room = f"{sid}_{id}"
             join_room(room)
             def handle_error(error: Union[str, Exception], *, extra_metadata: Optional[dict] = None):
@@ -116,7 +101,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
                 markdown = create_error_markdown(error_message, traceback_str, extra_metadata)
                 logger.error(f"Chat error: {markdown}")
-                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, error=True)
+                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, None, error=True)
                 socketio.emit(
                     "chat_error",
                     {"message": markdown},
@@ -127,7 +112,6 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 handle_error("Missing 'message' or 'id' in request JSON")
                 leave_room(room)
                 return
-            conversation_id = data.get("conversation_id")
             chat_request = ChatRequest(
                 message=message,
                 id=id,
@@ -185,5 +169,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
         was_enabled = state_json.get("chat_enabled", not auth_enabled)
         state_json["chat_enabled"] = chat_enabled and was_enabled
         
-
-chat_extension = MDVProjectChatServerExtension()
+    def get_session_config(self):
+        return {
+            "chat_enabled": chat_enabled
+        }

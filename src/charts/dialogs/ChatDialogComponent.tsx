@@ -8,11 +8,12 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Box, Button, Divider, IconButton, InputAdornment, TextField } from '@mui/material';
+import { Box, Button, Divider, IconButton, InputAdornment, Skeleton, TextField } from '@mui/material';
 import _ from 'lodash';
 import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 
 export type MessageType = {
@@ -136,7 +137,7 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
             ))} */}
 
             {/* Show suggested questions only for the welcome message (sender: 'system') */}
-            {sender === 'system' && (
+            {sender === 'system' && suggestedQuestions.length > 0 && (
                 <SuggestedQuestions suggestedQuestions={suggestedQuestions} onSelect={updateInput} />
             )}
             
@@ -236,7 +237,7 @@ const MessageMarkdown = ({ text }: { text: string }) => {
             // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-markdown, not our code
             children={markdown}
             remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw]}
+            rehypePlugins={[rehypeRaw, rehypeSanitize]}
             components={{
                 code({ node, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '')
@@ -343,7 +344,14 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 {messages.map((message) => (
                     <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} updateInput={updateInput} suggestedQuestions={suggestedQuestions} />
                 ))}
-                {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
+                {isSending ?  
+                    (requestProgress ? 
+                        <Progress {...requestProgress} verboseProgress={verboseProgress} /> : 
+                        <Skeleton variant='rectangular' sx={{ fontSize: "1.2rem", marginBottom: 2, marginTop: 2}} />
+                    ) : (
+                        <></>
+                    )
+                }
                 {/* {
                 isSending && 
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}

@@ -14,6 +14,8 @@ import { initialiseChartConfig } from "./chartConfigUtils";
 import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
+import tippy, {type Instance as TippyInstance} from "tippy.js";
+import 'tippy.js/dist/tippy.css'; 
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
 export type LegacyColorBy = { column: DataColumn<any> }
@@ -67,6 +69,7 @@ class BaseChart<T extends BaseConfig> {
     observable: { container: HTMLElement };
     width = 0;
     height = 0;
+    menuTooltips:TippyInstance[]=[];
     legend: any;
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
@@ -106,6 +109,7 @@ class BaseChart<T extends BaseConfig> {
         this.activeQueries = new ColumnQueryMapper(this, {
             setParams: ["param"],
             //! warning - we do still need some manual intervention in deserialisation
+            //- this is under active review now, 28-11-2025 -
             setToolTipColumn: "tooltip.column",
             colorByColumn: "color_by",
         });
@@ -195,7 +199,7 @@ class BaseChart<T extends BaseConfig> {
                 icon: "fas fa-copy",
                 func: () =>
                     navigator.clipboard.writeText(
-                        JSON.stringify(this.config, null, 2),
+                        JSON.stringify(this.getConfig(), null, 2),
                     ),
             });
             return menu;
@@ -236,7 +240,7 @@ class BaseChart<T extends BaseConfig> {
             action(() => {
                 //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
                 if (this.__doc__.fullscreenElement) {
-                    if (this.div === this.__doc__.fullscreenElement) {
+                    if (this.div === this.__doc__.fullscreenElement) {               
                         this.observable.container = this.div;
                         const rect = window.screen;
                         this.setSize(rect.width, rect.height);
@@ -258,6 +262,7 @@ class BaseChart<T extends BaseConfig> {
                     this.isFullscreen = true;
                 } else {
                     this.observable.container = this.__doc__.body;
+                 
                     // Reset the size of chart
                     this.setSize(...oldSize);
                     const cm = window.mdv.chartManager;
@@ -430,18 +435,23 @@ class BaseChart<T extends BaseConfig> {
         const sp = createEl(
             "span",
             {
-                "aria-label": tooltip,
-                "data-microtip-color": "red",
-                role: "tooltip",
-                "data-microtip-size": config.size || "small",
-                "data-microtip-position": config.position || "bottom-left",
+                
                 styles: {
                     margin: "0px 1px",
                 },
             },
             this.menuSpace,
         );
-
+        const t= tippy(sp, {
+            content: tooltip,
+            appendTo: this.div
+        });
+        //need to store in order to switch document when chart is popped out/in
+        this.menuTooltips.push(t); 
+        // event listener for hiding the tooltip on mouseleave event for popout window
+        sp.addEventListener('mouseleave', () => {
+            t.hide();
+          });
         createEl(
             "i",
             {
@@ -469,6 +479,7 @@ class BaseChart<T extends BaseConfig> {
 
     setToolTipColumn?(column: FieldSpec): void;
     setBackgroundFilter?(column: FieldName): void;
+    // only used by vanilla DensityScatterPlot
     changeContourParameter?(column: FieldName): void;
     colorByColumn?(c: FieldName): void;
     colorByDefault?(): void;
@@ -682,6 +693,8 @@ class BaseChart<T extends BaseConfig> {
         for (const disposer of this.reactionDisposers) {
             disposer();
         }
+        this.menuTooltips.forEach(t => t.destroy());
+        this.menuTooltips = [];
         // dynamic props?
     }
     removeLayout?(): void;
@@ -782,6 +795,7 @@ class BaseChart<T extends BaseConfig> {
             colorSettings.push(g({
                 label: "Color By",
                 type: "column",
+                // c.color_by degrades active link here #297
                 //@ts-expect-error LegacyColorBy should be gone by here
                 current_value: c.color_by,
                 columnType: filter,
@@ -959,6 +973,11 @@ class BaseChart<T extends BaseConfig> {
         // - fullscreen... some permutations of dialog behaviour / mouse events on deck are a bit odd
         //   ^^ that's not a changeBaseDocument() thing, it's a fullscreen thing...
         this.contextMenu.__doc__ = doc;
+        this.menuTooltips.forEach(t=>{
+            //for some reason the popout tooltip layer shows in the popout window
+            //and needs closing
+            setTimeout(()=>t.hide(),20);
+        });
         action(() => (this.observable.container = doc.body))();
         this.__doc__ = doc;
         for (const d of this.dialogs) {
@@ -1002,6 +1021,9 @@ class BaseChart<T extends BaseConfig> {
     /**
      * Returns a copy of the chart's config in serialized form
      * (todo central place for documentation describing this)
+     * Note that e.g. `RowsAsColsQuery` objects can exist anywhere in the config object
+     * and as long as they implement `toJSON()` correctly they shouldn't need explicit serialisation logic.
+     * We rely on `ColumnQueryMapper` for intercepting values passed to JS methods.
      */
     getConfig() {
         if (this.legend) {

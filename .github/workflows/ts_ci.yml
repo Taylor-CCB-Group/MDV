@@ -2,14 +2,10 @@ name: TypeScript/JS CI
 on:
   push:
     branches:
-      # FIXME replace this with main after merge to main
-      - dev
-#      - main
+      - main
   pull_request:
     branches:
-      # FIXME replace this with main after merge to main
-      - dev
-#      - main
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -26,4 +22,5 @@ jobs:
           cache: 'npm'
       - run: npm install
       - run: npm run vite-build
+      - run: npm run test
       # - uses: icrawl/action-tsc@v1

@@ -983,6 +983,21 @@ def create_edge_case_anndata() -> sc.AnnData:
 
 
 # Utility functions for testing
+def _check_missing_values(data):
+    """Check for missing values in a Dataset2D or DataFrame object."""
+    try:
+        if hasattr(data, 'to_pandas'):
+            df = data.to_pandas()  # type: ignore
+        elif hasattr(data, 'to_dataframe'):
+            df = data.to_dataframe()  # type: ignore
+        else:
+            # Assume it's already a DataFrame or similar
+            df = data
+        return bool(df.isnull().values.any())
+    except (AttributeError, TypeError):
+        # If we can't check for missing values, assume False
+        return False
+
 def get_anndata_summary(adata: sc.AnnData) -> Dict[str, Any]:
     """Get a summary of AnnData object properties for testing."""
     # Ensure adata.X is valid
@@ -998,8 +1013,8 @@ def get_anndata_summary(adata: sc.AnnData) -> Dict[str, Any]:
         'layers_keys': list(adata.layers.keys()),
         'uns_keys': list(adata.uns.keys()),
         'sparse': hasattr(adata.X, 'toarray'),
-        'has_missing_obs': bool(adata.obs.isnull().values.any()),
-        'has_missing_var': bool(adata.var.isnull().values.any()),
+        'has_missing_obs': bool(adata.obs.isnull().values.any()), # type: ignore - ! anndata.obs could be Dataset2D which doesn't have isnull()
+        'has_missing_var': bool(adata.var.isnull().values.any()), # type: ignore - ! anndata.var could be Dataset2D which doesn't have isnull()
         'categorical_obs': [col for col in adata.obs.columns 
                           if hasattr(adata.obs[col], 'cat')],
         'categorical_var': [col for col in adata.var.columns 

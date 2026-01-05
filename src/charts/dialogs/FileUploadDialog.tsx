@@ -4,37 +4,30 @@ import {
     useCallback,
     useReducer,
     type PropsWithChildren,
-    forwardRef
+    forwardRef,
+    useEffect
 } from "react";
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
 
 import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
 import { useProject } from "../../modules/ProjectContext";
-import { ColumnPreview } from "./ColumnPreview";
 
 import {
     useViewerStoreApi,
     useChannelsStoreApi,
-    type PixelSource,
-    type Metadata,
 } from "../../react/components/avivatorish/state";
-import { createLoader } from "../../react/components/avivatorish/utils";
-import { unstable_batchedUpdates } from "react-dom";
 
-import { TiffPreview } from "./TiffPreview";
-import { TiffMetadataTable } from "./TiffMetadataTable";
-import TiffVisualization from "./TiffVisualization";
-import { DatasourceDropdown } from "./DatasourceDropdown";
 import {
     CloudUpload as CloudUploadIcon
 } from "@mui/icons-material";
-import { isArray } from "@/lib/utils";
 // import processH5File from "./utils/h5Processing";
-import H5MetadataPreview from "./H5MetadataPreview";
 import DebugErrorComponent from "./DebugErrorComponent";
 import AnndataConflictDialog from "./AnndataConflictDialog";
 import ReusableDialog from "./ReusableDialog";
+
+// Import SocketIO upload client
+import { createSocketIOUpload, type SocketIOUploadClient } from "./SocketIOUploadClient";
 
 // Use dynamic import for the worker
 const DatasourceWorker = new Worker(
@@ -43,6 +36,9 @@ const DatasourceWorker = new Worker(
         type: "module",
     },
 );
+
+// Environment variable to control upload method
+const USE_SOCKETIO_UPLOAD = true; // Change to false to use HTTP upload
 
 export const Container = ({ children }: PropsWithChildren) => {
     return (
@@ -262,7 +258,9 @@ type UploadActionType =
     | "SET_H5_METADATA"
     | "SET_FILE_SUMMARY"
     | "SET_CONFLICT_DATA"
-    | "SET_SHOW_CONFLICT_DIALOG";
+    | "SET_SHOW_CONFLICT_DIALOG"
+    | "SET_UPLOAD_METHOD"
+    | "SET_SOCKETIO_CLIENT";
 
 // Reducer function
 const DEFAULT_REDUCER_STATE = {
@@ -277,7 +275,9 @@ const DEFAULT_REDUCER_STATE = {
     tiffMetadata: null as unknown,
     h5Metadata: null as H5Metadata | unknown,
     showReplaceDialog: false,
-    conflictData: null as { tempFolder: string } | null,
+    conflictData: null as { temp_folder: string } | null,
+    uploadMethod: USE_SOCKETIO_UPLOAD ? 'socketio' : 'http' as 'http' | 'socketio',
+    socketioClient: null as SocketIOUploadClient | null,
 } as const;
 type ReducerState = typeof DEFAULT_REDUCER_STATE;
 // TODO - would be good to type this, this is not how I should be spending my weekend.
@@ -304,7 +304,11 @@ type ReducerPayload<T extends UploadActionType> = T extends "SET_SELECTED_FILES"
                       ? { temp_folder: string } | null
                       : T extends "SET_SHOW_CONFLICT_DIALOG"
                         ? boolean
-                        : never;
+                        : T extends "SET_UPLOAD_METHOD"
+                          ? 'http' | 'socketio'
+                          : T extends "SET_SOCKETIO_CLIENT"
+                            ? SocketIOUploadClient | null
+                            : never;
 type ReducerAction<T extends UploadActionType> = {
     type: T;
     payload: ReducerPayload<T>;
@@ -338,6 +342,10 @@ const reducer = <T extends UploadActionType>(
             return { ...state, conflictData: action.payload };
         case "SET_SHOW_CONFLICT_DIALOG":
             return { ...state, showReplaceDialog: action.payload };
+        case "SET_UPLOAD_METHOD":
+            return { ...state, uploadMethod: action.payload };
+        case "SET_SOCKETIO_CLIENT":
+            return { ...state, socketioClient: action.payload };
         default:
             return state;
     }
@@ -350,7 +358,9 @@ const UPLOAD_STEP = 100 / (UPLOAD_DURATION / UPLOAD_INTERVAL);
 
 export interface FileUploadDialogComponentProps {
     onClose: () => void;
-    onResize: (width: number, height: number) => void; // Add this prop
+    onResize: (width: number, height: number) => void;
+    onLoadingStateChange: (isLoading: boolean) => void;
+    socketioClientRef?: (client: SocketIOUploadClient | null) => void;
 }
 
 // Define supported file types and their configurations
@@ -474,8 +484,8 @@ const useFileUploadProgress = () => {
 //todo figure out why type inference is failing with observer if we take out the `React.FC<...>` here
 //also - are we actually observing anything here? not that it particularly matters (apart from type inference, apparently)
 const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
-    observer(({ onClose, onResize }: FileUploadDialogComponentProps) => {
-        const { root, projectName, chartManager } = useProject();
+    observer(({ onClose, onResize, onLoadingStateChange, socketioClientRef }: FileUploadDialogComponentProps) => {
+        const { root, chartManager, mainApiRoute } = useProject();
 
         const [selectedOption, setSelectedOption] = useState<string | null>(
             null,
@@ -521,6 +531,16 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
         const [state, dispatch] = useReducer(reducer, DEFAULT_REDUCER_STATE);
 
+        useEffect(() => {
+            onLoadingStateChange(state.isUploading || state.isInserting);
+        }, [state.isUploading, state.isInserting, onLoadingStateChange]);
+
+        useEffect(() => {
+            if (socketioClientRef) {
+                socketioClientRef(state.socketioClient);
+            }
+        }, [state.socketioClient, socketioClientRef]);
+
         const viewerStore = useViewerStoreApi();
 
         const { progress, resetProgress, setProgress } =
@@ -565,63 +585,63 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                 columnCount: 0,
                             });
 
-                            // Process CSV with Web Worker
-                            DatasourceWorker.postMessage({
-                                file: file,
-                                fileType: fileConfig.type,
-                            });
-                            DatasourceWorker.onmessage = (
-                                event: MessageEvent,
-                            ) => {
-                                const {
-                                    columnNames,
-                                    columnTypes,
-                                    secondRowValues,
-                                    rowCount,
-                                    columnCount,
-                                    error,
-                                } = event.data;
+                            // // Process CSV with Web Worker
+                            // DatasourceWorker.postMessage({
+                            //     file: file,
+                            //     fileType: fileConfig.type,
+                            // });
+                            // DatasourceWorker.onmessage = (
+                            //     event: MessageEvent,
+                            // ) => {
+                            //     const {
+                            //         columnNames,
+                            //         columnTypes,
+                            //         secondRowValues,
+                            //         rowCount,
+                            //         columnCount,
+                            //         error,
+                            //     } = event.data;
 
-                                if (error) {
-                                    dispatch({
-                                        type: "SET_ERROR",
-                                        payload: {
-                                            message: "Validation failed.",
-                                            traceback: error,
-                                        },
-                                    });
-                                    dispatch({
-                                        type: "SET_IS_VALIDATING",
-                                        payload: false,
-                                    });
-                                } else {
-                                    setColumnNames(columnNames);
-                                    setColumnTypes(columnTypes);
-                                    setSecondRowValues(secondRowValues);
-                                    setDatasourceSummary(
-                                        (prevDatasrouceSummary) => ({
-                                            ...prevDatasrouceSummary,
-                                            rowCount,
-                                            columnCount,
-                                        }),
-                                    );
+                            //     if (error) {
+                            //         dispatch({
+                            //             type: "SET_ERROR",
+                            //             payload: {
+                            //                 message: "Validation failed.",
+                            //                 traceback: error,
+                            //             },
+                            //         });
+                            //         dispatch({
+                            //             type: "SET_IS_VALIDATING",
+                            //             payload: false,
+                            //         });
+                            //     } else {
+                            //         setColumnNames(columnNames);
+                            //         setColumnTypes(columnTypes);
+                            //         setSecondRowValues(secondRowValues);
+                            //         setDatasourceSummary(
+                            //             (prevDatasrouceSummary) => ({
+                            //                 ...prevDatasrouceSummary,
+                            //                 rowCount,
+                            //                 columnCount,
+                            //             }),
+                            //         );
 
-                                    const totalWidth = calculateTotalWidth(
-                                        columnNames,
-                                        columnTypes,
-                                        secondRowValues,
-                                    );
-                                    onResize(totalWidth, 745);
+                            //         const totalWidth = calculateTotalWidth(
+                            //             columnNames,
+                            //             columnTypes,
+                            //             secondRowValues,
+                            //         );
+                                    // onResize(totalWidth, 745);
                                     dispatch({
                                         type: "SET_IS_VALIDATING",
                                         payload: false,
                                     });
                                     dispatch({
                                         type: "SET_VALIDATION_RESULT",
-                                        payload: { columnNames, columnTypes },
+                                        payload: {  },
                                     });
-                                }
-                            };
+                                // }
+                            // };
                             break;
                         }
 
@@ -643,7 +663,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                             });
 
                             // Process TIFF file
-                            handleSubmitFile(acceptedFiles);
+                            // handleSubmitFile(acceptedFiles);
                             onResize(
                                 fileConfig.processingConfig.defaultWidth,
                                 fileConfig.processingConfig.defaultHeight,
@@ -660,14 +680,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         }
                         case "h5": {
                             try {
-                                const processH5File = (await import(
-                                    "./utils/h5Processing"
-                                )).default;
-                                const h5Metadata = await processH5File(file);
-                                dispatch({
-                                    type: "SET_H5_METADATA",
-                                    payload: h5Metadata,
-                                });
+                                // const processH5File = (await import(
+                                //     "./utils/h5Processing"
+                                // )).default;
+                                // const h5Metadata = await processH5File(file);
+                                // dispatch({
+                                //     type: "SET_H5_METADATA",
+                                //     payload: h5Metadata,
+                                // });
 
                                 const newDatasourceName = file.name;
                                 setDatasourceName(newDatasourceName);
@@ -682,7 +702,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                 });
                                 dispatch({
                                     type: "SET_VALIDATION_RESULT",
-                                    payload: { metadata: h5Metadata },
+                                    payload: {  },
                                 });
                             } catch (error) {
                                 console.error("H5 processing error:", error);
@@ -719,86 +739,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 }
             },
             [onResize, columnNames, columnTypes],
-        );
-
-        const handleSubmitFile = useCallback(
-            async (files: File[]) => {
-                let newSource;
-                if (files.length === 1) {
-                    newSource = {
-                        urlOrFile: files[0],
-                        description: files[0].name,
-                    };
-                } else {
-                    newSource = {
-                        urlOrFile: files,
-                        description: "data.zarr",
-                    };
-                }
-
-                viewerStore.setState({ isChannelLoading: [true] });
-                viewerStore.setState({ isViewerLoading: true });
-
-                try {
-                    const newLoader = await createLoader(
-                        newSource.urlOrFile,
-                        () => {}, // placeholder for toggleIsOffsetsSnackbarOn
-                        (message) => {
-                            viewerStore.setState({
-                                loaderErrorSnackbar: { on: true, message },
-                            });
-                        },
-                    );
-                    // types are still somewhat on a wing and a prayer... we'll get there
-                    let nextMeta: Metadata;
-                    let nextLoader: PixelSource["data"] | PixelSource["data"][];
-                    //let nextLoader: OME_TIFF['data'] | OME_TIFF['data'][];
-                    if (isArray(newLoader)) {
-                        if (newLoader.length > 1) {
-                            //@ts-ignore flagging so we can get back to this
-                            nextMeta = newLoader.map((l) => l.metadata);
-                            nextLoader = newLoader.map((l) => l.data);
-                        } else {
-                            nextMeta = newLoader[0].metadata;
-                            nextLoader = newLoader[0].data;
-                        }
-                    } else {
-                        //@ts-ignore flagging so we can get back to this
-                        nextMeta = newLoader.metadata;
-                        nextLoader = newLoader.data;
-                    }
-
-                    if (nextLoader) {
-                        console.log(
-                            "Metadata (in JSON-like form) for current file being viewed: ",
-                            nextMeta,
-                        );
-
-                        unstable_batchedUpdates(() => {
-                            channelsStore.setState({ loader: nextLoader });
-                            viewerStore.setState({ metadata: nextMeta });
-                        });
-
-                        dispatch({
-                            type: "SET_TIFF_METADATA",
-                            payload: nextMeta,
-                        });
-                    }
-                } catch (error: any) {
-                    console.error("Error loading file:", error);
-                    dispatch({
-                        type: "SET_ERROR",
-                        payload: {
-                            message: "Error loading TIFF file.",
-                            traceback: error.message,
-                        },
-                    });
-                } finally {
-                    viewerStore.setState({ isChannelLoading: [false] });
-                    viewerStore.setState({ isViewerLoading: false });
-                }
-            },
-            [viewerStore, channelsStore],
         );
 
         const handleDatasourceNameChange = useCallback((event: any) => {
@@ -884,7 +824,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             return Math.max(800, totalWidth);
         };
 
-        const handleUploadClick = async () => {
+        // HTTP Upload function (original implementation)
+        const handleHttpUpload = async () => {
             if (!state.selectedFiles.length) {
                 dispatch({
                     type: "SET_ERROR",
@@ -989,7 +930,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     dispatch({
                         type: "SET_CONFLICT_DATA",
                         payload: {
-                            AnndataConflictDialog,
                             temp_folder: error.response.data.temp_folder,
                         },
                     });
@@ -1001,6 +941,121 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     console.error("Error uploading file:", error);
                     handleUploadError(error);
                 }
+            }
+        };
+
+        // SocketIO Upload function
+        const handleSocketIOUpload = async () => {
+            if (!state.selectedFiles.length) {
+                dispatch({
+                    type: "SET_ERROR",
+                    payload: {
+                        message:
+                            "No files selected. Please select a file before uploading.",
+                        status: 400,
+                    },
+                });
+                return;
+            }
+
+            const file = state.selectedFiles[0];
+            const fileConfig = getFileTypeFromExtension(file.name);
+
+            if (!fileConfig) {
+                dispatch({
+                    type: "SET_ERROR",
+                    payload: {
+                        message: "Unsupported file type",
+                        status: 400,
+                    },
+                });
+                return;
+            }
+
+            dispatch({ type: "SET_IS_UPLOADING", payload: true });
+            resetProgress();
+
+            try {
+                // root is something like "/project/117", we need to extract the base URL and project ID
+                const projectId = root.split('/').filter(Boolean).pop(); // Get the last part which is the project ID
+                const socketPath = `${String(mainApiRoute).replace(/\/$/, '')}/socket.io`;
+                console.log('Project ID:', projectId);
+                console.log('Namespace:', `/project/${projectId}`);
+                console.log('Socket Path:', socketPath);
+                
+                // Create SocketIO upload client
+                const uploadClient = createSocketIOUpload({
+                    namespace: `/project/${projectId}`,
+                    socketPath: socketPath, // socket path for path variable: '/test/socket.io'
+                    file: file,
+                    fileName: file.name,
+                    // CSV-specific options
+                    datasourceName: fileConfig.type === 'csv' ? datasourceName : undefined,
+                    replace: fileConfig.type === 'csv' ? true : undefined,
+                    view: fileConfig.type === 'csv' ? 'default' : undefined,
+                    suppliedOnly: fileConfig.type === 'csv' ? false : undefined,
+                    onProgress: (progressPercent: number, uploaded: number, total: number) => {
+                        setProgress(progressPercent);
+                    },
+                    onStatusChange: (status: string, message?: string) => {
+                        console.log(`Upload status: ${status}`, message);
+                        if (status === 'processing') {
+                            dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                            dispatch({ type: "SET_IS_INSERTING", payload: true });
+                        }
+                    },
+                    onError: (error: any) => {
+                        console.error('SocketIO upload error:', error);
+                        dispatch({
+                            type: "SET_ERROR",
+                            payload: {
+                                message: error.message || 'Upload failed',
+                                status: 500,
+                            },
+                        });
+                        dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                        dispatch({ type: "SET_IS_INSERTING", payload: false });
+                    },
+                    onSuccess: (result: any) => {
+                        console.log('SocketIO upload success:', result);
+                        dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                        dispatch({ type: "SET_IS_INSERTING", payload: false });
+                        dispatch({ type: "SET_SUCCESS", payload: true });
+                        
+                        if (fileConfig.type === "tiff") {
+                            chartManager.saveState();
+                        }
+                    }
+                });
+
+                // Store client in state for potential cancellation
+                dispatch({ type: "SET_SOCKETIO_CLIENT", payload: uploadClient });
+
+                // Start the upload
+                await uploadClient.upload();
+
+            } catch (error) {
+                console.error("SocketIO upload error:", error);
+                dispatch({
+                    type: "SET_ERROR",
+                    payload: {
+                        message: error instanceof Error ? error.message : 'Upload failed',
+                        status: 500,
+                    },
+                });
+                dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                dispatch({ type: "SET_IS_INSERTING", payload: false });
+            }
+        };
+
+        // Main upload handler that chooses between HTTP and SocketIO
+        const handleUploadClick = async () => {
+            console.log(`Using ${state.uploadMethod} upload method`);
+            
+            if (state.uploadMethod === 'socketio') {
+                await handleSocketIOUpload();
+            } else {
+                await handleHttpUpload();
             }
         };
 
@@ -1028,10 +1083,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         }, []);
 
         const handleClose = useCallback(async () => {
+            if (state.socketioClient) {
+                state.socketioClient.cancel();
+            }
+            
             dispatch({ type: "SET_FILE_SUMMARY", payload: null });
             onResize(450, 320);
             onClose();
-        }, [onClose, onResize]);
+        }, [onClose, onResize, state.socketioClient]);
 
         const handleCombineConfirm = async (label: string) => {
             if (!state.conflictData) return;
@@ -1069,6 +1128,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
         const displayUploadDialog = async () => {
             if (state.error) {
+                // Reset all state
                 dispatch({ type: "SET_SELECTED_FILES", payload: [] });
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({ type: "SET_IS_INSERTING", payload: false });
@@ -1076,21 +1136,22 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 dispatch({ type: "SET_ERROR", payload: null });
                 dispatch({ type: "SET_IS_VALIDATING", payload: false });
                 dispatch({ type: "SET_VALIDATION_RESULT", payload: null });
-                dispatch({ type: "SET_FILE_TYPE", payload: null });
-                dispatch({ type: "SET_TIFF_METADATA", payload: null });
                 dispatch({ type: "SET_H5_METADATA", payload: null });
-                dispatch({ type: "SET_CONFLICT_DATA", payload: null });
-                dispatch({ type: "SET_SHOW_CONFLICT_DIALOG", payload: false });
-                setDatasourceName("");
-                setDatasourceSummary({
-                    datasourceName: "",
-                    fileName: "",
-                    fileSize: "",
-                    rowCount: 0,
-                    columnCount: 0,
-                });
-                return;
+                dispatch({ type: "SET_SELECTED_FILES", payload: [] });
+                dispatch({ type: "SET_FILE_TYPE", payload: null });
+                dispatch({ type: "SET_FILE_SUMMARY", payload: null });
+                dispatch({ type: "SET_SOCKETIO_CLIENT", payload: null });
+                onResize(450, 320);
+                onClose();
             }
+        };
+
+        const handleCombineError = (error: {
+            message: string;
+            status?: number;
+        }) => {
+            console.error("Conflict dialog error:", error);
+            dispatch({ type: "SET_ERROR", payload: error });
         };
 
         const handleCombineCancel = async () => {
@@ -1133,16 +1194,28 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             }
         };
 
-        const handleCombineError = (error: {
-            message: string;
-            status?: number;
-        }) => {
-            console.error("Conflict dialog error:", error);
-            dispatch({ type: "SET_ERROR", payload: error });
+        // Method toggle function for testing/debugging
+        const toggleUploadMethod = () => {
+            const newMethod = state.uploadMethod === 'http' ? 'socketio' : 'http';
+            dispatch({ type: "SET_UPLOAD_METHOD", payload: newMethod });
+            console.log(`Switched to ${newMethod} upload method`);
         };
 
         return (
             <Container>
+                {/* Upload Method Toggle (for development/testing) */}
+                {process.env.NODE_ENV === 'development' && (
+                    <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded">
+                        {/* <button
+                            type="button"
+                            onClick={toggleUploadMethod}
+                            className="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                            Current: {state.uploadMethod.toUpperCase()} - Click to toggle
+                        </button> */}
+                    </div>
+                )}
+
                 {state.isUploading ? (
                     <StatusContainer>
                         <Message>
@@ -1229,24 +1302,24 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                         <strong>{"File name"}</strong>{" "}
                                         {datasourceSummary.fileName}
                                     </FileSummaryText>
-                                    <FileSummaryText>
+                                    {/* <FileSummaryText>
                                         <strong>{"Number of rows"}</strong>{" "}
                                         {datasourceSummary.rowCount}
                                     </FileSummaryText>
                                     <FileSummaryText>
                                         <strong>{"Number of columns"}</strong>{" "}
                                         {datasourceSummary.columnCount}
-                                    </FileSummaryText>
+                                    </FileSummaryText> */}
                                     <FileSummaryText>
                                         <strong>{"File size"}</strong>{" "}
                                         {datasourceSummary.fileSize} MB
                                     </FileSummaryText>
                                 </FileSummary>
-                                <ColumnPreview
+                                {/* <ColumnPreview
                                     columnNames={columnNames}
                                     columnTypes={columnTypes}
                                     secondRowValues={secondRowValues}
-                                />
+                                /> */}
 
                                 <div className="flex justify-center items-center gap-6 mt-4">
                                     <Button
@@ -1292,12 +1365,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                                         {tiffSummary.fileSize}{" "}
                                                         MB
                                                     </FileSummaryText>
-                                                    <DatasourceDropdown
+                                                    {/* <DatasourceDropdown
                                                         options={
                                                             updatedNamesArray
                                                         }
                                                         onSelect={handleSelect}
-                                                    />
+                                                    /> */}
                                                 </FileSummary>
                                             </div>
                                         </div>
@@ -1308,20 +1381,20 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                                         Image Preview:
                                                     </strong>
                                                 </FileSummaryText>
-                                                <TiffVisualization
+                                                {/* <TiffVisualization
                                                     metadata={
                                                         state.tiffMetadata
                                                     }
                                                     file={
                                                         state.selectedFiles[0]
                                                     }
-                                                />
+                                                /> */}
                                             </div>
                                         </div>
                                     </div>
                                     <div className="w-2/3">
                                         <div className="flex items-start justify-start h-[70%] min-h-[420px]">
-                                            {showMetadata ? (
+                                            {/* {showMetadata ? (
                                                 <TiffMetadataTable
                                                     metadata={
                                                         state.tiffMetadata
@@ -1333,7 +1406,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                                         state.tiffMetadata
                                                     }
                                                 />
-                                            )}
+                                            )} */}
                                         </div>
                                         <div className="flex justify-between items-center ml-4 mr-2 mt-12">
                                             <Button
@@ -1368,7 +1441,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                             </>
                         )}
 
-                        {state.fileType === "h5" && state.h5Metadata && (
+                        {state.fileType === "h5" && (
                             <>
                                 <FileSummary>
                                     <FileSummaryHeading>
@@ -1453,14 +1526,33 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         );
     });
 
-const Wrapper = (props: FileUploadDialogComponentProps) => {
+const Wrapper = (props: Omit<FileUploadDialogComponentProps, 'onLoadingStateChange' | 'socketioClientRef'>) => {
     const [open, setOpen] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [socketioClient, setSocketioClient] = useState<SocketIOUploadClient | null>(null);
 
     const handleClose = () => {
+        if (socketioClient) {
+            socketioClient.cancel();
+        }
         setOpen(false);
+        props.onClose();
     };
+    
     return (
-        <ReusableDialog open={open} handleClose={handleClose} component={<FileUploadDialogComponent {...props} />} />
+        <ReusableDialog 
+            open={open} 
+            handleClose={handleClose} 
+            // Pass component with the new callback prop
+            component={
+                <FileUploadDialogComponent 
+                    {...props} 
+                    onClose={handleClose} 
+                    onLoadingStateChange={setIsLoading}
+                    socketioClientRef={setSocketioClient}
+                />
+            } 
+        />
     );
 };
 

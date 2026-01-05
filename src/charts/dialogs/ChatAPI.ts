@@ -14,6 +14,12 @@ const completedChatResponseSchema = z.object({
     // timestamp: z.string(),
     error: z.boolean().optional(),
 });
+const chatInitResponseSchema = z.object({
+    message: z.string(),
+    suggested_questions: z.array(z.string()).optional(),
+    error: z.boolean().optional(),
+});
+type ChatInitResponse = z.infer<typeof chatInitResponseSchema>;
 
 const chatProgressSchema = z.object({
     id: z.string().describe('The ID of the message this progress is associated with'),
@@ -87,28 +93,27 @@ function getViewName(): string | null {
     return urlParams.get('view');
 }
 
-
-const sendMessageHttp = async (message: string, id: string, route: string, conversationId: string) => {
+// this is now only used for the initial message, meaning that we can change the response format
+// to include suggested questions.
+const sendChatInitHttp = async (message: string, id: string, route: string, conversationId: string) => {
     // we should send information about the context - in particular, which view we're in
     // could consider a streaming response here rather than socket
-    const response = await axios.post<ChatResponse>(route, { message, id, conversation_id: conversationId });
-    const parsed = completedChatResponseSchema.parse(response.data); // may throw an error if the response is not valid
+    const response = await axios.post<ChatInitResponse>(route, { message, id, conversation_id: conversationId });
+    const parsed = chatInitResponseSchema.parse(response.data); // may throw an error if the response is not valid
     return parsed;
 };
 
-const sendMessageSocket = async (message: string, id: string, _routeUnused: string, conversationId: string) => {
+const sendMessageSocket = async (message: string, id: string, _routeUnused: string, conversationId: string, time?: number) => {
     // consider refactoring to be a generator function, so that we can yield progress updates
     const socket = window.mdv.chartManager.ipc?.socket;
     if (!socket) return;
 
     socket.emit('chat_request', { message, id, conversation_id: conversationId });
     const response = await new Promise<ChatResponse>((resolve, reject) => {
-        // 5-minute timeout - because in reality it does often take quite a while to run.
-        // we may consider something like re-querying, requesting status, or something like that?
-        const timeout = setTimeout(() => {
+        const timeout = time ? setTimeout(() => {
             socket.off('chat_response', onChatResponse);
             reject(new Error('Socket request timeout'));
-        }, 300000);
+        }, time) : undefined;
 
         const onChatResponse = (data: any) => {
             clearTimeout(timeout);
@@ -309,7 +314,7 @@ const useChat = () => {
             const id = generateId();
             setCurrentRequestId(id);
             //! todo - we might use socket here, in which case we need to have a different routeInit
-            const response = await sendMessageHttp('', id, routeInit, conversationId);
+            const response = await sendChatInitHttp('', id, routeInit, conversationId);
             if (!response) return;
             if (response?.error) throw response.message;
             
@@ -324,7 +329,7 @@ const useChat = () => {
             }
             // todo: Update when the endpoint is ready
             // const suggestedQuestions = await axios.get("");
-            setSuggestedQuestions(SUGGESTED_QUESTIONS);
+            if (response?.suggested_questions) setSuggestedQuestions(response?.suggested_questions);
         } catch (error: any) {
             const errorMessage =  error?.message ? 
                 error.message : 
@@ -440,7 +445,7 @@ const useChat = () => {
             setIsLoadingInit(true);
             setCurrentRequestId(id);
             setIsSending(true);
-            const response = await sendMessageHttp('', id, routeInit, newConversationId);
+            const response = await sendChatInitHttp('', id, routeInit, newConversationId);
             if (!response) return;
 
             if (response?.error) throw response.message;

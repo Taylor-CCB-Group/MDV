@@ -18,8 +18,9 @@ from pathlib import Path
 import scipy.sparse
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Optional, NewType, List, Union, Any
+from typing import Optional, NewType, List, Union, Any, cast
 from pandas.api.types import is_bool_dtype
+import polars as pl
 # from mdvtools.charts.view import View 
 import time
 import copy
@@ -79,6 +80,7 @@ class MDVProject:
         self.datasourcesfile = join(dir, "datasources.json")
         self.statefile = join(dir, "state.json")
         self.viewsfile = join(dir, "views.json")
+        self.readmefile = join(dir, 'README.md')
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
         if not exists(dir):
@@ -105,6 +107,14 @@ class MDVProject:
     @datasources.setter
     def datasources(self, value):
         save_json(self.datasourcesfile, value, self.safe_file_save)
+    
+    @property
+    def readme(self):
+        if not exists(self.readmefile): 
+            return None
+        with open(self.readmefile, 'r') as f:
+            markdown_string = f.read()
+        return markdown_string
 
     @property
     def views(self):
@@ -123,7 +133,7 @@ class MDVProject:
     def state(self, value):
         save_json(self.statefile, value ,self.safe_file_save)
 
-    def set_editable(self, edit):
+    def set_editable(self, edit=True):
         c = self.state
         c["permission"] = "edit" if edit else "view"
         self.state = c
@@ -293,6 +303,7 @@ class MDVProject:
     def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file):
         """Add or update an image datasource in datasources.json
         returns the name of the added view so the user can navigate to it"""
+        # todo consider moving this elsewhere & generally review the methods for adding spatial data
         # Load current datasources
         datasources = self.datasources
         # Check if the datasource exists
@@ -1014,7 +1025,7 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | pandas.Series | str,
+        dataframe: pandas.DataFrame | str, # could we add xarray here - we pass things from anndata which may not be DataFrame.
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
@@ -1140,6 +1151,170 @@ class MDVProject:
         except Exception as e:
             logger.error(f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}")
             raise  # Re-raise the exception to propagate it to the caller
+
+    def add_datasource_polars(
+        self,
+        name: str,
+        dataframe: pl.DataFrame | pl.LazyFrame | str,
+        columns: Optional[list] = None,
+        supplied_columns_only=False,
+        replace_data=False,
+        add_to_view: Optional[str] = "default",
+        separator="\t"
+    ) -> list[dict[str, str]]:
+        """Adds a polars dataframe to the project. Each column's datatype will be deduced by the
+        data it contains, but this is not always accurate. Hence, you can supply a list of column
+        metadata, which will override the names/types deduced from the dataframe.
+        
+        Args:
+            name (string): The name of datasource
+            dataframe (pl.DataFrame|str): Either a polars dataframe or the path of a text file
+            columns (list, optional) : A list of objects containing the column name and datatype.
+            supplied_columns_only (bool, optional): If True, only the subset of columns in the columns argument
+            replace_data (bool, optional): If True, the existing datasource will be overwritten, Default is False,
+            add_to_view (string, optional): The datasource will be added to the specified view.
+            separator (str, optional): If a path to text file is supplied, then this should be the file's delimiter.
+        """
+        dodgy_columns = []  # To hold any columns that can't be added
+        gr = None  # Initialize the group variable
+        h5 = None
+        
+        try:
+            print("starting add_datasource_polars")
+            
+            # If a path is provided, use scan_csv for lazy loading to prevent
+            # loading the entire file into memory at once.
+            if isinstance(dataframe, str):
+                dataframe = pl.scan_csv(dataframe, separator=separator, try_parse_dates=False)
+
+            is_lazy = isinstance(dataframe, pl.LazyFrame)
+
+            # Determine the number of rows. This is memory-efficient even for lazy frames.
+            if isinstance(dataframe, pl.LazyFrame):
+                num_rows = dataframe.select(pl.count()).collect().item()
+            else:
+                num_rows = len(dataframe)
+
+            # Get columns to add using polars-compatible function.
+            # Pass num_rows to avoid recalculating it for LazyFrames.
+            columns = get_column_info_polars(columns, dataframe, supplied_columns_only, num_rows)
+            
+            # Check if the datasource already exists
+            try:
+                ds = self.get_datasource_metadata(name)
+            except Exception:
+                ds = None
+
+            print(f"is ds None? {ds}")
+
+            if ds:
+                # Delete the existing datasource if replace_data is True
+                if replace_data:
+                    self.delete_datasource(name)
+                else:
+                    raise FileExistsError(
+                        f"Attempt to create datasource '{name}' failed because it already exists."
+                    )
+            
+            print("got passed the ds check")
+            
+            # Open HDF5 file and handle group creation
+            try:
+                h5 = self._get_h5_handle()
+                
+                # Print current groups for visibility
+                for group_name in h5.keys():
+                    print(group_name)
+                    
+                # Check for and delete existing group with this name
+                if name in h5:
+                    del h5[name]
+                    print(f"Deleted existing group '{name}' in HDF5 file.")
+                
+                gr = h5.create_group(name)
+            except Exception as e:
+                raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}") from e
+            
+            print("created h5 group without error")
+            
+            # Verify columns are provided
+            if not columns:
+                raise AttributeError("No columns to add. Please provide valid columns metadata.")
+            
+            # Add columns to the HDF5 group
+            dodgy_columns = []
+            for col in columns:
+                try:
+                    print(f"- adding column '{col['field']}' to datasource '{name}'")
+                    
+                    # If working with a lazy frame, select and collect one column at a time.
+                    # This reads only one column from the file into memory.
+                    if is_lazy:
+                        polars_series = dataframe.select(col["field"]).collect().get_columns()[0]
+                    else:
+                        polars_series = dataframe[col["field"]]
+
+                    add_column_to_group_from_polars(col, polars_series, gr, num_rows, self.skip_column_clean)
+                except Exception as e:
+                    print(f" ++++++ DODGY COLUMN: {col['field']}")
+                    dodgy_columns.append(col["field"])
+                    warnings.warn(
+                        f"Failed to add column '{col['field']}' to datasource '{name}': {repr(e)}"
+                    )
+            
+            h5.close()  # Close HDF5 file
+            columns = [x for x in columns if x["field"] not in dodgy_columns]
+            
+            # Update datasource metadata
+            ds = {"name": name, "columns": columns, "size": num_rows}
+            self.set_datasource_metadata(ds)
+            
+            print("Updated datasource metadata")
+            
+            # Add to view if specified
+            if add_to_view:
+                # TablePlot parameters
+                title = name
+                # Use collect_schema().names() for LazyFrame, .columns for DataFrame
+                if isinstance(dataframe, pl.LazyFrame):
+                    params = dataframe.collect_schema().names()
+                else:
+                    params = dataframe.columns
+                size = [792, 472]
+                position = [10, 10]
+            
+                # Create plot
+                table_plot = self.create_table_plot(title, params, size, position)
+                
+                # Convert plot to JSON and set view
+                table_plot_json = self.convert_plot_to_json(table_plot)
+                
+                v = self.get_view(add_to_view)
+                if not v:
+                    v = {"initialCharts": {}}
+
+                # Check if the initialCharts already has entries for `name`
+                if name not in v["initialCharts"] or not v["initialCharts"][name]:
+                    # If empty, initialize with [table_plot_json]
+                    v["initialCharts"][name] = [table_plot_json]
+                else:
+                    # If not empty, append table_plot_json to the existing list
+                    v["initialCharts"][name].append(table_plot_json)
+                    
+                self.set_view(add_to_view, v)
+            
+            # Update the project's update timestamp using the dedicated method
+            if self.backend_db:
+                from mdvtools.dbutils.dbservice import ProjectService
+                ProjectService.set_project_update_timestamp(self.id)
+            
+            print(f"In MDVProject.add_datasource_polars: Added datasource successfully '{name}'")
+            return dodgy_columns
+
+        except Exception as e:
+            print(f"Error in MDVProject.add_datasource_polars : Error adding datasource '{name}': {e}")
+            raise  # Re-raise the exception to propagate it to the caller
+
 
     def create_table_plot(self, title, params, size, position):
         """Create and configure a TablePlot instance with the given parameters."""
@@ -1335,8 +1510,22 @@ class MDVProject:
 
     def serve(self, **kwargs):
         from mdvtools.server import create_app
+        from mdvtools.server_extension import MDVServerOptions
 
-        create_app(self, **kwargs)
+        options = kwargs.pop("options", None)
+
+        if options is not None:
+            if kwargs:
+                warnings.warn(
+                    "Redundant keyword arguments passed to serve() along with 'options' object. "
+                    "These arguments will be ignored.",
+                    UserWarning
+                )
+        else:
+            # `options` was not provided, create it from kwargs.
+            options = MDVServerOptions(**kwargs)
+        
+        create_app(self, options=options)
         
 
     def delete(self):
@@ -1348,6 +1537,7 @@ class MDVProject:
             "datasources": self.datasources,
             "state": self.state,
         }
+        
         # legacy
         hyperion_conf = join(self.dir, "hyperion_config.json")
         if os.path.exists(hyperion_conf):
@@ -2148,6 +2338,159 @@ def get_random_string(length=6):
         )
     )
 
+
+def map_polars_to_mdv_type(polars_dtype):
+    """Map Polars data types to MDV project data types"""
+    import polars as pl
+    
+    # Map Polars types to our internal types
+    if polars_dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]:
+        return "integer"
+    elif polars_dtype in [pl.Float32, pl.Float64]:
+        return "double"
+    elif polars_dtype == pl.Boolean:
+        return "text"  # Map boolean to text as per original mapping
+    elif polars_dtype == pl.Categorical:
+        return "text"
+    elif polars_dtype in [pl.Utf8, pl.String]:
+        return "text"  # Default to text, might change to unique based on cardinality
+    else:
+        # Default to text for any other types
+        return "text"
+
+def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows, skip_column_clean):
+    """Add a column to HDF5 group using Polars Series data"""
+    import numpy as np
+    
+    field = col_info["field"]
+    
+    # Handle different column types
+    if col_info["datatype"] in ["text", "text16", "multitext"]:
+        # For categorical-like columns
+        if col_info["datatype"] == "multitext":
+            # This requires special handling for delimited strings
+            # First, extract unique values across all rows
+            if isinstance(polars_series, pl.Series):
+                # Convert to pandas for compatible processing with existing code
+                data = polars_series.to_pandas()
+                # Use existing add_column_to_group since it handles complex multitext logic
+                add_column_to_group(col_info, data, h5_group, num_rows, skip_column_clean)
+                return
+        else:
+            # For regular categorical columns
+            unique_values = polars_series.unique().sort()
+            # Only use text16 if we have too many categories for text
+            if len(unique_values) >= 256:
+                col_info["datatype"] = "text16"
+                dtype = np.uint16
+            else:
+                col_info["datatype"] = "text"
+                dtype = np.ubyte
+            
+            # Store the unique values in the column metadata
+            col_info["values"] = [str(v) for v in unique_values.to_list()]
+            
+            # Create mapping from values to indices
+            value_to_index = {str(v): i for i, v in enumerate(col_info["values"])}
+            
+            # Create an empty dataset and write to it in chunks
+            dset = h5_group.create_dataset(field, (num_rows,), dtype=dtype)
+            chunk_size = 100_000  # Process 100,000 rows at a time
+
+            for i in range(0, num_rows, chunk_size):
+                chunk = polars_series[i : i + chunk_size]
+                encoded_chunk = np.array([value_to_index.get(str(v), 0) for v in chunk], dtype=dtype)
+                dset[i : i + len(encoded_chunk)] = encoded_chunk
+    
+    elif col_info["datatype"] == "unique":
+        # For string columns with many unique values
+        if isinstance(polars_series, pl.Series):
+            # Calculate max length more efficiently
+            max_len = polars_series.str.len_bytes().max()
+            if max_len is None:
+                max_len = 1
+            
+            # Create a fixed-length string dataset (HDF5 requirement)
+            dt = h5py.string_dtype("utf-8", max_len)
+            dset = h5_group.create_dataset(field, (num_rows,), dtype=dt)
+            
+            # Update metadata
+            col_info["stringLength"] = max_len
+            
+            # Process and write in chunks
+            chunk_size = 100_000  # Process 100,000 rows at a time
+            for i in range(0, num_rows, chunk_size):
+                chunk = polars_series[i : i + chunk_size]
+                processed_chunk = chunk.fill_null("").to_list()
+                dset[i : i + len(processed_chunk)] = processed_chunk
+    
+    else:
+        # For numeric columns (integer, double)
+        if isinstance(polars_series, pl.Series):
+            # Use to_numpy() for more direct and memory-efficient conversion
+            if col_info["datatype"] == "int32":
+                data = polars_series.to_numpy(zero_copy_only=False).astype(np.int32)
+            else:
+                # fillna is necessary because NaN cannot be cast to int
+                data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
+
+            # Create dataset
+            h5_group.create_dataset(field, data=data)
+
+            # Calculate stats for metadata
+            finite_mask = np.isfinite(data)
+            if np.any(finite_mask):
+                finite_data = data[finite_mask]
+                col_info["minMax"] = [float(np.min(finite_data)), float(np.max(finite_data))]
+                
+                col_info["quantiles"] = {}
+                for q in [0.001, 0.01, 0.05]:
+                    col_info["quantiles"][str(q)] = [
+                        float(np.percentile(finite_data, 100 * q)),
+                        float(np.percentile(finite_data, 100 * (1 - q)))
+                    ]
+
+def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", supplied_columns_only, num_rows: int):
+    """Polars version of get_column_info function, supports LazyFrames."""
+    
+    if columns:
+        for col in columns:
+            if not col.get("field"):
+                col["field"] = col["name"]
+
+    if not supplied_columns_only:
+        # Get column info from polars dataframe or lazyframe
+        cols = []
+        # .schema works on both DataFrame and LazyFrame without loading data
+        for col_name, polars_dtype in dataframe.collect_schema().items():
+            mdv_dtype = map_polars_to_mdv_type(polars_dtype)
+            
+            # Check if this should be unique based on cardinality
+            if mdv_dtype == "text":
+                # Handle both DataFrame and LazyFrame cases
+                if isinstance(dataframe, pl.LazyFrame):
+                    unique_count = dataframe.select(pl.col(col_name).n_unique()).collect().item()
+                else:
+                    # For DataFrame, don't call collect()
+                    unique_count = dataframe.select(pl.col(col_name).n_unique()).item()
+                total_count = num_rows
+                # If most values are unique, treat as unique type
+                if unique_count > min(65536, total_count * 0.8):
+                    mdv_dtype = "unique"
+            
+            cols.append({
+                "datatype": mdv_dtype,
+                "name": col_name,
+                "field": col_name
+            })
+        
+        # Replace with user given column metadata
+        if columns:
+            col_map = {x["field"]: x for x in columns}
+            cols = [col_map.get(x["field"], x) for x in cols]
+        columns = cols
+    
+    return columns
 
 if __name__ == "__main__":
     path = os.getcwd()

@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.abspath("../"))
 # -- Project information -----------------------------------------------------
 
 project = "MDV"
-# copyright = "2021, Martin Sergeant"
-# author = "Martin Sergeant"
+# copyright = ""
+author = ""
 
 # The short X.Y version
 version = ""
@@ -54,6 +54,17 @@ autoapi_keep_files = True
 autoapi_generate_api_docs = True
 autoapi_add_toctree_entry = False
 
+# Ignore problematic modules that cause import errors
+autoapi_ignore = [
+    "**/llm/langchain_mdv.py",
+    "**/langchain_mdv.py",
+    "*langchain_mdv*",
+    "**/test_projects/**",
+    "**/RAG_examples/**",
+    "**/tests/test_*",
+    "*test_*",
+]
+
 # enable extensions for myst parser
 myst_enable_extensions = [
     "html_image",
@@ -63,8 +74,15 @@ myst_enable_extensions = [
 
 html_logo = "../../images/mdv_logo.png"
 html_theme_options = {
-    "logo_only": True,
-    #'display_version': False,
+    'display_version': False,
+    "repository_url": "https://github.com/Taylor-CCB-Group/MDV",
+    "repository_branch": "main",
+    "use_repository_button": True,
+    "footer_items": [],
+    "logo": {
+        "image_light": "../../images/mdv_logo.png",
+        "image_dark": "../../images/mdv_logo.png",
+    },
 }
 
 # TBD:
@@ -108,7 +126,7 @@ pygments_style = None
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "sphinx_book_theme"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -131,7 +149,7 @@ html_show_sphinx = False
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = ["maindocs/_static"]
+# html_static_path = ["_static"]
 
 
 # Custom sidebar templates, must be a dictionary that maps document names
