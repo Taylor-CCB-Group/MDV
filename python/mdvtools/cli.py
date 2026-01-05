@@ -127,16 +127,23 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
 @click.argument('spatialdata_path')
 @click.argument('output_folder')
 @click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data.')
+@click.option('--link', is_flag=True, help='Symlink to the original SpatialData objects.')
+@click.option('--output_geojson', is_flag=True, help='Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes).')
 @click.option('--serve', is_flag=True, help='Serve the project after conversion.')
-def convert_spatial(spatialdata_path, output_folder, preserve_existing, serve):
+def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, serve):
     """Convert SpatialData objects to MDV format."""
-    args = SpatialDataConversionArgs(
-        spatialdata_path=spatialdata_path,
-        output_folder=output_folder,
-        preserve_existing=preserve_existing,
-        serve=serve,
-    )
-    convert_spatialdata_to_mdv(args)
+    import tempfile
+    with tempfile.TemporaryDirectory() as temp_folder:
+        args = SpatialDataConversionArgs(
+            spatialdata_path=spatialdata_path,
+            output_folder=output_folder,
+            preserve_existing=preserve_existing,
+            temp_folder=temp_folder,
+            link=link,
+            output_geojson=output_geojson,
+            serve=serve,
+        )
+        convert_spatialdata_to_mdv(args)
 
 if __name__ == '__main__':
     cli()
