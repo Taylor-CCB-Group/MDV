@@ -12,7 +12,7 @@ import shutil
 import h5py
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 from werkzeug.utils import secure_filename
 import numpy as np
 from .mdvproject import MDVProject,create_bed_gz_file
@@ -1078,16 +1078,24 @@ def merge_projects(
                 if not region_map:
                     continue
                 group = base_h5.get(ds_name)
-                if group is None or field not in group:
+                if not isinstance(group, h5py.Group):
+                    continue
+                if field not in group:
                     continue
                 dataset = group[field]
+                if not isinstance(dataset, h5py.Dataset):
+                    continue
                 data = dataset[:]
                 if data.dtype.kind == "S":
                     updated = np.array(
                         [
-                            region_map.get(val.decode("utf-8"), val.decode("utf-8")).encode(
-                                "utf-8"
-                            )
+                            (
+                                lambda v: (
+                                    decoded := v.decode("utf-8"),
+                                    mapped := region_map.get(decoded, decoded),
+                                    mapped if isinstance(mapped, str) else decoded,
+                                )[2]
+                            )(val).encode("utf-8")
                             for val in data
                         ],
                         dtype=data.dtype,
@@ -1157,7 +1165,7 @@ def merge_projects(
     print(f"DEBUG: extra_views keys: {list(extra_views.keys())}")
     print(f"DEBUG: view_prefix_value: '{view_prefix_value}'")
 
-    def apply_replacements(obj):
+    def apply_replacements(obj: Any) -> Any:
         if isinstance(obj, dict):
             return {key: apply_replacements(value) for key, value in obj.items()}
         if isinstance(obj, list):
