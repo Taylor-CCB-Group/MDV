@@ -1,5 +1,5 @@
-[
-    {
+{
+    "oligos":[{
         "id": "tIuHGh",
         "include_index": false,
         "param": [
@@ -87,5 +87,59 @@
         16,
         473
         ]
-    }
-]
+    }],
+    "regions": [
+        {
+          "title": "",
+          "legend": "",
+          "param": [
+            "region",
+            "oligos found",
+            "chr",
+            "start"
+          ],
+          "type": "table_chart",
+          "id": "4b8nb0",
+          "size": [
+            419,
+            367
+          ],
+          "column_widths": {
+            "region": 188,
+            "chr": 60
+          },
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "title": "oligos found",
+          "legend": "",
+          "param": [
+            "oligos found"
+          ],
+          "type": "ring_chart",
+          "id": "zYsaJu",
+          "size": [
+            224,
+            225
+          ],
+          "axis": {
+            "x": {
+              "textSize": 13,
+              "label": "",
+              "size": 25,
+              "tickfont": 10
+            }
+          },
+          "position": [
+            2,
+            384
+          ]
+        }
+    ]
+}
+
+
+

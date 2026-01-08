@@ -2,9 +2,8 @@ import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { useDataSources } from "@/react/hooks";
-async function loadColumns(columns){
-    
-}
+import {loadColumn} from "@/dataloaders/DataLoaderUtil"
+
 
 class GenomeBrowser extends BaseChart {
     constructor(dataStore, div, config) {
@@ -82,9 +81,60 @@ class GenomeBrowser extends BaseChart {
                     this.onDataHighlighted({ indexes: [0] });
                 }
             }
-        });
-        if (c.sync_with_datastores){
+            //setup links to other datastores if specified
+            //i.e. the browser update if a region is highlighted in another datastore
+            this.links=[];
+            if (c.sync_with_datastores){
+                const dsources = useDataSources();  
+                for (let ds of c.sync_with_datastores){
+                    const dobj= dsources.find(x=>x.name===ds);
+                    if (dobj){
+                        this.linkToOtherDataStore(dobj.dataStore);
+                    }
+                    
+                }
 
+            }
+        });
+    }
+
+
+    //link this genome browser to another datastore
+    async linkToOtherDataStore(dataStore){
+        const gb = dataStore.genome_browser;
+        if (gb){
+            const tname = `${dataStore.name}_base_track`;
+            //ensure  the genomic coordinates are loaded in the datastore
+            //not sure why loadColumn only loads a single column,
+            //but I don't want to mess with it
+            for (const col of gb.location_fields){
+                await loadColumn(dataStore.name,col);
+            }
+            //display the the default track from the other datastore
+            //in the browser
+            if (!this.browser.getTrack(tname)){
+                this.browser.addTrack({
+                    short_label:gb.default_track.label,
+                    track_id:tname,
+                    url: gb.default_track.url,
+                    decode_function:"generic",
+                    displayMode:"EXPANDED",
+                    height:20
+                },2);
+                this.browser.update();
+            }
+            //listen to the other datastore for highlighted data
+            const lid = `gb_${this.config.id}_${dataStore.name}`;
+            dataStore.addListener(lid,(type,data)=>{
+                if (type==="data_highlighted"){
+                    this.onDataHighlighted(data);
+                }
+            });
+            //store info about the link
+            this.links.push({
+                listener_id:lid,
+                dataStore:dataStore
+            });
         }
     }
 
@@ -310,9 +360,11 @@ class GenomeBrowser extends BaseChart {
         //if (data.source === this) {
         //    return;
         //}
-        const p = this.config.param;
-        const vm = this.config.view_margins;
-        const o = this.dataStore.getRowAsObject(data.indexes[0], p);
+        const ds = data.dataStore || this.dataStore;
+        const p = ds.genome_browser.location_fields;
+        let  vm = this.dataStore===ds?this.config.view_margins:ds.genome_browser?.default_parameters?.view_margins;
+        vm = vm || this.config.view_margins
+        const o = ds.getRowAsObject(data.indexes[0], p);
         //some basic checks
         const st = o[p[2]] > o[p[1]] ? o[p[1]] : o[p[2]];
         let en = o[p[2]] > o[p[1]] ? o[p[2]] : o[p[1]];
@@ -513,6 +565,10 @@ class GenomeBrowser extends BaseChart {
         if (this.cellDim) {
             this.cellDim.destroy(notify);
             this.dataLink.dataStore.removeListener(`gb_${this.config.id}`);
+        }
+        //remove any listeners to other datastores
+        for (let l of this.links){
+            l.dataStore.removeListener(l.listener_id);
         }
         super.remove();
     }

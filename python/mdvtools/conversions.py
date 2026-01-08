@@ -595,32 +595,41 @@ def create_capsequm_project(
         MDVProject: The created MDV project object.
     """
     p = MDVProject(output, delete_existing=True)
+    # get info from config file
     with open(join(results_folder,"config.yml"), 'r') as file:
         config = yaml.safe_load(file)
-
+    # read  in the oligo data
     df = pd.read_csv(join(results_folder, "all_oligos.tsv"), sep="\t")
+    #add extra column merging is_best_oligo and pass_filter
     df["oligo_status"]=["best" if bool(x) else "pass" if bool(y) else "fail"\
                          for x,y in zip(df["is_best_oligo"], df["pass_filter"])]
+    #get first best oligo to set genome browser location
     first_best = df[df["oligo_status"] == "best"].iloc[0]
     chr_val = first_best["chr"]
     start_val = first_best["start"] -500
-    stop_val = first_best["stop"] +500
+    stop_val = first_best["stop"] + 500
 
-
+    #customize some of the columns
     cols = [
         {"name": "sequence", "datatype": "unique"},
         {
-            "name": "oligo_status",
+            "name": "oligo_status", 
             "datatype": "text",
             "values": ["best", "pass", "fail"],
             "colors": ["#4CAF50", "#9D9E48", "#F44336"],
-        }
+        },
+        {"name": "start", "datatype": "int32"},
+        {"name": "stop", "datatype": "int32"}
     ]
     p.add_datasource("oligos", df, columns=cols)
 
     # make a datasource of the regions
     regions_file = join(results_folder, "regions", "regions.bed")
-    rds  = pd.read_csv(regions_file, sep="\t", header=None)
+    #does it have features i.e. SNPs
+    features_file  = join(results_folder, "regions","features.bed")
+    has_features = exists(features_file)
+  
+    rds  = pd.read_csv(features_file if has_features else regions_file, sep="\t", header=None)
     rds.columns = ["chr", "start", "stop","region"]
     #get failed regions
     failed_file = join(results_folder, "failed_regions.txt")
@@ -629,7 +638,7 @@ def create_capsequm_project(
         failed = pd.read_csv(failed_file, sep="\t", header=None)
         failed.columns = ["region"]
         failed = set(failed["region"].tolist()) 
-    #add a column to the regions dataframe
+    #add a column to the regions dataframe showing if oligos were found
     rds["oligos found"] = ["No" if x in failed else "Yes" for x in rds["region"]]
     p.add_datasource("regions", rds, columns=[ 
         {"name": "start", "datatype": "int32"},
@@ -638,25 +647,33 @@ def create_capsequm_project(
         {"name": "oligos found", "datatype": "text", 
          "values":["Yes","No"],"colors":["#4CAF50","#F44336"]}
     ])
+
+    op = config["oligo_parameters"]
+    # for features (snps) - need wide view margins to see all oligos
+    vm = op["length"]*2 +50 if has_features else 500
     p.add_genome_browser(
         "regions", ["chr", "start", "stop"],name="all_regions",
         extra_params={
             "default_parameters": {
                 "color_by": "oligos found",
                 "highlight_selected_region": True,
-                "view_margins": {"type": "fixed_length", "value": 500},
+                "view_margins": {"type": "fixed_length", "value": vm},
                 "color_legend": {"display": False, "pos": [5, 5]}
             }
         }
     )
 
-    #calculate height of track based on overlap
-    op = config["oligo_parameters"]
-    ot_height = ceil(op["length"]/op["step"]) * 7
+    #calculate height of track based on overlap i.e. how stacked the oligos are
+    
+    ot_height = ceil(op["length"]/op["step"]) * 7.5
     extra_params = {
         "default_parameters": {
             "color_by": "oligo_status",
             "highlight_selected_region":True,
+            # will update when regions are selected
+            "sync_with_datastores": [
+                "regions"
+            ],
             "view_margins": {"type": "fixed_length", "value": 500},
              "genome_location": {
                 "chr": chr_val,
@@ -680,10 +697,10 @@ def create_capsequm_project(
     tracks =[]
     if config.get("create_offtarget_bigwig"):
         tracks.append({"file": join(results_folder, "offtarget.bw"),"color":"#72211F",})
-    features  = join(results_folder, "regions","features,bed")
+   
     
-    if exists(features):
-        tracks.append({"file": features,hideLabels:True,"color":"#6B81E4"})
+    if has_features:
+        tracks.append({"file": features_file,"hideLabels":True,"color":"#6B81E4"})
     original = join(results_folder, "summits", "original_regions.bed")
     hideLabels=False
     if exists(original):
@@ -692,7 +709,7 @@ def create_capsequm_project(
     tracks.append({
         "file": join(results_folder, "regions", "regions.bed"),
         "hideLabels":hideLabels,
-        "name":"Regions" if not original else "Summit Regions",
+        "name":"Regions" if not exists(original) else "Summit Regions",
         "color": "#6B81E4",
     })
     for bws in extra_bigwigs:
@@ -710,20 +727,19 @@ def create_capsequm_project(
     )
     tdir = join(split(os.path.abspath(__file__))[0], "templates")
     with open(join(tdir, "views", "capsequm.json")) as f:
-        view = json.load(f)
-   
-    view.append(gb)
+        views = json.load(f)
+    
+    views["oligos"].append(gb)
     p.set_view(
         "default",
         {
             "initialCharts": {
-                "oligos": view,
+                "oligos": views["oligos"],
+                "regions": views["regions"]
             }
         },
     )
-
     return p
-    
 
 def _create_dt_heatmap(
         project,
