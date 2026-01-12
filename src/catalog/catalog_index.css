@@ -90,3 +90,16 @@
     font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
     --button_color: #1266f1;
 }
+
+a {
+    color: var(--button_color);
+}
+
+/* Project Readme Markdown styles */
+.readme-markdown {
+    word-break: break-word;
+}
+
+.readme-markdown p {
+    margin: 0 0 16px;
+}

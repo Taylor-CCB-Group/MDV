@@ -57,6 +57,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
+          # Docker Hub username: mdvadmin (email: mdvadmin@ndm.ox.ac.uk)
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
@@ -97,8 +98,8 @@ jobs:
             --label "org.opencontainers.image.created=${{ steps.build_metadata.outputs.build_date }}" \
             --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
             --label "org.opencontainers.image.description=${{ steps.release_notes.outputs.release_notes }}" \
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ steps.build_metadata.outputs.git_commit_hash }} \
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
-            --cache-from=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:cache \
-            --cache-to=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:cache,mode=max \
-            --push . 
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv:${{ steps.build_metadata.outputs.git_commit_hash }} \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv:latest \
+            --cache-from=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv:cache \
+            --cache-to=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv:cache,mode=max \
+            --push .

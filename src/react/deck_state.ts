@@ -12,7 +12,14 @@ export function useViewState() {
     // we should do something nicer than try/catch here,
     // but longer term we'll probably have a single store/mobx state.
     try {
-        return useViewerStore(state => state.viewState);
+        const vs = useViewerStore(state => state.viewState);
+        if (!vs) {
+            // Return a default viewState when it hasn't been initialized yet
+            // This can happen when a new chart is initialized before the image loader is ready
+            // The viewState should be initialized from config in MainChart, but this provides a safety net
+            return { zoom: 0, target: [0, 0] };
+        }
+        return vs;
     } catch (e) {
         const config = useConfig<DeckScatterConfig>();
         if (!config.viewState) {

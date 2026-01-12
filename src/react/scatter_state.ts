@@ -20,7 +20,7 @@ import {
 } from "../webgl/ScatterDeckExtension";
 import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
-import type { ColumnName } from "@/charts/charts";
+import type { ColumnName, FieldName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -103,10 +103,14 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_bandwidth: 0.1,
     contour_intensity: 1,
     contour_opacity: 0.5,
+    contour_fillThreshold: 2,
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
     // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
+    field_legend: {
+        display: true
+    }
 };
 
 export const scatterAxisDefaults: AxisConfig2D = {
@@ -243,7 +247,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
  * If we have very different scales in x and y, then we probably want to also scale each axis
  * rather than assuming a 1:1 ratio - somewhat related concern... also need to consider that
  * we still want circular points to be circular...
- * 
+ *
  * Also note that we would like in future to be able to set the size of individual points
  * based on some property of the data - but for now we just return a number.
  */
@@ -256,7 +260,12 @@ export function useScatterRadius() {
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
     // (which implies that if we have a warped aspect ratio but making circles circular, they will be based on one or other axis)
-    const radiusScale = (radius * course_radius)/scale;
+    // see DensityPlot.js for an example of how this has been done there:
+    // y_scale = [0, 400 / whRatio];
+    // x_scale = [0, 400];
+
+    const safeScale = scale || 1; // avoid /0 (although - I don't _think_ useRegionScale() would return 0).
+    const radiusScale = (radius * course_radius) / safeScale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {
             const xRange = cx.minMax[1] - cx.minMax[0];
@@ -273,11 +282,11 @@ export type P = [number, number];
 /**
  * ! in its current form, this hook is only called by `useCreateSpatialAnnotationState`
  * in future we may want to be able to have different arrangement of layers & rework this.
- * 
+ *
  * As of now, charts with appropriate spatial context can call `useSpatialLayers()` at any point
  * to access the scatterplot layer, and the tooltip function.
  */
-export function useScatterplotLayer(modelMatrix: Matrix4) {
+export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: FieldName | null) {
     const id = useChartID();
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
@@ -294,6 +303,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     // const [cx, cy, contourParameter] = useParamColumns();
     const params = useParamColumns();
     const [cx, cy, cz] = params;
+    const scale = useRegionScale();
     const hoverInfoRef = useRef<PickingInfo | null>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
@@ -302,9 +312,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             if (typeof i !== "number") throw new Error("expected index");
             return i === highlightedIndex ? (0.2 * radiusScale) / scale : 0.0;
         },
-        [radiusScale, highlightedIndex],
+        [radiusScale, highlightedIndex, scale],
     );
-    const contourLayers = useLegacyDualContour();
+    const contourLayers = useLegacyDualContour(hoveredFieldId);
 
     // todo - Tooltip should be a separate component
     // would rather not even need to call a hook here, but just have some
@@ -346,7 +356,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
 
-    const scale = useRegionScale();
     // const { modelMatrix, setModelMatrix } = useScatterModelMatrix();
     const viewState = useZoomOnFilter(modelMatrix);
     const { point_shape } = config;
@@ -380,6 +389,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 if (typeof i !== "number") throw new Error("expected index");
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
+                // this `cz?.minMax` doesn't account for the potential of cz existing,
+                // but not being what we anticipated
+                // this shouldn't happen now - config.param should only be coordinates.
                 target[2] = cz?.minMax ? cz.data[i] : 0;
                 return target as unknown as Float32Array; // deck.gl types are wrong AFAICT
             },
@@ -470,7 +482,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 const m = modelMatrix.invert();
                 const p3 = m.transform(p) as P;
                 m.invert();
-                return p3;                
+                return p3;
             } catch (e) {
                 //console.error("unproject error", e);
                 return [0, 0];

@@ -1,8 +1,7 @@
 /// <reference types="vite/client" />
 import "./wdyr";
 import "./all_css";
-import HmrHack from "../react/HmrHack";
-HmrHack();
+import "../react/HmrHack";
 import ChartManager from "../charts/ChartManager.js";
 
 import {

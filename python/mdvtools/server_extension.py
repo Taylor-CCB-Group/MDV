@@ -16,7 +16,7 @@ class MDVProjectServerExtension(Protocol):
     integrating other services/libraries/functionality.
     We might also re-arrange so that some things like the add_anndata routes are moved into an extension.
 
-    Maybe rather than pass a Flask app to `server.py`, we pass something representing MDV app configuration,
+    Maybe rather  than pass a Flask app to `server.py`, we pass something representing MDV app configuration,
     including a Flask app, these extensions, auth provider etc...
     Flask becomes an implementation detail that we abstract away somewhat.
     """
@@ -31,6 +31,11 @@ class MDVProjectServerExtension(Protocol):
         e.g. to add information about the extension.
 
         Don't really want to pass flask app here, doing so for now to allow access to config.
+        """
+        ...
+    def register_global_routes(self, app: Flask, config: dict):
+        """
+        Register global routes that apply to the entire application.
         """
         ...
 

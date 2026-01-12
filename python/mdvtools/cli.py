@@ -5,7 +5,16 @@ import shutil
 import zipfile
 import os
 from os.path import exists, join, basename
-from .conversions import convert_scanpy_to_mdv, convert_mudata_to_mdv, convert_vcf_to_mdv
+from .conversions import (
+    convert_scanpy_to_mdv,
+    convert_mudata_to_mdv,
+    convert_vcf_to_mdv,
+    merge_projects,
+)
+from .spatial.conversion import (
+    convert_spatialdata_to_mdv,
+    SpatialDataConversionArgs,
+)
 
 def zip_and_remove(folder):
     """Zip a directory and delete the original."""
@@ -82,7 +91,8 @@ def convert_vcf(folder, vcf_filename, zip_output):
 
 @cli.command()
 @click.argument('folder')
-def serve(folder):
+@click.option('--port', default=5050, help='Port to serve on.')
+def serve(folder, port):
     """Serve MDV project."""
     from .serverlite import serve_project
     from .mdvproject import MDVProject
@@ -91,7 +101,49 @@ def serve(folder):
     ds_path = join(folder, "datasources.json")
     if not exists(ds_path):
         raise FileNotFoundError(f"{folder} does not contain a valid MDV project.")
-    serve_project(MDVProject(folder))
+    serve_project(MDVProject(folder), port=port)
+
+
+@cli.command("merge-project")
+@click.argument("base_project")
+@click.argument("extra_project")
+@click.option(
+    "--prefix",
+    default=None,
+    help="Prefix applied to imported datasource names. "
+    "If omitted, a prefix derived from EXTRA_PROJECT is used.",
+)
+@click.option(
+    "--view-prefix",
+    default=None,
+    help="Prefix applied to imported view names. Defaults to the datasource prefix.",
+)
+def merge_project(base_project, extra_project, prefix, view_prefix):
+    """Merge an existing MDV project into another project."""
+    merge_projects(base_project, extra_project, prefix=prefix, view_prefix=view_prefix)
+    click.echo(f"Merged '{extra_project}' into '{base_project}'.")
+
+@cli.command("convert-spatial")
+@click.argument('spatialdata_path')
+@click.argument('output_folder')
+@click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data.')
+@click.option('--link', is_flag=True, help='Symlink to the original SpatialData objects.')
+@click.option('--output_geojson', is_flag=True, help='Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes).')
+@click.option('--serve', is_flag=True, help='Serve the project after conversion.')
+def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, serve):
+    """Convert SpatialData objects to MDV format."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as temp_folder:
+        args = SpatialDataConversionArgs(
+            spatialdata_path=spatialdata_path,
+            output_folder=output_folder,
+            preserve_existing=preserve_existing,
+            temp_folder=temp_folder,
+            link=link,
+            output_geojson=output_geojson,
+            serve=serve,
+        )
+        convert_spatialdata_to_mdv(args)
 
 if __name__ == '__main__':
     cli()

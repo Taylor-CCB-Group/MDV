@@ -14,6 +14,8 @@ in float vIntensityMax;
 
 // todo more structured uniforms, array of structs...
 uniform float contourOpacity;
+uniform float contourFill;
+uniform float fillOpacity;
 // struct ContourProps {
 //     vec2 increment;
 //     float lineWidth;
@@ -27,12 +29,22 @@ float smoothContour(float value) {
     float w = width * fwidth(value);
     float f = 0.5; // reciprocol bandwidth
     if (value < f) return 0.; //todo something better
-    // if (value > 50. * f) return 1.; //metaballs
+    // if (value > contourFill * f) return 1.; //metaballs - should be controllable parameter with nice animation //no bool type for uniforms in new luma.gl afaik
     float wa = smoothstep(0., (w * f), mod(value * f, 1.)-0.5); //nb -0.5 is to center the contour
     wa = 1. - max(smoothstep(1.-w, 1., wa), smoothstep(w, 0., wa));
     // return 0.0;
     return smoothstep(0., 1., wa*0.5);
     // return contour(value);
+}
+
+float smoothEdge(float value, float threshold) {
+    // Create a smooth edge at the threshold boundary
+    float edgeWidth = 1.5; // Edge width in screen space
+    float w = edgeWidth * fwidth(value);
+    // Create a smooth transition around the threshold
+    // Returns 1.0 when value is at threshold, fading to 0.0 away from threshold
+    float dist = abs(value - threshold);
+    return 1.0 - smoothstep(0.0, w, dist);
 }
 
 
@@ -58,12 +70,44 @@ void main(void) {
 
   vec4 linearColor = getLinearColor(weight);
   // todo allow for multiple contours, with different properties
-  float c = smoothContour(weight) * contourOpacity;
+  // Calculate contour shape (0-1 based on weight position relative to contour lines)
+  float contourShape = smoothContour(weight);
+  // float f = 0.5; // reciprocol bandwidth
+  // if (value > contourFill * f) return 1.; //metaballs - should be controllable parameter with nice animation //no bool type for uniforms in new luma.gl afaik
+  // Determine fill strength: fillOpacity controls the overall strength of the fill contribution
+  float fillStrength = (weight > contourFill) ? fillOpacity : 0.0;
   vec4 fullColor = texture(colorTexture, vec2(1.0, 0.5)); //should be a uniform
-  //fullColor = vec4(1.);
-  linearColor = mix(linearColor, fullColor, c);
-  //   linearColor = c * vec4(1.);
-  linearColor.a *= opacity;
-  linearColor.a = max(linearColor.a, c*2.);
-  fragColor = linearColor;
+  
+  // Contour contribution: contourOpacity controls the overall strength
+  // Only show contour when contourShape > 0 (on a contour line)
+  // Don't mix with linearColor to avoid gradient - show fullColor directly
+  float c = contourShape * contourOpacity;
+  vec4 contourColor = fullColor;
+  // Apply contourOpacity and boost alpha for visibility (original logic used c*2.)
+  contourColor.a = c * 2.0;
+  
+  // Fill contribution: show linearColor when weight exceeds threshold
+  // fillOpacity controls the overall strength of the fill contribution
+  vec4 fillColor = linearColor;
+  fillColor.a *= fillStrength;
+  fillColor.rgb *= fillStrength; // Apply fillOpacity to RGB for proper blending
+  
+  // Edge contribution: create an edge at the fill boundary using smoothContour-like function
+  float edgeShape = smoothEdge(weight, contourFill);
+  float edgeStrength = edgeShape * fillOpacity * 1.3;
+  vec4 edgeColor = fullColor;
+  edgeColor.a = edgeStrength * 2.0; // Boost alpha for visibility
+  
+  // Combine: fill is base, edge overlays on fill, contour overlays on top
+  // When edgeShape is 0, edgeColor.a is 0, so we only see fillColor
+  // When edgeShape > 0, edgeColor overlays on fillColor
+  vec4 fillWithEdge;
+  fillWithEdge.rgb = fillColor.rgb * (1.0 - edgeColor.a) + edgeColor.rgb * edgeColor.a;
+  fillWithEdge.a = fillColor.a * (1.0 - edgeColor.a) + edgeColor.a;
+  
+  // Finally, overlay contour on top of fill+edge
+  // When contourShape is 0, contourColor.a is 0, so we only see fillWithEdge
+  // When contourShape > 0, contourColor overlays on fillWithEdge
+  fragColor.rgb = fillWithEdge.rgb * (1.0 - contourColor.a) + contourColor.rgb * contourColor.a;
+  fragColor.a = fillWithEdge.a * (1.0 - contourColor.a) + contourColor.a;
 }
