@@ -193,7 +193,7 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
     p= MDVProject(folder,delete_existing=delete_existing)
     #are there any general drs
     table = _add_dims(md.obs,md.obsm,max_dims)
-    #add drs derived from modalities
+    #add drs derived from modalities (cell clustering)
     for name,mod in md.mod.items():
         table = _add_dims(table,mod.obsm,max_dims,name)
     md.obs["cell_id"] = md.obs.index
@@ -202,18 +202,26 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
 
     for mod in md.mod.keys():
         mdata = md.mod[mod]
-        #add the modality to project
-        p.add_datasource(mod,mdata.var)
+
         #adds the index to the data as a name column
         #This is usually the unique gene name - but not always
-        column ="name"
-        #no longer unique
-        #column = {"name":"name","datatype":"unique"}
-        p.set_column(mod,column,mdata.var.index)
+        if "name" in mdata.var.columns:
+            logger.warning(f"name in modality {mod} will be overwritten with the index")
+        #Add name column to the actual dataframe, previously it was added to the datasource
+        #after creation. This way it ensures that the dataframe has a least one column, which
+        #is required for susbsequent steps
+        mdata.var["name"]=mdata.var.index
+
+        #add any DRs to the modality (e.g. gene/protein clustering)
+        mdata.var = _add_dims(mdata.var,mdata.varm,max_dims)
+     
+        #add the modality to project
+        p.add_datasource(mod,mdata.var)
+        
         #mod is used as both the tag and the label
-        #the name column is specified as the identifier that the user will use
-        #it is derived from the index and is usually the gene 'name'
-        #However it may not be appropriate can be changed later on 
+        #The name column is specified as the identifier that the user will use
+        #It is derived from the index and is usually the gene 'name'
+        #However it may not be appropriate and can be changed later on 
         p.add_rows_as_columns_link("cells",mod,"name",mod)
         matrix,sparse= get_matrix(mdata.X)
         #sometimes X is empty - all the data is in the layers
