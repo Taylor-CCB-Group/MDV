@@ -53,7 +53,8 @@ const useSlickGridReact = () => {
                 field: "__index__",
                 name: "index",
                 sortable: true,
-                minWidth: config.column_widths?.["__index__"] || 100,
+                width: config.column_widths?.["__index__"] || 100,
+                minWidth: 50,
             });
         }
 
@@ -64,7 +65,8 @@ const useSlickGridReact = () => {
                 field: col.field,
                 name: col.name,
                 sortable: true,
-                minWidth: config.column_widths?.[col.field] || 100,
+                width: config.column_widths?.[col.field] || 100,
+                minWidth: 50,
                 editor: isColumnEditable ? { model: Editors.text } : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
@@ -212,6 +214,8 @@ const useSlickGridReact = () => {
                         delete columnWidths[col.field];
                     }
                 });
+                // Force reference change so React memos that depend on it can update
+                config.column_widths = {...columnWidths};
             });
         });
 
@@ -233,12 +237,12 @@ const useSlickGridReact = () => {
         });
 
         return () => {
-            selectionHandler?.unsubscribe();
-            sortHandler?.unsubscribe();
+            grid.onSelectedRowsChanged.unsubscribe(selectionHandler);
+            grid.onSort.unsubscribe(sortHandler);
             headerMenuHandler?.unsubscribe();
             gridMenuHandler?.unsubscribe();
-            resizeHandler?.unsubscribe();
-            reorderHandler?.unsubscribe();
+            grid.onColumnsResized.unsubscribe(resizeHandler);
+            grid.onColumnsReordered.unsubscribe(reorderHandler);
         };
     }, [config]);
 

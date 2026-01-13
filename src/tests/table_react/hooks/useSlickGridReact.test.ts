@@ -130,8 +130,8 @@ describe("useSlickGridReact", () => {
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
             const nameColumn = result.current.columnDefs.find((col) => col.field === "name");
 
-            expect(ageColumn?.minWidth).toBe(150);
-            expect(nameColumn?.minWidth).toBe(200);
+            expect(ageColumn?.width).toBe(150);
+            expect(nameColumn?.width).toBe(200);
         });
     });
 
@@ -238,7 +238,7 @@ describe("useSlickGridReact", () => {
             const { result, rerender } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
-            expect(ageColumn?.minWidth).toBe(100); // default
+            expect(ageColumn?.width).toBe(100); // default
 
             act(() => {
                 runInAction(() => {
@@ -249,7 +249,7 @@ describe("useSlickGridReact", () => {
             rerender();
 
             const updatedAgeColumn = result.current.columnDefs.find((col) => col.field === "age");
-            expect(updatedAgeColumn?.minWidth).toBe(250);
+            expect(updatedAgeColumn?.width).toBe(250);
         });
     });
 });
