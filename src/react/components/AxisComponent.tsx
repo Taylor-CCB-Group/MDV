@@ -54,7 +54,7 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
     //prevents overlapping with x-axis.
     const chartHeight = height - margin.top - margin.bottom - 2;
 
-    // looks like we're using references to `minMax here` which are then liable to mutate.
+    // be careful not to use references to `minMax here` which are then liable to mutate.
     const [ranges, setRanges] = useState({ domainX: cx.minMax.slice(), domainY: cy.minMax.slice() });
 
     useLayoutEffect(() => {

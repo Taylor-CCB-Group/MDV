@@ -262,6 +262,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
             throw new Error("Deck instance not yet initialized");
         }
         const deck = deckRef.current.deck;
+        // we may want to deal with multiple viewports for "splatter-plot" & other scenarios.
         const viewport = deck.getViewports()[0];
         if (!viewport) {
             throw new Error("No viewport available");

@@ -476,6 +476,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 const r = boundingClientRect;
                 const x = e.clientX - r.left;
                 const y = e.clientY - r.top;
+                // should this also refer to something other than scatterplotLayer?
+                // in DeckScatterComponent we now use deckRef.current.deck.getViewports()[0]
                 const p = scatterplotLayer.unproject([x, y]) as P;
                 //still need to reason better about transforms...
                 // const scale = 1; //this was only right when Pixels.PhysicalSizeX === regions.scale
