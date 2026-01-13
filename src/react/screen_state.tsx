@@ -1,7 +1,7 @@
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { observer } from "mobx-react-lite";
-import { createContext, useContext } from "react";
+import { createContext, useContext, type PropsWithChildren } from "react";
 import type { createMdvPortal } from "./react_utils";
 import createCache, { type EmotionCache } from "@emotion/cache";
 import { CacheProvider } from "@emotion/react";
@@ -50,7 +50,7 @@ export function useEmotionCache(container: HTMLElement) {
  * hopefully the implementation will be easy to change if/when necessary.
  */
 export const OuterContainerProvider = observer(
-    ({ children, parent }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
+    ({ children, parent }: { parent?: BaseChart<any> | BaseDialog } & PropsWithChildren ) => {
         const container = parent?.observable?.container || document.body;
         const cache = useEmotionCache(container);
         return (
