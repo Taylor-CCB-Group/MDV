@@ -2,7 +2,7 @@ services:
   mdv_app:
     build:
      context: .
-    image: jayeshire/mdv:stable
+    image: mdvadmin/mdv:stable
     ports:
       - "5055:5055"
     volumes:
