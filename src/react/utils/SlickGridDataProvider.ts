@@ -32,7 +32,7 @@ class SlickGridDataProvider {
 
     if (!item) return null;
     // Add id for SlickGrid
-    item.id = index;
+    item.id = dataIndex;
 
     // Override __index__ if we're showing the index column
     if (this.includeIndex) {
@@ -48,7 +48,10 @@ class SlickGridDataProvider {
 
   // Get the data index for a grid row (for highlighting)
   getDataIndex(gridRow: number): number {
-    return this.indices[gridRow];
+    if (gridRow < 0 || gridRow >= this.indices.length) {
+      return -1;
+    }
+    return this.indices[gridRow] ?? -1;
   }
 
   // Required by GridStateService for row selection
@@ -70,8 +73,7 @@ class SlickGridDataProvider {
     return rows
         .filter(row => row >= 0 && row < this.indices.length)
         .map(row => {
-            const item = this.getItem(row);
-            return item?.id ?? row;
+            return this.indices[row];
         });
 }
 
