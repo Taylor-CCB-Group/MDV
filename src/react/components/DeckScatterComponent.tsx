@@ -180,6 +180,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
         getPosition: (_, { target, index }) => {
             target[0] = cx.data[index];
             target[1] = cy.data[index];
+            // we need to review whether changes are needed here related to density...
             if (cz) target[2] = cz.data[index];
             return target as [number, number];
         },
@@ -252,13 +253,22 @@ const DeckScatter = observer(function DeckScatterComponent() {
     //! deck doesn't like it if we change the layers array - better to toggle visibility
     const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer, axisLinesLayer].filter(x => x !== null);
     
-    // unproject used for updating ranges - may refactor hooks around this
-    const unproject = useCallback((coords: [number, number]) => {
-        // make sure it applies to the right `this`
-        return scatterplotLayer.unproject(coords);
-    }, [scatterplotLayer]);
     const outerContainer = useOuterContainer();
     const deckRef = useRef<any>();
+    
+    // unproject used for updating ranges - use deck viewport instead of layer
+    const unproject = useCallback((coords: [number, number]) => {
+        if (!deckRef.current?.deck) {
+            throw new Error("Deck instance not yet initialized");
+        }
+        const deck = deckRef.current.deck;
+        const viewport = deck.getViewports()[0];
+        if (!viewport) {
+            throw new Error("No viewport available");
+        }
+        // Unproject from screen coordinates to world coordinates
+        return viewport.unproject([coords[0], coords[1]]);
+    }, []);
     // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
     useEffect(() => {
         outerContainer; // make sure the hook runs when this changes

@@ -57,11 +57,8 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
     // looks like we're using references to `minMax here` which are then liable to mutate.
     const [ranges, setRanges] = useState({ domainX: cx.minMax.slice(), domainY: cy.minMax.slice() });
 
-    // Run synchronously after layout/before paint
     useLayoutEffect(() => {
-        //! not reacting to changes from useZoomOnFilter()...
         viewState;
-        // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
             const p = unproject([0, 0]);
             const p2 = unproject([chartWidth, chartHeight]);
@@ -70,8 +67,8 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
                 domainY: [p2[1], p[1]],
             });
         } catch (e) {
-            // Fallback to data ranges
-            // console.warn("AxisComponent: unproject failed", e);
+            // Fallback to data ranges when deck isn't ready yet
+            // This is normal on first render
             setRanges({ domainX: cx.minMax.slice(), domainY: cy.minMax.slice() });
         }
     }, [viewState, chartWidth, chartHeight, unproject, cx.minMax, cy.minMax]);
