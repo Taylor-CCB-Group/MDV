@@ -158,7 +158,12 @@ const TableChartReactComponent = observer(() => {
                         open={alertDialogOpen}
                         handleClose={onFeedbackDialogClose}
                         component={<FeedbackAlertComponent feedbackAlert={feedbackAlert} />}
-                        isAlertErrorComponent={!feedbackAlert.metadata || feedbackAlert.type !== "error"}
+                        isAlertErrorComponent={
+                            !(
+                                feedbackAlert.type === "error" &&
+                                (feedbackAlert.stack || feedbackAlert.traceback || feedbackAlert.metadata)
+                            )
+                        }
                     />
                 </div>
             )}
