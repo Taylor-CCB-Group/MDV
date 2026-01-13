@@ -1734,15 +1734,6 @@ class DataStore {
             const computed = this._computeMinMaxFromData(c);
             return computed || [0, 0];
         }
-        // Detect the "all NaN" initialization case: [Number.MAX_VALUE, Number.MIN_VALUE]
-        // This happens when minMax computation finds no finite values
-        if (
-            (a === Number.MAX_VALUE && b === Number.MIN_VALUE) ||
-            (a === Number.MIN_VALUE && b === Number.MAX_VALUE)
-        ) {
-            const computed = this._computeMinMaxFromData(c);
-            return computed || [0, 0];
-        }
         // Ensure [min, max] ordering
         return a <= b ? [a, b] : [b, a];
     }
@@ -1755,7 +1746,7 @@ class DataStore {
     _computeMinMaxFromData(c) {
         if (!c.data) return null;
         let min = Number.MAX_VALUE;
-        let max = Number.MIN_VALUE;
+        let max = Number.NEGATIVE_INFINITY;
         let foundFinite = false;
         for (let i = 0; i < c.data.length; i++) {
             const value = c.data[i];
