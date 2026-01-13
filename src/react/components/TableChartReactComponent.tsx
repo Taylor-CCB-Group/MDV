@@ -22,10 +22,18 @@ export type FeedbackAlertComponentType = {
     feedbackAlert: FeedbackAlert;
 };
 
+const isDebugError = (feedbackAlert: FeedbackAlert) => {
+    if (feedbackAlert)
+        return (
+            feedbackAlert.type === "error" && (feedbackAlert.stack || feedbackAlert.traceback || feedbackAlert.metadata)
+        );
+    else return false;
+};
+
 const FeedbackAlertComponent = ({ feedbackAlert }: FeedbackAlertComponentType) => {
     if (!feedbackAlert) return <></>;
 
-    if (feedbackAlert.type === "error" && (feedbackAlert.stack || feedbackAlert.traceback || feedbackAlert.metadata)) {
+    if (isDebugError(feedbackAlert)) {
         return (
             <DebugErrorComponent
                 error={{
@@ -159,10 +167,7 @@ const TableChartReactComponent = observer(() => {
                         handleClose={onFeedbackDialogClose}
                         component={<FeedbackAlertComponent feedbackAlert={feedbackAlert} />}
                         isAlertErrorComponent={
-                            !(
-                                feedbackAlert.type === "error" &&
-                                (feedbackAlert.stack || feedbackAlert.traceback || feedbackAlert.metadata)
-                            )
+                            !isDebugError(feedbackAlert)
                         }
                     />
                 </div>
