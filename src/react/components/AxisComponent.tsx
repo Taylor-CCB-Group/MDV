@@ -54,7 +54,8 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
     //prevents overlapping with x-axis.
     const chartHeight = height - margin.top - margin.bottom - 2;
 
-    const [ranges, setRanges] = useState({ domainX: cx.minMax, domainY: cy.minMax });
+    // looks like we're using references to `minMax here` which are then liable to mutate.
+    const [ranges, setRanges] = useState({ domainX: cx.minMax.slice(), domainY: cy.minMax.slice() });
 
     // Run synchronously after layout/before paint
     useLayoutEffect(() => {
@@ -71,16 +72,16 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
         } catch (e) {
             // Fallback to data ranges
             // console.warn("AxisComponent: unproject failed", e);
-            setRanges({ domainX: cx.minMax, domainY: cy.minMax });
+            setRanges({ domainX: cx.minMax.slice(), domainY: cy.minMax.slice() });
         }
     }, [viewState, chartWidth, chartHeight, unproject, cx.minMax, cy.minMax]);
 
     const scaleX = useMemo(() => Scale.scaleLinear({
-        domain: ranges.domainX.sort(), // e.g. [min, max]
+        domain: ranges.domainX,//.sort(), // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
     }), [chartWidth, ranges, margin.left]);
     const scaleY = useMemo(() => Scale.scaleLinear({
-        domain: ranges.domainY.sort(), // e.g. [min, max]
+        domain: ranges.domainY,//.sort(), // e.g. [min, max]
         range: [chartHeight + margin.top, margin.top],
     }), [chartHeight, ranges, margin.top]);
 
