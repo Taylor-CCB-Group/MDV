@@ -60,6 +60,8 @@ const FindAndReplaceDialog = ({
     const [findText, setFindText] = useState("");
     const [replaceText, setReplaceText] = useState("");
 
+    const title = `Find ${isColumnEditable ? "And Replace" : ""} ${columnName ? `in "${columnName}"` : ""}`;
+
     // Clear the find and replace text before closing
     const onDialogClose = useCallback(() => {
         setFindText("");
@@ -85,7 +87,7 @@ const FindAndReplaceDialog = ({
             }}
         >
             <DialogTitle style={{ cursor: "move" }} id="draggable-dialog-title">
-                Find And Replace {columnName ? `in "${columnName}"` : ""}
+                {title}
             </DialogTitle>
             <IconButton
                 aria-label="close"

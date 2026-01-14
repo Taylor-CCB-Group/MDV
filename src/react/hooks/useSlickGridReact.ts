@@ -54,7 +54,7 @@ const useSlickGridReact = () => {
                 field: "__index__",
                 name: "index",
                 sortable: true,
-                width: config.column_widths?.["__index__"] || 100,
+                width: config.column_widths?.["__index__"] ?? 100,
             });
         }
 
@@ -65,7 +65,7 @@ const useSlickGridReact = () => {
                 field: col.field,
                 name: col.name,
                 sortable: true,
-                width: config.column_widths?.[col.field] || 100,
+                width: config.column_widths?.[col.field] ?? 100,
                 editor: isColumnEditable ? { model: Editors.text } : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
@@ -276,6 +276,10 @@ const useSlickGridReact = () => {
             gridWidth: "100%",
             gridHeight: "600px",
             darkMode: window?.mdv?.chartManager?.theme === "dark",
+            autoFitColumnsOnFirstLoad: false,   // default
+            enableAutoSizeColumns: false, 
+            rowHeight: 25,  
+            defaultColumnWidth: 100,
             enableColumnPicker: false,
             enableSorting: true,
             multiColumnSort: false,
