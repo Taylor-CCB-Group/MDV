@@ -41,5 +41,5 @@ For programmatic use in Python tests, import from `mdvtools.tests.test_project_f
 - The CI/CD for playwright tests should be implemented either by having a playwright container running while running the tests or by a different approach.
 - The tests should run in parallel rather than serial mode. This may be fixed using project fixtures or setup and teardown.
 - Add more tests for the project view.
-- Further expanpsion of mock-project generating utilities, including simple front-end UI.
-- Some kind of protocol end-users can use to submit standardised reproduceable bug-reports based on mock data?
+- Further expansion of mock-project generating utilities, including simple front-end UI.
+- Some kind of protocol end-users can use to submit standardised reproducible bug-reports based on mock data?
