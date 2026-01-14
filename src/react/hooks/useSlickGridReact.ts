@@ -28,6 +28,7 @@ const useSlickGridReact = () => {
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [searchColumn, setSearchColumn] = useState<string | null>(null);
+    const [gridInstance, setGridInstance] = useState<SlickgridReactInstance | null>(null);
 
     // Refs
     const sortedIndicesRef = useRef(sortedIndices);
@@ -54,7 +55,6 @@ const useSlickGridReact = () => {
                 name: "index",
                 sortable: true,
                 width: config.column_widths?.["__index__"] || 100,
-                minWidth: 50,
             });
         }
 
@@ -66,7 +66,6 @@ const useSlickGridReact = () => {
                 name: col.name,
                 sortable: true,
                 width: config.column_widths?.[col.field] || 100,
-                minWidth: 50,
                 editor: isColumnEditable ? { model: Editors.text } : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
@@ -74,7 +73,7 @@ const useSlickGridReact = () => {
                         commandItems: [
                             {
                                 command: "find-replace",
-                                title: "Find & Replace",
+                                title: isColumnEditable ? "Find & Replace" : "Find",
                                 iconCssClass: "mdi mdi-magnify",
                             },
                         ],
@@ -114,6 +113,7 @@ const useSlickGridReact = () => {
             console.log("Grid created");
             gridRef.current = e.detail;
 
+            setGridInstance(e.detail);
             const grid = e.detail.slickGrid;
             if (grid && dataProvider) {
                 grid.setData(dataProvider, true);
@@ -124,7 +124,9 @@ const useSlickGridReact = () => {
     );
 
     useEffect(() => {
-        const grid = gridRef.current?.slickGrid;
+        // Using grid state to attach the handlers after the grid is created
+        if (!gridInstance) return;
+        const grid = gridInstance.slickGrid;
         if (!grid) return;
 
         const selectionHandler: any = grid.onSelectedRowsChanged.subscribe((_e, args) => {
@@ -244,7 +246,7 @@ const useSlickGridReact = () => {
             grid.onColumnsResized.unsubscribe(resizeHandler);
             grid.onColumnsReordered.unsubscribe(reorderHandler);
         };
-    }, [config]);
+    }, [config, gridInstance]);
 
     // Handle highlighted data from other charts
     useEffect(() => {
@@ -274,6 +276,7 @@ const useSlickGridReact = () => {
             gridWidth: "100%",
             gridHeight: "600px",
             darkMode: window?.mdv?.chartManager?.theme === "dark",
+            enableColumnPicker: false,
             enableSorting: true,
             multiColumnSort: false,
             enableGridMenu: false,
@@ -294,6 +297,9 @@ const useSlickGridReact = () => {
             enableRowSelection: true,
             rowSelectionOptions: {
                 selectActiveRow: true,
+            },
+            headerMenu: {
+                hideColumnHideCommand: true,
             },
         }),
         [chartId],

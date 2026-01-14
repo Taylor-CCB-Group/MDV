@@ -160,11 +160,14 @@ describe("useSlickGridReact", () => {
             const mockGrid = {
                 setData: vi.fn(),
                 render: vi.fn(),
-                onSelectedRowsChanged: { subscribe: vi.fn() },
-                onSort: { subscribe: vi.fn() },
+                onSelectedRowsChanged: { subscribe: vi.fn(), unsubscribe: vi.fn() },
+                onSort: { subscribe: vi.fn(), unsubscribe: vi.fn()  },
                 getPubSubService: vi.fn(() => ({
                     subscribe: vi.fn(),
+                    unsubscribe: vi.fn() 
                 })),
+                onColumnsResized: { subscribe: vi.fn(), unsubscribe: vi.fn() },
+                onColumnsReordered: { subscribe: vi.fn(), unsubscribe: vi.fn() },
             };
 
             const mockGridInstance = {

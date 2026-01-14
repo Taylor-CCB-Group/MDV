@@ -129,7 +129,7 @@ const FindAndReplaceDialog = ({
                             color="inherit"
                             sx={{ textTransform: "capitalize", fontSize: "0.8rem" }}
                         >
-                            Find All
+                            Find
                         </Button>
                         <Button
                             variant="outlined"
