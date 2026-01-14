@@ -19,6 +19,7 @@ vi.mock("@/react/hooks", () => ({
 
 vi.mock("@/react/selectionHooks", () => ({
     useHighlightedIndex: () => mockHighlightedIndex,
+    useHighlightedIndices: () => mockHighlightedIndex,
 }));
 
 vi.mock("@/react/hooks/useSortedIndices", () => ({
@@ -31,6 +32,7 @@ let mockChart: any;
 let mockOrderedParamColumns: LoadedDataColumn<DataType>[];
 let mockSortedIndices: Uint32Array;
 let mockHighlightedIndex: number;
+let mockHighlightedIndices: number[];
 
 describe("useSlickGridReact", () => {
     beforeEach(() => {
@@ -57,6 +59,7 @@ describe("useSlickGridReact", () => {
 
         mockSortedIndices = new Uint32Array([0, 1, 2]);
         mockHighlightedIndex = -1;
+        mockHighlightedIndices = [];
 
         // Setup mock config with observable properties
         mockConfig = observable({

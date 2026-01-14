@@ -158,12 +158,31 @@ class TableChart extends BaseChart {
         if (data.source === this) {
             return;
         }
-        const pos = this.dataModel.data.indexOf(data.indexes[0]);
-        if (pos !== -1) {
-            this.grid.scrollRowIntoView(pos);
+
+        // Get all highlighted indices
+        const indices = Array.isArray(data.indexes) ? data.indexes : Object.values(data.indexes);
+        
+        if (indices.length === 0) {
+            this.grid.setSelectedRows([]);
+            return;
+        }
+
+        // Find all positions in the data model
+        const positions = [];
+        for (const index of indices) {
+            const pos = this.dataModel.data.indexOf(index);
+            if (pos !== -1) {
+                positions.push(pos);
+            }
+        }
+
+        if (positions.length > 0) {
+            // Scroll to the first highlighted row
+            this.grid.scrollRowIntoView(positions[0]);
             this.tempMode = this.mode;
             this.mode = "";
-            this.grid.setSelectedRows([pos]);
+            // Set all highlighted rows
+            this.grid.setSelectedRows(positions);
             this.mode = this.tempMode;
         }
     }

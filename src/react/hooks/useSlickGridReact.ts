@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
 import { useChartID, useConfig, useOrderedParamColumns } from "../hooks";
-import { useHighlightedIndex } from "../selectionHooks";
+import { useHighlightedIndex, useHighlightedIndices } from "../selectionHooks";
 import useSortedIndices from "./useSortedIndices";
 import {
     type Column,
@@ -23,7 +23,8 @@ const useSlickGridReact = () => {
     const chart = useChart<TableChartReactConfig>();
     const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
     const sortedIndices = useSortedIndices();
-    const highlightedIndex = useHighlightedIndex();
+    // const highlightedIndex = useHighlightedIndex();
+    const highlightedIndices = useHighlightedIndices();
 
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
@@ -248,28 +249,52 @@ const useSlickGridReact = () => {
         };
     }, [config, gridInstance]);
 
-    // Handle highlighted data from other charts
+    // Handle highlighted data
     useEffect(() => {
-        if (highlightedIndex === -1) return;
-
         const grid = gridRef.current?.slickGrid;
         if (!grid) return;
 
-        // Find the row position in our filtered/sorted indices
-        const pos = sortedIndicesRef.current.indexOf(highlightedIndex);
-
-        if (pos !== -1) {
-            // Set flag to prevent triggering our own highlight event
-            isSelectingRef.current = true;
-
-            grid.scrollRowIntoView(pos, false);
-            grid.setSelectedRows([pos]);
-
-            setTimeout(() => {
-                isSelectingRef.current = false;
-            }, 100);
+        if (!dataProvider || !sortedIndices || sortedIndices.length === 0) {
+            return;
         }
-    }, [highlightedIndex]);
+
+        try {
+
+        if (highlightedIndices.length === 0) {
+            // Only reset if the data provider is initialized and sorted indices have values
+            // otherwise we will be messing with the initialization of the grid
+            // if (dataProvider && sortedIndicesRef.current.length > 0) {
+                isSelectingRef.current = true;
+                grid.setSelectedRows([]);
+                setTimeout(() => {
+                    isSelectingRef.current = false;
+                }, 100);
+            // }
+            return;
+        }
+
+        const positions: number[] = [];
+
+        for (const index of highlightedIndices) {
+            // Get the position of the index from sorted indices
+            const pos = sortedIndicesRef.current.indexOf(index);
+            if (pos !== -1) positions.push(pos);
+        }
+
+        if (positions.length === 0) return;
+
+        isSelectingRef.current = true;
+
+        grid.scrollRowIntoView(positions[0], false);
+        grid.setSelectedRows(positions);
+
+        setTimeout(() => {
+            isSelectingRef.current = false;
+        }, 100)
+    } catch (err) {
+        console.error("Error highlighting the rows in the table", err);
+    }
+    }, [highlightedIndices, dataProvider, sortedIndices]);
 
     const options: GridOption = useMemo(
         () => ({
