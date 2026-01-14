@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
 import { useChartID, useConfig, useOrderedParamColumns } from "../hooks";
-import { useHighlightedIndex, useHighlightedIndices } from "../selectionHooks";
+import { useHighlightedIndices } from "../selectionHooks";
 import useSortedIndices from "./useSortedIndices";
 import {
     type Column,
@@ -23,7 +23,6 @@ const useSlickGridReact = () => {
     const chart = useChart<TableChartReactConfig>();
     const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
     const sortedIndices = useSortedIndices();
-    // const highlightedIndex = useHighlightedIndex();
     const highlightedIndices = useHighlightedIndices();
 
     // States
@@ -263,13 +262,11 @@ const useSlickGridReact = () => {
         if (highlightedIndices.length === 0) {
             // Only reset if the data provider is initialized and sorted indices have values
             // otherwise we will be messing with the initialization of the grid
-            // if (dataProvider && sortedIndicesRef.current.length > 0) {
                 isSelectingRef.current = true;
                 grid.setSelectedRows([]);
                 setTimeout(() => {
                     isSelectingRef.current = false;
                 }, 100);
-            // }
             return;
         }
 
