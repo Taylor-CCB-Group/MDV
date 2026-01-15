@@ -14,6 +14,7 @@ vi.mock("@/react/context", () => ({
 vi.mock("@/react/hooks", () => ({
     useConfig: () => mockConfig,
     useChartID: () => "test-chart-id",
+    useTheme: () => "dark",
     useOrderedParamColumns: () => mockOrderedParamColumns,
 }));
 

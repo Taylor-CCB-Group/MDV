@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
-import { useChartID, useConfig, useOrderedParamColumns } from "../hooks";
+import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
 import {
     type Column,
@@ -24,6 +24,7 @@ const useSlickGridReact = () => {
     const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
     const sortedFilteredIndices = useSortedFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
+    const theme = useTheme();
 
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
@@ -311,7 +312,7 @@ const useSlickGridReact = () => {
         () => ({
             gridWidth: "100%",
             gridHeight: "600px",
-            darkMode: window?.mdv?.chartManager?.theme === "dark",
+            darkMode: theme === "dark",
             autoFitColumnsOnFirstLoad: false, // To avoid the columns to take less width
             enableAutoSizeColumns: false, 
             rowHeight: 25,  
@@ -342,7 +343,7 @@ const useSlickGridReact = () => {
                 hideColumnHideCommand: true, // Disabled to avoid messing with the column order
             },
         }),
-        [chartId],
+        [chartId, theme],
     );
 
     const onDialogClose = useCallback(() => {
