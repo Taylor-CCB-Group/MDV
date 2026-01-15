@@ -22,7 +22,7 @@ vi.mock("@/react/selectionHooks", () => ({
     useHighlightedIndices: () => mockHighlightedIndex,
 }));
 
-vi.mock("@/react/hooks/useSortedIndices", () => ({
+vi.mock("@/react/hooks/useSortedFilteredIndices", () => ({
     default: () => mockSortedIndices,
 }));
 

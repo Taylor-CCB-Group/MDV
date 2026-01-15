@@ -11,7 +11,7 @@ import type { FeedbackAlert } from "../components/TableChartReactComponent";
  */
 const useEditCell = (
     orderedParamColumnsRef: React.MutableRefObject<LoadedDataColumn<DataType>[]>,
-    sortedIndicesRef: React.MutableRefObject<Uint32Array>,
+    sortedFilteredIndicesRef: React.MutableRefObject<Uint32Array>,
     dataStore: DataStore,
     gridRef: React.MutableRefObject<SlickgridReactInstance | null>,
     setFeedbackAlert: (alert: FeedbackAlert) => void,
@@ -58,7 +58,7 @@ const useEditCell = (
             const { args } = e.detail;
             const { row, column, item } = args;
 
-            const currentSortedIndices = sortedIndicesRef.current;
+            const currentSortedIndices = sortedFilteredIndicesRef.current;
             const currentOrderedColumns = orderedParamColumnsRef.current;
 
             if (!currentSortedIndices || !currentOrderedColumns) {
@@ -121,7 +121,7 @@ const useEditCell = (
                 });
             }
         },
-        [dataStore, gridRef, orderedParamColumnsRef, sortedIndicesRef, setFeedbackAlert],
+        [dataStore, gridRef, orderedParamColumnsRef, sortedFilteredIndicesRef, setFeedbackAlert],
     );
 
     return {

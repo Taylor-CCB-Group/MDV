@@ -3,7 +3,6 @@ import type { TableChartReactConfig } from "../components/TableChartReactWrapper
 import { useChart, useDataStore } from "../context";
 import { useChartID, useConfig, useOrderedParamColumns } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
-import useSortedIndices from "./useSortedIndices";
 import {
     type Column,
     Editors,
@@ -14,6 +13,7 @@ import {
 } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { runInAction } from "mobx";
+import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
 const useSlickGridReact = () => {
     // Hooks
@@ -22,7 +22,7 @@ const useSlickGridReact = () => {
     const chartId = useChartID();
     const chart = useChart<TableChartReactConfig>();
     const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
-    const sortedIndices = useSortedIndices();
+    const sortedFilteredIndices = useSortedFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
 
     // States
@@ -31,7 +31,7 @@ const useSlickGridReact = () => {
     const [gridInstance, setGridInstance] = useState<SlickgridReactInstance | null>(null);
 
     // Refs
-    const sortedIndicesRef = useRef(sortedIndices);
+    const sortedFilteredIndicesRef = useRef(sortedFilteredIndices);
     const orderedParamColumnsRef = useRef(orderedParamColumns);
     const dataStoreRef = useRef(dataStore);
     const chartRef = useRef(chart);
@@ -39,11 +39,11 @@ const useSlickGridReact = () => {
     const gridRef = useRef<SlickgridReactInstance | null>(null);
 
     useEffect(() => {
-        sortedIndicesRef.current = sortedIndices;
+        sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
         dataStoreRef.current = dataStore;
         chartRef.current = chart;
-    }, [sortedIndices, dataStore, chart, orderedParamColumns]);
+    }, [sortedFilteredIndices, dataStore, chart, orderedParamColumns]);
 
     const columnDefs = useMemo<Column[]>(() => {
         const cols: Column[] = [];
@@ -86,8 +86,8 @@ const useSlickGridReact = () => {
     }, [config.include_index, config.column_widths, orderedParamColumns]);
 
     const dataProvider = useMemo(() => {
-        return new SlickGridDataProvider(orderedParamColumns, sortedIndices, config.include_index);
-    }, [orderedParamColumns, sortedIndices, config.include_index]);
+        return new SlickGridDataProvider(orderedParamColumns, sortedFilteredIndices, config.include_index);
+    }, [orderedParamColumns, sortedFilteredIndices, config.include_index]);
 
     const isColumnEditable = useMemo(() => {
         const column = orderedParamColumns.find((col) => col.field === searchColumn);
@@ -133,7 +133,7 @@ const useSlickGridReact = () => {
             const selectedRows = args.rows;
 
             if (selectedRows.length > 0) {
-                const indices = selectedRows.map((row) => sortedIndicesRef.current[row]);
+                const indices = selectedRows.map((row) => sortedFilteredIndicesRef.current[row]);
 
                 // Set flag to prevent grid update during selection
                 isSelectingRef.current = true;
@@ -253,7 +253,7 @@ const useSlickGridReact = () => {
         const grid = gridRef.current?.slickGrid;
         if (!grid) return;
 
-        if (!dataProvider || !sortedIndices || sortedIndices.length === 0) {
+        if (!dataProvider || !sortedFilteredIndices || sortedFilteredIndices.length === 0) {
             return;
         }
 
@@ -262,11 +262,25 @@ const useSlickGridReact = () => {
         if (highlightedIndices.length === 0) {
             // Only reset if the data provider is initialized and sorted indices have values
             // otherwise we will be messing with the initialization of the grid
-                isSelectingRef.current = true;
-                grid.setSelectedRows([]);
-                setTimeout(() => {
-                    isSelectingRef.current = false;
-                }, 100);
+            isSelectingRef.current = true;
+            grid.setSelectedRows([]);
+            setTimeout(() => {
+                isSelectingRef.current = false;
+            }, 100);
+            return;
+        }
+
+        const filteredSet = new Set(sortedFilteredIndicesRef.current);
+
+        // Filter the highlightedIndices by checking if the sortedFilteredIndices have those indices
+        const validIndices = highlightedIndices.filter(i => filteredSet.has(i));
+
+        if (validIndices.length === 0) {
+            isSelectingRef.current = true;
+            grid.setSelectedRows([]);
+            setTimeout(() => {
+                isSelectingRef.current = false;
+            }, 100);
             return;
         }
 
@@ -274,7 +288,7 @@ const useSlickGridReact = () => {
 
         for (const index of highlightedIndices) {
             // Get the position of the index from sorted indices
-            const pos = sortedIndicesRef.current.indexOf(index);
+            const pos = sortedFilteredIndicesRef.current.indexOf(index);
             if (pos !== -1) positions.push(pos);
         }
 
@@ -282,7 +296,9 @@ const useSlickGridReact = () => {
 
         isSelectingRef.current = true;
 
+        // Navigate to the first row
         grid.scrollRowIntoView(positions[0], false);
+        // Set the selected rows in the grid
         grid.setSelectedRows(positions);
 
         setTimeout(() => {
@@ -291,21 +307,21 @@ const useSlickGridReact = () => {
     } catch (err) {
         console.error("Error highlighting the rows in the table", err);
     }
-    }, [highlightedIndices, dataProvider, sortedIndices]);
+    }, [highlightedIndices, dataProvider, sortedFilteredIndices]);
 
     const options: GridOption = useMemo(
         () => ({
             gridWidth: "100%",
             gridHeight: "600px",
             darkMode: window?.mdv?.chartManager?.theme === "dark",
-            autoFitColumnsOnFirstLoad: false,   // default
+            autoFitColumnsOnFirstLoad: false, // To avoid the columns to take less width
             enableAutoSizeColumns: false, 
             rowHeight: 25,  
             defaultColumnWidth: 100,
-            enableColumnPicker: false,
+            enableColumnPicker: false, // Disable right click on column header
             enableSorting: true,
             multiColumnSort: false,
-            enableGridMenu: false,
+            enableGridMenu: false, // Disabled as it's interfering with the last column
             enableHeaderMenu: true,
             alwaysShowVerticalScroll: true,
             alwaysAllowHorizontalScroll: true,
@@ -325,7 +341,7 @@ const useSlickGridReact = () => {
                 selectActiveRow: true,
             },
             headerMenu: {
-                hideColumnHideCommand: true,
+                hideColumnHideCommand: true, // Disabled to avoid messing with the column order
             },
         }),
         [chartId],
@@ -341,12 +357,12 @@ const useSlickGridReact = () => {
         dataStore,
         chartId,
         orderedParamColumns,
-        sortedIndices,
+        sortedFilteredIndices,
         isFindReplaceOpen,
         searchColumn,
         setIsFindReplaceOpen,
         setSearchColumn,
-        sortedIndicesRef,
+        sortedFilteredIndicesRef,
         orderedParamColumnsRef,
         isSelectingRef,
         gridRef,

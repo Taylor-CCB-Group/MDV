@@ -18,7 +18,7 @@ export type FoundMatch = {
  */
 const useFindReplace = (
     orderedParamColumns: LoadedDataColumn<DataType>[],
-    sortedIndices: Uint32Array,
+    sortedFilteredIndices: Uint32Array,
     dataStore: DataStore,
     searchColumn: string | null,
     config: { include_index?: boolean },
@@ -77,8 +77,8 @@ const useFindReplace = (
                     throw new Error(`Column not found: ${searchColumn}`);
                 }
 
-                for (let row = 0; row < sortedIndices.length; row++) {
-                    const dataIndex = sortedIndices[row];
+                for (let row = 0; row < sortedFilteredIndices.length; row++) {
+                    const dataIndex = sortedFilteredIndices[row];
 
                     const value = column.getValue(dataIndex);
 
@@ -144,7 +144,7 @@ const useFindReplace = (
             }
         },
         [
-            sortedIndices,
+            sortedFilteredIndices,
             orderedParamColumns,
             config.include_index,
             searchColumn,

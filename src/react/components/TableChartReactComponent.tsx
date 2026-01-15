@@ -58,7 +58,7 @@ const FeedbackAlertComponent = ({ feedbackAlert }: FeedbackAlertComponentType) =
 
 // todo: add integration tests using playwright to test the working of this component
 // playwright would be more suitable to test this component rather than vitest which would require a lot of mocks
-const TableChartReactComponent = () => {
+const TableChartReactComponent = observer(() => {
     const [alertDialogOpen, setAlertDialogOpen] = useState(false);
     const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
 
@@ -79,8 +79,8 @@ const TableChartReactComponent = () => {
         orderedParamColumns,
         searchColumn,
         orderedParamColumnsRef,
-        sortedIndices,
-        sortedIndicesRef,
+        sortedFilteredIndices,
+        sortedFilteredIndicesRef,
         options,
         columnDefs,
         handleGridCreated,
@@ -100,7 +100,7 @@ const TableChartReactComponent = () => {
         onReset,
     } = useFindReplace(
         orderedParamColumns,
-        sortedIndices,
+        sortedFilteredIndices,
         dataStore,
         searchColumn,
         config,
@@ -111,7 +111,7 @@ const TableChartReactComponent = () => {
 
     const { handleBeforeEditCell, handleCellChange } = useEditCell(
         orderedParamColumnsRef,
-        sortedIndicesRef,
+        sortedFilteredIndicesRef,
         dataStore,
         gridRef,
         handleFeedbackAlert,
@@ -174,6 +174,6 @@ const TableChartReactComponent = () => {
             )}
         </div>
     );
-};
+});
 
 export default TableChartReactComponent;

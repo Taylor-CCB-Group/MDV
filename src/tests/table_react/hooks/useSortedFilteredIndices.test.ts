@@ -1,4 +1,4 @@
-import useSortedIndices from "@/react/hooks/useSortedIndices";
+import useSortedFilteredIndices from "@/react/hooks/useSortedFilteredIndices";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { observable, runInAction } from "mobx";
@@ -18,7 +18,7 @@ let mockDataStore: any;
 let mockConfig: TableChartReactConfig;
 let mockFilteredIndices: Uint32Array;
 
-describe("useSortedIndices", () => {
+describe("useSortedFilteredIndices", () => {
     beforeEach(() => {
         vi.clearAllMocks();
 
@@ -42,7 +42,7 @@ describe("useSortedIndices", () => {
     });
 
     test("should return unsorted indices by default", async () => {
-        const { result } = renderHook(() => useSortedIndices());
+        const { result } = renderHook(() => useSortedFilteredIndices());
 
         await waitFor(() => {
             expect(result.current).toEqual(new Uint32Array([0, 1, 2, 3, 4]));
@@ -50,7 +50,7 @@ describe("useSortedIndices", () => {
     });
 
     test("should sort ascending", async () => {
-        const { result } = renderHook(() => useSortedIndices());
+        const { result } = renderHook(() => useSortedFilteredIndices());
 
         act(() => {
             runInAction(() => {
@@ -65,7 +65,7 @@ describe("useSortedIndices", () => {
     });
 
     test("should sort descending", async () => {
-        const { result } = renderHook(() => useSortedIndices());
+        const { result } = renderHook(() => useSortedFilteredIndices());
 
         act(() => {
             runInAction(() => {
