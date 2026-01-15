@@ -71,6 +71,16 @@ const useEditCell = (
                 return;
             }
 
+            if (row < 0 || row > currentSortedIndices.length) {
+                console.error(`Row index ${row} is out of bounds`);
+                setFeedbackAlert({
+                    type: "error",
+                    message: `Row index ${row} is out of bounds`,
+                    title: "Edit Error",
+                });
+                return;
+            }
+
             const columnName = column.field;
             const updatedValue = item[columnName];
             const dataIndex = currentSortedIndices[row];
