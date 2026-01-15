@@ -160,7 +160,13 @@ class TableChart extends BaseChart {
         }
 
         // Get all highlighted indices
-        const indices = Array.isArray(data.indexes) ? data.indexes : Object.values(data.indexes);
+        let indices = [];
+
+        if (data.indexes) {
+            indices = Array.isArray(data.indexes)
+                ? data.indexes
+                : Object.values(data.indexes);
+        }
         
         if (indices.length === 0) {
             this.grid.setSelectedRows([]);
