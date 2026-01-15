@@ -71,7 +71,7 @@ const useEditCell = (
                 return;
             }
 
-            if (row < 0 || row > currentSortedIndices.length) {
+            if (row < 0 || row >= currentSortedIndices.length) {
                 console.error(`Row index ${row} is out of bounds`);
                 setFeedbackAlert({
                     type: "error",

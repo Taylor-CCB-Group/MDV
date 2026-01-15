@@ -1,5 +1,5 @@
 import useSlickGridReact from "@/react/hooks/useSlickGridReact";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { observable, runInAction } from "mobx";
 import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
@@ -19,8 +19,7 @@ vi.mock("@/react/hooks", () => ({
 }));
 
 vi.mock("@/react/selectionHooks", () => ({
-    useHighlightedIndex: () => mockHighlightedIndex,
-    useHighlightedIndices: () => mockHighlightedIndex,
+    useHighlightedIndices: () => mockHighlightedIndices,
 }));
 
 vi.mock("@/react/hooks/useSortedFilteredIndices", () => ({
@@ -32,7 +31,6 @@ let mockConfig: TableChartReactConfig;
 let mockChart: any;
 let mockOrderedParamColumns: LoadedDataColumn<DataType>[];
 let mockSortedIndices: Uint32Array;
-let mockHighlightedIndex: number;
 let mockHighlightedIndices: number[];
 
 describe("useSlickGridReact", () => {
@@ -59,7 +57,6 @@ describe("useSlickGridReact", () => {
         ] as any;
 
         mockSortedIndices = new Uint32Array([0, 1, 2]);
-        mockHighlightedIndex = -1;
         mockHighlightedIndices = [];
 
         // Setup mock config with observable properties
