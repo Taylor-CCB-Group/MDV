@@ -203,11 +203,9 @@ const useSlickGridReact = () => {
             console.log("resize handler");
             const columns = args.grid.getColumns();
             runInAction(() => {
-                if (!config.column_widths) {
-                    config.column_widths = {};
-                }
-                // reassigning config.column_widths to local variable to avoid undefined type error
-                const columnWidths = config.column_widths;
+                // Create a new reference of config.columnWidths
+                const columnWidths: Record<string, number> = config.column_widths ? {...config.column_widths} : {};
+                
                 columns.forEach((col: Column) => {
                     if (col.width && col.width !== 100) {
                         columnWidths[col.field] = col.width;
@@ -216,8 +214,9 @@ const useSlickGridReact = () => {
                         delete columnWidths[col.field];
                     }
                 });
-                // Force reference change so React memos that depend on it can update
-                config.column_widths = {...columnWidths};
+                
+                // Change the reference of config.order for react to detect and update
+                config.column_widths = columnWidths;
             });
         });
 
@@ -225,16 +224,15 @@ const useSlickGridReact = () => {
             console.log("reorder handler");
             const impactedColumns = args.impactedColumns;
             runInAction(() => {
-                // Initialize order if it doesn't exist
-                if (!config.order) {
-                    config.order = {};
-                }
-                // reassigning config.order to local variable to avoid undefined type error
-                const order = config.order;
+                // Create a new reference of config.order
+                const newOrder = config.order ? {...config.order} : {};
                 const cols = impactedColumns.filter((col) => col.field !== "__index__");
                 cols.forEach((col, index) => {
-                    order[col.field] = index;
+                    newOrder[col.field] = index;
                 });
+
+                // Change the reference of config.order for react to detect and update
+                config.order = newOrder;
             });
         });
 
