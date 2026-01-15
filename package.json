@@ -27,7 +27,7 @@
     "docker_dev": "docker compose -f docker-secrets.yml up -d --force-recreate",
     "docker_purge": "docker rm -f $(docker ps -a -q) && docker rmi -f $(docker images -q) && docker volume rm $(docker volume ls -q)",
     "docker_stack_rm": "docker stack rm mdv_stack",
-    "docker_createandpush": "docker build -t my_mdv_app_image:latest . && docker tag my_mdv_app_image:latest jayeshire/my_mdv_app_image:latest && docker push jayeshire/my_mdv_app_image:latest",
+    "docker_createandpush": "docker build -t my_mdv_app_image:latest . && docker tag my_mdv_app_image:latest mdvadmin/my_mdv_app_image:latest && docker push mdvadmin/my_mdv_app_image:latest",
     "docker_stack_deploy": "docker stack deploy -c docker-compose-stack.yml mdv_stack",
     "docker_prune": "docker system prune -a",
     "docker_stack_prune": "docker stack rm mdv_stack && docker container prune -f && docker image prune -a -f && docker volume prune -f",

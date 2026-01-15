@@ -67,3 +67,6 @@ logs/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Generated test data
+tests_playwright/test-data/temp/

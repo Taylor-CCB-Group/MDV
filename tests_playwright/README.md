@@ -6,6 +6,23 @@
 - Test data is located in `/test-data`
 - The test utility functions are in `/utils`
 
+### Generating Test Data
+
+Test MDV projects can be generated programmatically instead of committing large files:
+
+```bash
+# Create project from mock data (requires active mdv environment)
+python -m mdvtools.tests.generate_test_data ~/mdv/test_mock --mock
+
+# Create project from scanpy dataset  
+python -m mdvtools.tests.generate_test_data ~/mdv/test_pbmc3k --scanpy pbmc3k_processed
+
+# Create large mock project
+python -m mdvtools.tests.generate_test_data ~/mdv/test_large --mock --n-cells 1000000 --n-genes 5000
+```
+
+For programmatic use in Python tests, import from `mdvtools.tests.test_project_factory`.
+
 ### Running the tests
 
 #### New Approach: Isolated Test Environment (Recommended)
@@ -69,7 +86,8 @@ npm run test:container:clean
 - There is no CI/CD for the playwright tests to be run. The main blocker with this was that we need a dev container to be running for the playwright tests to run, so in the CI/CD tests, there should be a dev container running.
 
 ### Future plan
-- The CI/CD for playwright tests should be implemented either by having a dev container running while running the tests or by a different approach.
-- The tests should run in parallel rather than serial mode. This maybe fixed using project fixtures or setup and teardown.
+- The CI/CD for playwright tests should be implemented either by having a playwright container running while running the tests or by a different approach.
+- The tests should run in parallel rather than serial mode. This may be fixed using project fixtures or setup and teardown.
 - Add more tests for the project view.
-- Have a better way of running tests by using a separate container.
+- Further expansion of mock-project generating utilities, including simple front-end UI.
+- Some kind of protocol end-users can use to submit standardised reproducible bug-reports based on mock data?
