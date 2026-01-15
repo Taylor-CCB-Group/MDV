@@ -39,10 +39,9 @@ The Multi-Dimensional Viewer (MDV) is a web-based application designed to help u
 
 For information about using MDV and uploading your data please go to the [MDV Website](https://mdv.ndm.ox.ac.uk/).
 
-To install MDV using Docker see [MDV Installation](https://mdv.ndm.ox.ac.uk/docs/installation/installation-manual).
+To install MDV using Docker see [MDV Installation](https://mdv.ndm.ox.ac.uk/docs/installation/installation-manual) or the [local installation manual](docs/installation/installation-manual.md).
 
 You can browse existing projects an old [MDV Projects Website](https://mdv.molbiol.ox.ac.uk/projects)
-
 
 ### For Development or Running a Local Version from the Repository:
 
