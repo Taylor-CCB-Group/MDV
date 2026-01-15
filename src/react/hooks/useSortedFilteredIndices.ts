@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useConfig, useReactiveFilteredIndices, useSimplerFilteredIndices } from "../hooks";
+import { useConfig, useSimplerFilteredIndices } from "../hooks";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useDataStore } from "../context";
 import { autorun, trace } from "mobx";
