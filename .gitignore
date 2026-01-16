@@ -60,3 +60,13 @@ chat_debug.log
 # as seen inside devcontainer
 mdv/
 logs/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Generated test data
+tests_playwright/test-data/temp/

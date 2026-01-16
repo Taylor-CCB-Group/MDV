@@ -878,16 +878,24 @@ def create_minimal_anndata(n_cells: int = 10, n_genes: int = 5,
     to ensure existing tests continue to pass.
     """
     # Cell metadata - use the original simple pattern
+    # Ensure arrays match n_cells exactly
+    cell_types = (['T-cell', 'B-cell'] * (n_cells // 2 + 1))[:n_cells]
+    conditions = (['Control', 'Treatment'] * (n_cells // 2 + 1))[:n_cells]
+    
     obs_data = pd.DataFrame({
-        'cell_type': pd.Categorical(['T-cell', 'B-cell'] * (n_cells // 2)),
-        'condition': pd.Categorical(['Control', 'Treatment'] * (n_cells // 2)),
+        'cell_type': pd.Categorical(cell_types),
+        'condition': pd.Categorical(conditions),
         'quality_score': np.random.normal(0, 1, n_cells)
     })
     
-    # Gene metadata - use the original simple pattern  
+    # Gene metadata - use the original simple pattern
+    # Ensure arrays match n_genes exactly
+    gene_types = (['protein_coding', 'lncRNA'] * (n_genes // 2 + 1))[:n_genes]
+    chromosomes = (['chr1', 'chr2'] * (n_genes // 2 + 1))[:n_genes]
+    
     var_data = pd.DataFrame({
-        'gene_type': pd.Categorical(['protein_coding', 'lncRNA'] * (n_genes // 2) + ['miRNA']),
-        'chromosome': pd.Categorical(['chr1', 'chr2'] * (n_genes // 2) + ['chrX']),
+        'gene_type': pd.Categorical(gene_types),
+        'chromosome': pd.Categorical(chromosomes),
         'mean_expression': np.random.exponential(1, n_genes)
     })
     

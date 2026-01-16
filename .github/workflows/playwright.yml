@@ -1,0 +1,78 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start services
+        run: |
+          # Set required build args (can be empty for CI)
+          export GIT_COMMIT_DATE=$(git log -1 --format=%cI || echo "")
+          export GIT_BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD || echo "")
+          export GIT_COMMIT_HASH=$(git rev-parse HEAD || echo "")
+          export GIT_LAST_COMMIT_MESSAGE=$(git show -s --format=%s | sed 's/"/\\"/g' | tr -d '\n' || echo "")
+          export BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          export GIT_DIRTY=false
+          # Use both docker-secrets.yml and docker-compose.ci.yml to add playwright_test service
+          docker compose -f docker-secrets.yml -f docker-compose.ci.yml up -d --build
+
+      - name: Wait for app to be ready
+        run: |
+          echo "Waiting for app service to be ready..."
+          for i in {1..60}; do
+            if docker compose -f docker-secrets.yml -f docker-compose.ci.yml exec -T mdv_app curl -fsS http://localhost:5055/ >/dev/null 2>&1; then
+              echo "App is ready!"
+              break
+            fi
+            echo "Waiting for app (attempt $i/60)..."
+            sleep 2
+          done
+
+      - name: Run Playwright tests
+        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml exec -T playwright_test sh -c "cd /app/tests_playwright && TEST_BASE_URL=http://mdv_app:5055 npx playwright test"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test results (HTML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Show app logs on failure
+        if: failure()
+        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml logs mdv_app --tail=100
+
+      - name: Show test logs on failure
+        if: failure()
+        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml logs playwright_test --tail=100
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml down -v
