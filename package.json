@@ -35,15 +35,8 @@
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
     "test": "vitest",
-    "test:container:up": "docker compose -f docker-test.yml up -d",
-    "test:container:down": "docker compose -f docker-test.yml down",
-    "test:container:clean": "docker compose -f docker-test.yml down -v",
-    "test:container:logs": "docker compose -f docker-test.yml logs -f",
-    "test:container:restart": "npm run test:container:clean && npm run test:container:up",
-    "playwright-test": "npx playwright test",
-    "playwright-test-ui": "npx playwright test --ui",
-    "test:e2e": "npm run test:container:up && npx playwright test; npm run test:container:down",
-    "test:e2e:clean": "npm run test:container:clean && npm run test:container:up && npx playwright test; npm run test:container:down"
+    "playwright-test": "cd tests_playwright && npx playwright test",
+    "playwright-test-ui": "cd tests_playwright && npx playwright test --ui"
   },
   "repository": {
     "type": "git",
@@ -131,7 +124,7 @@
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "^7.25.9",
     "@biomejs/biome": "1.9.4",
-    "@playwright/test": "^1.55.1",
+    "@playwright/test": "^1.57.0",
     "@tanstack/react-query-devtools": "^5.80.0",
     "@testing-library/react": "^16.3.1",
     "@types/d3": "^7.4.3",

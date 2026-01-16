@@ -12,7 +12,7 @@ import { defineConfig, devices } from '@playwright/test';
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './tests_playwright',
+  testDir: '.', // Tests are in this directory (catalog/, project/, etc.)
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -21,14 +21,20 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
+  /* Timeout for each test */
+  timeout: 60000,
+  /* Timeout for hooks (beforeAll, afterAll, etc.) */
+  expect: {
+    timeout: 10000,
+  },
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    // Use TEST_BASE_URL env var if set, otherwise default to test container on port 5056
-    // Dev container runs on 5055, test container runs on 5056
-    baseURL: process.env.TEST_BASE_URL || 'http://localhost:5056/',
+    // Use TEST_BASE_URL env var if set, otherwise default to localhost:5055 (devcontainer exposed port)
+    // Tests run from host, connect to containerized app via localhost:5055
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:5055/',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -82,3 +88,4 @@ export default defineConfig({
   //   timeout: 120000,
   // },
 });
+
