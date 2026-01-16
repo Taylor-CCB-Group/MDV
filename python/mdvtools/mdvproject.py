@@ -1281,7 +1281,27 @@ class MDVProject:
         if not llink:
             llink = {}
             links[linkto] = llink
-        llink[linktype] = data
+        
+        # Check if link already exists and merge subgroups for rows_as_columns links
+        if linktype == "rows_as_columns" and linktype in llink:
+            existing_link = llink[linktype]
+            # Merge subgroups: preserve existing subgroups, add new ones from data
+            if "subgroups" in existing_link and "subgroups" in data:
+                # Merge subgroups dictionaries
+                merged_subgroups = existing_link["subgroups"].copy()
+                merged_subgroups.update(data["subgroups"])
+                data["subgroups"] = merged_subgroups
+            # Preserve other existing properties if they match
+            if existing_link.get("name_column") == data.get("name_column"):
+                # Same link configuration, merge subgroups
+                llink[linktype] = data
+            else:
+                # Different link configuration, overwrite (shouldn't happen in normal flow)
+                llink[linktype] = data
+        else:
+            # No existing link or not rows_as_columns type, overwrite as before
+            llink[linktype] = data
+        
         self.set_datasource_metadata(ds)
 
     def add_rows_as_columns_link(
