@@ -386,14 +386,12 @@ export const applyDefaultChannelState = (config: Partial<VivConfig>) => {
     const expectedLength = newConfig.channelsStore.channelsVisible?.length || 0;
     
     // Ensure ids array exists and has the correct length
-    // This handles backward compatibility for configs saved before ids was serialized
-    if (!newConfig.channelsStore.ids || newConfig.channelsStore.ids.length !== expectedLength) {
-        if (expectedLength > 0) {
-            newConfig.channelsStore.ids = Array.from({ length: expectedLength }, 
-                () => String(Math.random()));
-        } else {
-            newConfig.channelsStore.ids = [];
-        }
+    // Ignore any serialised value in config (not expected to be there other than in test config used during dev)
+    if (expectedLength > 0) {
+        newConfig.channelsStore.ids = Array.from({ length: expectedLength }, 
+            () => String(Math.random()));
+    } else {
+        newConfig.channelsStore.ids = [];
     }
     
     // Handle brightness and contrast arrays (legacy support)
