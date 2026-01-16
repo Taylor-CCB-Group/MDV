@@ -338,6 +338,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     contrast: channels.contrast,
                     domains: channels.domains,
                     selections: channels.selections,
+                    ids: channels.ids,
                 },
                 imageSettingsStore: {
                     // could be interested in lensEnabled, zoomLock, panLock, etc.
