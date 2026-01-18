@@ -2,7 +2,7 @@ import DeckGL from "@deck.gl/react";
 import { OrthographicView, OrbitView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
-import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { GeoJsonLayer, LineLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { useChart } from "../context";
@@ -16,6 +16,8 @@ import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import { useGateStore } from "../gates/useGateStore";
+import { computeCentroid } from "../gates/gateUtils";
 
 //todo this should be in a common place etc.
 const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -165,6 +167,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     // this is now somewhat able to render for "2d", pending further tweaks
     //! beware unproject from here is not what we want, should review
     const { scatterplotLayer, getTooltip } = scatterProps;
+    const gateStore = useGateStore();
 
     const filterValue = useFilterArray();
 
@@ -249,8 +252,99 @@ const DeckScatter = observer(function DeckScatterComponent() {
             y: 0,
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
+
+    // Gate labels layer - access gatesArray to ensure MobX reactivity
+    const allGates = gateStore.gatesArray;
+    const gateLabelsLayer = useMemo(() => {
+        if (!cx || !cy || allGates.length === 0) return null;
+        
+        // Get gates that match the current chart's X/Y columns
+        const relevantGates = allGates.filter(
+            gate => gate.columns[0] === cx.field && gate.columns[1] === cy.field
+        );
+        
+        if (relevantGates.length === 0) return null;
+        
+        // Create data array with gate positions and names
+        const gateData = relevantGates.map(gate => {
+            const centroid = computeCentroid(gate.geometry);
+            // For 2D, use z=0; for 3D, use middle of z range if cz exists
+            const z = is2d ? 0 : (cz?.minMax ? (cz.minMax[0] + cz.minMax[1]) / 2 : 0);
+            return {
+                position: [centroid[0], centroid[1], z] as [number, number, number],
+                name: gate.name,
+            };
+        });
+        
+        return new TextLayer({
+            id: `gate-labels-${id}`,
+            data: gateData,
+            getPosition: (d: { position: [number, number, number] }) => d.position,
+            getText: (d: { name: string }) => d.name,
+            getSize: 12,
+            getColor: [255, 255, 255, 255],
+            getTextAnchor: 'middle',
+            getAlignmentBaseline: 'center',
+            getBackgroundColor: [0, 0, 0, 191], // Semi-transparent black background
+            getBorderColor: [255, 255, 255, 76], // Semi-transparent white border
+            getBorderWidth: 1,
+            padding: [3, 8],
+            billboard: true,
+            pickable: false,
+            updateTriggers: {
+                getPosition: [allGates.length, relevantGates.map(g => g.id).join(',')],
+                getText: [allGates.length, relevantGates.map(g => g.name).join(',')],
+            },
+        });
+    }, [id, is2d, cx, cy, cz, allGates]);
+    // Gate polygons layer - renders the actual gate shapes
+const gatePolygonsLayer = useMemo(() => {
+    if (!cx || !cy || allGates.length === 0) return null;
+    
+    // Get gates that match the current chart's X/Y columns
+    const relevantGates = allGates.filter(
+        gate => gate.columns[0] === cx.field && gate.columns[1] === cy.field
+    );
+    
+    if (relevantGates.length === 0) return null;
+    
+    // Combine all gate geometries into a single FeatureCollection
+    // Each gate's features are copied with gate metadata in properties
+    const combinedFeatures = relevantGates.flatMap(gate => 
+        gate.geometry.features.map(feature => ({
+            ...feature,
+            properties: {
+                ...feature.properties,
+                gateId: gate.id,
+                gateName: gate.name
+            }
+        }))
+    );
+    
+    return new GeoJsonLayer({
+        id: `gate-polygons-${id}`,
+        data: {
+            type: "FeatureCollection",
+            features: combinedFeatures
+        } as any,
+        filled: true,
+        getFillColor: [76, 175, 80, 30], // Semi-transparent green fill
+        getLineColor: [76, 175, 80, 200], // Green border (more opaque)
+        getLineWidth: 2,
+        lineWidthMinPixels: 1,
+        pickable: false, // Gates are not interactive in MVP
+        updateTriggers: {
+            updateTriggers: {
+                getFillColor: [allGates.length, relevantGates.map(g => g.id).join(',')],
+                getLineColor: [allGates.length, relevantGates.map(g => g.id).join(',')],
+            },
+        },
+    });
+}, [id, cx, cy, allGates]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer, axisLinesLayer].filter(x => x !== null);
+    const layers = [scatterplotLayer, greyScatterplotLayer, gatePolygonsLayer, selectionLayer, axisLinesLayer, 
+         gateLabelsLayer
+    ].filter(x => x !== null);
     
     // unproject used for updating ranges - may refactor hooks around this
     const unproject = useCallback((coords: [number, number]) => {
@@ -259,6 +353,15 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }, [scatterplotLayer]);
     const outerContainer = useOuterContainer();
     const deckRef = useRef<any>();
+
+    useEffect(() => {
+        // useParamColumns() only returns when columns are loaded (it throws otherwise)
+        // So if we get here, columns are ready
+        if (cx && cy) {
+            gateStore.updateGatesColumnWhenReady().catch(console.error);
+        }
+    }, [cx, cy, gateStore]);
+
     // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
     useEffect(() => {
         outerContainer; // make sure the hook runs when this changes

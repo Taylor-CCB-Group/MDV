@@ -131,6 +131,11 @@ export function useRegionScale() {
     const chart = useChart();
     const regionScale = chart.dataStore.regions?.scale;
     const regionUnit = chart.dataStore.regions?.scale_unit;
+    //! Fix for the scatterplot not showing suggested by cursor
+    // guard against missing or invalid scale to avoid NaNs downstream
+    if (!regionScale || !Number.isFinite(regionScale) || regionScale === 0) {
+        return 1;
+    }
 
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
@@ -268,8 +273,8 @@ export function useScatterRadius() {
     const radiusScale = (radius * course_radius) / safeScale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {
-            const xRange = cx.minMax[1] - cx.minMax[0];
-            const yRange = cy.minMax[1] - cy.minMax[0];
+            const xRange = Math.abs(cx.minMax[1] - cx.minMax[0]);
+            const yRange = Math.abs(cy.minMax[1] - cy.minMax[0]);
             const r = 10000 / Math.max(xRange, yRange);
             return radiusScale / r;
         }

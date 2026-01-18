@@ -4,11 +4,14 @@ import PhotoSizeSelectSmallOutlinedIcon from "@mui/icons-material/PhotoSizeSelec
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
+import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
 import { useCallback, useMemo, useState } from "react";
 import type { useScatterplotLayer } from "../scatter_state";
 import { useSpatialLayers } from "../spatial_context";
 import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
+import GateNameDialog from "./GateNameDialog";
+import { useGateStore } from "../gates/useGateStore";
 import {
     DrawPolygonMode,
     DrawPolygonByDraggingMode,
@@ -20,6 +23,13 @@ import {
 } from '@deck.gl-community/editable-layers';
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
+import type { Gate } from "../gates/types";
+import { generateGateId } from "../gates/gateUtils";
+import { useParamColumns } from "../hooks";
+import { action } from "mobx";
+import { useChart } from "../context";
+import { getEmptyFeatureCollection } from "../deck_state";
+import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -129,8 +139,12 @@ const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButto
 
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
-    const { setSelectionMode } = selectionProps;
+    const { setSelectionMode, selectionFeatureCollection } = selectionProps;
+    const gateStore = useGateStore();
+    const paramColumns = useParamColumns();
+    const chart = useChart<DeckScatterConfig>();
     const [selectedTool, setSelectedToolX] = useState<Tool>("Pan");
+    const [gateDialogOpen, setGateDialogOpen] = useState(false);
     const setSelectedTool = useCallback((tool: Tool) => {
         // pending refactor
         const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
@@ -159,6 +173,38 @@ export default observer(function SelectionOverlay() {
             />
         ));
     }, [selectedTool, setSelectedTool]);
+
+    const onSaveGate = useCallback((gateName: string) => {
+        if (gateStore.hasGateName(gateName)) {
+            throw new Error('A gate with this name already exists');
+        }
+        
+        // Get X and Y columns
+        const [xCol, yCol] = paramColumns.slice(0, 2);
+        if (!xCol || !yCol) {
+            throw new Error('Chart must have X and Y axes');
+        }
+        
+        // Create gate
+        const gate: Gate = {
+            id: generateGateId(),
+            name: gateName.trim(),
+            geometry: selectionFeatureCollection,
+            columns: [xCol.field, yCol.field],
+            createdAt: Date.now()
+        };
+        
+        // Add to gate store
+        gateStore.addGate(gate);
+        
+        // Clear selection
+        action(() => {
+            chart.config.selectionFeatureCollection = getEmptyFeatureCollection();
+        })();
+    }, [gateStore, paramColumns, selectionFeatureCollection, chart.config]);
+    
+    const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
+    
     return (
         <>
             <ButtonGroup
@@ -169,7 +215,24 @@ export default observer(function SelectionOverlay() {
                 // style={{zIndex: 2, padding: '0.3em'}}
             >
                 {toolButtons}
+                {hasSelection && (
+                    <Tooltip title="Save selection as gate">
+                        <IconButton
+                            onClick={() => setGateDialogOpen(true)}
+                            aria-label="Save as Gate"
+                            style={{ backgroundColor: 'rgba(76, 175, 80, 0.2)' }}
+                        >
+                            <BookmarkAddOutlinedIcon />
+                        </IconButton>
+                    </Tooltip>
+                )}
             </ButtonGroup>
+            
+            <GateNameDialog
+                open={gateDialogOpen}
+                onClose={() => setGateDialogOpen(false)}
+                onSaveGate={onSaveGate}
+            />
         </>
     );
 });
