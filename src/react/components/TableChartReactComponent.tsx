@@ -7,7 +7,7 @@ import useSlickGridReact from "../hooks/useSlickGridReact";
 import useEditCell from "../hooks/useEditCell";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import AlertErrorComponent, { type AlertType } from "@/charts/dialogs/AlertErrorComponent";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 
 export type FeedbackAlert = {
     type: AlertType;
@@ -162,7 +162,7 @@ const TableChartReactComponent = observer(() => {
 
             {feedbackAlert && (
                 <div data-testid="feedback-alert-dialog">
-                    <ReusableDialog
+                    <ReusableAlertDialog
                         open={alertDialogOpen}
                         handleClose={onFeedbackDialogClose}
                         component={<FeedbackAlertComponent feedbackAlert={feedbackAlert} />}

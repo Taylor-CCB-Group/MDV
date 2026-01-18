@@ -4,6 +4,7 @@ import {
     Container,
     Dialog,
     DialogActions,
+    DialogContent,
 } from "@mui/material";
 
 export interface ReusableDialogProps {
@@ -26,26 +27,18 @@ const ReusableDialog = ({
     onConfirmClick,
 }: ReusableDialogProps) => {
     return (
-        <Dialog
-            open={open}
-            onClose={handleClose}
-            disableRestoreFocus
-            fullWidth
-            maxWidth={isAlertErrorComponent ? "sm" : "md"}
-            PaperProps={{
-                sx: {
-                    padding: 0,
-                    overflow: "hidden",
-                },
-            }}
-        >
-            <DialogCloseIconButton onClose={handleClose} />
-            <Container sx={{ mt: 1 }}>{component}</Container>
-            {isConfirmButton && (
-                <DialogActions>
-                    <Button onClick={() => onConfirmClick?.()}>{confirmText ?? "Confirm"}</Button>
-                </DialogActions>
-            )}
+        <Dialog open={open} onClose={handleClose} disableRestoreFocus fullWidth maxWidth={"md"}>
+            <DialogContent dividers>
+                <div className="flex items-center justify-center">
+                    <Container>{component}</Container>
+                </div>
+            </DialogContent>
+            <DialogActions>
+                {isConfirmButton && <Button onClick={() => onConfirmClick?.()}>{confirmText ?? "Confirm"}</Button>}
+                <Button onClick={handleClose} color="error">
+                    Close
+                </Button>
+            </DialogActions>
         </Dialog>
     );
 };
