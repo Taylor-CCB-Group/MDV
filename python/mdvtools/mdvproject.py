@@ -638,8 +638,30 @@ class MDVProject:
             del ds[cid]
         dt = numpy_dtypes.get(column["datatype"])
         if not dt:
-            dt = h5py.string_dtype("utf-8", column["stringLength"])
-        ds.create_dataset(cid, len(raw_data), data=raw_data, dtype=dt)
+            # Handle unique columns - need stringLength
+            if column["datatype"] == "unique":
+                string_length = column.get("stringLength")
+                if not string_length:
+                    raise ValueError(
+                        f"Column {cid} of type 'unique' requires 'stringLength' in metadata"
+                    )
+                dt = h5py.string_dtype("utf-8", string_length)
+            else:
+                raise ValueError(
+                    f"Unknown datatype: {column['datatype']} for column {cid}"
+                )
+        if column["datatype"] == "unique":
+            # If numeric data is received instead of array of strings, raise error
+            if raw_data and isinstance(raw_data[0], (int, float)):
+                raise ValueError(
+                    f"Column {cid} of type 'unique' expects array of strings, "
+                    f"but received numeric data."
+                )
+            # Use the actual length of the array (number of rows)
+            num_rows = len(raw_data)
+        else:
+            num_rows = len(raw_data)
+        ds.create_dataset(cid, num_rows, data=raw_data, dtype=dt)
         ds = self.get_datasource_metadata(datasource)
         cols = ds["columns"]
         ind = [c for c, x in enumerate(cols) if x["field"] == cid]
