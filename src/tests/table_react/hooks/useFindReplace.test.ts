@@ -12,7 +12,7 @@ describe("useFindReplace", () => {
     let searchColumn: string | null;
     let config: { include_index?: boolean };
     let gridRef: React.MutableRefObject<any>;
-    let isSelectingRef: React.MutableRefObject<boolean>;
+    let selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>;
     let setFeedbackAlert: ReturnType<typeof vi.fn>;
     let mockGrid: any;
 
@@ -62,7 +62,7 @@ describe("useFindReplace", () => {
         } as any;
 
         gridRef = { current: { slickGrid: mockGrid } } as any;
-        isSelectingRef = { current: false };
+        selectionSourceRef = { current: null };
         setFeedbackAlert = vi.fn();
     });
 
@@ -76,7 +76,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -100,7 +100,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -122,7 +122,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -145,7 +145,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -168,7 +168,7 @@ describe("useFindReplace", () => {
                     "invalid_column",
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -196,7 +196,7 @@ describe("useFindReplace", () => {
                     testSearchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -220,7 +220,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -248,7 +248,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -278,7 +278,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -309,7 +309,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -339,7 +339,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -372,7 +372,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -400,7 +400,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -430,7 +430,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -461,7 +461,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
@@ -490,7 +490,7 @@ describe("useFindReplace", () => {
                     searchColumn,
                     config,
                     gridRef,
-                    isSelectingRef,
+                    selectionSourceRef,
                     setFeedbackAlert,
                 ),
             );
