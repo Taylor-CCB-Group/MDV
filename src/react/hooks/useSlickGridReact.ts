@@ -3,16 +3,9 @@ import type { TableChartReactConfig } from "../components/TableChartReactWrapper
 import { useChart, useDataStore } from "../context";
 import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
-import {
-    type Column,
-    Editors,
-    type GridOption,
-    type OnColumnsReorderedEventArgs,
-    type OnColumnsResizedEventArgs,
-    type SlickgridReactInstance,
-} from "slickgrid-react";
+import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
-import { runInAction } from "mobx";
+import { action } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
 const useSlickGridReact = () => {
@@ -36,8 +29,9 @@ const useSlickGridReact = () => {
     const orderedParamColumnsRef = useRef(orderedParamColumns);
     const dataStoreRef = useRef(dataStore);
     const chartRef = useRef(chart);
-    const isSelectingRef = useRef(false); // Flag to prevent grid update during selection
+    const selectionSourceRef = useRef<'user' | 'programmatic' | null>(null); // Track source of selection changes
     const gridRef = useRef<SlickgridReactInstance | null>(null);
+    const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
@@ -98,9 +92,9 @@ const useSlickGridReact = () => {
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
         if (grid && dataProvider) {
-            // Skip update if we're in the middle of selection/navigation
-            if (isSelectingRef.current) {
-                console.log("Skipping grid update during selection");
+            // Skip update if user is actively selecting
+            if (selectionSourceRef.current === 'user') {
+                console.log("Skipping grid update during user selection");
                 return;
             }
             grid.setData(dataProvider, true);
@@ -119,9 +113,16 @@ const useSlickGridReact = () => {
             if (grid && dataProvider) {
                 grid.setData(dataProvider, true);
                 grid.render();
+                
+                // Apply initial sort if config.sort is set
+                if (config.sort) {
+                    suppressSortSyncRef.current = true;
+                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                    suppressSortSyncRef.current = false;
+                }
             }
         },
-        [dataProvider],
+        [dataProvider, config.sort],
     );
 
     useEffect(() => {
@@ -129,123 +130,149 @@ const useSlickGridReact = () => {
         if (!gridInstance) return;
         const grid = gridInstance.slickGrid;
         if (!grid) return;
+        const slickEventHandler = new SlickEventHandler();
 
-        const selectionHandler: any = grid.onSelectedRowsChanged.subscribe((_e, args) => {
+        slickEventHandler.subscribe(grid.onSelectedRowsChanged, (_e, args) => {
             const selectedRows = args.rows;
 
+            // Skip if we're programmatically updating
+            if (selectionSourceRef.current === 'programmatic') {
+                selectionSourceRef.current = null;
+                return;
+            }
+
             if (selectedRows.length > 0) {
+                selectionSourceRef.current = 'user';
                 const indices = selectedRows.map((row) => sortedFilteredIndicesRef.current[row]);
-
-                // Set flag to prevent grid update during selection
-                isSelectingRef.current = true;
-
                 dataStoreRef.current.dataHighlighted(indices, chartRef.current);
-
-                // Reset flag after reactions settle
-                setTimeout(() => {
-                    isSelectingRef.current = false;
-                }, 100);
+                // Reset immediately - the effect will handle any needed updates
+                selectionSourceRef.current = null;
             }
         });
 
-        const sortHandler: any = grid.onSort.subscribe((_e, args) => {
+        slickEventHandler.subscribe(grid.onSort, action((_e, args) => {
+            // Skip during programmatic sync to prevent feedback loops
+            if (suppressSortSyncRef.current) return;
+            
             if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
-                const columnId = args.sortCol.field as string;
-                const sortAsc = args.sortAsc as boolean;
+                const columnId = args.sortCol.field;
+                const sortAsc = args.sortAsc;
                 console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
-                runInAction(() => {
+                // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
+                // if not, then the type of config.sort.ascending should be optional.
+                // casting `as bool` just means that we make the types lie.
+                // It may seem like we don't reach this case because of `"sortAsc" in args` above - but technically,
+                // this gets into fiddly "key-optional" vs "value-optional" distinction.
+                // args.sortAsc could have a value of undefined - that's different from the key not being in the object in a meaningful way.
+                // it shouldn't be treated the same as a false value, or typed as though it was and passed further down...
+                if (sortAsc === undefined) {
+                    config.sort = undefined;
+                } else {
                     config.sort = { columnId, ascending: sortAsc };
-                });
+                }
             }
-        });
+        }));
 
-        const headerMenuHandler = grid
-            .getPubSubService()
-            ?.subscribe("onHeaderMenuCommand", (event: { column: Column; command: string }) => {
+        const pubSub = grid.getPubSubService();
+        if (!pubSub) {
+            // strong assertion acts as a type-guard
+            throw new Error("SlickGrid PubSubService undefined - this should be unreachable.");
+        }
+        // don't think we can use our slickEventHandler with pubSub
+        const headerMenuSubscription = pubSub.subscribe(
+            "onHeaderMenuCommand",
+            action((event: { column: Column; command: string }) => {
                 const { column, command } = event;
-                // Remove Sort
                 if (command === "clear-sort") {
-                    console.log("Clear sort");
-                    runInAction(() => {
-                        config.sort = undefined;
-                    });
-                    // Sort Ascending
+                    config.sort = undefined;
                 } else if (command === "sort-asc") {
-                    console.log("Sort Ascending");
-                    runInAction(() => {
-                        config.sort = { columnId: column.field, ascending: true };
-                    });
-                    // Sort Descending
+                    config.sort = { columnId: column.field, ascending: true };
                 } else if (command === "sort-desc") {
-                    console.log("Sort Descending");
-                    runInAction(() => {
-                        config.sort = { columnId: column.field, ascending: false };
-                    });
-                    // Find and replace
+                    config.sort = { columnId: column.field, ascending: false };
                 } else if (command === "find-replace") {
-                    console.log("Find and Replace");
                     setSearchColumn(column.field);
                     setIsFindReplaceOpen(true);
                 }
-            });
+            },
+        ));
 
-        const gridMenuHandler = grid
-            .getPubSubService()
-            ?.subscribe("onGridMenuCommand", ({ command }: { command: string }) => {
-                if (command === "clear-sorting") {
-                    console.log("Clear All sort");
-                    runInAction(() => {
-                        config.sort = undefined;
-                    });
-                }
-            });
+        const gridMenuSubscription = pubSub.subscribe("onGridMenuCommand", action(({ command }: { command: string }) => {
+            if (command === "clear-sorting") {
+                config.sort = undefined;
+            }
+        }));
 
-        const resizeHandler: any = grid.onColumnsResized?.subscribe((_e, args: OnColumnsResizedEventArgs) => {
-            console.log("resize handler");
+        slickEventHandler.subscribe(grid.onColumnsResized, action((_e, args) => {
             const columns = args.grid.getColumns();
-            runInAction(() => {
-                // Create a new reference of config.columnWidths
-                const columnWidths: Record<string, number> = config.column_widths ? {...config.column_widths} : {};
-                
-                columns.forEach((col: Column) => {
-                    if (col.width && col.width !== 100) {
-                        columnWidths[col.field] = col.width;
-                    } else if (columnWidths[col.field]) {
-                        // Remove if reset to default
-                        delete columnWidths[col.field];
-                    }
-                });
-                
-                // Change the reference of config.order for react to detect and update
-                config.column_widths = columnWidths;
-            });
-        });
+            // Create a new reference of config.columnWidths
+            const columnWidths: Record<string, number> = config.column_widths ? { ...config.column_widths } : {};
 
-        const reorderHandler: any = grid.onColumnsReordered?.subscribe((_e, args: OnColumnsReorderedEventArgs) => {
-            console.log("reorder handler");
+            for (const col of columns) {
+                if (col.width && col.width !== 100) {
+                    columnWidths[col.field] = col.width;
+                } else if (columnWidths[col.field]) {
+                    // Remove if reset to default
+                    delete columnWidths[col.field];
+                }
+            }
+
+            // Change the reference of config.order for react to detect and update
+            config.column_widths = columnWidths;
+        }));
+
+        slickEventHandler.subscribe(grid.onColumnsReordered, action((_e, args) => {
             const impactedColumns = args.impactedColumns;
-            runInAction(() => {
-                // Create a new reference of config.order
-                const newOrder = config.order ? {...config.order} : {};
-                const cols = impactedColumns.filter((col) => col.field !== "__index__");
-                cols.forEach((col, index) => {
-                    newOrder[col.field] = index;
-                });
-
-                // Change the reference of config.order for react to detect and update
-                config.order = newOrder;
+            // Create a new reference of config.order
+            const newOrder = config.order ? { ...config.order } : {};
+            const cols = impactedColumns.filter((col) => col.field !== "__index__");
+            cols.forEach((col, index) => {
+                newOrder[col.field] = index;
             });
-        });
+
+            // Change the reference of config.order for react to detect and update
+            config.order = newOrder;
+        }));
 
         return () => {
-            grid.onSelectedRowsChanged.unsubscribe(selectionHandler);
-            grid.onSort.unsubscribe(sortHandler);
-            headerMenuHandler?.unsubscribe();
-            gridMenuHandler?.unsubscribe();
-            grid.onColumnsResized.unsubscribe(resizeHandler);
-            grid.onColumnsReordered.unsubscribe(reorderHandler);
+            slickEventHandler.unsubscribeAll();
+            // the typing isn't great for these - but we believe as of writing that these will exist, 
+            // and unsubscribe() will be called on both.
+            if (!headerMenuSubscription) {
+                console.warn("no headerMenuSubscription to unsubscribe from... minor leak here.");
+            }
+            headerMenuSubscription?.unsubscribe?.();
+            gridMenuSubscription?.unsubscribe?.();
         };
     }, [config, gridInstance]);
+
+    // Sync config.sort → grid visual state
+    useEffect(() => {
+        const grid = gridRef.current?.slickGrid;
+        if (!grid || !gridInstance) return;
+        if (suppressSortSyncRef.current) return;
+        
+        const currentSortCols = grid.getSortColumns();
+        const currentSort = currentSortCols.length > 0 
+            ? { columnId: currentSortCols[0].columnId, ascending: currentSortCols[0].sortAsc }
+            : undefined;
+        
+        // Only update if different
+        const configStr = JSON.stringify(config.sort);
+        const currentStr = JSON.stringify(currentSort);
+        
+        if (configStr !== currentStr) {
+            suppressSortSyncRef.current = true;
+            try {
+                if (config.sort) {
+                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                } else {
+                    grid.setSortColumns([]);
+                }
+            } finally {
+                suppressSortSyncRef.current = false;
+            }
+        }
+    }, [config.sort, gridInstance]);
 
     // Handle highlighted data
     useEffect(() => {
@@ -257,92 +284,88 @@ const useSlickGridReact = () => {
         }
 
         try {
+            // Get current selection from grid
+            const currentSelection = grid.getSelectedRows();
+            const currentSelectionSorted = [...currentSelection].sort();
+            
+            // Calculate desired selection
+            const filteredSet = new Set(sortedFilteredIndices);
+            const validIndices = highlightedIndices.filter((i) => filteredSet.has(i));
+            
+            if (validIndices.length === 0) {
+                // Only clear if there's actually a selection and it wasn't user-initiated
+                if (currentSelection.length > 0 && selectionSourceRef.current !== 'user') {
+                    selectionSourceRef.current = 'programmatic';
+                    grid.setSelectedRows([]);
+                    requestAnimationFrame(() => {
+                        selectionSourceRef.current = null;
+                    });
+                }
+                return;
+            }
 
-        if (highlightedIndices.length === 0) {
-            // Only reset if the data provider is initialized and sorted indices have values
-            // otherwise we will be messing with the initialization of the grid
-            isSelectingRef.current = true;
-            grid.setSelectedRows([]);
-            setTimeout(() => {
-                isSelectingRef.current = false;
-            }, 100);
-            return;
+            const positions = validIndices
+                .map(index => sortedFilteredIndices.indexOf(index))
+                .filter(pos => pos !== -1);
+
+            if (positions.length === 0) return;
+            
+            const desiredSelectionSorted = [...positions].sort();
+            
+            // Only update if different
+            if (JSON.stringify(currentSelectionSorted) !== JSON.stringify(desiredSelectionSorted)) {
+                selectionSourceRef.current = 'programmatic';
+                grid.scrollRowIntoView(positions[0], false);
+                grid.setSelectedRows(positions);
+                requestAnimationFrame(() => {
+                    selectionSourceRef.current = null;
+                });
+            }
+        } catch (err) {
+            console.error("Error highlighting the rows in the table", err);
         }
-
-        const filteredSet = new Set(sortedFilteredIndicesRef.current);
-
-        // Filter the highlightedIndices by checking if the sortedFilteredIndices have those indices
-        const validIndices = highlightedIndices.filter(i => filteredSet.has(i));
-
-        if (validIndices.length === 0) {
-            isSelectingRef.current = true;
-            grid.setSelectedRows([]);
-            setTimeout(() => {
-                isSelectingRef.current = false;
-            }, 100);
-            return;
-        }
-
-        const positions: number[] = [];
-
-        for (const index of highlightedIndices) {
-            // Get the position of the index from sorted indices
-            const pos = sortedFilteredIndicesRef.current.indexOf(index);
-            if (pos !== -1) positions.push(pos);
-        }
-
-        if (positions.length === 0) return;
-
-        isSelectingRef.current = true;
-
-        // Navigate to the first row
-        grid.scrollRowIntoView(positions[0], false);
-        // Set the selected rows in the grid
-        grid.setSelectedRows(positions);
-
-        setTimeout(() => {
-            isSelectingRef.current = false;
-        }, 100)
-    } catch (err) {
-        console.error("Error highlighting the rows in the table", err);
-    }
     }, [highlightedIndices, dataProvider, sortedFilteredIndices]);
 
     const options: GridOption = useMemo(
-        () => ({
-            gridWidth: "100%",
-            gridHeight: "600px",
-            darkMode: theme === "dark",
-            autoFitColumnsOnFirstLoad: false, // To avoid the columns to take less width
-            enableAutoSizeColumns: false, 
-            rowHeight: 25,  
-            defaultColumnWidth: 100,
-            enableColumnPicker: false, // Disable right click on column header
-            enableSorting: true,
-            multiColumnSort: false,
-            enableGridMenu: false, // Disabled as it's interfering with the last column
-            enableHeaderMenu: true,
-            alwaysShowVerticalScroll: true,
-            alwaysAllowHorizontalScroll: true,
-            enableAutoResize: true,
-            autoResize: {
-                container: `#react-grid-${chartId}`,
-                calculateAvailableSizeBy: "container",
-                resizeDetection: "container",
-                autoHeight: true,
-            },
-            editable: true,
-            enableCellNavigation: true,
-            enableExcelCopyBuffer: true,
-            multiSelect: true,
-            enableRowSelection: true,
-            rowSelectionOptions: {
-                selectActiveRow: true,
-            },
-            headerMenu: {
-                hideColumnHideCommand: true, // Disabled to avoid messing with the column order
-            },
-        }),
+        () =>
+            ({
+                gridWidth: "100%",
+                gridHeight: "600px",
+                darkMode: theme === "dark",
+                autoFitColumnsOnFirstLoad: false, // To avoid the columns to take less width
+                enableAutoSizeColumns: false,
+                rowHeight: 25,
+                defaultColumnWidth: 100,
+                enableColumnPicker: false, // Disable right click on column header
+                enableSorting: true,
+                multiColumnSort: false,
+                enableGridMenu: false, // Disabled as it's interfering with the last column
+                enableHeaderMenu: true,
+                alwaysShowVerticalScroll: true,
+                alwaysAllowHorizontalScroll: true,
+                enableAutoResize: true,
+                autoResize: {
+                    container: `#react-grid-${chartId}`,
+                    calculateAvailableSizeBy: "container",
+                    resizeDetection: "container",
+                    autoHeight: true,
+                },
+                resizeByContentOptions: {
+                    // hack - seems somewhat closer to getting the right size here?
+                    defaultRatioForStringType: 1.1,
+                },
+                editable: true,
+                enableCellNavigation: true,
+                enableExcelCopyBuffer: true,
+                multiSelect: true,
+                enableRowSelection: true,
+                rowSelectionOptions: {
+                    selectActiveRow: true,
+                },
+                headerMenu: {
+                    hideColumnHideCommand: true, // Disabled to avoid messing with the column order
+                },
+            }) satisfies GridOption, // helps with autocomplete for options
         [chartId, theme],
     );
 
@@ -363,7 +386,7 @@ const useSlickGridReact = () => {
         setSearchColumn,
         sortedFilteredIndicesRef,
         orderedParamColumnsRef,
-        isSelectingRef,
+        selectionSourceRef,
         gridRef,
         options,
         columnDefs,

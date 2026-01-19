@@ -74,7 +74,7 @@ const TableChartReactComponent = observer(() => {
         config,
         dataStore,
         gridRef,
-        isSelectingRef,
+        selectionSourceRef,
         isFindReplaceOpen,
         orderedParamColumns,
         searchColumn,
@@ -105,7 +105,7 @@ const TableChartReactComponent = observer(() => {
         searchColumn,
         config,
         gridRef,
-        isSelectingRef,
+        selectionSourceRef,
         handleFeedbackAlert,
     );
 

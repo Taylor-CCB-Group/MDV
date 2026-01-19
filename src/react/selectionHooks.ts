@@ -16,7 +16,7 @@ export function useHighlightedIndex() {
  */
 export function useHighlightedIndices() {
     const dataStore = useDataStore();
-    const [highlightedIndices, setHighlightedIndices] = useState<number[]>([]);
+    const [highlightedIndices, setHighlightedIndices] = useState<number[]>(dataStore.highightedData || []);
     const listenerId = useId();
 
     useEffect(() => {
