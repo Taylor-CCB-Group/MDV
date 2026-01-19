@@ -356,8 +356,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     const deckRef = useRef<any>();
 
     useEffect(() => {
-        // useParamColumns() only returns when columns are loaded (it throws otherwise)
-        // So if we get here, columns are ready
+        // Wait for columns to be loaded to update the gates column
         if (cx && cy) {
             gateManager.updateGatesColumnWhenReady().catch(console.error);
         }
