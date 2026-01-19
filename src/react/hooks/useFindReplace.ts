@@ -23,23 +23,12 @@ const useFindReplace = (
     searchColumn: string | null,
     config: { include_index?: boolean },
     gridRef: React.MutableRefObject<SlickgridReactInstance | null>,
-    isSelectingRef: React.MutableRefObject<boolean>,
+    selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>,
     setFeedbackAlert: (alert: FeedbackAlert) => void,
 ) => {
     const [foundMatches, setFoundMatches] = useState<FoundMatch[]>([]);
     const [matchCount, setMatchCount] = useState<number | null>(null);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
-
-    const selectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-
-    useEffect(() => {
-        return () => {
-            if (selectionTimeoutRef.current !== null) {
-                clearTimeout(selectionTimeoutRef.current);
-            }
-        };
-    }, []);
 
     const disableFindPrev = useMemo(() => {
         return foundMatches.length === 0 || (foundMatches.length > 0 && currentMatchIndex <= 0);
@@ -107,21 +96,11 @@ const useFindReplace = (
                     const grid = gridRef.current?.slickGrid;
                     if (grid) {
                         const match = matches[0];
-                        // Set flag before navigation
-                        isSelectingRef.current = true;
-
+                        selectionSourceRef.current = 'programmatic';
                         grid.gotoCell(match.rowIndex, match.columnIndex, false);
-
-                        // Clear any existing timeout before scheduling a new one
-                        if (selectionTimeoutRef.current !== null) {
-                            clearTimeout(selectionTimeoutRef.current);
-                        }
-
-                        // Reset flag after delay
-                        selectionTimeoutRef.current = setTimeout(() => {
-                            isSelectingRef.current = false;
-                            selectionTimeoutRef.current = null;
-                        }, 100);
+                        requestAnimationFrame(() => {
+                            selectionSourceRef.current = null;
+                        });
                     }
                 } else {
                     setCurrentMatchIndex(-1);
@@ -149,7 +128,7 @@ const useFindReplace = (
             config.include_index,
             searchColumn,
             gridRef,
-            isSelectingRef,
+            selectionSourceRef,
             setFeedbackAlert,
         ],
     );
@@ -165,25 +144,15 @@ const useFindReplace = (
         const match = foundMatches[nextIndex];
 
         if (grid && match) {
-            // Set flag before navigation
-            isSelectingRef.current = true;
-
+            selectionSourceRef.current = 'programmatic';
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
-
-            // Clear any existing timeout before scheduling a new one
-            if (selectionTimeoutRef.current !== null) {
-                clearTimeout(selectionTimeoutRef.current);
-            }
-
-            // Reset flag after delay
-            selectionTimeoutRef.current = setTimeout(() => {
-                isSelectingRef.current = false;
-                selectionTimeoutRef.current = null;
-            }, 100);
+            requestAnimationFrame(() => {
+                selectionSourceRef.current = null;
+            });
         }
 
         console.log(`Match ${nextIndex + 1} of ${foundMatches.length}`);
-    }, [foundMatches, currentMatchIndex, gridRef, isSelectingRef]);
+    }, [foundMatches, currentMatchIndex, gridRef, selectionSourceRef]);
 
     const handleFindPrev = useCallback(() => {
         // Sanity checks
@@ -197,25 +166,15 @@ const useFindReplace = (
         const match = foundMatches[prevIndex];
 
         if (grid && match) {
-            // Set flag before navigation
-            isSelectingRef.current = true;
-
+            selectionSourceRef.current = 'programmatic';
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
-
-            // Clear any existing timeout before scheduling a new one
-            if (selectionTimeoutRef.current !== null) {
-                clearTimeout(selectionTimeoutRef.current);
-            }
-
-            // Reset flag after delay
-            selectionTimeoutRef.current = setTimeout(() => {
-                isSelectingRef.current = false;
-                selectionTimeoutRef.current = null;
-            }, 100);
+            requestAnimationFrame(() => {
+                selectionSourceRef.current = null;
+            });
         }
 
         console.log(`Match ${prevIndex + 1} of ${foundMatches.length}`);
-    }, [foundMatches, currentMatchIndex, gridRef, isSelectingRef]);
+    }, [foundMatches, currentMatchIndex, gridRef, selectionSourceRef]);
 
     //! Need a check for replace value
     const handleReplace = useCallback(

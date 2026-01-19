@@ -29,7 +29,7 @@ const useSlickGridReact = () => {
     const orderedParamColumnsRef = useRef(orderedParamColumns);
     const dataStoreRef = useRef(dataStore);
     const chartRef = useRef(chart);
-    const isSelectingRef = useRef(false); // Flag to prevent grid update during selection
+    const selectionSourceRef = useRef<'user' | 'programmatic' | null>(null); // Track source of selection changes
     const gridRef = useRef<SlickgridReactInstance | null>(null);
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
 
@@ -92,9 +92,9 @@ const useSlickGridReact = () => {
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
         if (grid && dataProvider) {
-            // Skip update if we're in the middle of selection/navigation
-            if (isSelectingRef.current) {
-                console.log("Skipping grid update during selection");
+            // Skip update if user is actively selecting
+            if (selectionSourceRef.current === 'user') {
+                console.log("Skipping grid update during user selection");
                 return;
             }
             grid.setData(dataProvider, true);
@@ -135,19 +135,18 @@ const useSlickGridReact = () => {
         slickEventHandler.subscribe(grid.onSelectedRowsChanged, (_e, args) => {
             const selectedRows = args.rows;
 
+            // Skip if we're programmatically updating
+            if (selectionSourceRef.current === 'programmatic') {
+                selectionSourceRef.current = null;
+                return;
+            }
+
             if (selectedRows.length > 0) {
+                selectionSourceRef.current = 'user';
                 const indices = selectedRows.map((row) => sortedFilteredIndicesRef.current[row]);
-
-                // Set flag to prevent grid update during selection
-                isSelectingRef.current = true;
-
                 dataStoreRef.current.dataHighlighted(indices, chartRef.current);
-
-                // Reset flag after reactions settle
-                // I wonder if we could find another way?
-                setTimeout(() => {
-                    isSelectingRef.current = false;
-                }, 100);
+                // Reset immediately - the effect will handle any needed updates
+                selectionSourceRef.current = null;
             }
         });
 
@@ -285,51 +284,43 @@ const useSlickGridReact = () => {
         }
 
         try {
-            if (highlightedIndices.length === 0) {
-                // Only reset if the data provider is initialized and sorted indices have values
-                // otherwise we will be messing with the initialization of the grid
-                isSelectingRef.current = true;
-                grid.setSelectedRows([]);
-                setTimeout(() => {
-                    isSelectingRef.current = false;
-                }, 100);
-                return;
-            }
-
-            const filteredSet = new Set(sortedFilteredIndicesRef.current);
-
-            // Filter the highlightedIndices by checking if the sortedFilteredIndices have those indices
+            // Get current selection from grid
+            const currentSelection = grid.getSelectedRows();
+            const currentSelectionSorted = [...currentSelection].sort();
+            
+            // Calculate desired selection
+            const filteredSet = new Set(sortedFilteredIndices);
             const validIndices = highlightedIndices.filter((i) => filteredSet.has(i));
-
+            
             if (validIndices.length === 0) {
-                isSelectingRef.current = true;
-                grid.setSelectedRows([]);
-                setTimeout(() => {
-                    isSelectingRef.current = false;
-                }, 100);
+                // Only clear if there's actually a selection and it wasn't user-initiated
+                if (currentSelection.length > 0 && selectionSourceRef.current !== 'user') {
+                    selectionSourceRef.current = 'programmatic';
+                    grid.setSelectedRows([]);
+                    requestAnimationFrame(() => {
+                        selectionSourceRef.current = null;
+                    });
+                }
                 return;
             }
 
-            const positions: number[] = [];
-
-            for (const index of highlightedIndices) {
-                // Get the position of the index from sorted indices
-                const pos = sortedFilteredIndicesRef.current.indexOf(index);
-                if (pos !== -1) positions.push(pos);
-            }
+            const positions = validIndices
+                .map(index => sortedFilteredIndices.indexOf(index))
+                .filter(pos => pos !== -1);
 
             if (positions.length === 0) return;
-
-            isSelectingRef.current = true;
-
-            // Navigate to the first row
-            grid.scrollRowIntoView(positions[0], false);
-            // Set the selected rows in the grid
-            grid.setSelectedRows(positions);
-
-            setTimeout(() => {
-                isSelectingRef.current = false;
-            }, 100);
+            
+            const desiredSelectionSorted = [...positions].sort();
+            
+            // Only update if different
+            if (JSON.stringify(currentSelectionSorted) !== JSON.stringify(desiredSelectionSorted)) {
+                selectionSourceRef.current = 'programmatic';
+                grid.scrollRowIntoView(positions[0], false);
+                grid.setSelectedRows(positions);
+                requestAnimationFrame(() => {
+                    selectionSourceRef.current = null;
+                });
+            }
         } catch (err) {
             console.error("Error highlighting the rows in the table", err);
         }
@@ -395,7 +386,7 @@ const useSlickGridReact = () => {
         setSearchColumn,
         sortedFilteredIndicesRef,
         orderedParamColumnsRef,
-        isSelectingRef,
+        selectionSourceRef,
         gridRef,
         options,
         columnDefs,
