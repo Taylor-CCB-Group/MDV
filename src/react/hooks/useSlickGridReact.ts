@@ -7,12 +7,8 @@ import {
     type Column,
     Editors,
     type GridOption,
-    type MultiColumnSort,
     type OnColumnsReorderedEventArgs,
     type OnColumnsResizedEventArgs,
-    type OnSelectedRowsChangedEventArgs,
-    type SingleColumnSort,
-    type SlickEventData,
     type SlickgridReactInstance,
 } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
@@ -134,7 +130,7 @@ const useSlickGridReact = () => {
         const grid = gridInstance.slickGrid;
         if (!grid) return;
 
-        const selectionHandler = (_e: SlickEventData<OnSelectedRowsChangedEventArgs>, args: OnSelectedRowsChangedEventArgs) => {
+        const selectionHandler: any = grid.onSelectedRowsChanged.subscribe((_e, args) => {
             const selectedRows = args.rows;
 
             if (selectedRows.length > 0) {
@@ -150,9 +146,9 @@ const useSlickGridReact = () => {
                     isSelectingRef.current = false;
                 }, 100);
             }
-        };
+        });
 
-        const sortHandler = (_e: SlickEventData<SingleColumnSort | MultiColumnSort>, args: SingleColumnSort | MultiColumnSort) => {
+        const sortHandler: any = grid.onSort.subscribe((_e, args) => {
             if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
                 const columnId = args.sortCol.field as string;
                 const sortAsc = args.sortAsc as boolean;
@@ -161,46 +157,50 @@ const useSlickGridReact = () => {
                     config.sort = { columnId, ascending: sortAsc };
                 });
             }
-        };
+        });
 
-        const headerMenuHandler = (event: { column: Column; command: string }) => {
-            const { column, command } = event;
-            // Remove Sort
-            if (command === "clear-sort") {
-                console.log("Clear sort");
-                runInAction(() => {
-                    config.sort = undefined;
-                });
-                // Sort Ascending
-            } else if (command === "sort-asc") {
-                console.log("Sort Ascending");
-                runInAction(() => {
-                    config.sort = { columnId: column.field, ascending: true };
-                });
-                // Sort Descending
-            } else if (command === "sort-desc") {
-                console.log("Sort Descending");
-                runInAction(() => {
-                    config.sort = { columnId: column.field, ascending: false };
-                });
-                // Find and replace
-            } else if (command === "find-replace") {
-                console.log("Find and Replace");
-                setSearchColumn(column.field);
-                setIsFindReplaceOpen(true);
-            }
-        };
+        const headerMenuHandler = grid
+            .getPubSubService()
+            ?.subscribe("onHeaderMenuCommand", (event: { column: Column; command: string }) => {
+                const { column, command } = event;
+                // Remove Sort
+                if (command === "clear-sort") {
+                    console.log("Clear sort");
+                    runInAction(() => {
+                        config.sort = undefined;
+                    });
+                    // Sort Ascending
+                } else if (command === "sort-asc") {
+                    console.log("Sort Ascending");
+                    runInAction(() => {
+                        config.sort = { columnId: column.field, ascending: true };
+                    });
+                    // Sort Descending
+                } else if (command === "sort-desc") {
+                    console.log("Sort Descending");
+                    runInAction(() => {
+                        config.sort = { columnId: column.field, ascending: false };
+                    });
+                    // Find and replace
+                } else if (command === "find-replace") {
+                    console.log("Find and Replace");
+                    setSearchColumn(column.field);
+                    setIsFindReplaceOpen(true);
+                }
+            });
 
-        const gridMenuHandler = ({ command }: { command: string }) => {
-            if (command === "clear-sorting") {
-                console.log("Clear All sort");
-                runInAction(() => {
-                    config.sort = undefined;
-                });
-            }
-        };
+        const gridMenuHandler = grid
+            .getPubSubService()
+            ?.subscribe("onGridMenuCommand", ({ command }: { command: string }) => {
+                if (command === "clear-sorting") {
+                    console.log("Clear All sort");
+                    runInAction(() => {
+                        config.sort = undefined;
+                    });
+                }
+            });
 
-        const resizeHandler = (_e: SlickEventData<OnColumnsResizedEventArgs>, args: OnColumnsResizedEventArgs) => {
+        const resizeHandler: any = grid.onColumnsResized?.subscribe((_e, args: OnColumnsResizedEventArgs) => {
             console.log("resize handler");
             const columns = args.grid.getColumns();
             runInAction(() => {
@@ -219,9 +219,9 @@ const useSlickGridReact = () => {
                 // Change the reference of config.order for react to detect and update
                 config.column_widths = columnWidths;
             });
-        };
+        });
 
-        const reorderHandler = (_e: SlickEventData<OnColumnsReorderedEventArgs>, args: OnColumnsReorderedEventArgs) => {
+        const reorderHandler: any = grid.onColumnsReordered?.subscribe((_e, args: OnColumnsReorderedEventArgs) => {
             console.log("reorder handler");
             const impactedColumns = args.impactedColumns;
             runInAction(() => {
@@ -235,51 +235,15 @@ const useSlickGridReact = () => {
                 // Change the reference of config.order for react to detect and update
                 config.order = newOrder;
             });
-        };
-
-        // Subscribe to events
-        grid.onSelectedRowsChanged.subscribe(selectionHandler);
-        grid.onSort.subscribe(sortHandler);
-
-
-        let headerMenuSubscription = null;
-        let gridMenuSubscription = null;
-
-        // Check if pubService exists
-        const pubService = grid.getPubSubService();
-        if (pubService) {
-            headerMenuSubscription = pubService.subscribe("onHeaderMenuCommand", headerMenuHandler);
-            gridMenuSubscription = pubService.subscribe("onGridMenuCommand", gridMenuHandler);
-        }
-        
-        if (grid.onColumnsResized) {
-            grid.onColumnsResized.subscribe(resizeHandler);
-        }
-
-        if (grid.onColumnsReordered) {
-            grid.onColumnsReordered.subscribe(reorderHandler);
-        }
+        });
 
         return () => {
-            // Unsubscribe all events
             grid.onSelectedRowsChanged.unsubscribe(selectionHandler);
             grid.onSort.unsubscribe(sortHandler);
-
-            if (headerMenuSubscription?.unsubscribe) {
-                headerMenuSubscription.unsubscribe();
-            }
-
-            if (gridMenuSubscription?.unsubscribe) {
-                gridMenuSubscription.unsubscribe();
-            }
-
-            if (grid.onColumnsResized && resizeHandler) {
-                grid.onColumnsResized.unsubscribe(resizeHandler);
-            }
-            
-            if (grid.onColumnsReordered && reorderHandler) {
-                grid.onColumnsReordered.unsubscribe(reorderHandler);
-            }
+            headerMenuHandler?.unsubscribe();
+            gridMenuHandler?.unsubscribe();
+            grid.onColumnsResized.unsubscribe(resizeHandler);
+            grid.onColumnsReordered.unsubscribe(reorderHandler);
         };
     }, [config, gridInstance]);
 
