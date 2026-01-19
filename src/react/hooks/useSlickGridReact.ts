@@ -5,7 +5,7 @@ import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hook
 import { useHighlightedIndices } from "../selectionHooks";
 import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
-import { runInAction } from "mobx";
+import { action } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
 const useSlickGridReact = () => {
@@ -136,33 +136,32 @@ const useSlickGridReact = () => {
                 dataStoreRef.current.dataHighlighted(indices, chartRef.current);
 
                 // Reset flag after reactions settle
+                // I wonder if we could find another way?
                 setTimeout(() => {
                     isSelectingRef.current = false;
                 }, 100);
             }
         });
 
-        slickEventHandler.subscribe(grid.onSort, (_e, args) => {
+        slickEventHandler.subscribe(grid.onSort, action((_e, args) => {
             if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
                 const columnId = args.sortCol.field;
                 const sortAsc = args.sortAsc;
                 console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
-                runInAction(() => {
-                    // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
-                    // if not, then the type of config.sort.ascending should be optional.
-                    // casting `as bool` just means that we make the types lie.
-                    // It may seem like we don't reach this case because of `"sortAsc" in args` above - but technically,
-                    // this gets into fiddly "key-optional" vs "value-optional" distinction.
-                    // args.sortAsc could have a value of undefined - that's different from the key not being in the object in a meaningful way.
-                    // it shouldn't be treated the same as a false value, or typed as though it was and passed further down...
-                    if (sortAsc === undefined) {
-                        config.sort = undefined;
-                    } else {
-                        config.sort = { columnId, ascending: sortAsc };
-                    }
-                });
+                // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
+                // if not, then the type of config.sort.ascending should be optional.
+                // casting `as bool` just means that we make the types lie.
+                // It may seem like we don't reach this case because of `"sortAsc" in args` above - but technically,
+                // this gets into fiddly "key-optional" vs "value-optional" distinction.
+                // args.sortAsc could have a value of undefined - that's different from the key not being in the object in a meaningful way.
+                // it shouldn't be treated the same as a false value, or typed as though it was and passed further down...
+                if (sortAsc === undefined) {
+                    config.sort = undefined;
+                } else {
+                    config.sort = { columnId, ascending: sortAsc };
+                }
             }
-        });
+        }));
 
         const pubSub = grid.getPubSubService();
         if (!pubSub) {
@@ -172,80 +171,57 @@ const useSlickGridReact = () => {
         // don't think we can use our slickEventHandler with pubSub
         const headerMenuSubscription = pubSub.subscribe(
             "onHeaderMenuCommand",
-            (event: { column: Column; command: string }) => {
+            action((event: { column: Column; command: string }) => {
                 const { column, command } = event;
-                // Remove Sort
                 if (command === "clear-sort") {
-                    console.log("Clear sort");
-                    runInAction(() => {
-                        config.sort = undefined;
-                    });
-                    // Sort Ascending
+                    config.sort = undefined;
                 } else if (command === "sort-asc") {
-                    console.log("Sort Ascending");
-                    runInAction(() => {
-                        config.sort = { columnId: column.field, ascending: true };
-                    });
-                    // Sort Descending
+                    config.sort = { columnId: column.field, ascending: true };
                 } else if (command === "sort-desc") {
-                    console.log("Sort Descending");
-                    runInAction(() => {
-                        config.sort = { columnId: column.field, ascending: false };
-                    });
-                    // Find and replace
+                    config.sort = { columnId: column.field, ascending: false };
                 } else if (command === "find-replace") {
-                    console.log("Find and Replace");
                     setSearchColumn(column.field);
                     setIsFindReplaceOpen(true);
                 }
             },
-        );
+        ));
 
-        const gridMenuSubscription = pubSub.subscribe("onGridMenuCommand", ({ command }: { command: string }) => {
+        const gridMenuSubscription = pubSub.subscribe("onGridMenuCommand", action(({ command }: { command: string }) => {
             if (command === "clear-sorting") {
-                console.log("Clear All sort");
-                runInAction(() => {
-                    config.sort = undefined;
-                });
+                config.sort = undefined;
             }
-        });
+        }));
 
-        slickEventHandler.subscribe(grid.onColumnsResized, (_e, args) => {
-            console.log("resize handler");
+        slickEventHandler.subscribe(grid.onColumnsResized, action((_e, args) => {
             const columns = args.grid.getColumns();
-            runInAction(() => {
-                // Create a new reference of config.columnWidths
-                const columnWidths: Record<string, number> = config.column_widths ? { ...config.column_widths } : {};
+            // Create a new reference of config.columnWidths
+            const columnWidths: Record<string, number> = config.column_widths ? { ...config.column_widths } : {};
 
-                columns.forEach((col: Column) => {
-                    if (col.width && col.width !== 100) {
-                        columnWidths[col.field] = col.width;
-                    } else if (columnWidths[col.field]) {
-                        // Remove if reset to default
-                        delete columnWidths[col.field];
-                    }
-                });
+            for (const col of columns) {
+                if (col.width && col.width !== 100) {
+                    columnWidths[col.field] = col.width;
+                } else if (columnWidths[col.field]) {
+                    // Remove if reset to default
+                    delete columnWidths[col.field];
+                }
+            }
 
-                // Change the reference of config.order for react to detect and update
-                config.column_widths = columnWidths;
-            });
-        });
+            // Change the reference of config.order for react to detect and update
+            config.column_widths = columnWidths;
+        }));
 
-        slickEventHandler.subscribe(grid.onColumnsReordered, (_e, args) => {
-            console.log("reorder handler");
+        slickEventHandler.subscribe(grid.onColumnsReordered, action((_e, args) => {
             const impactedColumns = args.impactedColumns;
-            runInAction(() => {
-                // Create a new reference of config.order
-                const newOrder = config.order ? { ...config.order } : {};
-                const cols = impactedColumns.filter((col) => col.field !== "__index__");
-                cols.forEach((col, index) => {
-                    newOrder[col.field] = index;
-                });
-
-                // Change the reference of config.order for react to detect and update
-                config.order = newOrder;
+            // Create a new reference of config.order
+            const newOrder = config.order ? { ...config.order } : {};
+            const cols = impactedColumns.filter((col) => col.field !== "__index__");
+            cols.forEach((col, index) => {
+                newOrder[col.field] = index;
             });
-        });
+
+            // Change the reference of config.order for react to detect and update
+            config.order = newOrder;
+        }));
 
         return () => {
             slickEventHandler.unsubscribeAll();
