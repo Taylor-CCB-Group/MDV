@@ -168,6 +168,7 @@ describe("useSlickGridReact", () => {
                         unsubscribe: vi.fn()
                     }))
                 })),
+                getSortColumns: vi.fn(() => []),
                 onColumnsResized: { subscribe: vi.fn(), unsubscribe: vi.fn() },
                 onColumnsReordered: { subscribe: vi.fn(), unsubscribe: vi.fn() },
             };
