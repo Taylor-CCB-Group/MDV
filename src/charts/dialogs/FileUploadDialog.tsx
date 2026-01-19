@@ -1204,17 +1204,17 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         return (
             <Container>
                 {/* Upload Method Toggle (for development/testing) */}
-                {process.env.NODE_ENV === 'development' && (
+                {/* {process.env.NODE_ENV === 'development' && (
                     <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                        {/* <button
+                        <button
                             type="button"
                             onClick={toggleUploadMethod}
                             className="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                         >
                             Current: {state.uploadMethod.toUpperCase()} - Click to toggle
-                        </button> */}
+                        </button>
                     </div>
-                )}
+                )} */}
 
                 {state.isUploading ? (
                     <StatusContainer>

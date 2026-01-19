@@ -4,7 +4,7 @@ import PhotoSizeSelectSmallOutlinedIcon from "@mui/icons-material/PhotoSizeSelec
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
-import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
+import SaveIcon from "@mui/icons-material/SaveOutlined";
 import { useCallback, useMemo, useState } from "react";
 import type { useScatterplotLayer } from "../scatter_state";
 import { useSpatialLayers } from "../spatial_context";
@@ -220,9 +220,8 @@ export default observer(function SelectionOverlay() {
                         <IconButton
                             onClick={() => setGateDialogOpen(true)}
                             aria-label="Save as Gate"
-                            style={{ backgroundColor: 'rgba(76, 175, 80, 0.2)' }}
                         >
-                            <BookmarkAddOutlinedIcon />
+                            <SaveIcon />
                         </IconButton>
                     </Tooltip>
                 )}

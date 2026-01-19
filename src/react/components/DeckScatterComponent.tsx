@@ -297,50 +297,51 @@ const DeckScatter = observer(function DeckScatterComponent() {
             },
         });
     }, [id, is2d, cx, cy, cz, allGates]);
+    
     // Gate polygons layer - renders the actual gate shapes
-const gatePolygonsLayer = useMemo(() => {
-    if (!cx || !cy || allGates.length === 0) return null;
-    
-    // Get gates that match the current chart's X/Y columns
-    const relevantGates = allGates.filter(
-        gate => gate.columns[0] === cx.field && gate.columns[1] === cy.field
-    );
-    
-    if (relevantGates.length === 0) return null;
-    
-    // Combine all gate geometries into a single FeatureCollection
-    // Each gate's features are copied with gate metadata in properties
-    const combinedFeatures = relevantGates.flatMap(gate => 
-        gate.geometry.features.map(feature => ({
-            ...feature,
-            properties: {
-                ...feature.properties,
-                gateId: gate.id,
-                gateName: gate.name
-            }
-        }))
-    );
-    
-    return new GeoJsonLayer({
-        id: `gate-polygons-${id}`,
-        data: {
-            type: "FeatureCollection",
-            features: combinedFeatures
-        } as any,
-        filled: true,
-        getFillColor: [76, 175, 80, 30], // Semi-transparent green fill
-        getLineColor: [76, 175, 80, 200], // Green border (more opaque)
-        getLineWidth: 2,
-        lineWidthMinPixels: 1,
-        pickable: false, // Gates are not interactive in MVP
-        updateTriggers: {
+    const gatePolygonsLayer = useMemo(() => {
+        if (!cx || !cy || allGates.length === 0) return null;
+        
+        // Get gates that match the current chart's X/Y columns
+        const relevantGates = allGates.filter(
+            gate => gate.columns[0] === cx.field && gate.columns[1] === cy.field
+        );
+        
+        if (relevantGates.length === 0) return null;
+        
+        // Combine all gate geometries into a single FeatureCollection
+        // Each gate's features are copied with gate metadata in properties
+        const combinedFeatures = relevantGates.flatMap(gate => 
+            gate.geometry.features.map(feature => ({
+                ...feature,
+                properties: {
+                    ...feature.properties,
+                    gateId: gate.id,
+                    gateName: gate.name
+                }
+            }))
+        );
+        
+        return new GeoJsonLayer({
+            id: `gate-polygons-${id}`,
+            data: {
+                type: "FeatureCollection",
+                features: combinedFeatures
+            } as any,
+            filled: true,
+            getFillColor: [76, 175, 80, 30], // Semi-transparent green fill
+            getLineColor: [76, 175, 80, 200], // Green border (more opaque)
+            getLineWidth: 2,
+            lineWidthMinPixels: 1,
+            pickable: false, // Gates are not interactive in MVP
             updateTriggers: {
-                getFillColor: [allGates.length, relevantGates.map(g => g.id).join(',')],
-                getLineColor: [allGates.length, relevantGates.map(g => g.id).join(',')],
+                updateTriggers: {
+                    getFillColor: [allGates.length, relevantGates.map(g => g.id).join(',')],
+                    getLineColor: [allGates.length, relevantGates.map(g => g.id).join(',')],
+                },
             },
-        },
-    });
-}, [id, cx, cy, allGates]);
+        });
+    }, [id, cx, cy, allGates]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
     const layers = [scatterplotLayer, greyScatterplotLayer, gatePolygonsLayer, selectionLayer, axisLinesLayer, 
          gateLabelsLayer
