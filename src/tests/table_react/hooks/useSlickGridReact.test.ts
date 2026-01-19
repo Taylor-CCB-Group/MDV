@@ -4,6 +4,7 @@ import { describe, test, expect, beforeEach, vi } from "vitest";
 import { observable, runInAction } from "mobx";
 import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
+import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 // Mock all the context hooks
 vi.mock("@/react/context", () => ({
@@ -158,24 +159,7 @@ describe("useSlickGridReact", () => {
         test("should set grid ref and initialize grid", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
-            const mockGrid = {
-                setData: vi.fn(),
-                render: vi.fn(),
-                onSelectedRowsChanged: { subscribe: vi.fn(), unsubscribe: vi.fn() },
-                onSort: { subscribe: vi.fn(), unsubscribe: vi.fn()  },
-                getPubSubService: vi.fn(() => ({
-                    subscribe: vi.fn(() => ({
-                        unsubscribe: vi.fn()
-                    }))
-                })),
-                getSortColumns: vi.fn(() => []),
-                onColumnsResized: { subscribe: vi.fn(), unsubscribe: vi.fn() },
-                onColumnsReordered: { subscribe: vi.fn(), unsubscribe: vi.fn() },
-            };
-
-            const mockGridInstance = {
-                slickGrid: mockGrid,
-            } as any;
+            const mockGridInstance = createSlickGridMock();
 
             const mockEvent = new CustomEvent("gridCreated", {
                 detail: mockGridInstance,
@@ -185,8 +169,8 @@ describe("useSlickGridReact", () => {
                 result.current.handleGridCreated(mockEvent);
             });
 
-            expect(mockGrid.setData).toHaveBeenCalled();
-            expect(mockGrid.render).toHaveBeenCalled();
+            expect(mockGridInstance.slickGrid.setData).toHaveBeenCalled();
+            expect(mockGridInstance.slickGrid.render).toHaveBeenCalled();
         });
     });
 
