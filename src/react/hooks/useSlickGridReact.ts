@@ -31,6 +31,7 @@ const useSlickGridReact = () => {
     const chartRef = useRef(chart);
     const isSelectingRef = useRef(false); // Flag to prevent grid update during selection
     const gridRef = useRef<SlickgridReactInstance | null>(null);
+    const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
@@ -112,9 +113,16 @@ const useSlickGridReact = () => {
             if (grid && dataProvider) {
                 grid.setData(dataProvider, true);
                 grid.render();
+                
+                // Apply initial sort if config.sort is set
+                if (config.sort) {
+                    suppressSortSyncRef.current = true;
+                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                    suppressSortSyncRef.current = false;
+                }
             }
         },
-        [dataProvider],
+        [dataProvider, config.sort],
     );
 
     useEffect(() => {
@@ -144,6 +152,9 @@ const useSlickGridReact = () => {
         });
 
         slickEventHandler.subscribe(grid.onSort, action((_e, args) => {
+            // Skip during programmatic sync to prevent feedback loops
+            if (suppressSortSyncRef.current) return;
+            
             if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
                 const columnId = args.sortCol.field;
                 const sortAsc = args.sortAsc;
@@ -234,6 +245,35 @@ const useSlickGridReact = () => {
             gridMenuSubscription?.unsubscribe?.();
         };
     }, [config, gridInstance]);
+
+    // Sync config.sort → grid visual state
+    useEffect(() => {
+        const grid = gridRef.current?.slickGrid;
+        if (!grid || !gridInstance) return;
+        if (suppressSortSyncRef.current) return;
+        
+        const currentSortCols = grid.getSortColumns();
+        const currentSort = currentSortCols.length > 0 
+            ? { columnId: currentSortCols[0].columnId, ascending: currentSortCols[0].sortAsc }
+            : undefined;
+        
+        // Only update if different
+        const configStr = JSON.stringify(config.sort);
+        const currentStr = JSON.stringify(currentSort);
+        
+        if (configStr !== currentStr) {
+            suppressSortSyncRef.current = true;
+            try {
+                if (config.sort) {
+                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                } else {
+                    grid.setSortColumns([]);
+                }
+            } finally {
+                suppressSortSyncRef.current = false;
+            }
+        }
+    }, [config.sort, gridInstance]);
 
     // Handle highlighted data
     useEffect(() => {
