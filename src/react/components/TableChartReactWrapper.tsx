@@ -4,7 +4,7 @@ import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import TableChartReactComponent from "./TableChartReactComponent";
 import { g } from "@/lib/utils";
-import { action, extendObservable, makeObservable, observable, runInAction } from "mobx";
+import { action, extendObservable } from "mobx";
 
 const TableChartComponent = observer(() => {
     return <TableChartReactComponent />;
@@ -30,10 +30,13 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         if (config.include_index === undefined || config.include_index === null) config.include_index = false;
 
         // Extending config to make config.sort observable
-        // Doing this is required as it's initialized with undefined and doesn't work if initialized like other properties
-        extendObservable(this.config, {
-            sort: undefined as { columnId: string; ascending: boolean } | undefined,
-        });
+        // If the config is saved with a sort property, doing this again causes an error.
+        if (!this.config.sort) {
+            // Doing this is required as it's initialized with undefined and doesn't work if initialized like other properties
+            extendObservable(this.config, {
+                sort: undefined,
+            });
+        }
 
         // Add Download menu icon (like the legacy version)
         // this.addMenuIcon("fas fa-download", "Download data", {
