@@ -3,13 +3,7 @@ import type { TableChartReactConfig } from "../components/TableChartReactWrapper
 import { useChart, useDataStore } from "../context";
 import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
-import {
-    type Column,
-    Editors,
-    type GridOption,
-    type SlickgridReactInstance,
-    SlickEventHandler,
-} from "slickgrid-react";
+import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { runInAction } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
@@ -176,35 +170,38 @@ const useSlickGridReact = () => {
             throw new Error("SlickGrid PubSubService undefined - this should be unreachable.");
         }
         // don't think we can use our slickEventHandler with pubSub
-        const headerMenuSubscription = pubSub.subscribe("onHeaderMenuCommand", (event: { column: Column; command: string; }) => {
-            const { column, command } = event;
-            // Remove Sort
-            if (command === "clear-sort") {
-                console.log("Clear sort");
-                runInAction(() => {
-                    config.sort = undefined;
-                });
-                // Sort Ascending
-            } else if (command === "sort-asc") {
-                console.log("Sort Ascending");
-                runInAction(() => {
-                    config.sort = { columnId: column.field, ascending: true };
-                });
-                // Sort Descending
-            } else if (command === "sort-desc") {
-                console.log("Sort Descending");
-                runInAction(() => {
-                    config.sort = { columnId: column.field, ascending: false };
-                });
-                // Find and replace
-            } else if (command === "find-replace") {
-                console.log("Find and Replace");
-                setSearchColumn(column.field);
-                setIsFindReplaceOpen(true);
-            }
-        });
+        const headerMenuSubscription = pubSub.subscribe(
+            "onHeaderMenuCommand",
+            (event: { column: Column; command: string }) => {
+                const { column, command } = event;
+                // Remove Sort
+                if (command === "clear-sort") {
+                    console.log("Clear sort");
+                    runInAction(() => {
+                        config.sort = undefined;
+                    });
+                    // Sort Ascending
+                } else if (command === "sort-asc") {
+                    console.log("Sort Ascending");
+                    runInAction(() => {
+                        config.sort = { columnId: column.field, ascending: true };
+                    });
+                    // Sort Descending
+                } else if (command === "sort-desc") {
+                    console.log("Sort Descending");
+                    runInAction(() => {
+                        config.sort = { columnId: column.field, ascending: false };
+                    });
+                    // Find and replace
+                } else if (command === "find-replace") {
+                    console.log("Find and Replace");
+                    setSearchColumn(column.field);
+                    setIsFindReplaceOpen(true);
+                }
+            },
+        );
 
-        const gridMenuSubscription = pubSub.subscribe("onGridMenuCommand", ({ command }: { command: string; }) => {
+        const gridMenuSubscription = pubSub.subscribe("onGridMenuCommand", ({ command }: { command: string }) => {
             if (command === "clear-sorting") {
                 console.log("Clear All sort");
                 runInAction(() => {
@@ -212,8 +209,7 @@ const useSlickGridReact = () => {
                 });
             }
         });
-        
-        
+
         slickEventHandler.subscribe(grid.onColumnsResized, (_e, args) => {
             console.log("resize handler");
             const columns = args.grid.getColumns();
@@ -268,96 +264,96 @@ const useSlickGridReact = () => {
         }
 
         try {
+            if (highlightedIndices.length === 0) {
+                // Only reset if the data provider is initialized and sorted indices have values
+                // otherwise we will be messing with the initialization of the grid
+                isSelectingRef.current = true;
+                grid.setSelectedRows([]);
+                setTimeout(() => {
+                    isSelectingRef.current = false;
+                }, 100);
+                return;
+            }
 
-        if (highlightedIndices.length === 0) {
-            // Only reset if the data provider is initialized and sorted indices have values
-            // otherwise we will be messing with the initialization of the grid
+            const filteredSet = new Set(sortedFilteredIndicesRef.current);
+
+            // Filter the highlightedIndices by checking if the sortedFilteredIndices have those indices
+            const validIndices = highlightedIndices.filter((i) => filteredSet.has(i));
+
+            if (validIndices.length === 0) {
+                isSelectingRef.current = true;
+                grid.setSelectedRows([]);
+                setTimeout(() => {
+                    isSelectingRef.current = false;
+                }, 100);
+                return;
+            }
+
+            const positions: number[] = [];
+
+            for (const index of highlightedIndices) {
+                // Get the position of the index from sorted indices
+                const pos = sortedFilteredIndicesRef.current.indexOf(index);
+                if (pos !== -1) positions.push(pos);
+            }
+
+            if (positions.length === 0) return;
+
             isSelectingRef.current = true;
-            grid.setSelectedRows([]);
+
+            // Navigate to the first row
+            grid.scrollRowIntoView(positions[0], false);
+            // Set the selected rows in the grid
+            grid.setSelectedRows(positions);
+
             setTimeout(() => {
                 isSelectingRef.current = false;
             }, 100);
-            return;
+        } catch (err) {
+            console.error("Error highlighting the rows in the table", err);
         }
-
-        const filteredSet = new Set(sortedFilteredIndicesRef.current);
-
-        // Filter the highlightedIndices by checking if the sortedFilteredIndices have those indices
-        const validIndices = highlightedIndices.filter(i => filteredSet.has(i));
-
-        if (validIndices.length === 0) {
-            isSelectingRef.current = true;
-            grid.setSelectedRows([]);
-            setTimeout(() => {
-                isSelectingRef.current = false;
-            }, 100);
-            return;
-        }
-
-        const positions: number[] = [];
-
-        for (const index of highlightedIndices) {
-            // Get the position of the index from sorted indices
-            const pos = sortedFilteredIndicesRef.current.indexOf(index);
-            if (pos !== -1) positions.push(pos);
-        }
-
-        if (positions.length === 0) return;
-
-        isSelectingRef.current = true;
-
-        // Navigate to the first row
-        grid.scrollRowIntoView(positions[0], false);
-        // Set the selected rows in the grid
-        grid.setSelectedRows(positions);
-
-        setTimeout(() => {
-            isSelectingRef.current = false;
-        }, 100)
-    } catch (err) {
-        console.error("Error highlighting the rows in the table", err);
-    }
     }, [highlightedIndices, dataProvider, sortedFilteredIndices]);
 
     const options: GridOption = useMemo(
-        () => ({
-            gridWidth: "100%",
-            gridHeight: "600px",
-            darkMode: theme === "dark",
-            autoFitColumnsOnFirstLoad: false, // To avoid the columns to take less width
-            enableAutoSizeColumns: false, 
-            rowHeight: 25,  
-            defaultColumnWidth: 100,
-            enableColumnPicker: false, // Disable right click on column header
-            enableSorting: true,
-            multiColumnSort: false,
-            enableGridMenu: false, // Disabled as it's interfering with the last column
-            enableHeaderMenu: true,
-            alwaysShowVerticalScroll: true,
-            alwaysAllowHorizontalScroll: true,
-            enableAutoResize: true,
-            autoResize: {
-                container: `#react-grid-${chartId}`,
-                calculateAvailableSizeBy: "container",
-                resizeDetection: "container",
-                autoHeight: true,
-            },
-            resizeByContentOptions: {
-                // hack - seems somewhat closer to getting the right size here?
-                defaultRatioForStringType: 1.1,
-            },
-            editable: true,
-            enableCellNavigation: true,
-            enableExcelCopyBuffer: true,
-            multiSelect: true,
-            enableRowSelection: true,
-            rowSelectionOptions: {
-                selectActiveRow: true,
-            },
-            headerMenu: {
-                hideColumnHideCommand: true, // Disabled to avoid messing with the column order
-            },
-        } satisfies GridOption), // helps with autocomplete for options
+        () =>
+            ({
+                gridWidth: "100%",
+                gridHeight: "600px",
+                darkMode: theme === "dark",
+                autoFitColumnsOnFirstLoad: false, // To avoid the columns to take less width
+                enableAutoSizeColumns: false,
+                rowHeight: 25,
+                defaultColumnWidth: 100,
+                enableColumnPicker: false, // Disable right click on column header
+                enableSorting: true,
+                multiColumnSort: false,
+                enableGridMenu: false, // Disabled as it's interfering with the last column
+                enableHeaderMenu: true,
+                alwaysShowVerticalScroll: true,
+                alwaysAllowHorizontalScroll: true,
+                enableAutoResize: true,
+                autoResize: {
+                    container: `#react-grid-${chartId}`,
+                    calculateAvailableSizeBy: "container",
+                    resizeDetection: "container",
+                    autoHeight: true,
+                },
+                resizeByContentOptions: {
+                    // hack - seems somewhat closer to getting the right size here?
+                    defaultRatioForStringType: 1.1,
+                },
+                editable: true,
+                enableCellNavigation: true,
+                enableExcelCopyBuffer: true,
+                multiSelect: true,
+                enableRowSelection: true,
+                rowSelectionOptions: {
+                    selectActiveRow: true,
+                },
+                headerMenu: {
+                    hideColumnHideCommand: true, // Disabled to avoid messing with the column order
+                },
+            }) satisfies GridOption, // helps with autocomplete for options
         [chartId, theme],
     );
 
