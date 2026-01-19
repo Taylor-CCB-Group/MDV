@@ -249,8 +249,13 @@ const useSlickGridReact = () => {
 
         return () => {
             slickEventHandler.unsubscribeAll();
-            headerMenuSubscription.unsubscribe?.();
-            gridMenuSubscription.unsubscribe?.();
+            // the typing isn't great for these - but we believe as of writing that these will exist, 
+            // and unsubscribe() will be called on both.
+            if (!headerMenuSubscription) {
+                console.warn("no headerMenuSubscription to unsubscribe from... minor leak here.");
+            }
+            headerMenuSubscription?.unsubscribe?.();
+            gridMenuSubscription?.unsubscribe?.();
         };
     }, [config, gridInstance]);
 
