@@ -5,9 +5,14 @@ import type { LoadedDataColumn } from "@/charts/charts";
 import { extractCoords, isPointInGate } from "./gateUtils";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
-// todo: Change later
 const GATES_COLUMN_NAME = "__gates__";
-export class GateStore {
+//todo: Add update and delete operations
+/**
+ * Class which manages the gating operations
+ * Creates a gates column if it doesn't exist, loads the gates column if it's not loaded
+ * Adds new gates and assigns it to the respective cells in the column
+ */
+export class GateManager {
     gates: Map<string, Gate> = new Map();
 
     private dataStore: DataStore;
@@ -19,8 +24,6 @@ export class GateStore {
         makeObservable(this, {
             gates: observable,
             addGate: action,
-            // removeGate: action,
-            // updateGate: action,
             gatesArray: computed,
         });
 
@@ -28,41 +31,46 @@ export class GateStore {
         this.loadGatesFromConfig();
     }
 
+    /**
+     * Ensure gate column's data is loaded, load the column data explicity if not loaded
+     */
     private async ensureGateColumnDataLoaded() {
         if (!this.gateColumn) return;
 
         // Check if data is already loaded
         if (this.gateColumn.data) {
-            return; // Already loaded
+            return;
         }
 
         // Check if column exists in columnIndex
         if (!this.dataStore.columnIndex[GATES_COLUMN_NAME]) {
-            return; // Column doesn't exist yet
+            return;
         }
 
         // Explicitly load the column data
         try {
             await loadColumn(this.dataStore.name, GATES_COLUMN_NAME);
-            // After loading, the gateColumn reference should now have data
             this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
         } catch (error) {
             console.error("Failed to load gates column data:", error);
         }
     }
 
+    /**
+     * Fetch the gates column if it exists, ensure the column data is loaded
+     * Else create a new column and add the column to datastore
+     */
     private initializeGateColumn() {
         const existingCol = this.dataStore.columnIndex[GATES_COLUMN_NAME];
         if (existingCol && existingCol.datatype === "multitext") {
             this.gateColumn = existingCol as LoadedDataColumn<"multitext">;
 
-            // CRITICAL: Ensure the column has data loaded
+            // Ensure the column has data loaded
             if (!this.gateColumn.data) {
-                // Column exists but data isn't loaded - this shouldn't happen for multitext
-                // but if it does, we need to wait for it to load
                 console.warn("Gates column exists but data is not loaded yet");
             }
 
+            //! Check if this is right
             // Ensure stringLength is set if missing
             if (typeof this.gateColumn.stringLength !== "number") {
                 // @ts-expect-error: Forcibly assign stringLength if not set
@@ -74,10 +82,8 @@ export class GateStore {
                 this.gateColumn.values = [];
             }
 
-            // If data isn't loaded, we'll load it asynchronously
-            // Don't block here, but ensure it gets loaded
             if (!this.gateColumn.data) {
-                // Load it asynchronously - don't await, but ensure it happens
+                // Load data asynchronously
                 this.ensureGateColumnDataLoaded().catch(console.error);
             }
         } else {
@@ -102,11 +108,15 @@ export class GateStore {
         }
     }
 
+    /**
+     * Get the gates saved in the dataStore.config or dataStore
+     * Ensure the gate column's data is loaded
+     * Update the gates column
+     */
     private async loadGatesFromConfig() {
         const savedGates = this.dataStore.config.gates || this.dataStore.gates;
         if (Array.isArray(savedGates)) {
             for (const gate of savedGates) {
-                // this.gates.set(gate.id, gate);
                 const clonedGate = {
                     ...gate,
                     geometry: JSON.parse(JSON.stringify(gate.geometry)),
@@ -114,14 +124,14 @@ export class GateStore {
                 this.gates.set(gate.id, clonedGate);
             }
         }
-        // Ensure column data is loaded before updating
-        await this.ensureGateColumnDataLoaded();
 
-        // Now try to update (will only work if required columns are loaded)
-        this.updateGatesColumnWhenReady().catch(console.error);
+        await this.updateGatesColumnWhenReady();
     }
 
-    private getValueIndex(gateName: string): number {
+    /**
+     * Utility function to get or add the value index from gate column for the given gate name
+     */
+    private getOrAddValueIndex(gateName: string): number {
         if (!this.gateColumn) {
             throw new Error("Gate column not initialized");
         }
@@ -137,6 +147,12 @@ export class GateStore {
         return index;
     }
 
+    /**
+     * Get the gate names for a given cell
+     *
+     * @param cellIndex - index of the cell in column's data array
+     * @returns array of strings with the gate names
+     */
     private getGateNamesForCell(cellIndex: number): string[] {
         if (!this.gateColumn || !this.gateColumn.stringLength) return [];
 
@@ -154,6 +170,12 @@ export class GateStore {
         return gateNames;
     }
 
+    /**
+     * Set the gate names for a given cell with the updated gate names
+     *
+     * @param cellIndex - index of the cell in the data array
+     * @param gateNames - updated gates names associated with the cell
+     */
     private setGateNamesForCell(cellIndex: number, gateNames: string[]) {
         if (!this.gateColumn || !this.gateColumn.stringLength) return;
 
@@ -167,11 +189,16 @@ export class GateStore {
         const sortedNames = [...gateNames].sort();
 
         for (let i = 0; i < maxValues; i++) {
-            const valueIndex = this.getValueIndex(sortedNames[i]);
+            const valueIndex = this.getOrAddValueIndex(sortedNames[i]);
             this.gateColumn.data[baseIndex + i] = valueIndex;
         }
     }
 
+    /**
+     * Ensure the gate column data is loaded
+     * Set the gate names as empty for all cells
+     * Recompute gates for the cells
+     */
     private async updateGateColumn() {
         if (!this.gateColumn) {
             return;
@@ -202,15 +229,19 @@ export class GateStore {
                 anyColumnsLoaded = true;
                 this.updateCellsWithGate(gate, true);
             }
-            // If columns aren't loaded yet, we'll update later when they are
         }
 
-        // Only notify if we actually updated something
+        // Only notify something was updated
         if (anyColumnsLoaded) {
             this.dataStore.dataChanged([GATES_COLUMN_NAME]);
         }
     }
 
+    /**
+     * Update the cells in the gate column with the given Gate
+     * Add the gate to the cells inside the selection if 'add' param is true
+     * Remove the gate from the cells if 'add' is false, if the cells had the gate stored
+     */
     private updateCellsWithGate(gate: Gate, add: boolean) {
         if (!this.gateColumn) return;
 
@@ -249,6 +280,12 @@ export class GateStore {
         }
     }
 
+    /**
+     * Add a new gate to gates array and update all cells in the selection with gate value
+     * Update the dataStore with the updated gates
+     *
+     * @param gate - Gate to be added
+     */
     async addGate(gate: Gate) {
         // Ensure column data is loaded
         await this.ensureGateColumnDataLoaded();
@@ -266,42 +303,38 @@ export class GateStore {
         }
     }
 
-    // removeGate(gateId: string) {
-    //     const gate = this.gates.get(gateId);
-    //     if (gate) {
-    //         this.updateCellsWithGate(gate, false);
-    //     }
-
-    //     this.gates.delete(gateId);
-    //     this.markDirty();
-
-    //     if (this.gateColumn) this.dataStore.dataChanged([GATES_COLUMN_NAME]);
-    // }
-
-    // updateGate(gateId: string, updates: Partial<Gate>) {
-    //     const gate = this.gates.get(gateId);
-    //     if (gate) {
-    //         this.gates.set(gateId, { ...gate, ...updates });
-    //         this.markDirty();
-    //     }
-    // }
-
+    /**
+     * Getter for the mobx computed gatesArray
+     * Deep clone the gates to avoid mutating mobx properties
+     */
     get gatesArray(): Gate[] {
-        // return Array.from(this.gates.values());
         return Array.from(this.gates.values()).map((gate) => ({
             ...gate,
             geometry: JSON.parse(JSON.stringify(gate.geometry)),
         }));
     }
 
+    /**
+     * Get gates for the columns
+     * @param xField - X Column field of chart
+     * @param yField - Y Column field of chart
+     * @returns - Gates present in the chart with the given x and y param fields
+     */
     getGatesForColumns(xField: string, yField: string): Gate[] {
         return this.gatesArray.filter((gate) => gate.columns[0] === xField && gate.columns[1] === yField);
     }
 
+    /**
+     * Check if gatesArray has the given gate name
+     */
     hasGateName(name: string): boolean {
         return this.gatesArray.some((gate) => gate.name === name);
     }
 
+    /**
+     * Update the gates column when it's loaded
+     * Ensure that the gates column and it's data is loaded before updating the column
+     */
     public async updateGatesColumnWhenReady() {
         if (this.gates.size > 0) {
             // Ensure column data is loaded first
@@ -319,6 +352,11 @@ export class GateStore {
         return names.filter((n) => n).join("; ");
     }
 
+    /**
+     * Updating the dataStore.config.gates and dataStore.gates with the updated gates
+     * Storing gates in dirtyMetadata for persistence
+     * Call the dataChanged function of dirtyColumns
+     */
     private markDirty() {
         const gatesArray = this.gatesArray;
         this.dataStore.config.gates = gatesArray;

@@ -16,7 +16,7 @@ import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
-import { useGateStore } from "../gates/useGateStore";
+import { useGateManager } from "../gates/useGateManager";
 import { computeCentroid } from "../gates/gateUtils";
 
 //todo this should be in a common place etc.
@@ -167,7 +167,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     // this is now somewhat able to render for "2d", pending further tweaks
     //! beware unproject from here is not what we want, should review
     const { scatterplotLayer, getTooltip } = scatterProps;
-    const gateStore = useGateStore();
+    const gateManager = useGateManager();
 
     const filterValue = useFilterArray();
 
@@ -254,7 +254,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }, [chartWidth, chartHeight, config.dimension, id]);
 
     // Gate labels layer - access gatesArray to ensure MobX reactivity
-    const allGates = gateStore.gatesArray;
+    const allGates = gateManager.gatesArray;
     const gateLabelsLayer = useMemo(() => {
         if (!cx || !cy || allGates.length === 0) return null;
         
@@ -359,9 +359,9 @@ const DeckScatter = observer(function DeckScatterComponent() {
         // useParamColumns() only returns when columns are loaded (it throws otherwise)
         // So if we get here, columns are ready
         if (cx && cy) {
-            gateStore.updateGatesColumnWhenReady().catch(console.error);
+            gateManager.updateGatesColumnWhenReady().catch(console.error);
         }
-    }, [cx, cy, gateStore]);
+    }, [cx, cy, gateManager]);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
     useEffect(() => {

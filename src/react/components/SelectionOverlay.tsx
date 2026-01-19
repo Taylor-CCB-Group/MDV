@@ -11,7 +11,7 @@ import { useSpatialLayers } from "../spatial_context";
 import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import GateNameDialog from "./GateNameDialog";
-import { useGateStore } from "../gates/useGateStore";
+import { useGateManager } from "../gates/useGateManager";
 import {
     DrawPolygonMode,
     DrawPolygonByDraggingMode,
@@ -140,7 +140,7 @@ const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButto
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
     const { setSelectionMode, selectionFeatureCollection } = selectionProps;
-    const gateStore = useGateStore();
+    const gateManager = useGateManager();
     const paramColumns = useParamColumns();
     const chart = useChart<DeckScatterConfig>();
     const [selectedTool, setSelectedToolX] = useState<Tool>("Pan");
@@ -175,7 +175,7 @@ export default observer(function SelectionOverlay() {
     }, [selectedTool, setSelectedTool]);
 
     const onSaveGate = useCallback((gateName: string) => {
-        if (gateStore.hasGateName(gateName)) {
+        if (gateManager.hasGateName(gateName)) {
             throw new Error('A gate with this name already exists');
         }
         
@@ -195,13 +195,13 @@ export default observer(function SelectionOverlay() {
         };
         
         // Add to gate store
-        gateStore.addGate(gate);
+        gateManager.addGate(gate);
         
         // Clear selection
         action(() => {
             chart.config.selectionFeatureCollection = getEmptyFeatureCollection();
         })();
-    }, [gateStore, paramColumns, selectionFeatureCollection, chart.config]);
+    }, [gateManager, paramColumns, selectionFeatureCollection, chart.config]);
     
     const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
     
