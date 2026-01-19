@@ -7,9 +7,8 @@ import {
     type Column,
     Editors,
     type GridOption,
-    type OnColumnsReorderedEventArgs,
-    type OnColumnsResizedEventArgs,
     type SlickgridReactInstance,
+    SlickEventHandler,
 } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { runInAction } from "mobx";
@@ -129,8 +128,9 @@ const useSlickGridReact = () => {
         if (!gridInstance) return;
         const grid = gridInstance.slickGrid;
         if (!grid) return;
+        const slickEventHandler = new SlickEventHandler();
 
-        const selectionHandler: any = grid.onSelectedRowsChanged.subscribe((_e, args) => {
+        slickEventHandler.subscribe(grid.onSelectedRowsChanged, (_e, args) => {
             const selectedRows = args.rows;
 
             if (selectedRows.length > 0) {
@@ -148,65 +148,79 @@ const useSlickGridReact = () => {
             }
         });
 
-        const sortHandler: any = grid.onSort.subscribe((_e, args) => {
+        slickEventHandler.subscribe(grid.onSort, (_e, args) => {
             if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
-                const columnId = args.sortCol.field as string;
-                const sortAsc = args.sortAsc as boolean;
+                const columnId = args.sortCol.field;
+                const sortAsc = args.sortAsc;
                 console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
                 runInAction(() => {
-                    config.sort = { columnId, ascending: sortAsc };
+                    // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
+                    // if not, then the type of config.sort.ascending should be optional.
+                    // casting `as bool` just means that we make the types lie.
+                    // It may seem like we don't reach this case because of `"sortAsc" in args` above - but technically,
+                    // this gets into fiddly "key-optional" vs "value-optional" distinction.
+                    // args.sortAsc could have a value of undefined - that's different from the key not being in the object in a meaningful way.
+                    // it shouldn't be treated the same as a false value, or typed as though it was and passed further down...
+                    if (sortAsc === undefined) {
+                        config.sort = undefined;
+                    } else {
+                        config.sort = { columnId, ascending: sortAsc };
+                    }
                 });
             }
         });
 
-        const headerMenuHandler = grid
-            .getPubSubService()
-            ?.subscribe("onHeaderMenuCommand", (event: { column: Column; command: string }) => {
-                const { column, command } = event;
-                // Remove Sort
-                if (command === "clear-sort") {
-                    console.log("Clear sort");
-                    runInAction(() => {
-                        config.sort = undefined;
-                    });
-                    // Sort Ascending
-                } else if (command === "sort-asc") {
-                    console.log("Sort Ascending");
-                    runInAction(() => {
-                        config.sort = { columnId: column.field, ascending: true };
-                    });
-                    // Sort Descending
-                } else if (command === "sort-desc") {
-                    console.log("Sort Descending");
-                    runInAction(() => {
-                        config.sort = { columnId: column.field, ascending: false };
-                    });
-                    // Find and replace
-                } else if (command === "find-replace") {
-                    console.log("Find and Replace");
-                    setSearchColumn(column.field);
-                    setIsFindReplaceOpen(true);
-                }
-            });
+        const pubSub = grid.getPubSubService();
+        if (!pubSub) {
+            // strong assertion acts as a type-guard
+            throw new Error("SlickGrid PubSubService undefined - this should be unreachable.");
+        }
+        // don't think we can use our slickEventHandler with pubSub
+        const headerMenuSubscription = pubSub.subscribe("onHeaderMenuCommand", (event: { column: Column; command: string; }) => {
+            const { column, command } = event;
+            // Remove Sort
+            if (command === "clear-sort") {
+                console.log("Clear sort");
+                runInAction(() => {
+                    config.sort = undefined;
+                });
+                // Sort Ascending
+            } else if (command === "sort-asc") {
+                console.log("Sort Ascending");
+                runInAction(() => {
+                    config.sort = { columnId: column.field, ascending: true };
+                });
+                // Sort Descending
+            } else if (command === "sort-desc") {
+                console.log("Sort Descending");
+                runInAction(() => {
+                    config.sort = { columnId: column.field, ascending: false };
+                });
+                // Find and replace
+            } else if (command === "find-replace") {
+                console.log("Find and Replace");
+                setSearchColumn(column.field);
+                setIsFindReplaceOpen(true);
+            }
+        });
 
-        const gridMenuHandler = grid
-            .getPubSubService()
-            ?.subscribe("onGridMenuCommand", ({ command }: { command: string }) => {
-                if (command === "clear-sorting") {
-                    console.log("Clear All sort");
-                    runInAction(() => {
-                        config.sort = undefined;
-                    });
-                }
-            });
-
-        const resizeHandler: any = grid.onColumnsResized?.subscribe((_e, args: OnColumnsResizedEventArgs) => {
+        const gridMenuSubscription = pubSub.subscribe("onGridMenuCommand", ({ command }: { command: string; }) => {
+            if (command === "clear-sorting") {
+                console.log("Clear All sort");
+                runInAction(() => {
+                    config.sort = undefined;
+                });
+            }
+        });
+        
+        
+        slickEventHandler.subscribe(grid.onColumnsResized, (_e, args) => {
             console.log("resize handler");
             const columns = args.grid.getColumns();
             runInAction(() => {
                 // Create a new reference of config.columnWidths
-                const columnWidths: Record<string, number> = config.column_widths ? {...config.column_widths} : {};
-                
+                const columnWidths: Record<string, number> = config.column_widths ? { ...config.column_widths } : {};
+
                 columns.forEach((col: Column) => {
                     if (col.width && col.width !== 100) {
                         columnWidths[col.field] = col.width;
@@ -215,18 +229,18 @@ const useSlickGridReact = () => {
                         delete columnWidths[col.field];
                     }
                 });
-                
+
                 // Change the reference of config.order for react to detect and update
                 config.column_widths = columnWidths;
             });
         });
 
-        const reorderHandler: any = grid.onColumnsReordered?.subscribe((_e, args: OnColumnsReorderedEventArgs) => {
+        slickEventHandler.subscribe(grid.onColumnsReordered, (_e, args) => {
             console.log("reorder handler");
             const impactedColumns = args.impactedColumns;
             runInAction(() => {
                 // Create a new reference of config.order
-                const newOrder = config.order ? {...config.order} : {};
+                const newOrder = config.order ? { ...config.order } : {};
                 const cols = impactedColumns.filter((col) => col.field !== "__index__");
                 cols.forEach((col, index) => {
                     newOrder[col.field] = index;
@@ -238,12 +252,9 @@ const useSlickGridReact = () => {
         });
 
         return () => {
-            grid.onSelectedRowsChanged.unsubscribe(selectionHandler);
-            grid.onSort.unsubscribe(sortHandler);
-            headerMenuHandler?.unsubscribe();
-            gridMenuHandler?.unsubscribe();
-            grid.onColumnsResized.unsubscribe(resizeHandler);
-            grid.onColumnsReordered.unsubscribe(reorderHandler);
+            slickEventHandler.unsubscribeAll();
+            headerMenuSubscription.unsubscribe?.();
+            gridMenuSubscription.unsubscribe?.();
         };
     }, [config, gridInstance]);
 
@@ -331,6 +342,10 @@ const useSlickGridReact = () => {
                 resizeDetection: "container",
                 autoHeight: true,
             },
+            resizeByContentOptions: {
+                // hack - seems somewhat closer to getting the right size here?
+                defaultRatioForStringType: 1.1,
+            },
             editable: true,
             enableCellNavigation: true,
             enableExcelCopyBuffer: true,
@@ -342,7 +357,7 @@ const useSlickGridReact = () => {
             headerMenu: {
                 hideColumnHideCommand: true, // Disabled to avoid messing with the column order
             },
-        }),
+        } satisfies GridOption), // helps with autocomplete for options
         [chartId, theme],
     );
 
