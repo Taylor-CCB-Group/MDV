@@ -43,24 +43,46 @@ const useSlickGridReact = () => {
     const columnDefs = useMemo<Column[]>(() => {
         const cols: Column[] = [];
 
+        // Get current column widths from grid if it exists, to preserve autosized widths
+        // that might not yet be saved to config.column_widths
+        let currentGridWidths: Record<string, number> | null = null;
+        const grid = gridRef.current?.slickGrid;
+        if (grid) {
+            try {
+                const gridColumns = grid.getColumns();
+                currentGridWidths = {};
+                for (const col of gridColumns) {
+                    if (col.width && col.width !== 100) {
+                        currentGridWidths[col.field] = col.width;
+                    }
+                }
+            } catch (e) {
+                // Grid might not be fully initialized, ignore
+                console.debug("Could not read current grid widths:", e);
+            }
+        }
+
         if (config.include_index) {
+            const indexWidth = currentGridWidths?.["__index__"] ?? config.column_widths?.["__index__"] ?? 100;
             cols.push({
                 id: "__index__",
                 field: "__index__",
                 name: "index",
                 sortable: true,
-                width: config.column_widths?.["__index__"] ?? 100,
+                width: indexWidth,
             });
         }
 
         for (const col of orderedParamColumns) {
             const isColumnEditable = col?.editable ?? false;
+            // Prefer current grid width (if exists) over saved config width, to preserve autosized widths
+            const colWidth = currentGridWidths?.[col.field] ?? config.column_widths?.[col.field] ?? 100;
             cols.push({
                 id: col.field,
                 field: col.field,
                 name: col.name,
                 sortable: true,
-                width: config.column_widths?.[col.field] ?? 100,
+                width: colWidth,
                 editor: isColumnEditable ? { model: Editors.text } : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
@@ -202,23 +224,51 @@ const useSlickGridReact = () => {
             }
         }));
 
-        slickEventHandler.subscribe(grid.onColumnsResized, action((_e, args) => {
-            const columns = args.grid.getColumns();
-            // Create a new reference of config.columnWidths
-            const columnWidths: Record<string, number> = config.column_widths ? { ...config.column_widths } : {};
+        // Subscribe to autosize event to capture autosized column widths.
+        // This ensures autosized widths are saved immediately when autosizing occurs.
+        slickEventHandler.subscribe(
+            grid.onAutosizeColumns,
+            action((_e, _args) => {
+                const columns = grid.getColumns();
+                const columnWidths: Record<string, number> = config.column_widths
+                    ? { ...config.column_widths }
+                    : {};
 
-            for (const col of columns) {
-                if (col.width && col.width !== 100) {
-                    columnWidths[col.field] = col.width;
-                } else if (columnWidths[col.field]) {
-                    // Remove if reset to default
-                    delete columnWidths[col.field];
+                for (const col of columns) {
+                    if (col.width && col.width !== 100) {
+                        // Save any non-default width (including autosized widths)
+                        columnWidths[col.field] = col.width;
+                    } else if (columnWidths[col.field]) {
+                        // Remove if reset to default
+                        delete columnWidths[col.field];
+                    }
                 }
-            }
 
-            // Change the reference of config.order for react to detect and update
-            config.column_widths = columnWidths;
-        }));
+                config.column_widths = columnWidths;
+            }),
+        );
+
+        slickEventHandler.subscribe(
+            grid.onColumnsResized,
+            action((_e, args) => {
+                // Save column widths when columns are resized (manually or via autosize)
+                // This handler captures both manual resizes and autosizes that trigger this event
+                const columns = args.grid.getColumns();
+                const columnWidths: Record<string, number> = config.column_widths
+                    ? { ...config.column_widths }
+                    : {};
+
+                for (const col of columns) {
+                    if (col.width && col.width !== 100) {
+                        columnWidths[col.field] = col.width;
+                    } else if (columnWidths[col.field]) {
+                        delete columnWidths[col.field];
+                    }
+                }
+
+                config.column_widths = columnWidths;
+            }),
+        );
 
         slickEventHandler.subscribe(grid.onColumnsReordered, action((_e, args) => {
             const impactedColumns = args.impactedColumns;
