@@ -89,6 +89,11 @@ class SlickGridDataProvider {
     }
 
     // Avoid calling the default methods for sorting and filtering
+    // We do sorting separately with useSortedFilteredIndices, which observes config.sort/filter state 
+    // and returns array...
+    // This circumvention of SlickGrid's own state does mean that we need to be careful to synchronise
+    // for example, so that appropriate visual feedback appears when deserialising.
+    // This is liable to something of an ongoing maintenance issue.
     sort() {}
 
     reSort() {}
