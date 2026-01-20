@@ -2,8 +2,8 @@
 import argparse
 import sys
 import os
-import json
-from typing import List, Dict, Union
+from pathlib import Path
+from typing import Dict, Union
 
 # Add the parent directory to sys.path to import mdvtools modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -60,47 +60,60 @@ def assign_permissions(user_email: str, project_name: str, permission: str):
         print(f"Error assigning permissions: {str(e)}")
         return False
 
-def batch_assign_from_file(file_path: str):
+def batch_assign_from_text(file_path: str) -> bool:
     """
-    Batch assign permissions from a JSON file.
-    Expected format:
-    {
-        "assignments": [
-            {
-                "email": "user@example.com",
-                "projects": [
-                    {"name": "project1", "permission": "view"},
-                    {"name": "project2", "permission": "edit"}
-                ]
-            }
-        ]
-    }
+    Batch assign permissions from a plain text file.
+
+    Accepted line formats (comments and empty lines are ignored):
+        project_name,email,permission
+        project_name email permission
     """
-    try:
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-    except Exception as e:
-        print(f"Error reading file: {str(e)}")
+    path = Path(file_path)
+    if not path.exists():
+        print(f"Error: file not found: {file_path}")
         return False
 
+    with path.open(encoding="utf-8") as f:
+        lines = [
+            line.strip()
+            for line in f
+            if line.strip() and not line.strip().startswith("#")
+        ]
+
+    if not lines:
+        print("No assignments found in file.")
+        return False
+
+    allowed_perms = {"view", "edit", "owner"}
     success = True
-    for assignment in data.get('assignments', []):
-        email = assignment.get('email')
-        if not email:
-            print("Error: Missing email in assignment")
+
+    for idx, line in enumerate(lines, start=1):
+        # Support comma-separated or whitespace-separated
+        if "," in line:
+            parts = [p.strip() for p in line.split(",")]
+        else:
+            parts = line.split()
+
+        if len(parts) != 3:
+            print(
+                f"Line {idx}: invalid format. Expected 'project_name,email,permission' "
+                f"or 'project_name email permission', got: {line}"
+            )
             success = False
             continue
 
-        for project in assignment.get('projects', []):
-            project_name = project.get('name')
-            permission = project.get('permission')
-            if not project_name or not permission:
-                print(f"Error: Missing project name or permission for {email}")
-                success = False
-                continue
+        project_name, email, permission = parts
 
-            if not assign_permissions(email, project_name, permission):
-                success = False
+        if permission not in allowed_perms:
+            print(
+                f"Line {idx}: invalid permission '{permission}'. "
+                f"Must be one of: view, edit, owner."
+            )
+            success = False
+            continue
+
+        if not assign_permissions(email, project_name, permission):
+            success = False
 
     return success
 
@@ -117,9 +130,13 @@ def main():
     assign_parser.add_argument('--permission', required=True, choices=['view', 'edit', 'owner'], 
                              help='Permission level')
     
-    # Batch assignment command
-    batch_parser = subparsers.add_parser('batch', help='Batch assign permissions from a JSON file')
-    batch_parser.add_argument('--file', required=True, help='Path to JSON file with assignments')
+    # Batch assignment command (text only)
+    batch_txt_parser = subparsers.add_parser(
+        'batch_txt',
+        help='Batch assign permissions from a plain text file '
+             '(lines: project_name,email,permission or project_name email permission)',
+    )
+    batch_txt_parser.add_argument('--file', required=True, help='Path to text file with assignments')
 
     args = parser.parse_args()
 
@@ -127,8 +144,8 @@ def main():
     with app.app_context():
         if args.command == 'assign':
             success = assign_permissions(args.email, args.project, args.permission)
-        elif args.command == 'batch':
-            success = batch_assign_from_file(args.file)
+        elif args.command == 'batch_txt':
+            success = batch_assign_from_text(args.file)
         else:
             parser.print_help()
             sys.exit(1)

@@ -1,4 +1,10 @@
+import secrets
+import string
+import sys
+from pathlib import Path
+
 import requests
+
 
 def get_management_api_token(domain, client_id, client_secret):
     url = f"https://{domain}/oauth/token"
@@ -6,36 +12,81 @@ def get_management_api_token(domain, client_id, client_secret):
         "grant_type": "client_credentials",
         "client_id": client_id,
         "client_secret": client_secret,
-        "audience": f"https://{domain}/api/v2/"
+        "audience": f"https://{domain}/api/v2/",
     }
     headers = {"Content-Type": "application/json"}
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
     return response.json()["access_token"]
 
-def send_invitation(email, connection_id, management_api_token, domain, redirect_url=None):
+
+def get_users_by_email(domain, management_api_token, email):
     """
-    Send an Auth0 invitation.
+    Look up existing Auth0 users by email.
     """
-    url = f'https://{domain}/api/v2/tickets/password-change'
+    url = f"https://{domain}/api/v2/users-by-email"
     headers = {
         "Authorization": f"Bearer {management_api_token}",
         "Content-Type": "application/json",
     }
-    data = {
-        "email": email,
-        "connection_id": connection_id,
+    params = {"email": email}
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+    return response.json()
+
+
+def create_user(
+    domain,
+    management_api_token,
+    connection,
+    email,
+    password=None,
+    username=None,
+    user_metadata=None,
+):
+    """
+    Create a new Auth0 database user.
+
+    NOTE: `connection` is the *name* of the database connection
+    (e.g. "Username-Password-Authentication"), not the connection_id.
+    """
+    url = f"https://{domain}/api/v2/users"
+    headers = {
+        "Authorization": f"Bearer {management_api_token}",
+        "Content-Type": "application/json",
     }
-    if redirect_url:
-        data["result_url"] = redirect_url
+    data = {"connection": connection, "email": email}
+    if password:
+        data["password"] = password
+    if username:
+        data["username"] = username
+    if user_metadata:
+        data["user_metadata"] = user_metadata
 
     response = requests.post(url, json=data, headers=headers)
     response.raise_for_status()
-    return response.json()["ticket"]
+    return response.json()
 
-def automate_invitations(domain, client_id, client_secret, connection_id, users, redirect_url=None):
+
+def generate_random_password(length=16):
     """
-    Automate sending invitations for a list of whitelisted users.
+    Generate a random password that respects typical Auth0 DB constraints.
+
+    Adjust the length/character set if you have stricter password rules.
+    """
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def upsert_users(domain, client_id, client_secret, connection, users):
+    """
+    For each user email:
+      1. Check if a user already exists in Auth0.
+      2. If not, create the user in the specified database connection with
+         a random password and optional username.
+
+    This does NOT send password-reset or invitation emails. Users can later
+    reset their passwords via your normal "forgot password" flow.
     """
     # Get API token
     token = get_management_api_token(domain, client_id, client_secret)
@@ -43,24 +94,123 @@ def automate_invitations(domain, client_id, client_secret, connection_id, users,
     for user in users:
         try:
             email = user.get("email")
-            print(f"Sending invitation to {email}...")
-            ticket = send_invitation(email, connection_id, token, domain, redirect_url)
-            print(f"Invitation sent to {email}: {ticket}")
+            if not email:
+                print("Skipping user with no email:", user)
+                continue
+
+            # Optional username if your DB connection requires it
+            username = user.get("username")
+
+            # Either use provided password or generate one
+            password = user.get("password") or generate_random_password()
+            user_metadata = user.get("user_metadata")
+
+            existing = get_users_by_email(domain, token, email)
+
+            # Check if user already has an identity in the target connection only
+            user_in_target_connection = False
+            for u in existing:
+                for ident in u.get("identities", []):
+                    if ident.get("connection") == connection:
+                        user_in_target_connection = True
+                        break
+                if user_in_target_connection:
+                    break
+
+            if user_in_target_connection:
+                print(f"User {email} already exists in connection '{connection}'.")
+                continue
+
+            print(f"Creating user {email} in connection '{connection}'...")
+            created = create_user(
+                domain,
+                token,
+                connection=connection,
+                email=email,
+                password=password,
+                username=username,
+                user_metadata=user_metadata,
+            )
+            print(f"Created user {email} with id {created.get('user_id')}")
+
         except Exception as e:
-            print(f"Failed to send invitation to {email}: {e}")
+            print(f"Failed to process {user}: {e}")
 
-# Usage example
+
 if __name__ == "__main__":
-    DOMAIN = "" 
-    CLIENT_ID = ""
-    CLIENT_SECRET = ""
-    CONNECTION_ID = ""
-    REDIRECT_URL = "https://mdv.com/login" 
-    # Example whitelist of users
-    WHITELISTED_USERS = [
-        {"email": "user1@example.com"},
-        {"email": "user2@example.com"},
-        {"email": "user3@example.com"},
-    ]
+    if len(sys.argv) < 2:
+        print("Usage: python auth_invitation <path-to-text-config-file>")
+        print(
+            "Supported formats:\n"
+            "  - TXT where the first non-empty lines define:\n"
+            "        domain=...\n"
+            "        client_id=...\n"
+            "        client_secret=...\n"
+            "        connection=...\n"
+            "    followed by lines of:\n"
+            "        email\n"
+            "      or email,username\n"
+            "      or email username"
+        )
+        sys.exit(1)
 
-    automate_invitations(DOMAIN, CLIENT_ID, CLIENT_SECRET, CONNECTION_ID, WHITELISTED_USERS, REDIRECT_URL)
+    config_path = Path(sys.argv[1])
+    if not config_path.exists():
+        print(f"Config file not found: {config_path}")
+        sys.exit(1)
+
+    DOMAIN = CLIENT_ID = CLIENT_SECRET = CONNECTION = ""
+    WHITELISTED_USERS = []
+
+    # TXT mode only: key=value config, then list of emails (optionally with username).
+    with config_path.open(encoding="utf-8") as f:
+        lines = [
+            line.strip()
+            for line in f
+            if line.strip() and not line.strip().startswith("#")
+        ]
+
+    cfg = {}
+    users_start_index = 0
+    for i, line in enumerate(lines):
+        if "=" in line and any(
+            line.lower().startswith(k + "=")
+            for k in ("domain", "client_id", "client_secret", "connection")
+        ):
+            key, value = line.split("=", 1)
+            cfg[key.strip().lower()] = value.strip()
+            users_start_index = i + 1
+        else:
+            # First non-config line marks the start of user entries.
+            users_start_index = i
+            break
+
+    for key in ("domain", "client_id", "client_secret", "connection"):
+        if key not in cfg:
+            print(f"Missing required config '{key}' in text file.")
+            sys.exit(1)
+
+    DOMAIN = cfg["domain"]
+    CLIENT_ID = cfg["client_id"]
+    CLIENT_SECRET = cfg["client_secret"]
+    CONNECTION = cfg["connection"]
+
+    for line in lines[users_start_index:]:
+        # support: email, email,username, or email username
+        if "," in line:
+            parts = [p.strip() for p in line.split(",", 1)]
+        else:
+            parts = line.split()
+        if not parts:
+            continue
+        email = parts[0]
+        if not email:
+            continue
+        user = {"email": email}
+        if len(parts) > 1:
+            username = parts[1].strip()
+            if username:
+                user["username"] = username
+        WHITELISTED_USERS.append(user)
+
+    upsert_users(DOMAIN, CLIENT_ID, CLIENT_SECRET, CONNECTION, WHITELISTED_USERS)
