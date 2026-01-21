@@ -53,8 +53,6 @@ const useSlickGridReact = () => {
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices);
     const orderedParamColumnsRef = useRef(orderedParamColumns);
-    const dataStoreRef = useRef(dataStore);
-    const chartRef = useRef(chart);
     const selectionSourceRef = useRef<'user' | 'programmatic' | null>(null); // Track source of selection changes
     const gridRef = useRef<SlickgridReactInstance | null>(null);
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
@@ -62,9 +60,7 @@ const useSlickGridReact = () => {
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
-        dataStoreRef.current = dataStore;
-        chartRef.current = chart;
-    }, [sortedFilteredIndices, dataStore, chart, orderedParamColumns]);
+    }, [sortedFilteredIndices, orderedParamColumns]);
 
     // Extract initial widths from config once (non-observable)
     // This avoids rules-of-hooks issues and prevents columnDefs from reacting to config.column_widths changes
@@ -194,7 +190,7 @@ const useSlickGridReact = () => {
             if (selectedRows.length > 0) {
                 selectionSourceRef.current = 'user';
                 const indices = selectedRows.map((row) => sortedFilteredIndicesRef.current[row]);
-                dataStoreRef.current.dataHighlighted(indices, chartRef.current);
+                dataStore.dataHighlighted(indices, chart);
                 // Reset immediately - the effect will handle any needed updates
                 selectionSourceRef.current = null;
             }
@@ -275,7 +271,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, gridInstance]);
+    }, [config, gridInstance, dataStore, chart]);
 
     // Sync config.sort → grid visual state
     useEffect(() => {
