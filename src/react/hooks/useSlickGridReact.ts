@@ -8,6 +8,32 @@ import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { action } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
+/**
+ * Hook for managing SlickGrid React component state.
+ * 
+ * State Management Contract:
+ * 
+ * 1. Config Object (MobX Observable):
+ *    - The config object is deeply observable via MobX (made observable in BaseChart constructor)
+ *    - All config properties should exist before makeAutoObservable is called (handled in adaptConfig)
+ *    - Config properties are the source of truth for persisted state (column_widths, sort, order, etc.)
+ * 
+ * 2. Column Widths State Management:
+ *    - config.column_widths is used ONLY for initial column widths when creating columnDefs
+ *    - After grid is created, grid manages widths internally
+ *    - columnDefs does NOT depend on config.column_widths (removed from dependencies)
+ *    - getConfig() serializes current grid widths to config for persistence
+ *    - No runtime synchronization needed - grid is authoritative during runtime
+ * 
+ * 3. Sort State Management:
+ *    - suppressSortSyncRef prevents feedback loops
+ *    - Config.sort is the source of truth, synced bidirectionally with grid visual state
+ * 
+ * 4. Event Handler Lifecycle:
+ *    - Event handlers are attached in a useEffect that depends on [config, gridInstance]
+ *    - Handlers update config properties for persistence
+ *    - Suppression flags (only for sort) prevent reactive recalculation during operations
+ */
 const useSlickGridReact = () => {
     // Hooks
     const config = useConfig<TableChartReactConfig>();
@@ -40,43 +66,42 @@ const useSlickGridReact = () => {
         chartRef.current = chart;
     }, [sortedFilteredIndices, dataStore, chart, orderedParamColumns]);
 
+    // Extract initial widths from config once (non-observable)
+    // This avoids rules-of-hooks issues and prevents columnDefs from reacting to config.column_widths changes
+    // We read config.column_widths only once on mount to get initial values
+    const initialWidths = useMemo(() => {
+        return config.column_widths ? { ...config.column_widths } : {};
+        // we don't expect this to re-run, nothing should be touching `column_widths` at runtime.
+        // keeping in dependency array to satisfy lint.
+    }, [config.column_widths]);
+
+    /**
+     * Column definitions for SlickGrid.
+     * 
+     * State Management Contract:
+     * - Uses initialWidths (extracted from config.column_widths on mount) ONLY for initial column widths
+     * - After grid is created, grid manages widths internally
+     * - getConfig() serializes current grid widths to config for persistence
+     * - No runtime synchronization - grid is authoritative during runtime
+     */
     const columnDefs = useMemo<Column[]>(() => {
         const cols: Column[] = [];
 
-        // Get current column widths from grid if it exists, to preserve autosized widths
-        // that might not yet be saved to config.column_widths
-        let currentGridWidths: Record<string, number> | null = null;
-        const grid = gridRef.current?.slickGrid;
-        if (grid) {
-            try {
-                const gridColumns = grid.getColumns();
-                currentGridWidths = {};
-                for (const col of gridColumns) {
-                    if (col.width && col.width !== 100) {
-                        currentGridWidths[col.field] = col.width;
-                    }
-                }
-            } catch (e) {
-                // Grid might not be fully initialized, ignore
-                console.debug("Could not read current grid widths:", e);
-            }
-        }
-
         if (config.include_index) {
-            const indexWidth = currentGridWidths?.["__index__"] ?? config.column_widths?.["__index__"] ?? 100;
+            const indexWidth = initialWidths["__index__"] ?? 100;
             cols.push({
                 id: "__index__",
                 field: "__index__",
                 name: "index",
                 sortable: true,
                 width: indexWidth,
+                reorderable: false,
             });
         }
 
         for (const col of orderedParamColumns) {
             const isColumnEditable = col?.editable ?? false;
-            // Prefer current grid width (if exists) over saved config width, to preserve autosized widths
-            const colWidth = currentGridWidths?.[col.field] ?? config.column_widths?.[col.field] ?? 100;
+            const colWidth = initialWidths[col.field] ?? 100;
             cols.push({
                 id: col.field,
                 field: col.field,
@@ -100,7 +125,7 @@ const useSlickGridReact = () => {
         }
 
         return cols;
-    }, [config.include_index, config.column_widths, orderedParamColumns]);
+    }, [config.include_index, orderedParamColumns, initialWidths]);
 
     const dataProvider = useMemo(() => {
         return new SlickGridDataProvider(orderedParamColumns, sortedFilteredIndices, config.include_index);
@@ -129,6 +154,9 @@ const useSlickGridReact = () => {
         (e: CustomEvent<SlickgridReactInstance>) => {
             console.log("Grid created");
             gridRef.current = e.detail;
+            
+            // Store gridRef in chart instance for getConfig() access
+            (chart as any).gridRef = gridRef;
 
             setGridInstance(e.detail);
             const grid = e.detail.slickGrid;
@@ -144,7 +172,7 @@ const useSlickGridReact = () => {
                 }
             }
         },
-        [dataProvider, config.sort],
+        [dataProvider, config.sort, chart],
     );
 
     useEffect(() => {
@@ -223,52 +251,6 @@ const useSlickGridReact = () => {
                 config.sort = undefined;
             }
         }));
-
-        // Subscribe to autosize event to capture autosized column widths.
-        // This ensures autosized widths are saved immediately when autosizing occurs.
-        slickEventHandler.subscribe(
-            grid.onAutosizeColumns,
-            action((_e, _args) => {
-                const columns = grid.getColumns();
-                const columnWidths: Record<string, number> = config.column_widths
-                    ? { ...config.column_widths }
-                    : {};
-
-                for (const col of columns) {
-                    if (col.width && col.width !== 100) {
-                        // Save any non-default width (including autosized widths)
-                        columnWidths[col.field] = col.width;
-                    } else if (columnWidths[col.field]) {
-                        // Remove if reset to default
-                        delete columnWidths[col.field];
-                    }
-                }
-
-                config.column_widths = columnWidths;
-            }),
-        );
-
-        slickEventHandler.subscribe(
-            grid.onColumnsResized,
-            action((_e, args) => {
-                // Save column widths when columns are resized (manually or via autosize)
-                // This handler captures both manual resizes and autosizes that trigger this event
-                const columns = args.grid.getColumns();
-                const columnWidths: Record<string, number> = config.column_widths
-                    ? { ...config.column_widths }
-                    : {};
-
-                for (const col of columns) {
-                    if (col.width && col.width !== 100) {
-                        columnWidths[col.field] = col.width;
-                    } else if (columnWidths[col.field]) {
-                        delete columnWidths[col.field];
-                    }
-                }
-
-                config.column_widths = columnWidths;
-            }),
-        );
 
         slickEventHandler.subscribe(grid.onColumnsReordered, action((_e, args) => {
             const impactedColumns = args.impactedColumns;
