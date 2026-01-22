@@ -11,10 +11,12 @@ Usage (with active mdv environment):
 import argparse
 import os
 import sys
+import inspect
 
 import scanpy as sc
 from mdvtools.tests.mock_anndata import create_minimal_anndata
 from mdvtools.conversions import convert_scanpy_to_mdv
+from xarray.util.deprecation_helpers import POSITIONAL_ONLY
 
 
 def main():
@@ -96,18 +98,24 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
         print(f"Loading scanpy dataset: {dataset}...")
         
         # Dynamically get all available datasets from sc.datasets
+        # notwithstanding ebi_expression_atlas or anything else which might need any arguments
         dataset_loaders = {
-            name: getattr(sc.datasets, name)
+            name: loader
             for name in dir(sc.datasets)
-            if not name.startswith('_') and callable(getattr(sc.datasets, name, None))
+            if not name.startswith('_')
+            and callable(loader := getattr(sc.datasets, name, None))
+            and not any(
+                p.default is p.empty and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+                for p in inspect.signature(loader).parameters.values()
+            )
         }
-        
         if dataset not in dataset_loaders:
             available = ', '.join(sorted(dataset_loaders.keys()))
             print(f"Error: Unknown dataset '{dataset}'. Available: {available}")
             sys.exit(1)
         
         adata = dataset_loaders[dataset]()
+        assert(isinstance(adata, sc.AnnData))
     
     print(f"AnnData: {adata.n_obs:,} cells x {adata.n_vars:,} genes")
     
