@@ -16,7 +16,6 @@ import inspect
 import scanpy as sc
 from mdvtools.tests.mock_anndata import create_minimal_anndata
 from mdvtools.conversions import convert_scanpy_to_mdv
-from xarray.util.deprecation_helpers import POSITIONAL_ONLY
 
 
 def main():
