@@ -104,7 +104,7 @@ test.describe('Chart Creation', () => {
     });
 
     test('Word Cloud', async () => {
-        await addChartAndAssert(page, 'Word Cloud', 'row_chart');
+        await addChartAndAssert(page, 'Word Cloud', 'wordcloud');
     });
 
     test('Dot Plot', async () => {
