@@ -17,7 +17,6 @@ import json
 from typing import List, Dict, Tuple, Optional, Any, Union
 from datetime import datetime
 
-from mdvtools.dbutils.mdv_server_app import app, is_valid_mdv_project
 from mdvtools.dbutils.dbmodels import db, Project, File, UserProject
 from mdvtools.logging_config import get_logger
 
@@ -73,6 +72,7 @@ def list_orphaned_projects(app) -> List[Tuple[str, str]]:
     Returns:
         List of tuples (project_path, project_name) for orphaned projects
     """
+    from mdvtools.dbutils.mdv_server_app import app, is_valid_mdv_project
     orphaned = []
     
     with app.app_context():
@@ -933,6 +933,9 @@ Examples:
                         help='Filter projects by name pattern (supports * and %% wildcards)')
     
     args = parser.parse_args()
+    # lazily import app so we if the args are wrong we can quickly feed back to user without waiting and printing spurious logs
+    from mdvtools.dbutils.mdv_server_app import app
+
     
     # Ensure app is available
     if app is None:
