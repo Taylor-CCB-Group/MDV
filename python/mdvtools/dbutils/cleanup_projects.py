@@ -19,7 +19,6 @@ from datetime import datetime
 
 from mdvtools.dbutils.mdv_server_app import app, is_valid_mdv_project
 from mdvtools.dbutils.dbmodels import db, Project, File, UserProject
-from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -38,6 +37,30 @@ def list_deleted_projects(app) -> List[Project]:
     with app.app_context():
         deleted_projects = Project.query.filter(Project.is_deleted == True).all()
         return deleted_projects
+
+
+def list_projects_by_name_pattern(app, pattern: str) -> List[Project]:
+    """
+    Find all projects whose name matches the given pattern.
+    
+    Supports SQL LIKE wildcards (% for multiple chars, _ for single char).
+    Also converts shell-style wildcards (* and ?) to SQL LIKE format.
+    
+    Args:
+        app: Flask application instance
+        pattern: Name pattern to match (e.g., "pbmc3k%", "*test*")
+        
+    Returns:
+        List of Project objects matching the pattern
+    """
+    with app.app_context():
+        # Convert shell-style wildcards to SQL LIKE wildcards
+        sql_pattern = pattern.replace('*', '%').replace('?', '_')
+        
+        # Query projects matching the pattern
+        projects = Project.query.filter(Project.name.like(sql_pattern)).all()
+        logger.info(f"Found {len(projects)} projects matching pattern '{pattern}'")
+        return projects
 
 
 def list_orphaned_projects(app) -> List[Tuple[str, str]]:
@@ -78,6 +101,41 @@ def list_orphaned_projects(app) -> List[Tuple[str, str]]:
             logger.error(f"Error scanning base directory {base_dir}: {e}")
     
     return orphaned
+
+
+def list_test_generated_projects(app) -> List[Project]:
+    """
+    Find all projects that have test generation provenance in state.json.
+    
+    Args:
+        app: Flask application instance
+        
+    Returns:
+        List of Project objects with test generation provenance
+    """
+    test_projects = []
+    
+    with app.app_context():
+        all_projects = Project.query.all()
+        
+        for project in all_projects:
+            state_file = os.path.join(project.path, "state.json")
+            
+            if os.path.exists(state_file):
+                try:
+                    with open(state_file, 'r') as f:
+                        state = json.load(f)
+                        # Check if provenance metadata exists
+                        if "provenance" in state:
+                            test_projects.append(project)
+                            logger.debug(f"Found test-generated project: {project.id} ({project.name})")
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.warning(f"Error reading state.json for project {project.id} ({project.name}): {e}")
+            else:
+                logger.debug(f"No state.json found for project {project.id} at {project.path}")
+    
+    logger.info(f"Found {len(test_projects)} test-generated projects")
+    return test_projects
 
 
 def list_empty_datasource_projects(app) -> List[Project]:
@@ -378,6 +436,47 @@ def print_project_list(projects: List[Project], title: str):
             except:
                 print(f"   Datasources: Error reading file")
         
+        # Try to get provenance metadata from state.json
+        state_file = os.path.join(project.path, "state.json")
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, 'r') as f:
+                    state = json.load(f)
+                    if "provenance" in state:
+                        prov = state["provenance"]
+                        # Format provenance info compactly
+                        source = prov.get("source", "unknown")
+                        created_by = prov.get("created_by", "unknown")
+                        created_at = prov.get("created_at", "unknown")
+                        
+                        # Build parameter string
+                        params = prov.get("parameters", {})
+                        param_parts = []
+                        if "dataset" in params and params["dataset"]:
+                            param_parts.append(f"dataset={params['dataset']}")
+                        if "n_cells" in params:
+                            param_parts.append(f"{params['n_cells']:,} cells")
+                        if "n_genes" in params:
+                            param_parts.append(f"{params['n_genes']:,} genes")
+                        
+                        param_str = ", ".join(param_parts) if param_parts else ""
+                        prov_str = f"{created_by} ({source}"
+                        if param_str:
+                            prov_str += f", {param_str}"
+                        prov_str += ")"
+                        
+                        print(f"   Provenance: {prov_str}")
+                        if created_at != "unknown":
+                            # Try to parse and format datetime
+                            try:
+                                from datetime import datetime as dt
+                                created_dt = dt.fromisoformat(created_at.replace('Z', '+00:00'))
+                                print(f"   Created: {created_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                            except:
+                                print(f"   Created: {created_at}")
+            except (json.JSONDecodeError, IOError):
+                pass  # Silently skip if can't read state.json
+        
         print()
 
 
@@ -510,12 +609,16 @@ Examples:
                         help='List projects with empty datasources')
     parser.add_argument('--list-orphaned', action='store_true',
                         help='List projects that exist in filesystem but not in database')
+    parser.add_argument('--list-test-generated', action='store_true',
+                        help='List projects with test generation provenance metadata')
     parser.add_argument('--purge-deleted', action='store_true',
                         help='Remove deleted projects from filesystem and database')
     parser.add_argument('--purge-empty-datasources', action='store_true',
                         help='Delete projects with empty datasources')
     parser.add_argument('--purge-orphaned', action='store_true',
                         help='Remove orphaned project directories from filesystem')
+    parser.add_argument('--delete-and-purge', action='store_true',
+                        help='Delete and purge projects in one step (use with --filter-name or --list-test-generated)')
     
     # Options
     parser.add_argument('--hard-delete', action='store_true',
@@ -525,6 +628,10 @@ Examples:
     parser.add_argument('--confirm', action='store_true',
                         help='Skip confirmation prompts (use with caution)')
     
+    # Filters
+    parser.add_argument('--filter-name', type=str, metavar='PATTERN',
+                        help='Filter projects by name pattern (supports * and %% wildcards)')
+    
     args = parser.parse_args()
     
     # Ensure app is available
@@ -533,33 +640,122 @@ Examples:
         sys.exit(1)
     
     # Check that at least one operation is specified
-    if not any([args.list_deleted, args.list_empty, args.list_orphaned, 
-                args.purge_deleted, args.purge_empty_datasources, args.purge_orphaned]):
+    if not any([args.list_deleted, args.list_empty, args.list_orphaned, args.list_test_generated,
+                args.purge_deleted, args.purge_empty_datasources, args.purge_orphaned, args.delete_and_purge]):
         parser.print_help()
+        sys.exit(1)
+    
+    # Validate delete-and-purge requires a filter
+    if args.delete_and_purge and not (args.filter_name or args.list_test_generated):
+        print("Error: --delete-and-purge requires either --filter-name or --list-test-generated for safety")
+        print("This prevents accidentally deleting all projects.")
         sys.exit(1)
     
     # Execute operations
     try:
+        # Helper function to apply name filter
+        def apply_name_filter(projects: List[Project]) -> List[Project]:
+            if args.filter_name:
+                name_filtered = list_projects_by_name_pattern(app, args.filter_name)
+                # Get intersection of projects
+                name_filtered_ids = {p.id for p in name_filtered}
+                return [p for p in projects if p.id in name_filtered_ids]
+            return projects
+        
         if args.list_deleted:
             projects = list_deleted_projects(app)
-            print_project_list(projects, "DELETED PROJECTS")
+            projects = apply_name_filter(projects)
+            title = "DELETED PROJECTS" + (f" (filtered by name: {args.filter_name})" if args.filter_name else "")
+            print_project_list(projects, title)
         
         if args.list_empty:
             projects = list_empty_datasource_projects(app)
-            print_project_list(projects, "PROJECTS WITH EMPTY DATASOURCES")
+            projects = apply_name_filter(projects)
+            title = "PROJECTS WITH EMPTY DATASOURCES" + (f" (filtered by name: {args.filter_name})" if args.filter_name else "")
+            print_project_list(projects, title)
         
         if args.list_orphaned:
             orphaned = list_orphaned_projects(app)
-            print_orphaned_project_list(orphaned, "ORPHANED PROJECTS (Filesystem Only)")
+            # For orphaned projects, we can't filter by name in the same way since they're tuples
+            # but we can filter by the name part of the tuple
+            if args.filter_name:
+                sql_pattern = args.filter_name.replace('*', '%').replace('?', '_')
+                # Convert SQL LIKE pattern to Python regex for simple matching
+                import re
+                regex_pattern = sql_pattern.replace('%', '.*').replace('_', '.')
+                orphaned = [(path, name) for path, name in orphaned if re.match(regex_pattern, name)]
+                title = f"ORPHANED PROJECTS (Filesystem Only) (filtered by name: {args.filter_name})"
+            else:
+                title = "ORPHANED PROJECTS (Filesystem Only)"
+            print_orphaned_project_list(orphaned, title)
+        
+        if args.list_test_generated:
+            projects = list_test_generated_projects(app)
+            projects = apply_name_filter(projects)
+            title = "TEST-GENERATED PROJECTS" + (f" (filtered by name: {args.filter_name})" if args.filter_name else "")
+            print_project_list(projects, title)
         
         if args.purge_deleted:
+            # Apply name filter if specified
+            if args.filter_name:
+                logger.info(f"Applying name filter: {args.filter_name}")
+            
             if not args.dry_run and not args.confirm:
-                if not confirm_action("⚠️  This will PERMANENTLY DELETE projects from filesystem and database. Continue?"):
+                filter_msg = f" matching '{args.filter_name}'" if args.filter_name else ""
+                if not confirm_action(f"⚠️  This will PERMANENTLY DELETE{filter_msg} projects from filesystem and database. Continue?"):
                     print("Operation cancelled.")
                     sys.exit(0)
             
-            results = purge_deleted_projects(app, dry_run=args.dry_run)
-            print_results(results, "PURGE DELETED PROJECTS")
+            # Get deleted projects and apply filter
+            with app.app_context():
+                projects_to_purge = list_deleted_projects(app)
+                projects_to_purge = apply_name_filter(projects_to_purge)
+                
+                # Create a modified version of purge that works with filtered list
+                results = {
+                    'total': len(projects_to_purge),
+                    'filesystem_removed': 0,
+                    'database_removed': 0,
+                    'errors': []
+                }
+                
+                if args.dry_run:
+                    logger.info(f"[DRY RUN] Would purge {len(projects_to_purge)} deleted projects")
+                else:
+                    for project in projects_to_purge:
+                        project_id = project.id
+                        project_name = project.name
+                        project_path = project.path
+                        
+                        logger.info(f"Processing project {project_id}: {project_name}")
+                        
+                        # Remove from filesystem
+                        if os.path.exists(project_path):
+                            try:
+                                if os.path.isdir(project_path):
+                                    shutil.rmtree(project_path)
+                                    logger.info(f"  ✓ Removed directory: {project_path}")
+                                    results['filesystem_removed'] += 1
+                                else:
+                                    os.remove(project_path)
+                                    logger.info(f"  ✓ Removed file: {project_path}")
+                                    results['filesystem_removed'] += 1
+                            except Exception as e:
+                                error_msg = f"Error removing filesystem path: {e}"
+                                logger.error(f"  ✗ {error_msg}")
+                                results['errors'].append((project_id, project_name, error_msg))
+                        else:
+                            logger.info(f"  ⚠ Path does not exist: {project_path}")
+                        
+                        # Remove from database (including related records)
+                        success, error_msg = delete_project_from_database(project_id, project_name)
+                        if success:
+                            results['database_removed'] += 1
+                        else:
+                            results['errors'].append((project_id, project_name, error_msg))
+            
+            filter_title = f" (filtered by name: {args.filter_name})" if args.filter_name else ""
+            print_results(results, f"PURGE DELETED PROJECTS{filter_title}")
         
         if args.purge_empty_datasources:
             action = "HARD-DELETE" if args.hard_delete else "SOFT-DELETE"
@@ -580,6 +776,74 @@ Examples:
             
             results = purge_orphaned_projects(app, dry_run=args.dry_run)
             print_results(results, "PURGE ORPHANED PROJECTS")
+        
+        if args.delete_and_purge:
+            # Get projects matching the criteria
+            with app.app_context():
+                if args.list_test_generated:
+                    projects_to_delete = list_test_generated_projects(app)
+                    criteria_msg = "test-generated projects"
+                else:
+                    # Must have filter_name due to validation above
+                    projects_to_delete = list_projects_by_name_pattern(app, args.filter_name)
+                    criteria_msg = f"projects matching '{args.filter_name}'"
+                
+                # Apply additional name filter if both are specified
+                if args.filter_name and args.list_test_generated:
+                    projects_to_delete = apply_name_filter(projects_to_delete)
+                    criteria_msg = f"test-generated projects matching '{args.filter_name}'"
+                
+                # Confirm action
+                if not args.dry_run and not args.confirm:
+                    msg = f"⚠️  This will DELETE and PURGE {len(projects_to_delete)} {criteria_msg}. Continue?"
+                    if not confirm_action(msg):
+                        print("Operation cancelled.")
+                        sys.exit(0)
+                
+                # Execute delete and purge
+                results = {
+                    'total': len(projects_to_delete),
+                    'filesystem_removed': 0,
+                    'database_removed': 0,
+                    'errors': []
+                }
+                
+                if args.dry_run:
+                    logger.info(f"[DRY RUN] Would delete and purge {len(projects_to_delete)} {criteria_msg}")
+                else:
+                    for project in projects_to_delete:
+                        project_id = project.id
+                        project_name = project.name
+                        project_path = project.path
+                        
+                        logger.info(f"Processing project {project_id}: {project_name}")
+                        
+                        # Remove from filesystem
+                        if os.path.exists(project_path):
+                            try:
+                                if os.path.isdir(project_path):
+                                    shutil.rmtree(project_path)
+                                    logger.info(f"  ✓ Removed directory: {project_path}")
+                                    results['filesystem_removed'] += 1
+                                else:
+                                    os.remove(project_path)
+                                    logger.info(f"  ✓ Removed file: {project_path}")
+                                    results['filesystem_removed'] += 1
+                            except Exception as e:
+                                error_msg = f"Error removing filesystem path: {e}"
+                                logger.error(f"  ✗ {error_msg}")
+                                results['errors'].append((project_id, project_name, error_msg))
+                        else:
+                            logger.info(f"  ⚠ Path does not exist: {project_path}")
+                        
+                        # Remove from database (including related records)
+                        success, error_msg = delete_project_from_database(project_id, project_name)
+                        if success:
+                            results['database_removed'] += 1
+                        else:
+                            results['errors'].append((project_id, project_name, error_msg))
+                
+                print_results(results, f"DELETE AND PURGE: {criteria_msg}")
     
     except Exception as e:
         logger.exception(f"Fatal error during cleanup operation: {e}")

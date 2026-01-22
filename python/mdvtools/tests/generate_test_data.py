@@ -114,7 +114,38 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
     print(f"Creating MDV project at {output_path}...")
     convert_scanpy_to_mdv(output_path, adata, delete_existing=args.force)
     
+    # Add provenance metadata to state.json
+    print("Adding provenance metadata...")
+    from mdvtools.mdvproject import MDVProject
+    from datetime import datetime
+    
+    project = MDVProject(output_path)
+    state = project.state
+    
+    # Build provenance metadata
+    provenance = {
+        "created_by": "generate_test_data.py",
+        "created_at": datetime.now().isoformat(),
+        "source": "mock" if args.mock else "scanpy",
+        "parameters": {}
+    }
+    
+    # Add source-specific parameters
+    if args.mock:
+        provenance["parameters"]["n_cells"] = args.n_cells
+        provenance["parameters"]["n_genes"] = args.n_genes
+    else:
+        provenance["parameters"]["dataset"] = args.scanpy
+        # Also include actual dimensions from the loaded data
+        provenance["parameters"]["n_cells"] = adata.n_obs
+        provenance["parameters"]["n_genes"] = adata.n_vars
+    
+    # Add provenance to state
+    state["provenance"] = provenance
+    project.state = state
+    
     print(f"✓ Created MDV project at {output_path}")
+    print(f"  Provenance: {provenance['source']} data, {provenance['parameters']}")
 
 
 if __name__ == '__main__':
