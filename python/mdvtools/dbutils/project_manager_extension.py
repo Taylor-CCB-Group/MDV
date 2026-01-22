@@ -566,15 +566,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         )
                     })
 
-                        shared_users_list.append({
-                            "id": user_data["id"],
-                            "email": user_data["email"],
-                            "permission": (
-                                "Owner" if proj_perm["is_owner"] else "Edit" if proj_perm["can_write"] else "View"
-                            )
-                        })
-
-
                 # Step 4: Get unshared users for dropdown
                 # Read from database to ensure we have all users (including newly synced ones)
                 all_db_users = User.query.all()
