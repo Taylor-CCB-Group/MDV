@@ -4,7 +4,8 @@
 
 The `cleanup_projects.py` script provides utilities for cleaning up projects in the MDV database. It handles both database records and filesystem directories.
 
-**⚠️ WARNING**: This script is intended primarily for local development environments. Be very cautious about running it in production/server deployments!
+**⚠️ WARNING**: This script is intended primarily for local development environments. It is mostly LLM authored, as a quick convenience - but hopefully of some wider use.
+Be very cautious and please review carefully before running it in production/server deployments, or if you are not confident that any important data is backed up!
 
 ## Database Relationships
 
@@ -29,113 +30,144 @@ psycopg2.errors.NotNullViolation: null value in column "project_id"
 of relation "files" violates not-null constraint
 ```
 
-## Available Operations
+## API Structure
 
-### List Operations (Read-only)
+The cleanup script uses an orthogonal API design where **actions** and **selectors** are separate, making it easier to compose operations.
 
-- `--list-deleted`: List all projects marked as deleted (is_deleted=True)
-- `--list-empty`: List projects with empty datasources (datasources.json contains `[]`)
-- `--list-orphaned`: List projects that exist in filesystem but not in database
-- `--list-test-generated`: List projects with test generation provenance metadata
+### Actions (Mutually Exclusive)
 
-### Filtering Options
+Choose **one** action to perform:
 
-- `--filter-name PATTERN`: Filter projects by name pattern (supports `*` and `%` wildcards)
-  - Can be combined with any list or purge operation
-  - Examples: `--filter-name "pbmc*"`, `--filter-name "%test%"`
+- `--list SELECTOR`: List projects matching selector (read-only)
+- `--soft-delete SELECTOR`: Mark projects as deleted (sets is_deleted=True)
+- `--purge SELECTOR`: Remove projects completely (filesystem + database)
+- `--restore SELECTOR`: Restore deleted projects (sets is_deleted=False)
 
-### Delete Operations (Destructive)
+### Selectors
 
-- `--purge-deleted`: Remove deleted projects from filesystem AND database
-  - Deletes project directory
-  - Deletes related File records
-  - Deletes related UserProject records
-  - Deletes Project record
+Specify which projects to target:
 
-- `--purge-empty-datasources`: Handle projects with empty datasources
-  - Default: Soft-delete (sets is_deleted=True, deleted_timestamp=now())
-  - With `--hard-delete`: Complete removal (filesystem + database)
+- `deleted`: Projects where is_deleted=True
+- `empty`: Projects with empty datasources (datasources.json contains `[]`)
+- `orphaned`: Projects in filesystem but not in database
+- `test-generated`: Projects with provenance metadata (created by test scripts)
+- `all`: All projects (⚠️ requires --confirm flag for non-list actions)
 
-- `--purge-orphaned`: Remove orphaned project directories
-  - Deletes directories that exist in filesystem but not registered in database
+### Additional Filters
 
-- `--delete-and-purge`: Delete and purge projects in one step
-  - **Must** be combined with `--filter-name` or `--list-test-generated` (safety requirement)
-  - Immediately removes projects from both filesystem and database
-  - Useful for cleaning up non-deleted projects (e.g., test projects you want to remove)
+- `--filter-name PATTERN`: Further narrow selection by name pattern
+  - Supports `*` and `%` wildcards
+  - Examples: `"pbmc*"`, `"%test%"`, `"*mock*"`
 
 ### Safety Options
 
-- `--dry-run`: Preview changes without executing (shows what would be done)
+- `--dry-run`: Preview changes without executing
 - `--confirm`: Skip confirmation prompts (for automation, use with caution)
 
 ## Usage Examples
 
-### Safe Exploration
+### List Operations (Read-Only)
 
 ```bash
 # List all deleted projects
-python -m mdvtools.dbutils.cleanup_projects --list-deleted
+python -m mdvtools.dbutils.cleanup_projects --list deleted
 
 # List projects with empty datasources
-python -m mdvtools.dbutils.cleanup_projects --list-empty
+python -m mdvtools.dbutils.cleanup_projects --list empty
 
 # List orphaned filesystem directories
-python -m mdvtools.dbutils.cleanup_projects --list-orphaned
+python -m mdvtools.dbutils.cleanup_projects --list orphaned
 
-# List test-generated projects (with provenance metadata)
-python -m mdvtools.dbutils.cleanup_projects --list-test-generated
+# List test-generated projects
+python -m mdvtools.dbutils.cleanup_projects --list test-generated
 
-# Filter projects by name pattern
-python -m mdvtools.dbutils.cleanup_projects --list-deleted --filter-name "pbmc*"
-python -m mdvtools.dbutils.cleanup_projects --list-empty --filter-name "%test%"
-python -m mdvtools.dbutils.cleanup_projects --list-test-generated --filter-name "*mock*"
+# List with name filtering
+python -m mdvtools.dbutils.cleanup_projects --list deleted --filter-name "pbmc*"
+python -m mdvtools.dbutils.cleanup_projects --list empty --filter-name "%test%"
+python -m mdvtools.dbutils.cleanup_projects --list test-generated --filter-name "*mock*"
+
+# List all projects (everything in database)
+python -m mdvtools.dbutils.cleanup_projects --list all
 ```
 
-### Preview Changes (Dry Run)
+### Soft-Delete Operations (Mark as Deleted)
 
 ```bash
-# See what would be purged (deleted projects)
-python -m mdvtools.dbutils.cleanup_projects --purge-deleted --dry-run
+# Soft-delete projects with empty datasources (preview)
+python -m mdvtools.dbutils.cleanup_projects --soft-delete empty --dry-run
 
-# See what would be purged (empty datasource projects)
-python -m mdvtools.dbutils.cleanup_projects --purge-empty-datasources --hard-delete --dry-run
+# Soft-delete projects with empty datasources (execute)
+python -m mdvtools.dbutils.cleanup_projects --soft-delete empty
 
-# See what would be purged (orphaned directories)
-python -m mdvtools.dbutils.cleanup_projects --purge-orphaned --dry-run
+# Soft-delete test-generated projects without confirmation
+python -m mdvtools.dbutils.cleanup_projects --soft-delete test-generated --confirm
+
+# Soft-delete with name filtering
+python -m mdvtools.dbutils.cleanup_projects --soft-delete test-generated --filter-name "pbmc*" --confirm
 ```
 
-### Actual Deletion (with confirmation)
+### Purge Operations (Complete Removal)
 
 ```bash
+# Preview purge of deleted projects
+python -m mdvtools.dbutils.cleanup_projects --purge deleted --dry-run
+
 # Purge deleted projects (will prompt for confirmation)
-python -m mdvtools.dbutils.cleanup_projects --purge-deleted
+python -m mdvtools.dbutils.cleanup_projects --purge deleted
 
-# Soft-delete projects with empty datasources (will prompt)
-python -m mdvtools.dbutils.cleanup_projects --purge-empty-datasources
+# Purge projects with empty datasources
+python -m mdvtools.dbutils.cleanup_projects --purge empty --confirm
 
-# Hard-delete projects with empty datasources (will prompt)
-python -m mdvtools.dbutils.cleanup_projects --purge-empty-datasources --hard-delete
+# Purge orphaned directories
+python -m mdvtools.dbutils.cleanup_projects --purge orphaned --confirm
 
-# Remove orphaned directories (will prompt)
-python -m mdvtools.dbutils.cleanup_projects --purge-orphaned
+# Purge with name filtering
+python -m mdvtools.dbutils.cleanup_projects --purge deleted --filter-name "pbmc*" --confirm
+python -m mdvtools.dbutils.cleanup_projects --purge test-generated --filter-name "*mock*" --confirm
 ```
 
-### Automated Deletion (skip confirmation)
+### Restore Operations (Undelete)
 
 ```bash
-# For automation - skips confirmation prompts
-python -m mdvtools.dbutils.cleanup_projects --purge-deleted --confirm
-python -m mdvtools.dbutils.cleanup_projects --purge-orphaned --confirm
+# Restore deleted projects (preview)
+python -m mdvtools.dbutils.cleanup_projects --restore deleted --dry-run
 
-# Purge with filtering
-python -m mdvtools.dbutils.cleanup_projects --purge-deleted --filter-name "pbmc*" --confirm
-python -m mdvtools.dbutils.cleanup_projects --purge-empty-datasources --list-test-generated --confirm
+# Restore specific deleted projects by name
+python -m mdvtools.dbutils.cleanup_projects --restore deleted --filter-name "important*"
 
-# Delete and purge in one step (for non-deleted projects)
-python -m mdvtools.dbutils.cleanup_projects --delete-and-purge --filter-name "pbmc*" --dry-run
-python -m mdvtools.dbutils.cleanup_projects --delete-and-purge --filter-name "pbmc*" --confirm
-python -m mdvtools.dbutils.cleanup_projects --delete-and-purge --list-test-generated --confirm
+# Restore all deleted projects (requires --confirm)
+python -m mdvtools.dbutils.cleanup_projects --restore all --confirm
+```
+
+### Common Workflows
+
+```bash
+# Workflow 1: Clean up test data
+# Step 1: See what test projects exist
+python -m mdvtools.dbutils.cleanup_projects --list test-generated
+
+# Step 2: Preview removal
+python -m mdvtools.dbutils.cleanup_projects --purge test-generated --dry-run
+
+# Step 3: Execute removal
+python -m mdvtools.dbutils.cleanup_projects --purge test-generated --confirm
+
+# Workflow 2: Handle empty datasource projects
+# Step 1: List them
+python -m mdvtools.dbutils.cleanup_projects --list empty
+
+# Step 2: Soft-delete (mark as deleted)
+python -m mdvtools.dbutils.cleanup_projects --soft-delete empty
+
+# Step 3: Later, purge the deleted projects
+python -m mdvtools.dbutils.cleanup_projects --purge deleted --confirm
+
+# Workflow 3: Clean up orphaned directories
+# Step 1: List orphaned projects
+python -m mdvtools.dbutils.cleanup_projects --list orphaned
+
+# Step 2: Remove them
+python -m mdvtools.dbutils.cleanup_projects --purge orphaned --confirm
 ```
 
 ## Error Handling

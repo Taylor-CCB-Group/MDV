@@ -14,7 +14,7 @@ import sys
 import argparse
 import shutil
 import json
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, Any, Union
 from datetime import datetime
 
 from mdvtools.dbutils.mdv_server_app import app, is_valid_mdv_project
@@ -170,7 +170,7 @@ def list_empty_datasource_projects(app) -> List[Project]:
         return empty_projects
 
 
-def delete_project_from_database(project_id: int, project_name: str) -> Tuple[bool, str]:
+def delete_project_from_database(app, project_id: int, project_name: str, dry_run: bool = False) -> Dict[str, Any]:
     """
     Delete a project and all related records from the database.
     Handles foreign key constraints by deleting related records first.
@@ -183,43 +183,64 @@ def delete_project_from_database(project_id: int, project_name: str) -> Tuple[bo
     foreign key constraint violations.
     
     Args:
+        app: Flask application instance
         project_id: Project ID to delete
         project_name: Project name (for logging)
+        dry_run: If True, only preview without executing
         
     Returns:
-        Tuple of (success: bool, error_message: str)
+        Dictionary with success count, failed count, and errors
     """
+    results = {
+        'success_count': 0,
+        'failed_count': 0,
+        'errors': []
+    }
+    
     try:
-        # Delete related File records first
-        files = File.query.filter_by(project_id=project_id).all()
-        if files:
-            logger.info(f"  Deleting {len(files)} related file record(s)")
-            for file in files:
-                db.session.delete(file)
-        
-        # Delete related UserProject records
-        user_projects = UserProject.query.filter_by(project_id=project_id).all()
-        if user_projects:
-            logger.info(f"  Deleting {len(user_projects)} related user-project record(s)")
-            for user_project in user_projects:
-                db.session.delete(user_project)
-        
-        # Now delete the project itself
-        project = Project.query.get(project_id)
-        if project:
-            db.session.delete(project)
-            db.session.commit()
-            logger.info(f"  ✓ Removed from database (including {len(files)} files, {len(user_projects)} user associations)")
-            return True, ""
-        else:
-            logger.warning(f"  ⚠ Project {project_id} not found in database")
-            return False, "Project not found in database"
+        with app.app_context():
+            if dry_run:
+                # Just log what would be done
+                files = File.query.filter_by(project_id=project_id).all()
+                user_projects = UserProject.query.filter_by(project_id=project_id).all()
+                logger.info(f"  [DRY RUN] Would delete {len(files)} file record(s), {len(user_projects)} user-project record(s), and project {project_id}")
+                results['success_count'] = 1
+            else:
+                # Delete related File records first
+                files = File.query.filter_by(project_id=project_id).all()
+                if files:
+                    logger.info(f"  Deleting {len(files)} related file record(s)")
+                    for file in files:
+                        db.session.delete(file)
+                
+                # Delete related UserProject records
+                user_projects = UserProject.query.filter_by(project_id=project_id).all()
+                if user_projects:
+                    logger.info(f"  Deleting {len(user_projects)} related user-project record(s)")
+                    for user_project in user_projects:
+                        db.session.delete(user_project)
+                
+                # Now delete the project itself
+                project = Project.query.get(project_id)
+                if project:
+                    db.session.delete(project)
+                    db.session.commit()
+                    logger.info(f"  ✓ Removed from database (including {len(files)} files, {len(user_projects)} user associations)")
+                    results['success_count'] = 1
+                else:
+                    logger.warning(f"  ⚠ Project {project_id} not found in database")
+                    results['failed_count'] = 1
+                    results['errors'].append((project_name, "Project not found in database"))
             
     except Exception as e:
         error_msg = f"Error removing from database: {e}"
         logger.error(f"  ✗ {error_msg}")
-        db.session.rollback()
-        return False, error_msg
+        results['failed_count'] = 1
+        results['errors'].append((project_name, str(e)))
+        if not dry_run:
+            db.session.rollback()
+    
+    return results
 
 
 def purge_deleted_projects(app, dry_run=False) -> Dict:
@@ -274,11 +295,12 @@ def purge_deleted_projects(app, dry_run=False) -> Dict:
                 logger.info(f"  ⚠ Path does not exist: {project_path}")
             
             # Remove from database (including related records)
-            success, error_msg = delete_project_from_database(project_id, project_name)
-            if success:
+            delete_result = delete_project_from_database(app, project_id, project_name, dry_run=False)
+            if delete_result['success_count'] > 0:
                 results['database_removed'] += 1
             else:
-                results['errors'].append((project_id, project_name, error_msg))
+                if delete_result['errors']:
+                    results['errors'].extend(delete_result['errors'])
     
     return results
 
@@ -378,11 +400,12 @@ def purge_empty_datasource_projects(app, hard_delete=False, dry_run=False) -> Di
                         continue
                 
                 # Remove from database (including related records)
-                success, error_msg = delete_project_from_database(project_id, project_name)
-                if success:
+                delete_result = delete_project_from_database(app, project_id, project_name, dry_run=False)
+                if delete_result['success_count'] > 0:
                     results['hard_deleted'] += 1
                 else:
-                    results['errors'].append((project_id, project_name, error_msg))
+                    if delete_result['errors']:
+                        results['errors'].extend(delete_result['errors'])
             else:
                 # Soft delete
                 try:
@@ -526,8 +549,21 @@ def print_results(results: Dict, operation: str):
     print(f"\n{'='*80}")
     print(f"SUMMARY: {operation}")
     print(f"{'='*80}")
-    print(f"Total projects processed: {results['total']}")
     
+    # Handle both old and new result formats
+    if 'total' in results:
+        print(f"Total projects processed: {results['total']}")
+    else:
+        total = results.get('success_count', 0) + results.get('failed_count', 0)
+        print(f"Total projects processed: {total}")
+    
+    # New format
+    if 'success_count' in results:
+        print(f"Successful: {results['success_count']}")
+    if 'failed_count' in results and results['failed_count'] > 0:
+        print(f"Failed: {results['failed_count']}")
+    
+    # Old format (for backwards compatibility)
     if 'filesystem_removed' in results:
         print(f"Filesystem removals: {results['filesystem_removed']}")
     if 'database_removed' in results:
@@ -539,7 +575,7 @@ def print_results(results: Dict, operation: str):
     if 'hard_deleted' in results:
         print(f"Hard-deleted: {results['hard_deleted']}")
     
-    if results['errors']:
+    if results.get('errors'):
         print(f"\nErrors encountered: {len(results['errors'])}")
         # Handle both 2-tuple and 3-tuple error formats
         for error_info in results['errors']:
@@ -569,6 +605,279 @@ def confirm_action(message: str) -> bool:
     return response in ['yes', 'y']
 
 
+def apply_name_filter(projects: List[Project], pattern: str) -> List[Project]:
+    """
+    Filter projects by name pattern.
+    
+    Args:
+        projects: List of Project objects
+        pattern: Name pattern (supports * and % wildcards)
+        
+    Returns:
+        Filtered list of projects
+    """
+    # Convert wildcards to SQL LIKE pattern
+    sql_pattern = pattern.replace('*', '%')
+    
+    # Filter projects
+    filtered = []
+    for project in projects:
+        # Use SQL LIKE pattern matching
+        if '%' in sql_pattern:
+            # Simple pattern matching
+            import re
+            regex_pattern = sql_pattern.replace('%', '.*')
+            if re.match(regex_pattern, project.name):
+                filtered.append(project)
+        else:
+            # Exact match
+            if project.name == sql_pattern:
+                filtered.append(project)
+    
+    return filtered
+
+
+def select_projects(app, selector: str, name_filter: Optional[str] = None) -> Union[List[Project], Tuple[List[Project], List[Tuple[str, str]]]]:
+    """
+    Universal project selector.
+    
+    Args:
+        app: Flask application instance
+        selector: Selector type (deleted, empty, orphaned, test-generated, all)
+        name_filter: Optional name pattern filter
+        
+    Returns:
+        For orphaned selector: tuple (empty list, orphaned_list)
+        For all other selectors: List of Project objects
+    """
+    logger.info(f"Selecting projects with selector: {selector}, name_filter: {name_filter}")
+    
+    if selector == 'deleted':
+        projects = list_deleted_projects(app)
+    elif selector == 'empty':
+        projects = list_empty_datasource_projects(app)
+    elif selector == 'orphaned':
+        # Orphaned projects are special - they return tuples (path, name)
+        orphaned = list_orphaned_projects(app)
+        if name_filter:
+            # Filter orphaned projects by name
+            sql_pattern = name_filter.replace('*', '%')
+            import re
+            regex_pattern = sql_pattern.replace('%', '.*')
+            filtered_orphaned = []
+            for path, name in orphaned:
+                if '%' in sql_pattern:
+                    if re.match(regex_pattern, name):
+                        filtered_orphaned.append((path, name))
+                else:
+                    if name == sql_pattern:
+                        filtered_orphaned.append((path, name))
+            return ([], filtered_orphaned)  # Return empty projects list and filtered orphaned
+        return ([], orphaned)  # Return empty projects list and all orphaned
+    elif selector == 'test-generated':
+        projects = list_test_generated_projects(app)
+    elif selector == 'all':
+        # Get all projects
+        with app.app_context():
+            projects = Project.query.all()
+    else:
+        logger.error(f"Unknown selector: {selector}")
+        return []
+    
+    # Apply name filter if provided (not for orphaned, handled above)
+    if name_filter and selector != 'orphaned':
+        projects = apply_name_filter(projects, name_filter)
+    
+    return projects
+
+
+def action_list(app, projects: List[Project], orphaned_projects: List[tuple], selector: str):
+    """
+    List projects.
+    
+    Args:
+        app: Flask application instance
+        projects: List of Project objects
+        orphaned_projects: List of orphaned project tuples
+        selector: Selector type for title
+    """
+    if selector == 'orphaned':
+        title = f"{selector.upper()} PROJECTS"
+        print_orphaned_project_list(orphaned_projects, title)
+    else:
+        title = f"{selector.upper()} PROJECTS"
+        print_project_list(projects, title)
+
+
+def action_soft_delete(app, projects: List[Project], dry_run: bool = False) -> Dict[str, Any]:
+    """
+    Soft-delete projects (mark as deleted).
+    
+    Args:
+        app: Flask application instance
+        projects: List of Project objects
+        dry_run: If True, only preview without executing
+        
+    Returns:
+        Dictionary with success count, failed count, and errors
+    """
+    from datetime import datetime
+    
+    results = {
+        'success_count': 0,
+        'failed_count': 0,
+        'errors': []
+    }
+    
+    with app.app_context():
+        for project in projects:
+            try:
+                if dry_run:
+                    print(f"Would mark as deleted: {project.name} (ID: {project.id}, Path: {project.path})")
+                    results['success_count'] += 1
+                else:
+                    project.is_deleted = True
+                    project.deleted_timestamp = datetime.now()
+                    db.session.commit()
+                    logger.info(f"Marked project as deleted: {project.name} (ID: {project.id})")
+                    print(f"✓ Marked as deleted: {project.name}")
+                    results['success_count'] += 1
+            except Exception as e:
+                error_msg = f"Failed to mark {project.name} as deleted: {str(e)}"
+                logger.error(error_msg)
+                results['failed_count'] += 1
+                results['errors'].append((project.name, str(e)))
+                if not dry_run:
+                    db.session.rollback()
+    
+    return results
+
+
+def action_purge(app, projects: List[Project], orphaned_projects: List[tuple], 
+                 selector: str, dry_run: bool = False) -> Dict[str, Any]:
+    """
+    Purge projects completely (filesystem + database).
+    
+    Args:
+        app: Flask application instance
+        projects: List of Project objects
+        orphaned_projects: List of orphaned project tuples
+        selector: Selector type to determine purge strategy
+        dry_run: If True, only preview without executing
+        
+    Returns:
+        Dictionary with success count, failed count, and errors
+    """
+    results = {
+        'success_count': 0,
+        'failed_count': 0,
+        'errors': []
+    }
+    
+    # Handle orphaned projects separately
+    if selector == 'orphaned':
+        with app.app_context():
+            for project_path, project_name in orphaned_projects:
+                try:
+                    if dry_run:
+                        print(f"Would remove orphaned directory: {project_name} ({project_path})")
+                        results['success_count'] += 1
+                    else:
+                        if os.path.isdir(project_path):
+                            shutil.rmtree(project_path)
+                            logger.info(f"Removed orphaned directory: {project_path}")
+                            print(f"✓ Removed orphaned directory: {project_name}")
+                            results['success_count'] += 1
+                        else:
+                            logger.warning(f"Orphaned path no longer exists: {project_path}")
+                            results['success_count'] += 1
+                except Exception as e:
+                    error_msg = f"Failed to remove orphaned directory {project_name}: {str(e)}"
+                    logger.error(error_msg)
+                    results['failed_count'] += 1
+                    results['errors'].append((project_name, str(e)))
+        return results
+    
+    # Handle database projects
+    with app.app_context():
+        for project in projects:
+            try:
+                if dry_run:
+                    print(f"Would purge: {project.name} (ID: {project.id}, Path: {project.path})")
+                    results['success_count'] += 1
+                else:
+                    # Remove from filesystem
+                    if os.path.exists(project.path):
+                        if os.path.isdir(project.path):
+                            shutil.rmtree(project.path)
+                        else:
+                            os.remove(project.path)
+                        logger.info(f"Removed from filesystem: {project.path}")
+                    
+                    # Delete from database (handles foreign keys)
+                    delete_result = delete_project_from_database(app, project.id, project.name, dry_run=False)
+                    
+                    if delete_result['success_count'] > 0:
+                        print(f"✓ Purged: {project.name}")
+                        results['success_count'] += 1
+                    else:
+                        results['failed_count'] += 1
+                        if delete_result['errors']:
+                            results['errors'].extend(delete_result['errors'])
+                        
+            except Exception as e:
+                error_msg = f"Failed to purge {project.name}: {str(e)}"
+                logger.error(error_msg)
+                results['failed_count'] += 1
+                results['errors'].append((project.name, str(e)))
+                if not dry_run:
+                    db.session.rollback()
+    
+    return results
+
+
+def action_restore(app, projects: List[Project], dry_run: bool = False) -> Dict[str, Any]:
+    """
+    Restore deleted projects (undelete).
+    
+    Args:
+        app: Flask application instance
+        projects: List of Project objects
+        dry_run: If True, only preview without executing
+        
+    Returns:
+        Dictionary with success count, failed count, and errors
+    """
+    results = {
+        'success_count': 0,
+        'failed_count': 0,
+        'errors': []
+    }
+    
+    with app.app_context():
+        for project in projects:
+            try:
+                if dry_run:
+                    print(f"Would restore: {project.name} (ID: {project.id}, Path: {project.path})")
+                    results['success_count'] += 1
+                else:
+                    project.is_deleted = False
+                    project.deleted_timestamp = None
+                    db.session.commit()
+                    logger.info(f"Restored project: {project.name} (ID: {project.id})")
+                    print(f"✓ Restored: {project.name}")
+                    results['success_count'] += 1
+            except Exception as e:
+                error_msg = f"Failed to restore {project.name}: {str(e)}"
+                logger.error(error_msg)
+                results['failed_count'] += 1
+                results['errors'].append((project.name, str(e)))
+                if not dry_run:
+                    db.session.rollback()
+    
+    return results
+
+
 def main():
     """Main entry point for the script."""
     parser = argparse.ArgumentParser(
@@ -576,53 +885,44 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # List deleted projects
-  %(prog)s --list-deleted
+  # List projects
+  %(prog)s --list deleted
+  %(prog)s --list empty --filter-name "pbmc*"
+  %(prog)s --list test-generated
   
-  # List orphaned projects (in filesystem but not database)
-  %(prog)s --list-orphaned
+  # Soft-delete (mark as deleted)
+  %(prog)s --soft-delete empty --dry-run
+  %(prog)s --soft-delete test-generated --confirm
   
-  # Preview what would be purged
-  %(prog)s --purge-deleted --dry-run
+  # Purge (complete removal)
+  %(prog)s --purge deleted --confirm
+  %(prog)s --purge empty --filter-name "pbmc*" --confirm
   
-  # Actually purge deleted projects
-  %(prog)s --purge-deleted --confirm
-  
-  # List projects with empty datasources
-  %(prog)s --list-empty
-  
-  # Soft-delete projects with empty datasources
-  %(prog)s --purge-empty-datasources
-  
-  # Hard-delete (purge) projects with empty datasources
-  %(prog)s --purge-empty-datasources --hard-delete --confirm
-  
-  # Remove orphaned project directories
-  %(prog)s --purge-orphaned --confirm
+  # Restore (undelete)
+  %(prog)s --restore deleted --filter-name "important*"
         """
     )
     
-    # Operation modes
-    parser.add_argument('--list-deleted', action='store_true',
-                        help='List all projects marked as deleted')
-    parser.add_argument('--list-empty', action='store_true',
-                        help='List projects with empty datasources')
-    parser.add_argument('--list-orphaned', action='store_true',
-                        help='List projects that exist in filesystem but not in database')
-    parser.add_argument('--list-test-generated', action='store_true',
-                        help='List projects with test generation provenance metadata')
-    parser.add_argument('--purge-deleted', action='store_true',
-                        help='Remove deleted projects from filesystem and database')
-    parser.add_argument('--purge-empty-datasources', action='store_true',
-                        help='Delete projects with empty datasources')
-    parser.add_argument('--purge-orphaned', action='store_true',
-                        help='Remove orphaned project directories from filesystem')
-    parser.add_argument('--delete-and-purge', action='store_true',
-                        help='Delete and purge projects in one step (use with --filter-name or --list-test-generated)')
+    # Actions (mutually exclusive)
+    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument('--list', 
+                             choices=['deleted', 'empty', 'orphaned', 'test-generated', 'all'],
+                             metavar='SELECTOR',
+                             help='List projects (choices: deleted, empty, orphaned, test-generated, all)')
+    action_group.add_argument('--soft-delete',
+                             choices=['empty', 'test-generated', 'all'],
+                             metavar='SELECTOR',
+                             help='Mark projects as deleted (choices: empty, test-generated, all)')
+    action_group.add_argument('--purge',
+                             choices=['deleted', 'empty', 'orphaned', 'test-generated', 'all'],
+                             metavar='SELECTOR',
+                             help='Remove projects completely (choices: deleted, empty, orphaned, test-generated, all)')
+    action_group.add_argument('--restore',
+                             choices=['deleted', 'all'],
+                             metavar='SELECTOR',
+                             help='Restore deleted projects (choices: deleted, all)')
     
     # Options
-    parser.add_argument('--hard-delete', action='store_true',
-                        help='Use with --purge-empty-datasources for immediate purge (default is soft-delete)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be done without executing')
     parser.add_argument('--confirm', action='store_true',
@@ -639,211 +939,97 @@ Examples:
         logger.error("Flask app is not initialized. Cannot proceed.")
         sys.exit(1)
     
-    # Check that at least one operation is specified
-    if not any([args.list_deleted, args.list_empty, args.list_orphaned, args.list_test_generated,
-                args.purge_deleted, args.purge_empty_datasources, args.purge_orphaned, args.delete_and_purge]):
+    # Determine action and selector
+    if args.list:
+        action = 'list'
+        selector = args.list
+    elif args.soft_delete:
+        action = 'soft_delete'
+        selector = args.soft_delete
+    elif args.purge:
+        action = 'purge'
+        selector = args.purge
+    elif args.restore:
+        action = 'restore'
+        selector = args.restore
+    else:
         parser.print_help()
         sys.exit(1)
     
-    # Validate delete-and-purge requires a filter
-    if args.delete_and_purge and not (args.filter_name or args.list_test_generated):
-        print("Error: --delete-and-purge requires either --filter-name or --list-test-generated for safety")
-        print("This prevents accidentally deleting all projects.")
-        sys.exit(1)
+    # Safety check for 'all' selector
+    if selector == 'all' and action != 'list':
+        if not args.confirm and not args.dry_run:
+            print(f"Error: --{action.replace('_', '-')} all requires --confirm or --dry-run flag for safety")
+            print("This prevents accidentally affecting all projects.")
+            sys.exit(1)
     
     # Execute operations
     try:
-        # Helper function to apply name filter
-        def apply_name_filter(projects: List[Project]) -> List[Project]:
-            if args.filter_name:
-                name_filtered = list_projects_by_name_pattern(app, args.filter_name)
-                # Get intersection of projects
-                name_filtered_ids = {p.id for p in name_filtered}
-                return [p for p in projects if p.id in name_filtered_ids]
-            return projects
+        # Select projects based on selector and filter
+        result = select_projects(app, selector, args.filter_name)
         
-        if args.list_deleted:
-            projects = list_deleted_projects(app)
-            projects = apply_name_filter(projects)
-            title = "DELETED PROJECTS" + (f" (filtered by name: {args.filter_name})" if args.filter_name else "")
-            print_project_list(projects, title)
+        # Handle orphaned projects separately (they return a tuple)
+        projects: List[Project]
+        orphaned_projects: List[Tuple[str, str]]
         
-        if args.list_empty:
-            projects = list_empty_datasource_projects(app)
-            projects = apply_name_filter(projects)
-            title = "PROJECTS WITH EMPTY DATASOURCES" + (f" (filtered by name: {args.filter_name})" if args.filter_name else "")
-            print_project_list(projects, title)
+        if selector == 'orphaned':
+            # Type narrowing: result is Tuple[List[Project], List[Tuple[str, str]]]
+            assert isinstance(result, tuple)
+            projects, orphaned_projects = result
+        else:
+            # Type narrowing: result is List[Project]
+            assert isinstance(result, list)
+            projects = result
+            orphaned_projects = []
         
-        if args.list_orphaned:
-            orphaned = list_orphaned_projects(app)
-            # For orphaned projects, we can't filter by name in the same way since they're tuples
-            # but we can filter by the name part of the tuple
-            if args.filter_name:
-                sql_pattern = args.filter_name.replace('*', '%').replace('?', '_')
-                # Convert SQL LIKE pattern to Python regex for simple matching
-                import re
-                regex_pattern = sql_pattern.replace('%', '.*').replace('_', '.')
-                orphaned = [(path, name) for path, name in orphaned if re.match(regex_pattern, name)]
-                title = f"ORPHANED PROJECTS (Filesystem Only) (filtered by name: {args.filter_name})"
-            else:
-                title = "ORPHANED PROJECTS (Filesystem Only)"
-            print_orphaned_project_list(orphaned, title)
+        # Print selection summary
+        if args.filter_name:
+            filter_msg = f" (filtered by name: {args.filter_name})"
+        else:
+            filter_msg = ""
         
-        if args.list_test_generated:
-            projects = list_test_generated_projects(app)
-            projects = apply_name_filter(projects)
-            title = "TEST-GENERATED PROJECTS" + (f" (filtered by name: {args.filter_name})" if args.filter_name else "")
-            print_project_list(projects, title)
+        if selector == 'orphaned':
+            count_msg = f"Found {len(orphaned_projects)} {selector} project(s){filter_msg}"
+        else:
+            count_msg = f"Found {len(projects)} {selector} project(s){filter_msg}"
         
-        if args.purge_deleted:
-            # Apply name filter if specified
-            if args.filter_name:
-                logger.info(f"Applying name filter: {args.filter_name}")
-            
+        logger.info(count_msg)
+        print(f"\n{count_msg}")
+        
+        # Execute action
+        if action == 'list':
+            action_list(app, projects, orphaned_projects, selector)
+        
+        elif action == 'soft_delete':
+            # Confirm if needed
             if not args.dry_run and not args.confirm:
-                filter_msg = f" matching '{args.filter_name}'" if args.filter_name else ""
-                if not confirm_action(f"⚠️  This will PERMANENTLY DELETE{filter_msg} projects from filesystem and database. Continue?"):
+                if not confirm_action(f"⚠️  Mark {len(projects)} project(s) as deleted?"):
                     print("Operation cancelled.")
                     sys.exit(0)
             
-            # Get deleted projects and apply filter
-            with app.app_context():
-                projects_to_purge = list_deleted_projects(app)
-                projects_to_purge = apply_name_filter(projects_to_purge)
-                
-                # Create a modified version of purge that works with filtered list
-                results = {
-                    'total': len(projects_to_purge),
-                    'filesystem_removed': 0,
-                    'database_removed': 0,
-                    'errors': []
-                }
-                
-                if args.dry_run:
-                    logger.info(f"[DRY RUN] Would purge {len(projects_to_purge)} deleted projects")
-                else:
-                    for project in projects_to_purge:
-                        project_id = project.id
-                        project_name = project.name
-                        project_path = project.path
-                        
-                        logger.info(f"Processing project {project_id}: {project_name}")
-                        
-                        # Remove from filesystem
-                        if os.path.exists(project_path):
-                            try:
-                                if os.path.isdir(project_path):
-                                    shutil.rmtree(project_path)
-                                    logger.info(f"  ✓ Removed directory: {project_path}")
-                                    results['filesystem_removed'] += 1
-                                else:
-                                    os.remove(project_path)
-                                    logger.info(f"  ✓ Removed file: {project_path}")
-                                    results['filesystem_removed'] += 1
-                            except Exception as e:
-                                error_msg = f"Error removing filesystem path: {e}"
-                                logger.error(f"  ✗ {error_msg}")
-                                results['errors'].append((project_id, project_name, error_msg))
-                        else:
-                            logger.info(f"  ⚠ Path does not exist: {project_path}")
-                        
-                        # Remove from database (including related records)
-                        success, error_msg = delete_project_from_database(project_id, project_name)
-                        if success:
-                            results['database_removed'] += 1
-                        else:
-                            results['errors'].append((project_id, project_name, error_msg))
-            
-            filter_title = f" (filtered by name: {args.filter_name})" if args.filter_name else ""
-            print_results(results, f"PURGE DELETED PROJECTS{filter_title}")
+            results = action_soft_delete(app, projects, args.dry_run)
+            print_results(results, f"SOFT-DELETE {selector.upper()} PROJECTS{filter_msg}")
         
-        if args.purge_empty_datasources:
-            action = "HARD-DELETE" if args.hard_delete else "SOFT-DELETE"
+        elif action == 'purge':
+            # Confirm if needed
             if not args.dry_run and not args.confirm:
-                message = f"⚠️  This will {action} projects with empty datasources. Continue?"
-                if not confirm_action(message):
+                total = len(orphaned_projects) if selector == 'orphaned' else len(projects)
+                if not confirm_action(f"⚠️  PERMANENTLY DELETE {total} project(s) from filesystem and database?"):
                     print("Operation cancelled.")
                     sys.exit(0)
             
-            results = purge_empty_datasource_projects(app, hard_delete=args.hard_delete, dry_run=args.dry_run)
-            print_results(results, f"{action} EMPTY DATASOURCE PROJECTS")
+            results = action_purge(app, projects, orphaned_projects, selector, args.dry_run)
+            print_results(results, f"PURGE {selector.upper()} PROJECTS{filter_msg}")
         
-        if args.purge_orphaned:
+        elif action == 'restore':
+            # Confirm if needed
             if not args.dry_run and not args.confirm:
-                if not confirm_action("⚠️  This will PERMANENTLY DELETE orphaned project directories. Continue?"):
+                if not confirm_action(f"⚠️  Restore {len(projects)} project(s)?"):
                     print("Operation cancelled.")
                     sys.exit(0)
             
-            results = purge_orphaned_projects(app, dry_run=args.dry_run)
-            print_results(results, "PURGE ORPHANED PROJECTS")
-        
-        if args.delete_and_purge:
-            # Get projects matching the criteria
-            with app.app_context():
-                if args.list_test_generated:
-                    projects_to_delete = list_test_generated_projects(app)
-                    criteria_msg = "test-generated projects"
-                else:
-                    # Must have filter_name due to validation above
-                    projects_to_delete = list_projects_by_name_pattern(app, args.filter_name)
-                    criteria_msg = f"projects matching '{args.filter_name}'"
-                
-                # Apply additional name filter if both are specified
-                if args.filter_name and args.list_test_generated:
-                    projects_to_delete = apply_name_filter(projects_to_delete)
-                    criteria_msg = f"test-generated projects matching '{args.filter_name}'"
-                
-                # Confirm action
-                if not args.dry_run and not args.confirm:
-                    msg = f"⚠️  This will DELETE and PURGE {len(projects_to_delete)} {criteria_msg}. Continue?"
-                    if not confirm_action(msg):
-                        print("Operation cancelled.")
-                        sys.exit(0)
-                
-                # Execute delete and purge
-                results = {
-                    'total': len(projects_to_delete),
-                    'filesystem_removed': 0,
-                    'database_removed': 0,
-                    'errors': []
-                }
-                
-                if args.dry_run:
-                    logger.info(f"[DRY RUN] Would delete and purge {len(projects_to_delete)} {criteria_msg}")
-                else:
-                    for project in projects_to_delete:
-                        project_id = project.id
-                        project_name = project.name
-                        project_path = project.path
-                        
-                        logger.info(f"Processing project {project_id}: {project_name}")
-                        
-                        # Remove from filesystem
-                        if os.path.exists(project_path):
-                            try:
-                                if os.path.isdir(project_path):
-                                    shutil.rmtree(project_path)
-                                    logger.info(f"  ✓ Removed directory: {project_path}")
-                                    results['filesystem_removed'] += 1
-                                else:
-                                    os.remove(project_path)
-                                    logger.info(f"  ✓ Removed file: {project_path}")
-                                    results['filesystem_removed'] += 1
-                            except Exception as e:
-                                error_msg = f"Error removing filesystem path: {e}"
-                                logger.error(f"  ✗ {error_msg}")
-                                results['errors'].append((project_id, project_name, error_msg))
-                        else:
-                            logger.info(f"  ⚠ Path does not exist: {project_path}")
-                        
-                        # Remove from database (including related records)
-                        success, error_msg = delete_project_from_database(project_id, project_name)
-                        if success:
-                            results['database_removed'] += 1
-                        else:
-                            results['errors'].append((project_id, project_name, error_msg))
-                
-                print_results(results, f"DELETE AND PURGE: {criteria_msg}")
+            results = action_restore(app, projects, args.dry_run)
+            print_results(results, f"RESTORE {selector.upper()} PROJECTS{filter_msg}")
     
     except Exception as e:
         logger.exception(f"Fatal error during cleanup operation: {e}")
