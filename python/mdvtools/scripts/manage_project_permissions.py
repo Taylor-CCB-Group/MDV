@@ -29,12 +29,45 @@ def parse_permission(permission: str) -> Dict[str, bool]:
         'can_read': True  # Always true if added to a project
     }
 
-def assign_permissions(user_email: str, project_name: str, permission: str):
-    """Assign permissions for a single user and project."""
+def sync_users_from_auth0():
+    """Sync users from Auth0 to the database if Auth0 is enabled."""
+    try:
+        from mdvtools.auth.authutils import get_auth_provider
+        auth_provider = get_auth_provider()
+        if hasattr(auth_provider, 'sync_users_to_db'):
+            print("Syncing users from Auth0 to database...")
+            auth_provider.sync_users_to_db()
+            print("User sync completed.")
+            return True
+        else:
+            print("Auth provider does not support user sync.")
+            return False
+    except Exception as e:
+        print(f"Warning: Could not sync users from Auth0: {e}")
+        return False
+
+def assign_permissions(user_email: str, project_name: str, permission: str, refresh_cache: bool = True):
+    """
+    Assign permissions for a single user and project.
+    
+    Args:
+        user_email: User's email address
+        project_name: Project name
+        permission: Permission level (view, edit, owner)
+        refresh_cache: Whether to refresh cache after assignment (default: True)
+    """
     user = get_user_by_email(user_email)
     if not user:
-        print(f"Error: User with email {user_email} not found")
-        return False
+        # Try syncing from Auth0 first
+        print(f"User with email {user_email} not found in database. Syncing from Auth0...")
+        sync_users_from_auth0()
+        if refresh_cache:
+            cache_user_projects()
+        # Try again after sync
+        user = get_user_by_email(user_email)
+        if not user:
+            print(f"Error: User with email {user_email} not found even after sync")
+            return False
 
     project = get_project_by_name(project_name)
     if not project:
@@ -51,8 +84,9 @@ def assign_permissions(user_email: str, project_name: str, permission: str):
             can_write=perm['can_write']
         )
 
-        # Refresh all caches
-        cache_user_projects()
+        # Refresh cache only if requested (skip in batch mode for efficiency)
+        if refresh_cache:
+            cache_user_projects()
 
         print(f"Successfully assigned {permission} permission to {user_email} for project {project_name}")
         return True
@@ -84,9 +118,13 @@ def batch_assign_from_text(file_path: str) -> bool:
         print("No assignments found in file.")
         return False
 
+    # Extract all unique emails from the file to check if they exist
+    emails_to_check = set()
     allowed_perms = {"view", "edit", "owner"}
     success = True
 
+    # First pass: parse and validate format, collect emails
+    parsed_lines = []
     for idx, line in enumerate(lines, start=1):
         # Support comma-separated or whitespace-separated
         if "," in line:
@@ -112,16 +150,53 @@ def batch_assign_from_text(file_path: str) -> bool:
             success = False
             continue
 
-        if not assign_permissions(email, project_name, permission):
+        emails_to_check.add(email)
+        parsed_lines.append((project_name, email, permission))
+
+    # Check if any users are missing and sync from Auth0 if needed
+    missing_users = []
+    for email in emails_to_check:
+        user = get_user_by_email(email)
+        if not user:
+            missing_users.append(email)
+
+    if missing_users:
+        print(f"Found {len(missing_users)} user(s) not in database. Syncing from Auth0...")
+        sync_users_from_auth0()
+        # Refresh cache after sync
+        cache_user_projects()
+
+    # Second pass: assign permissions (without individual cache refreshes for efficiency)
+    for project_name, email, permission in parsed_lines:
+        if not assign_permissions(email, project_name, permission, refresh_cache=False):
             success = False
+
+    # Final cache refresh to ensure all changes are reflected
+    print("Refreshing cache...")
+    cache_user_projects()
+    print("Cache refreshed. All permission changes are now active.")
 
     return success
 
 def main():
-    parser = argparse.ArgumentParser(description='Manage project permissions for users')
+    # Check if first argument is a file path (before parsing, to avoid subparser conflicts)
+    if len(sys.argv) > 1:
+        first_arg = sys.argv[1]
+        # If it looks like a file path (contains / or .txt or exists as a file), treat it as such
+        if '/' in first_arg or first_arg.endswith('.txt') or Path(first_arg).exists():
+            # Direct file path mode - process immediately
+            with app.app_context():
+                success = batch_assign_from_text(first_arg)
+            sys.exit(0 if success else 1)
+    
+    # Otherwise, use normal command parsing for single assignment
+    parser = argparse.ArgumentParser(
+        description='Manage project permissions for users',
+        epilog='Usage: python manage_project_permissions.py <file_path> OR python manage_project_permissions.py assign --email ... --project ... --permission ...'
+    )
     
     # Create subparsers for different commands
-    subparsers = parser.add_subparsers(dest='command', help='Commands')
+    subparsers = parser.add_subparsers(dest='command', help='Commands', required=True)
     
     # Single assignment command
     assign_parser = subparsers.add_parser('assign', help='Assign permission for a single user and project')
@@ -129,14 +204,6 @@ def main():
     assign_parser.add_argument('--project', required=True, help='Project name')
     assign_parser.add_argument('--permission', required=True, choices=['view', 'edit', 'owner'], 
                              help='Permission level')
-    
-    # Batch assignment command (text only)
-    batch_txt_parser = subparsers.add_parser(
-        'batch_txt',
-        help='Batch assign permissions from a plain text file '
-             '(lines: project_name,email,permission or project_name email permission)',
-    )
-    batch_txt_parser.add_argument('--file', required=True, help='Path to text file with assignments')
 
     args = parser.parse_args()
 
@@ -144,8 +211,6 @@ def main():
     with app.app_context():
         if args.command == 'assign':
             success = assign_permissions(args.email, args.project, args.permission)
-        elif args.command == 'batch_txt':
-            success = batch_assign_from_text(args.file)
         else:
             parser.print_help()
             sys.exit(1)
