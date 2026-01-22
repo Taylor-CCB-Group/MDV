@@ -53,7 +53,7 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
         '--scanpy',
         type=str,
         metavar='DATASET',
-        help='Load from scanpy.datasets (pbmc3k, pbmc3k_processed, pbmc68k_reduced)'
+        help='Load from scanpy.datasets (any available dataset)'
     )
     
     # Mock data parameters
@@ -95,14 +95,15 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
         dataset = args.scanpy
         print(f"Loading scanpy dataset: {dataset}...")
         
+        # Dynamically get all available datasets from sc.datasets
         dataset_loaders = {
-            'pbmc3k': sc.datasets.pbmc3k,
-            'pbmc3k_processed': sc.datasets.pbmc3k_processed,
-            'pbmc68k_reduced': sc.datasets.pbmc68k_reduced,
+            name: getattr(sc.datasets, name)
+            for name in dir(sc.datasets)
+            if not name.startswith('_') and callable(getattr(sc.datasets, name, None))
         }
         
         if dataset not in dataset_loaders:
-            available = ', '.join(dataset_loaders.keys())
+            available = ', '.join(sorted(dataset_loaders.keys()))
             print(f"Error: Unknown dataset '{dataset}'. Available: {available}")
             sys.exit(1)
         
