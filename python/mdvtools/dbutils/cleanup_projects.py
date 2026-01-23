@@ -72,7 +72,7 @@ def list_orphaned_projects(app) -> List[Tuple[str, str]]:
     Returns:
         List of tuples (project_path, project_name) for orphaned projects
     """
-    from mdvtools.dbutils.mdv_server_app import app, is_valid_mdv_project
+    from mdvtools.dbutils.mdv_server_app import is_valid_mdv_project
     orphaned = []
     
     with app.app_context():
@@ -197,8 +197,8 @@ def delete_project_from_database(app, project_id: int, project_name: str, dry_ru
         'errors': []
     }
     
-    try:
-        with app.app_context():
+    with app.app_context():
+        try:
             if dry_run:
                 # Just log what would be done
                 files = File.query.filter_by(project_id=project_id).all()
@@ -232,13 +232,13 @@ def delete_project_from_database(app, project_id: int, project_name: str, dry_ru
                     results['failed_count'] = 1
                     results['errors'].append((project_name, "Project not found in database"))
             
-    except Exception as e:
-        error_msg = f"Error removing from database: {e}"
-        logger.error(f"  ✗ {error_msg}")
-        results['failed_count'] = 1
-        results['errors'].append((project_name, str(e)))
-        if not dry_run:
-            db.session.rollback()
+        except Exception as e:
+            error_msg = f"Error removing from database: {e}"
+            logger.error(f"  ✗ {error_msg}")
+            results['failed_count'] = 1
+            results['errors'].append((project_name, str(e)))
+            if not dry_run:
+                db.session.rollback()
     
     return results
 
