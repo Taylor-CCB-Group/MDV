@@ -341,7 +341,7 @@ def purge_orphaned_projects(app, dry_run=False) -> Dict:
                 except Exception as e:
                     error_msg = f"Error removing orphaned project: {e}"
                     logger.error(f"  ✗ {error_msg}")
-                    results['errors'].append((project_name, project_name, error_msg))
+                    results['errors'].append((project_path, project_name, error_msg))
             else:
                 logger.warning(f"  ⚠ Path no longer exists: {project_path}")
     

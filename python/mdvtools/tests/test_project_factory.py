@@ -57,7 +57,9 @@ def create_test_h5ad_file(
         raise ValueError(f"Unknown source: {source}. Available: mock, scanpy")
     
     # Ensure directory exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     
     # Write file
     adata.write_h5ad(output_path)
