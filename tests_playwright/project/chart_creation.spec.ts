@@ -104,6 +104,8 @@ test.describe('Chart Creation', () => {
     });
 
     test('Word Cloud', async () => {
+        // this is indeed failing at runtime as well - the test failure is useful.
+        // although when I tried to debug, the behaviour changed and now I can't reproduce?
         await addChartAndAssert(page, 'Word Cloud', 'wordcloud');
     });
 
