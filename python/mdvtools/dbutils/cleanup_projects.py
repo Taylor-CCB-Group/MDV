@@ -7,6 +7,12 @@ including removing deleted projects and handling projects with empty datasources
 
 As of writing, this is mostly intended for use in local development environments
 - be very cautious about running in any kind of actual server deployment!
+
+There are no guarantees of proper synchronisation of state etc - if there's a chance
+of it being used concurrently with other operations, there could be risks of
+compromises to data integrity etc etc.
+
+Hopefully it wouldn't be too difficult to adapt into a more robust model.
 """
 
 import os
@@ -748,6 +754,13 @@ def action_soft_delete(app, projects: List[Project], dry_run: bool = False) -> D
                 results['failed_count'] += 1
                 results['errors'].append((project.name, str(e)))
                 if not dry_run:
+                    # coderabbit pointed out SQLAlchemy detached instance issue: projects may become detached between contexts.
+                    # in general - this script should NOT be taken as something that should go anywhere near an active prod system
+                    # "Projects are queried within list_deleted_projects() app context (line 23), returned outside that context, 
+                    # then accessed in action_soft_delete()'s different app context..."
+                    # This seems like a fair cop. Use at your own risk.
+                    logger.error("WARNING: if you are seeing this in a live production system, that means you've ignored some warnings...")
+                    logger.error("Potential undefined state after db session rollback.")
                     db.session.rollback()
     
     return results

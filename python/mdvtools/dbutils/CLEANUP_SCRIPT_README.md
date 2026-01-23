@@ -5,7 +5,7 @@
 The `cleanup_projects.py` script provides utilities for cleaning up projects in the MDV database. It handles both database records and filesystem directories.
 
 **⚠️ WARNING**: This script is intended primarily for local development environments. It is mostly LLM authored, as a quick convenience - but hopefully of some wider use.
-Be very cautious and please review carefully before running it in production/server deployments, or if you are not confident that any important data is backed up!
+Be very cautious and please review carefully before running it in production/server deployments, or if you are not confident that any important data is backed up! It is likely that any concurrent operations on the database could lead to undefined results/data corruption/cats and dogs living together/mass hysteria/etc.
 
 ## Database Relationships
 
