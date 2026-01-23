@@ -1,7 +1,7 @@
 import type DataStore from "@/datastore/DataStore";
 import type { Gate } from "./types";
 import { action, computed, makeObservable, observable } from "mobx";
-import type { LoadedDataColumn } from "@/charts/charts";
+import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { extractCoords, isPointInGate } from "./gateUtils";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
@@ -31,32 +31,57 @@ export class GateManager {
         this.loadGatesFromConfig();
     }
 
+    async addGate(gate: Gate) {
+        // Ensure column data is loaded
+        await this.ensureGatesColumnDataLoaded();
+
+        const clonedGate = {
+            ...gate,
+            geometry: JSON.parse(JSON.stringify(gate.geometry)), // Only clone geometry
+        };
+        this.gates.set(gate.id, clonedGate);
+
+        // Update the cells with the gate
+        this.updateCellsWithGate(clonedGate, true);
+        this.updateDataStoreWithGates();
+
+        if (this.gateColumn) {
+            this.dataStore.dataChanged([GATES_COLUMN_NAME]);
+        }
+    }
+
+    updateGate(gateId: string, updates: Partial<Gate>) {
+        const gate = this.gates.get(gateId);
+        if (!gate) {
+            console.error(`Gate ${gateId} not found`);
+            return;
+        }
+
+        const updatedGate = {
+            ...gate,
+            ...updates,
+            geometry: updates.geometry ? JSON.parse(JSON.stringify(updates.geometry)) : gate.geometry,
+        };
+
+        action(() => {
+            this.gates.set(gateId, updatedGate);
+        })();
+
+        this.updateCellsWithGate(updatedGate, true);
+        this.updateDataStoreWithGates();
+
+        if (this.gateColumn) {
+            this.dataStore.dataChanged([GATES_COLUMN_NAME]);
+        }
+    }
+
+    // todo: Add NA or some empty value initially which will be used for filtering
     private initializeGateColumn() {
+
         const existingCol = this.dataStore.columnIndex[GATES_COLUMN_NAME];
         if (existingCol && existingCol.datatype === "multitext") {
+            // Get the existing column
             this.gateColumn = existingCol as LoadedDataColumn<"multitext">;
-
-            // Ensure the column has data loaded
-            if (!this.gateColumn.data) {
-                console.warn("Gates column exists but data is not loaded yet");
-            }
-
-            //! Check if this is right
-            // Ensure stringLength is set if missing
-            if (typeof this.gateColumn.stringLength !== "number") {
-                // @ts-expect-error: Forcibly assign stringLength if not set
-                this.gateColumn.stringLength = 10 as any;
-            }
-
-            // Ensure values array exists
-            if (!Array.isArray(this.gateColumn.values)) {
-                this.gateColumn.values = [];
-            }
-
-            if (!this.gateColumn.data) {
-                // Load data asynchronously
-                this.ensureGateColumnDataLoaded().catch(console.error);
-            }
         } else {
             // Create a new column
             const column = {
@@ -65,7 +90,7 @@ export class GateManager {
                 datatype: "multitext" as const,
                 editable: false, // as of now
                 delimiter: "," as const,
-                values: [""] as string[],
+                values: [] as string[],
                 stringLength: 10,
             };
 
@@ -96,46 +121,29 @@ export class GateManager {
             }
         }
 
-        await this.updateGatesColumnWhenReady();
+        // await this.ensureGatesColumnDataLoaded();
+        await this.rebuildGatesColumnWhenReady();
     }
 
-    async addGate(gate: Gate) {
-        // Ensure column data is loaded
-        await this.ensureGateColumnDataLoaded();
-
-        const clonedGate = {
-            ...gate,
-            geometry: JSON.parse(JSON.stringify(gate.geometry)), // Only clone geometry
-        };
-        this.gates.set(gate.id, clonedGate);
-
-        // Update the cells with the gate
-        this.updateCellsWithGate(clonedGate, true);
-        this.updateDataStoreWithGates();
-
-        if (this.gateColumn) {
-            this.dataStore.dataChanged([GATES_COLUMN_NAME]);
-        }
-    }
-
-    public async updateGatesColumnWhenReady() {
+    public async rebuildGatesColumnWhenReady() {
         if (this.gates.size > 0) {
             // Ensure column data is loaded before updating gate column
-            await this.ensureGateColumnDataLoaded();
-            await this.updateGateColumn();
+            await this.ensureGatesColumnDataLoaded();
+            await this.rebuildGateColumn();
         }
     }
 
-    private async ensureGateColumnDataLoaded() {
-        if (!this.gateColumn) return;
-
-        // Check if data is already loaded
-        if (this.gateColumn.data) {
-            return;
+    private async ensureGatesColumnDataLoaded() {
+        if (!this.gateColumn) {
+            this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
+            if (!this.gateColumn) {
+                console.error("No gates column in the dataStore");
+                return;
+            }
         }
 
-        // Check if column exists in columnIndex
-        if (!this.dataStore.columnIndex[GATES_COLUMN_NAME]) {
+        if (this.gateColumn.data) {
+            // Gate column data already loaded
             return;
         }
 
@@ -143,6 +151,9 @@ export class GateManager {
         try {
             await loadColumn(this.dataStore.name, GATES_COLUMN_NAME);
             this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
+            if (!this.gateColumn.data) {
+                console.error("Failed to load gates column data");
+            }
         } catch (error) {
             console.error("Failed to load gates column data:", error);
         }
@@ -153,19 +164,9 @@ export class GateManager {
      * Set the gate names as empty for all cells
      * Recompute gates for the cells
      */
-    private async updateGateColumn() {
+    private async rebuildGateColumn() {
         if (!this.gateColumn) {
             return;
-        }
-
-        // Ensure data is loaded
-        if (!this.gateColumn.data) {
-            await this.ensureGateColumnDataLoaded();
-            // If still not loaded, can't update yet
-            if (!this.gateColumn.data) {
-                console.warn("Cannot update gates column: data not loaded");
-                return;
-            }
         }
 
         // Populate the gate names for all cells with empty array
@@ -270,8 +271,9 @@ export class GateManager {
         }
     }
 
-    private updateDataStoreWithGates() {
+    public updateDataStoreWithGates() {
         const gatesArray = this.gatesArray;
+        // Update dataStore and config with the new gates array
         this.dataStore.config.gates = gatesArray;
         this.dataStore.gates = gatesArray;
         this.dataStore.dirtyMetadata.add("gates");
@@ -279,17 +281,6 @@ export class GateManager {
         if (this.gateColumn) {
             (this.dataStore.dirtyColumns as any).data_changed[GATES_COLUMN_NAME] = true;
         }
-    }
-
-    toJSON(): Gate[] {
-        return this.gatesArray;
-    }
-
-    get gatesArray(): Gate[] {
-        return Array.from(this.gates.values()).map((gate) => ({
-            ...gate,
-            geometry: JSON.parse(JSON.stringify(gate.geometry)),
-        }));
     }
 
     private getOrAddValueIndex(gateName: string): number {
@@ -306,6 +297,17 @@ export class GateManager {
             index = this.gateColumn.values.length - 1;
         }
         return index;
+    }
+
+    toJSON(): Gate[] {
+        return this.gatesArray;
+    }
+
+    get gatesArray(): Gate[] {
+        return Array.from(this.gates.values()).map((gate) => ({
+            ...gate,
+            geometry: JSON.parse(JSON.stringify(gate.geometry)),
+        }));
     }
 
     getGatesForColumns(xField: string, yField: string): Gate[] {

@@ -2,8 +2,14 @@ import type { FeatureCollection, Polygon } from '@turf/helpers';
 import type { Gate } from './types';
 import { v4 as uuid } from 'uuid';
 
-export function extractCoords(geometry: FeatureCollection): [number, number][] {
-    const feature = geometry.features[0];
+/**
+ * Extract the coordinates of the gate selection from it's feature collection
+ * 
+ * @param featureCollection - Feature Collection of the gate
+ * @returns - Extracted coordinates of the gate
+ */
+export function extractCoords(featureCollection: FeatureCollection): [number, number][] {
+    const feature = featureCollection.features[0];
     if (!feature || !feature.geometry || feature.geometry.type !== "Polygon") {
         return [];
     }
@@ -21,6 +27,10 @@ export function extractCoords(geometry: FeatureCollection): [number, number][] {
     return coords.map((coord: number[]) => [coord[0], coord[1]] as [number, number]);
 }
 
+/**
+ * Check if the point is in the polygon or not
+ * (Taken from the RangeDimension.filterPoly) 
+ */
 export function isPointInPolygon(
     point: [number, number],
     polygon: [number, number][]
@@ -60,6 +70,9 @@ export function isPointInGate(x: number, y: number, gate: Gate): boolean {
     return isPointInPolygon([x, y], polygonCoords);
 }
 
+/**
+ * Calculate the average of the coordinates to get the centroid of the gate
+ */
 export function computeCentroid(geometry: FeatureCollection): [number, number] {
     const polygonCoords = extractCoords(geometry);
     if (polygonCoords.length === 0) return [0, 0];

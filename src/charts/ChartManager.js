@@ -1112,8 +1112,8 @@ export class ChartManager {
                 field: cl.field,
             };
             
-            // Add stringLength to metadata for unique columns (required by server)
-            if (cl.datatype === "unique" && cl.stringLength) {
+            // Add stringLength to metadata for unique and multitext columns
+            if ((cl.datatype === "unique" || cl.datatype === "multitext") && cl.stringLength) {
                 md.stringLength = cl.stringLength;
             }
             
