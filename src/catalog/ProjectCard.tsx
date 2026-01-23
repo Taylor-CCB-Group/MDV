@@ -115,6 +115,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 flexDirection: "column",
                 position: "relative",
             }}
+            data-testid="project_card"
+            data-project-id={id}
         >
             <a
                 href={href}
@@ -124,6 +126,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     display: "flex",
                     flexDirection: "column",
                 }}
+                aria-label={`open project ${name} (${id})`}
+                data-testid={`project_open_${id}`}
             >
                 <CardMedia
                     component="div"
@@ -216,6 +220,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                             },
                             zIndex: 1,
                         }}
+                        data-testid={`project_menu_${id}`}
                     >
                         <MoreVert />
                     </IconButton>
@@ -232,6 +237,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                     setIsInfoModalOpen(true);
                                     handleMenuClose();
                                 }}
+                                data-testid={`project_info_${id}`}
                             >
                                 <ListItemIcon>
                                     <Info fontSize="small" />
@@ -246,6 +252,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                     handleMenuClose();
                                 }}
                                 disabled={!permissions.edit}
+                                data-testid={`project_rename_${id}`}
                             >
                                 <ListItemIcon>
                                     <DriveFileRenameOutline fontSize="small" />
@@ -260,6 +267,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                     onExport(id, name)
                                 }}
                                 disabled={!permissions.edit}
+                                data-testid={`project_export_${id}`}
                             >
                                 <ListItemIcon>
                                     <UploadIcon fontSize="small" />
@@ -274,6 +282,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                     handleMenuClose();
                                 }}
                                 disabled={!permissions.edit}
+                                data-testid={`project_share_${id}`}
                             >
                                 <ListItemIcon>
                                     <ShareIcon fontSize="small" />
@@ -289,6 +298,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                 }}
                                 sx={{color: theme.palette.error.main}}
                                 disabled={!permissions.edit}
+                                data-testid={`project_delete_${id}`}
                             >
                                 <ListItemIcon>
                                     <DeleteIcon color="error" fontSize="small" />
