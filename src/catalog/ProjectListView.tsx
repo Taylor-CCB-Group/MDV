@@ -164,7 +164,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 <ListItemText>Rename Project</ListItemText>
                             </MenuItem>
                         )}
-                        {operationPermissions.exportProject && (
+                        {/* {operationPermissions.exportProject && (
                             <MenuItem 
                                 onClick={() => {
                                     if (selectedProject) {
@@ -179,7 +179,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 </ListItemIcon>
                                 <ListItemText>Export Project (as *.mdv.zip)</ListItemText>
                             </MenuItem>
-                        )}
+                        )} */}
                         {operationPermissions.shareProject && (
                             <MenuItem 
                                 onClick={() => handleModalOpen(setIsShareModalOpen)} 
