@@ -78,7 +78,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
     const hasPermissions = useCallback((proj: Project) => 
         proj.permissions.edit && (operationPermissions.renameProject ||
         operationPermissions.deleteProject ||
-        operationPermissions.exportProject ||
+        // operationPermissions.exportProject ||
         operationPermissions.shareProject)
         , [operationPermissions]);
 

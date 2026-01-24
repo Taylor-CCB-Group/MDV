@@ -100,7 +100,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             permissions.edit &&
             (operationPermissions.renameProject ||
                 operationPermissions.deleteProject ||
-                operationPermissions.exportProject ||
+                // operationPermissions.exportProject ||
                 operationPermissions.shareProject),
         [permissions.edit, operationPermissions],
     );
