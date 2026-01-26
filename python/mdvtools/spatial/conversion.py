@@ -553,6 +553,8 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
         # images that are likely compatible
         img_candidates = [img for img in sdata.images.items() if cs in _get_transform_keys(img[1])]
 
+        # Sort to prioritize morphology_focus images (especially for xenium datasets)
+        img_candidates.sort(key=lambda img: (0 if 'morphology_focus' in str(img[0]) else 1, img[0]))
 
         img_entries: list[ImageEntry] = []
         best_idx = 0
