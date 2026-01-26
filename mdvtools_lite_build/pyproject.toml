@@ -61,6 +61,7 @@ mdvtools = "mdvtools.cli:cli"
 "../python/mdvtools/spatial"="mdvtools/spatial"
 "../python/mdvtools/network_helpers.py"="mdvtools/network_helpers.py"
 "../python/mdvtools/build_info.py"="mdvtools/build_info.py"
+"../python/mdvtools/markdown_utils.py"="mdvtools/markdown_utils.py"
 
 [tool.hatch.build.targets.wheel]
 exclude = [
