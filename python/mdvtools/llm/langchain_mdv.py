@@ -19,7 +19,7 @@ from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain.schema import HumanMessage
-from .markdown_utils import create_suggested_questions_prompt
+from mdvtools.markdown_utils import create_suggested_questions_prompt
 
 # from langchain.prompts import PromptTemplate
 

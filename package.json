@@ -34,7 +34,9 @@
     "fix_npm_win": "npm config set script-shell \"cmd\"",
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
-    "test": "vitest"
+    "test": "vitest",
+    "playwright-test": "cd tests_playwright && npx playwright test",
+    "playwright-test-ui": "cd tests_playwright && npx playwright test --ui"
   },
   "repository": {
     "type": "git",
@@ -122,6 +124,7 @@
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "^7.25.9",
     "@biomejs/biome": "1.9.4",
+    "@playwright/test": "^1.57.0",
     "@tanstack/react-query-devtools": "^5.80.0",
     "@testing-library/react": "^16.3.1",
     "@types/d3": "^7.4.3",
