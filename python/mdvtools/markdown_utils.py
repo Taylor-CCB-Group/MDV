@@ -119,6 +119,12 @@ def create_column_markdown(cols: list[dict]) -> str:
     
     return f"{markdown}\n\n"
 
+## ---------------------------------
+## ---------------------------------
+## chat/LLM related stuff... there could be an argument for having this in `mdvtools.llm`
+## but it doesn't have any external module dependencies etc.
+
+
 chart_types_md = """
 - Abundance Box Plot
 - Box Plot

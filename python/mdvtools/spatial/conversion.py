@@ -71,7 +71,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     We may consider adding more configuration options etc.
     """
     from mdvtools.spatial.mermaid import sdata_to_mermaid
-    from mdvtools.llm.markdown_utils import create_project_markdown
+    from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.charts.text_box_plot import TextBox
     from mdvtools.build_info import get_build_info_markdown
     import json
@@ -641,7 +641,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
 
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
-    from mdvtools.llm.markdown_utils import create_project_markdown
+    from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.build_info import get_build_info
     
     # Print version banner if build info is available
