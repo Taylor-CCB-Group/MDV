@@ -29,7 +29,6 @@ import ReusableDialog from "./ReusableDialog";
 
 // Import SocketIO upload client
 import { createSocketIOUpload, type SocketIOUploadClient } from "./SocketIOUploadClient";
-import { Typography } from "@mui/material";
 
 // Use dynamic import for the worker
 const DatasourceWorker = new Worker(
@@ -1218,7 +1217,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
         return (
             <Container>
-                {/* Upload Method Toggle (for development/testing) */}
+                {/* Upload Method Toggle (for development/testing), uncomment when required */}
                 {/* {process.env.NODE_ENV === 'development' && (
                     <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded">
                         <button
