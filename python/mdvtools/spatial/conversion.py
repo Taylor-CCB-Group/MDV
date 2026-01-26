@@ -260,7 +260,7 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
     # todo: support non-2d cases...
     axes = ("x", "y")
     # Convert coordinates to homogeneous coordinates (add 1s for translation)
-    coords_homogeneous = np.column_stack([adata.obsm["spatial"], np.ones(adata.obsm["spatial"].shape[0])])
+    coords_homogeneous = np.column_stack([adata.obsm["spatial"], np.ones(adata.obsm["spatial"].shape[0], dtype=float)])
     _r, region_element, _instance_key = get_table_keys(adata)
 
     transformed_coords = np.full_like(adata.obsm["spatial"], fill_value=np.nan)
