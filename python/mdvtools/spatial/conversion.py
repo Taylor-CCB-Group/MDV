@@ -225,25 +225,26 @@ def _get_transformation_between_coordinate_systems_safe(
         if src_node == tgt_node:
             return Identity()
         
-        # Find all paths
-        paths = list(nx.all_simple_paths(g, source=src_node, target=tgt_node))
-        if len(paths) == 0:
+        try:
+            path = nx.shortest_path(g, source=src_node, target=tgt_node)
+            
+            # Build transformation sequence from path
+            transformations_list = [
+                g[path[i]][path[i + 1]]["transformation"] 
+                for i in range(len(path) - 1)
+            ]
+            sequence = Sequence(transformations_list)
+            return sequence
+        
+        # - not expected as we call this with nodes previously established to be connected
+        except nx.NetworkXNoPath:
+            # No path exists between source and target 
             return None
-        
-        # Find shortest paths and select first one
-        shortest_paths = [p for p in paths if len(p) == min(map(len, paths))]
-        if len(shortest_paths) == 0:
-            return None
-        
-        path = shortest_paths[0]
-        
-        # Build transformation sequence from path
-        transformations_list = [
-            g[path[i]][path[i + 1]]["transformation"] 
-            for i in range(len(path) - 1)
-        ]
-        sequence = Sequence(transformations_list)
-        return sequence
+        except Exception as e:
+            # Re-raise all other exceptions as unexpected errors
+            raise RuntimeError(
+                f"Unexpected error while computing transformation path: {e}"
+            ) from e
 
 
 def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
