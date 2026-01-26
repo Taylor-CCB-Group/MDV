@@ -550,9 +550,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
         const onDrop = useCallback(
             async (acceptedFiles: File[]) => {
-                if (!acceptedFiles || acceptedFiles.length === 0) {
-                    return;
-                }
+                if (acceptedFiles.length > 0) {
                     const file = acceptedFiles[0];
                     const fileConfig = getFileTypeFromExtension(file.name);
 
@@ -740,6 +738,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         type: "SET_FILE_TYPE",
                         payload: fileConfig.type,
                     });
+                }
             },
             [onResize, columnNames, columnTypes],
         );
