@@ -57,6 +57,7 @@ def sdata_to_mermaid(sdata: "SpatialData", orientation: Literal["LR", "TD"] = "L
                     if element_type == "tables":
                         annotated, _element_description, _instance_key = get_table_keys(element)
                         annotated_array = annotated if isinstance(annotated, list) else [annotated]
+                        annotated_array = [a for a in annotated_array if a is not None]
                         cs_annotations[element_name] = annotated_array
                         # Track annotations for de-duplication
                         for annotated_element in annotated_array:
