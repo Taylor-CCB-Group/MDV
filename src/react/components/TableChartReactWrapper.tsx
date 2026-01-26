@@ -17,7 +17,7 @@ export type TableChartReactConfig = BaseConfig & {
     include_index?: boolean;
     column_widths?: Record<string, number>;
     order?: Record<string, number>;
-    sort?: { columnId: string; ascending: boolean } | undefined;
+    sort?: { columnId: string; ascending: boolean } | null;
 };
 
 /**
@@ -40,7 +40,8 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
         config.include_index = false;
     }
     if (!('sort' in config)) {
-        config.sort = undefined;
+        // Assigning this to null instead of undefined to make it observable
+        config.sort = null;
     }
     return config;
 }

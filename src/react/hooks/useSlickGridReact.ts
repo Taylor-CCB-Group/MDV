@@ -135,8 +135,8 @@ const useSlickGridReact = () => {
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
         if (grid && dataProvider) {
-            // Skip update if user is actively selecting
-            if (selectionSourceRef.current === 'user') {
+            // Skip update if selectionSourceRef is not empty
+            if (selectionSourceRef.current !== null) {
                 console.log("Skipping grid update during user selection");
                 return;
             }
