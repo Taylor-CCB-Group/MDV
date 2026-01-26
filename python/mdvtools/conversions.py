@@ -281,7 +281,7 @@ def get_matrix(matrix,main_names=None,mod_names=None) -> tuple[scipy.sparse.csc_
         matrix = scipy.sparse.csc_matrix(matrix)
     
     # Early return if no alignment needed
-    if  not main_names.any()  or not mod_names.any():
+    if  not any(main_names)  or not any(mod_names):
         return matrix, is_sparse
     
     # Validate dimensions
