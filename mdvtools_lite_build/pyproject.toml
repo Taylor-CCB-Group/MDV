@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mdvtools"
-version = "0.0.10"
+version = "0.0.13"
 authors = [
     { name= "Martin Sergeant", email="m.j.sergeant1@googlemail.com"},
     { name= "PeterTodd", email="peter.todd@well.ox.ac.uk"},
 ]
 description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
 readme = "pypireadme.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -24,12 +24,15 @@ dependencies = [
  "mudata>=0.2.3",
  "pyyaml>=5.3",
  "numpy>=1.22",
- "pandas>=1.5.0",
+ "pandas==2.3.3",
  "scanpy>=1.7.2",
- "anndata>=0.10.8, !=0.10.9", #0.10.9 is incompatible with some versions of mudata
+ "anndata>=0.12.0",
  "scipy>=1.7.3",
  "typing_extensions>=4.1.0",
- "Werkzeug>=2.3.0"
+ "Werkzeug>=2.3.0",
+ "spatialdata==0.5.0",
+ "spatialdata-io==0.3.0",
+ "polars>=1.35"
 ]
 
 [project.urls]
@@ -55,7 +58,16 @@ mdvtools = "mdvtools.cli:cli"
 "../python/mdvtools/chart_prototypes.py" = "mdvtools/chart_prototypes.py"
 "../python/mdvtools/logging_config.py"="mdvtools/logging_config.py"
 "../python/mdvtools/cli.py"="mdvtools/cli.py"
+"../python/mdvtools/spatial"="mdvtools/spatial"
+"../python/mdvtools/network_helpers.py"="mdvtools/network_helpers.py"
+"../python/mdvtools/build_info.py"="mdvtools/build_info.py"
+"../python/mdvtools/markdown_utils.py"="mdvtools/markdown_utils.py"
 
+[tool.hatch.build.targets.wheel]
+exclude = [
+    "mdvtools/static/**/*.map",
+    "mdvtools/static/**/*.js.map",
+]
 
 
 
