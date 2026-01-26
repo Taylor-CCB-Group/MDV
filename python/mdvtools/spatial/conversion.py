@@ -151,6 +151,100 @@ def _shape_to_geojson(shape: "GeoDataFrame", transform_to_image: "BaseTransforma
     transformed_shape = shape.affine_transform(matrix)
     return f"{transformed_shape.to_json()}"
 
+def _get_transformation_between_coordinate_systems_safe(
+    sdata: "SpatialData",
+    source_coordinate_system: "SpatialElement | str",
+    target_coordinate_system: "SpatialElement | str",
+) -> Optional["BaseTransformation"]:
+    """
+    Safely get transformation between coordinate systems, handling multiple equal paths.
+    
+    When multiple equal-length shortest paths are found, this function automatically
+    selects the first path and logs a warning, rather than raising an error.
+    
+    Args:
+        sdata: SpatialData object
+        source_coordinate_system: Source coordinate system (element or string)
+        target_coordinate_system: Target coordinate system (element or string)
+        
+    Returns:
+        Transformation between the coordinate systems, or None if no path exists
+    """
+    from spatialdata.transformations import get_transformation_between_coordinate_systems
+    from spatialdata.transformations import get_transformation, Identity, Sequence
+    from spatialdata.models._utils import has_type_spatial_element
+    import networkx as nx
+    import contextlib
+    
+    try:
+        return get_transformation_between_coordinate_systems(
+            sdata, source_coordinate_system, target_coordinate_system
+        )
+    except RuntimeError as e:
+        error_msg = str(e)
+        if "Multiple equal paths found" not in error_msg:
+            # Re-raise if it's a different error
+            raise
+        
+        # Log warning about auto-selecting path
+        print(
+            f"WARNING: Multiple equal transformation paths found. "
+            f"Automatically selecting the first path. Error details: {error_msg}"
+        )
+        
+        # Manually build graph and select first shortest path
+        # Replicate _build_transformations_graph logic
+        g = nx.DiGraph()
+        gen = sdata._gen_spatial_element_values()
+        for cs in sdata.coordinate_systems:
+            g.add_node(cs)
+        for e in gen:
+            g.add_node(id(e))
+            transformations = get_transformation(e, get_all=True)
+            if not isinstance(transformations, dict):
+                raise ValueError("Expected transformations to be a dict")
+            for cs, t in transformations.items():
+                g.add_edge(id(e), cs, transformation=t)
+                with contextlib.suppress(np.linalg.LinAlgError):
+                    g.add_edge(cs, id(e), transformation=t.inverse())
+        
+        # Determine source and target nodes
+        if has_type_spatial_element(source_coordinate_system):
+            src_node = id(source_coordinate_system)
+        else:
+            assert isinstance(source_coordinate_system, str)
+            src_node = source_coordinate_system
+        
+        if has_type_spatial_element(target_coordinate_system):
+            tgt_node = id(target_coordinate_system)
+        else:
+            assert isinstance(target_coordinate_system, str)
+            tgt_node = target_coordinate_system
+        
+        # Check for identity case
+        if src_node == tgt_node:
+            return Identity()
+        
+        # Find all paths
+        paths = list(nx.all_simple_paths(g, source=src_node, target=tgt_node))
+        if len(paths) == 0:
+            return None
+        
+        # Find shortest paths and select first one
+        shortest_paths = [p for p in paths if len(p) == min(map(len, paths))]
+        if len(shortest_paths) == 0:
+            return None
+        
+        path = shortest_paths[0]
+        
+        # Build transformation sequence from path
+        transformations_list = [
+            g[path[i]][path[i + 1]]["transformation"] 
+            for i in range(len(path) - 1)
+        ]
+        sequence = Sequence(transformations_list)
+        return sequence
+
 
 def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
     """
@@ -274,8 +368,6 @@ def _get_xenium_transform(
     Returns:
         Tuple of (transform, shape_name) if found, None otherwise
     """
-    from spatialdata.transformations import get_transformation_between_coordinate_systems
-    
     if not _is_xenium_like(sdata):
         if require:
             context = f" in '{sdata_name}'" if sdata_name else ""
@@ -296,7 +388,7 @@ def _get_xenium_transform(
         return None
     
     shape_name, shape_element = xenium_shape
-    transform = get_transformation_between_coordinate_systems(sdata, shape_element, img_obj)
+    transform = _get_transformation_between_coordinate_systems_safe(sdata, shape_element, img_obj)
     if transform is None:
         if require:
             context = f" in '{sdata_name}'" if sdata_name else ""
@@ -337,8 +429,6 @@ def _choose_point_transform(
         - transform_type: brief description
         - xenium_detected: boolean if auto-mode detected Xenium
     """
-    from spatialdata.transformations import get_transformation_between_coordinate_systems
-    
     metadata = {
         "mode": mode,
         "source_element": annotated_name,
@@ -385,7 +475,7 @@ def _choose_point_transform(
     if mode == "annotated-element":
         # Note: This transform is from the element's coordinate system, not to image
         # We still need to get the transform to the image
-        transform = get_transformation_between_coordinate_systems(sdata, annotated_element, img_obj)
+        transform = _get_transformation_between_coordinate_systems_safe(sdata, annotated_element, img_obj)
         if transform is None:
             metadata["transform_type"] = "None (no transform to image found)"
         else:
@@ -394,7 +484,7 @@ def _choose_point_transform(
     
     # Handle image mode (default)
     if mode == "image":
-        transform = get_transformation_between_coordinate_systems(sdata, annotated_element, img_obj)
+        transform = _get_transformation_between_coordinate_systems_safe(sdata, annotated_element, img_obj)
         if transform is None:
             metadata["transform_type"] = "None (no transform found)"
         else:
