@@ -74,9 +74,8 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     from mdvtools.llm.markdown_utils import create_project_markdown
     from mdvtools.charts.text_box_plot import TextBox
     from mdvtools.build_info import get_build_info_markdown
-    import json
     markdown = initial_markdown
-    markdown += f"# SpatialData conversion information:\n\n"
+    markdown += "# SpatialData conversion information:\n\n"
     
     # Add build information
     markdown += get_build_info_markdown()
@@ -161,8 +160,8 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
     from spatialdata.transformations import Identity
     if "spatial" not in adata.obsm:
         # todo: proper support for non-spatial tables, add tests.
-        print(f"WARNING: No spatial coordinates found in obsm['spatial']")
-        print(f"We should be able to handle this case, but it is not supported or tested yet, results may be undesired.")
+        print("WARNING: No spatial coordinates found in obsm['spatial']")
+        print("We should be able to handle this case, but it is not supported or tested yet, results may be undesired.")
         return adata
     # todo: support non-2d cases...
     axes = ("x", "y")
@@ -203,7 +202,7 @@ def _get_transform_keys(e: "SpatialElement") -> list[str]:
     from spatialdata.transformations import get_transformation
     transformations = get_transformation(e, get_all=True)
     if not isinstance(transformations, dict):
-        raise ValueError(f"This should be unreachable, get_transformation with get_all=True should always return a dict")
+        raise ValueError("This should be unreachable, get_transformation with get_all=True should always return a dict")
     return list(transformations.keys())
 
 
@@ -415,7 +414,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
       this is used later to set the region metadata for the mdv project.
     If conversion_args.output_geojson is True, geojson should be saved to the output folder as <mdv.dir>/spatial/region_id.geojson
     """
-    from spatialdata.transformations import get_transformation, get_transformation_between_coordinate_systems
+    from spatialdata.transformations import get_transformation
     from spatialdata.models import get_table_keys
     from anndata import AnnData
     adata = sdata.tables[table_name]
@@ -452,7 +451,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             raise ValueError(f"This should be unreachable - '{r}' is not a table in '{sdata_name}':\n{sdata}")
         transformations = get_transformation(annotated, get_all=True)
         if not isinstance(transformations, dict):
-            raise ValueError(f"This should be unreachable, get_transformation with get_all=True should always return a dict")
+            raise ValueError("This should be unreachable, get_transformation with get_all=True should always return a dict")
         cs_names = list(transformations.keys())
         if not cs_names:
             raise ValueError(f"Annotated element '{r}' has no coordinate system definitions")
