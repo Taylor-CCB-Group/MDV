@@ -100,7 +100,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             permissions.edit &&
             (operationPermissions.renameProject ||
                 operationPermissions.deleteProject ||
-                operationPermissions.exportProject ||
+                // operationPermissions.exportProject ||
                 operationPermissions.shareProject),
         [permissions.edit, operationPermissions],
     );
@@ -260,7 +260,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                 <ListItemText>Rename Project</ListItemText>
                             </MenuItem>
                         )}
-                        {operationPermissions.exportProject && (
+                        {/* {operationPermissions.exportProject && (
                             <MenuItem
                                 onClick={() => {
                                     handleMenuClose();
@@ -274,7 +274,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                 </ListItemIcon>
                                 <ListItemText>Export Project (as *.mdv.zip)</ListItemText>
                             </MenuItem>
-                        )}
+                        )} */}
                         {operationPermissions.shareProject && (
                             <MenuItem
                                 onClick={() => {
