@@ -1,5 +1,5 @@
 import { type PropsWithChildren, createContext, useContext } from "react";
-import type { loadBioformatsZarr, loadOmeTiff, loadOmeZarr } from "@vivjs-experimental/viv";
+import type { loadOmeTiff, loadOmeZarr } from "@hms-dbmi/viv";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
@@ -9,11 +9,10 @@ import type { EqFn, Selector, ZustandStore } from "./zustandTypes";
 // ... not to mention HTJ2K?
 export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
 export type OME_ZARR = Awaited<ReturnType<typeof loadOmeZarr>>;
-export type BIO_ZARR = Awaited<ReturnType<typeof loadBioformatsZarr>>;
-export type PixelSource = OME_TIFF | OME_ZARR | BIO_ZARR;
+export type PixelSource = OME_TIFF | OME_ZARR;
 
 // --- copied straight from Avivator's code::: with notes / changes for MDV ---
-import { RENDERING_MODES } from "@vivjs-experimental/viv";
+import { RENDERING_MODES } from "@hms-dbmi/viv";
 import { getEntries } from "@/lib/utils";
 
 const capitalize = (string: string) => string.charAt(0).toUpperCase() + string.slice(1);
@@ -359,7 +358,7 @@ type OME_METADATA = OME_ZARR['metadata'] & {
         PhysicalSizeXUnit?: string;
     }
 }
-export type Metadata = OME_TIFF['metadata'] | OME_METADATA | BIO_ZARR['metadata'];
+export type Metadata = OME_TIFF['metadata'] | OME_METADATA;
 //export type Metadata = TiffPreviewProps["metadata"];
 export const useMetadata = (): Metadata | undefined | null => {
     try {

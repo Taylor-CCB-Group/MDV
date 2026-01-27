@@ -1,10 +1,10 @@
 import * as React from "react";
 import DeckGL from "@deck.gl/react";
 import type { MjolnirEvent } from 'mjolnir.js';
-// import { getVivId } from '@vivjs-experimental/views';
+// import { getVivId } from '@hms-dbmi/views';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
-import { ScaleBarLayer } from "@vivjs-experimental/viv";
+import { ScaleBarLayer } from "@hms-dbmi/viv";
 import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
@@ -413,7 +413,7 @@ class MDVivViewerWrapper extends React.PureComponent<
 }
 
 /**
- * This is a wrapper around the VivViewer component from @vivjs-experimental/viv
+ * This is a wrapper around the VivViewer component from @hms-dbmi/viv
  * *** THIS IS NOW ACTUALLY NECESSARY ***
  * to fix issues with mouse events in popouts.
  * In future, we may handle more interesting things here to do with layer rendering.

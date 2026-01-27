@@ -6,7 +6,7 @@ import {
     ColorPalette3DExtensions,
     DETAIL_VIEW_ID,
     getChannelStats,
-} from "@vivjs-experimental/viv";
+} from "@hms-dbmi/viv";
 
 import { hexToRGB, RGBToHex } from "../datastore/DataStore.js";
 import { Deck } from "@deck.gl/core";
