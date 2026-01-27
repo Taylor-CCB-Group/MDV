@@ -50,7 +50,6 @@ export type ChannelsState = {
     contrastLimits: [number, number][];
     colors: [number, number, number][];
     domains: [number, number][];
-    // not all of these properties are always there - not all images have z/t
     selections: { z: number; c: number; t: number }[];
     loader: any; //TBD
     image: number;
@@ -203,11 +202,11 @@ export function createVivStores() {
             set((state: ChannelsState) => {
                 const entries = getEntries(newProperties);
                 const newState: Partial<ChannelsState> = {};
-                //@ts-expect-error there is a strong case for changing the structure of the state...
+                //@ts-ignore there is a strong case for changing the structure of the state...
                 entries.forEach(([property, value]) => {
-                    //@ts-expect-error there is a strong case for changing the structure of the state...
+                    //@ts-ignore there is a strong case for changing the structure of the state...
                     newState[property] = [...state[property]];
-                    //@ts-expect-error there is a strong case for changing the structure of the state...
+                    //@ts-ignore there is a strong case for changing the structure of the state...
                     newState[property][channel] = value;
                 });
                 return { ...state, ...newState };
@@ -218,9 +217,9 @@ export function createVivStores() {
                 const channelKeys = Object.keys(DEFAUlT_CHANNEL_VALUES);
                 Object.keys(state).forEach((key) => {
                     if (channelKeys.includes(key)) {
-                        //@ts-expect-error viv removeChannel
+                        //@ts-ignore
                         newState[key] = state[key].filter(
-                            //@ts-expect-error viv removeChannel
+                            //@ts-ignore
                             (_, j) => j !== channel,
                         );
                     }
@@ -232,13 +231,13 @@ export function createVivStores() {
                 const entries = getEntries(newProperties);
                 const newState = { ...state };
                 entries.forEach(([property, value]) => {
-                    //@ts-expect-error there is a strong case for changing the structure of the state...
+                    //@ts-ignore there is a strong case for changing the structure of the state...
                     newState[property] = [...state[property], value];
                 });
                 Object.entries(DEFAUlT_CHANNEL_VALUES).forEach(([k, v]) => {
-                    //@ts-expect-error viv addChannel
+                    //@ts-ignore
                     if (newState[k].length < newState[entries[0][0]].length) {
-                        //@ts-expect-error viv addChannel
+                        //@ts-ignore
                         newState[k] = [...state[k], v];
                     }
                 });
@@ -380,28 +379,16 @@ export const useMetadata = (): Metadata | undefined | null => {
 export const applyDefaultChannelState = (config: Partial<VivConfig>) => {
     // return config as VivConfig;
     const newConfig = config as VivConfig;
+    //seemed like simplest way to deal with viv's fixed number of channels, but doesn't work after manipulation
+    const n = 6; //newConfig.channelsStore.channelsVisible.length;
     if (!newConfig.channelsStore) newConfig.channelsStore = {};
-    
-    // Determine the expected number of channels from channelsVisible array
-    const expectedLength = newConfig.channelsStore.channelsVisible?.length || 0;
-    
-    // Ensure ids array exists and has the correct length
-    // Ignore any serialised value in config (not expected to be there other than in test config used during dev)
-    if (expectedLength > 0) {
-        newConfig.channelsStore.ids = Array.from({ length: expectedLength }, 
-            () => String(Math.random()));
-    } else {
-        newConfig.channelsStore.ids = [];
-    }
-    
-    // Handle brightness and contrast arrays (legacy support)
     for (const [k, v] of Object.entries(DEFAUlT_CHANNEL_VALUES)) {
-        if (k === "ids") continue; // Already handled above
+        if (k === "ids") continue;
         // it would be nice if this was more generic, but for now we are explicitly dealing with brightness and contrast...
         if (k !== "brightness" && k !== "contrast") continue;
         if (newConfig.channelsStore[k] === undefined) {
             console.log(`adding default value ${v} for`, k);
-            newConfig.channelsStore[k] = new Array(expectedLength).fill(v);
+            newConfig.channelsStore[k] = new Array(n).fill(v);
         }
     }
     return newConfig;

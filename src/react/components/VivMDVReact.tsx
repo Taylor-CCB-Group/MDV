@@ -338,7 +338,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     contrast: channels.contrast,
                     domains: channels.domains,
                     selections: channels.selections,
-                    // ids: channels.ids, // don't need to be serialised as long as they are synthesised correctly in applyDefaultChannelState
                 },
                 imageSettingsStore: {
                     // could be interested in lensEnabled, zoomLock, panLock, etc.
