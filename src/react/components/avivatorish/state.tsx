@@ -44,12 +44,15 @@ function generateToggles<TDefaults extends {}, TState extends TDefaults>(
     });
     return toggles;
 }
+type ChannelSelection = {
+    z?: number, c?: number, t?: number
+}
 export type ChannelsState = {
     channelsVisible: boolean[];
     contrastLimits: [number, number][];
     colors: [number, number, number][];
     domains: [number, number][];
-    selections: { z: number; c: number; t: number }[];
+    selections: ChannelSelection[];
     loader: any; //TBD
     image: number;
     ids: string[];
@@ -65,7 +68,7 @@ export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
     contrast: [] as number[],
     colors: [],
     domains: [] as [number, number][],
-    selections: [] as { z: number; c: number; t: number }[],
+    selections: [],
     ids: [],
     // not for serialization... think about this.
     loader: [{ labels: [], shape: [] }],
