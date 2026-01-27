@@ -2,7 +2,9 @@
 # warning - we had an obscure npm error with cross-env not found, and it seems like using an earlier nodejs version fixed it
 # for some reason node_modules/.bin wasn't populated after `RUN npm install` - but manually running it in the container worked
 # not sure if there's a way of pinning a more specific build of the base image. May want to see if we can reproduce this issue outside of docker.
-FROM nikolaik/python-nodejs:python3.12-nodejs20 AS frontend-builder
+# revisiting in 2026: node20 is reaching EOL, and we have a "npm warn EBADENGINE Unsupported engine" related to "vite-plugin-glsl" in npm install
+# changing to node22 again.
+FROM nikolaik/python-nodejs:python3.12-nodejs22 AS frontend-builder
 
 # ARG and ENV for build information, to be passed in from the CI pipeline
 ARG GIT_COMMIT_DATE="unknown"

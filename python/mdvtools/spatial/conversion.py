@@ -71,12 +71,11 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     We may consider adding more configuration options etc.
     """
     from mdvtools.spatial.mermaid import sdata_to_mermaid
-    from mdvtools.llm.markdown_utils import create_project_markdown
+    from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.charts.text_box_plot import TextBox
     from mdvtools.build_info import get_build_info_markdown
-    import json
     markdown = initial_markdown
-    markdown += f"# SpatialData conversion information:\n\n"
+    markdown += "# SpatialData conversion information:\n\n"
     
     # Add build information
     markdown += get_build_info_markdown()
@@ -152,6 +151,101 @@ def _shape_to_geojson(shape: "GeoDataFrame", transform_to_image: "BaseTransforma
     transformed_shape = shape.affine_transform(matrix)
     return f"{transformed_shape.to_json()}"
 
+def _get_transformation_between_coordinate_systems_safe(
+    sdata: "SpatialData",
+    source_coordinate_system: "SpatialElement | str",
+    target_coordinate_system: "SpatialElement | str",
+) -> Optional["BaseTransformation"]:
+    """
+    Safely get transformation between coordinate systems, handling multiple equal paths.
+    
+    When multiple equal-length shortest paths are found, this function automatically
+    selects the first path and logs a warning, rather than raising an error.
+    
+    Args:
+        sdata: SpatialData object
+        source_coordinate_system: Source coordinate system (element or string)
+        target_coordinate_system: Target coordinate system (element or string)
+        
+    Returns:
+        Transformation between the coordinate systems, or None if no path exists
+    """
+    from spatialdata.transformations import get_transformation_between_coordinate_systems
+    from spatialdata.transformations import get_transformation, Identity, Sequence
+    from spatialdata.models._utils import has_type_spatial_element
+    import networkx as nx
+    import contextlib
+    
+    try:
+        return get_transformation_between_coordinate_systems(
+            sdata, source_coordinate_system, target_coordinate_system
+        )
+    except RuntimeError as e:
+        error_msg = str(e)
+        if "Multiple equal paths found" not in error_msg:
+            # Re-raise if it's a different error
+            raise
+        
+        # Log warning about auto-selecting path
+        print(
+            f"WARNING: Multiple equal transformation paths found. "
+            f"Automatically selecting the first path. Error details: {error_msg}"
+        )
+        
+        # Manually build graph and select first shortest path
+        # Replicate _build_transformations_graph logic
+        g = nx.DiGraph()
+        gen = sdata._gen_spatial_element_values()
+        for cs in sdata.coordinate_systems:
+            g.add_node(cs)
+        for e in gen:
+            g.add_node(id(e))
+            transformations = get_transformation(e, get_all=True)
+            if not isinstance(transformations, dict):
+                raise ValueError("Expected transformations to be a dict")
+            for cs, t in transformations.items():
+                g.add_edge(id(e), cs, transformation=t)
+                with contextlib.suppress(np.linalg.LinAlgError):
+                    g.add_edge(cs, id(e), transformation=t.inverse())
+        
+        # Determine source and target nodes
+        if has_type_spatial_element(source_coordinate_system):
+            src_node = id(source_coordinate_system)
+        else:
+            assert isinstance(source_coordinate_system, str)
+            src_node = source_coordinate_system
+        
+        if has_type_spatial_element(target_coordinate_system):
+            tgt_node = id(target_coordinate_system)
+        else:
+            assert isinstance(target_coordinate_system, str)
+            tgt_node = target_coordinate_system
+        
+        # Check for identity case
+        if src_node == tgt_node:
+            return Identity()
+        
+        try:
+            path = nx.shortest_path(g, source=src_node, target=tgt_node)
+            
+            # Build transformation sequence from path
+            transformations_list = [
+                g[path[i]][path[i + 1]]["transformation"] 
+                for i in range(len(path) - 1)
+            ]
+            sequence = Sequence(transformations_list)
+            return sequence
+        
+        # - not expected as we call this with nodes previously established to be connected
+        except nx.NetworkXNoPath:
+            # No path exists between source and target 
+            return None
+        except Exception as e:
+            # Re-raise all other exceptions as unexpected errors
+            raise RuntimeError(
+                f"Unexpected error while computing transformation path: {e}"
+            ) from e
+
 
 def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, ImageEntry]):
     """
@@ -161,13 +255,13 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
     from spatialdata.transformations import Identity
     if "spatial" not in adata.obsm:
         # todo: proper support for non-spatial tables, add tests.
-        print(f"WARNING: No spatial coordinates found in obsm['spatial']")
-        print(f"We should be able to handle this case, but it is not supported or tested yet, results may be undesired.")
+        print("WARNING: No spatial coordinates found in obsm['spatial']")
+        print("We should be able to handle this case, but it is not supported or tested yet, results may be undesired.")
         return adata
     # todo: support non-2d cases...
     axes = ("x", "y")
     # Convert coordinates to homogeneous coordinates (add 1s for translation)
-    coords_homogeneous = np.column_stack([adata.obsm["spatial"], np.ones(adata.obsm["spatial"].shape[0])])
+    coords_homogeneous = np.column_stack([adata.obsm["spatial"], np.ones(adata.obsm["spatial"].shape[0], dtype=float)])
     _r, region_element, _instance_key = get_table_keys(adata)
 
     transformed_coords = np.full_like(adata.obsm["spatial"], fill_value=np.nan)
@@ -203,7 +297,7 @@ def _get_transform_keys(e: "SpatialElement") -> list[str]:
     from spatialdata.transformations import get_transformation
     transformations = get_transformation(e, get_all=True)
     if not isinstance(transformations, dict):
-        raise ValueError(f"This should be unreachable, get_transformation with get_all=True should always return a dict")
+        raise ValueError("This should be unreachable, get_transformation with get_all=True should always return a dict")
     return list(transformations.keys())
 
 
@@ -275,8 +369,6 @@ def _get_xenium_transform(
     Returns:
         Tuple of (transform, shape_name) if found, None otherwise
     """
-    from spatialdata.transformations import get_transformation_between_coordinate_systems
-    
     if not _is_xenium_like(sdata):
         if require:
             context = f" in '{sdata_name}'" if sdata_name else ""
@@ -297,7 +389,7 @@ def _get_xenium_transform(
         return None
     
     shape_name, shape_element = xenium_shape
-    transform = get_transformation_between_coordinate_systems(sdata, shape_element, img_obj)
+    transform = _get_transformation_between_coordinate_systems_safe(sdata, shape_element, img_obj)
     if transform is None:
         if require:
             context = f" in '{sdata_name}'" if sdata_name else ""
@@ -338,8 +430,6 @@ def _choose_point_transform(
         - transform_type: brief description
         - xenium_detected: boolean if auto-mode detected Xenium
     """
-    from spatialdata.transformations import get_transformation_between_coordinate_systems
-    
     metadata = {
         "mode": mode,
         "source_element": annotated_name,
@@ -386,7 +476,7 @@ def _choose_point_transform(
     if mode == "annotated-element":
         # Note: This transform is from the element's coordinate system, not to image
         # We still need to get the transform to the image
-        transform = get_transformation_between_coordinate_systems(sdata, annotated_element, img_obj)
+        transform = _get_transformation_between_coordinate_systems_safe(sdata, annotated_element, img_obj)
         if transform is None:
             metadata["transform_type"] = "None (no transform to image found)"
         else:
@@ -395,7 +485,7 @@ def _choose_point_transform(
     
     # Handle image mode (default)
     if mode == "image":
-        transform = get_transformation_between_coordinate_systems(sdata, annotated_element, img_obj)
+        transform = _get_transformation_between_coordinate_systems_safe(sdata, annotated_element, img_obj)
         if transform is None:
             metadata["transform_type"] = "None (no transform found)"
         else:
@@ -415,7 +505,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
       this is used later to set the region metadata for the mdv project.
     If conversion_args.output_geojson is True, geojson should be saved to the output folder as <mdv.dir>/spatial/region_id.geojson
     """
-    from spatialdata.transformations import get_transformation, get_transformation_between_coordinate_systems
+    from spatialdata.transformations import get_transformation
     from spatialdata.models import get_table_keys
     from anndata import AnnData
     adata = sdata.tables[table_name]
@@ -452,7 +542,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             raise ValueError(f"This should be unreachable - '{r}' is not a table in '{sdata_name}':\n{sdata}")
         transformations = get_transformation(annotated, get_all=True)
         if not isinstance(transformations, dict):
-            raise ValueError(f"This should be unreachable, get_transformation with get_all=True should always return a dict")
+            raise ValueError("This should be unreachable, get_transformation with get_all=True should always return a dict")
         cs_names = list(transformations.keys())
         if not cs_names:
             raise ValueError(f"Annotated element '{r}' has no coordinate system definitions")
@@ -463,6 +553,9 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
         # images that are likely compatible
         img_candidates = [img for img in sdata.images.items() if cs in _get_transform_keys(img[1])]
 
+        # Sort to prioritize morphology_focus images (especially for xenium datasets)
+        # note - there is some dead code below that would interact badly with this if it was actually doing anything
+        img_candidates.sort(key=lambda img: (0 if 'morphology_focus' in str(img[0]) else 1, img[0]))
 
         img_entries: list[ImageEntry] = []
         best_idx = 0
@@ -476,6 +569,10 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             )
             if T is None and conversion_args.point_transform != "identity":
                 continue
+            
+            ## TODO fix or simplify non-functional size-heuristic...
+            # currently not expecting to do much with wh, and anticipating that this will be less relevant
+            # once we use spatialdata.js
             
             # try to extract pixel size / extent if available
             # nb, this is wrong, it was written by an LLM.
@@ -641,7 +738,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
 
     # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
-    from mdvtools.llm.markdown_utils import create_project_markdown
+    from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.build_info import get_build_info
     
     # Print version banner if build info is available
