@@ -554,6 +554,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
         img_candidates = [img for img in sdata.images.items() if cs in _get_transform_keys(img[1])]
 
         # Sort to prioritize morphology_focus images (especially for xenium datasets)
+        # note - there is some dead code below that would interact badly with this if it was actually doing anything
         img_candidates.sort(key=lambda img: (0 if 'morphology_focus' in str(img[0]) else 1, img[0]))
 
         img_entries: list[ImageEntry] = []
@@ -568,6 +569,10 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             )
             if T is None and conversion_args.point_transform != "identity":
                 continue
+            
+            ## TODO fix or simplify non-functional size-heuristic...
+            # currently not expecting to do much with wh, and anticipating that this will be less relevant
+            # once we use spatialdata.js
             
             # try to extract pixel size / extent if available
             # nb, this is wrong, it was written by an LLM.
