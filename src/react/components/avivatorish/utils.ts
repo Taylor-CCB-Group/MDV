@@ -4,14 +4,13 @@ import { Matrix4 } from "@math.gl/core";
 
 import {
     loadOmeTiff,
-    loadBioformatsZarr,
     loadOmeZarr,
     loadMultiTiff,
     getChannelStats,
     RENDERING_MODES,
     ColorPalette3DExtensions,
     AdditiveColormap3DExtensions,
-} from "@vivjs-experimental/viv";
+} from "@hms-dbmi/viv";
 
 import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
 import { isArray } from "@/lib/utils";
@@ -232,33 +231,19 @@ export async function createLoader(
             return source;
         }
 
-        // Bio-Formats Zarr
-        let source;
-        try {
-            //@ts-ignore !ruh-roh
-            source = await loadBioformatsZarr(urlOrFile);
-        } catch (e) {
-            if (isZodError(e)) {
-                // If the error is a ZodError, it means there was an OME-XML file
-                // but it was invalid. We shouldn't try to load the file as a OME-Zarr.
-                throw e;
-            }
-
-            // try ome-zarr
-            //@ts-ignore !ruh-roh
-            const res = await loadOmeZarr(urlOrFile, { type: "multiscales" });
-            // extract metadata into OME-XML-like form
-            const metadata = {
-                Pixels: {
-                    Channels: res.metadata.omero.channels.map((c) => ({
-                        Name: c.label,
-                        SamplesPerPixel: 1,
-                    })),
-                },
-            };
-            source = { data: res.data, metadata };
-        }
-        return source;
+        // try ome-zarr
+        //@ts-ignore !ruh-roh
+        const res = await loadOmeZarr(urlOrFile, { type: "multiscales" });
+        // extract metadata into OME-XML-like form
+        const metadata = {
+            Pixels: {
+                Channels: res.metadata.omero.channels.map((c: any) => ({
+                    Name: c.label,
+                    SamplesPerPixel: 1,
+                })),
+            },
+        };
+        return { data: res.data, metadata };
     } catch (e) {
         if (e instanceof UnsupportedBrowserError) {
             handleLoaderError(e.message);
