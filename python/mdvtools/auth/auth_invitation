@@ -213,33 +213,5 @@ if __name__ == "__main__":
                 user["username"] = username
         WHITELISTED_USERS.append(user)
 
+    # Only add/update users in Auth0; MDV server will sync/cache on its side
     upsert_users(DOMAIN, CLIENT_ID, CLIENT_SECRET, CONNECTION, WHITELISTED_USERS)
-    
-    # Sync users from Auth0 to MDV database and refresh cache
-    print("\nSyncing users from Auth0 to MDV database...")
-    try:
-        import os
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        from mdvtools.dbutils.safe_mdv_app import app
-        from mdvtools.auth.authutils import get_auth_provider, cache_user_projects
-        
-        with app.app_context():
-            try:
-                auth_provider = get_auth_provider()
-                if hasattr(auth_provider, 'sync_users_to_db'):
-                    auth_provider.sync_users_to_db()
-                    print("Users synced to MDV database successfully.")
-                    
-                    # Refresh cache
-                    print("Refreshing user-project cache...")
-                    cache_user_projects()
-                    print("Cache refreshed successfully.")
-                else:
-                    print("Warning: Auth provider does not support user sync.")
-            except Exception as e:
-                print(f"Warning: Could not sync users to MDV database: {e}")
-                print("You may need to restart the container or run sync manually.")
-    except Exception as e:
-        print(f"Warning: Could not initialize MDV app context for sync: {e}")
-        print("Users were added to Auth0, but MDV database sync failed.")
-        print("You may need to restart the container for changes to take effect.")
