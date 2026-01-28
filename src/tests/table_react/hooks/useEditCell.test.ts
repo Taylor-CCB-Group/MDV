@@ -1,6 +1,5 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import type { FeedbackAlert } from "@/react/components/TableChartReactComponent";
 import useEditCell from "@/react/hooks/useEditCell";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
