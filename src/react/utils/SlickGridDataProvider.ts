@@ -1,10 +1,19 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 
+/**
+ * Data Provider for the SlickGrid's DataView API
+ * 
+ * Maps the row indices to the data indices using the indices
+ * array
+ * 
+ * sort(), reSort(), refresh() are no-ops because sorting is managed
+ * externally via useSortedFilteredIndices hook.
+ */
 class SlickGridDataProvider {
     private columns: LoadedDataColumn<DataType>[];
     private indices: Uint32Array;
     private includeIndex: boolean;
-    private selectedRowIds: Set<number>;
+    private selectedRowIds: Set<number>; // Track the selected rows
     constructor(columns: LoadedDataColumn<DataType>[], indices: Uint32Array, includeIndex = false) {
         this.columns = columns;
         this.indices = indices;
@@ -16,6 +25,7 @@ class SlickGridDataProvider {
         return this.indices.length;
     }
 
+    // Map row indices of grid to the indices of the actual data
     getItem(index: number): any {
         if (index < 0 || index >= this.indices.length) {
             return null;

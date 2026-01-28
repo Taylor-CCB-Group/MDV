@@ -1,14 +1,24 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { useCallback, useRef } from "react";
 import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs, SlickgridReactInstance } from "slickgrid-react";
-import { replaceMatches, setCellValueFromString } from "../utils/valueReplacementUtil";
+import { setCellValueFromString } from "../utils/valueReplacementUtil";
 import type DataStore from "@/datastore/DataStore";
-import type { FeedbackAlert } from "../components/TableChartReactComponent";
+import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 
 /**
  *
- * Custom hook to handle editing of cell in the grid
- */
+ * Hook for handling cell editing in the grid
+ *
+ * Uses refs, not values, for orderedParamColumns and sortedFilteredIndices
+ * because SlickGrid stores callback references internally. Using refs
+ * ensures the callbacks always access the current data avoiding stale closures.
+ * 
+ * - Stores the old value for comparison when applying edit
+ * - Uses the util function setCellValueFromString for editing
+ * - Calls dataStore.dataChanged for dimension filter to refilter
+ * - Rerender the grid after updation
+ * 
+*/
 const useEditCell = (
     orderedParamColumnsRef: React.MutableRefObject<LoadedDataColumn<DataType>[]>,
     sortedFilteredIndicesRef: React.MutableRefObject<Uint32Array>,
@@ -18,6 +28,7 @@ const useEditCell = (
 ) => {
     const oldCellValueRef = useRef<string | null>(null);
 
+    // Store the old value of the cell in the oldCellValueRef
     const handleBeforeEditCell = useCallback(
         (
             e: CustomEvent<{
@@ -32,6 +43,7 @@ const useEditCell = (
 
             const editedCol = currentOrderedColumns.find((col) => col.field === columnName);
 
+            // Not an editable column, return
             if (!editedCol || !editedCol.editable) {
                 oldCellValueRef.current = null;
                 return;
@@ -39,6 +51,7 @@ const useEditCell = (
 
             const oldValue = item[columnName];
 
+            // Store the old value in the ref if it exists as 'String'
             if (oldValue !== null && oldValue !== undefined) {
                 oldCellValueRef.current = String(oldValue);
             } else {
@@ -93,22 +106,23 @@ const useEditCell = (
                     throw new Error("Column not found");
                 }
 
-                if (!editedCol?.editable) {
+                if (!editedCol.editable) {
                     console.error(`Column ${columnName} not editable`);
                     throw new Error(`Column ${columnName} not editable`);
                 }
 
                 const newValueString = updatedValue !== null && updatedValue !== undefined ? String(updatedValue) : "";
 
-                // setCellValueFromString now throws on error instead of returning false
+                // Set new value
                 setCellValueFromString(editedCol, dataIndex, newValueString);
 
-                // If we get here, it succeeded
                 setFeedbackAlert({
                     type: "success",
                     message: `Updated value ${oldValue} with ${updatedValue} in column: ${columnName}`,
                     title: "Edit Successful",
                 });
+
+                // Update the dataStore and rerender the grid
                 dataStore.dataChanged([columnName]);
                 const grid = gridRef.current?.slickGrid;
                 if (grid) {

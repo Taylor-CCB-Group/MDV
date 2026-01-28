@@ -7,11 +7,10 @@ import { g } from "@/lib/utils";
 import { action } from "mobx";
 import type { SlickgridReactInstance } from "slickgrid-react";
 
-const TableChartComponent = observer(() => {
+const TableChartComponent = () => {
     return <TableChartReactComponent />;
-});
+};
 
-// todo: Add params and other options to config
 export type TableChartReactConfig = BaseConfig & {
     type: "table_chart_react";
     include_index?: boolean;
@@ -46,7 +45,6 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
     return config;
 }
 
-// todo: Add required functions related to the features
 class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     gridRef?: { current: SlickgridReactInstance | null };
     
@@ -56,13 +54,7 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         config = adaptConfig(config);
         super(dataStore, div, config, TableChartComponent);
 
-        // Add Download menu icon (like the legacy version)
-        // this.addMenuIcon("fas fa-download", "Download data", {
-        //     func: () => {
-        //         console.log("Download Data");
-        //         // this.downloadData();
-        //     },
-        // });
+        // todo: Add download (like the legacy version) and other features
     }
 
     getConfig() {
@@ -109,7 +101,6 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     }
 }
 
-// todo: Sync the options of config including the params
 BaseChart.types["table_chart_react"] = {
     name: "Table Chart (React)",
     class: TableChartReact,

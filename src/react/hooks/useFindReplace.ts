@@ -1,9 +1,9 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { replaceMatches, replaceValueInString } from "../utils/valueReplacementUtil";
+import { useCallback, useMemo, useState } from "react";
+import { replaceMatches } from "../utils/valueReplacementUtil";
 import type { SlickgridReactInstance } from "slickgrid-react";
 import type DataStore from "@/datastore/DataStore";
-import type { FeedbackAlert } from "../components/TableChartReactComponent";
+import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 
 export type FoundMatch = {
     value: string | number;
@@ -14,7 +14,7 @@ export type FoundMatch = {
 };
 
 /**
- * Custom hook which handles find and replace logic
+ * Hook for handling find and replace functionality
  */
 const useFindReplace = (
     orderedParamColumns: LoadedDataColumn<DataType>[],
@@ -66,6 +66,7 @@ const useFindReplace = (
                     throw new Error(`Column not found: ${searchColumn}`);
                 }
 
+                // Find the matches in the sortedFilteredIndices array
                 for (let row = 0; row < sortedFilteredIndices.length; row++) {
                     const dataIndex = sortedFilteredIndices[row];
 

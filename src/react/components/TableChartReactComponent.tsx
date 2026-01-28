@@ -5,59 +5,20 @@ import FindAndReplaceDialog from "./FindAndReplaceDialog";
 import useFindReplace from "../hooks/useFindReplace";
 import useSlickGridReact from "../hooks/useSlickGridReact";
 import useEditCell from "../hooks/useEditCell";
-import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
-import AlertErrorComponent, { type AlertType } from "@/charts/dialogs/AlertErrorComponent";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./FeedbackAlertComponent";
 
-export type FeedbackAlert = {
-    type: AlertType;
-    message: string;
-    stack?: string;
-    traceback?: string;
-    title?: string;
-    metadata?: object;
-} | null;
-
-export type FeedbackAlertComponentType = {
-    feedbackAlert: FeedbackAlert;
-};
-
-const isDebugError = (feedbackAlert: FeedbackAlert) => {
-    if (feedbackAlert)
-        return (
-            feedbackAlert.type === "error" && (feedbackAlert.stack || feedbackAlert.traceback || feedbackAlert.metadata)
-        );
-    else return false;
-};
-
-const FeedbackAlertComponent = ({ feedbackAlert }: FeedbackAlertComponentType) => {
-    if (!feedbackAlert) return <></>;
-
-    if (isDebugError(feedbackAlert)) {
-        return (
-            <DebugErrorComponent
-                error={{
-                    message: feedbackAlert.message,
-                    stack: feedbackAlert?.stack,
-                    traceback: feedbackAlert?.traceback,
-                }}
-                title={feedbackAlert.title || "Error"}
-                extraMetadata={feedbackAlert.metadata}
-            />
-        );
-    } else {
-        return (
-            <AlertErrorComponent
-                message={feedbackAlert.message}
-                title={feedbackAlert.title || feedbackAlert.type}
-                alertType={feedbackAlert.type}
-            />
-        );
-    }
-};
-
+/**
+ * Main component for the react table chart
+ * 
+ * Uses:
+ * - useSlickGridReact: Core grid states, refs and events
+ * - useFindReplace: Find and replace logic
+ * - useEditCell: Cell editing logic
+ * 
+ * Wrapped in an observer to react to Mobx changes
+ */
 // todo: add integration tests using playwright to test the working of this component
-// playwright would be more suitable to test this component rather than vitest which would require a lot of mocks
 const TableChartReactComponent = observer(() => {
     const [alertDialogOpen, setAlertDialogOpen] = useState(false);
     const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);

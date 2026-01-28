@@ -2,12 +2,17 @@ import { useEffect, useState } from "react";
 import { useConfig, useSimplerFilteredIndices } from "../hooks";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useDataStore } from "../context";
-import { autorun, trace } from "mobx";
+import { autorun } from "mobx";
 
-// This follows a similar approach for sorting as DataModel.sort()
 /**
- * Custom hook to sort and handle externally filtered indices
- * @returns the sorted indices
+ * Hook that sorts the filtered indices based on the config.sort
+ * 
+ * - Follows the logic of sorting in DataModel.sort()
+ * - Uses Mobx autorun to react to config.sort changes
+ * - Updates the indices when any of these change: filteredIndices,
+ * dataStore or config.sort
+ * 
+ * Returns a new Uint32Array of sorted indices
  */
 const useSortedFilteredIndices = () => {
     const config = useConfig<TableChartReactConfig>();
