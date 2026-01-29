@@ -1,5 +1,5 @@
 import DebugErrorComponent, { type ErrorMetadata } from "@/charts/dialogs/DebugErrorComponent";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import { Error as ErrorIcon } from "@mui/icons-material";
 import { Alert, Button, Container, Paper } from "@mui/material";
 import { useState } from "react";
@@ -67,7 +67,7 @@ const ErrorComponent = ({error, extraMetaData, title}: ErrorComponentType) => {
                         {title ? title : "ERROR: Click to view details"}
                     </Button>
                 </Alert>
-                <ReusableDialog
+                <ReusableAlertDialog
                     open={open}
                     handleClose={handleClose}
                     component={
