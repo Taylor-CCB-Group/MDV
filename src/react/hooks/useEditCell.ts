@@ -127,7 +127,6 @@ const useEditCell = (
                 const grid = gridRef.current?.slickGrid;
                 if (grid) {
                     grid.invalidate();
-                    grid.render();
                 }
             } catch (err) {
                 const error =

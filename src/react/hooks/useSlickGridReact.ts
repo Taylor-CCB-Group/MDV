@@ -48,7 +48,6 @@ const useSlickGridReact = () => {
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [searchColumn, setSearchColumn] = useState<string | null>(null);
-    const [gridReady, setGridReady] = useState(false);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -128,7 +127,7 @@ const useSlickGridReact = () => {
      * A new data provider gets created whenever any of the dependencies change which
      * will trigger an update to the grid
      * 
-     * Creation of a new data provider isn't expensive - Cursor
+     * Creation of a new data provider isn't expensive according to LLM
      */
     const dataProvider = useMemo(() => {
         return new SlickGridDataProvider(orderedParamColumns, sortedFilteredIndices, config.include_index);
@@ -156,7 +155,7 @@ const useSlickGridReact = () => {
      * This function handles grid creation, attaching data provider to the grid
      * and attaching all the event handlers
      * 
-     * Only runs when onReactGridCreated is called by grid
+     * Only runs when onReactGridCreated event is called by grid
      */
     const handleGridCreated = useCallback(
         (e: CustomEvent<SlickgridReactInstance>) => {
@@ -166,7 +165,6 @@ const useSlickGridReact = () => {
             // Store gridRef in chart instance for getConfig() access
             (chart as any).gridRef = gridRef;
 
-            setGridReady(true);
             const grid = e.detail.slickGrid;
             if (grid && dataProvider) {
                 grid.setData(dataProvider, true);
@@ -197,7 +195,6 @@ const useSlickGridReact = () => {
     const attachEventHandlers = useCallback((gridInstance: SlickgridReactInstance) => {
         const grid = gridInstance?.slickGrid;
         if (!grid) return;
-        console.log("add event handlers");
 
         const slickEventHandler = new SlickEventHandler();
 
@@ -221,14 +218,17 @@ const useSlickGridReact = () => {
 
         slickEventHandler.subscribe(grid.onSort, action((_e, args) => {
             // Skip during programmatic sync to prevent feedback loops
-            // console.log("inside sort handler");
             if (suppressSortSyncRef.current) return;
             
             if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
                 const columnId = args.sortCol.field;
                 const sortAsc = args.sortAsc;
-                const isSame = config.sort?.columnId === columnId && 
-                                config.sort?.ascending === sortAsc;
+                const currentSort = {columnId, ascending: sortAsc};
+
+                const currentSortStr = JSON.stringify(currentSort);
+                const configSortStr = JSON.stringify(config.sort);
+                
+                const isSame = currentSortStr === configSortStr;
                 console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
                 // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
                 // if not, then the type of config.sort.ascending should be optional.
@@ -237,7 +237,7 @@ const useSlickGridReact = () => {
                 // this gets into fiddly "key-optional" vs "value-optional" distinction.
                 // args.sortAsc could have a value of undefined - that's different from the key not being in the object in a meaningful way.
                 // it shouldn't be treated the same as a false value, or typed as though it was and passed further down...
-                if (!isSame) { // Check if there is a change
+                if (!isSame) { // Only update if there is a change
                     if (sortAsc === undefined) {
                         config.sort = undefined;
                     } else {
@@ -319,7 +319,7 @@ const useSlickGridReact = () => {
      */
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
-        if (!grid || !gridReady) return;
+        if (!grid) return;
         if (suppressSortSyncRef.current) return;
         
         const currentSortCols = grid.getSortColumns();
@@ -343,9 +343,15 @@ const useSlickGridReact = () => {
                 suppressSortSyncRef.current = false;
             }
         }
-    }, [config.sort, gridReady]);
+    }, [config.sort]);
 
-    // Handle highlighted data
+    /**
+     * Handle external highlighted data
+     * 
+     * When highlighting changes externally, update the grid's visual selection
+     * Internal grid's highlighting is handled by the event handler
+     * 
+     */
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
         if (!grid) return;

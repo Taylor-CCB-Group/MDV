@@ -15,6 +15,9 @@ export type FoundMatch = {
 
 /**
  * Hook for handling find and replace functionality
+ * 
+ * Search runs over the currently selected column and uses sortedFilteredIndices (visible rows).
+ * Replace uses valueReplacementUtil and notifies the data store so changes persist.
  */
 const useFindReplace = (
     orderedParamColumns: LoadedDataColumn<DataType>[],
@@ -30,6 +33,7 @@ const useFindReplace = (
     const [matchCount, setMatchCount] = useState<number | null>(null);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
+    // Disable flags for the find and replace dialog to disable the prev and next buttons
     const disableFindPrev = useMemo(() => {
         return foundMatches.length === 0 || (foundMatches.length > 0 && currentMatchIndex <= 0);
     }, [currentMatchIndex, foundMatches.length]);
@@ -92,6 +96,7 @@ const useFindReplace = (
                 setFoundMatches(matches);
                 setMatchCount(matches.length);
 
+                // If matches are found, set match index to 0 and navigate to the cell
                 if (matches.length > 0) {
                     setCurrentMatchIndex(0);
                     const grid = gridRef.current?.slickGrid;
@@ -139,11 +144,13 @@ const useFindReplace = (
         if (foundMatches.length === 0) return;
         if (currentMatchIndex + 1 >= foundMatches.length) return;
 
+        // Update match index
         const nextIndex = currentMatchIndex + 1;
         setCurrentMatchIndex(nextIndex);
         const grid = gridRef.current?.slickGrid;
         const match = foundMatches[nextIndex];
 
+        // Go to the cell in grid's display
         if (grid && match) {
             selectionSourceRef.current = 'programmatic';
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
@@ -160,12 +167,14 @@ const useFindReplace = (
         if (foundMatches.length === 0) return;
         if (currentMatchIndex === 0) return;
 
+        // Update match index
         const prevIndex = (currentMatchIndex - 1) % foundMatches.length;
         setCurrentMatchIndex(prevIndex);
 
         const grid = gridRef.current?.slickGrid;
         const match = foundMatches[prevIndex];
 
+        // Go to the cell in grid's display
         if (grid && match) {
             selectionSourceRef.current = 'programmatic';
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
@@ -177,7 +186,6 @@ const useFindReplace = (
         console.log(`Match ${prevIndex + 1} of ${foundMatches.length}`);
     }, [foundMatches, currentMatchIndex, gridRef, selectionSourceRef]);
 
-    //! Need a check for replace value
     const handleReplace = useCallback(
         (findValue: string, replaceValue: string) => {
             try {
@@ -200,6 +208,7 @@ const useFindReplace = (
 
                 const match = foundMatches[currentMatchIndex];
 
+                // Replace the cell value with new value
                 const matchReplaced = replaceMatches(searchColumn, column, findValue, replaceValue, match.dataIndex);
 
                 if (matchReplaced) {
@@ -208,12 +217,15 @@ const useFindReplace = (
                         message: `Replaced ${findValue} with ${replaceValue} in column: ${searchColumn}`,
                         title: "Replace Successful",
                     });
+
+                    // Update the data store and rerender the grid
                     dataStore.dataChanged([searchColumn]);
                     const grid = gridRef.current?.slickGrid;
                     if (grid) {
                         grid.invalidate();
-                        grid.render();
                     }
+
+                    // Find the rest of the occurrences
                     handleFind(findValue);
                 } else {
                     // No match found - this is not an error, just inform the user
@@ -274,7 +286,7 @@ const useFindReplace = (
                 let successCount = 0;
                 let errorCount = 0;
 
-                // let valuesReplaced = false;
+                // Replace all matches with new value
                 for (const match of foundMatches) {
                     try {
                         const matchReplaced = replaceMatches(
@@ -293,17 +305,18 @@ const useFindReplace = (
                     }
                 }
 
+                // Update the data store and rerender the grid if values were changed
                 if (successCount > 0) {
                     dataStore.dataChanged([searchColumn]);
                     const grid = gridRef.current?.slickGrid;
                     if (grid) {
                         grid.invalidate();
-                        grid.render();
                     }
                     handleFind(findValue);
                 }
 
                 if (successCount > 0 && !errorCount) {
+                    // Display success if there are no errors
                     setFeedbackAlert({
                         type: "success",
                         message: `Replaced ${successCount} occurrences of ${findValue} with ${replaceValue} in column: ${searchColumn}`,
@@ -311,6 +324,7 @@ const useFindReplace = (
                     });
                     return;
                 } else if (!successCount && !errorCount) {
+                    // Display warning if there was no replacement made
                     setFeedbackAlert({
                         type: "warning",
                         message: `No matches were replaced for ${findValue} with ${replaceValue} in column: ${searchColumn}`,
@@ -318,6 +332,7 @@ const useFindReplace = (
                     });
                     return;
                 } else {
+                    // Display error if there were one or more errors
                     setFeedbackAlert({
                         type: "error",
                         message: `${errorCount} error(s) occurred while trying to replace all occurrences of ${findValue} with ${replaceValue} in column: ${searchColumn}`,

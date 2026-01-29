@@ -43,6 +43,7 @@ export function createSlickGridMock(): SlickgridReactInstance {
         setData: vi.fn(),
         render: vi.fn(),
         invalidate: vi.fn(),
+        gotoCell: vi.fn(),
         setSortColumn: vi.fn(),
         setSortColumns: vi.fn(),
         getSortColumns: vi.fn(() => []),

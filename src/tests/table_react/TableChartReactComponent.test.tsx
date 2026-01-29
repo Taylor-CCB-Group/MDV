@@ -2,6 +2,7 @@ import TableChartReactComponent from "@/react/components/TableChartReactComponen
 import { render, screen } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { observable } from "mobx";
+import { createSlickGridMock } from "./hooks/testUtils/createSlickGridMock";
 
 // Mock SlickgridReact to avoid browser API issues
 vi.mock("slickgrid-react", () => ({
@@ -35,7 +36,7 @@ describe("TableChartReactComponent", () => {
             chartId: "test-chart",
             config: observable({}),
             dataStore: {},
-            gridRef: { current: null },
+            gridRef: { current: createSlickGridMock() },
             isSelectingRef: { current: false },
             isFindReplaceOpen: false,
             orderedParamColumns: [],
