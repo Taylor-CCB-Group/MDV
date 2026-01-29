@@ -7,7 +7,7 @@ from mdvtools.llm.chat_protocol import (
   ProjectChatProtocol, 
   chat_enabled
 )
-from mdvtools.llm.markdown_utils import create_project_markdown, create_error_markdown
+from mdvtools.markdown_utils import create_project_markdown, create_error_markdown
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 # from mdvtools.dbutils.config import config

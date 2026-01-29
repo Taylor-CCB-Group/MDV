@@ -3,13 +3,21 @@ import scipy
 import pandas as pd
 from os.path import join, split
 import os
-from .mdvproject import MDVProject,create_bed_gz_file
-import numpy as np
+import re
 import json
 import gzip
 import copy
 import yaml
 import shutil
+import h5py
+import logging
+from pathlib import Path
+from typing import Dict, List, Tuple, Any
+from werkzeug.utils import secure_filename
+import numpy as np
+from .mdvproject import MDVProject,create_bed_gz_file
+
+logger = logging.getLogger(__name__)
 
 
 def convert_scanpy_to_mdv(
@@ -185,29 +193,37 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
     p= MDVProject(folder,delete_existing=delete_existing)
     #are there any general drs
     table = _add_dims(md.obs,md.obsm,max_dims)
-    #add drs derived from modalities
+    #add drs derived from modalities (cell clustering)
     for name,mod in md.mod.items():
         table = _add_dims(table,mod.obsm,max_dims,name)
-    md.obs["cell_id"] = md.obs.index
+    table["cell_id"] = md.obs.index
     columns= [{"name":"cell_id","datatype":"unique"}]
     p.add_datasource("cells",table,columns)
 
     for mod in md.mod.keys():
         mdata = md.mod[mod]
-        #add the modality to project
-        p.add_datasource(mod,mdata.var)
+
         #adds the index to the data as a name column
         #This is usually the unique gene name - but not always
-        column ="name"
-        #no longer unique
-        #column = {"name":"name","datatype":"unique"}
-        p.set_column(mod,column,mdata.var.index)
+        if "name" in mdata.var.columns:
+            logger.warning(f"name in modality {mod} will be overwritten with the index")
+        #Add name column to the actual dataframe, previously it was added to the datasource
+        #after creation. This way it ensures that the dataframe has a least one column, which
+        #is required for subsequent steps
+        mdata.var["name"]=mdata.var.index
+
+        #add any DRs to the modality (e.g. gene/protein clustering)
+        mdata.var = _add_dims(mdata.var,mdata.varm,max_dims)
+     
+        #add the modality to project
+        p.add_datasource(mod,mdata.var)
+        
         #mod is used as both the tag and the label
-        #the name column is specified as the identifier that the user will use
-        #it is derived from the index and is usually the gene 'name'
-        #However it may not be appropriate can be changed later on 
+        #The name column is specified as the identifier that the user will use
+        #It is derived from the index and is usually the gene 'name'
+        #However it may not be appropriate and can be changed later on 
         p.add_rows_as_columns_link("cells",mod,"name",mod)
-        matrix,sparse= get_matrix(mdata.X)
+        matrix,sparse= get_matrix(mdata.X,md.obs_names,mdata.obs_names)
         #sometimes X is empty - all the data is in the layers
         if matrix.shape[1] !=0:
             p.add_rows_as_columns_subgroup("cells",mod,mod+"_expr",matrix,sparse=sparse, chunk_data=chunk_data)
@@ -215,7 +231,7 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
         layers = mdata.layers.keys()
         for layer in layers:
             matrix  = mdata.layers[layer]
-            matrix,sparse = get_matrix(matrix,mdata.obs_names,md.obs_names)
+            matrix,sparse = get_matrix(matrix,md.obs_names,mdata.obs_names)
             p.add_rows_as_columns_subgroup("cells",mod,f"{mod}_{layer}",matrix,sparse=sparse, chunk_data=chunk_data)
     return p
 
@@ -226,36 +242,138 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
 # the modality's obs_names will be in a different order and/or a subset of the main names
 # Hence a sparse matrix corresponding to the main indices needs to be created
 def get_matrix(matrix,main_names=None,mod_names=None) -> tuple[scipy.sparse.csc_matrix | np.ndarray, bool]:
+    """
+    Process and align a matrix to match main observation names.
+    
+    Args:
+        matrix: Input matrix (sparse or dense, may be wrapped)
+        main_names: Target observation names (e.g., from main AnnData object)
+        mod_names: Source observation names (e.g., from modality)
+    
+    Returns:
+        Tuple of (aligned_matrix, is_sparse)
+    """
     if main_names is None:
         main_names = []
     if mod_names is None:
         mod_names = []
-    #check where the matrix data actually is
+    
+    # Unwrap matrix if needed
     matrix = matrix.value if hasattr(matrix,"value") else matrix
-    #is the matrix backed sparse matrix -convert to non backed else cannot convert
+    
+    # Handle backed sparse matrices
     if hasattr(matrix,"backend"):
-        matrix=matrix._to_backed()
-    #not a sparse matrix - nothing else to do
-    if not scipy.sparse.issparse(matrix):
-        return matrix,False
-    #will convert sparse (and dense matrixes) to the csc
-    #format required by MDV
-    if not isinstance(matrix, scipy.sparse.csc_matrix):
+        matrix = matrix._to_backed()
+    
+    # Validate matrix
+    if matrix is None:
+        raise ValueError("Matrix cannot be None")
+    
+    # Check for empty matrix
+    if hasattr(matrix, 'shape') and (matrix.shape[0] == 0 or matrix.shape[1] == 0):
+        logger.warning(f"Empty matrix with shape {matrix.shape}")
+        return matrix, scipy.sparse.issparse(matrix)
+    
+    is_sparse = scipy.sparse.issparse(matrix)
+    
+    # Convert sparse matrix to CSC format for efficient column operations
+    if is_sparse and not isinstance(matrix, scipy.sparse.csc_matrix):
         matrix = scipy.sparse.csc_matrix(matrix)
-   
-    #check indexes are in sync and if so just return the csc matrix
-    if list(main_names) == list(mod_names):
-        return matrix,True
-    #create lookup of mod indices to main indices
-    main_map  =  {name: i for i, name in enumerate(main_names)}
-    lookup = np.array([main_map[name] for name in mod_names])
-    # Apply the lookup to the entire mod indices array using vectorized approach
-    indices  = lookup[matrix.indices]
-    # create a new sparse matrix 
-    matrix = scipy.sparse.csc_matrix((matrix.data, indices, matrix.indptr), 
-                                          shape=(len(main_names), matrix.shape[1]),
-                                          dtype=matrix.dtype)
-    return matrix,True
+    
+    # Early return if no alignment needed
+    if  not any(main_names)  or not any(mod_names):
+        return matrix, is_sparse
+    
+    # Validate dimensions
+    if len(mod_names) != matrix.shape[0]:
+        raise ValueError(
+            f"Length mismatch: mod_names has {len(mod_names)} entries "
+            f"but matrix has {matrix.shape[0]} rows"
+        )
+    
+    # Quick check if already aligned
+    if len(main_names) == len(mod_names) and all(m == n for m, n in zip(main_names, mod_names)):
+        return matrix, is_sparse
+    
+    # Create lookup from main names to indices
+    main_map = {name: i for i, name in enumerate(main_names)}
+    
+    # Identify missing and extra names
+    missing_names = [name for name in mod_names if name not in main_map]
+    
+    if missing_names:
+        n_missing = len(missing_names)
+        if n_missing <= 5:
+            logger.warning(
+                f"{n_missing} cell(s) present in modality but absent in main object "
+                f"and will be ignored: {', '.join(missing_names)}"
+            )
+        else:
+            logger.warning(
+                f"{n_missing} cells present in modality but absent in main object "
+                f"and will be ignored (showing first 5): {', '.join(missing_names[:5])}"
+            )
+    
+    # Check for duplicate names in mod_names
+    if len(mod_names) != len(set(mod_names)):
+        duplicates = [name for name in set(mod_names) if mod_names.count(name) > 1]
+        logger.warning(
+            f"Duplicate names found in modality: {', '.join(duplicates[:5])}. "
+            f"Only the first occurrence will be used."
+        )
+    
+    # Filter valid entries and build lookup
+    valid_indices = []
+    valid_mod_names = []
+    seen = set()
+    
+    for i, name in enumerate(mod_names):
+        if name in main_map and name not in seen:
+            valid_indices.append(i)
+            valid_mod_names.append(name)
+            seen.add(name)
+    
+    if not valid_indices:
+        raise ValueError(
+            "No overlapping cell names between main object and modality. "
+            "Cannot align matrices."
+        )
+    
+    # Extract valid rows
+    if len(valid_indices) < len(mod_names):
+        valid_indices_array = np.array(valid_indices)
+        matrix = matrix[valid_indices_array, :]
+        mod_names = valid_mod_names
+    
+    # Build mapping from mod indices to main indices
+    lookup = np.array([main_map[name] for name in mod_names], dtype=np.int32)
+    
+    if not is_sparse:
+        # Dense matrix handling
+        new_matrix = np.full((len(main_names), matrix.shape[1]), np.nan, dtype=np.float32)
+        new_matrix[lookup, :] = matrix
+        return new_matrix, False
+    else:
+      
+        # Remap row indices to match main_names order
+        new_indices = lookup[matrix.indices]
+        
+        # Verify indices are within bounds
+        if np.any(new_indices < 0) or np.any(new_indices >= len(main_names)):
+            raise ValueError("Index remapping produced out-of-bounds indices")
+        
+        # Create new sparse matrix with remapped rows
+        try:
+            new_matrix = scipy.sparse.csc_matrix(
+                (matrix.data, new_indices, matrix.indptr),
+                shape=(len(main_names), matrix.shape[1]),
+                dtype=matrix.dtype
+            )
+        except Exception as e:
+            logger.error(f"Failed to create remapped sparse matrix: {e}")
+            raise
+        
+        return new_matrix, True
 
 
 
@@ -678,3 +796,529 @@ def _add_dims(table, dims, max_dims: int, stub: str = "") -> pd.DataFrame:
         #perhaps only necessary with mudata objects but will do no harm
         table = table.merge(dim_table, left_index=True, right_index=True, how= "left")
     return table
+
+
+def _default_merge_prefix(extra_dir: str) -> str:
+    """
+    Generate a deterministic prefix derived from the extra project directory.
+    Ensures collisions are unlikely when importing datasources.
+    """
+    candidate = os.path.basename(os.path.normpath(extra_dir)) or "merged"
+    candidate = re.sub(r"[^0-9A-Za-z_]+", "_", candidate)
+    candidate = candidate.strip("_") or "merged"
+    if not candidate.endswith("_"):
+        candidate += "_"
+    return candidate
+
+
+def _replace_path_segment(path: str, segment: str, replacement: str) -> str:
+    """
+    Replace whole path segments inside a relative path.
+    """
+    if not isinstance(path, str):
+        return path
+    parts = path.split("/")
+    changed = False
+    for idx, part in enumerate(parts):
+        if part == segment:
+            parts[idx] = replacement
+            changed = True
+    return "/".join(parts) if changed else path
+
+
+def merge_projects(
+    base_dir: str,
+    extra_dir: str,
+    prefix: str | None = None,
+    view_prefix: str | None = None,
+) -> MDVProject:
+    """
+    Merge an existing MDV project into another project.
+
+    Args:
+        base_dir: Path to the target MDV project that will receive new datasources.
+        extra_dir: Path to the MDV project to merge into ``base_dir``.
+        prefix: Optional prefix applied to imported datasource names. When omitted a
+            prefix derived from ``extra_dir`` is used.
+        view_prefix: Optional prefix for imported views. Defaults to ``prefix`` with
+            the trailing underscore trimmed.
+
+    Returns:
+        The updated ``MDVProject`` instance for ``base_dir``.
+    """
+    base_dir = os.path.abspath(base_dir)
+    extra_dir = os.path.abspath(extra_dir)
+    if base_dir == extra_dir:
+        raise ValueError("base_dir and extra_dir must refer to different projects.")
+
+    required_files = ("datafile.h5", "datasources.json", "views.json", "state.json")
+    for directory in (base_dir, extra_dir):
+        for fname in required_files:
+            if not os.path.exists(os.path.join(directory, fname)):
+                raise FileNotFoundError(
+                    f"'{directory}' does not appear to be an MDV project (missing {fname})."
+                )
+
+    base_project = MDVProject(base_dir)
+    extra_project = MDVProject(extra_dir)
+
+    prefix_value = prefix
+    if prefix_value is None:
+        prefix_value = _default_merge_prefix(extra_dir)
+    # Allow explicitly disabling prefixing via an empty string.
+    prefix_value = prefix_value or ""
+
+    base_names = set(base_project.get_datasource_names())
+    extra_datasources = copy.deepcopy(extra_project.datasources)
+
+    name_mapping: Dict[str, str] = {}
+    for ds in extra_datasources:
+        old_name = ds["name"]
+        new_name = f"{prefix_value}{old_name}" if prefix_value else old_name
+        if new_name in base_names:
+            raise ValueError(
+                f"Datasource '{new_name}' already exists in base project. "
+                f"Provide a prefix to avoid collisions."
+            )
+        name_mapping[old_name] = new_name
+        base_names.add(new_name)
+
+    view_prefix_value = view_prefix
+    if view_prefix_value is None:
+        if prefix_value:
+            view_prefix_value = prefix_value.rstrip("_")
+        else:
+            view_prefix_value = _default_merge_prefix(extra_dir).rstrip("_")
+    if view_prefix_value:
+        if not view_prefix_value.endswith("_"):
+            view_prefix_value = f"{view_prefix_value}_"
+
+    dir_tasks: List[Tuple[str, str]] = []
+    file_tasks: List[Tuple[str, str]] = []
+    track_tasks: List[Tuple[str, str]] = []
+    region_field_updates: List[Tuple[str, str, Dict[str, str]]] = []
+    string_replacements: Dict[str, str] = {k: v for k, v in name_mapping.items()}
+
+    dir_destinations: set[str] = set()
+    file_destinations: set[str] = set()
+
+    def schedule_directory(src: str, dest: str) -> None:
+        if not os.path.isdir(src):
+            return
+        if dest in dir_destinations:
+            return
+        dir_destinations.add(dest)
+        dir_tasks.append((src, dest))
+
+    def schedule_file(src: str, dest: str) -> None:
+        if not os.path.isfile(src):
+            return
+        if dest in file_destinations:
+            return
+        file_destinations.add(dest)
+        file_tasks.append((src, dest))
+
+    def schedule_track(old_rel: str, new_rel: str) -> None:
+        track_tasks.append((old_rel, new_rel))
+
+    prepared_datasources: List[dict] = []
+
+    def rewrite_json_path(value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        # Handle both json/ and images/ prefixes for geo.json files
+        if value.startswith("json/"):
+            prefix_dir = "json"
+        elif value.startswith("images/"):
+            prefix_dir = "images"
+        else:
+            return value
+        filename = value.split("/", 1)[1]
+        new_filename = f"{prefix_value}{filename}" if prefix_value else filename
+        new_rel = f"{prefix_dir}/{new_filename}"
+        schedule_file(os.path.join(extra_dir, value), os.path.join(base_dir, new_rel))
+        if new_rel != value:
+            string_replacements[value] = new_rel
+        return new_rel
+
+    for ds in extra_datasources:
+        old_name = ds["name"]
+        new_name = name_mapping[old_name]
+        ds_meta = copy.deepcopy(ds)
+        ds_meta["name"] = new_name
+
+        links = ds_meta.get("links")
+        if links:
+            new_links = {}
+            for target, link in links.items():
+                new_links[name_mapping.get(target, target)] = link
+            ds_meta["links"] = new_links
+
+        # Binary data and datasource images
+        schedule_directory(
+            os.path.join(extra_dir, "binarydata", old_name),
+            os.path.join(base_dir, "binarydata", new_name),
+        )
+        schedule_directory(
+            os.path.join(extra_dir, "images", old_name),
+            os.path.join(base_dir, "images", new_name),
+        )
+
+        images_meta = ds_meta.get("images")
+        if isinstance(images_meta, dict):
+            for img_name, img_info in images_meta.items():
+                if not isinstance(img_info, dict):
+                    continue
+                base_url = img_info.get("base_url")
+                if isinstance(base_url, str):
+                    updated_url = _replace_path_segment(base_url, old_name, new_name)
+                    if updated_url != base_url:
+                        string_replacements[base_url] = updated_url
+                        img_info["base_url"] = updated_url
+
+        # Genome browser assets
+        genome_browser = ds_meta.get("genome_browser")
+        if isinstance(genome_browser, dict):
+            sanitized_old = secure_filename(old_name)
+            sanitized_new = secure_filename(new_name)
+
+            def adjust_track(url: str | None) -> str | None:
+                if not isinstance(url, str) or not url.startswith("tracks/"):
+                    return url
+                old_rel = url[len("tracks/") :]
+                new_rel = old_rel
+                if sanitized_old and sanitized_old != sanitized_new and old_rel.startswith(
+                    sanitized_old
+                ):
+                    new_rel = sanitized_new + old_rel[len(sanitized_old) :]
+                new_url = f"tracks/{new_rel}"
+                schedule_track(old_rel, new_rel)
+                if new_url != url:
+                    string_replacements[url] = new_url
+                return new_url
+
+            default_track = genome_browser.get("default_track")
+            if isinstance(default_track, dict):
+                default_track["url"] = adjust_track(default_track.get("url"))
+                if default_track.get("label") == old_name:
+                    default_track["label"] = new_name
+
+            default_tracks = genome_browser.get("default_tracks")
+            if isinstance(default_tracks, list):
+                for track in default_tracks:
+                    if not isinstance(track, dict):
+                        continue
+                    track["url"] = adjust_track(track.get("url"))
+                    if track.get("short_label") == old_name:
+                        track["short_label"] = new_name
+
+            atac_track = genome_browser.get("atac_bam_track")
+            if isinstance(atac_track, dict):
+                atac_track["url"] = adjust_track(atac_track.get("url"))
+
+        # Regions metadata (spatial projects)
+        regions = ds_meta.get("regions")
+        if isinstance(regions, dict):
+            all_regions = regions.get("all_regions", {})
+            if isinstance(all_regions, dict) and all_regions:
+                # First pass: collect all actual spatial directory names from metadata
+                # The actual spatial directories are named after sdata_name (e.g., "sample1.zarr"),
+                # not the region names (e.g., "sample1_region1")
+                spatial_dirs_to_copy: Dict[str, str] = {}  # old_spatial_dir -> new_spatial_dir
+                
+                for region_name, region_info in all_regions.items():
+                    if not isinstance(region_info, dict):
+                        continue
+                    # Extract the actual spatial directory name from metadata
+                    spatial_info = region_info.get("spatial")
+                    if isinstance(spatial_info, dict):
+                        spatial_file = spatial_info.get("file")
+                        if isinstance(spatial_file, str):
+                            # Track which spatial directories need to be copied
+                            if spatial_file not in spatial_dirs_to_copy:
+                                new_spatial_dir = (
+                                    f"{prefix_value}{spatial_file}" if prefix_value else spatial_file
+                                )
+                                spatial_dirs_to_copy[spatial_file] = new_spatial_dir
+                
+                # Copy all spatial directories (not just those referenced by region names)
+                # Also scan the actual spatial directory for any directories not in metadata
+                extra_spatial_dir = os.path.join(extra_dir, "spatial")
+                if os.path.isdir(extra_spatial_dir):
+                    for item in os.listdir(extra_spatial_dir):
+                        item_path = os.path.join(extra_spatial_dir, item)
+                        if os.path.isdir(item_path):
+                            # If not already scheduled, add it
+                            if item not in spatial_dirs_to_copy:
+                                new_spatial_dir = (
+                                    f"{prefix_value}{item}" if prefix_value else item
+                                )
+                                spatial_dirs_to_copy[item] = new_spatial_dir
+                
+                # Schedule copying of all spatial directories
+                for old_spatial_dir, new_spatial_dir in spatial_dirs_to_copy.items():
+                    schedule_directory(
+                        os.path.join(extra_dir, "spatial", old_spatial_dir),
+                        os.path.join(base_dir, "spatial", new_spatial_dir),
+                    )
+                    if old_spatial_dir != new_spatial_dir:
+                        string_replacements[f"spatial/{old_spatial_dir}"] = (
+                            f"spatial/{new_spatial_dir}"
+                        )
+                        string_replacements[old_spatial_dir] = new_spatial_dir
+                
+                # Second pass: update region metadata with new names and paths
+                new_all_regions: Dict[str, dict] = {}
+                region_mapping: Dict[str, str] = {}
+                for region_name, region_info in all_regions.items():
+                    if not isinstance(region_info, dict):
+                        new_all_regions[region_name] = region_info
+                        continue
+                    new_region_name = (
+                        f"{prefix_value}{region_name}" if prefix_value else region_name
+                    )
+                    updated_info = copy.deepcopy(region_info)
+                    
+                    # Update spatial file reference if it exists
+                    spatial_info = updated_info.get("spatial")
+                    if isinstance(spatial_info, dict):
+                        spatial_file = spatial_info.get("file")
+                        if isinstance(spatial_file, str):
+                            # Update to new spatial directory name if it was renamed
+                            new_spatial_file = spatial_dirs_to_copy.get(spatial_file, spatial_file)
+                            if new_spatial_file != spatial_file:
+                                spatial_info["file"] = new_spatial_file
+                                string_replacements[spatial_file] = new_spatial_file
+                    
+                    # Update viv_image paths
+                    viv_image = updated_info.get("viv_image")
+                    if isinstance(viv_image, dict):
+                        for key in ("file", "url"):
+                            if key in viv_image and isinstance(viv_image[key], str):
+                                # Update paths that reference old spatial directory names
+                                old_val = viv_image[key]
+                                new_val = old_val
+                                for old_dir, new_dir in spatial_dirs_to_copy.items():
+                                    if old_dir != new_dir and old_dir in old_val:
+                                        new_val = old_val.replace(old_dir, new_dir)
+                                        break
+                                # Also update region name references
+                                if new_val == old_val:
+                                    new_val = _replace_path_segment(
+                                        old_val, region_name, new_region_name
+                                    )
+                                if new_val != old_val:
+                                    string_replacements[old_val] = new_val
+                                    viv_image[key] = new_val
+                    
+                    # Update images dictionary paths
+                    images_dict = updated_info.get("images")
+                    if isinstance(images_dict, dict):
+                        for image_meta in images_dict.values():
+                            if not isinstance(image_meta, dict):
+                                continue
+                            for key in ("url", "file"):
+                                if key in image_meta and isinstance(image_meta[key], str):
+                                    old_val = image_meta[key]
+                                    new_val = old_val
+                                    # Update paths that reference old spatial directory names
+                                    for old_dir, new_dir in spatial_dirs_to_copy.items():
+                                        if old_dir != new_dir and old_dir in old_val:
+                                            new_val = old_val.replace(old_dir, new_dir)
+                                            break
+                                    # Also update region name references
+                                    if new_val == old_val:
+                                        new_val = _replace_path_segment(
+                                            old_val, region_name, new_region_name
+                                        )
+                                    if new_val != old_val:
+                                        string_replacements[old_val] = new_val
+                                        image_meta[key] = new_val
+                    
+                    json_path = updated_info.get("json")
+                    if isinstance(json_path, str):
+                        updated_info["json"] = rewrite_json_path(json_path)
+                    
+                    new_all_regions[new_region_name] = updated_info
+                    if new_region_name != region_name:
+                        region_mapping[region_name] = new_region_name
+                        string_replacements[region_name] = new_region_name
+                        string_replacements[f"spatial/{region_name}"] = (
+                            f"spatial/{new_region_name}"
+                        )
+                
+                regions["all_regions"] = new_all_regions
+                if region_mapping:
+                    region_field = regions.get("region_field")
+                    if region_field:
+                        region_field_updates.append(
+                            (new_name, region_field, region_mapping)
+                        )
+                        # Also update the values array in the column metadata
+                        columns = ds_meta.get("columns", [])
+                        for col in columns:
+                            if col.get("name") == region_field or col.get("field") == region_field:
+                                if "values" in col and isinstance(col["values"], list):
+                                    col["values"] = [
+                                        region_mapping.get(v, v) for v in col["values"]
+                                    ]
+                                break
+
+        prepared_datasources.append(ds_meta)
+
+    # Copy HDF5 groups
+    with h5py.File(extra_project.h5file, "r") as extra_h5, h5py.File(
+        base_project.h5file, "a"
+    ) as base_h5:
+        for old_name, new_name in name_mapping.items():
+            if old_name not in extra_h5:
+                raise KeyError(
+                    f"Datasource '{old_name}' missing from extra project datafile."
+                )
+            if new_name in base_h5:
+                raise ValueError(
+                    f"HDF5 group '{new_name}' already exists in base project datafile."
+                )
+            extra_h5.copy(extra_h5[old_name], base_h5, name=new_name)
+
+    # Update region field values within copied datasources (if required)
+    if region_field_updates:
+        with h5py.File(base_project.h5file, "a") as base_h5:
+            for ds_name, field, region_map in region_field_updates:
+                if not region_map:
+                    continue
+                group = base_h5.get(ds_name)
+                if not isinstance(group, h5py.Group):
+                    continue
+                if field not in group:
+                    continue
+                dataset = group[field]
+                if not isinstance(dataset, h5py.Dataset):
+                    continue
+                data = dataset[:]
+                if data.dtype.kind == "S":
+                    updated = np.array(
+                        [
+                            (
+                                lambda v: (
+                                    decoded := v.decode("utf-8"),
+                                    mapped := region_map.get(decoded, decoded),
+                                    mapped if isinstance(mapped, str) else decoded,
+                                )[2]
+                            )(val).encode("utf-8")
+                            for val in data
+                        ],
+                        dtype=data.dtype,
+                    )
+                    dataset[...] = updated
+                elif data.dtype.kind == "U":
+                    updated = np.array(
+                        [region_map.get(val, val) for val in data], dtype=data.dtype
+                    )
+                    dataset[...] = updated
+                elif data.dtype.kind == "O":
+                    updated_values = []
+                    for val in data:
+                        if isinstance(val, bytes):
+                            decoded = val.decode("utf-8")
+                            updated_values.append(
+                                region_map.get(decoded, decoded).encode("utf-8")
+                            )
+                        else:
+                            decoded = str(val)
+                            replacement = region_map.get(decoded, val)
+                            updated_values.append(replacement)
+                    dataset[...] = updated_values
+
+    # Persist datasource metadata now that the HDF5 groups exist
+    for ds_meta in prepared_datasources:
+        base_project.set_datasource_metadata(ds_meta)
+
+    # Convert track tasks into file copies (including .tbi siblings)
+    for old_rel, new_rel in track_tasks:
+        src = os.path.join(extra_dir, "tracks", old_rel)
+        dest = os.path.join(base_dir, "tracks", new_rel)
+        schedule_file(src, dest)
+        src_tbi = f"{src}.tbi"
+        dest_tbi = f"{dest}.tbi"
+        if os.path.exists(src_tbi):
+            schedule_file(src_tbi, dest_tbi)
+
+    # Ensure target directories exist before copying.
+    for subdir in ("binarydata", "images", "tracks", "spatial", "json"):
+        Path(os.path.join(base_dir, subdir)).mkdir(parents=True, exist_ok=True)
+
+    for src, dest in dir_tasks:
+        if not os.path.isdir(src):
+            continue
+        if os.path.exists(dest):
+            raise FileExistsError(
+                f"Cannot merge '{src}' into '{dest}': destination already exists."
+            )
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dest)
+
+    for src, dest in file_tasks:
+        if not os.path.isfile(src):
+            continue
+        if os.path.exists(dest):
+            raise FileExistsError(
+                f"Cannot merge '{src}' into '{dest}': destination already exists."
+            )
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+
+    # Merge views
+    extra_views = copy.deepcopy(extra_project.views)
+    
+    # DEBUG
+    print(f"DEBUG: extra_views keys: {list(extra_views.keys())}")
+    print(f"DEBUG: view_prefix_value: '{view_prefix_value}'")
+
+    def apply_replacements(obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {key: apply_replacements(value) for key, value in obj.items()}
+        if isinstance(obj, list):
+            return [apply_replacements(item) for item in obj]
+        if isinstance(obj, str):
+            return string_replacements.get(obj, obj)
+        return obj
+
+    def remap_view(view_config: dict) -> dict:
+        view_copy = copy.deepcopy(view_config)
+        if "initialCharts" in view_copy and isinstance(view_copy["initialCharts"], dict):
+            remapped_initial = {}
+            for ds_name, charts in view_copy["initialCharts"].items():
+                new_key = string_replacements.get(ds_name, ds_name)
+                remapped_initial[new_key] = [
+                    apply_replacements(chart) for chart in charts
+                ]
+            view_copy["initialCharts"] = remapped_initial
+        if "dataSources" in view_copy and isinstance(view_copy["dataSources"], dict):
+            remapped_sources = {}
+            for ds_name, config in view_copy["dataSources"].items():
+                new_key = string_replacements.get(ds_name, ds_name)
+                remapped_sources[new_key] = apply_replacements(config)
+            view_copy["dataSources"] = remapped_sources
+        return apply_replacements(view_copy)
+
+    for view_name, view_data in extra_views.items():
+        new_view_name = view_name
+        if view_prefix_value:
+            new_view_name = f"{view_prefix_value}{view_name}"
+        if base_project.get_view(new_view_name):
+            raise ValueError(
+                f"View '{new_view_name}' already exists in base project. "
+                f"Provide a different view prefix."
+            )
+        base_project.set_view(new_view_name, remap_view(view_data))
+        # DEBUG
+        print(f"DEBUG: Added view '{new_view_name}'")
+
+    logger.info(
+        "Merged %d datasources from '%s' into '%s'.",
+        len(prepared_datasources),
+        extra_dir,
+        base_dir,
+    )
+    return base_project

@@ -1,6 +1,6 @@
 from mdvtools.mdvproject import MDVProject
 from typing import Any
-from mdvtools.llm.markdown_utils import create_project_markdown, create_column_markdown
+from mdvtools.markdown_utils import create_project_markdown, create_column_markdown
 prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.

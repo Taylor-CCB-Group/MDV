@@ -1,12 +1,17 @@
-import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
-import type { ColumnName, DataColumn, DataType } from "../../charts/charts";
-import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import type { ColumnName } from "../../charts/charts";
 import { observer } from "mobx-react-lite";
-import { scatterAxisDefaults, scatterDefaults, type ScatterPlotConfig2D, type ScatterPlotConfig3D, type ScatterPlotConfig } from "../scatter_state";
+import {
+    scatterAxisDefaults,
+    scatterDefaults,
+    type ScatterPlotConfig2D,
+    type ScatterPlotConfig3D,
+    type ScatterPlotConfig,
+} from "../scatter_state";
 import DeckScatterComponent from "./DeckScatterComponent";
-import type { OrthographicViewState, OrbitViewState } from "deck.gl";
+import type { OrbitViewState } from "deck.gl";
 import { g } from "@/lib/utils";
 import type DataStore from "@/datastore/DataStore";
 import { getDensitySettings } from "../contour_state";
@@ -17,7 +22,6 @@ const MainChart = observer(() => {
     return <DeckScatterComponent />;
 });
 
-
 export type DeckScatterConfig = ScatterPlotConfig2D | ScatterPlotConfig3D;
 const defaultViewState = {
     viewState: {
@@ -25,8 +29,8 @@ const defaultViewState = {
         zoom: 0,
         /** not expected to be user-tweakable as of this writing */
         minZoom: -50,
-    }
-}
+    },
+};
 
 function adaptConfig(originalConfig: DeckScatterConfig) {
     if (originalConfig.type === "wgl_3d_scatter_plot") {
@@ -52,11 +56,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
     pendingRecenter = false;
-    constructor(
-        dataStore: DataStore,
-        div: HTMLDivElement,
-        originalConfig: DeckScatterConfig,
-    ) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: DeckScatterConfig) {
         const config = adaptConfig(originalConfig);
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
@@ -94,7 +94,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const viewState = {
             target: c.viewState.target,
             zoom: c.viewState.zoom,
-        }
+        };
         if (c.dimension === "3d") {
             const v = c.viewState;
             const orbitSerialized = viewState as OrbitViewState;
@@ -108,9 +108,11 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const c = this.config;
         const settings = super.getSettings();
 
+        // is this how we decide? maybe?
+        // had been thinking we'd revisit abstract version of density with a new shape for chart config
         if (c.type.includes("Density")) {
             // weird things happening with parameter & category settings?
-            settings.push(getDensitySettings(c, this))
+            settings.push(getDensitySettings(c, this));
         }
         if (c.dimension === "2d") {
             const axisSettings = getAxisGuiSpec(c);
@@ -118,6 +120,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         }
         return settings.concat([
             getTooltipSettings(c),
+            // this should probably also be common with VivMDVReact.
             g({
                 type: "radiobuttons",
                 label: "course radius",
@@ -227,8 +230,8 @@ BaseChart.types["DeckDensity"] = {
         },
         {
             type: "_multi_column:number",
-            name: "density fields"
-        }
+            name: "density fields",
+        },
     ],
     // todo
     // extra_controls: (ds) => (g({
@@ -257,7 +260,7 @@ BaseChart.types["DeckScatter3D"] = {
     ],
     init: (config: ScatterPlotConfig) => {
         config.dimension = "3d";
-    }
+    },
 };
 BaseChart.types["wgl_scatter_plot_dev"] = {
     name: "2D Scatter Plot (experimental)",
@@ -272,7 +275,7 @@ BaseChart.types["wgl_scatter_plot_dev"] = {
             type: "number",
             name: "y axis",
         },
-    ]
+    ],
 };
 BaseChart.types["wgl_3d_scatter_plot_dev"] = {
     // todo: remove (Deck) later, added to differentiate it with the existing 3d scatter plot
@@ -297,7 +300,7 @@ BaseChart.types["wgl_3d_scatter_plot_dev"] = {
         //! charts loaded from other configs may not have a dimension set
         // and won't pass through the init function
         config.dimension = "3d";
-    }
+    },
 };
 
 export type VivMdvReactType = typeof DeckScatterReact;

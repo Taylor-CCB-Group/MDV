@@ -21,7 +21,7 @@ fasteners = "^0.18"
 Flask = "3.0.3"
 Flask-SocketIO = "^5.3.6"
 h5py = "^3.10.0"
-mudata = "^0.2.3"
+mudata = ">=0.3.0"
 # numpy 2.3.0 drops support for Python 3.10
 numpy = "<2.3.0"
 pandas = "2.3.2"

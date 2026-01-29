@@ -181,6 +181,7 @@ const Dashboard: React.FC = () => {
                             sx={{ ml: 1 }}
                             onClick={toggleColorMode}
                             color="inherit"
+                            data-testid="theme_toggle_catalog"
                         >
                             {mode === "dark" ? (
                                 <Brightness4Icon />
