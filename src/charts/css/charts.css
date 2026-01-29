@@ -707,19 +707,27 @@ select, input, textarea {
     }
 
     .slick-header-column {
-        display: block !important;
+        display: flex !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         white-space: nowrap !important;
     }
 
     .slick-header-column * {
-        max-width: 100% !important;
+        height: auto;
+        /* max-width: 100% !important; */
         overflow: hidden !important;
         text-overflow: ellipsis !important;
+        flex-grow: 1;
     }
-
+    
     .slick-column-name {
+        /* width: 100%; */
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        /* border: 4px solid gray; */
         max-width: 80% !important;
         font-weight: 600 !important;
     }

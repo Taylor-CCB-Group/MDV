@@ -8,6 +8,32 @@ import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { action } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
+/**
+ * Hook for managing SlickGrid React component state.
+ * 
+ * State Management Contract:
+ * 
+ * 1. Config Object (MobX Observable):
+ *    - The config object is deeply observable via MobX (made observable in BaseChart constructor)
+ *    - All config properties should exist before makeAutoObservable is called (handled in adaptConfig)
+ *    - Config properties are the source of truth for persisted state (column_widths, sort, order, etc.)
+ * 
+ * 2. Column Widths State Management:
+ *    - config.column_widths is used ONLY for initial column widths when creating columnDefs
+ *    - After grid is created, grid manages widths internally
+ *    - columnDefs does NOT depend on config.column_widths (removed from dependencies)
+ *    - getConfig() serializes current grid widths to config for persistence
+ *    - No runtime synchronization needed - grid is authoritative during runtime
+ * 
+ * 3. Sort State Management:
+ *    - suppressSortSyncRef prevents feedback loops
+ *    - Config.sort is the source of truth, synced bidirectionally with grid visual state
+ * 
+ * 4. Event Handler Lifecycle:
+ *    - Event handlers are attached in a useEffect that depends on [config, gridInstance]
+ *    - Handlers update config properties for persistence
+ *    - Suppression flags (only for sort) prevent reactive recalculation during operations
+ */
 const useSlickGridReact = () => {
     // Hooks
     const config = useConfig<TableChartReactConfig>();
@@ -22,45 +48,62 @@ const useSlickGridReact = () => {
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [searchColumn, setSearchColumn] = useState<string | null>(null);
-    const [gridInstance, setGridInstance] = useState<SlickgridReactInstance | null>(null);
 
     // Refs
-    const sortedFilteredIndicesRef = useRef(sortedFilteredIndices);
-    const orderedParamColumnsRef = useRef(orderedParamColumns);
-    const dataStoreRef = useRef(dataStore);
-    const chartRef = useRef(chart);
+    const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
+    const orderedParamColumnsRef = useRef(orderedParamColumns); //  Holds latest value of columns when event handlers are called
     const selectionSourceRef = useRef<'user' | 'programmatic' | null>(null); // Track source of selection changes
     const gridRef = useRef<SlickgridReactInstance | null>(null);
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
+    const cleanupRef = useRef<(() => void) | null>(null); // Cleanup event handlers
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
-        dataStoreRef.current = dataStore;
-        chartRef.current = chart;
-    }, [sortedFilteredIndices, dataStore, chart, orderedParamColumns]);
+    }, [sortedFilteredIndices, orderedParamColumns]);
 
+    // Extract initial widths from config once (non-observable)
+    // This avoids rules-of-hooks issues and prevents columnDefs from reacting to config.column_widths changes
+    // We read config.column_widths only once on mount to get initial values
+    const initialWidths = useMemo(() => {
+        return config.column_widths ? { ...config.column_widths } : {};
+        // we don't expect this to re-run, nothing should be touching `column_widths` at runtime.
+        // keeping in dependency array to satisfy lint.
+    }, [config.column_widths]);
+
+    /**
+     * Column definitions for SlickGrid.
+     * 
+     * State Management Contract:
+     * - Uses initialWidths (extracted from config.column_widths on mount) ONLY for initial column widths
+     * - After grid is created, grid manages widths internally
+     * - getConfig() serializes current grid widths to config for persistence
+     * - No runtime synchronization - grid is authoritative during runtime
+     */
     const columnDefs = useMemo<Column[]>(() => {
         const cols: Column[] = [];
 
         if (config.include_index) {
+            const indexWidth = initialWidths["__index__"] ?? 100;
             cols.push({
                 id: "__index__",
                 field: "__index__",
                 name: "index",
                 sortable: true,
-                width: config.column_widths?.["__index__"] ?? 100,
+                width: indexWidth,
+                reorderable: false,
             });
         }
 
         for (const col of orderedParamColumns) {
             const isColumnEditable = col?.editable ?? false;
+            const colWidth = initialWidths[col.field] ?? 100;
             cols.push({
                 id: col.field,
                 field: col.field,
                 name: col.name,
                 sortable: true,
-                width: config.column_widths?.[col.field] ?? 100,
+                width: colWidth,
                 editor: isColumnEditable ? { model: Editors.text } : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
@@ -78,22 +121,27 @@ const useSlickGridReact = () => {
         }
 
         return cols;
-    }, [config.include_index, config.column_widths, orderedParamColumns]);
+    }, [config.include_index, orderedParamColumns, initialWidths]);
 
+    /**
+     * A new data provider gets created whenever any of the dependencies change which
+     * will trigger an update to the grid
+     * 
+     * Creation of a new data provider isn't expensive according to LLM
+     */
     const dataProvider = useMemo(() => {
         return new SlickGridDataProvider(orderedParamColumns, sortedFilteredIndices, config.include_index);
     }, [orderedParamColumns, sortedFilteredIndices, config.include_index]);
 
-    const isColumnEditable = useMemo(() => {
-        const column = orderedParamColumns.find((col) => col.field === searchColumn);
-        return column?.editable ?? false;
-    }, [searchColumn, orderedParamColumns]);
-
+    /**
+     * This useEffect is called whenever there is an update in dataProvider
+     * (sorting, filtering, editing, etc)
+     */
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
         if (grid && dataProvider) {
-            // Skip update if user is actively selecting
-            if (selectionSourceRef.current === 'user') {
+            // Skip update if selectionSourceRef is not empty
+            if (selectionSourceRef.current !== null) {
                 console.log("Skipping grid update during user selection");
                 return;
             }
@@ -103,33 +151,51 @@ const useSlickGridReact = () => {
         }
     }, [dataProvider]);
 
+    /**
+     * This function handles grid creation, attaching data provider to the grid
+     * and attaching all the event handlers
+     * 
+     * Only runs when onReactGridCreated event is called by grid
+     */
     const handleGridCreated = useCallback(
         (e: CustomEvent<SlickgridReactInstance>) => {
             console.log("Grid created");
             gridRef.current = e.detail;
+            
+            // Store gridRef in chart instance for getConfig() access
+            (chart as any).gridRef = gridRef;
 
-            setGridInstance(e.detail);
             const grid = e.detail.slickGrid;
             if (grid && dataProvider) {
                 grid.setData(dataProvider, true);
                 grid.render();
                 
+                //? Do we need this? We are syncing the sort in the useEffect below which does the same.
                 // Apply initial sort if config.sort is set
-                if (config.sort) {
-                    suppressSortSyncRef.current = true;
-                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
-                    suppressSortSyncRef.current = false;
-                }
+                // if (config.sort) {
+                //     suppressSortSyncRef.current = true;
+                //     grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                //     suppressSortSyncRef.current = false;
+                // }
+
+                attachEventHandlers(e.detail);
             }
         },
-        [dataProvider, config.sort],
+        [dataProvider, chart],
     );
 
-    useEffect(() => {
-        // Using grid state to attach the handlers after the grid is created
-        if (!gridInstance) return;
-        const grid = gridInstance.slickGrid;
+    /**
+     * Attach the event handlers to the grid
+     * 
+     * - Making use of a single SlickEventHandler instance for subscribing to the event to 
+     * easily unsubscribe to all events except the pubService events
+     * - Making use of sortedFilteredIndicesRef to get the current value when the handler is called
+     * - selectionSourceRef keeps track of the selectedRows
+     */
+    const attachEventHandlers = useCallback((gridInstance: SlickgridReactInstance) => {
+        const grid = gridInstance?.slickGrid;
         if (!grid) return;
+
         const slickEventHandler = new SlickEventHandler();
 
         slickEventHandler.subscribe(grid.onSelectedRowsChanged, (_e, args) => {
@@ -144,7 +210,7 @@ const useSlickGridReact = () => {
             if (selectedRows.length > 0) {
                 selectionSourceRef.current = 'user';
                 const indices = selectedRows.map((row) => sortedFilteredIndicesRef.current[row]);
-                dataStoreRef.current.dataHighlighted(indices, chartRef.current);
+                dataStore.dataHighlighted(indices, chart);
                 // Reset immediately - the effect will handle any needed updates
                 selectionSourceRef.current = null;
             }
@@ -157,6 +223,12 @@ const useSlickGridReact = () => {
             if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
                 const columnId = args.sortCol.field;
                 const sortAsc = args.sortAsc;
+                const currentSort = {columnId, ascending: sortAsc};
+
+                const currentSortStr = JSON.stringify(currentSort);
+                const configSortStr = JSON.stringify(config.sort);
+                
+                const isSame = currentSortStr === configSortStr;
                 console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
                 // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
                 // if not, then the type of config.sort.ascending should be optional.
@@ -165,12 +237,27 @@ const useSlickGridReact = () => {
                 // this gets into fiddly "key-optional" vs "value-optional" distinction.
                 // args.sortAsc could have a value of undefined - that's different from the key not being in the object in a meaningful way.
                 // it shouldn't be treated the same as a false value, or typed as though it was and passed further down...
-                if (sortAsc === undefined) {
-                    config.sort = undefined;
-                } else {
-                    config.sort = { columnId, ascending: sortAsc };
+                if (!isSame) { // Only update if there is a change
+                    if (sortAsc === undefined) {
+                        config.sort = undefined;
+                    } else {
+                        config.sort = { columnId, ascending: sortAsc };
+                    }
                 }
             }
+        }));
+
+        slickEventHandler.subscribe(grid.onColumnsReordered, action((_e, args) => {
+            const impactedColumns = args.impactedColumns;
+            // Create a new reference of config.order
+            const newOrder = config.order ? { ...config.order } : {};
+            const cols = impactedColumns.filter((col) => col.field !== "__index__");
+            cols.forEach((col, index) => {
+                newOrder[col.field] = index;
+            });
+
+            // Change the reference of config.order for react to detect and update
+            config.order = newOrder;
         }));
 
         const pubSub = grid.getPubSubService();
@@ -202,38 +289,7 @@ const useSlickGridReact = () => {
             }
         }));
 
-        slickEventHandler.subscribe(grid.onColumnsResized, action((_e, args) => {
-            const columns = args.grid.getColumns();
-            // Create a new reference of config.columnWidths
-            const columnWidths: Record<string, number> = config.column_widths ? { ...config.column_widths } : {};
-
-            for (const col of columns) {
-                if (col.width && col.width !== 100) {
-                    columnWidths[col.field] = col.width;
-                } else if (columnWidths[col.field]) {
-                    // Remove if reset to default
-                    delete columnWidths[col.field];
-                }
-            }
-
-            // Change the reference of config.order for react to detect and update
-            config.column_widths = columnWidths;
-        }));
-
-        slickEventHandler.subscribe(grid.onColumnsReordered, action((_e, args) => {
-            const impactedColumns = args.impactedColumns;
-            // Create a new reference of config.order
-            const newOrder = config.order ? { ...config.order } : {};
-            const cols = impactedColumns.filter((col) => col.field !== "__index__");
-            cols.forEach((col, index) => {
-                newOrder[col.field] = index;
-            });
-
-            // Change the reference of config.order for react to detect and update
-            config.order = newOrder;
-        }));
-
-        return () => {
+        cleanupRef.current = () => {
             slickEventHandler.unsubscribeAll();
             // the typing isn't great for these - but we believe as of writing that these will exist, 
             // and unsubscribe() will be called on both.
@@ -243,12 +299,27 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, gridInstance]);
+    }, [config, chart, dataStore]);
 
-    // Sync config.sort → grid visual state
+    useEffect(() => {
+        // Cleanup the event handlers on unmount
+        return () => {
+            if (cleanupRef.current) {
+                cleanupRef.current();
+            }
+        }
+    }, []);
+
+    /**
+     * Sync config.sort → grid visual state
+     * 
+     * If the sort is changed externally or internally through grid, this synchronizes 
+     * the config.sort
+     * suppressSortSyncRef avoids multiple rerenders when the sortColumns change
+     */
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
-        if (!grid || !gridInstance) return;
+        if (!grid) return;
         if (suppressSortSyncRef.current) return;
         
         const currentSortCols = grid.getSortColumns();
@@ -272,9 +343,15 @@ const useSlickGridReact = () => {
                 suppressSortSyncRef.current = false;
             }
         }
-    }, [config.sort, gridInstance]);
+    }, [config.sort]);
 
-    // Handle highlighted data
+    /**
+     * Handle external highlighted data
+     * 
+     * When highlighting changes externally, update the grid's visual selection
+     * Internal grid's highlighting is handled by the event handler
+     * 
+     */
     useEffect(() => {
         const grid = gridRef.current?.slickGrid;
         if (!grid) return;
@@ -325,6 +402,11 @@ const useSlickGridReact = () => {
             console.error("Error highlighting the rows in the table", err);
         }
     }, [highlightedIndices, dataProvider, sortedFilteredIndices]);
+
+    const isColumnEditable = useMemo(() => {
+        const column = orderedParamColumns.find((col) => col.field === searchColumn);
+        return column?.editable ?? false;
+    }, [searchColumn, orderedParamColumns]);
 
     const options: GridOption = useMemo(
         () =>

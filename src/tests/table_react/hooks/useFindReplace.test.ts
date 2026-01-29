@@ -1,9 +1,9 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import type { FeedbackAlert } from "@/react/components/TableChartReactComponent";
 import useFindReplace from "@/react/hooks/useFindReplace";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
+import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 describe("useFindReplace", () => {
     let orderedParamColumns: LoadedDataColumn<DataType>[];
@@ -14,18 +14,12 @@ describe("useFindReplace", () => {
     let gridRef: React.MutableRefObject<any>;
     let selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>;
     let setFeedbackAlert: ReturnType<typeof vi.fn>;
-    let mockGrid: any;
+    let mockGridInstance: ReturnType<typeof createSlickGridMock>;
 
     beforeEach(() => {
-        // Reset all mocks before each test
         vi.clearAllMocks();
-
-        // Setup mock grid
-        mockGrid = {
-            gotoCell: vi.fn(),
-            invalidate: vi.fn(),
-            render: vi.fn(),
-        };
+        mockGridInstance = createSlickGridMock();
+        gridRef = { current: mockGridInstance } as any;
 
         // Setup basic columns
         orderedParamColumns = [
@@ -61,7 +55,6 @@ describe("useFindReplace", () => {
             dataChanged: vi.fn(),
         } as any;
 
-        gridRef = { current: { slickGrid: mockGrid } } as any;
         selectionSourceRef = { current: null };
         setFeedbackAlert = vi.fn();
     });
@@ -88,7 +81,7 @@ describe("useFindReplace", () => {
             expect(result.current.foundMatches).toHaveLength(3);
             expect(result.current.matchCount).toBe(3);
             expect(result.current.currentMatchIndex).toBe(0);
-            expect(mockGrid.gotoCell).toHaveBeenCalledWith(0, 1, false);
+            expect(mockGridInstance.slickGrid.gotoCell).toHaveBeenCalledWith(0, 1, false);
         });
 
         test("should find matches case-insensitively", () => {
@@ -236,7 +229,7 @@ describe("useFindReplace", () => {
             });
 
             expect(result.current.currentMatchIndex).toBe(1);
-            expect(mockGrid.gotoCell).toHaveBeenCalledTimes(2); // Once for find, once for findNext
+            expect(mockGridInstance.slickGrid.gotoCell).toHaveBeenCalledTimes(2); // Once for find, once for findNext
         });
 
         test("should not navigate past last match", () => {

@@ -1,10 +1,19 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 
+/**
+ * Data Provider for the SlickGrid's DataView API
+ * 
+ * Maps the row indices to the data indices using the indices
+ * array
+ * 
+ * sort(), reSort(), refresh() are no-ops because sorting is managed
+ * externally via useSortedFilteredIndices hook.
+ */
 class SlickGridDataProvider {
     private columns: LoadedDataColumn<DataType>[];
     private indices: Uint32Array;
     private includeIndex: boolean;
-    private selectedRowIds: Set<number>;
+    private selectedRowIds: Set<number>; // Track the selected rows
     constructor(columns: LoadedDataColumn<DataType>[], indices: Uint32Array, includeIndex = false) {
         this.columns = columns;
         this.indices = indices;
@@ -16,6 +25,7 @@ class SlickGridDataProvider {
         return this.indices.length;
     }
 
+    // Map row indices of grid to the indices of the actual data
     getItem(index: number): any {
         if (index < 0 || index >= this.indices.length) {
             return null;
@@ -89,6 +99,11 @@ class SlickGridDataProvider {
     }
 
     // Avoid calling the default methods for sorting and filtering
+    // We do sorting separately with useSortedFilteredIndices, which observes config.sort/filter state 
+    // and returns array...
+    // This circumvention of SlickGrid's own state does mean that we need to be careful to synchronise
+    // for example, so that appropriate visual feedback appears when deserialising.
+    // This is liable to something of an ongoing maintenance issue.
     sort() {}
 
     reSort() {}

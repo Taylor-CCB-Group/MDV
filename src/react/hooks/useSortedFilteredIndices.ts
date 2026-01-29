@@ -2,12 +2,21 @@ import { useEffect, useState } from "react";
 import { useConfig, useSimplerFilteredIndices } from "../hooks";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useDataStore } from "../context";
-import { autorun, trace } from "mobx";
+import { autorun } from "mobx";
 
-// This follows a similar approach for sorting as DataModel.sort()
 /**
- * Custom hook to sort and handle externally filtered indices
- * @returns the sorted indices
+ * Hook that sorts the filtered indices based on the config.sort
+ * 
+ * - Follows the logic of sorting in DataModel.sort()
+ * - Uses Mobx autorun to react to config.sort changes
+ * - Updates the indices when any of these change: filteredIndices,
+ * dataStore or config.sort
+ * 
+ * For unique columns, we decode the data and sort it
+ * For all other columns we directly sort it, we put the null and 
+ * NaN values at the end
+ * 
+ * Returns a new Uint32Array of sorted indices
  */
 const useSortedFilteredIndices = () => {
     const config = useConfig<TableChartReactConfig>();
@@ -80,7 +89,18 @@ const useSortedFilteredIndices = () => {
 
                 // Sort the indices by comparing decoded strings
                 indices.sort((a, b) => {
-                    const comparison = decodedData[a].localeCompare(decodedData[b]);
+                    const strA = decodedData[a];
+                    const strB = decodedData[b];
+
+                    // Handle null/undefined and empty strings
+                    const aIsEmpty = !strA || strA.trim() === "";
+                    const bIsEmpty = !strB || strB.trim() === "";
+
+                    if (aIsEmpty && bIsEmpty) return 0;
+                    if (aIsEmpty) return 1;
+                    if (bIsEmpty) return -1;
+
+                    const comparison = strA.localeCompare(strB);
                     return ascending ? comparison : -comparison;
                 });
                 setSortedFilteredIndices(new Uint32Array(indices));
@@ -90,19 +110,12 @@ const useSortedFilteredIndices = () => {
                     const valueA = data?.[a];
                     const valueB = data?.[b];
 
-                    // Handle null/undefined (but not 0 or false)
-                    const aIsNull = valueA == null;
-                    const bIsNull = valueB == null;
-                    if (aIsNull && bIsNull) return 0;
-                    if (aIsNull) return 1; // null values go to the end
-                    if (bIsNull) return -1;
-
-                    // Handle NaN values
-                    const aIsNaN = Number.isNaN(valueA);
-                    const bIsNaN = Number.isNaN(valueB);
-                    if (aIsNaN && bIsNaN) return 0;
-                    if (aIsNaN) return 1; // NaN values go to the end
-                    if (bIsNaN) return -1;
+                    // Handle null/undefined and NaN values (but not 0 or false)
+                    const aIsEmpty = valueA == null || Number.isNaN(valueA);
+                    const bIsEmpty = valueB == null || Number.isNaN(valueB);
+                    if (aIsEmpty && bIsEmpty) return 0;
+                    if (aIsEmpty) return 1;
+                    if (bIsEmpty) return -1;
 
                     // Normal comparison
                     const comparison = valueA < valueB ? -1 : valueA > valueB ? 1 : 0;

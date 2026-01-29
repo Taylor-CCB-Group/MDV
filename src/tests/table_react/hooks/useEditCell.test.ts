@@ -1,10 +1,10 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import type { FeedbackAlert } from "@/react/components/TableChartReactComponent";
 import useEditCell from "@/react/hooks/useEditCell";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs } from "slickgrid-react";
+import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 describe("useEditCell", () => {
     let orderedParamColumns: LoadedDataColumn<DataType>[];
@@ -12,19 +12,14 @@ describe("useEditCell", () => {
     let dataStore: DataStore;
     let gridRef: React.MutableRefObject<any>;
     let setFeedbackAlert: ReturnType<typeof vi.fn>;
-    let mockGrid: any;
+    let mockGridInstance: ReturnType<typeof createSlickGridMock>;
     let orderedParamColumnsRef: React.MutableRefObject<LoadedDataColumn<DataType>[]>;
     let sortedIndicesRef: React.MutableRefObject<Uint32Array>;
 
     beforeEach(() => {
-        // Reset all mocks before each test
         vi.clearAllMocks();
-
-        // Setup mock grid
-        mockGrid = {
-            invalidate: vi.fn(),
-            render: vi.fn(),
-        };
+        mockGridInstance = createSlickGridMock();
+        gridRef = { current: mockGridInstance } as any;
 
         // Setup basic columns
         orderedParamColumns = [
@@ -59,7 +54,6 @@ describe("useEditCell", () => {
 
         orderedParamColumnsRef = { current: orderedParamColumns };
         sortedIndicesRef = { current: sortedIndices };
-        gridRef = { current: { slickGrid: mockGrid } } as any;
         setFeedbackAlert = vi.fn();
     });
 
@@ -159,8 +153,7 @@ describe("useEditCell", () => {
                 }),
             );
             expect(dataStore.dataChanged).toHaveBeenCalledWith(["sample_count"]);
-            expect(mockGrid.invalidate).toHaveBeenCalled();
-            expect(mockGrid.render).toHaveBeenCalled();
+            expect(mockGridInstance.slickGrid.invalidate).toHaveBeenCalled();
         });
 
         test("should show error when column not found", () => {

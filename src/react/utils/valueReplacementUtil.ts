@@ -1,6 +1,5 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 
-//? What if find and cell value are empty strings "" and we want to update it
 /**
  * Replaces all occurrences of find value with replace value in the given cell value.
  *
@@ -33,7 +32,7 @@ export const replaceValueInString = (findValue: string, replaceValue: string, ce
  * @throws Error if length of values array exceeds the maxValues
  *
  */
-const getValueIndex = (replaceValue: string, values: string[], maxValues: number) => {
+const getOrAddValueIndex = (replaceValue: string, values: string[], maxValues: number) => {
     let valueIndex = values.indexOf(replaceValue);
 
     if (valueIndex === -1) {
@@ -158,7 +157,7 @@ export const setCellValueFromString = (
         }
 
         const maxValues = datatype === "text" ? 256 : 65536;
-        const valueIndex = getValueIndex(newValue, values, maxValues);
+        const valueIndex = getOrAddValueIndex(newValue, values, maxValues);
         data[dataIndex] = valueIndex;
         return; 
     }
@@ -174,7 +173,6 @@ export const setCellValueFromString = (
         return; 
     }
 
-    //! review this
     // multitext
     if (datatype === "multitext") {
         if (!values || !stringLength) {
@@ -182,6 +180,10 @@ export const setCellValueFromString = (
         }
 
         const baseIndex = dataIndex * stringLength;
+
+        if (baseIndex + stringLength > data.length) {
+            throw new Error(`Index out of bounds for multitext column: "${column.field}"`);
+        }
 
         const maxValues = 65536;
 
@@ -198,7 +200,7 @@ export const setCellValueFromString = (
 
         // Set new values
         for (let i = 0; i < Math.min(parts.length, stringLength); i++) {
-            const valueIndex = getValueIndex(parts[i], values, maxValues);
+            const valueIndex = getOrAddValueIndex(parts[i], values, maxValues);
             data[baseIndex + i] = valueIndex;
         }
 

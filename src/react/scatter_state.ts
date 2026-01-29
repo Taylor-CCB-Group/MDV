@@ -257,11 +257,10 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
  * based on some property of the data - but for now we just return a number.
  */
 export function useScatterRadius() {
-    const config = useConfig<ScatterPlotConfig>();
+    const { radius, course_radius } = useConfig<ScatterPlotConfig>();
     const params = useParamColumns();
     const [cx, cy] = params;
     const scale = useRegionScale();
-    const { radius, course_radius } = config;
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
     // (which implies that if we have a warped aspect ratio but making circles circular, they will be based on one or other axis)
@@ -273,6 +272,8 @@ export function useScatterRadius() {
     const radiusScale = (radius * course_radius) / safeScale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {
+            // apparently `minMax` is sometimes `maxMin` - so adding abs.
+            // how does this come to be? is it a spatial conversion thing?
             const xRange = Math.abs(cx.minMax[1] - cx.minMax[0]);
             const yRange = Math.abs(cy.minMax[1] - cy.minMax[0]);
             const r = 10000 / Math.max(xRange, yRange);
@@ -480,6 +481,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 const r = boundingClientRect;
                 const x = e.clientX - r.left;
                 const y = e.clientY - r.top;
+                // should this also refer to something other than scatterplotLayer?
+                // in DeckScatterComponent we now use deckRef.current.deck.getViewports()[0]
                 const p = scatterplotLayer.unproject([x, y]) as P;
                 //still need to reason better about transforms...
                 // const scale = 1; //this was only right when Pixels.PhysicalSizeX === regions.scale

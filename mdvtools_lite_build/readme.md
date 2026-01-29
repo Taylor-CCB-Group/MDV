@@ -3,7 +3,7 @@ This folder contains a .toml file to build a scaled down version of MDVTools whi
 
 To build , first of all you need to build the javascript. In the main directory:-
 ```
-npm run vite-build
+npm run build-flask-vite
 ```
 Make sure you have hatch installed:-
 ```

@@ -4,51 +4,83 @@ import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import TableChartReactComponent from "./TableChartReactComponent";
 import { g } from "@/lib/utils";
-import { action, extendObservable } from "mobx";
+import { action } from "mobx";
+import type { SlickgridReactInstance } from "slickgrid-react";
 
-const TableChartComponent = observer(() => {
+const TableChartComponent = () => {
     return <TableChartReactComponent />;
-});
+};
 
-// todo: Add params and other options to config
 export type TableChartReactConfig = BaseConfig & {
     type: "table_chart_react";
     include_index?: boolean;
     column_widths?: Record<string, number>;
     order?: Record<string, number>;
-    sort?: { columnId: string; ascending: boolean } | undefined;
+    sort?: { columnId: string; ascending: boolean } | null;
 };
 
-// todo: Add required functions related to the features
+/**
+ * Adapts and validates the config before it is made observable by makeAutoObservable.
+ * 
+ * This ensures all properties exist before makeAutoObservable is called, which is required
+ * for MobX to properly track them. All properties should be initialized to their default
+ * values here.
+ * 
+ * In future, this may be replaced with a more formal validation step (e.g., zod schema).
+ * Probably incorporated into the `initialiseChartConfig` function, which will be able to lookup
+ * from schemas...
+ */
+function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
+    // Ensure all properties exist before makeAutoObservable
+    // This ensures MobX can properly track them
+    if (!config.column_widths) config.column_widths = {};
+    if (!config.order) config.order = {};
+    if (config.include_index === undefined || config.include_index === null) {
+        config.include_index = false;
+    }
+    if (!('sort' in config)) {
+        // Assigning this to null instead of undefined to make it observable
+        config.sort = null;
+    }
+    return config;
+}
+
 class TableChartReact extends BaseReactChart<TableChartReactConfig> {
-
+    gridRef?: { current: SlickgridReactInstance | null };
+    
     constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
+        // Adapt config before calling super constructor, which will make the config observable
+        // This ensures all properties exist and are properly initialized before makeAutoObservable runs
+        config = adaptConfig(config);
         super(dataStore, div, config, TableChartComponent);
-        
-        if (!config.column_widths) config.column_widths = {};
-        if (!config.order) config.order = {};
-        if (config.include_index === undefined || config.include_index === null) config.include_index = false;
 
-        // Extending config to make config.sort observable
-        // If the config is saved with a sort property, doing this again causes an error.
-        if (!this.config.sort) {
-            // Doing this is required as it's initialized with undefined and doesn't work if initialized like other properties
-            extendObservable(this.config, {
-                sort: undefined,
-            });
-        }
-
-        // Add Download menu icon (like the legacy version)
-        // this.addMenuIcon("fas fa-download", "Download data", {
-        //     func: () => {
-        //         console.log("Download Data");
-        //         // this.downloadData();
-        //     },
-        // });
+        // todo: Add download (like the legacy version) and other features
     }
 
     getConfig() {
         const config = super.getConfig();
+        
+        // Serialize current grid widths to config.column_widths for persistence
+        // This ensures persisted state reflects actual grid state at serialization time
+        // Grid manages widths internally during runtime, but we serialize them here for persistence
+        if (this.gridRef?.current?.slickGrid) {
+            try {
+                const columns = this.gridRef.current.slickGrid.getColumns();
+                const columnWidths: Record<string, number> = {};
+                
+                for (const col of columns) {
+                    if (col.width && col.width !== 100) {
+                        columnWidths[col.field] = col.width;
+                    }
+                }
+                
+                config.column_widths = columnWidths;
+            } catch (e) {
+                // If grid is not available or error occurs, keep existing config.column_widths
+                console.warn("Could not read grid widths in getConfig():", e);
+            }
+        }
+        
         return config;
     }
 
@@ -69,7 +101,6 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     }
 }
 
-// todo: Sync the options of config including the params
 BaseChart.types["table_chart_react"] = {
     name: "Table Chart (React)",
     class: TableChartReact,
@@ -88,6 +119,7 @@ BaseChart.types["table_chart_react"] = {
         },
     ],
     init: (config, ds, ec) => {
+        // nb - may be undefined if user hasn't touched that control
         config.include_index = ec.include_index;
     },
 };
