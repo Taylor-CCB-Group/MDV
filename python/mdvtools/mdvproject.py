@@ -1114,7 +1114,8 @@ class MDVProject:
                 # TablePlot parameters
                 title=name,
                 #params = ["leiden", "ARVCF", "DOK3", "FAM210B", "GBGT1", "NFE2L2", "UBE2D4", "YPEL2"]
-                params = dataframe.columns.to_list()
+                #only want columns from the dataframe that were added to the datasource
+                params = [x["field"] for x in columns]
                 size = [792, 472]
                 position = [10, 10]
             

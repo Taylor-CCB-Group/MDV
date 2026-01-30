@@ -490,6 +490,12 @@ class DataStore {
         if (isColumnText(column) && !c.values) {
             c.values = [""];
         }
+
+        // Normalize minMax for numeric columns if provided
+        if (isDatatypeNumeric(c.datatype) && column.minMax) {
+            c.minMax = this._normalizeMinMax(c, column.minMax);
+        }
+
         this.columns.push(c);
         this.columnIndex[c.field] = c;
         if (data) {
@@ -1196,17 +1202,9 @@ class DataStore {
                     : new Float32Array(buffer));
             if (!c.minMax) {
                 console.log(`Calculating min/max for ${c.name}`);
-                let min = Number.MAX_VALUE;
-                let max = Number.MIN_VALUE;
-                for (let i = 0; i < dataArray.length; i++) {
-                    const value = dataArray[i];
-                    if (Number.isNaN(value)) {
-                        continue;
-                    }
-                    min = value < min ? value : min;
-                    max = value > max ? value : max;
-                }
-                c.minMax = [min, max];
+                const computed = this._computeMinMaxFromData(c);
+                // Normalize ensures [min, max] ordering and handles edge cases
+                c.minMax = this._normalizeMinMax(c, computed);
             }
             if (!c.quantiles) {
                 const a = c.data.filter((x) => !Number.isNaN(x)).sort();
@@ -1707,6 +1705,61 @@ class DataStore {
     }
 
     /**
+     * Normalizes a minMax array to ensure [min, max] ordering.
+     * Handles edge cases like reversed order, NaN values, and the "all NaN" sentinel case.
+     * 
+     * **Invariant**: Always returns [min, max] where min <= max.
+     * 
+     * **Edge cases**:
+     * - All-NaN columns default to [0, 0]
+     * - Reversed arrays are automatically normalized
+     * - Invalid values (NaN, Infinity) trigger computation from data
+     * 
+     * **Note**: Backwards ranges (where min > max might be semantically meaningful)
+     * are not supported. If needed, handle at a higher level.
+     * 
+     * @param {Column} c - The column object (needed to compute from data if needed)
+     * @param {[number, number] | null | undefined} raw - The raw minMax array
+     * @returns {[number, number]} Normalized [min, max], or [0, 0] if invalid and no data available
+     */
+    _normalizeMinMax(c, raw) {
+        if (!raw || !Array.isArray(raw) || raw.length !== 2) {
+            // Try to compute from data
+            const computed = this._computeMinMaxFromData(c);
+            return computed || [0, 0];
+        }
+        const [a, b] = raw;
+        // Check for invalid values (NaN, Infinity)
+        if (!Number.isFinite(a) || !Number.isFinite(b)) {
+            const computed = this._computeMinMaxFromData(c);
+            return computed || [0, 0];
+        }
+        // Ensure [min, max] ordering
+        return a <= b ? [a, b] : [b, a];
+    }
+
+    /**
+     * Computes min/max from the column's data array.
+     * @param {Column} c - The column object
+     * @returns {[number, number] | null} Normalized [min, max] or null if no finite values found
+     */
+    _computeMinMaxFromData(c) {
+        if (!c.data) return null;
+        let min = Number.MAX_VALUE;
+        let max = Number.NEGATIVE_INFINITY;
+        let foundFinite = false;
+        for (let i = 0; i < c.data.length; i++) {
+            const value = c.data[i];
+            if (!Number.isFinite(value)) continue;
+            foundFinite = true;
+            if (value < min) min = value;
+            if (value > max) max = value;
+        }
+        if (!foundFinite) return null;
+        return [min, max];
+    }
+
+    /**
      * Returns the min/max values for a given column
      * @param {string} column The column id(field). Should be a numeric column, otherwise an error will be thrown
      * @returns {[number, number]} An array - the first value being the min value and the second the max value
@@ -1716,26 +1769,14 @@ class DataStore {
         if (!isDatatypeNumeric(c.datatype)) {
             throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
         }
-        // columns loaded via rows_as_columns_link may not automatically have this metadata, so we can compute here.
+        // Compute and normalize if missing
         if (!c.minMax) {
             if (!c.data) {
                 throw new Error(`Attempting to compute minMax for column '${column}' which is not loaded...`);
-                //considered returning some default vals here
-                // return [0, 1];
             }
-            // Return the calculated min and max values
-            let min = Number.MAX_VALUE;
-            let max = Number.MIN_VALUE;
-            for (let i = 0; i < c.data.length; i++) {
-                const value = c.data[i];
-                if (Number.isNaN(value)) {
-                    continue;
-                }
-                min = value < min ? value : min;
-                max = value > max ? value : max;
-            }
-            c.minMax = [min, max]
-            return c.minMax;
+            const computed = this._computeMinMaxFromData(c);
+            // Normalize ensures [min, max] ordering and handles edge cases
+            c.minMax = this._normalizeMinMax(c, computed);
         }
         return c.minMax;
     }

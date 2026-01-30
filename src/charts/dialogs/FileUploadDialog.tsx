@@ -5,7 +5,8 @@ import {
     useReducer,
     type PropsWithChildren,
     forwardRef,
-    useEffect
+    useEffect,
+    useMemo
 } from "react";
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
@@ -754,6 +755,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             useDropzone({
                 onDrop,
                 accept: generateDropzoneAccept(),
+                multiple: false,
                 maxSize: Math.max(
                     ...Object.values(FILE_TYPES).map(
                         (config) => config.maxSize || 0,
@@ -761,10 +763,22 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 ),
             });
 
-        const rejectionMessage =
-            fileRejections.length > 0
-                ? "Only CSV, TSV, and TIFF files can be selected"
-                : "Drag and drop files here or click the button below to upload";
+        const rejectionMessage = useMemo(() => {
+            let message = "";
+            if (fileRejections.length > 0) {
+                const fileRejectionMessages: string[] = [];
+                fileRejections.forEach((fileRejection) => {
+                    fileRejection.errors.forEach((error) => {
+                        fileRejectionMessages.push(error.message);
+                    })
+                })
+
+                message = fileRejectionMessages.join(", ");
+            } else {
+                message = "Drag and drop files here or click the button below to upload";
+            }
+            return message;
+        }, [fileRejections])
 
         const rejectionMessageStyle =
             fileRejections.length > 0 ? "text-red-500" : "";
@@ -1203,18 +1217,18 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
         return (
             <Container>
-                {/* Upload Method Toggle (for development/testing) */}
-                {process.env.NODE_ENV === 'development' && (
+                {/* Upload Method Toggle (for development/testing), uncomment when required */}
+                {/* {process.env.NODE_ENV === 'development' && (
                     <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                        {/* <button
+                        <button
                             type="button"
                             onClick={toggleUploadMethod}
                             className="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                         >
                             Current: {state.uploadMethod.toUpperCase()} - Click to toggle
-                        </button> */}
+                        </button>
                     </div>
-                )}
+                )} */}
 
                 {state.isUploading ? (
                     <StatusContainer>

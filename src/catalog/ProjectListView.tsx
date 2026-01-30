@@ -78,7 +78,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
     const hasPermissions = useCallback((proj: Project) => 
         proj.permissions.edit && (operationPermissions.renameProject ||
         operationPermissions.deleteProject ||
-        operationPermissions.exportProject ||
+        // operationPermissions.exportProject ||
         operationPermissions.shareProject)
         , [operationPermissions]);
 
@@ -103,6 +103,9 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 hover
                                 onClick={() => handleRowClick(project.id)}
                                 sx={{ cursor: "pointer" }}
+                                data-testid="project_list_row"
+                                data-project-id={project.id}
+                                aria-label={`open project ${project.name} (${project.id})`}
                             >
                                 <TableCell>
                                     <div className="flex items-center gap-3">
@@ -123,6 +126,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                                 handleMenuClick(e, project)
                                             }
                                             size="small"
+                                            data-testid={`project_menu_${project.id}`}
                                         >
                                             <MoreVert />
                                         </IconButton>
@@ -160,7 +164,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 <ListItemText>Rename Project</ListItemText>
                             </MenuItem>
                         )}
-                        {operationPermissions.exportProject && (
+                        {/* {operationPermissions.exportProject && (
                             <MenuItem 
                                 onClick={() => {
                                     if (selectedProject) {
@@ -175,7 +179,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 </ListItemIcon>
                                 <ListItemText>Export Project (as *.mdv.zip)</ListItemText>
                             </MenuItem>
-                        )}
+                        )} */}
                         {operationPermissions.shareProject && (
                             <MenuItem 
                                 onClick={() => handleModalOpen(setIsShareModalOpen)} 
