@@ -23,6 +23,7 @@ class SpatialDataConversionArgs:
     output_geojson: bool = False
     serve: bool = False
     link: bool = False
+    density: bool = False
     point_transform: str = "auto"
 
 def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversionArgs"):
@@ -698,7 +699,7 @@ def _try_read_zarr(path: str):# -> sd.SpatialData | None:
         print(f"Warning: Failed to read SpatialData object from {path}: '{e}'")
         return None
 
-def _set_default_image_view(mdv: "MDVProject"):
+def _set_default_image_view(mdv: "MDVProject", args: SpatialDataConversionArgs):
     """
     Uses a template view for the default view of the spatial data.
     In future it would be good to make this user-configurable.
@@ -716,6 +717,12 @@ def _set_default_image_view(mdv: "MDVProject"):
     print(f"Using region '{region_name}' for default view")
     with open(os.path.join(os.path.dirname(__file__), "spatial_view_template.json"), "r") as f:
         view_str = f.read().replace("<SPATIAL_REGION_NAME>", region_name)
+        density = """
+        {
+            "linkedDsName": "genes", "maxItems": 15, "type": "RowsAsColsQuery"
+        }
+        """
+        view_str = view_str.replace('"<DENSITY_FIELDS>"', density if args.density else "")
         mdv.set_view("default", json.loads(view_str), True)
 
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
@@ -865,7 +872,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         "all_regions": all_regions,
     }
     mdv.set_datasource_metadata(cells_md)
-    _set_default_image_view(mdv)
+    _set_default_image_view(mdv, args)
     print(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n")
     print(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---")
     add_readme_to_project(mdv, merged_adata, args)
@@ -884,6 +891,7 @@ if __name__ == "__main__":
     parser.add_argument("--link", action="store_true", help="Symlink to the original SpatialData objects")
     parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data")
     parser.add_argument("--output_geojson", action="store_true", help="Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes)")
+    parser.add_argument("--density", action="store_true", help="Include density fields for gene expression in default view")
     parser.add_argument("--serve", action="store_true", help="Serve the project after conversion")
     parser.add_argument(
         "--point-transform",
