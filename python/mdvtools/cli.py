@@ -130,7 +130,10 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
 @click.option('--link', is_flag=True, help='Symlink to the original SpatialData objects.')
 @click.option('--output_geojson', is_flag=True, help='Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes).')
 @click.option('--serve', is_flag=True, help='Serve the project after conversion.')
-def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, serve):
+@click.option('--annotation-anndata', 'annotation_anndata_path', type=str, default=None, help='Path to additional anndata file to merge into tables (e.g., containing UMAP annotations).')
+@click.option('--merge-key', 'merge_key_column', type=str, default=None, help='Column name to use for merging (default: auto-infer from get_table_keys).')
+@click.option('--include-annotations-in-sdata', 'include_annotations_in_sdata', is_flag=True, help='Include merged annotations in written SpatialData objects (only when not using --link).')
+def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, serve, annotation_anndata_path, merge_key_column, include_annotations_in_sdata):
     """Convert SpatialData objects to MDV format."""
     import tempfile
     with tempfile.TemporaryDirectory() as temp_folder:
@@ -142,6 +145,9 @@ def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, ou
             link=link,
             output_geojson=output_geojson,
             serve=serve,
+            annotation_anndata_path=annotation_anndata_path,
+            merge_key_column=merge_key_column,
+            include_annotations_in_sdata=include_annotations_in_sdata,
         )
         convert_spatialdata_to_mdv(args)
 

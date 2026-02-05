@@ -25,12 +25,17 @@ class SpatialDataConversionArgs:
     link: bool = False
     density: bool = False
     point_transform: str = "auto"
+    annotation_anndata_path: Optional[str] = None
+    merge_key_column: Optional[str] = None
+    include_annotations_in_sdata: bool = False
 
 def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversionArgs"):
     """Processes a single SpatialData object path."""
     # imports need to be here for the separate process
     from mdvtools.spatial.conversion import _try_read_zarr, _resolve_regions_for_table
     from mdvtools.spatial.mermaid import sdata_to_mermaid
+    from mdvtools.spatial.anndata_merge import _merge_annotation_anndata
+    from anndata import read_h5ad
     import os
 
     sdata_name = os.path.basename(sdata_path)
@@ -39,15 +44,69 @@ def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversion
         return None
     print(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n")
     print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
+    
+    # Load annotation anndata if provided
+    annotation_adata = None
+    if conversion_args.annotation_anndata_path:
+        if not os.path.exists(conversion_args.annotation_anndata_path):
+            print(f"WARNING: Annotation anndata path '{conversion_args.annotation_anndata_path}' does not exist. Skipping merge.")
+        else:
+            try:
+                print(f"Loading annotation anndata from '{conversion_args.annotation_anndata_path}'")
+                annotation_adata = read_h5ad(conversion_args.annotation_anndata_path)
+                print(f"Annotation anndata: {annotation_adata.n_obs} obs, {annotation_adata.n_vars} vars")
+            except Exception as e:
+                print(f"WARNING: Failed to load annotation anndata: {e}. Skipping merge.")
+                annotation_adata = None
+    
     adata_objects = []
     all_regions = {}
+    merge_success_count = 0
+    merge_attempted_count = 0
+    
     for table_name, adata in sdata.tables.items():
+        # Merge annotation anndata if provided (before region resolution)
+        if annotation_adata is not None:
+            merge_attempted_count += 1
+            print(f"Attempting to merge annotation anndata into table '{table_name}'")
+            merged_adata, merge_warnings, merge_provenance = _merge_annotation_anndata(
+                adata, annotation_adata, conversion_args.merge_key_column,
+                conversion_args.annotation_anndata_path
+            )
+            # Provenance is already stored in merged_adata.uns["mdv"]["merge_provenance"]
+            
+            # Check if merge was successful
+            if merge_provenance.get("merge_successful", False):
+                merge_success_count += 1
+                print(f"Successfully merged annotation data into table '{table_name}'")
+                # Update the table in sdata if we're going to write it back (and not linking)
+                # When linking, we never write sdata, so in-memory modification is fine
+                # When not linking and include_annotations_in_sdata is True, we want to write the merged version
+                if conversion_args.include_annotations_in_sdata and not conversion_args.link:
+                    sdata.tables[table_name] = merged_adata
+            else:
+                print(f"Skipped merging annotation data into table '{table_name}': {merge_provenance.get('merge_failure_reason', 'unknown reason')}")
+            
+            adata = merged_adata
+        
         _resolve_regions_for_table(sdata, table_name, sdata_name, conversion_args)
         adata.obs["spatialdata_path"] = sdata_name
         adata.obs["table_name"] = table_name
         adata_objects.append(adata)
         if "regions" in adata.uns.get("mdv", {}):
             all_regions.update(adata.uns["mdv"]["regions"])
+    
+    # Validate that at least one table was successfully merged
+    if annotation_adata is not None and merge_attempted_count > 0:
+        if merge_success_count == 0:
+            raise ValueError(
+                f"Cannot merge annotation data: attempted to merge into {merge_attempted_count} table(s), "
+                f"but none were successful. Annotation data must be mappable to at least one table's "
+                f"instance_key. Check that the annotation data has a column matching the instance_key "
+                f"in at least one SpatialData table."
+            )
+        else:
+            print(f"\nMerge summary: Successfully merged annotation data into {merge_success_count} out of {merge_attempted_count} table(s).\n")
 
     return sdata_name, sdata, adata_objects, all_regions
 
@@ -89,6 +148,11 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Output GeoJSON**: {conversion_args.output_geojson}\n"
         markdown += f"- **Link spatial data**: {conversion_args.link}\n"
         markdown += f"- **SpatialData path**: `{conversion_args.spatialdata_path}`\n"
+        if conversion_args.annotation_anndata_path:
+            markdown += f"- **Annotation anndata path**: `{conversion_args.annotation_anndata_path}`\n"
+            if conversion_args.merge_key_column:
+                markdown += f"- **Merge key column**: `{conversion_args.merge_key_column}`\n"
+            markdown += f"- **Include annotations in SpatialData**: {conversion_args.include_annotations_in_sdata}\n"
         markdown += "\n"
     
     markdown += "## SpatialData objects:\n\n"
@@ -119,6 +183,68 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
                 markdown += f"  - Source element: `{transform_meta['source_element']}`\n"
                 markdown += f"  - Target element: `{transform_meta['target_element']}`\n"
                 markdown += f"  - Transform type: `{transform_meta['transform_type']}`\n"
+        
+        markdown += "\n"
+    
+    # Add annotation merge provenance section
+    if adata is not None and "mdv" in adata.uns and "merge_provenance" in adata.uns["mdv"]:
+        markdown += "\n\n---\n\n## Annotation merge provenance:\n\n"
+        markdown += "The following annotation data was merged into the tables:\n\n"
+        
+        merge_provenance = adata.uns["mdv"]["merge_provenance"]
+        if isinstance(merge_provenance, dict):
+            markdown += f"- **Annotation source**: `{merge_provenance.get('annotation_path', 'unknown')}`\n"
+            markdown += f"- **Merge timestamp**: `{merge_provenance.get('merge_timestamp', 'unknown')}`\n"
+            markdown += f"- **Merge key**: `{merge_provenance.get('merge_key', 'index-based')}`\n"
+            markdown += f"- **Merge key source**: `{merge_provenance.get('merge_key_source', 'unknown')}`\n"
+            markdown += f"- **Merge successful**: {merge_provenance.get('merge_successful', False)}\n"
+            markdown += f"\n**Data dimensions:**\n"
+            markdown += f"  - Original: {merge_provenance.get('original_n_obs', 'unknown')} obs × {merge_provenance.get('original_n_vars', 'unknown')} vars\n"
+            markdown += f"  - Annotation: {merge_provenance.get('annotation_n_obs', 'unknown')} obs × {merge_provenance.get('annotation_n_vars', 'unknown')} vars\n"
+            markdown += f"  - Merged: {merge_provenance.get('final_n_obs', 'unknown')} obs × {merge_provenance.get('final_n_vars', 'unknown')} vars\n"
+            
+            merged_obs = merge_provenance.get("merged_obs_columns", [])
+            if merged_obs:
+                markdown += f"\n**Merged obs columns ({len(merged_obs)}):**\n"
+                new_cols = [c["name"] for c in merged_obs if c.get("source") == "new"]
+                merged_cols = [c["name"] for c in merged_obs if c.get("source") == "merged"]
+                if new_cols:
+                    markdown += f"  - New columns ({len(new_cols)}): {', '.join(new_cols[:10])}"
+                    if len(new_cols) > 10:
+                        markdown += f" ... and {len(new_cols) - 10} more"
+                    markdown += "\n"
+                if merged_cols:
+                    markdown += f"  - Merged columns ({len(merged_cols)}): {', '.join(merged_cols[:10])}"
+                    if len(merged_cols) > 10:
+                        markdown += f" ... and {len(merged_cols) - 10} more"
+                    markdown += "\n"
+            
+            merged_obsm = merge_provenance.get("merged_obsm_keys", [])
+            if merged_obsm:
+                markdown += f"\n**Merged obsm keys ({len(merged_obsm)}):** {', '.join(merged_obsm)}\n"
+            
+            # Add diagnostic statistics
+            diagnostics = merge_provenance.get("merge_diagnostics", {})
+            if diagnostics:
+                markdown += f"\n**Merge diagnostics:**\n"
+                markdown += f"  - Overlap: {diagnostics.get('overlapping_keys', 0)} instances ({diagnostics.get('overlap_percentage', 0):.1f}% of original)\n"
+                markdown += f"  - Original-only: {diagnostics.get('original_only_keys', 0)} instances\n"
+                markdown += f"  - Annotation-only: {diagnostics.get('annotation_only_keys', 0)} instances\n"
+                if diagnostics.get('original_duplicates', 0) > 0:
+                    markdown += f"  - Original duplicates: {diagnostics.get('original_duplicates', 0)}\n"
+                if diagnostics.get('annotation_duplicates', 0) > 0:
+                    markdown += f"  - Annotation duplicates: {diagnostics.get('annotation_duplicates', 0)}\n"
+            
+            markdown += f"\n**Note**: X layer from annotation data was skipped (using original table's X).\n"
+            markdown += f"**Note**: Only obs columns are merged. Var/varm merging is not currently supported.\n"
+            
+            warnings = merge_provenance.get("warnings", [])
+            if warnings:
+                markdown += f"\n**Warnings/Info ({len(warnings)}):**\n"
+                for warning in warnings[:10]:  # Limit to first 10 warnings
+                    markdown += f"  - {warning}\n"
+                if len(warnings) > 10:
+                    markdown += f"  - ... and {len(warnings) - 10} more warnings\n"
         
         markdown += "\n"
     
@@ -907,6 +1033,9 @@ if __name__ == "__main__":
             "'annotated-element' (use transformation from annotated element itself)."
         )
     )
+    parser.add_argument("--annotation-anndata", type=str, default=None, help="Path to additional anndata file to merge into tables (e.g., containing UMAP annotations).")
+    parser.add_argument("--merge-key", type=str, default=None, help="Column name to use for merging (default: auto-infer from get_table_keys).")
+    parser.add_argument("--include-annotations-in-sdata", action="store_true", help="Include merged annotations in written SpatialData objects (only when not using --link).")
     args = parser.parse_args()
     print(f"Converting SpatialData from '{args.spatialdata_path}' to {args.output_folder}")
     print(f"Preserving existing project data: {args.preserve_existing}")
@@ -914,6 +1043,19 @@ if __name__ == "__main__":
     print(f"Converting {len(os.listdir(args.spatialdata_path))} potential SpatialData objects")
     import tempfile
     with tempfile.TemporaryDirectory() as temp_folder:
-        args.temp_folder = temp_folder
-        convert_spatialdata_to_mdv(args) # type: ignore argparse->SpatialDataConversionArgs
+        conversion_args = SpatialDataConversionArgs(
+            spatialdata_path=args.spatialdata_path,
+            output_folder=args.output_folder,
+            temp_folder=temp_folder,
+            preserve_existing=args.preserve_existing,
+            output_geojson=args.output_geojson,
+            serve=args.serve,
+            link=args.link,
+            density=args.density,
+            point_transform=args.point_transform,
+            annotation_anndata_path=getattr(args, 'annotation_anndata', None),
+            merge_key_column=getattr(args, 'merge_key', None),
+            include_annotations_in_sdata=getattr(args, 'include_annotations_in_sdata', False),
+        )
+        convert_spatialdata_to_mdv(conversion_args)
         
