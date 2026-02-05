@@ -2058,6 +2058,7 @@ def save_json_atomic(path, data):
     This method was suggested by ChatGPT: https://chatgpt.com/share/6813337b-9acc-800b-a6cd-6d058f339cd5
     """
     dir_name = os.path.dirname(path)
+    # we need to make sure that the tempfile will have proper permissions (same as existing at path)
     with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False) as tmp:
         json.dump(data, tmp, indent=2, allow_nan=False)
         tmp.flush()
