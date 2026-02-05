@@ -1,10 +1,10 @@
-import type { FeatureCollection, Polygon } from '@turf/helpers';
-import type { Gate } from './types';
-import { v4 as uuid } from 'uuid';
+import type { FeatureCollection, Polygon } from "@turf/helpers";
+import type { Gate } from "./types";
+import { v4 as uuid } from "uuid";
 
 /**
  * Extract the coordinates of the gate selection from it's feature collection
- * 
+ *
  * @param featureCollection - Feature Collection of the gate
  * @returns - Extracted coordinates of the gate
  */
@@ -29,12 +29,9 @@ export function extractCoords(featureCollection: FeatureCollection): [number, nu
 
 /**
  * Check if the point is in the polygon or not
- * (Taken from the RangeDimension.filterPoly) 
+ * (Taken from the RangeDimension.filterPoly)
  */
-export function isPointInPolygon(
-    point: [number, number],
-    polygon: [number, number][]
-): boolean {
+export function isPointInPolygon(point: [number, number], polygon: [number, number][]): boolean {
     const [x, y] = point;
     let minX = Number.MAX_VALUE;
     let minY = Number.MAX_VALUE;
@@ -90,4 +87,3 @@ export function computeCentroid(geometry: FeatureCollection): [number, number] {
 export function generateGateId(): string {
     return `gate-${uuid()}-${Date.now()}`;
 }
-

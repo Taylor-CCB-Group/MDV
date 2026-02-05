@@ -1,37 +1,31 @@
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from "@mui/material";
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
 import { useState } from "react";
-import { observer } from 'mobx-react-lite';
 
 export type GateNameDialogType = {
     open: boolean;
     onClose: () => void;
     onSaveGate: (gateName: string) => void;
+    name?: string;
 };
 
-const GateNameDialog = observer(function GateNameDialog({ 
-    open, 
-    onClose,
-    onSaveGate,
-}: GateNameDialogType) {
-    const [gateName, setGateName] = useState('');
-    const [error, setError] = useState('');
+const GateNameDialog = ({ open, onClose, onSaveGate, name }: GateNameDialogType) => {
+    const [gateName, setGateName] = useState(name ? name : "");
+    const [error, setError] = useState("");
 
     const handleSave = () => {
         // Validate name
         if (!gateName.trim()) {
-            setError('Gate name cannot be empty');
+            setError("Gate name cannot be empty");
             return;
         }
 
         try {
             onSaveGate(gateName);
+            handleClose();
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : "Something went wrong while saving the gate";
             setError(errorMsg);
         }
-        
-        // Close
-        handleClose();
     };
 
     const handleClose = () => {
@@ -42,14 +36,8 @@ const GateNameDialog = observer(function GateNameDialog({
 
     return (
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Create Gate</DialogTitle>
-            <DialogContent>
-                <Typography variant="caption" color="textSecondary" paragraph>
-                    Gates define cell populations. This gate will appear on all charts with matching axes.
-                </Typography>
-                
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                
+            <DialogTitle>Gate Name</DialogTitle>
+            <DialogContent dividers>
                 <TextField
                     autoFocus
                     fullWidth
@@ -58,19 +46,32 @@ const GateNameDialog = observer(function GateNameDialog({
                     value={gateName}
                     onChange={(e) => {
                         setGateName(e.target.value);
-                        setError('');
+                        setError("");
                     }}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSave()}
+                    onKeyDown={(e) => e.key === "Enter" && handleSave()}
                     sx={{ mt: 1 }}
                 />
+
+                {error && (
+                    <Alert
+                        severity="error"
+                        sx={{
+                            mt: 2,
+                            backgroundColor: "var(--background_color_error)",
+                        }}
+                    >
+                        {error}
+                    </Alert>
+                )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={handleClose}>Cancel</Button>
-                <Button onClick={handleSave} variant="contained">Save Gate</Button>
+                <Button onClick={handleSave} variant="contained">
+                    Save Gate
+                </Button>
             </DialogActions>
         </Dialog>
     );
-});
+};
 
 export default GateNameDialog;
-

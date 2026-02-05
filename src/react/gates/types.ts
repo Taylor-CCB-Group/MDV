@@ -1,4 +1,4 @@
-import type { FeatureCollection } from '@turf/helpers';
+import type { FeatureCollection } from "@turf/helpers";
 
 export interface Gate {
     id: string;
@@ -9,4 +9,3 @@ export interface Gate {
     labelPosition?: [number, number];
     gatePosition?: [number, number];
 }
-

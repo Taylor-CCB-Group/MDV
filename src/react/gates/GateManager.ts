@@ -1,12 +1,11 @@
 import type DataStore from "@/datastore/DataStore";
 import type { Gate } from "./types";
 import { action, computed, makeObservable, observable } from "mobx";
-import type { DataType, LoadedDataColumn } from "@/charts/charts";
+import type { LoadedDataColumn } from "@/charts/charts";
 import { extractCoords, isPointInGate } from "./gateUtils";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
 const GATES_COLUMN_NAME = "__gates__";
-//todo: Add update and delete operations
 /**
  * Class which manages the gating operations
  * Creates a gates column if it doesn't exist, loads the gates column if it's not loaded
@@ -24,11 +23,12 @@ export class GateManager {
         makeObservable(this, {
             gates: observable,
             addGate: action,
+            updateGate: action,
+            deleteGate: action,
             gatesArray: computed,
         });
 
         this.initializeGateColumn();
-        this.loadGatesFromConfig();
     }
 
     async addGate(gate: Gate) {
@@ -67,7 +67,32 @@ export class GateManager {
             this.gates.set(gateId, updatedGate);
         })();
 
-        this.updateCellsWithGate(updatedGate, true);
+        const cellUpdatedNeeded = "geometry" in updates || "name" in updates || "columns" in updates;
+
+        if (cellUpdatedNeeded) {
+            this.updateCellsWithGate(updatedGate, true);
+        }
+
+        this.updateDataStoreWithGates();
+
+        if (this.gateColumn) {
+            this.dataStore.dataChanged([GATES_COLUMN_NAME]);
+        }
+    }
+
+    deleteGate(gateId: string) {
+        const gate = this.gates.get(gateId);
+        if (!gate) {
+            console.error(`Gate ${gateId} not found`);
+            return;
+        }
+
+        this.updateCellsWithGate(gate, false);
+
+        action(() => {
+            this.gates.delete(gateId);
+        })();
+
         this.updateDataStoreWithGates();
 
         if (this.gateColumn) {
@@ -77,7 +102,6 @@ export class GateManager {
 
     // todo: Add NA or some empty value initially which will be used for filtering
     private initializeGateColumn() {
-
         const existingCol = this.dataStore.columnIndex[GATES_COLUMN_NAME];
         if (existingCol && existingCol.datatype === "multitext") {
             // Get the existing column
@@ -104,12 +128,14 @@ export class GateManager {
 
             this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
         }
+
+        this.loadGatesFromConfig();
     }
 
     private async loadGatesFromConfig() {
         // Get the stored gates
         const savedGates = this.dataStore.config.gates || this.dataStore.gates;
-        
+
         if (Array.isArray(savedGates)) {
             for (const gate of savedGates) {
                 // Deep clone the gate
@@ -313,7 +339,7 @@ export class GateManager {
     getGatesForColumns(xField: string, yField: string): Gate[] {
         return this.gatesArray.filter((gate) => gate.columns[0] === xField && gate.columns[1] === yField);
     }
-    
+
     hasGateName(name: string): boolean {
         return this.gatesArray.some((gate) => gate.name === name);
     }

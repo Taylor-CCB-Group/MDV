@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useGateManager } from "../gates/useGateManager";
 import { useConfig, useParamColumns } from "../hooks";
 import type { LoadedDataColumn } from "@/charts/charts";
@@ -7,7 +7,13 @@ import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
 import { TextLayer } from "deck.gl";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 
-//todo: Be able to drag and drop a gate overlay layer and fix issues related to the whole thing moving when the gate layer or text layer is moved
+const MAX_LABEL_LENGTH = 18;
+
+function truncateGateLabel(name: string, maxLen: number = MAX_LABEL_LENGTH) {
+    if (name.length <= maxLen) return name;
+    return `${name.slice(0, maxLen - 1)}...`;
+}
+//todo: Be able to drag and drop a gate overlay layer
 const useGateLayers = () => {
     const gateManager = useGateManager();
     const id = useId();
@@ -18,8 +24,11 @@ const useGateLayers = () => {
     const is2d = dimension === "2d";
     const [labelPositions, setLabelPositions] = useState<Map<string, [number, number]>>(new Map());
     const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [isHoveringLabel, setIsHoveringLabel] = useState(false);
+    const draggingIdRef = useRef<string | null>(null);
     const [dragPos, setDragPos] = useState<[number, number] | null>(null);
     const gates = gateManager.gatesArray;
+    const hasRebuiltGateColumnRef = useRef(false);
 
     useEffect(() => {
         const positions = new Map<string, [number, number]>();
@@ -36,9 +45,9 @@ const useGateLayers = () => {
 
     useEffect(() => {
         // Wait for columns to be loaded to update the gates column
-        if (cx && cy) {
-            gateManager.rebuildGatesColumnWhenReady().catch(console.error);
-        }
+        if (!cx || !cy || hasRebuiltGateColumnRef.current) return;
+        hasRebuiltGateColumnRef.current = true;
+        gateManager.rebuildGatesColumnWhenReady().catch(console.error);
     }, [cx, cy, gateManager]);
 
     const gateLabelLayer = useMemo(() => {
@@ -58,7 +67,7 @@ const useGateLayers = () => {
             const z = is2d ? 0 : cz?.minMax ? (cz.minMax[0] + cz.minMax[1]) / 2 : 0;
             return {
                 position: [position[0], position[1], z] as [number, number, number],
-                text: gate.name,
+                text: truncateGateLabel(gate.name),
                 gateId: gate.id,
             };
         });
@@ -69,26 +78,34 @@ const useGateLayers = () => {
             getPosition: (d: { position: [number, number, number] }) => d.position,
             getText: (d: { text: string }) => d.text,
             getSize: 12,
+            // todo: fix the color based on the theme
             getColor: [255, 255, 255, 255],
             getTextAnchor: "middle",
             getAlignmentBaseline: "center",
             padding: [3, 8],
-            billboard: true,
+            // billboard: true,
             pickable: true,
             updateTriggers: {
                 getPosition: [gates.length, labelPositions.size],
                 getColor: [draggingId],
                 getBackgroundColor: [draggingId],
             },
+            onHover(pickingInfo) {
+                if (pickingInfo.index !== -1) {
+                    setIsHoveringLabel(true);
+                } else {
+                    setIsHoveringLabel(false);
+                }
+            },
             onDrag(pickingInfo) {
-                if (!draggingId || !dragPos || !pickingInfo.object || !pickingInfo.coordinate) return;
-                console.log("onDrag.....");
+                const currentId = draggingIdRef.current;
+                if (!currentId || !dragPos || !pickingInfo.object || !pickingInfo.coordinate) return;
 
                 const currentPosition: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]];
 
                 setLabelPositions((prev) => {
                     const newPositions = new Map(prev);
-                    newPositions.set(draggingId, currentPosition);
+                    newPositions.set(currentId, currentPosition);
                     return newPositions;
                 });
 
@@ -96,21 +113,21 @@ const useGateLayers = () => {
             },
             onDragStart(pickingInfo) {
                 if (!pickingInfo.object || !pickingInfo.coordinate) return false;
-                console.log("onDragStart.....");
 
+                draggingIdRef.current = pickingInfo.object.gateId;
                 setDraggingId(pickingInfo.object.gateId);
                 setDragPos([pickingInfo.coordinate[0], pickingInfo.coordinate[1]]);
-                console.log("drag position", [pickingInfo.coordinate[0], pickingInfo.coordinate[1]]);
                 return true;
             },
-            onDragEnd(_pickingInfo, _event) {
-                if (!draggingId) return;
-                console.log("onDragEnd.....");
+            onDragEnd() {
+                const currentId = draggingIdRef.current;
+                if (!currentId) return;
 
-                const position = labelPositions?.get(draggingId);
+                const position = labelPositions?.get(currentId);
                 if (position) {
-                    gateManager.updateGate(draggingId, { labelPosition: position });
+                    gateManager.updateGate(currentId, { labelPosition: position });
                 }
+                draggingIdRef.current = null;
                 setDraggingId(null);
                 setDragPos(null);
             },
@@ -136,8 +153,7 @@ const useGateLayers = () => {
                     },
                 };
             });
-        }
-        );
+        });
 
         return new MonkeyPatchEditableGeoJsonLayer({
             id: `gate-layer-${id}`,
@@ -152,19 +168,6 @@ const useGateLayers = () => {
             getLineWidth: 2,
             lineWidthMinPixels: 1,
             pickable: false,
-            onDrag(pickingInfo, event) {
-                console.log("onDrag.....")
-                console.log("pickingInfo: ", pickingInfo);
-            },
-            onDragStart(pickingInfo, event) {
-                console.log("onDragStart.....")
-                console.log("pickingInfo: ", pickingInfo);
-            },
-            onDragEnd(pickingInfo, event) {
-                console.log("onDragEnd.....")
-                console.log("pickingInfo: ", pickingInfo);
-            },
-            
         });
     }, [cx, cy, id, gates]);
 
@@ -172,6 +175,7 @@ const useGateLayers = () => {
         gateLabelLayer,
         gateOverlayLayer,
         draggingId,
+        isHoveringLabel,
     };
 };
 

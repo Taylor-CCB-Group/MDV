@@ -173,6 +173,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
         gateLabelLayer,
         gateOverlayLayer,
         draggingId,
+        isHoveringLabel
     } = useGateLayers();
 
     // this should move in to scatter_state, common with viv...
@@ -321,14 +322,8 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     ref={deckRef}
                     layers={layers}
                     useDevicePixels={true}
-                    // controller={true}
-                    // controller={!draggingId}
                     controller={{
-                        dragPan: !draggingId,
-                        scrollZoom: !draggingId,
-                        doubleClickZoom: !draggingId,
-                        touchRotate: !draggingId,
-                        keyboard: !draggingId,
+                        dragPan: !(draggingId || isHoveringLabel),
                     }}
                     viewState={viewState}
                     // initialViewState={viewState} //consider not using react state for this        

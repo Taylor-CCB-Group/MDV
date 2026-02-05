@@ -1,14 +1,13 @@
-import { ButtonGroup, IconButton, Tooltip } from "@mui/material"; //check tree-shaking...
+import { ButtonGroup, Divider, IconButton, Tooltip } from "@mui/material"; //check tree-shaking...
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import PhotoSizeSelectSmallOutlinedIcon from "@mui/icons-material/PhotoSizeSelectSmallOutlined";
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
 import SaveIcon from "@mui/icons-material/SaveOutlined";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import { useCallback, useMemo, useState } from "react";
-import type { useScatterplotLayer } from "../scatter_state";
 import { useSpatialLayers } from "../spatial_context";
-import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import GateNameDialog from "./GateNameDialog";
 import { useGateManager } from "../gates/useGateManager";
@@ -23,13 +22,8 @@ import {
 } from '@deck.gl-community/editable-layers';
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
-import type { Gate } from "../gates/types";
-import { generateGateId } from "../gates/gateUtils";
-import { useParamColumns } from "../hooks";
-import { action } from "mobx";
-import { useChart } from "../context";
-import { getEmptyFeatureCollection } from "../deck_state";
-import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
+import ManageGateDialog from "./ManageGateDialog";
+import useGateActions from "../hooks/useGateActions";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -114,6 +108,7 @@ type ToolButtonProps = {
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
 };
+// todo: fix the colors based on the themes
 const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
     const style = useMemo(
         () => ({
@@ -141,10 +136,17 @@ export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
     const { setSelectionMode, selectionFeatureCollection } = selectionProps;
     const gateManager = useGateManager();
-    const paramColumns = useParamColumns();
-    const chart = useChart<DeckScatterConfig>();
     const [selectedTool, setSelectedToolX] = useState<Tool>("Pan");
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
+    const [manageGateDialogOpen, setManageGateDialogOpen] = useState(false);
+
+    const {
+        onDeleteGate,
+        onExportClick,
+        onRenameGate,
+        onSaveGate,
+    } = useGateActions();
+
     const setSelectedTool = useCallback((tool: Tool) => {
         // pending refactor
         const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
@@ -174,35 +176,6 @@ export default observer(function SelectionOverlay() {
         ));
     }, [selectedTool, setSelectedTool]);
 
-    const onSaveGate = useCallback((gateName: string) => {
-        if (gateManager.hasGateName(gateName)) {
-            throw new Error('A gate with this name already exists');
-        }
-        
-        // Get X and Y columns
-        const [xCol, yCol] = paramColumns.slice(0, 2);
-        if (!xCol || !yCol) {
-            throw new Error('Chart must have X and Y axes');
-        }
-        
-        // Create gate
-        const gate: Gate = {
-            id: generateGateId(),
-            name: gateName.trim(),
-            geometry: selectionFeatureCollection,
-            columns: [xCol.field, yCol.field],
-            createdAt: Date.now()
-        };
-        
-        // Add to gate store
-        gateManager.addGate(gate);
-        
-        // Clear selection
-        action(() => {
-            chart.config.selectionFeatureCollection = getEmptyFeatureCollection();
-        })();
-    }, [gateManager, paramColumns, selectionFeatureCollection, chart.config]);
-    
     const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
     
     return (
@@ -215,6 +188,23 @@ export default observer(function SelectionOverlay() {
                 // style={{zIndex: 2, padding: '0.3em'}}
             >
                 {toolButtons}
+                <Divider 
+                    orientation="vertical" 
+                    sx={{
+                        color: "inherit",
+                        width: "5px",
+                        height: "35px",
+                        padding: "2px",
+                    }} 
+                />
+                <Tooltip title="Manage gates">
+                    <IconButton
+                        onClick={() => setManageGateDialogOpen(true)}
+                        aria-label="Manage Gates"
+                    >
+                        <SettingsIcon />
+                    </IconButton>
+                </Tooltip>
                 {hasSelection && (
                     <Tooltip title="Save selection as gate">
                         <IconButton
@@ -231,6 +221,15 @@ export default observer(function SelectionOverlay() {
                 open={gateDialogOpen}
                 onClose={() => setGateDialogOpen(false)}
                 onSaveGate={onSaveGate}
+            />
+            <ManageGateDialog
+                open={manageGateDialogOpen}
+                onClose={() => setManageGateDialogOpen(false)}
+                // Passing gatesArray directly as there are no mutations to the array
+                gatesArray={gateManager.gatesArray}
+                onDelete={onDeleteGate}
+                onRenameGate={onRenameGate}
+                onExportClick={onExportClick}
             />
         </>
     );
