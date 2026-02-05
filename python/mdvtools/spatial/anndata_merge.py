@@ -400,12 +400,62 @@ def _merge_annotation_anndata(
     merged_adata.obs = merged_obs.reset_index()
     
     # Merge obsm (dimensionality reductions like UMAP)
-    # Annotation takes precedence for matching keys
-    for key in annotation_adata_copy.obsm.keys():
-        if key in merged_adata.obsm:
-            all_warnings.append(f"INFO: Replacing obsm['{key}'] with annotation version.")
-        merged_adata.obsm[key] = annotation_adata_copy.obsm[key].copy()
-        provenance["merged_obsm_keys"].append(key)
+    # Annotation data may contain data for multiple tables, so we need to:
+    # 1. Find which rows in annotation_adata match this table's instances
+    # 2. Extract obsm values for those matching rows
+    # 3. Align them with merged_adata order based on merge_key
+    
+    # Create a mapping from merge_key to annotation row index
+    # Handle potential duplicates by taking first match
+    ann_key_to_idx = {}
+    for idx, key in enumerate(annotation_adata_copy.obs[merge_key].values):
+        if key not in ann_key_to_idx:  # Take first occurrence if duplicates
+            ann_key_to_idx[key] = idx
+    
+    # Get the set of keys that are in both original and annotation
+    original_keys = set(merged_adata.obs[merge_key].values)
+    matching_keys = original_keys & set(ann_key_to_idx.keys())
+    
+    if len(matching_keys) == 0:
+        all_warnings.append("WARNING: No matching instances found in annotation data for obsm merge. Skipping obsm.")
+    else:
+        # Merge obsm keys from annotation
+        for key in annotation_adata_copy.obsm.keys():
+            if key in merged_adata.obsm:
+                all_warnings.append(f"INFO: Replacing obsm['{key}'] with annotation version.")
+            
+            # Get shape of annotation obsm and convert to numpy array if needed
+            ann_obsm_data = annotation_adata_copy.obsm[key]
+            # Convert to numpy array if it's a sparse matrix or other type
+            if hasattr(ann_obsm_data, 'toarray'):
+                ann_obsm_data = ann_obsm_data.toarray()
+            elif not isinstance(ann_obsm_data, np.ndarray):
+                ann_obsm_data = np.asarray(ann_obsm_data)
+            
+            ann_obsm_shape = ann_obsm_data.shape
+            if len(ann_obsm_shape) == 1:
+                n_dims = 1
+            else:
+                n_dims = ann_obsm_shape[1]
+            
+            # Create aligned obsm array matching merged_adata order
+            aligned_obsm = np.full(
+                (merged_adata.n_obs, n_dims),
+                fill_value=np.nan,
+                dtype=ann_obsm_data.dtype
+            )
+            
+            # Fill in values for matching instances
+            for i, instance_key in enumerate(merged_adata.obs[merge_key].values):
+                if instance_key in ann_key_to_idx:
+                    ann_idx = ann_key_to_idx[instance_key]
+                    if len(ann_obsm_shape) == 1:
+                        aligned_obsm[i, 0] = ann_obsm_data[ann_idx]
+                    else:
+                        aligned_obsm[i] = ann_obsm_data[ann_idx]
+            
+            merged_adata.obsm[key] = aligned_obsm
+            provenance["merged_obsm_keys"].append(key)
     
     # Note: We do NOT merge var or varm - current scope is obs-only merging
     # Future: If we want to support multi-modal data where vars refer to different
