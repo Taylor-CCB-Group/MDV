@@ -25,6 +25,8 @@ const useSortedFilteredIndices = () => {
     const [sortedFilteredIndices, setSortedFilteredIndices] = useState<Uint32Array>(new Uint32Array(0));
     const dataStore = useDataStore();
 
+    // If we include the config.sort in the useEffect's dependencies, then it will cause unnecessary rerenders when config.sort changes everytime
+    // biome-ignore lint/correctness/useExhaustiveDependencies: the config.sort is tracked by mobx autorun
     useEffect(() => {
         const disposer = autorun(() => {
             // Create a copy of filtered indices
@@ -126,7 +128,7 @@ const useSortedFilteredIndices = () => {
             return;
         });
         return () => disposer();
-    }, [filteredIndices, dataStore, config.sort]);
+    }, [filteredIndices, dataStore]);
 
     return sortedFilteredIndices;
 };
