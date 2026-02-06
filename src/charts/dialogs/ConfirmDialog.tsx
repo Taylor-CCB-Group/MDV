@@ -9,10 +9,6 @@ export type ConfirmDialogType = {
 };
 
 const ConfirmDialog = ({ open, onClose, message, title, onConfirm }: ConfirmDialogType) => {
-    const handleConfirm = () => {
-        onConfirm();
-        onClose();
-    };
     
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
@@ -21,7 +17,7 @@ const ConfirmDialog = ({ open, onClose, message, title, onConfirm }: ConfirmDial
                 <Typography>{message}</Typography>
             </DialogContent>
             <DialogActions>
-                <Button color="primary" onClick={handleConfirm}>
+                <Button color="primary" onClick={onConfirm}>
                     Yes
                 </Button>
                 <Button color="error" onClick={onClose}>

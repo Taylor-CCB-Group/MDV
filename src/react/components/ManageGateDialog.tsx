@@ -189,6 +189,7 @@ const ManageGateDialog = ({
                     }}
                     onConfirm={() => {
                         onDelete(deleteGateId);
+                        setDeleteGateId(null);
                     }}
                 />
             )}
