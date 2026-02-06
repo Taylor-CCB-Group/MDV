@@ -1,5 +1,5 @@
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type GateNameDialogType = {
     open: boolean;
@@ -11,6 +11,13 @@ export type GateNameDialogType = {
 const GateNameDialog = ({ open, onClose, onSaveGate, name }: GateNameDialogType) => {
     const [gateName, setGateName] = useState(name ? name : "");
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (open) {
+            setGateName(name ?? "");
+            setError("");
+        }
+    }, [open, name]);
 
     const handleSave = () => {
         // Validate name
