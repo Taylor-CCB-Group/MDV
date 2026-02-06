@@ -170,18 +170,19 @@ const useSlickGridReact = () => {
                 grid.setData(dataProvider, true);
                 grid.render();
                 
-                //? Do we need this? We are syncing the sort in the useEffect below which does the same.
                 // Apply initial sort if config.sort is set
-                // if (config.sort) {
-                //     suppressSortSyncRef.current = true;
-                //     grid.setSortColumn(config.sort.columnId, config.sort.ascending);
-                //     suppressSortSyncRef.current = false;
-                // }
+                // we need this because the useEffect for sort sync won't run if grid is null
+                // and it won't rerun if we don't initially set the config.sort
+                if (config.sort) {
+                    suppressSortSyncRef.current = true;
+                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                    suppressSortSyncRef.current = false;
+                }
 
                 attachEventHandlers(e.detail);
             }
         },
-        [dataProvider, chart],
+        [dataProvider, chart, config.sort],
     );
 
     /**
