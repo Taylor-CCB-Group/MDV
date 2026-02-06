@@ -5,8 +5,8 @@ import { PriorityHigh as PriorityHighIcon } from "@mui/icons-material";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
 import { useChartManager, useViewManager } from "../hooks";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 
 export type DropdownType = {
     options: string[];
@@ -124,7 +124,7 @@ const ViewSelectorDropdown = observer(() => {
                 </IconButton>
             )}
             {openError && (
-                <ReusableDialog
+                <ReusableAlertDialog
                     open={openError}
                     handleClose={() => setOpenError(false)}
                     component={

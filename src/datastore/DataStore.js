@@ -76,6 +76,7 @@ class DataStore {
         this.syncColumnColors = [];
         this.linkColumns = [];
         this.regions = config.regions;
+        this.gates = config.gates;
 
         //for react / mobx... makeAutoObservable causes problems with webworker.postMessage:
         // `DOMException: Failed to execute 'postMessage' on 'Worker': [object Array] could not be cloned.`
@@ -90,9 +91,12 @@ class DataStore {
         // for re-usable filteredIndices
         this.addListener(
             "invalidateFilteredIndicesCache",
-            action(() => {
+            action((type, _data) => {
                 //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
-                this._filteredIndicesPromise = null;
+                // Make the promise null only if the data is filtered, changed or added
+                if (type === "filtered" || type === "data_changed" || type === "data_added") {
+                    this._filteredIndicesPromise = null;
+                }
             }),
         );
 

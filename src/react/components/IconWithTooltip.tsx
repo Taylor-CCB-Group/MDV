@@ -4,7 +4,7 @@ import type React from "react";
 export type IconWithTooltipProps = {
     children: React.ReactNode;
     tooltipText: string;
-    onClick: () => void;
+    onClick: React.MouseEventHandler<HTMLButtonElement>;
     tooltipProps?: object;
     iconButtonProps?: object;
 };
