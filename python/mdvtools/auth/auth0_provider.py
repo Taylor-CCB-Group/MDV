@@ -2,7 +2,10 @@ import time
 import requests
 from authlib.integrations.flask_client import OAuth
 from flask import jsonify, session, redirect
-from typing import Optional
+from typing import Optional, Dict, List, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mdvtools.dbutils.dbmodels import Project
 # from flask import Response
 from flask.typing import ResponseReturnValue
 from mdvtools.auth.auth_provider import AuthProvider
@@ -20,35 +23,8 @@ _jwks_cache_expiry = None
 JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 
 # Rate limiting and retry parameters
-MAX_RETRIES = 3
 BASE_DELAY = 1  # Base delay in seconds
 MAX_DELAY = 8  # Maximum delay in seconds
-
-
-def retry_with_exponential_backoff(func):
-    """ Decorator to implement retry logic with exponential backoff."""
-    def wrapper(*args, **kwargs):
-        retry_count = 0
-        last_exception = None
-        while retry_count < MAX_RETRIES:
-            try:
-                return func(*args, **kwargs)
-            except RateLimitError as e:
-                retry_count += 1
-                last_exception = e
-                if retry_count == MAX_RETRIES:
-                    raise e
-                
-                # Calculate delay with jitter
-                delay = min(BASE_DELAY * (2 ** retry_count) + random.uniform(0, 1), MAX_DELAY)
-                logging.warning(f"Rate limit hit. Retrying in {delay:.2f} seconds... (Attempt {retry_count}/{MAX_RETRIES})")
-                time.sleep(delay)
-            except Exception as e:
-                raise e
-        # If we got here, we've tried MAX_RETRIES times and failed.
-        if last_exception:
-            raise last_exception
-    return wrapper
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -391,8 +367,260 @@ class Auth0Provider(AuthProvider):
         except Exception as e:
             logging.exception(f"Error in validate_user: {e}")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
+    
+    class SyncContext:
+        """Context object for user sync operations."""
+        def __init__(
+            self,
+            auth0: Auth0,
+            all_projects: List['Project'],
+            page: int,
+            processed_users: int = 0,
+            new_users: int = 0,
+            updated_users: int = 0,
+            admin_users_synced: int = 0,
+            pagination_rate_limit_count: int = 0,
+            max_pagination_rate_limit_retries: int = 5,
+            pagination_retry_delay: float = 2.0,
+            per_page: int = 50,
+            max_role_fetch_retries: int = 3
+        ):
+            self.auth0 = auth0
+            self.all_projects = all_projects
+            self.page = page
+            self.processed_users = processed_users
+            self.new_users = new_users
+            self.updated_users = updated_users
+            self.admin_users_synced = admin_users_synced
+            self.pagination_rate_limit_count = pagination_rate_limit_count
+            self.max_pagination_rate_limit_retries = max_pagination_rate_limit_retries
+            self.pagination_retry_delay = pagination_retry_delay
+            self.per_page = per_page
+            self.max_role_fetch_retries = max_role_fetch_retries
         
-    def sync_users_to_db(self):
+        def to_dict(self) -> Dict[str, int]:
+            """Convert context stats to dictionary."""
+            return {
+                'processed_users': self.processed_users,
+                'new_users': self.new_users,
+                'updated_users': self.updated_users,
+                'admin_users_synced': self.admin_users_synced
+            }
+        
+        def reset_pagination_rate_limit(self) -> None:
+            """Reset pagination rate limit counters after successful request."""
+            self.pagination_rate_limit_count = 0
+            self.pagination_retry_delay = 2.0
+    
+    def _fetch_user_roles_with_retry(
+        self, 
+        auth0_id: str,
+        context: 'SyncContext'
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch user roles from Auth0 with retry logic for rate limiting.
+        
+        Args:
+            auth0_id: Auth0 user ID
+            context: SyncContext object containing auth0 client, page, and stats
+            
+        Returns:
+            dict: User roles dictionary, or None if fetch failed after retries
+        """
+        roles = None
+        retry_count = 0
+        success = False
+        max_retries = context.max_role_fetch_retries
+        
+        while retry_count < max_retries and not success:
+            try:
+                roles = context.auth0.users.list_roles(auth0_id)
+                success = True
+            except RateLimitError as e:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    # Max retries exceeded
+                    error_info = {
+                        'user_id': auth0_id,
+                        'page': context.page,
+                        'processed': context.processed_users,
+                        'status': getattr(e, 'status_code', None),
+                        'code': getattr(e, 'error_code', None),
+                        'message': getattr(e, 'message', str(e)),
+                        'reset_at': getattr(e, 'reset_at', None),
+                        'remaining': getattr(e, 'remaining', None),
+                        'limit': getattr(e, 'limit', None),
+                    }
+                    error_info = {k: v for k, v in error_info.items() if v is not None}
+                    
+                    logging.error(
+                        f"Rate limit during role fetch for user {auth0_id} after {max_retries} retries: "
+                        f"{error_info}. Skipping user."
+                    )
+                    return None
+                else:
+                    # Calculate exponential backoff delay with jitter
+                    delay = min(BASE_DELAY * (2 ** retry_count) + random.uniform(0, 1), MAX_DELAY)
+                    logging.warning(
+                        f"Rate limit during role fetch for user {auth0_id}. "
+                        f"Retrying in {delay:.2f} seconds... (Attempt {retry_count}/{max_retries})"
+                    )
+                    time.sleep(delay)
+            except Exception as e:
+                # Non-rate-limit error
+                logging.error(f"Error fetching roles for user {auth0_id}: {str(e)}")
+                return None
+        
+        return roles if success else None
+    
+    def _process_single_user(
+        self, 
+        user: Dict[str, Any], 
+        context: 'SyncContext'
+    ) -> bool:
+        """
+        Process a single user: sync to DB, fetch roles, update admin status, assign projects.
+        
+        Args:
+            user: User dict from Auth0 API
+            context: SyncContext object containing auth0 client, projects, page, and stats
+            
+        Returns:
+            bool: True if user was successfully processed, False otherwise
+        """
+        from mdvtools.dbutils.dbservice import UserService, UserProjectService
+        from mdvtools.dbutils.dbmodels import db, User
+        
+        email = user.get('email', '')
+        auth0_id = user['user_id']
+        
+        # Check if user already exists to track new vs updated
+        existing_user = User.query.filter_by(auth_id=auth0_id).first()
+        is_new_user = existing_user is None
+        
+        # Use UserService to add or update user
+        db_user = UserService.add_or_update_user(
+            email=email,
+            auth_id=auth0_id
+        )
+        
+        if is_new_user:
+            context.new_users += 1
+        else:
+            context.updated_users += 1
+        
+        # Add delay between role requests to avoid rate limiting
+        time.sleep(0.2)  # 200ms delay between requests
+        
+        # Fetch user's roles with retry mechanism
+        roles = self._fetch_user_roles_with_retry(auth0_id, context)
+        if roles is None:
+            # Failed to fetch roles, skip this user
+            return False
+        
+        is_admin = any(role['name'] == 'admin' for role in roles['roles'])
+        
+        # Update admin status
+        was_admin = db_user.is_admin
+        db_user.is_admin = is_admin
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error updating user {auth0_id} admin status: {e}")
+            return False
+        
+        if is_admin and not was_admin:
+            context.admin_users_synced += 1
+        
+        if is_admin:
+            # Assign all projects to this user as owner via UserProjectService
+            for project in context.all_projects:
+                UserProjectService.add_or_update_user_project(
+                    user_id=db_user.id,
+                    project_id=project.id,
+                    is_owner=True
+                )
+        
+        context.processed_users += 1
+        return True
+    
+    def _handle_pagination_rate_limit(
+        self, 
+        e: RateLimitError,
+        context: 'SyncContext'
+    ) -> None:
+        """
+        Handle rate limit error during pagination. Updates context in place.
+        
+        Args:
+            e: RateLimitError exception
+            context: SyncContext object containing pagination state
+            
+        Raises:
+            RuntimeError: If max retries exceeded
+        """
+        context.pagination_rate_limit_count += 1
+        new_count = context.pagination_rate_limit_count
+        
+        # Collect all available error information
+        error_info = {
+            'page': context.page,
+            'processed': context.processed_users,
+            'consecutive_errors': new_count,
+            'retry_delay': context.pagination_retry_delay,
+            'status': getattr(e, 'status_code', None),
+            'code': getattr(e, 'error_code', None),
+            'message': getattr(e, 'message', str(e)),
+            'reset_at': getattr(e, 'reset_at', None),
+            'remaining': getattr(e, 'remaining', None),
+            'limit': getattr(e, 'limit', None),
+        }
+        # Filter out None values for cleaner output
+        error_info = {k: v for k, v in error_info.items() if v is not None}
+        
+        logging.error(f"Rate limit during pagination: {error_info}")
+        
+        # Check if we've exceeded max retries
+        if new_count >= context.max_pagination_rate_limit_retries:
+            logging.error(
+                f"Aborting: {new_count} consecutive rate limit errors "
+                f"(max: {context.max_pagination_rate_limit_retries}). Processed {context.processed_users} users."
+            )
+            raise RuntimeError(
+                f"Too many consecutive rate limit errors. Check: function call frequency, "
+                f"concurrent execution, or insufficient delays between requests."
+            ) from e
+        
+        logging.warning(
+            f"Rate limit hit ({new_count}/{context.max_pagination_rate_limit_retries}). "
+            f"Possible issues: frequent calls, concurrent execution, batch size ({context.per_page}), "
+            f"or insufficient delays (1s pages, 0.2s roles). Retrying in {context.pagination_retry_delay}s..."
+        )
+        
+        # Update retry delay with exponential backoff, max 60s
+        context.pagination_retry_delay = min(context.pagination_retry_delay * 2, 60.0)
+    
+    def _log_sync_statistics(self, initial_user_count: int, initial_admin_count: int) -> None:
+        """
+        Log initial and final database statistics for user sync.
+        
+        Args:
+            initial_user_count: User count at start of sync
+            initial_admin_count: Admin user count at start of sync
+        """
+        from mdvtools.dbutils.dbmodels import User
+        
+        final_user_count = User.query.count()
+        final_admin_count = User.query.filter_by(is_admin=True).count()
+        
+        logging.info(
+            f"User sync completed. Database: {final_user_count} total users "
+            f"({final_user_count - initial_user_count:+d}), "
+            f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
+        )
+        
+    def sync_users_to_db(self) -> None:
         """
         Syncs users from Auth0 to the application's database using UserService and UserProjectService.
         Implements rate limiting and retry logic for Auth0 API calls.
@@ -409,8 +637,7 @@ class Auth0Provider(AuthProvider):
         - If called frequently (e.g., on every share dialog open), will hit rate limits quickly
         - Consider: caching, background jobs, or incremental sync instead of full sync on-demand
         """
-        from mdvtools.dbutils.dbservice import UserService, UserProjectService
-        from mdvtools.dbutils.dbmodels import db, Project
+        from mdvtools.dbutils.dbmodels import Project
         
         try:
             # Load Auth0 config from app
@@ -433,190 +660,71 @@ class Auth0Provider(AuthProvider):
                 f"Starting user sync. Database stats: {initial_user_count} total users, "
                 f"{initial_admin_count} admin users"
             )
-
-            # Fetch users from Auth0 connection with pagination
-            page = 0
-            per_page = 50  # Reduced batch size
-            processed_users = 0
-            new_users = 0
-            updated_users = 0
-            admin_users_synced = 0
-            pagination_rate_limit_count = 0
-            max_pagination_rate_limit_retries = 5  # Limit retries to prevent infinite loops
-            pagination_retry_delay = 2  # Start with 2 seconds
-            has_more_users = True  # Flag to track if there are more users to fetch
             
-            while has_more_users:
+            # Initialize sync context
+            all_projects = Project.query.all()
+            sync_context = self.SyncContext(
+                auth0=auth0,
+                all_projects=all_projects,
+                page=0
+            )
+            
+            # Fetch users from Auth0 connection with pagination
+            while True:
                 try:
                     users = auth0.users.list(
                         q=f'identities.connection:"{auth0_db_connection}"',
-                        page=page,
-                        per_page=per_page
+                        page=sync_context.page,
+                        per_page=sync_context.per_page
                     )
                     
                     # Reset rate limit counter on successful request
-                    pagination_rate_limit_count = 0
-                    pagination_retry_delay = 2
+                    sync_context.reset_pagination_rate_limit()
                     
                     # Check if we've reached the end of pagination
                     # Auth0 returns an empty list when there are no more users to fetch
                     user_list = users.get('users', [])
                     if not user_list:
-                        logging.info(f"Reached end of pagination at page {page} (empty user list returned)")
-                        has_more_users = False
-                        continue  # Skip processing, exit loop on next iteration
+                        logging.info(f"Reached end of pagination at page {sync_context.page} (empty user list returned)")
+                        break
+                    
+                    # Process users on this page
+                    for user in user_list:
+                        success = self._process_single_user(user, sync_context)
+                        
+                        if success:
+                            # Log progress every 10 users
+                            if sync_context.processed_users % 10 == 0:
+                                logging.info(
+                                    f"Progress: {sync_context.processed_users} processed "
+                                    f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
+                                    f"{sync_context.admin_users_synced} admins)"
+                                )
                     
                     # Check if we got fewer users than requested (indicates last page)
-                    is_last_page = len(user_list) < per_page
-                    if is_last_page:
+                    if len(user_list) < sync_context.per_page:
                         logging.info(
-                            f"Reached end of pagination at page {page} "
-                            f"(got {len(user_list)} users, less than requested {per_page})"
+                            f"Reached end of pagination at page {sync_context.page} "
+                            f"(got {len(user_list)} users, less than requested {sync_context.per_page})"
                         )
-                        has_more_users = False  # This is the last page, but process it first
-
-                    for user in user_list:
-                        email = user.get('email', '')
-                        auth0_id = user['user_id']
-
-                        # Check if user already exists to track new vs updated
-                        # note: could probably avoid requerying here.
-                        # also - clarify where we identify users by auth0_id vs email.
-                        existing_user = User.query.filter_by(auth_id=auth0_id).first()
-                        is_new_user = existing_user is None
-
-                        # Use UserService to add or update user
-                        db_user = UserService.add_or_update_user(
-                            email=email,
-                            auth_id=auth0_id
-                        )
-                        
-                        if is_new_user:
-                            new_users += 1
-                        else:
-                            updated_users += 1
-
-                        # Add delay between role requests to avoid rate limiting
-                        time.sleep(0.2)  # 200ms delay between requests
-                        
-                        try:
-                            # Fetch user's roles with retry mechanism
-                            @retry_with_exponential_backoff
-                            def get_user_roles(id):
-                                # this is the real place where a RateLimitError may be raised
-                                return auth0.users.list_roles(id)
-                            
-                            roles = get_user_roles(auth0_id)
-                            is_admin = any(role['name'] == 'admin' for role in roles['roles'])
-
-                            # Update admin status
-                            was_admin = db_user.is_admin
-                            db_user.is_admin = is_admin
-                            # could hypothetically raise error - don't think we've seen this but may be better handle explicitly
-                            db.session.commit()
-                            
-                            if is_admin and not was_admin:
-                                admin_users_synced += 1
-
-                            if is_admin:
-                                # Assign all projects to this user as owner via UserProjectService
-                                for project in Project.query.all():
-                                    UserProjectService.add_or_update_user_project(
-                                        user_id=db_user.id,
-                                        project_id=project.id,
-                                        is_owner=True
-                                    )
-                        
-                            processed_users += 1
-                            if processed_users % 10 == 0:  # Log progress every 10 users
-                                logging.info(
-                                    f"Progress: {processed_users} processed "
-                                    f"({new_users} new, {updated_users} updated, {admin_users_synced} admins)"
-                                )
-                                
-                        except RateLimitError as e:
-                            # Collect all available error information
-                            error_info = {
-                                'user_id': auth0_id,
-                                'page': page,
-                                'processed': processed_users,
-                                'status': getattr(e, 'status_code', None),
-                                'code': getattr(e, 'error_code', None),
-                                'message': getattr(e, 'message', str(e)),
-                                'reset_at': getattr(e, 'reset_at', None),
-                                'remaining': getattr(e, 'remaining', None),
-                                'limit': getattr(e, 'limit', None),
-                            }
-                            # Filter out None values for cleaner output
-                            error_info = {k: v for k, v in error_info.items() if v is not None}
-                            
-                            logging.error(
-                                f"Rate limit during user processing: {error_info}. "
-                                f"Possible causes: too frequent calls, concurrent execution, or insufficient delays."
-                            )
-                            raise
-                        except Exception as e:
-                            logging.error(f"Error processing user {auth0_id}: {str(e)}")
-                            continue
-
-                    # If this was the last page, has_more_users is already False, loop will exit
-                    # Otherwise, continue to next page
-                    if has_more_users:
-                        page += 1
-                        time.sleep(1)  # Add delay between pagination requests
+                        break
+                    
+                    # Continue to next page
+                    sync_context.page += 1
+                    time.sleep(1)  # Add delay between pagination requests
                     
                 except RateLimitError as e:
-                    pagination_rate_limit_count += 1
-                    
-                    # Collect all available error information
-                    error_info = {
-                        'page': page,
-                        'processed': processed_users,
-                        'consecutive_errors': pagination_rate_limit_count,
-                        'retry_delay': pagination_retry_delay,
-                        'status': getattr(e, 'status_code', None),
-                        'code': getattr(e, 'error_code', None),
-                        'message': getattr(e, 'message', str(e)),
-                        'reset_at': getattr(e, 'reset_at', None),
-                        'remaining': getattr(e, 'remaining', None),
-                        'limit': getattr(e, 'limit', None),
-                    }
-                    # Filter out None values for cleaner output
-                    error_info = {k: v for k, v in error_info.items() if v is not None}
-                    
-                    logging.error(f"Rate limit during pagination: {error_info}")
-                    
-                    # Check if we've exceeded max retries
-                    if pagination_rate_limit_count >= max_pagination_rate_limit_retries:
-                        logging.error(
-                            f"Aborting: {pagination_rate_limit_count} consecutive rate limit errors "
-                            f"(max: {max_pagination_rate_limit_retries}). Processed {processed_users} users."
-                        )
-                        raise RuntimeError(
-                            f"Too many consecutive rate limit errors. Check: function call frequency, "
-                            f"concurrent execution, or insufficient delays between requests."
-                        ) from e
-                    
-                    logging.warning(
-                        f"Rate limit hit ({pagination_rate_limit_count}/{max_pagination_rate_limit_retries}). "
-                        f"Possible issues: frequent calls, concurrent execution, batch size ({per_page}), "
-                        f"or insufficient delays (1s pages, 0.2s roles). Retrying in {pagination_retry_delay}s..."
-                    )
-                    
-                    time.sleep(pagination_retry_delay)
-                    pagination_retry_delay = min(pagination_retry_delay * 2, 60)  # Exponential backoff, max 60s
+                    self._handle_pagination_rate_limit(e, sync_context)
+                    time.sleep(sync_context.pagination_retry_delay)
                     continue
                 
-            # Get final database statistics
-            final_user_count = User.query.count()
-            final_admin_count = User.query.filter_by(is_admin=True).count()
-            
+            # Log final statistics
             logging.info(
-                f"User sync completed. Stats: {processed_users} processed "
-                f"({new_users} new, {updated_users} updated, {admin_users_synced} admins synced). "
-                f"Database: {final_user_count} total users ({final_user_count - initial_user_count:+d}), "
-                f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
+                f"User sync completed. Stats: {sync_context.processed_users} processed "
+                f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
+                f"{sync_context.admin_users_synced} admins synced)."
             )
+            self._log_sync_statistics(initial_user_count, initial_admin_count)
 
         except Exception as e:
             logging.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
