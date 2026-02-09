@@ -121,7 +121,6 @@ class Auth0Provider(AuthProvider):
             logging.info("Initiating login process.")
             #redirect_uri = url_for('callback', _external=True)
             redirect_uri = self.app.config["AUTH0_CALLBACK_URL"]
-            print(redirect_uri)
             audience = self.app.config["AUTH0_AUDIENCE"]  # The API audience for which the token is requested
             
 
@@ -272,6 +271,7 @@ class Auth0Provider(AuthProvider):
         Validates the provided token by verifying its signature using Auth0's public keys
         and ensuring it's not expired.
         """
+        # todo: review thread-safe implementation of these caches
         global _jwks_cache, _jwks_cache_expiry
         
         try:
@@ -480,6 +480,8 @@ class Auth0Provider(AuthProvider):
                         auth0_id = user['user_id']
 
                         # Check if user already exists to track new vs updated
+                        # note: could probably avoid requerying here.
+                        # also - clarify where we identify users by auth0_id vs email.
                         existing_user = User.query.filter_by(auth_id=auth0_id).first()
                         is_new_user = existing_user is None
 
@@ -500,15 +502,17 @@ class Auth0Provider(AuthProvider):
                         try:
                             # Fetch user's roles with retry mechanism
                             @retry_with_exponential_backoff
-                            def get_user_roles():
-                                return auth0.users.list_roles(auth0_id)
+                            def get_user_roles(id):
+                                # this is the real place where a RateLimitError may be raised
+                                return auth0.users.list_roles(id)
                             
-                            roles = get_user_roles()
+                            roles = get_user_roles(auth0_id)
                             is_admin = any(role['name'] == 'admin' for role in roles['roles'])
 
                             # Update admin status
                             was_admin = db_user.is_admin
                             db_user.is_admin = is_admin
+                            # could hypothetically raise error - don't think we've seen this but may be better handle explicitly
                             db.session.commit()
                             
                             if is_admin and not was_admin:
