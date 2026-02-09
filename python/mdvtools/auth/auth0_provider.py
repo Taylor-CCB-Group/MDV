@@ -396,6 +396,18 @@ class Auth0Provider(AuthProvider):
         """
         Syncs users from Auth0 to the application's database using UserService and UserProjectService.
         Implements rate limiting and retry logic for Auth0 API calls.
+        
+        WARNING: This function makes many Auth0 Management API calls and should be called sparingly.
+        Known call sites:
+        - On application startup (acceptable)
+        - From manage_project_permissions.py script (acceptable)
+        - From project_manager_extension when showing share dialog (PROBLEMATIC - may cause rate limiting)
+        
+        Design concerns:
+        - Auth0 Management API has strict rate limits (typically 2 req/sec for free tier)
+        - This function makes 1 + N*2 API calls where N = number of users (list users + list_roles per user)
+        - If called frequently (e.g., on every share dialog open), will hit rate limits quickly
+        - Consider: caching, background jobs, or incremental sync instead of full sync on-demand
         """
         from mdvtools.dbutils.dbservice import UserService, UserProjectService
         from mdvtools.dbutils.dbmodels import db, Project
@@ -417,8 +429,12 @@ class Auth0Provider(AuthProvider):
             page = 0
             per_page = 50  # Reduced batch size
             processed_users = 0
+            pagination_rate_limit_count = 0
+            max_pagination_rate_limit_retries = 5  # Limit retries to prevent infinite loops
+            pagination_retry_delay = 2  # Start with 2 seconds
+            has_more_users = True  # Flag to track if there are more users to fetch
             
-            while True:
+            while has_more_users:
                 try:
                     users = auth0.users.list(
                         q=f'identities.connection:"{auth0_db_connection}"',
@@ -426,10 +442,28 @@ class Auth0Provider(AuthProvider):
                         per_page=per_page
                     )
                     
-                    if not users['users']:
-                        break
+                    # Reset rate limit counter on successful request
+                    pagination_rate_limit_count = 0
+                    pagination_retry_delay = 2
+                    
+                    # Check if we've reached the end of pagination
+                    # Auth0 returns an empty list when there are no more users to fetch
+                    user_list = users.get('users', [])
+                    if not user_list:
+                        logging.info(f"Reached end of pagination at page {page} (empty user list returned)")
+                        has_more_users = False
+                        continue  # Skip processing, exit loop on next iteration
+                    
+                    # Check if we got fewer users than requested (indicates last page)
+                    is_last_page = len(user_list) < per_page
+                    if is_last_page:
+                        logging.info(
+                            f"Reached end of pagination at page {page} "
+                            f"(got {len(user_list)} users, less than requested {per_page})"
+                        )
+                        has_more_users = False  # This is the last page, but process it first
 
-                    for user in users['users']:
+                    for user in user_list:
                         email = user.get('email', '')
                         auth0_id = user['user_id']
 
@@ -469,18 +503,76 @@ class Auth0Provider(AuthProvider):
                                 logging.info(f"Processed {processed_users} users")
                                 
                         except RateLimitError as e:
-                            logging.error(f"Rate limit reached for user {auth0_id}: {str(e)}")
+                            # Collect all available error information
+                            error_info = {
+                                'user_id': auth0_id,
+                                'page': page,
+                                'processed': processed_users,
+                                'status': getattr(e, 'status_code', None),
+                                'code': getattr(e, 'error_code', None),
+                                'message': getattr(e, 'message', str(e)),
+                                'reset_at': getattr(e, 'reset_at', None),
+                                'remaining': getattr(e, 'remaining', None),
+                                'limit': getattr(e, 'limit', None),
+                            }
+                            # Filter out None values for cleaner output
+                            error_info = {k: v for k, v in error_info.items() if v is not None}
+                            
+                            logging.error(
+                                f"Rate limit during user processing: {error_info}. "
+                                f"Possible causes: too frequent calls, concurrent execution, or insufficient delays."
+                            )
                             raise
                         except Exception as e:
                             logging.error(f"Error processing user {auth0_id}: {str(e)}")
                             continue
 
-                    page += 1
-                    time.sleep(1)  # Add delay between pagination requests
+                    # If this was the last page, has_more_users is already False, loop will exit
+                    # Otherwise, continue to next page
+                    if has_more_users:
+                        page += 1
+                        time.sleep(1)  # Add delay between pagination requests
                     
                 except RateLimitError as e:
-                    logging.error(f"Rate limit reached during pagination: {str(e)}")
-                    time.sleep(2)  # Wait before retrying the current page
+                    pagination_rate_limit_count += 1
+                    
+                    # Collect all available error information
+                    error_info = {
+                        'page': page,
+                        'processed': processed_users,
+                        'consecutive_errors': pagination_rate_limit_count,
+                        'retry_delay': pagination_retry_delay,
+                        'status': getattr(e, 'status_code', None),
+                        'code': getattr(e, 'error_code', None),
+                        'message': getattr(e, 'message', str(e)),
+                        'reset_at': getattr(e, 'reset_at', None),
+                        'remaining': getattr(e, 'remaining', None),
+                        'limit': getattr(e, 'limit', None),
+                    }
+                    # Filter out None values for cleaner output
+                    error_info = {k: v for k, v in error_info.items() if v is not None}
+                    
+                    logging.error(f"Rate limit during pagination: {error_info}")
+                    
+                    # Check if we've exceeded max retries
+                    if pagination_rate_limit_count >= max_pagination_rate_limit_retries:
+                        logging.error(
+                            f"Aborting: {pagination_rate_limit_count} consecutive rate limit errors "
+                            f"(max: {max_pagination_rate_limit_retries}). Processed {processed_users} users."
+                        )
+                        raise RuntimeError(
+                            f"Too many consecutive rate limit errors. Check: function call frequency, "
+                            f"concurrent execution, or insufficient delays between requests."
+                        ) from e
+                    
+                    logging.warning(
+                        f"Rate limit hit ({pagination_rate_limit_count}/{max_pagination_rate_limit_retries}). "
+                        f"Possible issues: frequent calls, concurrent execution, batch size ({per_page}), "
+                        f"or insufficient delays (1s pages, 0.2s roles). Retrying in {pagination_retry_delay}s..."
+                    )
+                    
+                    time.sleep(pagination_retry_delay)
+                    pagination_retry_delay = min(pagination_retry_delay * 2, 60)  # Exponential backoff, max 60s
                     continue
                 
             logging.info(f"Successfully synced {processed_users} users from Auth0 to the database.")
