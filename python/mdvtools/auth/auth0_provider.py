@@ -425,10 +425,22 @@ class Auth0Provider(AuthProvider):
             mgmt_api_token = get_token.client_credentials(audience=audience)["access_token"]
             auth0 = Auth0(auth0_domain, mgmt_api_token)
 
+            # Get initial database statistics
+            from mdvtools.dbutils.dbmodels import User
+            initial_user_count = User.query.count()
+            initial_admin_count = User.query.filter_by(is_admin=True).count()
+            logging.info(
+                f"Starting user sync. Database stats: {initial_user_count} total users, "
+                f"{initial_admin_count} admin users"
+            )
+
             # Fetch users from Auth0 connection with pagination
             page = 0
             per_page = 50  # Reduced batch size
             processed_users = 0
+            new_users = 0
+            updated_users = 0
+            admin_users_synced = 0
             pagination_rate_limit_count = 0
             max_pagination_rate_limit_retries = 5  # Limit retries to prevent infinite loops
             pagination_retry_delay = 2  # Start with 2 seconds
@@ -467,11 +479,20 @@ class Auth0Provider(AuthProvider):
                         email = user.get('email', '')
                         auth0_id = user['user_id']
 
+                        # Check if user already exists to track new vs updated
+                        existing_user = User.query.filter_by(auth_id=auth0_id).first()
+                        is_new_user = existing_user is None
+
                         # Use UserService to add or update user
                         db_user = UserService.add_or_update_user(
                             email=email,
                             auth_id=auth0_id
                         )
+                        
+                        if is_new_user:
+                            new_users += 1
+                        else:
+                            updated_users += 1
 
                         # Add delay between role requests to avoid rate limiting
                         time.sleep(0.2)  # 200ms delay between requests
@@ -486,8 +507,12 @@ class Auth0Provider(AuthProvider):
                             is_admin = any(role['name'] == 'admin' for role in roles['roles'])
 
                             # Update admin status
+                            was_admin = db_user.is_admin
                             db_user.is_admin = is_admin
                             db.session.commit()
+                            
+                            if is_admin and not was_admin:
+                                admin_users_synced += 1
 
                             if is_admin:
                                 # Assign all projects to this user as owner via UserProjectService
@@ -500,7 +525,10 @@ class Auth0Provider(AuthProvider):
                         
                             processed_users += 1
                             if processed_users % 10 == 0:  # Log progress every 10 users
-                                logging.info(f"Processed {processed_users} users")
+                                logging.info(
+                                    f"Progress: {processed_users} processed "
+                                    f"({new_users} new, {updated_users} updated, {admin_users_synced} admins)"
+                                )
                                 
                         except RateLimitError as e:
                             # Collect all available error information
@@ -575,7 +603,16 @@ class Auth0Provider(AuthProvider):
                     pagination_retry_delay = min(pagination_retry_delay * 2, 60)  # Exponential backoff, max 60s
                     continue
                 
-            logging.info(f"Successfully synced {processed_users} users from Auth0 to the database.")
+            # Get final database statistics
+            final_user_count = User.query.count()
+            final_admin_count = User.query.filter_by(is_admin=True).count()
+            
+            logging.info(
+                f"User sync completed. Stats: {processed_users} processed "
+                f"({new_users} new, {updated_users} updated, {admin_users_synced} admins synced). "
+                f"Database: {final_user_count} total users ({final_user_count - initial_user_count:+d}), "
+                f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
+            )
 
         except Exception as e:
             logging.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
