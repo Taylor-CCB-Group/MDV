@@ -1,5 +1,6 @@
 import time
 import requests
+import threading
 from authlib.integrations.flask_client import OAuth
 from flask import jsonify, session, redirect
 from typing import Optional, Dict, List, Any, TYPE_CHECKING
@@ -17,9 +18,10 @@ from auth0.authentication import GetToken
 from auth0.exceptions import RateLimitError
 import random
 
-# Add JWKS cache
+# Add JWKS cache with thread-safe access
 _jwks_cache = {}
 _jwks_cache_expiry = None
+_jwks_cache_lock = threading.Lock()  # Lock to protect cache access
 JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 
 # Rate limiting and retry parameters
@@ -247,8 +249,7 @@ class Auth0Provider(AuthProvider):
         Validates the provided token by verifying its signature using Auth0's public keys
         and ensuring it's not expired.
         """
-        # todo: review thread-safe implementation of these caches
-        global _jwks_cache, _jwks_cache_expiry
+        global _jwks_cache, _jwks_cache_expiry, _jwks_cache_lock
         
         try:
             # Step 1: Decode the token header without verification to extract the 'kid'
@@ -262,21 +263,46 @@ class Auth0Provider(AuthProvider):
             rsa_key = {}
             if 'kid' in unverified_header:
                 try:
-                    # Check if JWKS cache is valid
+                    # Double-checked locking pattern for thread-safe cache access
                     current_time = time.time()
-                    if _jwks_cache_expiry is None or current_time > _jwks_cache_expiry:
-                        # Fetch Auth0 public keys from jwks_uri
-                        response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
-                        if response.status_code != 200:
-                            logging.error(f"Failed to fetch JWKS: {response.status_code}")
-                            return False
-                        
-                        _jwks_cache = response.json()
-                        _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
-                        logging.info("JWKS cache refreshed")
+                    
+                    # First check (without lock) - fast path for cache hit
+                    if _jwks_cache_expiry is not None and current_time <= _jwks_cache_expiry:
+                        # Cache is valid, read it (this is safe for reads in Python due to GIL,
+                        # but we still need lock for consistency with writes)
+                        with _jwks_cache_lock:
+                            # Re-check after acquiring lock (double-checked locking)
+                            if _jwks_cache_expiry is not None and current_time <= _jwks_cache_expiry:
+                                # Cache is still valid, use it
+                                cache_to_use = _jwks_cache
+                            else:
+                                # Cache expired while waiting for lock, need to refresh
+                                cache_to_use = None
+                    else:
+                        # Cache expired or doesn't exist, need to refresh
+                        cache_to_use = None
+                    
+                    # If cache is invalid or expired, refresh it
+                    if cache_to_use is None:
+                        with _jwks_cache_lock:
+                            # Re-check one more time (another thread might have refreshed it)
+                            if _jwks_cache_expiry is not None and current_time <= _jwks_cache_expiry:
+                                # Another thread refreshed it, use the cached version
+                                cache_to_use = _jwks_cache
+                            else:
+                                # We need to refresh the cache
+                                response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
+                                if response.status_code != 200:
+                                    logging.error(f"Failed to fetch JWKS: {response.status_code}")
+                                    return False
+                                
+                                _jwks_cache = response.json()
+                                _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
+                                cache_to_use = _jwks_cache
+                                logging.info("JWKS cache refreshed")
                     
                     # Find the key in the cached JWKS that matches the 'kid' in the token header
-                    for key in _jwks_cache['keys']:
+                    for key in cache_to_use['keys']:
                         if key['kid'] == unverified_header['kid']:
                             rsa_key = {
                                 'kty': key['kty'],
