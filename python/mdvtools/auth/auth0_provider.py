@@ -536,12 +536,7 @@ class Auth0Provider(AuthProvider):
             email=email,
             auth_id=auth0_id
         )
-        
-        if is_new_user:
-            context.new_users += 1
-        else:
-            context.updated_users += 1
-        
+                
         # Add delay between role requests to avoid rate limiting
         time.sleep(0.2)  # 200ms delay between requests
         
@@ -562,10 +557,7 @@ class Auth0Provider(AuthProvider):
             db.session.rollback()
             logging.error(f"Error updating user {auth0_id} admin status: {e}")
             return False
-        
-        if is_admin and not was_admin:
-            context.admin_users_synced += 1
-        
+                
         if is_admin:
             # Assign all projects to this user as owner via UserProjectService
             for project in context.all_projects:
@@ -574,7 +566,13 @@ class Auth0Provider(AuthProvider):
                     project_id=project.id,
                     is_owner=True
                 )
-        
+        # Update context stats
+        if is_admin and not was_admin:
+            context.admin_users_synced += 1
+        if is_new_user:
+            context.new_users += 1
+        else:
+            context.updated_users += 1        
         context.processed_users += 1
         return True
     
