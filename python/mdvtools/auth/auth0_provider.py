@@ -291,17 +291,23 @@ class Auth0Provider(AuthProvider):
                                 cache_to_use = _jwks_cache
                             else:
                                 # We need to refresh the cache
-                                response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
-                                if response.status_code != 200:
-                                    logging.error(f"Failed to fetch JWKS: {response.status_code}")
-                                    return False
-                                
-                                _jwks_cache = response.json()
-                                _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
-                                cache_to_use = _jwks_cache
-                                logging.info("JWKS cache refreshed")
-                    
+                                needs_refresh = True
+                    if needs_refresh:
+                        response = requests.get(
+                            url=self.app.config['AUTH0_PUBLIC_KEY_URI'],
+                            timeout=10
+                        )
+                        if response.status_code != 200:
+                            logging.error(f"Failed to fetch JWKS: {response.status_code}")
+                            return False
+                        new_jwks = response.json()
+                        with _jwks_cache_lock:
+                            _jwks_cache = new_jwks
+                            _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
+                            cache_to_use = _jwks_cache
+                        logging.info("JWKS cache refreshed")
                     # Find the key in the cached JWKS that matches the 'kid' in the token header
+                    assert cache_to_use is not None, "Cache is None"
                     for key in cache_to_use['keys']:
                         if key['kid'] == unverified_header['kid']:
                             rsa_key = {
