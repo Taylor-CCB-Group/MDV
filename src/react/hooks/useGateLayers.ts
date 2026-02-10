@@ -1,11 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGateManager } from "../gates/useGateManager";
-import { useConfig, useParamColumns } from "../hooks";
+import { useChartID, useConfig, useParamColumns } from "../hooks";
 import type { LoadedDataColumn } from "@/charts/charts";
 import { computeCentroid } from "../gates/gateUtils";
 import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
 import { TextLayer } from "deck.gl";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
+import { getVivId } from "../components/avivatorish/MDVivViewer";
 
 const MAX_LABEL_LENGTH = 18;
 
@@ -16,7 +17,6 @@ function truncateGateLabel(name: string, maxLen: number = MAX_LABEL_LENGTH) {
 //todo: Be able to drag and drop a gate overlay layer
 const useGateLayers = () => {
     const gateManager = useGateManager();
-    const id = useId();
     const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const config = useConfig<DeckScatterConfig>();
@@ -29,6 +29,8 @@ const useGateLayers = () => {
     const [dragPos, setDragPos] = useState<[number, number] | null>(null);
     const gates = gateManager.gatesArray;
     const hasRebuiltGateColumnRef = useRef(false);
+    const chartId = useChartID();
+    const vivLayerId = getVivId(`${chartId}detail-react`);
 
     useEffect(() => {
         const positions = new Map<string, [number, number]>();
@@ -73,7 +75,7 @@ const useGateLayers = () => {
         });
 
         return new TextLayer({
-            id: `text-layer-${id}`,
+            id: `text-layer-${vivLayerId}`,
             data: layerData,
             getPosition: (d: { position: [number, number, number] }) => d.position,
             getText: (d: { text: string }) => d.text,
@@ -132,7 +134,7 @@ const useGateLayers = () => {
                 setDragPos(null);
             },
         });
-    }, [cx, cy, cz, is2d, id, gates, draggingId, dragPos, gateManager, labelPositions]);
+    }, [cx, cy, cz, is2d, gates, draggingId, dragPos, gateManager, labelPositions, vivLayerId]);
 
     const gateOverlayLayer = useMemo(() => {
         if (!cx || !cy || gates.length === 0) return null;
@@ -156,7 +158,7 @@ const useGateLayers = () => {
         });
 
         return new MonkeyPatchEditableGeoJsonLayer({
-            id: `gate-layer-${id}`,
+            id: `gate-layer-${vivLayerId}`,
             // todo: Fix typing here
             data: {
                 type: "FeatureCollection",
@@ -169,7 +171,7 @@ const useGateLayers = () => {
             lineWidthMinPixels: 1,
             pickable: false,
         });
-    }, [cx, cy, id, gates]);
+    }, [cx, cy, gates, vivLayerId]);
 
     return {
         gateLabelLayer,
