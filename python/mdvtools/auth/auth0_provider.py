@@ -525,7 +525,10 @@ class Auth0Provider(AuthProvider):
         from mdvtools.dbutils.dbmodels import db, User
         
         email = user.get('email', '')
-        auth0_id = user['user_id']
+        auth0_id = user.get('user_id')
+        if not auth0_id:
+            logging.error(f"User '{email}' has no user_id, skipping")
+            return False
         
         # Check if user already exists to track new vs updated
         existing_user = User.query.filter_by(auth_id=auth0_id).first()
@@ -546,7 +549,8 @@ class Auth0Provider(AuthProvider):
             # Failed to fetch roles, skip this user
             return False
         
-        is_admin = any(role['name'] == 'admin' for role in roles['roles'])
+        roles_list = roles.get('roles', [])
+        is_admin = any(role['name'] == 'admin' for role in roles_list)
         
         # Update admin status
         was_admin = db_user.is_admin
@@ -722,7 +726,7 @@ class Auth0Provider(AuthProvider):
                         try:
                             success = self._process_single_user(user, sync_context)
                         except Exception as e:
-                            logging.error(f"Error processing user {user['user_id']}: {e}")
+                            logging.error(f"Error processing user '{user.get('email', '')}': {e}")
                         
                         if success:
                             # Log progress every 10 users
