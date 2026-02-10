@@ -531,23 +531,16 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can share the project"}), 403
                 
-                # Sync users from Auth0 and refresh cache to ensure we have the latest users and permissions
-                # This ensures changes from manage_project_permissions.py script are reflected immediately
-                ## NOTE: this is expensive, and may not be necessary every time...
-                ## this should be mostly mitigated by the front-end not going too crazy with calling it unnecessarily (any more)
-                ## but there's probably a better lifecycle for this.
+                # Refresh cache to pick up permission changes from manage_project_permissions.py
+                # Note: sync_users_to_db is no longer called here - the manage_project_permissions.py
+                # script ensures the DB is up to date by syncing at the start of main()
                 try:
-                    from mdvtools.auth.authutils import get_auth_provider, cache_user_projects
-                    auth_provider = get_auth_provider()
-                    if hasattr(auth_provider, 'sync_users_to_db'):
-                        logger.info("Syncing users from Auth0 before showing share dialog...")
-                        auth_provider.sync_users_to_db()
-                    # Always refresh cache to pick up any permission changes from manage_project_permissions.py
+                    from mdvtools.auth.authutils import cache_user_projects
                     logger.info("Refreshing user and permission cache...")
                     cache_user_projects()
                     logger.info("Cache refresh completed.")
                 except Exception as e:
-                    logger.warning(f"Could not sync/refresh: {e}. Continuing with existing cache.")
+                    logger.warning(f"Could not refresh cache: {e}. Continuing with existing cache.")
 
                 # Step 3: Compile shared users list
                 # Read directly from database to ensure we have the latest permissions
