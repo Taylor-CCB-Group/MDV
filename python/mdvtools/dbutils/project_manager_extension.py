@@ -533,6 +533,9 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 
                 # Sync users from Auth0 and refresh cache to ensure we have the latest users and permissions
                 # This ensures changes from manage_project_permissions.py script are reflected immediately
+                ## NOTE: this is expensive, and may not be necessary every time...
+                ## this should be mostly mitigated by the front-end not going too crazy with calling it unnecessarily (any more)
+                ## but there's probably a better lifecycle for this.
                 try:
                     from mdvtools.auth.authutils import get_auth_provider, cache_user_projects
                     auth_provider = get_auth_provider()
