@@ -623,9 +623,6 @@ class Auth0Provider(AuthProvider):
             f"Possible issues: frequent calls, concurrent execution, batch size ({context.per_page}), "
             f"or insufficient delays (1s pages, 0.2s roles). Retrying in {context.pagination_retry_delay}s..."
         )
-        
-        # Update retry delay with exponential backoff, max 60s
-        context.pagination_retry_delay = min(context.pagination_retry_delay * 2, 60.0)
     
     def _log_sync_statistics(self, initial_user_count: int, initial_admin_count: int) -> None:
         """
@@ -716,7 +713,11 @@ class Auth0Provider(AuthProvider):
                     
                     # Process users on this page
                     for user in user_list:
-                        success = self._process_single_user(user, sync_context)
+                        success = False
+                        try:
+                            success = self._process_single_user(user, sync_context)
+                        except Exception as e:
+                            logging.error(f"Error processing user {user['user_id']}: {e}")
                         
                         if success:
                             # Log progress every 10 users
@@ -742,6 +743,8 @@ class Auth0Provider(AuthProvider):
                 except RateLimitError as e:
                     self._handle_pagination_rate_limit(e, sync_context)
                     time.sleep(sync_context.pagination_retry_delay)
+                    # Update retry delay with exponential backoff, max 60s
+                    sync_context.pagination_retry_delay = min(sync_context.pagination_retry_delay * 2, 60.0)
                     continue
                 
             # Log final statistics
