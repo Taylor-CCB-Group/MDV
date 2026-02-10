@@ -1,8 +1,12 @@
 import time
 import requests
+import threading
 from authlib.integrations.flask_client import OAuth
 from flask import jsonify, session, redirect
-from typing import Optional
+from typing import Optional, Dict, List, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mdvtools.dbutils.dbmodels import Project
 # from flask import Response
 from flask.typing import ResponseReturnValue
 from mdvtools.auth.auth_provider import AuthProvider
@@ -14,41 +18,15 @@ from auth0.authentication import GetToken
 from auth0.exceptions import RateLimitError
 import random
 
-# Add JWKS cache
+# Add JWKS cache with thread-safe access
 _jwks_cache = {}
 _jwks_cache_expiry = None
+_jwks_cache_lock = threading.Lock()  # Lock to protect cache access
 JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 
 # Rate limiting and retry parameters
-MAX_RETRIES = 3
 BASE_DELAY = 1  # Base delay in seconds
 MAX_DELAY = 8  # Maximum delay in seconds
-
-
-def retry_with_exponential_backoff(func):
-    """ Decorator to implement retry logic with exponential backoff."""
-    def wrapper(*args, **kwargs):
-        retry_count = 0
-        last_exception = None
-        while retry_count < MAX_RETRIES:
-            try:
-                return func(*args, **kwargs)
-            except RateLimitError as e:
-                retry_count += 1
-                last_exception = e
-                if retry_count == MAX_RETRIES:
-                    raise e
-                
-                # Calculate delay with jitter
-                delay = min(BASE_DELAY * (2 ** retry_count) + random.uniform(0, 1), MAX_DELAY)
-                logging.warning(f"Rate limit hit. Retrying in {delay:.2f} seconds... (Attempt {retry_count}/{MAX_RETRIES})")
-                time.sleep(delay)
-            except Exception as e:
-                raise e
-        # If we got here, we've tried MAX_RETRIES times and failed.
-        if last_exception:
-            raise last_exception
-    return wrapper
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -121,7 +99,6 @@ class Auth0Provider(AuthProvider):
             logging.info("Initiating login process.")
             #redirect_uri = url_for('callback', _external=True)
             redirect_uri = self.app.config["AUTH0_CALLBACK_URL"]
-            print(redirect_uri)
             audience = self.app.config["AUTH0_AUDIENCE"]  # The API audience for which the token is requested
             
 
@@ -272,7 +249,7 @@ class Auth0Provider(AuthProvider):
         Validates the provided token by verifying its signature using Auth0's public keys
         and ensuring it's not expired.
         """
-        global _jwks_cache, _jwks_cache_expiry
+        global _jwks_cache, _jwks_cache_expiry, _jwks_cache_lock
         
         try:
             # Step 1: Decode the token header without verification to extract the 'kid'
@@ -286,21 +263,53 @@ class Auth0Provider(AuthProvider):
             rsa_key = {}
             if 'kid' in unverified_header:
                 try:
-                    # Check if JWKS cache is valid
+                    # Double-checked locking pattern for thread-safe cache access
                     current_time = time.time()
-                    if _jwks_cache_expiry is None or current_time > _jwks_cache_expiry:
-                        # Fetch Auth0 public keys from jwks_uri
-                        response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
+                    
+                    # First check (without lock) - fast path for cache hit
+                    if _jwks_cache_expiry is not None and current_time <= _jwks_cache_expiry:
+                        # Cache is valid, read it (this is safe for reads in Python due to GIL,
+                        # but we still need lock for consistency with writes)
+                        with _jwks_cache_lock:
+                            # Re-check after acquiring lock (double-checked locking)
+                            if _jwks_cache_expiry is not None and current_time <= _jwks_cache_expiry:
+                                # Cache is still valid, use it
+                                cache_to_use = _jwks_cache
+                            else:
+                                # Cache expired while waiting for lock, need to refresh
+                                cache_to_use = None
+                    else:
+                        # Cache expired or doesn't exist, need to refresh
+                        cache_to_use = None
+                    
+                    # If cache is invalid or expired, refresh it
+                    needs_refresh = False
+                    if cache_to_use is None:
+                        with _jwks_cache_lock:
+                            # Re-check one more time (another thread might have refreshed it)
+                            if _jwks_cache_expiry is not None and current_time <= _jwks_cache_expiry:
+                                # Another thread refreshed it, use the cached version
+                                cache_to_use = _jwks_cache
+                            else:
+                                # We need to refresh the cache
+                                needs_refresh = True
+                    if needs_refresh:
+                        response = requests.get(
+                            url=self.app.config['AUTH0_PUBLIC_KEY_URI'],
+                            timeout=10
+                        )
                         if response.status_code != 200:
                             logging.error(f"Failed to fetch JWKS: {response.status_code}")
                             return False
-                        
-                        _jwks_cache = response.json()
-                        _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
+                        new_jwks = response.json()
+                        with _jwks_cache_lock:
+                            _jwks_cache = new_jwks
+                            _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
+                            cache_to_use = _jwks_cache
                         logging.info("JWKS cache refreshed")
-                    
                     # Find the key in the cached JWKS that matches the 'kid' in the token header
-                    for key in _jwks_cache['keys']:
+                    assert cache_to_use is not None, "Cache is None"
+                    for key in cache_to_use['keys']:
                         if key['kid'] == unverified_header['kid']:
                             rsa_key = {
                                 'kty': key['kty'],
@@ -391,14 +400,280 @@ class Auth0Provider(AuthProvider):
         except Exception as e:
             logging.exception(f"Error in validate_user: {e}")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
+    
+    class SyncContext:
+        """Context object for user sync operations."""
+        def __init__(
+            self,
+            auth0: Auth0,
+            all_projects: List['Project'],
+            page: int,
+            processed_users: int = 0,
+            new_users: int = 0,
+            updated_users: int = 0,
+            admin_users_synced: int = 0,
+            pagination_rate_limit_count: int = 0,
+            max_pagination_rate_limit_retries: int = 5,
+            pagination_retry_delay: float = 2.0,
+            per_page: int = 50,
+            max_role_fetch_retries: int = 3
+        ):
+            self.auth0 = auth0
+            self.all_projects = all_projects
+            self.page = page
+            self.processed_users = processed_users
+            self.new_users = new_users
+            self.updated_users = updated_users
+            self.admin_users_synced = admin_users_synced
+            self.pagination_rate_limit_count = pagination_rate_limit_count
+            self.max_pagination_rate_limit_retries = max_pagination_rate_limit_retries
+            self.pagination_retry_delay = pagination_retry_delay
+            self.per_page = per_page
+            self.max_role_fetch_retries = max_role_fetch_retries
         
-    def sync_users_to_db(self):
+        def to_dict(self) -> Dict[str, int]:
+            """Convert context stats to dictionary."""
+            return {
+                'processed_users': self.processed_users,
+                'new_users': self.new_users,
+                'updated_users': self.updated_users,
+                'admin_users_synced': self.admin_users_synced
+            }
+        
+        def reset_pagination_rate_limit(self) -> None:
+            """Reset pagination rate limit counters after successful request."""
+            self.pagination_rate_limit_count = 0
+            self.pagination_retry_delay = 2.0
+    
+    def _fetch_user_roles_with_retry(
+        self, 
+        auth0_id: str,
+        context: 'SyncContext'
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch user roles from Auth0 with retry logic for rate limiting.
+        
+        Args:
+            auth0_id: Auth0 user ID
+            context: SyncContext object containing auth0 client, page, and stats
+            
+        Returns:
+            dict: User roles dictionary, or None if fetch failed after retries
+        """
+        roles = None
+        retry_count = 0
+        success = False
+        max_retries = context.max_role_fetch_retries
+        
+        while retry_count < max_retries and not success:
+            try:
+                roles = context.auth0.users.list_roles(auth0_id)
+                success = True
+            except RateLimitError as e:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    # Max retries exceeded
+                    error_info = {
+                        'user_id': auth0_id,
+                        'page': context.page,
+                        'processed': context.processed_users,
+                        'status': getattr(e, 'status_code', None),
+                        'code': getattr(e, 'error_code', None),
+                        'message': getattr(e, 'message', str(e)),
+                        'reset_at': getattr(e, 'reset_at', None),
+                        'remaining': getattr(e, 'remaining', None),
+                        'limit': getattr(e, 'limit', None),
+                    }
+                    error_info = {k: v for k, v in error_info.items() if v is not None}
+                    
+                    logging.error(
+                        f"Rate limit during role fetch for user {auth0_id} after {max_retries} retries: "
+                        f"{error_info}. Skipping user."
+                    )
+                    return None
+                else:
+                    # Calculate exponential backoff delay with jitter
+                    delay = min(BASE_DELAY * (2 ** retry_count) + random.uniform(0, 1), MAX_DELAY)
+                    logging.warning(
+                        f"Rate limit during role fetch for user {auth0_id}. "
+                        f"Retrying in {delay:.2f} seconds... (Attempt {retry_count}/{max_retries})"
+                    )
+                    time.sleep(delay)
+            except Exception as e:
+                # Non-rate-limit error
+                logging.error(f"Error fetching roles for user {auth0_id}: {str(e)}")
+                return None
+        
+        return roles if success else None
+    
+    def _process_single_user(
+        self, 
+        user: Dict[str, Any], 
+        context: 'SyncContext'
+    ) -> bool:
+        """
+        Process a single user: sync to DB, fetch roles, update admin status, assign projects.
+        
+        Args:
+            user: User dict from Auth0 API
+            context: SyncContext object containing auth0 client, projects, page, and stats
+            
+        Returns:
+            bool: True if user was successfully processed, False otherwise
+        """
+        from mdvtools.dbutils.dbservice import UserService, UserProjectService
+        from mdvtools.dbutils.dbmodels import db, User
+        
+        email = user.get('email', '')
+        auth0_id = user.get('user_id')
+        if not auth0_id:
+            logging.error(f"User '{email}' has no user_id, skipping")
+            return False
+        
+        # Check if user already exists to track new vs updated
+        existing_user = User.query.filter_by(auth_id=auth0_id).first()
+        is_new_user = existing_user is None
+        
+        # Use UserService to add or update user
+        db_user = UserService.add_or_update_user(
+            email=email,
+            auth_id=auth0_id
+        )
+                
+        # Add delay between role requests to avoid rate limiting
+        time.sleep(0.2)  # 200ms delay between requests
+        
+        # Fetch user's roles with retry mechanism
+        roles = self._fetch_user_roles_with_retry(auth0_id, context)
+        if roles is None:
+            # Failed to fetch roles, skip this user
+            return False
+        
+        roles_list = roles.get('roles', [])
+        is_admin = any(role['name'] == 'admin' for role in roles_list)
+        
+        # Update admin status
+        was_admin = db_user.is_admin
+        db_user.is_admin = is_admin
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error updating user {auth0_id} admin status: {e}")
+            return False
+                
+        if is_admin:
+            # Assign all projects to this user as owner via UserProjectService
+            for project in context.all_projects:
+                try:
+                    UserProjectService.add_or_update_user_project(
+                        user_id=db_user.id,
+                        project_id=project.id,
+                        is_owner=True
+                    )
+                except Exception as e:
+                    logging.error(f"Error assigning project {project.name} to user {auth0_id}: {e}")
+                    return False
+        # Update context stats
+        if is_admin and not was_admin:
+            context.admin_users_synced += 1
+        if is_new_user:
+            context.new_users += 1
+        else:
+            context.updated_users += 1        
+        context.processed_users += 1
+        return True
+    
+    def _handle_pagination_rate_limit(
+        self, 
+        e: RateLimitError,
+        context: 'SyncContext'
+    ) -> None:
+        """
+        Handle rate limit error during pagination. Updates context in place.
+        
+        Args:
+            e: RateLimitError exception
+            context: SyncContext object containing pagination state
+            
+        Raises:
+            RuntimeError: If max retries exceeded
+        """
+        context.pagination_rate_limit_count += 1
+        new_count = context.pagination_rate_limit_count
+        
+        # Collect all available error information
+        error_info = {
+            'page': context.page,
+            'processed': context.processed_users,
+            'consecutive_errors': new_count,
+            'retry_delay': context.pagination_retry_delay,
+            'status': getattr(e, 'status_code', None),
+            'code': getattr(e, 'error_code', None),
+            'message': getattr(e, 'message', str(e)),
+            'reset_at': getattr(e, 'reset_at', None),
+            'remaining': getattr(e, 'remaining', None),
+            'limit': getattr(e, 'limit', None),
+        }
+        # Filter out None values for cleaner output
+        error_info = {k: v for k, v in error_info.items() if v is not None}
+        
+        logging.error(f"Rate limit during pagination: {error_info}")
+        
+        # Check if we've exceeded max retries
+        if new_count >= context.max_pagination_rate_limit_retries:
+            logging.error(
+                f"Aborting: {new_count} consecutive rate limit errors "
+                f"(max: {context.max_pagination_rate_limit_retries}). Processed {context.processed_users} users."
+            )
+            raise RuntimeError(
+                f"Too many consecutive rate limit errors. Check: function call frequency, "
+                f"concurrent execution, or insufficient delays between requests."
+            ) from e
+        
+        logging.warning(
+            f"Rate limit hit ({new_count}/{context.max_pagination_rate_limit_retries}). "
+            f"Possible issues: frequent calls, concurrent execution, batch size ({context.per_page}), "
+            f"or insufficient delays (1s pages, 0.2s roles). Retrying in {context.pagination_retry_delay}s..."
+        )
+    
+    def _log_sync_statistics(self, initial_user_count: int, initial_admin_count: int) -> None:
+        """
+        Log initial and final database statistics for user sync.
+        
+        Args:
+            initial_user_count: User count at start of sync
+            initial_admin_count: Admin user count at start of sync
+        """
+        from mdvtools.dbutils.dbmodels import User
+        
+        final_user_count = User.query.count()
+        final_admin_count = User.query.filter_by(is_admin=True).count()
+        
+        logging.info(
+            f"User sync completed. Database: {final_user_count} total users "
+            f"({final_user_count - initial_user_count:+d}), "
+            f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
+        )
+        
+    def sync_users_to_db(self) -> None:
         """
         Syncs users from Auth0 to the application's database using UserService and UserProjectService.
         Implements rate limiting and retry logic for Auth0 API calls.
+        
+        WARNING: This function makes many Auth0 Management API calls and should be called sparingly.
+        Known call sites:
+        - On application startup (acceptable)
+        - From manage_project_permissions.py script (acceptable)
+        - From project_manager_extension when showing share dialog (PROBLEMATIC - may cause rate limiting)
+        
+        Design concerns:
+        - Auth0 Management API has strict rate limits (typically 2 req/sec for free tier)
+        - This function makes 1 + N*2 API calls where N = number of users (list users + list_roles per user)
+        - If called frequently (e.g., on every share dialog open), will hit rate limits quickly
+        - Consider: caching, background jobs, or incremental sync instead of full sync on-demand
         """
-        from mdvtools.dbutils.dbservice import UserService, UserProjectService
-        from mdvtools.dbutils.dbmodels import db, Project
+        from mdvtools.dbutils.dbmodels import Project
         
         try:
             # Load Auth0 config from app
@@ -413,77 +688,85 @@ class Auth0Provider(AuthProvider):
             mgmt_api_token = get_token.client_credentials(audience=audience)["access_token"]
             auth0 = Auth0(auth0_domain, mgmt_api_token)
 
-            # Fetch users from Auth0 connection with pagination
-            page = 0
-            per_page = 50  # Reduced batch size
-            processed_users = 0
+            # Get initial database statistics
+            from mdvtools.dbutils.dbmodels import User
+            initial_user_count = User.query.count()
+            initial_admin_count = User.query.filter_by(is_admin=True).count()
+            logging.info(
+                f"Starting user sync. Database stats: {initial_user_count} total users, "
+                f"{initial_admin_count} admin users"
+            )
             
+            # Initialize sync context
+            all_projects = Project.query.all()
+            sync_context = self.SyncContext(
+                auth0=auth0,
+                all_projects=all_projects,
+                page=0
+            )
+            
+            # Fetch users from Auth0 connection with pagination
             while True:
                 try:
                     users = auth0.users.list(
                         q=f'identities.connection:"{auth0_db_connection}"',
-                        page=page,
-                        per_page=per_page
+                        page=sync_context.page,
+                        per_page=sync_context.per_page
                     )
                     
-                    if not users['users']:
+                    # Reset rate limit counter on successful request
+                    sync_context.reset_pagination_rate_limit()
+                    
+                    # Check if we've reached the end of pagination
+                    # Auth0 returns an empty list when there are no more users to fetch
+                    user_list = users.get('users', [])
+                    if not user_list:
+                        logging.info(f"Reached end of pagination at page {sync_context.page} (empty user list returned)")
                         break
-
-                    for user in users['users']:
-                        email = user.get('email', '')
-                        auth0_id = user['user_id']
-
-                        # Use UserService to add or update user
-                        db_user = UserService.add_or_update_user(
-                            email=email,
-                            auth_id=auth0_id
-                        )
-
-                        # Add delay between role requests to avoid rate limiting
-                        time.sleep(0.2)  # 200ms delay between requests
-                        
+                    
+                    # Process users on this page
+                    for user in user_list:
+                        success = False
                         try:
-                            # Fetch user's roles with retry mechanism
-                            @retry_with_exponential_backoff
-                            def get_user_roles():
-                                return auth0.users.list_roles(auth0_id)
-                            
-                            roles = get_user_roles()
-                            is_admin = any(role['name'] == 'admin' for role in roles['roles'])
-
-                            # Update admin status
-                            db_user.is_admin = is_admin
-                            db.session.commit()
-
-                            if is_admin:
-                                # Assign all projects to this user as owner via UserProjectService
-                                for project in Project.query.all():
-                                    UserProjectService.add_or_update_user_project(
-                                        user_id=db_user.id,
-                                        project_id=project.id,
-                                        is_owner=True
-                                    )
-                        
-                            processed_users += 1
-                            if processed_users % 10 == 0:  # Log progress every 10 users
-                                logging.info(f"Processed {processed_users} users")
-                                
-                        except RateLimitError as e:
-                            logging.error(f"Rate limit reached for user {auth0_id}: {str(e)}")
-                            raise
+                            success = self._process_single_user(user, sync_context)
                         except Exception as e:
-                            logging.error(f"Error processing user {auth0_id}: {str(e)}")
-                            continue
-
-                    page += 1
+                            logging.error(f"Error processing user '{user.get('email', '')}': {e}")
+                        
+                        if success:
+                            # Log progress every 10 users
+                            if sync_context.processed_users % 10 == 0:
+                                logging.info(
+                                    f"Progress: {sync_context.processed_users} processed "
+                                    f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
+                                    f"{sync_context.admin_users_synced} admins)"
+                                )
+                    
+                    # Check if we got fewer users than requested (indicates last page)
+                    if len(user_list) < sync_context.per_page:
+                        logging.info(
+                            f"Reached end of pagination at page {sync_context.page} "
+                            f"(got {len(user_list)} users, less than requested {sync_context.per_page})"
+                        )
+                        break
+                    
+                    # Continue to next page
+                    sync_context.page += 1
                     time.sleep(1)  # Add delay between pagination requests
                     
                 except RateLimitError as e:
-                    logging.error(f"Rate limit reached during pagination: {str(e)}")
-                    time.sleep(2)  # Wait before retrying the current page
+                    self._handle_pagination_rate_limit(e, sync_context)
+                    time.sleep(sync_context.pagination_retry_delay)
+                    # Update retry delay with exponential backoff, max 60s
+                    sync_context.pagination_retry_delay = min(sync_context.pagination_retry_delay * 2, 60.0)
                     continue
                 
-            logging.info(f"Successfully synced {processed_users} users from Auth0 to the database.")
+            # Log final statistics
+            logging.info(
+                f"User sync completed. Stats: {sync_context.processed_users} processed "
+                f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
+                f"{sync_context.admin_users_synced} admins synced)."
+            )
+            self._log_sync_statistics(initial_user_count, initial_admin_count)
 
         except Exception as e:
             logging.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
