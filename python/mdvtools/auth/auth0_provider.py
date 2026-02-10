@@ -565,11 +565,15 @@ class Auth0Provider(AuthProvider):
         if is_admin:
             # Assign all projects to this user as owner via UserProjectService
             for project in context.all_projects:
-                UserProjectService.add_or_update_user_project(
-                    user_id=db_user.id,
-                    project_id=project.id,
-                    is_owner=True
-                )
+                try:
+                    UserProjectService.add_or_update_user_project(
+                        user_id=db_user.id,
+                        project_id=project.id,
+                        is_owner=True
+                    )
+                except Exception as e:
+                    logging.error(f"Error assigning project {project.name} to user {auth0_id}: {e}")
+                    return False
         # Update context stats
         if is_admin and not was_admin:
             context.admin_users_synced += 1
