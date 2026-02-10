@@ -283,6 +283,7 @@ class Auth0Provider(AuthProvider):
                         cache_to_use = None
                     
                     # If cache is invalid or expired, refresh it
+                    needs_refresh = False
                     if cache_to_use is None:
                         with _jwks_cache_lock:
                             # Re-check one more time (another thread might have refreshed it)
