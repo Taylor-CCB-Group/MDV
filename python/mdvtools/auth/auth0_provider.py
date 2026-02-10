@@ -665,7 +665,7 @@ class Auth0Provider(AuthProvider):
         Known call sites:
         - On application startup (acceptable)
         - From manage_project_permissions.py script (acceptable)
-        - From project_manager_extension when showing share dialog (PROBLEMATIC - may cause rate limiting)
+        - Previously, from project_manager_extension when showing share dialog (PROBLEMATIC - may cause rate limiting)
         
         Design concerns:
         - Auth0 Management API has strict rate limits (typically 2 req/sec for free tier)
