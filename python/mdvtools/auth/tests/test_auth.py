@@ -214,7 +214,8 @@ class TestAuth0ProviderSync:
         assert mock_auth0_client.users.list.call_count >= 2
         assert mock_user_service.add_or_update_user.call_count == 75
         # Admin user should get project assignments
-        assert mock_user_project_service.add_or_update_user_project.call_count >= 0
+        # `>= 0` is vacuous and doesn't test anything
+        # assert mock_user_project_service.add_or_update_user_project.call_count >= 0
     
     def test_sync_users_to_db_rate_limit_role_fetch(
         self, auth0_app, mock_auth0_client, mock_user_service,
