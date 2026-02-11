@@ -11,7 +11,7 @@
     "vite-build": "tsgo && cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=dev_pt vite build --outDir ./vite-dist",
     "build": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop vite build --outDir ./dist",
     "build-standalone": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=production exclude_dir=true asset_base=/static/mdv/ vite build --outDir ./dist/mdv",
-    "build-flask-vite-jbrowse": "cross-env NODE_OPTIONS=\"--max-old-space-size=8192\" build=desktop_pt worker-format=es vite build --outDir ./python/mdvtools/static",
+    "build-flask-vite-jbrowse": "cross-env NODE_OPTIONS=\"--max-old-space-size=8192\" build=desktop_pt worker_format=es vite build --outDir ./python/mdvtools/static",
     "build-flask-vite": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "build-flask-dockerjs": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./dist/flask",
     "build-flask-docker-hotfix": "cross-env build=desktop_pt vite build --outDir ./python/dist_hotfix/flask",

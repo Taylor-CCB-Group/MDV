@@ -7,7 +7,7 @@ The standalone build (`npm run standalone`) exposes the `mdv` object (including 
 
 1. **Build**: Run the standalone build script:
     ```
-    npm run standalone
+    npm run build-standalone
     ```
 2. **Deploy**: Place the resulting `dist/mdv` folder into the `/static/` directory of your web application.
 3. **Include in HTML**: Add the following to your HTML page:
