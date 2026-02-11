@@ -14,7 +14,7 @@ The standalone build (`npm run standalone`) exposes the `mdv` object (including 
     ```html
     <link rel="stylesheet" href="/static/mdv/assets/mdv.css">
     <script type="module" src="/static/mdv/mdv.js"></script>
-    <script>
+    <script type="module">
       // div: the container for MDV
       // dataSources: loaded from dataSources.json
       // dataLoader: custom dataloader
