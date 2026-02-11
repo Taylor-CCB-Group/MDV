@@ -162,10 +162,9 @@ export function GeneNetworkInfoComponent({
         <Paper
             ref={containerRef}
             variant="outlined"
-            elevation={isHighlighted ? 3 : 0}
             tabIndex={onCardClick || onCardKeyDown ? 0 : undefined}
             className={clsx(
-                "h-[180px] w-full overflow-hidden flex flex-col rounded-md transition-shadow",
+                "h-[150px] w-full overflow-hidden flex flex-col rounded-md transition-shadow",
                 isHighlighted
                     ? "border-2 border-blue-500 shadow-md"
                     : "border border-gray-200",
@@ -213,7 +212,7 @@ export function GeneNetworkInfoComponent({
                 <>
                     <div className="flex items-start justify-between">
                         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5, lineHeight: 1.2 }}>
-                            Gene Information for {geneInfo.geneName}
+                            {geneInfo.geneName}
                         </Typography>
                     </div>
                     <Typography variant="body2" sx={{ mb: 0.5, lineHeight: 1.3 }}>
