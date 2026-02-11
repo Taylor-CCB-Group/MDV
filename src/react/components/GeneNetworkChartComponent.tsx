@@ -92,7 +92,7 @@ export const GeneNetworkChartComponent = observer(() => {
     // No cap needed now that we have virtualisation
     const visibleGeneIds = geneIds;
 
-    const ROW_HEIGHT = 180;
+    const ROW_HEIGHT = 150;
     const ROW_VERTICAL_GAP = 16; // vertical space between items
     const ROW_TOTAL_HEIGHT = ROW_HEIGHT + ROW_VERTICAL_GAP;
 
@@ -255,6 +255,7 @@ export const GeneNetworkChartComponent = observer(() => {
         focusedGeneIndex,
         rangeAnchorGeneIndex,
         rowVirtualizer,
+        ROW_TOTAL_HEIGHT
     ]);
 
     const setGeneRef = (geneId: string, element: HTMLDivElement | null) => {
