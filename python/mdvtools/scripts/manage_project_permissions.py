@@ -58,16 +58,9 @@ def assign_permissions(user_email: str, project_name: str, permission: str, refr
     """
     user = get_user_by_email(user_email)
     if not user:
-        # Try syncing from Auth0 first
-        print(f"User with email {user_email} not found in database. Syncing from Auth0...")
-        sync_users_from_auth0()
-        if refresh_cache:
-            cache_user_projects()
-        # Try again after sync
-        user = get_user_by_email(user_email)
-        if not user:
-            print(f"Error: User with email {user_email} not found even after sync")
-            return False
+        print(f"Error: User with email {user_email} not found in database")
+        print("Note: Users should be synced from Auth0 before running this script")
+        return False
 
     project = get_project_by_name(project_name)
     if not project:
@@ -153,7 +146,7 @@ def batch_assign_from_text(file_path: str) -> bool:
         emails_to_check.add(email)
         parsed_lines.append((project_name, email, permission))
 
-    # Check if any users are missing and sync from Auth0 if needed
+    # Check if any users are missing (shouldn't happen if sync ran at start)
     missing_users = []
     for email in emails_to_check:
         user = get_user_by_email(email)
@@ -161,10 +154,9 @@ def batch_assign_from_text(file_path: str) -> bool:
             missing_users.append(email)
 
     if missing_users:
-        print(f"Found {len(missing_users)} user(s) not in database. Syncing from Auth0...")
-        sync_users_from_auth0()
-        # Refresh cache after sync
-        cache_user_projects()
+        print(f"Error: Found {len(missing_users)} user(s) not in database: {missing_users}")
+        print("Note: Users should be synced from Auth0 before running this script")
+        return False
 
     # Second pass: assign permissions (without individual cache refreshes for efficiency)
     for project_name, email, permission in parsed_lines:
@@ -186,6 +178,8 @@ def main():
         if '/' in first_arg or first_arg.endswith('.txt') or Path(first_arg).exists():
             # Direct file path mode - process immediately
             with app.app_context():
+                # Sync users from Auth0 first to ensure DB is up to date
+                sync_users_from_auth0()
                 success = batch_assign_from_text(first_arg)
             sys.exit(0 if success else 1)
     
@@ -209,6 +203,8 @@ def main():
 
     # Create application context
     with app.app_context():
+        # Sync users from Auth0 first to ensure DB is up to date
+        sync_users_from_auth0()
         if args.command == 'assign':
             success = assign_permissions(args.email, args.project, args.permission)
         else:

@@ -36,11 +36,7 @@
           "type": "RowsAsColsQuery"
         },
         "densityFields": [
-          {
-            "linkedDsName": "genes",
-            "maxItems": 15,
-            "type": "RowsAsColsQuery"
-          }       
+          "<DENSITY_FIELDS>"      
         ],
         "background_filter": {
           "column": "spatial_region",

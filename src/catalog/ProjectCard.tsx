@@ -339,7 +339,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         onClose={() => setIsRenameModalOpen(false)}
                     />}
 
-                    {operationPermissions.shareProject && <ProjectShareModal
+                    {operationPermissions.shareProject && isShareModalOpen && <ProjectShareModal
                         open={isShareModalOpen}
                         onClose={() => setIsShareModalOpen(false)}
                         projectId={id}
