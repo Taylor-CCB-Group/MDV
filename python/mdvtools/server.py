@@ -49,13 +49,6 @@ from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
 logger.info("server.py module loaded")
-def log(*args, **kwargs):
-    """
-    Log info-level messages using the module logger.
-    Behaves similarly to print, but sends output to logger.info.
-    """
-    msg = " ".join(str(arg) for arg in args)
-    logger.info(msg)
 
 routes = set()
 
@@ -67,6 +60,14 @@ def create_app(
     project: MDVProject,
     options: Optional[MDVServerOptions] = None,
 ):
+    def log(*args, **kwargs):
+        """
+        Log info-level messages using the module logger.
+        Behaves similarly to print, but sends output to logger.info.
+        """
+        msg = " ".join(str(arg) for arg in args)
+        logger.info(f"[{project.id} - '{project.dir.split('/')[-1]}'] {msg}", **kwargs)
+    
     if options is None:
         options = MDVServerOptions()
 
