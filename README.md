@@ -43,7 +43,6 @@ To install MDV using Docker see [MDV Installation](https://mdv.ndm.ox.ac.uk/docs
 
 You can browse existing projects an old [MDV Projects Website](https://mdv.molbiol.ox.ac.uk/projects)
 
-
 ### For Development or Running a Local Version from the Repository:
 
 The canonical way of developing the application as of this writing is to use a [devcontainer](https://containers.dev/), which standardises the development environment and dependencies.

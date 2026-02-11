@@ -531,45 +531,45 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can share the project"}), 403
                 
+                # Refresh cache to pick up permission changes from manage_project_permissions.py
+                # Note: sync_users_to_db is no longer called here - the manage_project_permissions.py
+                # script ensures the DB is up to date by syncing at the start of main()
+                try:
+                    from mdvtools.auth.authutils import cache_user_projects
+                    logger.info("Refreshing user and permission cache...")
+                    cache_user_projects()
+                    logger.info("Cache refresh completed.")
+                except Exception as e:
+                    logger.warning(f"Could not refresh cache: {e}. Continuing with existing cache.")
 
                 # Step 3: Compile shared users list
+                # Read directly from database to ensure we have the latest permissions
+                from mdvtools.dbutils.dbmodels import UserProject
                 shared_users_list = []
-                for uid, permissions in user_project_cache.items():
-                    proj_perm = permissions.get(project_id)
-                    if proj_perm:
-                        user_data = user_cache.get(uid) if user_cache is not None else None
-                        if not user_data:
-                            # Fallback: Try fetching from the DB if not in cache
-                            user_obj = User.query.get(uid)
-                            if not user_obj:
-                                continue  # Skip if user doesn't exist in DB
-                            user_data = {
-                                "id": user_obj.id,
-                                "email": user_obj.email,
-                                "auth_id": user_obj.auth_id,
-                                "is_admin": user_obj.is_admin
-                            }
-                            # Optionally update cache to avoid this hit next time
-                            if user_cache is not None:
-                                user_cache[uid] = user_data
-                            if user_data not in all_users_cache:
-                                all_users_cache.append(user_data)
-
-                        shared_users_list.append({
-                            "id": user_data["id"],
-                            "email": user_data["email"],
-                            "permission": (
-                                "Owner" if proj_perm["is_owner"] else "Edit" if proj_perm["can_write"] else "View"
-                            )
-                        })
-
+                
+                # Get all user-project relationships for this project from database
+                user_projects = UserProject.query.filter_by(project_id=project_id).all()
+                for up in user_projects:
+                    user_obj = User.query.get(up.user_id)
+                    if not user_obj:
+                        continue
+                    
+                    shared_users_list.append({
+                        "id": user_obj.id,
+                        "email": user_obj.email,
+                        "permission": (
+                            "Owner" if up.is_owner else "Edit" if up.can_write else "View"
+                        )
+                    })
 
                 # Step 4: Get unshared users for dropdown
+                # Read from database to ensure we have all users (including newly synced ones)
+                all_db_users = User.query.all()
                 shared_user_ids = {u["id"] for u in shared_users_list}
                 all_users = [
-                    {"id": u["id"], "email": u["email"]}
-                    for u in all_users_cache
-                    if u["id"] not in shared_user_ids
+                    {"id": u.id, "email": u.email}
+                    for u in all_db_users
+                    if u.id not in shared_user_ids
                 ]
                 
                 # Return the list of users with permissions, and all users for the dropdown

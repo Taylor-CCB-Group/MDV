@@ -8,7 +8,6 @@ import WordCloud from "wordcloud";
 class RowChart extends CategoryChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config, { x: {} });
-        this.config.type = "row_chart";
         //redraw the chart
         this.onDataFiltered(null);
         this.labelg = this.graph_area.append("g");
@@ -231,7 +230,6 @@ class RowChart extends CategoryChart {
     }
 
     getWordCloudSettings() {
-        const settings = super.getSettings();
         const c = this.config;
 
         return [
