@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from
 import { useQuery } from "@tanstack/react-query";
 import { Paper, Typography, Link } from "@mui/material";
 import z from "zod";
+import clsx from "clsx";
 
 // Zod schema for GeneNetwork API response
 const geneNetworkApiResponseSchema = z.object({
@@ -160,26 +161,24 @@ export function GeneNetworkInfoComponent({
     return (
         <Paper
             ref={containerRef}
-            variant={isHighlighted ? "elevation" : "outlined"}
-            elevation={isHighlighted ? 2 : 0}
+            variant="outlined"
+            elevation={isHighlighted ? 3 : 0}
             tabIndex={onCardClick || onCardKeyDown ? 0 : undefined}
+            className={clsx(
+                "h-[180px] w-full overflow-hidden flex flex-col rounded-md transition-shadow",
+                isHighlighted
+                    ? "border-2 border-blue-500 shadow-md"
+                    : "border border-gray-200",
+                onCardClick ? "cursor-pointer" : "cursor-default",
+                // Subtle but visible focus style (applies for both keyboard and mouse focus)
+                "focus:outline-none focus:ring-1 focus:ring-blue-400/60 focus:ring-offset-1",
+            )}
             sx={{
                 p: 1.5,
-                m: 1,
-                borderRadius: 1,
-                height: 180, // Fixed height for virtualization
-                overflow: "hidden", // Prevent content from expanding beyond fixed height
-                display: "flex",
-                flexDirection: "column",
-                border: isHighlighted ? "2px solid" : undefined,
-                borderColor: isHighlighted ? "primary.main" : undefined,
-                cursor: onCardClick ? "pointer" : "default",
-                outline: "none",
-                "&:focus-visible": {
-                    outline: "2px solid",
-                    outlineColor: "primary.main",
-                    outlineOffset: "2px",
-                },
+                // Ensure border color is applied (MUI might override)
+                ...(isHighlighted && {
+                    borderColor: "rgb(59, 130, 246)", // blue-500
+                }),
             }}
             onClick={handleCardClick}
             onKeyDown={handleKeyDown}

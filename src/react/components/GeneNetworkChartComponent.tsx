@@ -92,12 +92,16 @@ export const GeneNetworkChartComponent = observer(() => {
     // No cap needed now that we have virtualisation
     const visibleGeneIds = geneIds;
 
+    const ROW_HEIGHT = 180;
+    const ROW_VERTICAL_GAP = 16; // vertical space between items
+    const ROW_TOTAL_HEIGHT = ROW_HEIGHT + ROW_VERTICAL_GAP;
+
     // Set up virtualizer for efficient rendering of large gene lists
-    // Using fixed height of 180px (matches GeneNetworkInfoComponent fixed height)
+    // Using fixed height of gene card plus a vertical gap between items
     const rowVirtualizer = useVirtualizer({
         count: visibleGeneIds.length,
         getScrollElement: () => scrollContainerRef.current,
-        estimateSize: () => 180, // Fixed height of gene card (matches GeneNetworkInfoComponent)
+        estimateSize: () => ROW_TOTAL_HEIGHT,
         overscan: 5, // Render a few extra items for smoother scrolling
     });
 
@@ -223,12 +227,11 @@ export const GeneNetworkChartComponent = observer(() => {
 
         const scrollTop = container.scrollTop;
         const containerHeight = container.clientHeight;
-        const itemHeight = 180; // Fixed height from estimateSize
 
-        const firstVisibleIndex = Math.floor(scrollTop / itemHeight);
+        const firstVisibleIndex = Math.floor(scrollTop / ROW_TOTAL_HEIGHT);
         const lastVisibleIndex = Math.min(
             visibleGeneIds.length - 1,
-            Math.floor((scrollTop + containerHeight) / itemHeight),
+            Math.floor((scrollTop + containerHeight) / ROW_TOTAL_HEIGHT),
         );
 
         // Only scroll if the target gene is outside the actual viewport
@@ -497,11 +500,8 @@ export const GeneNetworkChartComponent = observer(() => {
                         onKeyDown={handleContainerKeyDown}
                     >
                         <div
-                            style={{
-                                height: `${rowVirtualizer.getTotalSize()}px`,
-                                width: "100%",
-                                position: "relative",
-                            }}
+                            className="relative w-full"
+                            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
                         >
                             {rowVirtualizer.getVirtualItems().map((virtualItem: { index: number; start: number }) => {
                                 const geneId = visibleGeneIds[virtualItem.index];
@@ -513,14 +513,13 @@ export const GeneNetworkChartComponent = observer(() => {
                                         ref={(el) => setGeneRef(geneId, el)}
                                         data-gene-id={geneId}
                                         data-index={virtualItem.index}
+                                        className="absolute left-0 w-full px-2"
                                         style={{
-                                            position: "absolute",
                                             top: `${virtualItem.start}px`,
-                                            left: 0,
-                                            width: "100%",
+                                            height: `${ROW_TOTAL_HEIGHT}px`,
                                         }}
                                     >
-                                        <div className="relative">
+                                        <div className="relative h-full flex items-center">
                                             <GeneNetworkInfoComponent
                                                 geneId={geneId}
                                                 isHighlighted={isHighlighted}
