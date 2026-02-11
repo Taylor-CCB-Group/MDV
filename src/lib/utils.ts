@@ -67,11 +67,11 @@ export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
 // });
 
 /**
- * Helper function to match two strings
+ * Helper function to check if string `str` contains every element of `substrings`
  * (Will update to more sophisticated matching algorithm in future)
  */
-export function matchString(str1: string[], str2: string) {
-    return !str1.some(i => !str2.includes(i));
+export function stringContainsAll(substrings: string[], str: string) {
+    return !substrings.some(i => !str.includes(i));
 }
 
 /**
@@ -93,4 +93,12 @@ export function parseDelimitedString(str: string) {
         .map(s => s.trim())
         .filter(Boolean);
     return items;
+}
+
+/**
+ * Helper function to compare two strings if they are equal or not
+ * (Will update to more advanced comparison including case matching, partial or whole matching, etc)
+ */
+export function compareStrings(str1: string, str2: string) {
+    return str1 === str2;
 }

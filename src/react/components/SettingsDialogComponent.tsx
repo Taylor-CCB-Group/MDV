@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Button, Chip, FormControl, FormControlLabel, Radio, RadioGroup, Slider, Typography } from "@mui/material";
+import { Box, Button, Chip, Divider, FormControl, FormControlLabel, Paper, type PaperProps, Radio, RadioGroup, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -19,11 +19,12 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/utils";
+import { isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
+import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -301,8 +302,16 @@ export const DropdownAutocompleteComponent = observer(({
                 multiple={multiple}
                 size="small"
                 id={id}
-                options={options}
-                limitTags={5}
+                options={useMemo(() => {
+                    // Moving the selected options to the top
+                    const singleOption = okOption.length ? [okOption[0]] : [];
+                    const selectedSet = new Set(
+                      (multiple ? okOption : singleOption).map((option) => val(option))
+                    );
+                    const selected = options.filter((o) => selectedSet.has(val(o)));
+                    const unselected = options.filter((o) => !selectedSet.has(val(o)));
+                    return [...selected, ...unselected];
+                  }, [options, okOption, multiple, val])}
                 disableCloseOnSelect={multiple}
                 getOptionLabel={label}
                 value={multiple ? 
@@ -357,25 +366,49 @@ export const DropdownAutocompleteComponent = observer(({
                     );
                 }}
                 renderTags={(tagValue, getTagProps) => {
+
+                    if (!isArray(tagValue)) return null;
+
+                    if (tagValue.length > AUTOCOMPLETE_TAGS_LIMIT) {
+                        return (
+                            <div>
+                                <Typography
+                                    variant="button"
+                                    color="textSecondary"
+                                >
+                                    {tagValue.length} selected
+                                </Typography>
+                            </div>
+                        )
+                    }
+
                     //seems to be a material-ui bug with not properly handling key / props...
                     //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
-                    return tagValue.map((option, index) => !option ? null : (
+                    const tags = tagValue.map((option, index) => !option ? null : (
                         <Chip
                             {...getTagProps({ index })}
                             key={val(option)}
                             label={label(option)}
                         />
                     ));
+
+                    return <div className="max-h-32 overflow-auto pr-3">{tags}</div>
                 }}
                 renderInput={(params) => {
                     const { InputProps } = params;
                     return (
                         <TextField
                             {...params}
+                            placeholder={okOption.length === 0 ? "Type or paste to search and select" : ""}
                             slotProps={{
                                 input: {
                                     ...InputProps,
                                     onPaste: handlePaste,
+                                    sx: {
+                                        '& .MuiInputBase-input::placeholder': {
+                                        fontSize: '0.75rem'
+                                        },
+                                    },
                                 }
                             }}
                             // label="Checkboxes"
@@ -383,6 +416,34 @@ export const DropdownAutocompleteComponent = observer(({
                         />
                     )
                 }}
+                PaperComponent={useMemo(() => (paperProps: PaperProps) => {
+                    const { children, ...restPaperProps } = paperProps;
+                    const showMessage = options.length > AUTOCOMPLETE_OPTIONS_LIMIT;
+                    return (
+                        <Paper {...restPaperProps}>
+                            {showMessage && (
+                                <>
+                                    <Box
+                                        py={1}
+                                        px={2}
+                                        sx={{
+                                            textAlign: "center",
+                                            fontSize: "10px",
+                                            color: "text.secondary",
+                                            backgroundColor: "var(--menu_bar_color)",
+                                            border: "2px solid var(--fade_background_color)",
+                                        }}
+                                    >
+                                        Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {options.length} options. Type
+                                        or paste to search and select.
+                                    </Box>
+                                    <Divider />
+                                </>
+                            )}
+                            {children}
+                        </Paper>
+                    );
+                }, [options.length])}
             />
         </>
     );

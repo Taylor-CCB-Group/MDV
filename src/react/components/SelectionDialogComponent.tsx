@@ -1,7 +1,7 @@
 import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
-import { createFilterOptions } from '@mui/material/Autocomplete';
+import { type AutocompleteRenderGetTagProps, createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
@@ -42,6 +42,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { RowsAsColsQuery } from "@/links/link_utils";
+import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+
+
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -63,7 +66,7 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
         : RangeFilter) | null;
     return filter;
 }
-const filterOptions = createFilterOptions<any>({ limit: 100 });
+
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const [open, setOpen] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
@@ -142,9 +145,13 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         <Autocomplete
             multiple
             size="small"
-            options={values}
+            options={useMemo(() => {
+                const selectedSet = new Set(value);
+                const selected = values.filter((v) => selectedSet.has(v));
+                const unselected = values.filter((v) => !selectedSet.has(v));
+                return [...selected, ...unselected];
+              }, [values, value])}
             value={value}
-            filterOptions={filterOptions}
             onChange={(_, value) => {
                 if(isArray(value) && value.length === 0) {
                     setSelectAll(false);
@@ -163,11 +170,17 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                     <TextFieldExtended
                         key={key}
                         {...p}
+                        placeholder={value.length === 0 ? "Type or paste to search and select": ""}
                         slotProps={{
                             input: {
                                 ...InputProps,
                                 onPaste: handlePaste,
-                            }
+                                sx: {
+                                    '& .MuiInputBase-input::placeholder': {
+                                    fontSize: '0.75rem'
+                                    },
+                                },
+                            },
                         }}
                     />
                 </>
@@ -194,6 +207,21 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 );
             }}
             renderTags={(value, getTagProps) => {
+                if (!isArray(value)) return null;
+
+                if (value.length > AUTOCOMPLETE_TAGS_LIMIT) {
+                    return (
+                        <div>
+                            <Typography
+                                variant="button"
+                                color="textSecondary"
+                            >
+                                {value.length} selected
+                            </Typography>
+                        </div>
+                    )
+                }
+                
                 //seems to be a material-ui bug with not properly handling key / props...
                 //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
                 const chips = value.map((option, index) => {
@@ -204,17 +232,36 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 //similar to MultiSelect.js config.maxShow (default 4)
                 //consider 'maxChars' perhaps so that we respond to the actual amount of text
                 //or I suppose we could have some CSS container query or something...
-                if (chips.length > 8) {
-                    return <div>{chips.length} selected</div>
-                }
+
                 //todo improve styling - bad from UX perspective at the moment when it overflows.
-                return <div className="max-h-32 overflow-auto">{chips}</div>;
+                return <div className="max-h-32 overflow-auto pr-3">{chips}</div>;
             }}
             // Getting warnings in console if slotProps is used for rendering Paper Component
             PaperComponent={useMemo(() => (paperProps: PaperProps) => {
                 const { children, ...restPaperProps } = paperProps;
+                const showMessage = values.length > AUTOCOMPLETE_OPTIONS_LIMIT;
                 return (
                   <Paper {...restPaperProps}>
+                    {showMessage && (
+                        <>
+                            <Box 
+                                py={1}
+                                px={2}
+                                sx={{
+                                    textAlign: "center",
+                                    fontSize: "10px",
+                                    color: "text.secondary",
+                                    backgroundColor: "var(--menu_bar_color)",
+                                    border: "2px solid var(--fade_background_color)"
+                                }}
+                            >
+                                Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {values.length} options. Type
+                                or paste to search and select.
+                            </Box>
+                            <Divider />
+                        </>
+
+                    )}
                     <Box
                         onMouseDown={(e) => e.preventDefault()}
                         py={1}
@@ -229,7 +276,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                     {children}
                   </Paper>
                 );
-              }, [selectAll, handleSelectAll])}
+              }, [selectAll, handleSelectAll, values])}
         />
     );
 });
