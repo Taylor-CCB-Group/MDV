@@ -172,7 +172,7 @@ export default defineConfig(env => {
         strictPort: true,
         proxy,
     },
-    publicDir: process.env.exclude_dir?'':'examples', //used for netlify.toml??... the rest is noise.
+    publicDir: process.env.exclude_dir?false:'examples', //used for netlify.toml??... the rest is noise.
     build: {
         sourcemap: process.env.nomap?false:true,
         rollupOptions: { 
@@ -197,7 +197,7 @@ export default defineConfig(env => {
         })
     ],
     worker: {
-        format: process.env.worker_format || 'iife',
+        format: (process.env.worker_format || 'iife') as 'es' | 'iife',
     },
     resolve: {
         alias: {

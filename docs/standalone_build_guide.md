@@ -20,7 +20,7 @@ The standalone build (`npm run standalone`) exposes the `mdv` object (including 
       // dataLoader: custom dataloader
       // state: loaded from state.json
       // listener: reacts to MDV events
-      mdv.chartManager = new mdv.chartManager(div, dataSources, dataLoader, state, listener);
+      const chartManager = new mdv.ChartManager(div, dataSources, dataLoader, state, listener);
     </script>
     ```
 
