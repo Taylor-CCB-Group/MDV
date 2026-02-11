@@ -165,12 +165,8 @@ export function GeneNetworkInfoComponent({
             tabIndex={onCardClick || onCardKeyDown ? 0 : undefined}
             className={clsx(
                 "h-[150px] w-full overflow-hidden flex flex-col rounded-md transition-shadow",
-                isHighlighted
-                    ? "border-2 border-blue-500 shadow-md"
-                    : "border border-gray-200",
                 onCardClick ? "cursor-pointer" : "cursor-default",
-                // Subtle but visible focus style (applies for both keyboard and mouse focus)
-                "focus:outline-none focus:ring-1 focus:ring-blue-400/60 focus:ring-offset-1",
+                "focus:outline-none focus:ring-2 focus:ring-offset-1",
             )}
             sx={{
                 p: 1.5,
@@ -178,6 +174,9 @@ export function GeneNetworkInfoComponent({
                 ...(isHighlighted && {
                     borderColor: "rgb(59, 130, 246)", // blue-500
                 }),
+                "&:focus": {
+                    borderWidth: "2px"
+                }
             }}
             onClick={handleCardClick}
             onKeyDown={handleKeyDown}
@@ -238,6 +237,11 @@ export function GeneNetworkInfoComponent({
                             target="_blank"
                             rel="noopener noreferrer"
                             tabIndex={-1}
+                            sx={{
+                                "&:hover": {
+                                    fontWeight: 600,
+                                },
+                            }}
                         >
                             More info on GeneNetwork
                         </Link>
@@ -247,6 +251,11 @@ export function GeneNetworkInfoComponent({
                             target="_blank"
                             rel="noopener noreferrer"
                             tabIndex={-1}
+                            sx={{
+                                "&:hover": {
+                                    fontWeight: 600,
+                                },
+                            }}
                         >
                             Open on genecards.org
                         </Link>
