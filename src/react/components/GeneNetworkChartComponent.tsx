@@ -38,7 +38,6 @@ export const GeneNetworkChartComponent = observer(() => {
     const lastScrolledGeneIndexRef = useRef<number | null>(null);
 
     const mode = chart.config.mode || "filtered";
-    const maxGenes = chart.config.maxGenes ?? 100;
 
     // Get gene IDs based on display mode
     const { geneIds, geneHighlightCounts } = useMemo(() => {
@@ -90,9 +89,8 @@ export const GeneNetworkChartComponent = observer(() => {
         };
     }, [mode, highlightedIndices, filteredIndices, column]);
 
-    // Apply cap
-    const visibleGeneIds = geneIds.slice(0, maxGenes);
-    const hasMore = geneIds.length > maxGenes;
+    // No cap needed now that we have virtualisation
+    const visibleGeneIds = geneIds;
 
     // Set up virtualizer for efficient rendering of large gene lists
     // Using fixed height of 180px (matches GeneNetworkInfoComponent fixed height)
@@ -103,8 +101,8 @@ export const GeneNetworkChartComponent = observer(() => {
         overscan: 5, // Render a few extra items for smoother scrolling
     });
 
-    // Auto-scroll to highlighted genes from external sources (smart interaction detection)
-    // Default to true unless explicitly disabled in config
+    // Auto-scroll to highlighted genes from external sources (smart interaction detection).
+    // Controlled via chart config so it can be toggled from settings and serialised.
     const autoScroll = chart.config.autoScroll ?? true;
     useLayoutEffect(() => {
         if (!autoScroll) return;
@@ -493,11 +491,6 @@ export const GeneNetworkChartComponent = observer(() => {
         <div className="absolute w-[100%] h-[100%] overflow-y-auto text-sm h-full flex flex-col">
             {visibleGeneIds.length > 0 ? (
                 <>
-                    {hasMore && (
-                        <div className="p-3 mb-2 text-xs text-gray-500">
-                            Showing first {maxGenes} of {geneIds.length} genes (adjust cap in settings)
-                        </div>
-                    )}
                     <div 
                         ref={scrollContainerRef} 
                         className="flex-1 min-h-0 overflow-y-auto"
