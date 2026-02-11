@@ -167,7 +167,10 @@ export function GeneNetworkInfoComponent({
                 p: 1.5,
                 m: 1,
                 borderRadius: 1,
-                minHeight: 100,
+                height: 180, // Fixed height for virtualization
+                overflow: "hidden", // Prevent content from expanding beyond fixed height
+                display: "flex",
+                flexDirection: "column",
                 border: isHighlighted ? "2px solid" : undefined,
                 borderColor: isHighlighted ? "primary.main" : undefined,
                 cursor: onCardClick ? "pointer" : "default",
@@ -210,17 +213,28 @@ export function GeneNetworkInfoComponent({
             {isVisible && geneInfo && (
                 <>
                     <div className="flex items-start justify-between">
-                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5, lineHeight: 1.2 }}>
                             Gene Information for {geneInfo.geneName}
                         </Typography>
                     </div>
-                    <Typography variant="body2">
+                    <Typography variant="body2" sx={{ mb: 0.5, lineHeight: 1.3 }}>
                         <strong>Gene ID:</strong> {geneInfo.geneId}
                     </Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    <Typography 
+                        variant="body2" 
+                        sx={{ 
+                            mb: 0.5, 
+                            lineHeight: 1.3,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                        }}
+                    >
                         <strong>Description:</strong> {geneInfo.geneDescription}
                     </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ mt: "auto", lineHeight: 1.3 }}>
                         <Link
                             href={`https://www.genenetwork.nl/gene/${geneInfo.geneId}`}
                             target="_blank"

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useLayoutEffect, useState, useEffect, useCallback, type MouseEvent, type KeyboardEvent } from "react";
 import { observer } from "mobx-react-lite";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useChart } from "../context";
 import { useParamColumns } from "../hooks";
 import { useHighlightedIndices, useHighlightRows } from "../selectionHooks";
@@ -33,6 +34,7 @@ export const GeneNetworkChartComponent = observer(() => {
     const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
     const [focusedGeneIndex, setFocusedGeneIndex] = useState<number | null>(null);
     const [rangeAnchorGeneIndex, setRangeAnchorGeneIndex] = useState<number | null>(null);
+    const prevHighlightedIndicesRef = useRef<number[] | null>(null);
 
     const mode = chart.config.mode || "filtered";
     const maxGenes = chart.config.maxGenes ?? 100;
@@ -91,13 +93,47 @@ export const GeneNetworkChartComponent = observer(() => {
     const visibleGeneIds = geneIds.slice(0, maxGenes);
     const hasMore = geneIds.length > maxGenes;
 
-    // Auto-scroll to highlighted genes
-    // always disabled at the moment, pending better behaviour.
-    const { autoScroll } = chart.config;
+    // Set up virtualizer for efficient rendering of large gene lists
+    // Using fixed height of 180px (matches GeneNetworkInfoComponent fixed height)
+    const rowVirtualizer = useVirtualizer({
+        count: visibleGeneIds.length,
+        getScrollElement: () => scrollContainerRef.current,
+        estimateSize: () => 180, // Fixed height of gene card (matches GeneNetworkInfoComponent)
+        overscan: 5, // Render a few extra items for smoother scrolling
+    });
+
+    // Auto-scroll to highlighted genes from external sources (smart interaction detection)
+    // Default to true unless explicitly disabled in config
+    const autoScroll = chart.config.autoScroll ?? true;
     useLayoutEffect(() => {
         if (!autoScroll) return;
         if (highlightedIndices.length === 0 || visibleGeneIds.length === 0) return;
         if (!scrollContainerRef.current) return;
+
+        // Only auto-scroll when highlighted indices actually change (not on scroll/layout changes)
+        const prevHighlighted = prevHighlightedIndicesRef.current;
+        const highlightedChanged = !prevHighlighted || 
+            prevHighlighted.length !== highlightedIndices.length ||
+            !prevHighlighted.every((val, idx) => val === highlightedIndices[idx]);
+        
+        if (!highlightedChanged) {
+            return; // Highlighted indices haven't changed, don't auto-scroll
+        }
+        
+        // Update ref for next comparison
+        prevHighlightedIndicesRef.current = highlightedIndices;
+
+        // Check if user is actively interacting with the component
+        // If so, don't auto-scroll to avoid feedback loops
+        const hasComponentFocus = scrollContainerRef.current?.contains(document.activeElement) ?? false;
+        const isUserInteracting = hasComponentFocus && (
+            focusedGeneIndex !== null || // User navigating with keyboard
+            rangeAnchorGeneIndex !== null // User extending range selection
+        );
+
+        if (isUserInteracting) {
+            return; // Don't auto-scroll while user is interacting with this component
+        }
 
         // Find which genes correspond to highlighted rows
         const highlightedGeneIds = new Set<string>();
@@ -113,29 +149,38 @@ export const GeneNetworkChartComponent = observer(() => {
             }
         }
 
-        // Scroll to the first highlighted gene that's not visible
-        for (const geneId of highlightedGeneIds) {
-            const geneElement = geneRefs.current.get(geneId);
-            if (geneElement) {
-                const container = scrollContainerRef.current;
-                const containerRect = container.getBoundingClientRect();
-                const elementRect = geneElement.getBoundingClientRect();
-
-                // Check if element is not fully visible
-                const isVisible =
-                    elementRect.top >= containerRect.top &&
-                    elementRect.bottom <= containerRect.bottom;
-
-                if (!isVisible) {
-                    geneElement.scrollIntoView({
+        // Find the first highlighted gene that's outside the actual viewport
+        // Calculate visible range based on scroll position and container height (not overscan)
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        
+        const scrollTop = container.scrollTop;
+        const containerHeight = container.clientHeight;
+        const itemHeight = 180; // Fixed height from estimateSize
+        
+        // Calculate which indices are actually visible in the viewport
+        const firstVisibleIndex = Math.floor(scrollTop / itemHeight);
+        const lastVisibleIndex = Math.min(
+            visibleGeneIds.length - 1,
+            Math.floor((scrollTop + containerHeight) / itemHeight)
+        );
+        
+        // Find first highlighted gene that's outside the actual viewport
+        for (let i = 0; i < visibleGeneIds.length; i++) {
+            const geneId = visibleGeneIds[i];
+            if (highlightedGeneIds.has(geneId)) {
+                // Check if this gene is outside the actual viewport (with small buffer)
+                if (i < firstVisibleIndex || i > lastVisibleIndex) {
+                    // Found a highlighted gene outside viewport - scroll to it
+                    rowVirtualizer.scrollToIndex(i, {
+                        align: "center",
                         behavior: "smooth",
-                        block: "nearest",
                     });
                     break; // Only scroll to first one
                 }
             }
         }
-    }, [highlightedIndices, visibleGeneIds, column, autoScroll]);
+    }, [highlightedIndices, visibleGeneIds, column, autoScroll, focusedGeneIndex, rangeAnchorGeneIndex, rowVirtualizer]);
 
     const setGeneRef = (geneId: string, element: HTMLDivElement | null) => {
         if (element) {
@@ -238,22 +283,17 @@ export const GeneNetworkChartComponent = observer(() => {
         setRangeAnchorGeneIndex(null);
     }, [filteredIndices, highlightedIndices, lastClickedIndex, highlightRows, getIndicesForGeneId, visibleGeneIds, rangeAnchorGeneIndex]);
 
-    const scrollToFocusedGene = useCallback((geneId: string) => {
-        const geneElement = geneRefs.current.get(geneId);
-        if (geneElement && scrollContainerRef.current) {
-            geneElement.scrollIntoView({
-                behavior: "smooth",
-                block: "nearest",
-            });
-        }
-    }, []);
-
     const focusGeneAtIndex = useCallback((index: number, shouldSelect: boolean, isRange: boolean, isToggle: boolean) => {
         if (index < 0 || index >= visibleGeneIds.length) return;
         
         const geneId = visibleGeneIds[index];
         setFocusedGeneIndex(index);
-        scrollToFocusedGene(geneId);
+        
+        // Scroll to the gene using virtualizer
+        rowVirtualizer.scrollToIndex(index, {
+            align: "center",
+            behavior: "smooth",
+        });
         
         // Focus the gene card element
         const geneElement = geneRefs.current.get(geneId);
@@ -268,7 +308,7 @@ export const GeneNetworkChartComponent = observer(() => {
         if (shouldSelect) {
             handleGeneSelection(geneId, isToggle, isRange, index);
         }
-    }, [visibleGeneIds, scrollToFocusedGene, handleGeneSelection]);
+    }, [visibleGeneIds, rowVirtualizer, handleGeneSelection]);
 
     // Container-level keyboard handler for arrow key navigation
     const handleContainerKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
@@ -389,41 +429,42 @@ export const GeneNetworkChartComponent = observer(() => {
                         className="flex-1 min-h-0 overflow-y-auto"
                         onKeyDown={handleContainerKeyDown}
                     >
-                        {visibleGeneIds.map((geneId) => {
-                            // when we have lots of genes visible...
-                            // nb - one unanticipated bottleneck here is when we make a screenshot...
-                            // it has to `cloneCSSStyle` for all of the elements, which if we extend to e.g. 20k genes
-                            // The styling when selection changes also becomes very slow.
-                            // Also HMR refreshes lead to a stack overflow...
-                            // is a lot... so we need a different virtualisation strategy.
-                            // and consider making it always show entire list.
-                            
-                            // --- features to add:
-                            // keyboard shortcuts with cursor keys
-                            // search field - also with ability to paste gene list etc.
-                            // may have some functionality in common with selection-dialog text component
-                            // (currently being improved in another branch)
-                            // but the strategy here can be more focused on "list of genes"
-                            const highlightCount = geneHighlightCounts.get(geneId) || 0;
-                            const isHighlighted = highlightCount > 0;
-                            return (
-                                <div
-                                    key={geneId}
-                                    ref={(el) => setGeneRef(geneId, el)}
-                                    data-gene-id={geneId}
-                                >
-                                    <div className="relative">
-                                        <GeneNetworkInfoComponent
-                                            geneId={geneId}
-                                            // highlightCount={highlightCount}
-                                            isHighlighted={isHighlighted}
-                                            onCardClick={(event) => handleGeneClick(geneId, event)}
-                                            onCardKeyDown={(event) => handleGeneKeyDown(geneId, event)}
-                                        />
+                        <div
+                            style={{
+                                height: `${rowVirtualizer.getTotalSize()}px`,
+                                width: "100%",
+                                position: "relative",
+                            }}
+                        >
+                            {rowVirtualizer.getVirtualItems().map((virtualItem: { index: number; start: number }) => {
+                                const geneId = visibleGeneIds[virtualItem.index];
+                                const highlightCount = geneHighlightCounts.get(geneId) || 0;
+                                const isHighlighted = highlightCount > 0;
+                                return (
+                                    <div
+                                        key={geneId}
+                                        ref={(el) => setGeneRef(geneId, el)}
+                                        data-gene-id={geneId}
+                                        data-index={virtualItem.index}
+                                        style={{
+                                            position: "absolute",
+                                            top: `${virtualItem.start}px`,
+                                            left: 0,
+                                            width: "100%",
+                                        }}
+                                    >
+                                        <div className="relative">
+                                            <GeneNetworkInfoComponent
+                                                geneId={geneId}
+                                                isHighlighted={isHighlighted}
+                                                onCardClick={(event) => handleGeneClick(geneId, event)}
+                                                onCardKeyDown={(event) => handleGeneKeyDown(geneId, event)}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 </>
             ) : (
