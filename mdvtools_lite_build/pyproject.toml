@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mdvtools"
-version = "0.0.13"
+version = "1.2.2"
 authors = [
     { name= "Martin Sergeant", email="m.j.sergeant1@googlemail.com"},
     { name= "PeterTodd", email="peter.todd@well.ox.ac.uk"},
