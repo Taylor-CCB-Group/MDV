@@ -35,6 +35,7 @@ export const GeneNetworkChartComponent = observer(() => {
     const [focusedGeneIndex, setFocusedGeneIndex] = useState<number | null>(null);
     const [rangeAnchorGeneIndex, setRangeAnchorGeneIndex] = useState<number | null>(null);
     const prevHighlightedIndicesRef = useRef<number[] | null>(null);
+    const lastScrolledGeneIndexRef = useRef<number | null>(null);
 
     const mode = chart.config.mode || "filtered";
     const maxGenes = chart.config.maxGenes ?? 100;
@@ -112,75 +113,148 @@ export const GeneNetworkChartComponent = observer(() => {
 
         // Only auto-scroll when highlighted indices actually change (not on scroll/layout changes)
         const prevHighlighted = prevHighlightedIndicesRef.current;
-        const highlightedChanged = !prevHighlighted || 
+        const highlightedChanged =
+            !prevHighlighted ||
             prevHighlighted.length !== highlightedIndices.length ||
             !prevHighlighted.every((val, idx) => val === highlightedIndices[idx]);
-        
+
         if (!highlightedChanged) {
             return; // Highlighted indices haven't changed, don't auto-scroll
         }
-        
+
+        // Compute sorted previous and current highlights for diffing
+        const prevSorted = prevHighlighted ? [...prevHighlighted].sort((a, b) => a - b) : [];
+        const currSorted = [...highlightedIndices].sort((a, b) => a - b);
+
+        const prevSet = new Set(prevSorted);
+        const currSet = new Set(currSorted);
+
+        const added: number[] = currSorted.filter((i) => !prevSet.has(i));
+        const removed: number[] = prevSorted.filter((i) => !currSet.has(i));
+
+        // Decide target row index based on how the selection changed
+        let targetRowIndex: number | null = null;
+
+        if (currSorted.length === 1) {
+            // If new selection has a single item, always scroll to it
+            targetRowIndex = currSorted[0];
+        } else if (added.length > 0 && removed.length === 0) {
+            // Pure extension (typical Shift+Arrow/Shift+Click) -> scroll to new far edge
+            targetRowIndex = added[added.length - 1];
+        } else if (removed.length > 0 && added.length === 0) {
+            // Pure contraction: scroll to the corresponding end
+            const prevMin = prevSorted[0];
+            const prevMax = prevSorted[prevSorted.length - 1];
+            const currMin = currSorted[0];
+            const currMax = currSorted[currSorted.length - 1];
+
+            // Determine which end contracted more by comparing distances
+            const contractedFromTop = currMin > prevMin;
+            const contractedFromBottom = currMax < prevMax;
+
+            if (contractedFromBottom && !contractedFromTop) {
+                // Contracted from bottom: scroll to new bottom
+                targetRowIndex = currMax;
+            } else if (contractedFromTop && !contractedFromBottom) {
+                // Contracted from top: scroll to new top
+                targetRowIndex = currMin;
+            } else {
+                // Mixed or unclear contraction: pick closer end to previous focus
+                if (focusedGeneIndex !== null) {
+                    // Map focusedGeneIndex (gene list index) back to nearest row index in current selection
+                    // Find the row index closest to focusedGeneIndex
+                    let closest = currSorted[0];
+                    let minDist = Math.abs(closest - focusedGeneIndex);
+                    for (const idx of currSorted) {
+                        const dist = Math.abs(idx - focusedGeneIndex);
+                        if (dist < minDist) {
+                            closest = idx;
+                            minDist = dist;
+                        }
+                    }
+                    targetRowIndex = closest;
+                } else {
+                    // Fallback: scroll to new top
+                    targetRowIndex = currMin;
+                }
+            }
+        } else if (added.length > 0) {
+            // Mixed changes (external or complex update): scroll to first newly added
+            targetRowIndex = added[0];
+        } else {
+            // No clear target; don't scroll
+            prevHighlightedIndicesRef.current = highlightedIndices;
+            return;
+        }
+
         // Update ref for next comparison
         prevHighlightedIndicesRef.current = highlightedIndices;
 
         // Check if user is actively interacting with the component
         // If so, don't auto-scroll to avoid feedback loops
-        const hasComponentFocus = scrollContainerRef.current?.contains(document.activeElement) ?? false;
-        const isUserInteracting = hasComponentFocus && (
-            focusedGeneIndex !== null || // User navigating with keyboard
-            rangeAnchorGeneIndex !== null // User extending range selection
-        );
+        const hasComponentFocus =
+            scrollContainerRef.current?.contains(document.activeElement) ?? false;
+        const isUserInteracting =
+            hasComponentFocus &&
+            (focusedGeneIndex !== null || rangeAnchorGeneIndex !== null);
 
         if (isUserInteracting) {
             return; // Don't auto-scroll while user is interacting with this component
         }
 
-        // Find which genes correspond to highlighted rows
-        const highlightedGeneIds = new Set<string>();
-        for (let i = 0; i < highlightedIndices.length; i++) {
-            const index = highlightedIndices[i];
+        // Helper: map a data row index to the gene list index
+        const getGeneListIndexForRowIndex = (rowIndex: number): number | null => {
             try {
-                const geneId = getTextValue(column, index);
-                if (geneId && visibleGeneIds.includes(geneId)) {
-                    highlightedGeneIds.add(geneId);
-                }
-            } catch (e) {
-                // Skip invalid indices
+                const geneId = getTextValue(column, rowIndex);
+                if (!geneId) return null;
+                const idx = visibleGeneIds.indexOf(geneId);
+                return idx === -1 ? null : idx;
+            } catch {
+                return null;
             }
+        };
+
+        const targetGeneIndex = getGeneListIndexForRowIndex(targetRowIndex);
+        if (targetGeneIndex == null) {
+            return;
         }
 
-        // Find the first highlighted gene that's outside the actual viewport
-        // Calculate visible range based on scroll position and container height (not overscan)
+        // Calculate visible range based on scroll position and container height
         const container = scrollContainerRef.current;
         if (!container) return;
-        
+
         const scrollTop = container.scrollTop;
         const containerHeight = container.clientHeight;
         const itemHeight = 180; // Fixed height from estimateSize
-        
-        // Calculate which indices are actually visible in the viewport
+
         const firstVisibleIndex = Math.floor(scrollTop / itemHeight);
         const lastVisibleIndex = Math.min(
             visibleGeneIds.length - 1,
-            Math.floor((scrollTop + containerHeight) / itemHeight)
+            Math.floor((scrollTop + containerHeight) / itemHeight),
         );
-        
-        // Find first highlighted gene that's outside the actual viewport
-        for (let i = 0; i < visibleGeneIds.length; i++) {
-            const geneId = visibleGeneIds[i];
-            if (highlightedGeneIds.has(geneId)) {
-                // Check if this gene is outside the actual viewport (with small buffer)
-                if (i < firstVisibleIndex || i > lastVisibleIndex) {
-                    // Found a highlighted gene outside viewport - scroll to it
-                    rowVirtualizer.scrollToIndex(i, {
-                        align: "center",
-                        behavior: "smooth",
-                    });
-                    break; // Only scroll to first one
-                }
+
+        // Only scroll if the target gene is outside the actual viewport
+        if (targetGeneIndex < firstVisibleIndex || targetGeneIndex > lastVisibleIndex) {
+            if (lastScrolledGeneIndexRef.current !== targetGeneIndex) {
+                lastScrolledGeneIndexRef.current = targetGeneIndex;
+                rowVirtualizer.scrollToIndex(targetGeneIndex, {
+                    align: "center",
+                    behavior: "smooth",
+                });
             }
+        } else if (lastScrolledGeneIndexRef.current === targetGeneIndex) {
+            // If it's now visible, clear the last scrolled ref
+            lastScrolledGeneIndexRef.current = null;
         }
-    }, [highlightedIndices, visibleGeneIds, column, autoScroll, focusedGeneIndex, rangeAnchorGeneIndex, rowVirtualizer]);
+    }, [
+        highlightedIndices,
+        visibleGeneIds,
+        column,
+        autoScroll,
+        focusedGeneIndex,
+        rangeAnchorGeneIndex,
+        rowVirtualizer,
+    ]);
 
     const setGeneRef = (geneId: string, element: HTMLDivElement | null) => {
         if (element) {
