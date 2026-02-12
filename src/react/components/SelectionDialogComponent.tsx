@@ -57,6 +57,12 @@ type Props<K extends DataType> = {
     // filter?: K extends CategoricalDataType ? CategoryFilter : [number, number];
 };
 
+/**
+ * Retrieve the current filter configuration for a given data column.
+ *
+ * @param column - The data column whose filter configuration to read
+ * @returns The filter object associated with `column.field` for the column's datatype (`CategoryFilter`, `RangeFilter`, `MultiTextFilter`, or `UniqueFilter`), or `null` if no filter is set
+ */
 function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
     const { datatype, field } = column;
     const filters = useConfig<SelectionDialogConfig>().filters;
