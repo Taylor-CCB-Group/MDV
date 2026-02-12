@@ -996,6 +996,7 @@ class MDVProject:
                         shutil.copyfile(i_file, f"{to_file}.tbi")
                 # assume its a just a bed file- compress and index it
                 else:
+                    check_htslib()
                     t_file = join(track["file"])
                     o_file = join(self.trackfolder, fname)
                     create_bed_gz_file(t_file, o_file)        
@@ -1008,11 +1009,16 @@ class MDVProject:
                 "track_id": track.get("id",track_name),
                 "color": track.get("color", "black"),
             }
+
             if track_type== "bed":
+                mtrack["type"] = "bed"
+                mtrack["format"] = "feature"
                 mtrack["featureHeight"] = track.get("featureHeight", 10)
                 mtrack["height"] = mtrack["featureHeight"] + 12
                 mtrack["displayMode"] = track.get("displayMode", "EXPANDED")
             elif track_type == "wig":
+                mtrack["type"] = "bigwig"
+                mtrack["format"]="wig"
                 mtrack["height"] = track.get("height", 50)
             for param in ["hideLabels"]:
                 if track.get(param):

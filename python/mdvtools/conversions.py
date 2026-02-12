@@ -722,7 +722,8 @@ def create_capsequm_project(
     df["oligo_status"]=["best" if bool(x) else "pass" if bool(y) else "fail"\
                          for x,y in zip(df["is_best_oligo"], df["pass_filter"])]
     #get first best oligo to set genome browser location
-    first_best = df[df["oligo_status"] == "best"].iloc[0]
+    best_df = df[df["oligo_status"] == "best"]
+    first_best = best_df.iloc[0] if not best_df.empty else df.iloc[0]
     chr_val = first_best["chr"]
     start_val = first_best["start"] -500
     stop_val = first_best["stop"] + 500
@@ -807,10 +808,11 @@ def create_capsequm_project(
     }
 
     p.add_genome_browser("oligos", ["chr", "start", "stop"],extra_params=extra_params)
-    try:
-        p.add_refseq_track("oligos", config["genome"])
-    except KeyError:
-        print(f"No genome {config['genome']} specified in the config file, skipping refseq track.")
+    if config.get("genome"):
+        try:
+            p.add_refseq_track("oligos", config["genome"])
+        except Exception as e:
+           logger.warning(f"Could not add refseq track for genome '{config['genome']}'. Reason: {e}")
 
     tracks =[]
     if config.get("create_offtarget_bigwig"):

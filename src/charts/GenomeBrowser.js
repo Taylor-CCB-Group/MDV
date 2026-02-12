@@ -9,6 +9,7 @@ class GenomeBrowser extends BaseChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
         const c = this.config;
+        this.links=[];
         c.view_margins = c.view_margins || { type: "percentage", value: 20 };
         this.contentDiv.style.width = "100%";
         this.contentDiv.style.height = "100%";
@@ -83,7 +84,7 @@ class GenomeBrowser extends BaseChart {
             }
             //setup links to other datastores if specified
             //i.e. the browser update if a region is highlighted in another datastore
-            this.links=[];
+           
             if (c.sync_with_datastores){
                 const dsources = useDataSources();  
                 for (let ds of c.sync_with_datastores){

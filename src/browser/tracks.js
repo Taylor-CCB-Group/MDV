@@ -64,7 +64,7 @@ class MLVTrack{
     getFeatureAt(genomicLocation, chr,yOffset, bpPerPixel){
         return null;
     }
-
+    //not actually used anymore - remove ?
     setConfig(config){
         if (this.config.url !== config.url){
             this.config=config;

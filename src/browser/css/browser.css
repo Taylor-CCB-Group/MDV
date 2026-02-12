@@ -6,6 +6,7 @@
     position:absolute;
     right:5px;
     display:none;
+    /*variables should be not contain underscores but dashes as it violates custom-property-pattern*/
     background-color: var(--background_color);
     color: var(--text_color);
     border: 0.5px solid var(--text_color);
