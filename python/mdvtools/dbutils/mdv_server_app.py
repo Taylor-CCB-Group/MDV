@@ -92,6 +92,7 @@ def create_flask_app(config_name=None):
             if ENABLE_AUTH:
                 try:
                     logger.info("Syncing users from Auth provider into the database...")
+                    # potentially redundant - still may be worth reviewing lifecycle for querying auth API
                     auth_provider = get_auth_provider()
                     auth_provider.sync_users_to_db()
 
@@ -541,9 +542,11 @@ def serve_projects_from_filesystem(app, base_dir):
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
-                            auth_provider = get_auth_provider()
-                            auth_provider.sync_users_to_db()  # Sync users and assign permissions
-                            logger.info("Synced Auth users after adding project.")
+                            # NOTE: skipping this as it seems highly redundant to do per project
+                            # and we were hitting rate limits with Auth0
+                            # auth_provider = get_auth_provider()
+                            # auth_provider.sync_users_to_db()  # Sync users and assign permissions
+                            # logger.info("Synced Auth users after adding project.")
 
                             cache_user_projects() #update the cache
                         except Exception as auth_e:
