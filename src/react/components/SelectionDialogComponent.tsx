@@ -242,26 +242,6 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 const showMessage = values.length > AUTOCOMPLETE_OPTIONS_LIMIT;
                 return (
                   <Paper {...restPaperProps}>
-                    {showMessage && (
-                        <>
-                            <Box 
-                                py={1}
-                                px={2}
-                                sx={{
-                                    textAlign: "center",
-                                    fontSize: "10px",
-                                    color: "text.secondary",
-                                    backgroundColor: "var(--menu_bar_color)",
-                                    border: "2px solid var(--fade_background_color)"
-                                }}
-                            >
-                                Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {values.length} options. Type
-                                or paste to search and select.
-                            </Box>
-                            <Divider />
-                        </>
-
-                    )}
                     <Box
                         onMouseDown={(e) => e.preventDefault()}
                         py={1}
@@ -273,6 +253,25 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                         </Button>
                     </Box>
                     <Divider />
+                    {showMessage && (
+                        <>
+                            <Box 
+                                py={1}
+                                px={2}
+                                sx={{
+                                    textAlign: "center",
+                                    fontSize: "0.8rem",
+                                    color: "text.secondary",
+                                    backgroundColor: "var(--menu_bar_color)",
+                                    border: "2px solid var(--fade_background_color)"
+                                }}
+                            >
+                                Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {values.length} options.
+                            </Box>
+                            <Divider />
+                        </>
+
+                    )}
                     {children}
                   </Paper>
                 );

@@ -428,14 +428,13 @@ export const DropdownAutocompleteComponent = observer(({
                                         px={2}
                                         sx={{
                                             textAlign: "center",
-                                            fontSize: "10px",
+                                            fontSize: "0.8rem",
                                             color: "text.secondary",
                                             backgroundColor: "var(--menu_bar_color)",
                                             border: "2px solid var(--fade_background_color)",
                                         }}
                                     >
-                                        Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {options.length} options. Type
-                                        or paste to search and select.
+                                        Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {options.length} options.
                                     </Box>
                                     <Divider />
                                 </>
