@@ -15,7 +15,6 @@ from mdvtools.server_utils import (
 
 import webbrowser
 import json
-from mdvtools.llm.code_manipulation import parse_view_name
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject

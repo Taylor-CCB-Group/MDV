@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 import numpy as np
+from ..serverlite import serve_project
 # nb, main spatialdata import should happen lazily
 # so user doesn't have to wait and see lots of scary unrelated output if they input bad arguments.
 if TYPE_CHECKING:
@@ -878,7 +879,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     add_readme_to_project(mdv, merged_adata, args)
     if args.serve:
         print(f"Serving project at {args.output_folder}")
-        mdv.serve()
+        serve_project(mdv)
     else:
         print(f"Project saved to {args.output_folder}")
 
