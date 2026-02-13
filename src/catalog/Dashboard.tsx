@@ -268,7 +268,7 @@ const Dashboard: React.FC = () => {
                             mb: 1,
                         }}
                     >
-                        <Typography variant="h5">{authEnabled ? "Recent Projects" : "Published Projects"}</Typography>
+                        <Typography variant="h5">{!isPublicPage ? "Recent Projects" : "Published Projects"}</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                             {/* Hide rescan projects on public page */}
                             {!isPublicPage && (
