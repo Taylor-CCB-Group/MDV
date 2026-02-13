@@ -91,11 +91,8 @@ def create_flask_app(config_name=None):
 
             if ENABLE_AUTH:
                 try:
-                    logger.info("Syncing users from Auth provider into the database...")
-                    # potentially redundant - still may be worth reviewing lifecycle for querying auth API
-                    auth_provider = get_auth_provider()
-                    auth_provider.sync_users_to_db()
-
+                    # Note: sync_users_to_db() is no longer called automatically on startup.
+                    # It should only be called manually from manage_project_permissions.py script.
                     logger.info("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
 
