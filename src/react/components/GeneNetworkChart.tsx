@@ -6,11 +6,9 @@ import { g, isArray } from "@/lib/utils";
 
 export type GeneNetworkConfig = {
     mode?: "filtered" | "observableFields";
-    maxGenes?: number;
+    /** Whether to auto-scroll to highlighted genes coming from external interactions. */
     autoScroll?: boolean;
 } & BaseConfig;
-
-const DEFAULT_MAX_GENES = 100;
 
 class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
     constructor(
@@ -19,7 +17,7 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
         config: GeneNetworkConfig & BaseConfig,
     ) {
         if (!config.mode) config.mode = "filtered";
-        if (!config.maxGenes) config.maxGenes = DEFAULT_MAX_GENES;
+        if (config.autoScroll === undefined) config.autoScroll = true;
         super(dataStore, div, config, GeneNetworkChartComponent);
     }
     getSettings() {
@@ -44,14 +42,11 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
             //     },
             // }),
             g({
-                type: "spinner",
-                label: "Max genes to show",
-                current_value: c.maxGenes ?? DEFAULT_MAX_GENES,
-                min: 10,
-                max: 1000,
-                step: 10,
-                func: (v) => {
-                    c.maxGenes = v;
+                type: "check",
+                label: "Auto-scroll to highlighted genes",
+                current_value: c.autoScroll ?? true,
+                func: (x) => {
+                    c.autoScroll = x;
                 },
             }),
         ];
