@@ -13,7 +13,7 @@ import warnings
 import shutil
 import random
 import string
-from os.path import join, split, exists
+from os.path import join, split, exists, basename
 from pathlib import Path
 import scipy.sparse
 from werkzeug.utils import secure_filename
@@ -842,7 +842,7 @@ class MDVProject:
             raise AttributeError(
                 f"genome browser track already exists for {datasource}"
             )
-        track_name = f"{secure_filename(datasource)}.bed"
+        track_name = f"{secure_filename(name)}.bed"
         if not custom_track:
             # get all the genome locations
             loc = [self.get_column(datasource, x) for x in parameters]
@@ -885,19 +885,23 @@ class MDVProject:
     def get_genome_browser(self, datasource):
         ds = self.get_datasource_metadata(datasource)
         info = ds.get("genome_browser")
+        if not info:
+            raise AttributeError(f"no genome browser for {datasource}")
+        default_track =  {
+            "short_label": info["default_track"]["label"],
+            "url": info["default_track"]["url"],
+            "track_id": "_base_track",
+            "decode_function": "generic",
+            "height": 15,
+            "displayMode": "EXPANDED"
+        }
+        if info.get("default_track_parameters"):
+            default_track.update(info["default_track_parameters"])
+        
         gb = {
             "type": "genome_browser",
             "param": info["location_fields"],
-            "tracks": [
-                {
-                    "short_label": info["default_track"]["label"],
-                    "url": info["default_track"]["url"],
-                    "track_id": "_base_track",
-                    "decode_function": "generic",
-                    "height": 15,
-                    "displayMode": "EXPANDED",
-                }
-            ],
+            "tracks": [default_track]
         }
         at = info.get("atac_bam_track")
         if at:
@@ -945,6 +949,82 @@ class MDVProject:
         # copy to tracks folder
         shutil.copy(reft, join(self.trackfolder, f"{genome}.bed.gz"))
         shutil.copy(reft + ".tbi", join(self.trackfolder, f"{genome}.bed.gz.tbi"))
+        self.set_datasource_metadata(ds)
+
+    def add_tracks(self,datasource: str,tracks: list[dict]) :
+        """Adds a list of tracks to the datasource's genome browser.
+        
+        Args:
+            tracks (list[dict]): A list of track dictionaries to add.
+            datasource (str): The name of the datasource to which the tracks will be added.
+        """
+        ds = self.get_datasource_metadata(datasource)
+        gb = ds.get("genome_browser")
+        if not gb:
+            raise AttributeError(f"no genome browser for {datasource}")
+        dt = gb.get("default_tracks", [])
+        for track in tracks:
+            if not isinstance(track, dict):
+                raise TypeError("Each track must be a dictionary")
+            if  "file" not in track:
+                raise ValueError("Each track must have specify a local or remote file")
+            fname = basename(track["file"])
+            track_name = track.get("name", fname.split(".")[0])
+            track_type= track.get("type")
+            if not track_type:
+                if ".bed" in fname or fname.endswith(".bb"):
+                    track_type = "bed"
+                elif ".bigwig" in fname or fname.endswith(".bw"):
+                    track_type = "wig"
+            if not track_type:
+                raise AttributeError(f" the type of track {fname} cannot be deduced")
+            #no need to do anything - will be served from the original location
+            if track["file"].startswith("http"):
+                url = track["file"]
+            else:
+                if not exists(track["file"]):
+                    raise FileNotFoundError(f"Track file {track['file']} does not exist")
+                # tracks already compressed and indexed - just copy to tracks folder
+                if track_type == "wig" or fname.endswith(".gz") or fname.endswith(".bb"):
+                    to_file = join(self.trackfolder, fname)
+                    shutil.copy(track["file"], to_file)
+                    # for .gz also need to copy index
+                    if fname.endswith(".gz"):
+                        i_file = track["file"] + ".tbi"
+                        if not exists(i_file):
+                            raise FileNotFoundError(f"Index file {i_file} not found")
+                        shutil.copyfile(i_file, f"{to_file}.tbi")
+                # assume its a just a bed file- compress and index it
+                else:
+                    check_htslib()
+                    t_file = join(track["file"])
+                    o_file = join(self.trackfolder, fname)
+                    create_bed_gz_file(t_file, o_file)        
+                    fname= fname+".gz"
+                url = f"./tracks/{fname}"
+            #will need to adapt this for other browsers
+            mtrack ={
+                "short_label": track_name,
+                "url": url,
+                "track_id": track.get("id",track_name),
+                "color": track.get("color", "black"),
+            }
+
+            if track_type== "bed":
+                mtrack["type"] = "bed"
+                mtrack["format"] = "feature"
+                mtrack["featureHeight"] = track.get("featureHeight", 10)
+                mtrack["height"] = mtrack["featureHeight"] + 12
+                mtrack["displayMode"] = track.get("displayMode", "EXPANDED")
+            elif track_type == "wig":
+                mtrack["type"] = "bigwig"
+                mtrack["format"]="wig"
+                mtrack["height"] = track.get("height", 50)
+            for param in ["hideLabels"]:
+                if track.get(param):
+                    mtrack[param] = track[param]
+            dt.append(mtrack)
+        gb["default_tracks"] = dt
         self.set_datasource_metadata(ds)
 
     def add_datasource(
