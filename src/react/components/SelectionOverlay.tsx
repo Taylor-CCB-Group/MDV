@@ -1,4 +1,4 @@
-import { ButtonGroup, Divider, IconButton, Tooltip } from "@mui/material"; //check tree-shaking...
+import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import RectangleOutlinedIcon from "@mui/icons-material/RectangleOutlined";
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
@@ -25,6 +25,7 @@ import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-is
 import ManageGateDialog from "./ManageGateDialog";
 import useGateActions from "../hooks/useGateActions";
 import { useTheme } from "../hooks";
+import IconWithTooltip from "./IconWithTooltip";
 
 
 class EditMode extends CompositeMode {
@@ -125,15 +126,16 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
         [selectedTool, name, selectedBackgroundColor],
     );
     return (
-        <Tooltip title={name}>
-            <IconButton
-                sx={style}
-                onClick={() => setSelectedTool(name)}
-                aria-label={name}
-            >
-                <ToolIcon />
-            </IconButton>
-        </Tooltip>
+        <IconWithTooltip
+            tooltipText={name}
+            onClick={() => setSelectedTool(name)}
+            iconButtonProps={{
+                sx: style,
+                "aria-label": name,
+            }}
+        >
+            <ToolIcon />
+        </IconWithTooltip>
     );
 });
 
@@ -207,33 +209,34 @@ export default observer(function SelectionOverlay() {
                         padding: "2px",
                     }} 
                 />
-                <Tooltip title="Manage gates">
-                    <IconButton
-                        onClick={() => setManageGateDialogOpen(true)}
-                        aria-label="Manage Gates"
-                        sx={{
+                <IconWithTooltip
+                    tooltipText={"Manage Gates"}
+                    onClick={() => setManageGateDialogOpen(true)}
+                    iconButtonProps={{
+                        sx: {
                             color: "var(--text_color)",
-                            backgroundColor: "transparent",
                             borderRadius: 10,
                             zIndex: 2,
                             ml: 1,
+                        },
+                        "aria-label": "Manage Gates",
+                    }}
+                >
+                    <LayersIcon />
+                </IconWithTooltip>
+                {hasSelection && (
+                    <IconWithTooltip
+                        tooltipText={"Save selection as gate"}
+                        onClick={() => setGateDialogOpen(true)}
+                        iconButtonProps={{
+                            sx: {
+                                color: "var(--text_color)"
+                            },
+                            "aria-label": "Save Gate",
                         }}
                     >
-                        <LayersIcon />
-                    </IconButton>
-                </Tooltip>
-                {hasSelection && (
-                    <Tooltip title="Save selection as gate">
-                        <IconButton
-                            onClick={() => setGateDialogOpen(true)}
-                            aria-label="Save as Gate"
-                            sx={{
-                                color: "var(--text_color)"
-                            }}
-                        >
-                            <AddOutlinedIcon />
-                        </IconButton>
-                    </Tooltip>
+                        <AddOutlinedIcon />
+                    </IconWithTooltip>
                 )}
             </ButtonGroup>
             
