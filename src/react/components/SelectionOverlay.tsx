@@ -1,11 +1,11 @@
 import { ButtonGroup, Divider, IconButton, Tooltip } from "@mui/material"; //check tree-shaking...
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
-import PhotoSizeSelectSmallOutlinedIcon from "@mui/icons-material/PhotoSizeSelectSmallOutlined";
+import RectangleOutlinedIcon from "@mui/icons-material/RectangleOutlined";
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
-import SaveIcon from "@mui/icons-material/SaveOutlined";
-import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import LayersIcon from '@mui/icons-material/Layers';
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import { useCallback, useMemo, useState } from "react";
 import { useSpatialLayers } from "../spatial_context";
 import { observer } from "mobx-react-lite";
@@ -24,6 +24,8 @@ import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
 import ManageGateDialog from "./ManageGateDialog";
 import useGateActions from "../hooks/useGateActions";
+import { useTheme } from "../hooks";
+
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -73,7 +75,7 @@ const Tools = {
     },
     rectangle: {
         name: "Rectangle",
-        ToolIcon: PhotoSizeSelectSmallOutlinedIcon,
+        ToolIcon: RectangleOutlinedIcon,
         mode: RectangleMode
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
@@ -109,20 +111,23 @@ type ToolButtonProps = {
     setSelectedTool: (tool: Tool) => void;
 };
 // todo: fix the colors based on the themes
-const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
+const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
+    const theme = useTheme();
+    const selectedBackgroundColor = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(48, 46, 46, 0.18)";
     const style = useMemo(
         () => ({
             backgroundColor:
-                selectedTool === name ? "rgba(255,255,255,0.2)" : "transparent",
+                selectedTool === name ? selectedBackgroundColor : "transparent",
+            color: "var(--text_color)",
             borderRadius: 10,
             zIndex: 2,
         }),
-        [selectedTool, name],
+        [selectedTool, name, selectedBackgroundColor],
     );
     return (
         <Tooltip title={name}>
             <IconButton
-                style={style}
+                sx={style}
                 onClick={() => setSelectedTool(name)}
                 aria-label={name}
             >
@@ -130,7 +135,7 @@ const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButto
             </IconButton>
         </Tooltip>
     );
-};
+});
 
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
@@ -139,6 +144,7 @@ export default observer(function SelectionOverlay() {
     const [selectedTool, setSelectedToolX] = useState<Tool>("Pan");
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
     const [manageGateDialogOpen, setManageGateDialogOpen] = useState(false);
+    const theme = useTheme();
 
     const {
         onDeleteGate,
@@ -184,8 +190,12 @@ export default observer(function SelectionOverlay() {
                 variant="contained"
                 aria-label="choose tool for manipulating view or selection"
                 //moving this to the top right corner and absolute to avoid interfering with axes
-                className="z-[2] p-2 absolute top-0 right-0"
-                // style={{zIndex: 2, padding: '0.3em'}}
+                className="z-[2] p-2 absolute top-0 right-0 opacity-90"
+                sx={{
+                    backgroundColor: theme === "dark" ? "rgba(37,37,37,0.92)" : "rgba(245,245,245,0.92)",
+                    borderRadius: 0,
+                    borderBottomLeftRadius: "5px",
+                }}
             >
                 {toolButtons}
                 <Divider 
@@ -201,8 +211,15 @@ export default observer(function SelectionOverlay() {
                     <IconButton
                         onClick={() => setManageGateDialogOpen(true)}
                         aria-label="Manage Gates"
+                        sx={{
+                            color: "var(--text_color)",
+                            backgroundColor: "transparent",
+                            borderRadius: 10,
+                            zIndex: 2,
+                            ml: 1,
+                        }}
                     >
-                        <SettingsIcon />
+                        <LayersIcon />
                     </IconButton>
                 </Tooltip>
                 {hasSelection && (
@@ -210,8 +227,11 @@ export default observer(function SelectionOverlay() {
                         <IconButton
                             onClick={() => setGateDialogOpen(true)}
                             aria-label="Save as Gate"
+                            sx={{
+                                color: "var(--text_color)"
+                            }}
                         >
-                            <SaveIcon />
+                            <AddOutlinedIcon />
                         </IconButton>
                     </Tooltip>
                 )}

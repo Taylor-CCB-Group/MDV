@@ -168,7 +168,7 @@ const useGateLayers = () => {
             getFillColor: [76, 175, 80, 30], // Semi-transparent green fill
             getLineColor: [76, 175, 80, 200], // Green border
             getLineWidth: 2,
-            lineWidthMinPixels: 1,
+            lineWidthMinPixels: 4,
             pickable: false,
         });
     }, [cx, cy, gates, vivLayerId]);
