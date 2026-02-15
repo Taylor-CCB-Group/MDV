@@ -1,14 +1,16 @@
-import { ButtonGroup, IconButton, Tooltip } from "@mui/material"; //check tree-shaking...
+import { ButtonGroup, Divider, IconButton, Tooltip } from "@mui/material"; //check tree-shaking...
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
-import PhotoSizeSelectSmallOutlinedIcon from "@mui/icons-material/PhotoSizeSelectSmallOutlined";
+import RectangleOutlinedIcon from "@mui/icons-material/RectangleOutlined";
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
+import LayersIcon from '@mui/icons-material/Layers';
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import { useCallback, useMemo, useState } from "react";
-import type { useScatterplotLayer } from "../scatter_state";
 import { useSpatialLayers } from "../spatial_context";
-import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
+import GateNameDialog from "./GateNameDialog";
+import { useGateManager } from "../gates/useGateManager";
 import {
     DrawPolygonMode,
     DrawPolygonByDraggingMode,
@@ -20,6 +22,10 @@ import {
 } from '@deck.gl-community/editable-layers';
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
+import ManageGateDialog from "./ManageGateDialog";
+import useGateActions from "../hooks/useGateActions";
+import { useTheme } from "../hooks";
+
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -69,7 +75,7 @@ const Tools = {
     },
     rectangle: {
         name: "Rectangle",
-        ToolIcon: PhotoSizeSelectSmallOutlinedIcon,
+        ToolIcon: RectangleOutlinedIcon,
         mode: RectangleMode
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
@@ -104,20 +110,24 @@ type ToolButtonProps = {
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
 };
-const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
+// todo: fix the colors based on the themes
+const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
+    const theme = useTheme();
+    const selectedBackgroundColor = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(48, 46, 46, 0.18)";
     const style = useMemo(
         () => ({
             backgroundColor:
-                selectedTool === name ? "rgba(255,255,255,0.2)" : "transparent",
+                selectedTool === name ? selectedBackgroundColor : "transparent",
+            color: "var(--text_color)",
             borderRadius: 10,
             zIndex: 2,
         }),
-        [selectedTool, name],
+        [selectedTool, name, selectedBackgroundColor],
     );
     return (
         <Tooltip title={name}>
             <IconButton
-                style={style}
+                sx={style}
                 onClick={() => setSelectedTool(name)}
                 aria-label={name}
             >
@@ -125,12 +135,24 @@ const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButto
             </IconButton>
         </Tooltip>
     );
-};
+});
 
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
-    const { setSelectionMode } = selectionProps;
+    const { setSelectionMode, selectionFeatureCollection } = selectionProps;
+    const gateManager = useGateManager();
     const [selectedTool, setSelectedToolX] = useState<Tool>("Pan");
+    const [gateDialogOpen, setGateDialogOpen] = useState(false);
+    const [manageGateDialogOpen, setManageGateDialogOpen] = useState(false);
+    const theme = useTheme();
+
+    const {
+        onDeleteGate,
+        onExportClick,
+        onRenameGate,
+        onSaveGate,
+    } = useGateActions();
+
     const setSelectedTool = useCallback((tool: Tool) => {
         // pending refactor
         const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
@@ -159,17 +181,76 @@ export default observer(function SelectionOverlay() {
             />
         ));
     }, [selectedTool, setSelectedTool]);
+
+    const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
+    
     return (
         <>
             <ButtonGroup
                 variant="contained"
                 aria-label="choose tool for manipulating view or selection"
                 //moving this to the top right corner and absolute to avoid interfering with axes
-                className="z-[2] p-2 absolute top-0 right-0"
-                // style={{zIndex: 2, padding: '0.3em'}}
+                className="z-[2] p-2 absolute top-0 right-0 opacity-90"
+                sx={{
+                    backgroundColor: theme === "dark" ? "rgba(37,37,37,0.92)" : "rgba(245,245,245,0.92)",
+                    borderRadius: 0,
+                    borderBottomLeftRadius: "5px",
+                }}
             >
                 {toolButtons}
+                <Divider 
+                    orientation="vertical" 
+                    sx={{
+                        color: "inherit",
+                        width: "5px",
+                        height: "35px",
+                        padding: "2px",
+                    }} 
+                />
+                <Tooltip title="Manage gates">
+                    <IconButton
+                        onClick={() => setManageGateDialogOpen(true)}
+                        aria-label="Manage Gates"
+                        sx={{
+                            color: "var(--text_color)",
+                            backgroundColor: "transparent",
+                            borderRadius: 10,
+                            zIndex: 2,
+                            ml: 1,
+                        }}
+                    >
+                        <LayersIcon />
+                    </IconButton>
+                </Tooltip>
+                {hasSelection && (
+                    <Tooltip title="Save selection as gate">
+                        <IconButton
+                            onClick={() => setGateDialogOpen(true)}
+                            aria-label="Save as Gate"
+                            sx={{
+                                color: "var(--text_color)"
+                            }}
+                        >
+                            <AddOutlinedIcon />
+                        </IconButton>
+                    </Tooltip>
+                )}
             </ButtonGroup>
+            
+            <GateNameDialog
+                open={gateDialogOpen}
+                onClose={() => setGateDialogOpen(false)}
+                onSaveGate={onSaveGate}
+            />
+            <ManageGateDialog
+                open={manageGateDialogOpen}
+                onClose={() => setManageGateDialogOpen(false)}
+                // Passing gatesArray directly as there are no mutations to the array
+                gatesArray={gateManager.gatesArray}
+                onDelete={onDeleteGate}
+                onRenameGate={onRenameGate}
+                onExportClick={onExportClick}
+            />
         </>
     );
 });

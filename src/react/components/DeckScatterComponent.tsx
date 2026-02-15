@@ -16,6 +16,7 @@ import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import useGateLayers from "../hooks/useGateLayers";
 
 //todo this should be in a common place etc.
 const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -168,6 +169,13 @@ const DeckScatter = observer(function DeckScatterComponent() {
 
     const filterValue = useFilterArray();
 
+    const {
+        gateLabelLayer,
+        gateOverlayLayer,
+        draggingId,
+        isHoveringLabel
+    } = useGateLayers();
+
     // this should move in to scatter_state, common with viv...
     const greyScatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatterplot-layer-grey-${id}`,
@@ -235,7 +243,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     const view = useMemo(() => {
         return config.dimension === "2d" ? new OrthographicView({
             id: `scatterplot-view-${id}`,
-            controller: true,
+            // controller: true,
             width: chartWidth,
             height: chartHeight,
             x: 0,
@@ -243,15 +251,17 @@ const DeckScatter = observer(function DeckScatterComponent() {
             flipY: false,
         }) : new OrbitView({
             id: `scatterplot-view-${id}`,
-            controller: true,
+            // controller: true,
             width: chartWidth,
             height: chartHeight,
             x: 0,
             y: 0,
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
+
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer, axisLinesLayer].filter(x => x !== null);
+    const layers = [gateLabelLayer, gateOverlayLayer, scatterplotLayer, greyScatterplotLayer,  selectionLayer, axisLinesLayer, 
+    ].filter(x => x !== null);
     
     const outerContainer = useOuterContainer();
     const deckRef = useRef<any>();
@@ -286,10 +296,25 @@ const DeckScatter = observer(function DeckScatterComponent() {
             }
         }
     }, [outerContainer]);
+
+    const getCursor = useCallback(({isDragging, isHovering}: {isDragging: boolean, isHovering: boolean}) => {
+        if (draggingId)
+            return "grabbing";
+
+        if (isDragging)
+            return "grabbing"
+
+        if (isHovering)
+            return "grab";
+
+        return "grab";
+    }, [draggingId]);
     
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.
     // const controller = useMemo(() => ({inertia: 10+Math.random()}), [outerContainer])
+
+
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
@@ -297,12 +322,15 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     ref={deckRef}
                     layers={layers}
                     useDevicePixels={true}
-                    controller={true}
+                    controller={{
+                        dragPan: !(draggingId || isHoveringLabel),
+                    }}
                     viewState={viewState}
                     // initialViewState={viewState} //consider not using react state for this        
                     views={view}
                     onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
                     getTooltip={getTooltip}
+                    getCursor={getCursor}
                 />
             </AxisComponent>
         </>

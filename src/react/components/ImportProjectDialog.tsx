@@ -7,7 +7,6 @@ import {
     DynamicText,
     FileInputLabel,
 } from "@/charts/dialogs/FileUploadDialog";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import {
     Box,
     Button,
@@ -26,6 +25,7 @@ import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 import { createSocketIOUpload, type SocketIOUploadClient } from "../../charts/dialogs/SocketIOUploadClient";
 import { ZipReader, BlobReader } from "@zip.js/zip.js";
 import { useApiRoot } from "@/catalog/hooks/useApiRoot";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 
 // Constants moved to module level to avoid recreation
 const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);
@@ -363,7 +363,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                 </DialogActions>
             </Dialog>
             {error && (
-                <ReusableDialog
+                <ReusableAlertDialog
                     open={errorOpen}
                     handleClose={() => setErrorOpen(false)}
                     isAlertErrorComponent={!error?.stack}
