@@ -2056,21 +2056,34 @@ def save_json_atomic(path, data):
     Save JSON data to a file atomically.
     Hopefully this will be safer - in certain situations we were ending up with truncated output files.
     This method was suggested by ChatGPT: https://chatgpt.com/share/6813337b-9acc-800b-a6cd-6d058f339cd5
+
+    Now modified to avoid permissions issues e.g. with shared projects in cluster
+    There will be some additional overhead as a result, probably not significant.
     """
     dir_name = os.path.dirname(path)
+    
+    # Get permissions from existing file if it exists, otherwise use default group permissions
+    if os.path.exists(path):
+        existing_mode = os.stat(path).st_mode
+    else:
+        # Default to 0664 (rw-rw-r--) for group access in cluster environments
+        existing_mode = 0o664
+    
     with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False) as tmp:
         json.dump(data, tmp, indent=2, allow_nan=False)
         tmp.flush()
         os.fsync(tmp.fileno())
         temp_name = tmp.name
+    
+    # Set permissions on temp file to match existing file or use default
+    os.chmod(temp_name, existing_mode)
+    
     # potential issues particularly in Docker where the files are on a different volume
     # safest option is to sync like this before and after, but may be overkill
     # 'sync' will fail silently on windows
     os.system("sync")
     os.replace(temp_name, path)  # Atomic move on most OSes
     os.system("sync")
-    #file is saved with restictive permissions (this may be intentional)
-    #
     # this method is lower overhead than os.system("sync") 
     # but stress testing indicates it is less robust
     # dir_fd = os.open(dir_name, os.O_DIRECTORY)
