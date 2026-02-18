@@ -8,7 +8,7 @@ import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn } from
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
-import { compareStrings, isArray, notEmpty, parseDelimitedString } from "@/lib/utils";
+import { isArray, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
@@ -575,7 +575,7 @@ export const usePasteHandler = <T, V = T>({
             // Find the option which matches the pasted text
             const matched = options.find((option) => {
                 const optionLower = getLabel(option).toLowerCase();
-                return compareStrings(itemLower, optionLower);
+                return itemLower === optionLower;
             });
 
             if (matched) {
@@ -590,7 +590,7 @@ export const usePasteHandler = <T, V = T>({
             const matched = options.filter((option) => 
                 itemLower.some((item) => {
                     const optionLower = getLabel(option).toLowerCase();
-                    return compareStrings(item, optionLower);
+                    return item === optionLower;
                 })
             );
 

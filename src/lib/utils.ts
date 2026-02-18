@@ -100,12 +100,3 @@ export function parseDelimitedString(str: string) {
         .filter(Boolean);
     return items;
 }
-
-/**
- * Check whether two strings are exactly equal.
- *
- * @returns `true` if the strings are exactly equal using strict equality (`===`), `false` otherwise.
- */
-export function compareStrings(str1: string, str2: string) {
-    return str1 === str2;
-}
