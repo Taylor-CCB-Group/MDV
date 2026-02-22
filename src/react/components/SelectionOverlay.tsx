@@ -5,6 +5,8 @@ import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
 import LayersIcon from '@mui/icons-material/Layers';
+import DoneOutlinedIcon from '@mui/icons-material/DoneOutlined';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import { useCallback, useMemo, useState } from "react";
 import { useSpatialLayers } from "../spatial_context";
@@ -26,6 +28,7 @@ import ManageGateDialog from "./ManageGateDialog";
 import useGateActions from "../hooks/useGateActions";
 import { useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
+import { getEmptyFeatureCollection } from "../deck_state";
 
 
 class EditMode extends CompositeMode {
@@ -68,7 +71,7 @@ class FreehandMode extends CompositeMode {
 }
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
-const Tools = {
+export const Tools = {
     pan: {
         name: "Pan",
         ToolIcon: PanToolOutlinedIcon,
@@ -102,7 +105,7 @@ const Tools = {
     // },
 } as const;
 type ToolIcon = typeof Tools[keyof typeof Tools]["ToolIcon"];
-type Tool = (typeof Tools)[keyof typeof Tools]["name"];
+export type Tool = (typeof Tools)[keyof typeof Tools]["name"];
 const ToolArray = Object.values(Tools);
 
 type ToolButtonProps = {
@@ -141,9 +144,17 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
 
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
-    const { setSelectionMode, selectionFeatureCollection } = selectionProps;
+    const { 
+        setSelectionMode, 
+        selectionFeatureCollection,
+        editingGateId, 
+        setEditingGateId, 
+        setSelectionFeatureCollection,
+        selectedTool,
+        setSelectedTool: setSelectedToolX
+    } = selectionProps;
     const gateManager = useGateManager();
-    const [selectedTool, setSelectedToolX] = useState<Tool>("Pan");
+    
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
     const [manageGateDialogOpen, setManageGateDialogOpen] = useState(false);
     const theme = useTheme();
@@ -153,6 +164,8 @@ export default observer(function SelectionOverlay() {
         onExportClick,
         onRenameGate,
         onSaveGate,
+        onUpdateEditGate,
+        onCancelEditGate,
     } = useGateActions();
 
     const setSelectedTool = useCallback((tool: Tool) => {
@@ -162,11 +175,18 @@ export default observer(function SelectionOverlay() {
             console.error("no mode found for tool", tool);
             return;
         }
+
+        const drawingMode = tool === "Rectangle" || tool === "Polygon" || tool === "Freehand";
+        if (editingGateId && drawingMode) {
+            setEditingGateId(null);
+            setSelectionFeatureCollection(getEmptyFeatureCollection());
+        }
+
         //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
         //setSelectionMode(new CompositeMode([new mode(), new TranslateModeEx()]));
         setSelectionMode(new mode());
         setSelectedToolX(tool);
-    }, [setSelectionMode]);
+    }, [setSelectionMode, editingGateId, setEditingGateId, setSelectionFeatureCollection, setSelectedToolX]);
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc.
     // (thanks copilot, that may be over-ambitious)
@@ -224,7 +244,7 @@ export default observer(function SelectionOverlay() {
                 >
                     <LayersIcon />
                 </IconWithTooltip>
-                {hasSelection && (
+                {hasSelection && !editingGateId && (
                     <IconWithTooltip
                         tooltipText={"Save selection as gate"}
                         onClick={() => setGateDialogOpen(true)}
@@ -237,6 +257,38 @@ export default observer(function SelectionOverlay() {
                     >
                         <AddOutlinedIcon />
                     </IconWithTooltip>
+                )}
+                {editingGateId && (
+                    <>
+                        <IconWithTooltip
+                            tooltipText={"Confirm"}
+                            onClick={onUpdateEditGate}
+                            iconButtonProps={{
+                                sx: {
+                                    color: "green",
+                                    borderRadius: 10,
+                                    zIndex: 2,
+                                },
+                                "aria-label": "Confirm",
+                            }}
+                        >
+                            <DoneOutlinedIcon />
+                        </IconWithTooltip>
+                        <IconWithTooltip
+                            tooltipText={"Cancel"}
+                            onClick={onCancelEditGate}
+                            iconButtonProps={{
+                                sx: {
+                                    color: "red",
+                                    borderRadius: 10,
+                                    zIndex: 2,
+                                },
+                                "aria-label": "Cancel",
+                            }}
+                        >
+                            <CloseOutlinedIcon />
+                        </IconWithTooltip>
+                    </>
                 )}
             </ButtonGroup>
             

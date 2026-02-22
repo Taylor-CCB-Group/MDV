@@ -4,7 +4,7 @@ import {
     DetailView,
 } from "@hms-dbmi/viv";
 import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useRef, useState, useCallback } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
@@ -105,9 +105,9 @@ const Main = observer(({
 
     const {
         gateLabelLayer,
-        gateOverlayLayer,
-        draggingId,
-        isHoveringLabel
+        gateDisplayLayer,
+        controllerOptions,
+        getCursor,
     } = useGateLayers();
     
     // Get field contour legend data
@@ -212,19 +212,6 @@ const Main = observer(({
         ],
     );
 
-    const getCursor = useCallback(({isDragging, isHovering}: {isDragging: boolean, isHovering: boolean}) =>  {
-        if (draggingId)
-            return "grabbing";
-
-        if (isDragging)
-            return "grabbing"
-
-        if (isHovering)
-            return "grab";
-
-        return "grab";
-    }, [draggingId]);
-
     const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
             getTooltip,
@@ -237,7 +224,7 @@ const Main = observer(({
                 jsonLayer, 
                 scatterplotLayer, 
                 selectionLayer, 
-                gateOverlayLayer, 
+                gateDisplayLayer, 
                 gateLabelLayer,
             ].filter(l => l !== null),
             id: `${id}deck`,
@@ -250,7 +237,7 @@ const Main = observer(({
             // },
             controller: {
                 doubleClickZoom: false,
-                dragPan: !(draggingId || isHoveringLabel),
+                dragPan: controllerOptions.dragPan,
             },
             getCursor,
             // deviceProps: {
@@ -260,15 +247,14 @@ const Main = observer(({
         }),
         [
             gateLabelLayer,
-            gateOverlayLayer,
+            gateDisplayLayer,
             scatterplotLayer,
             selectionLayer,
             jsonLayer,
             id,
             getTooltip,
+            controllerOptions,
             getCursor,
-            draggingId,
-            isHoveringLabel,
         ],
     );
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...

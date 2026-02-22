@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGateManager } from "../gates/useGateManager";
 import { useChartID, useConfig, useParamColumns } from "../hooks";
 import type { LoadedDataColumn } from "@/charts/charts";
 import { computeCentroid } from "../gates/gateUtils";
 import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
-import { TextLayer } from "deck.gl";
-import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
+import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
+import { useSpatialLayers } from "../spatial_context";
+import { Tools } from "../components/SelectionOverlay";
 
 const MAX_LABEL_LENGTH = 18;
 
@@ -30,7 +31,15 @@ const useGateLayers = () => {
     const gates = gateManager.gatesArray;
     const hasRebuiltGateColumnRef = useRef(false);
     const chartId = useChartID();
-    const vivLayerId = getVivId(`${chartId}detail-react`);
+    // const vivLayerId = getVivId(`${chartId}detail-react`);
+    const { selectionProps } = useSpatialLayers();
+    const { editingGateId, setSelectionFeatureCollection, setSelectedTool, setSelectionMode, setEditingGateId } =
+        selectionProps;
+
+    const relevantGates = useMemo(() => {
+        if (!cx || !cy) return [];
+        return gateManager.gatesArray.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
+    }, [gateManager.gatesArray, cx, cy]);
 
     useEffect(() => {
         const positions = new Map<string, [number, number]>();
@@ -53,9 +62,9 @@ const useGateLayers = () => {
     }, [cx, cy, gateManager]);
 
     const gateLabelLayer = useMemo(() => {
-        if (!cx || !cy || gates.length === 0) return null;
+        if (!cx || !cy || gates.length === 0 || editingGateId) return null;
 
-        const relevantGates = gates.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
+        // const relevantGates = gates.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
 
         if (relevantGates.length === 0) return null;
 
@@ -75,7 +84,7 @@ const useGateLayers = () => {
         });
 
         return new TextLayer({
-            id: `text-layer-${vivLayerId}`,
+            id: `text-layer-${getVivId(`${chartId}detail-react`)}`,
             data: layerData,
             getPosition: (d: { position: [number, number, number] }) => d.position,
             getText: (d: { text: string }) => d.text,
@@ -87,6 +96,10 @@ const useGateLayers = () => {
             padding: [3, 8],
             // billboard: true,
             pickable: true,
+            background: true,
+            backgroundPadding: [6, 4],
+            backgroundBorderRadius: 4,
+            getBackgroundColor: [0, 0, 0, 100],
             updateTriggers: {
                 getPosition: [gates.length, labelPositions.size],
                 getColor: [draggingId],
@@ -134,50 +147,94 @@ const useGateLayers = () => {
                 setDragPos(null);
             },
         });
-    }, [cx, cy, cz, is2d, gates, draggingId, dragPos, gateManager, labelPositions, vivLayerId]);
+    }, [
+        cx,
+        cy,
+        cz,
+        is2d,
+        gates,
+        draggingId,
+        dragPos,
+        gateManager,
+        labelPositions,
+        chartId,
+        editingGateId,
+        relevantGates,
+    ]);
 
-    const gateOverlayLayer = useMemo(() => {
-        if (!cx || !cy || gates.length === 0) return null;
+    const gateDisplayLayer = useMemo(() => {
+        if (!cx || !cy || gateManager.gatesArray.length === 0 || editingGateId) return null;
+        const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
+        const features = filteredGates.flatMap((gate) =>
+            gate.geometry.features.map((feature) => ({
+                ...feature,
+                properties: {
+                    ...feature.properties,
+                    gateId: gate.id,
+                    gateName: gate.name,
+                },
+            })),
+        );
 
-        const relevantGates = gates.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
-
-        if (relevantGates.length === 0) return null;
-
-        //* Why do we need to do this?
-        const layerData = relevantGates.flatMap((gate) => {
-            return gate.geometry.features.map((feature) => {
-                return {
-                    ...feature,
-                    properties: {
-                        ...feature.properties,
-                        gateId: gate.id,
-                        gateName: gate.name,
-                    },
-                };
-            });
-        });
-
-        return new MonkeyPatchEditableGeoJsonLayer({
-            id: `gate-layer-${vivLayerId}`,
-            // todo: Fix typing here
+        return new GeoJsonLayer({
+            id: `gate_${getVivId(`${getVivId(`${chartId}detail-react`)}`)}`,
             data: {
                 type: "FeatureCollection",
-                features: layerData,
+                features,
             } as any,
             filled: true,
             getFillColor: [76, 175, 80, 30], // Semi-transparent green fill
             getLineColor: [76, 175, 80, 200], // Green border
             getLineWidth: 2,
             lineWidthMinPixels: 4,
-            pickable: false,
+            pickable: true,
+            onClick(pickingInfo) {
+                const gateId = pickingInfo.object?.properties?.gateId;
+                if (gateId) {
+                    const gate = gateManager.gates.get(gateId);
+                    if (gate) {
+                        setSelectionFeatureCollection(JSON.parse(JSON.stringify(gate.geometry)));
+                        setEditingGateId(gateId);
+                        const panMode = Tools["pan"].mode;
+                        setSelectionMode(new panMode());
+                        setSelectedTool("Pan");
+                    }
+                }
+            },
         });
-    }, [cx, cy, gates, vivLayerId]);
+    }, [
+        relevantGates,
+        chartId,
+        editingGateId,
+        gateManager,
+        setSelectionFeatureCollection,
+        setEditingGateId,
+        setSelectionMode,
+        setSelectedTool,
+        cx,
+        cy,
+    ]);
+
+    const getCursor = useCallback(({isDragging, isHovering}: {isDragging: boolean, isHovering: boolean}) => {
+        if (draggingId)
+            return "grabbing";
+
+        if (isDragging)
+            return "grabbing"
+
+        if (isHovering)
+            return "grab";
+
+        return "grab";
+    }, [draggingId]);
 
     return {
         gateLabelLayer,
-        gateOverlayLayer,
-        draggingId,
-        isHoveringLabel,
+        gateDisplayLayer,
+        // draggingId,
+        // isHoveringLabel,
+        controllerOptions: { dragPan: !(draggingId || isHoveringLabel) },
+        getCursor,
     };
 };
 

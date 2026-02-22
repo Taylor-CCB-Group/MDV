@@ -171,9 +171,9 @@ const DeckScatter = observer(function DeckScatterComponent() {
 
     const {
         gateLabelLayer,
-        gateOverlayLayer,
-        draggingId,
-        isHoveringLabel
+        gateDisplayLayer,
+        controllerOptions,
+        getCursor,
     } = useGateLayers();
 
     // this should move in to scatter_state, common with viv...
@@ -260,7 +260,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }, [chartWidth, chartHeight, config.dimension, id]);
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [gateLabelLayer, gateOverlayLayer, scatterplotLayer, greyScatterplotLayer,  selectionLayer, axisLinesLayer, 
+    const layers = [gateLabelLayer, gateDisplayLayer, scatterplotLayer, greyScatterplotLayer,  selectionLayer, axisLinesLayer, 
     ].filter(x => x !== null);
     
     const outerContainer = useOuterContainer();
@@ -296,19 +296,6 @@ const DeckScatter = observer(function DeckScatterComponent() {
             }
         }
     }, [outerContainer]);
-
-    const getCursor = useCallback(({isDragging, isHovering}: {isDragging: boolean, isHovering: boolean}) => {
-        if (draggingId)
-            return "grabbing";
-
-        if (isDragging)
-            return "grabbing"
-
-        if (isHovering)
-            return "grab";
-
-        return "grab";
-    }, [draggingId]);
     
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.
@@ -323,7 +310,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     layers={layers}
                     useDevicePixels={true}
                     controller={{
-                        dragPan: !(draggingId || isHoveringLabel),
+                        dragPan: controllerOptions.dragPan,
                     }}
                     viewState={viewState}
                     // initialViewState={viewState} //consider not using react state for this        

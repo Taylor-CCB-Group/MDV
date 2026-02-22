@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useGateManager } from "../gates/useGateManager";
 import { useParamColumns } from "../hooks";
 import type { Gate } from "../gates/types";
-import { generateGateId } from "../gates/gateUtils";
+import { computeCentroid, generateGateId } from "../gates/gateUtils";
 import { useSpatialLayers } from "../spatial_context";
 import { action } from "mobx";
 import { getEmptyFeatureCollection } from "../deck_state";
@@ -13,8 +13,14 @@ const useGateActions = () => {
     const gateManager = useGateManager();
     const paramColumns = useParamColumns();
     const { selectionProps } = useSpatialLayers();
-    const { selectionFeatureCollection } = selectionProps;
+    const { selectionFeatureCollection, setEditingGateId, editingGateId } = selectionProps;
     const chart = useChart<DeckScatterConfig>();
+
+    const clearSelection = useCallback(() => {
+        action(() => {
+            chart.config.selectionFeatureCollection = getEmptyFeatureCollection();
+        })();
+    }, [chart.config]);
 
     const onSaveGate = useCallback(
         (gateName: string) => {
@@ -41,11 +47,9 @@ const useGateActions = () => {
             gateManager.addGate(gate);
 
             // Clear selection
-            action(() => {
-                chart.config.selectionFeatureCollection = getEmptyFeatureCollection();
-            })();
+            clearSelection();
         },
-        [gateManager, paramColumns, selectionFeatureCollection, chart.config],
+        [gateManager, paramColumns, selectionFeatureCollection, clearSelection],
     );
 
     const onDeleteGate = useCallback(
@@ -83,11 +87,36 @@ const useGateActions = () => {
         [gateManager],
     );
 
+    const onUpdateEditGate = useCallback(
+        () => {
+            if (!editingGateId) return;
+            // const gate = gateManager.gatesArray.find((g) => g.id === editingGateId);
+            // if (!gate) return;
+            const currentGeometry = chart.config.selectionFeatureCollection;
+
+            const newLabelPosition = computeCentroid(currentGeometry);
+            gateManager.updateGate(editingGateId, { geometry: currentGeometry, labelPosition: newLabelPosition });
+            setEditingGateId(null);
+            clearSelection();
+        },
+        [gateManager, clearSelection, chart.config, setEditingGateId, editingGateId]
+    );
+
+    const onCancelEditGate = useCallback(
+        () => {
+            setEditingGateId(null);
+            clearSelection();
+        },
+        [setEditingGateId, clearSelection]
+    );
+
     return {
         onSaveGate,
         onDeleteGate,
         onRenameGate,
         onExportClick,
+        onUpdateEditGate,
+        onCancelEditGate,
     };
 };
 
