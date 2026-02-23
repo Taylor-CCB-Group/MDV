@@ -107,13 +107,12 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const coords = useSelectionCoords(selectionFeatureCollection);
 
     useEffect(() => {
-        console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
             setSelectionFeatureCollection(getEmptyFeatureCollection());
             setEditingGateId(null);
         }
     }, [chart, setSelectionFeatureCollection]);
-    
+
     useEffect(() => {
         if (coords.length === 0) {
             chart.resetButton.style.display = "none";

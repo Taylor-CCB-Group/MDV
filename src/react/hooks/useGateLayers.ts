@@ -31,7 +31,6 @@ const useGateLayers = () => {
     const gates = gateManager.gatesArray;
     const hasRebuiltGateColumnRef = useRef(false);
     const chartId = useChartID();
-    // const vivLayerId = getVivId(`${chartId}detail-react`);
     const { selectionProps } = useSpatialLayers();
     const { editingGateId, setSelectionFeatureCollection, setSelectedTool, setSelectionMode, setEditingGateId } =
         selectionProps;
@@ -62,13 +61,14 @@ const useGateLayers = () => {
     }, [cx, cy, gateManager]);
 
     const gateLabelLayer = useMemo(() => {
-        if (!cx || !cy || gates.length === 0 || editingGateId) return null;
+        if (!cx || !cy || gates.length === 0) return null;
 
-        // const relevantGates = gates.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
+        // filter the editing gate
+        const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
 
-        if (relevantGates.length === 0) return null;
+        if (filteredGates.length === 0) return null;
 
-        const layerData = relevantGates.map((gate) => {
+        const layerData = filteredGates.map((gate) => {
             let position = labelPositions?.get(gate.id);
             if (!position) {
                 const centroid = computeCentroid(gate.geometry);
@@ -97,11 +97,11 @@ const useGateLayers = () => {
             // billboard: true,
             pickable: true,
             background: true,
-            backgroundPadding: [6, 4],
+            // backgroundPadding: [6, 4],
             backgroundBorderRadius: 4,
             getBackgroundColor: [0, 0, 0, 100],
             updateTriggers: {
-                getPosition: [gates.length, labelPositions.size],
+                getPosition: [gates.length, labelPositions.size, dragPos],
                 getColor: [draggingId],
                 getBackgroundColor: [draggingId],
             },
@@ -163,7 +163,9 @@ const useGateLayers = () => {
     ]);
 
     const gateDisplayLayer = useMemo(() => {
-        if (!cx || !cy || gateManager.gatesArray.length === 0 || editingGateId) return null;
+        if (!cx || !cy || gateManager.gatesArray.length === 0) return null;
+
+        // Filter the editing gate
         const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
         const features = filteredGates.flatMap((gate) =>
             gate.geometry.features.map((feature) => ({
@@ -177,7 +179,7 @@ const useGateLayers = () => {
         );
 
         return new GeoJsonLayer({
-            id: `gate_${getVivId(`${getVivId(`${chartId}detail-react`)}`)}`,
+            id: `gate_${getVivId(`${chartId}detail-react`)}`,
             data: {
                 type: "FeatureCollection",
                 features,
@@ -215,25 +217,19 @@ const useGateLayers = () => {
         cy,
     ]);
 
-    const getCursor = useCallback(({isDragging, isHovering}: {isDragging: boolean, isHovering: boolean}) => {
-        if (draggingId)
+    const getCursor = useCallback(({isDragging}: {isDragging: boolean, isHovering: boolean}) => {
+        if (draggingId || isDragging)
             return "grabbing";
-
-        if (isDragging)
-            return "grabbing"
-
-        if (isHovering)
-            return "grab";
 
         return "grab";
     }, [draggingId]);
 
+    const dragPan = !(draggingId || isHoveringLabel);
+
     return {
         gateLabelLayer,
         gateDisplayLayer,
-        // draggingId,
-        // isHoveringLabel,
-        controllerOptions: { dragPan: !(draggingId || isHoveringLabel) },
+        controllerOptions: { dragPan },
         getCursor,
     };
 };
