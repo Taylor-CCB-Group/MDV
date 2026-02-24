@@ -419,6 +419,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             modelMatrix,
             ...({
                 // todo - consider lower overhead version of this.
+                // future work https://deck.gl/docs/developer-guide/performance#use-binary-data
                 getFilterValue: shouldFilterNaN && colorColumn
                     ? (i: number) => Number.isFinite(colorColumn.data[i]) ? 1 : 0
                     : (_: number) => 1,
