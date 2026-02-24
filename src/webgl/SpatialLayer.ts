@@ -103,18 +103,8 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 .filter((l) => l)
                 .map((props) => {
                     const { extensions, ...p } = this.getSubLayerProps(props);
-                    // todo: maybe encapsulate this in a different way
-                    //patch so that it doesn't try to use incompatible extensions used by the ScatterplotLayer
-                    //up for review...
-                    if (extensions && extensions.length > 0) {
-                        console.log(
-                            "pending review how extensions interact with sublayers - filtering out from subLayerProps",
-                            extensions,
-                        );
-                    }
                     return new HeatmapLayer({
                         ...p,
-                        // extensions: [],
                         _subLayerProps: {
                             triangle: {
                                 type: TriangleLayerContours,

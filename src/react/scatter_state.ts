@@ -5,6 +5,7 @@ import {
     useChartID,
     useChartSize,
     useConfig,
+    useFieldSpec,
     useFieldSpecs,
     useFilteredIndices,
     useParamColumns,
@@ -18,6 +19,9 @@ import {
     ScatterSquareExtension,
     ScatterDensityExension,
 } from "../webgl/ScatterDeckExtension";
+import type { LayerExtension } from "@deck.gl/core";
+import { DataFilterExtension } from "@deck.gl/extensions";
+import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName, FieldName } from "@/charts/charts";
@@ -317,6 +321,13 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     );
     const contourLayers = useLegacyDualContour(hoveredFieldId);
 
+    const colorBySpec = config.color_by;
+    const colorByField: FieldSpec | undefined = colorBySpec
+        ? (typeof colorBySpec === "string" ? colorBySpec : "column" in colorBySpec ? colorBySpec.column?.field : undefined)
+        : undefined;
+    const colorColumn = useFieldSpec(colorByField);
+    const shouldFilterNaN = colorColumn && !isDatatypeCategorical(colorColumn.datatype);
+
     // todo - Tooltip should be a separate component
     // would rather not even need to call a hook here, but just have some
     // `state.tooltip.column` which would have a column object...
@@ -361,11 +372,12 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     const viewState = useZoomOnFilter(modelMatrix);
     const { point_shape } = config;
 
-    // could probably bring this more into SpatialLayer...
     const extensions = useMemo(() => {
-        if (point_shape === "circle") return [];
-        if (point_shape === "gaussian") return [new ScatterDensityExension()];
-        return [new ScatterSquareExtension()];
+        const exts: LayerExtension[] = [];
+        if (point_shape === "gaussian") exts.push(new ScatterDensityExension());
+        else if (point_shape !== "circle") exts.push(new ScatterSquareExtension());
+        exts.push(new DataFilterExtension({ filterSize: 1 }));
+        return exts;
     }, [point_shape]);
     const scatterplotLayer = useMemo(() => {
         const is3d = config.dimension === "3d";
@@ -397,15 +409,18 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 return target as unknown as Float32Array; // deck.gl types are wrong AFAICT
             },
             modelMatrix,
+            ...({
+                // todo - consider lower overhead version of this.
+                getFilterValue: shouldFilterNaN && colorColumn
+                    ? (i: number) => Number.isFinite(colorColumn.data[i]) ? 1 : 0
+                    : (_: number) => 1,
+                filterRange: [0.5, 1],
+            } as any),
             updateTriggers: {
-                getFillColor: colorBy, //this is working; removing it breaks the color change...
-                // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
-                // getLineWith: clickIndex, // this does not work, seems to need something like a function
+                getFillColor: colorBy,
                 getLineWidth,
                 getPosition: [cx, cy, cz],
-                // getRadius: [radiusScale, scale],
-                //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
-                // getContourWeight1: config.category1,
+                getFilterValue: [colorColumn],
             },
             pickable: true,
             onHover: (info) => {
@@ -455,6 +470,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         getLineWidth,
         contourLayers,
         config.dimension,
+        shouldFilterNaN,
+        colorColumn,
     ]);
     // this should take into account axis margins... not chart.contentDiv,
     // but the actual area where the scatterplot is rendered
