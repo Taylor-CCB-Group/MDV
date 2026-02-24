@@ -636,15 +636,25 @@ class MDVProject:
             raise AttributeError(f"{datasource} is not a group")
         if ds.get(cid):
             del ds[cid]
+        num_rows = len(raw_data)
         dt = numpy_dtypes.get(column["datatype"])
         if not dt:
             # Handle unique columns - need stringLength
             if column["datatype"] == "unique":
                 string_length = column.get("stringLength")
-                if not string_length:
+                if not isinstance(string_length, (int, numpy.integer)) or int(string_length) <= 0:
                     raise ValueError(
                         f"Column {cid} of type 'unique' requires 'stringLength' in metadata"
                     )
+                string_length = int(string_length)
+                # Avoid silent truncation: use max actual length
+                if raw_data:
+                    max_str_len = max(
+                        len(s) if isinstance(s, str) else len(s.decode("utf-8"))
+                        for s in raw_data
+                    )
+                    if max_str_len > string_length:
+                        string_length = max_str_len
                 dt = h5py.string_dtype("utf-8", string_length)
             else:
                 raise ValueError(
@@ -652,15 +662,11 @@ class MDVProject:
                 )
         if column["datatype"] == "unique":
             # If numeric data is received instead of array of strings, raise error
-            if raw_data and isinstance(raw_data[0], (int, float)):
+            if raw_data and isinstance(raw_data[0], (int, float, numpy.integer, numpy.floating)):
                 raise ValueError(
                     f"Column {cid} of type 'unique' expects array of strings, "
                     f"but received numeric data."
                 )
-            # Use the actual length of the array (number of rows)
-            num_rows = len(raw_data)
-        else:
-            num_rows = len(raw_data)
         ds.create_dataset(cid, num_rows, data=raw_data, dtype=dt)
         ds = self.get_datasource_metadata(datasource)
         cols = ds["columns"]
