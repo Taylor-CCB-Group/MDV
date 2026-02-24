@@ -1,9 +1,11 @@
 import {
+    Box,
     Button,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
+    Divider,
     ListItemIcon,
     ListItemText,
     Menu,
@@ -16,7 +18,7 @@ import {
     Typography,
 } from "@mui/material";
 import IconWithTooltip from "./IconWithTooltip";
-import BorderColorOutlinedIcon from "@mui/icons-material/BorderColorOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -24,12 +26,15 @@ import { useCallback, useState } from "react";
 import type { Gate } from "../gates/types";
 import GateNameDialog from "./GateNameDialog";
 import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
+import { PenBoxIcon } from "lucide-react";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
 export type ManageGateDialogType = {
     open: boolean;
     onClose: () => void;
     gatesArray: Gate[];
     onDelete: (gateId: string) => void;
+    onEdit: (gateId: string) => void;
     onRenameGate: (gateId: string, newName: string) => void;
     onExportClick: (gateId: string) => void;
 };
@@ -39,6 +44,7 @@ const ManageGateDialog = ({
     onClose,
     gatesArray,
     onDelete,
+    onEdit,
     onRenameGate,
     onExportClick,
 }: ManageGateDialogType) => {
@@ -70,7 +76,11 @@ const ManageGateDialog = ({
 
     return (
         <>
-            <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+            <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+                <DialogTitle>
+                    Manage Gates
+                    <DialogCloseIconButton onClose={onClose} />
+                </DialogTitle>
                 <DialogContent dividers>
                     <Table
                         sx={{
@@ -80,52 +90,20 @@ const ManageGateDialog = ({
                             },
                         }}
                     >
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>
-                                    <Typography variant="button" color="textSecondary">
-                                        Name
-                                    </Typography>
-                                </TableCell>
-                                <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
-                                    <Typography variant="button" color="textSecondary">
-                                        Rename
-                                    </Typography>
-                                </TableCell>
-                                <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
-                                    <Typography variant="button" color="textSecondary">
-                                        Delete
-                                    </Typography>
-                                </TableCell>
-                                <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
-                                    <Typography variant="button" color="textSecondary">
-                                        Actions
+                        <TableBody>
+                            {gatesArray.length === 0 ? (
+                                <TableRow>
+                                <TableCell colSpan={2} align="center" sx={{ py: 4 }}>
+                                    <Typography color="textSecondary">
+                                        No gates yet. Draw a selection on the chart and save it as a gate.
                                     </Typography>
                                 </TableCell>
                             </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {gatesArray.map((gate) => (
+                            ) : ( 
+                                gatesArray.map((gate) => (
                                 <TableRow key={gate.id}>
                                     <TableCell>
                                         <Typography variant="subtitle1">{gate.name}</Typography>
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
-                                        {/* todo: add this onClick*/}
-                                        <IconWithTooltip
-                                            tooltipText="Rename Gate"
-                                            onClick={() => onRenameClick(gate.id)}
-                                        >
-                                            <BorderColorOutlinedIcon />
-                                        </IconWithTooltip>
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
-                                        <IconWithTooltip
-                                            tooltipText="Delete Gate"
-                                            onClick={() => onDeleteClick(gate.id)}
-                                        >
-                                            <DeleteOutlineOutlinedIcon />
-                                        </IconWithTooltip>
                                     </TableCell>
                                     <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
                                         <IconWithTooltip
@@ -136,7 +114,8 @@ const ManageGateDialog = ({
                                         </IconWithTooltip>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            ))
+                        )}
                         </TableBody>
                     </Table>
                     {selectedId && (
@@ -148,6 +127,30 @@ const ManageGateDialog = ({
                         >
                             <MenuItem
                                 onClick={() => {
+                                    onEdit(selectedId);
+                                    handleMenuClose();
+                                    onClose();
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <EditOutlinedIcon />
+                                </ListItemIcon>
+                                <ListItemText>Edit Geometry</ListItemText>
+                            </MenuItem>
+                            <MenuItem
+                                onClick={() => {
+                                    onRenameClick(selectedId)
+                                    handleMenuClose();
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <PenBoxIcon size={20} />
+                                </ListItemIcon>
+                                <ListItemText>Rename</ListItemText>
+                            </MenuItem>
+                            <Divider />
+                            <MenuItem
+                                onClick={() => {
                                     onExportClick(selectedId);
                                     handleMenuClose();
                                 }}
@@ -157,14 +160,22 @@ const ManageGateDialog = ({
                                 </ListItemIcon>
                                 <ListItemText>Export (as GeoJSON)</ListItemText>
                             </MenuItem>
+                            <Divider />
+                            <MenuItem
+                                onClick={() => {
+                                    onDeleteClick(selectedId);
+                                    handleMenuClose();
+                                }}
+                                sx={{ color: "var(--icon_color_error)" }}
+                            >
+                                <ListItemIcon sx={{ color: "var(--icon_color_error)" }}>
+                                    <DeleteOutlineOutlinedIcon />
+                                </ListItemIcon>
+                                <ListItemText>Delete</ListItemText>
+                            </MenuItem>
                         </Menu>
                     )}
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={onClose} color="error">
-                        Close
-                    </Button>
-                </DialogActions>
             </Dialog>
             {renameGateId && (
                 <GateNameDialog
@@ -191,6 +202,7 @@ const ManageGateDialog = ({
                         onDelete(deleteGateId);
                         setDeleteGateId(null);
                     }}
+                    isDelete
                 />
             )}
         </>

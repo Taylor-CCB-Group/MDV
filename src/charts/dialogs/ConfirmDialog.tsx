@@ -6,10 +6,12 @@ export type ConfirmDialogType = {
     message: string;
     onClose: () => void;
     onConfirm: () => void;
+    isDelete?: boolean;
 };
 
-const ConfirmDialog = ({ open, onClose, message, title, onConfirm }: ConfirmDialogType) => {
+const ConfirmDialog = ({ open, onClose, message, title, onConfirm, isDelete }: ConfirmDialogType) => {
     
+
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
             <DialogTitle>{title}</DialogTitle>
@@ -17,10 +19,10 @@ const ConfirmDialog = ({ open, onClose, message, title, onConfirm }: ConfirmDial
                 <Typography>{message}</Typography>
             </DialogContent>
             <DialogActions>
-                <Button color="primary" onClick={onConfirm}>
+                <Button color={isDelete ? "error" : "primary"} onClick={onConfirm}>
                     Yes
                 </Button>
-                <Button color="error" onClick={onClose}>
+                <Button color={isDelete ? "primary" : "error"} onClick={onClose}>
                     No
                 </Button>
             </DialogActions>

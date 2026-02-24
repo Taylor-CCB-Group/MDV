@@ -6,6 +6,5 @@ export interface Gate {
     geometry: FeatureCollection;
     columns: [string, string];
     createdAt: number;
-    labelPosition?: [number, number];
-    gatePosition?: [number, number];
+    labelPosition: [number, number];
 }

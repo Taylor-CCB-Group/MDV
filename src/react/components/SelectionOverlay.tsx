@@ -4,7 +4,6 @@ import RectangleOutlinedIcon from "@mui/icons-material/RectangleOutlined";
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
-import LayersIcon from '@mui/icons-material/Layers';
 import DoneOutlinedIcon from '@mui/icons-material/DoneOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
@@ -26,10 +25,11 @@ import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
 import ManageGateDialog from "./ManageGateDialog";
 import useGateActions from "../hooks/useGateActions";
-import { useTheme } from "../hooks";
+import { useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
 import { getEmptyFeatureCollection } from "../deck_state";
-
+import { TuneOutlined } from "@mui/icons-material";
+import { LassoIcon, PentagonIcon, SplineIcon, SplinePointerIcon, SquareIcon } from "lucide-react";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -79,23 +79,23 @@ export const Tools = {
     },
     rectangle: {
         name: "Rectangle",
-        ToolIcon: RectangleOutlinedIcon,
+        ToolIcon: SquareIcon,
         mode: RectangleMode
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
     polygon: {
         name: "Polygon",
-        ToolIcon: PolylineOutlinedIcon,
+        ToolIcon: PentagonIcon,
         mode: PolygonMode
     },
     freehand: {
         name: "Freehand",
-        ToolIcon: EditOutlinedIcon,
+        ToolIcon: LassoIcon,
         mode: DrawPolygonByDraggingMode
     },
     transform: {
         name: "Modify",
-        ToolIcon: ControlCameraOutlinedIcon,
+        ToolIcon: SplineIcon,
         mode: EditMode
     },
     // measure: {
@@ -107,6 +107,7 @@ export const Tools = {
 type ToolIcon = typeof Tools[keyof typeof Tools]["ToolIcon"];
 export type Tool = (typeof Tools)[keyof typeof Tools]["name"];
 const ToolArray = Object.values(Tools);
+const EDIT_MODE_TOOL_NAMES: Tool[] = ["Pan", "Modify"];
 
 type ToolButtonProps = {
     name: Tool;
@@ -114,7 +115,7 @@ type ToolButtonProps = {
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
 };
-// todo: fix the colors based on the themes
+
 const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
     const theme = useTheme();
     const selectedBackgroundColor = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(48, 46, 46, 0.18)";
@@ -137,7 +138,7 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
                 "aria-label": name,
             }}
         >
-            <ToolIcon />
+            <ToolIcon size={20} />
         </IconWithTooltip>
     );
 });
@@ -148,12 +149,12 @@ export default observer(function SelectionOverlay() {
         setSelectionMode, 
         selectionFeatureCollection,
         editingGateId, 
-        setEditingGateId, 
         setSelectionFeatureCollection,
         selectedTool,
         setSelectedTool: setSelectedToolX
     } = selectionProps;
     const gateManager = useGateManager();
+    const [cx, cy] = useParamColumns();
     
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
     const [manageGateDialogOpen, setManageGateDialogOpen] = useState(false);
@@ -164,9 +165,18 @@ export default observer(function SelectionOverlay() {
         onExportClick,
         onRenameGate,
         onSaveGate,
-        onUpdateEditGate,
+        onEditGate,
+        onConfirmEditGate,
         onCancelEditGate,
     } = useGateActions();
+
+    const toolsToShow = useMemo(
+        () =>
+            editingGateId
+                ? ToolArray.filter((t) => EDIT_MODE_TOOL_NAMES.includes(t.name))
+                : ToolArray,
+        [editingGateId],
+    );
 
     const setSelectedTool = useCallback((tool: Tool) => {
         // pending refactor
@@ -176,24 +186,21 @@ export default observer(function SelectionOverlay() {
             return;
         }
 
-        const drawingMode = tool === "Rectangle" || tool === "Polygon" || tool === "Freehand";
-        if (editingGateId && drawingMode) {
-            setEditingGateId(null);
+        if (!editingGateId) {
             setSelectionFeatureCollection(getEmptyFeatureCollection());
         }
-
         //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
         //setSelectionMode(new CompositeMode([new mode(), new TranslateModeEx()]));
         setSelectionMode(new mode());
         setSelectedToolX(tool);
-    }, [setSelectionMode, editingGateId, setEditingGateId, setSelectionFeatureCollection, setSelectedToolX]);
+    }, [setSelectionMode, editingGateId, setSelectionFeatureCollection, setSelectedToolX]);
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc.
     // (thanks copilot, that may be over-ambitious)
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
-        return ToolArray.map(({ name, ToolIcon, mode }) => (
+        return toolsToShow.map(({ name, ToolIcon }) => (
             <ToolButton
                 key={name}
                 name={name}
@@ -202,7 +209,13 @@ export default observer(function SelectionOverlay() {
                 setSelectedTool={setSelectedTool}
             />
         ));
-    }, [selectedTool, setSelectedTool]);
+    }, [selectedTool, setSelectedTool, toolsToShow]);
+
+    const relevantGates = useMemo(() => 
+        gateManager.gatesArray.filter(
+            (gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field
+        )
+    , [gateManager.gatesArray, cx, cy]);
 
     const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
     
@@ -242,27 +255,24 @@ export default observer(function SelectionOverlay() {
                         "aria-label": "Manage Gates",
                     }}
                 >
-                    <LayersIcon />
+                    <TuneOutlined />
                 </IconWithTooltip>
                 {hasSelection && !editingGateId && (
                     <IconWithTooltip
                         tooltipText={"Save selection as gate"}
                         onClick={() => setGateDialogOpen(true)}
                         iconButtonProps={{
-                            sx: {
-                                color: "var(--text_color)"
-                            },
                             "aria-label": "Save Gate",
                         }}
                     >
-                        <AddOutlinedIcon />
+                        <AddOutlinedIcon color="success" />
                     </IconWithTooltip>
                 )}
                 {editingGateId && (
                     <>
                         <IconWithTooltip
                             tooltipText={"Confirm"}
-                            onClick={onUpdateEditGate}
+                            onClick={onConfirmEditGate}
                             iconButtonProps={{
                                 sx: {
                                     color: "green",
@@ -301,10 +311,11 @@ export default observer(function SelectionOverlay() {
                 open={manageGateDialogOpen}
                 onClose={() => setManageGateDialogOpen(false)}
                 // Passing gatesArray directly as there are no mutations to the array
-                gatesArray={gateManager.gatesArray}
+                gatesArray={relevantGates}
                 onDelete={onDeleteGate}
                 onRenameGate={onRenameGate}
                 onExportClick={onExportClick}
+                onEdit={onEditGate}
             />
         </>
     );

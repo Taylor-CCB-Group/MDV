@@ -8,12 +8,20 @@ import { action } from "mobx";
 import { getEmptyFeatureCollection } from "../deck_state";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
+import { Tools } from "../components/SelectionOverlay";
 
 const useGateActions = () => {
     const gateManager = useGateManager();
     const paramColumns = useParamColumns();
     const { selectionProps } = useSpatialLayers();
-    const { selectionFeatureCollection, setEditingGateId, editingGateId } = selectionProps;
+    const {
+        selectionFeatureCollection,
+        setEditingGateId,
+        editingGateId,
+        setSelectedTool,
+        setSelectionFeatureCollection,
+        setSelectionMode,
+    } = selectionProps;
     const chart = useChart<DeckScatterConfig>();
 
     const clearSelection = useCallback(() => {
@@ -34,6 +42,8 @@ const useGateActions = () => {
                 throw new Error("Chart must have X and Y axes");
             }
 
+            const centroid = computeCentroid(selectionFeatureCollection);
+
             // Create gate
             const gate: Gate = {
                 id: generateGateId(),
@@ -41,6 +51,7 @@ const useGateActions = () => {
                 geometry: selectionFeatureCollection,
                 columns: [xCol.field, yCol.field],
                 createdAt: Date.now(),
+                labelPosition: centroid,
             };
 
             // Add to gate store
@@ -87,35 +98,44 @@ const useGateActions = () => {
         [gateManager],
     );
 
-    const onUpdateEditGate = useCallback(
-        () => {
-            if (!editingGateId) return;
-            // const gate = gateManager.gatesArray.find((g) => g.id === editingGateId);
-            // if (!gate) return;
-            const currentGeometry = chart.config.selectionFeatureCollection;
-
-            const newLabelPosition = computeCentroid(currentGeometry);
-            gateManager.updateGate(editingGateId, { geometry: currentGeometry, labelPosition: newLabelPosition });
-            setEditingGateId(null);
-            clearSelection();
+    const onEditGate = useCallback(
+        (gateId: string) => {
+            if (gateId) {
+                const gate = gateManager.gates.get(gateId);
+                if (gate) {
+                    setSelectionFeatureCollection(JSON.parse(JSON.stringify(gate.geometry)));
+                    setEditingGateId(gateId);
+                    const panMode = Tools["pan"].mode;
+                    setSelectionMode(new panMode());
+                    setSelectedTool("Pan");
+                }
+            }
         },
-        [gateManager, clearSelection, chart.config, setEditingGateId, editingGateId]
+        [setSelectionFeatureCollection, setEditingGateId, setSelectionMode, setSelectedTool, gateManager],
     );
 
-    const onCancelEditGate = useCallback(
-        () => {
-            setEditingGateId(null);
-            clearSelection();
-        },
-        [setEditingGateId, clearSelection]
-    );
+    const onConfirmEditGate = useCallback(() => {
+        if (!editingGateId) return;
+        const currentGeometry = chart.config.selectionFeatureCollection;
+
+        const newLabelPosition = computeCentroid(currentGeometry);
+        gateManager.updateGate(editingGateId, { geometry: currentGeometry, labelPosition: newLabelPosition });
+        setEditingGateId(null);
+        clearSelection();
+    }, [gateManager, clearSelection, chart.config, setEditingGateId, editingGateId]);
+
+    const onCancelEditGate = useCallback(() => {
+        setEditingGateId(null);
+        clearSelection();
+    }, [setEditingGateId, clearSelection]);
 
     return {
         onSaveGate,
         onDeleteGate,
         onRenameGate,
         onExportClick,
-        onUpdateEditGate,
+        onEditGate,
+        onConfirmEditGate,
         onCancelEditGate,
     };
 };
