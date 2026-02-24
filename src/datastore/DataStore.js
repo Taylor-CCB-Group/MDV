@@ -1479,10 +1479,7 @@ class DataStore {
             const dark = window.mdv?.chartManager.theme === "dark";
             const white = config.asArray ? [255, 255, 255] : "#ffffff";
             const black = config.asArray ? [0, 0, 0] : "#000000";
-            // chart background may not be exactly black/white
-            // we may want to optionally return undefined as a way of skipping missing values
-            // (only for callers that supply config indicating they can handle it)
-            const fallbackColor = dark ? black : white;
+            const fallbackColor = ov.hideMissing ? undefined : (dark ? black : white);
             //the actual function - bins the value and returns the color for that bin
             function getColor(v) {
                 if (isFallback(v)) return fallbackColor;

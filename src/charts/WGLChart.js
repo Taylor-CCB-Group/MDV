@@ -70,6 +70,8 @@ class WGLChart extends SVGChart {
                 asArray: true,
                 overideValues: {
                     colorLogScale: this.config.log_color_scale,
+                    fallbackOnZero: this.config.fallbackOnZero,
+                    hideMissing: this.config.hideMissing,
                 },
             };
             this._addTrimmedColor(c.color_by, conf);

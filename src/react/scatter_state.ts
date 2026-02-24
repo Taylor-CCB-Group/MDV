@@ -11,6 +11,7 @@ import {
     useParamColumns,
 } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from "./components/VivScatterComponent";
@@ -24,7 +25,7 @@ import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
-import type { ColumnName, FieldName } from "@/charts/charts";
+import type { ColumnName, DataColumn, FieldName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -284,6 +285,18 @@ export function useScatterRadius() {
 
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
+
+function useShouldFilterNaN(): { shouldFilter: boolean; colorColumn: DataColumn<any> | undefined } {
+    const chart = useChart();
+    const colorBySpec = chart.config.color_by;
+    const colorByField: FieldSpec | undefined = colorBySpec
+        ? (typeof colorBySpec === "string" ? colorBySpec : "column" in colorBySpec ? colorBySpec.column?.field : undefined)
+        : undefined;
+    const colorColumn = useFieldSpec(colorByField);
+    const shouldFilter = !!(chart.config.hideMissing && colorColumn && !isDatatypeCategorical(colorColumn.datatype));
+    return { shouldFilter, colorColumn };
+}
+
 /**
  * ! in its current form, this hook is only called by `useCreateSpatialAnnotationState`
  * in future we may want to be able to have different arrangement of layers & rework this.
@@ -321,12 +334,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     );
     const contourLayers = useLegacyDualContour(hoveredFieldId);
 
-    const colorBySpec = config.color_by;
-    const colorByField: FieldSpec | undefined = colorBySpec
-        ? (typeof colorBySpec === "string" ? colorBySpec : "column" in colorBySpec ? colorBySpec.column?.field : undefined)
-        : undefined;
-    const colorColumn = useFieldSpec(colorByField);
-    const shouldFilterNaN = colorColumn && !isDatatypeCategorical(colorColumn.datatype);
+    const { shouldFilter: shouldFilterNaN, colorColumn } = useShouldFilterNaN();
 
     // todo - Tooltip should be a separate component
     // would rather not even need to call a hook here, but just have some
@@ -420,7 +428,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 getFillColor: colorBy,
                 getLineWidth,
                 getPosition: [cx, cy, cz],
-                getFilterValue: [colorColumn],
+                getFilterValue: [colorColumn, shouldFilterNaN],
             },
             pickable: true,
             onHover: (info) => {
