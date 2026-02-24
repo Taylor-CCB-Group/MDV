@@ -317,7 +317,9 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     views={view}
                     onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
                     getTooltip={getTooltip}
-                    getCursor={getCursor}
+                    getCursor={({ isDragging }) => {
+                        return isDragging ? "grabbing" : "crosshair";
+                    }}
                 />
             </AxisComponent>
         </>

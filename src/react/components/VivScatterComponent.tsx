@@ -107,7 +107,6 @@ const Main = observer(({
         gateLabelLayer,
         gateDisplayLayer,
         controllerOptions,
-        getCursor,
     } = useGateLayers();
     
     // Get field contour legend data
@@ -239,7 +238,6 @@ const Main = observer(({
                 doubleClickZoom: false,
                 dragPan: controllerOptions.dragPan,
             },
-            getCursor,
             // deviceProps: {
             //     // todo - get this working more usefully.
             //     debugSpectorJS: true,
@@ -254,7 +252,6 @@ const Main = observer(({
             id,
             getTooltip,
             controllerOptions,
-            getCursor,
         ],
     );
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
