@@ -1099,6 +1099,41 @@ API endpoints check permissions before operations:
 - Session cookies: HTTPOnly, Secure, SameSite=Lax
 - User data: `session['user']` contains `{id, email, auth_id, is_admin}`
 
+### Local development (mock auth)
+
+For local development you can run with authentication either off or on using a mock provider.
+
+- **Auth off**: Set `ENABLE_AUTH=0` (or omit it). No login is required; all project routes are accessible.
+- **Auth on with mock provider**: Set `ENABLE_AUTH=1` and `DEFAULT_AUTH_METHOD=dummy`. You must also set `FLASK_SECRET_KEY` (and have a running DB). The app will use `DummyAuthProvider`: visiting `/login` logs you in as a dummy user without a real IdP.
+  - **Dummy user in the database**: The dummy provider uses a fixed identity (`auth_id`: `dummy|localuser`, `id`: 1 in session). For project permissions and the `/projects` list to work, ensure this user exists in the database and has project assignments. Either:
+    - Run a one-time sync or script that creates a user with `auth_id = 'dummy|localuser'` and assigns them as owner (or with `can_read`/`can_write`) to the projects you need, or
+    - Use the project manager UI after first login to share projects with the dummy user if your setup creates that user on first login.
+  - **Login route**: Use `/login` (which respects `DEFAULT_AUTH_METHOD`) or the dev login page at `/login_dev` if your front end points there.
+
+Do not set `DEFAULT_AUTH_METHOD=dummy` in production; use a real provider (e.g. `auth0`).
+
+### Security audit (project access)
+
+This section summarizes how project-related endpoints and WebSockets are protected when `ENABLE_AUTH` is true.
+
+| Route / socket | Protection |
+|----------------|------------|
+| **Project blueprint** (`/project/<id>/`, `/<file>.json`, `/<file>.b`, `/spatial/...`, etc.) | `project_pre_dispatch_checks`: requires at least one of `can_read`, `can_write`, `is_owner`. Editable routes (`access_level='editable'`) additionally require `can_write` or `is_owner` and project `access_level == 'editable'`. |
+| **WebSocket** `connect` for `/project/<id>` (chat) | After `is_authenticated()`, same read check as above: user must have `can_read`, `can_write`, or `is_owner` for the project. |
+| **GET /projects** | List filtered by `user_project_cache` (only projects where user has `can_read`, `can_write`, or `is_owner`). |
+| **POST /create_project**, **POST /import_project** | Session required; creator gets owner. |
+| **GET /export_project/<id>** | Owner only (`is_owner`). |
+| **DELETE /delete_project/<id>** | Owner only. |
+| **PUT /projects/<id>/rename** | Owner only. |
+| **PUT /projects/<id>/access** | Owner only. |
+| **GET /projects/<id>/share** | Owner only. |
+| **POST /projects/<id>/share** | Owner only. |
+| **POST /projects/<id>/share/<user_id>/edit** | Owner only. |
+| **POST /projects/<id>/share/<user_id>/delete** | Owner only. |
+| **GET /rescan_projects** | Admin only (`is_admin`). |
+
+**Single-project mode** (`SingleProjectShim`): When the app serves a single project (no multi-project blueprint), there is no project-level `before_request` hook; only app-level authentication runs. Use single-project mode only for dev or single-tenant deployments where project-level isolation is not required.
+
 ---
 
 ## Best Practices
