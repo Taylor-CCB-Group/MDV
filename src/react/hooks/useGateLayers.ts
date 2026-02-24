@@ -23,7 +23,6 @@ const useGateLayers = () => {
     const config = useConfig<DeckScatterConfig>();
     const { dimension } = config;
     const is2d = dimension === "2d";
-    const [labelPositions, setLabelPositions] = useState<Map<string, [number, number]>>(new Map());
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [isHoveringLabel, setIsHoveringLabel] = useState(false);
     const draggingIdRef = useRef<string | null>(null);
@@ -32,26 +31,13 @@ const useGateLayers = () => {
     const hasRebuiltGateColumnRef = useRef(false);
     const chartId = useChartID();
     const { selectionProps } = useSpatialLayers();
-    const { editingGateId, setSelectionFeatureCollection, setSelectedTool, setSelectionMode, setEditingGateId } =
+    const { editingGateId, selectionFeatureCollection, setSelectionFeatureCollection, setSelectedTool, setSelectionMode, setEditingGateId } =
         selectionProps;
 
     const relevantGates = useMemo(() => {
         if (!cx || !cy) return [];
         return gateManager.gatesArray.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
     }, [gateManager.gatesArray, cx, cy]);
-
-    useEffect(() => {
-        const positions = new Map<string, [number, number]>();
-        gates.forEach((gate) => {
-            if (gate.labelPosition) {
-                positions.set(gate.id, gate.labelPosition);
-            } else {
-                const centroid = computeCentroid(gate.geometry);
-                positions.set(gate.id, [centroid[0], centroid[1]]);
-            }
-        });
-        setLabelPositions(positions);
-    }, [gates]);
 
     useEffect(() => {
         // Wait for columns to be loaded to update the gates column
@@ -64,15 +50,16 @@ const useGateLayers = () => {
         if (!cx || !cy || gates.length === 0) return null;
 
         // filter the editing gate
-        const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
+        // const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
 
-        if (filteredGates.length === 0) return null;
+        if (relevantGates.length === 0) return null;
 
-        const layerData = filteredGates.map((gate) => {
-            let position = labelPositions?.get(gate.id);
-            if (!position) {
-                const centroid = computeCentroid(gate.geometry);
-                position = [centroid[0], centroid[1]];
+        const layerData = relevantGates.map((gate) => {
+            let position;
+            if (gate.id === editingGateId) {
+                position = computeCentroid(selectionFeatureCollection);
+            } else {
+                position = gate.labelPosition;
             }
             // Get the average of z if it exists
             const z = is2d ? 0 : cz?.minMax ? (cz.minMax[0] + cz.minMax[1]) / 2 : 0;
@@ -89,19 +76,17 @@ const useGateLayers = () => {
             getPosition: (d: { position: [number, number, number] }) => d.position,
             getText: (d: { text: string }) => d.text,
             getSize: 12,
-            // todo: fix the color based on the theme
             getColor: [255, 255, 255, 255],
+            getBackgroundColor: [0, 0, 0, 100],
             getTextAnchor: "middle",
             getAlignmentBaseline: "center",
             padding: [3, 8],
-            // billboard: true,
             pickable: true,
             background: true,
-            // backgroundPadding: [6, 4],
+            backgroundPadding: [4, 2],
             backgroundBorderRadius: 4,
-            getBackgroundColor: [0, 0, 0, 100],
             updateTriggers: {
-                getPosition: [gates.length, labelPositions.size, dragPos],
+                getPosition: [gates.length, dragPos, selectionFeatureCollection],
                 getColor: [draggingId],
                 getBackgroundColor: [draggingId],
             },
@@ -118,12 +103,6 @@ const useGateLayers = () => {
 
                 const currentPosition: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]];
 
-                setLabelPositions((prev) => {
-                    const newPositions = new Map(prev);
-                    newPositions.set(currentId, currentPosition);
-                    return newPositions;
-                });
-
                 setDragPos(currentPosition);
             },
             onDragStart(pickingInfo) {
@@ -138,7 +117,7 @@ const useGateLayers = () => {
                 const currentId = draggingIdRef.current;
                 if (!currentId) return;
 
-                const position = labelPositions?.get(currentId);
+                const position = dragPos;
                 if (position) {
                     gateManager.updateGate(currentId, { labelPosition: position });
                 }
@@ -156,10 +135,10 @@ const useGateLayers = () => {
         draggingId,
         dragPos,
         gateManager,
-        labelPositions,
         chartId,
         editingGateId,
         relevantGates,
+        selectionFeatureCollection,
     ]);
 
     const gateDisplayLayer = useMemo(() => {
