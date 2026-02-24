@@ -647,25 +647,34 @@ class MDVProject:
                         f"Column {cid} of type 'unique' requires 'stringLength' in metadata"
                     )
                 string_length = int(string_length)
-                # Avoid silent truncation: use max actual length
-                if raw_data:
-                    max_str_len = max(
-                        len(s) if isinstance(s, str) else len(s.decode("utf-8"))
-                        for s in raw_data
+                
+                # Check for numeric data BEFORE computing max_str_len
+                if raw_data and isinstance(raw_data[0], (int, float, numpy.integer, numpy.floating)):
+                    raise ValueError(
+                        f"Column {cid} of type 'unique' expects array of strings, "
+                        f"but received numeric data."
                     )
+                
+                # Compute max byte length (handling None, str, and bytes)
+                if raw_data:
+                    def _byte_len(v):
+                        if v is None:
+                            return 0
+                        if isinstance(v, (bytes, numpy.bytes_)):
+                            return len(v)
+                        # Convert to str then get UTF-8 byte length
+                        return len(str(v).encode("utf-8"))
+                    
+                    max_str_len = max(_byte_len(v) for v in raw_data)
                     if max_str_len > string_length:
                         string_length = max_str_len
+                        # Update column metadata so it persists correctly
+                        column["stringLength"] = string_length
+                
                 dt = h5py.string_dtype("utf-8", string_length)
             else:
                 raise ValueError(
                     f"Unknown datatype: {column['datatype']} for column {cid}"
-                )
-        if column["datatype"] == "unique":
-            # If numeric data is received instead of array of strings, raise error
-            if raw_data and isinstance(raw_data[0], (int, float, numpy.integer, numpy.floating)):
-                raise ValueError(
-                    f"Column {cid} of type 'unique' expects array of strings, "
-                    f"but received numeric data."
                 )
         ds.create_dataset(cid, num_rows, data=raw_data, dtype=dt)
         ds = self.get_datasource_metadata(datasource)
