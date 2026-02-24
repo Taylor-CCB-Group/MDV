@@ -29,7 +29,7 @@ import { useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
 import { getEmptyFeatureCollection } from "../deck_state";
 import { TuneOutlined } from "@mui/icons-material";
-import { LassoIcon, PentagonIcon, SplineIcon, SplinePointerIcon, SquareIcon } from "lucide-react";
+import { LassoIcon, PentagonIcon, SplineIcon, SquareIcon } from "lucide-react";
 
 class EditMode extends CompositeMode {
     constructor() {
