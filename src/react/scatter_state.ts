@@ -314,11 +314,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     const radiusScale = useScatterRadius();
 
     const data = useFilteredIndices();
-    //! not keen on third param potentially being either contourParameter or cz
-    // n.b. Viv version already has config.contourParameter (maybe should be densityParameter)
-    // param[2] is set to the same value for some kind of backward compatibility?
-    // or as the result of still using old BaseChart.init()
-    // const [cx, cy, contourParameter] = useParamColumns();
     const params = useParamColumns();
     const [cx, cy, cz] = params;
     const scale = useRegionScale();
@@ -420,7 +415,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             ...({
                 // todo - consider lower overhead version of this.
                 // future work https://deck.gl/docs/developer-guide/performance#use-binary-data
-                getFilterValue: shouldFilterNaN && colorColumn
+                //currently useFieldSpec is typed as DataColumn|undefined, 
+                //if not undefined is guaranteed to be loaded but we may change how we manage lazy-loading.
+                getFilterValue: shouldFilterNaN && colorColumn?.data 
                     ? (i: number) => Number.isFinite(colorColumn.data[i]) ? 1 : 0
                     : (_: number) => 1,
                 filterRange: [0.5, 1],
