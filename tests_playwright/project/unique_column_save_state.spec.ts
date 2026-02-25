@@ -50,18 +50,13 @@ test.describe("Unique column and save_state round-trip", () => {
         expect(hasTable).toBe(true);
     });
 
-    test("save_state can be triggered without error", async () => {
-        // Trigger save via chartManager (same as frontend Save flow)
-        const saveResult = await page.evaluate(() => {
-            const cm = (window as any).mdv?.chartManager;
-            if (!cm?.saveState) return { ok: false, error: "no saveState" };
-            try {
-                cm.saveState();
-                return { ok: true };
-            } catch (e: any) {
-                return { ok: false, error: String(e?.message || e) };
-            }
-        });
-        expect(saveResult.ok).toBe(true);
+    test("save_state posts successfully", async () => {
+        const [resp] = await Promise.all([
+            page.waitForResponse(
+                (r) => r.request().method() === "POST" && r.url().includes("/save_state")
+            ),
+            page.evaluate(() => (window as any).mdv?.chartManager?.saveState()),
+        ]);
+        expect(resp.ok()).toBe(true);
     });
 });
