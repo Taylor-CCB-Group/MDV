@@ -182,6 +182,15 @@ class TableChart extends BaseChart {
             }
         }
 
+        // Clear the selection if there are no selected rows
+        if (positions.length === 0) {
+            this.tempMode = this.mode;
+            this.mode = "";
+            this.grid.setSelectedRows([]);
+            this.mode = this.tempMode;
+            return;
+        }
+
         if (positions.length > 0) {
             // Scroll to the first highlighted row
             this.grid.scrollRowIntoView(positions[0]);
