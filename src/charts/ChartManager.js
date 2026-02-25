@@ -1145,10 +1145,10 @@ export class ChartManager {
                         continue;
                     }
 
-                    const rowBytes = cl.data.slice(baseIndex, baseIndex + stringLength);
+                    const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
                     const decoded = textDecoder.decode(rowBytes);
                     // Remove null padding characters
-                    arr[i] = decoded.replace(/\0/g, '');
+                    arr[i] = decoded.replace(/\0+$/, "");
                 }
             } else {
                 // For other datatypes, get the values from data array
