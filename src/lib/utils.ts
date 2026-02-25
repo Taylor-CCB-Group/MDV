@@ -67,11 +67,14 @@ export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
 // });
 
 /**
- * Helper function to match two strings
- * (Will update to more sophisticated matching algorithm in future)
+ * Determines whether `str` contains every substring in `substrings`.
+ *
+ * @param substrings - Array of substrings to look for in `str`
+ * @param str - The string to search within
+ * @returns `true` if every element of `substrings` is contained in `str`, `false` otherwise
  */
-export function matchString(str1: string[], str2: string) {
-    return !str1.some(i => !str2.includes(i));
+export function stringContainsAll(substrings: string[], str: string) {
+    return !substrings.some(i => !str.includes(i));
 }
 
 /**
@@ -82,9 +85,12 @@ export function matchEmail(str1: string, str2: string) {
 }
 
 /**
- * 
- * Helper function to parse and extract the items from a string by splitting it by 
- * space, comma, tab and new line
+ * Parse a delimited string into an array of trimmed, non-empty items.
+ *
+ * The input is split on commas, spaces, tabs, and newlines; empty segments are removed and each item is trimmed.
+ *
+ * @param str - The input string containing items separated by commas, spaces, tabs, or newlines
+ * @returns An array of trimmed, non-empty strings extracted from `str`
  */
 export function parseDelimitedString(str: string) {
     // Split by space or any whitespace character

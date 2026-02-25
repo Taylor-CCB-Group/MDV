@@ -159,21 +159,25 @@ class TableChart extends BaseChart {
             return;
         }
 
-        // Get all highlighted indices
         let indices = [];
-
         if (data.indexes) {
             indices = Array.isArray(data.indexes)
                 ? data.indexes
                 : Object.values(data.indexes);
         }
-        
-        if (indices.length === 0) {
+        this._applyHighlightedIndices(indices);
+    }
+
+    _applyHighlightedIndices(indices) {
+        const tempMode = this.mode;
+        this.mode = "";
+
+        if (!indices || indices.length === 0) {
             this.grid.setSelectedRows([]);
+            this.mode = tempMode;
             return;
         }
 
-        // Find all positions in the data model
         const positions = [];
         for (const index of indices) {
             const pos = this.dataModel.data.indexOf(index);
@@ -182,15 +186,15 @@ class TableChart extends BaseChart {
             }
         }
 
-        if (positions.length > 0) {
-            // Scroll to the first highlighted row
-            this.grid.scrollRowIntoView(positions[0]);
-            this.tempMode = this.mode;
-            this.mode = "";
-            // Set all highlighted rows
-            this.grid.setSelectedRows(positions);
-            this.mode = this.tempMode;
+        if (positions.length === 0) {
+            this.grid.setSelectedRows([]);
+            this.mode = tempMode;
+            return;
         }
+
+        this.grid.scrollRowIntoView(positions[0]);
+        this.grid.setSelectedRows(positions);
+        this.mode = tempMode;
     }
 
     onColumnRemoved(column) {
@@ -393,6 +397,11 @@ class TableChart extends BaseChart {
         if (this.config.sort) {
             this._sort(this.config.sort);
         }
+        const highlighted =
+            typeof this.dataStore.getHighlightedData === "function"
+                ? this.dataStore.getHighlightedData() || []
+                : [];
+        this._applyHighlightedIndices(highlighted);
     }
 }
 
