@@ -286,7 +286,7 @@ export function useScatterRadius() {
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
 
-function useShouldFilterNaN(): { shouldFilter: boolean; colorColumn: DataColumn<any> | undefined } {
+function useShouldFilterNaN() {
     const chart = useChart();
     const colorBySpec = chart.config.color_by;
     const colorByField: FieldSpec | undefined = colorBySpec
