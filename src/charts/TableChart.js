@@ -161,6 +161,7 @@ class TableChart extends BaseChart {
         
         // Get all highlighted indices
         let indices = [];
+        const tempMode = this.mode;
 
         if (data.indexes) {
             indices = Array.isArray(data.indexes)
@@ -169,7 +170,9 @@ class TableChart extends BaseChart {
         }
         
         if (indices.length === 0) {
+            this.mode = "";
             this.grid.setSelectedRows([]);
+            this.mode = tempMode;
             return;
         }
 
@@ -184,21 +187,19 @@ class TableChart extends BaseChart {
 
         // Clear the selection if there are no selected rows
         if (positions.length === 0) {
-            this.tempMode = this.mode;
             this.mode = "";
             this.grid.setSelectedRows([]);
-            this.mode = this.tempMode;
+            this.mode = tempMode;
             return;
         }
 
         if (positions.length > 0) {
             // Scroll to the first highlighted row
             this.grid.scrollRowIntoView(positions[0]);
-            this.tempMode = this.mode;
             this.mode = "";
             // Set all highlighted rows
             this.grid.setSelectedRows(positions);
-            this.mode = this.tempMode;
+            this.mode = tempMode;
         }
     }
 
