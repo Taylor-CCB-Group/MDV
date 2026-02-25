@@ -4,6 +4,14 @@ Example usage of the mock AnnData module.
 
 This script demonstrates how to use the MockAnnDataFactory and related utilities
 for creating test data and stress testing the MDV conversion pipeline.
+
+To create an MDV project with a unique column for manual integration testing
+(edit from the frontend, then save state):
+
+  python -m mdvtools.tests.example_mock_usage --create-unique-project ./test_unique_project
+
+Then serve the project and open in the browser to edit the unique column and verify
+round-trip / set_column_with_raw_data behaviour.
 """
 
 import os
@@ -173,6 +181,56 @@ def example_validation_and_summary():
         print(f"   Is sparse: {summary['sparse']}")
 
 
+def example_create_project_with_unique_column(output_path=None):
+    """Create an MDV project that has at least one unique column for manual integration testing.
+
+    Use this to get a project you can serve and then edit unique columns from the frontend
+    (e.g. change a cell_id value and save state) to verify unique column round-trip and
+    set_column_with_raw_data behaviour.
+
+    If output_path is None, uses a temporary directory (project is removed when the
+    script exits). Pass a path (e.g. ./test_unique_project) to keep the project for
+    serving and manual testing.
+
+    To serve and test in the browser:
+        cd /path/to/mdv && python -m mdvtools.serve --project /path/to/project
+        # or use your usual serve command; then open the app and edit a unique column.
+    """
+    print("\n=== Create Project With Unique Column (for manual integration testing) ===")
+    if output_path is None:
+        project_dir = tempfile.mkdtemp(prefix="mdv_unique_")
+        cleanup = True
+    else:
+        project_dir = os.path.expanduser(output_path)
+        cleanup = False
+        if os.path.exists(project_dir):
+            shutil.rmtree(project_dir)
+        os.makedirs(project_dir, exist_ok=True)
+
+    try:
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(30, 15)
+        with suppress_anndata_warnings():
+            mdv = convert_scanpy_to_mdv(project_dir, adata, delete_existing=True)
+        n_rows = len(adata)
+        cell_ids = [f"cell_{i}" for i in range(n_rows)]
+        mdv.set_column(
+            "cells",
+            {"name": "cell_id", "field": "cell_id", "datatype": "unique", "editable": True},
+            cell_ids,
+        )
+        print(f"   Project created at: {os.path.abspath(project_dir)}")
+        print(f"   Datasource 'cells' has a unique column 'cell_id' ({n_rows} rows).")
+        if cleanup:
+            print("   (Temporary directory; remove when done or re-run with output_path= to keep.)")
+        else:
+            print("   To serve for manual testing:")
+            print(f"      python -m mdvtools.serve --project {os.path.abspath(project_dir)}")
+    finally:
+        if cleanup and os.path.exists(project_dir):
+            shutil.rmtree(project_dir, ignore_errors=True)
+
+
 def example_stress_testing():
     """Example of stress testing with large datasets."""
     print("\n=== Stress Testing Examples ===")
@@ -208,7 +266,13 @@ def example_stress_testing():
 
 
 def main():
-    """Run all examples."""
+    """Run all examples, or create a project with a unique column for manual testing."""
+    import sys
+    if len(sys.argv) >= 2 and sys.argv[1] == "--create-unique-project":
+        output_path = sys.argv[2] if len(sys.argv) > 2 else "./test_unique_project"
+        print("Creating MDV project with unique column for manual integration testing.")
+        example_create_project_with_unique_column(output_path)
+        return
     print("Mock AnnData Module Usage Examples")
     print("=" * 50)
     
