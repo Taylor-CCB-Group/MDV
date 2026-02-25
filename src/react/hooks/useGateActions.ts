@@ -80,6 +80,9 @@ const useGateActions = () => {
         [gateManager],
     );
 
+    /**
+     * Export the geometry of the gate in GeoJSON format
+     */
     const onExportClick = useCallback(
         (gateId: string) => {
             const gate = gateManager.gatesArray.find((g) => g.id === gateId);
@@ -98,6 +101,9 @@ const useGateActions = () => {
         [gateManager],
     );
 
+    /**
+     * Set editing gate id and change selection mode to pan mode
+     */
     const onEditGate = useCallback(
         (gateId: string) => {
             if (gateId) {
@@ -114,6 +120,10 @@ const useGateActions = () => {
         [setSelectionFeatureCollection, setEditingGateId, setSelectionMode, setSelectedTool, gateManager],
     );
 
+    /**
+     * Update the gate with the new geometry and label position of the gate
+     * Compute centroid of label position of editing gate
+     */
     const onConfirmEditGate = useCallback(() => {
         if (!editingGateId) return;
         const currentGeometry = chart.config.selectionFeatureCollection;
@@ -124,6 +134,9 @@ const useGateActions = () => {
         clearSelection();
     }, [gateManager, clearSelection, chart.config, setEditingGateId, editingGateId]);
 
+    /**
+     * Clear the editing id and clear selection
+     */
     const onCancelEditGate = useCallback(() => {
         setEditingGateId(null);
         clearSelection();

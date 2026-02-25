@@ -7,7 +7,7 @@ import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
-import { Tools } from "../components/SelectionOverlay";
+import useGateActions from "./useGateActions";
 
 const MAX_LABEL_LENGTH = 18;
 
@@ -31,12 +31,19 @@ const useGateLayers = () => {
     const hasRebuiltGateColumnRef = useRef(false);
     const chartId = useChartID();
     const { selectionProps } = useSpatialLayers();
-    const { editingGateId, selectionFeatureCollection, setSelectionFeatureCollection, setSelectedTool, setSelectionMode, setEditingGateId } =
-        selectionProps;
+    const {
+        onEditGate
+    } = useGateActions();
+    const {
+        editingGateId,
+        selectionFeatureCollection,
+    } = selectionProps;
 
     const relevantGates = useMemo(() => {
         if (!cx || !cy) return [];
-        return gateManager.gatesArray.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
+        return gateManager.gatesArray.filter(
+            (gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field
+        );
     }, [gateManager.gatesArray, cx, cy]);
 
     useEffect(() => {
@@ -49,16 +56,19 @@ const useGateLayers = () => {
     const gateLabelLayer = useMemo(() => {
         if (!cx || !cy || gates.length === 0) return null;
 
-        // filter the editing gate
-        // const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
-
         if (relevantGates.length === 0) return null;
 
         const layerData = relevantGates.map((gate) => {
             let position;
+
             if (gate.id === editingGateId) {
+                // If gate is editing, we compute the centroid of the gate
                 position = computeCentroid(selectionFeatureCollection);
+            } else if (gate.id === draggingId && dragPos) {
+                // If the label is getting dragged, we use the dragging position
+                position = dragPos;
             } else {
+                // Get the label position of the gate for normal gates
                 position = gate.labelPosition;
             }
             // Get the average of z if it exists
@@ -103,11 +113,14 @@ const useGateLayers = () => {
 
                 const currentPosition: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]];
 
+                // Update the drag position of the label with the current dragged position
                 setDragPos(currentPosition);
             },
             onDragStart(pickingInfo) {
-                if (!pickingInfo.object || !pickingInfo.coordinate) return false;
+                // Not allowing dragging when editing a gate to avoid issues
+                if (!pickingInfo.object || !pickingInfo.coordinate || editingGateId) return false;
 
+                // Set teh dragging id and drag position state
                 draggingIdRef.current = pickingInfo.object.gateId;
                 setDraggingId(pickingInfo.object.gateId);
                 setDragPos([pickingInfo.coordinate[0], pickingInfo.coordinate[1]]);
@@ -119,6 +132,7 @@ const useGateLayers = () => {
 
                 const position = dragPos;
                 if (position) {
+                    // Update the label position of the gate, when the dragging ends
                     gateManager.updateGate(currentId, { labelPosition: position });
                 }
                 draggingIdRef.current = null;
@@ -146,6 +160,9 @@ const useGateLayers = () => {
 
         // Filter the editing gate
         const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
+
+        // Create the objects of features to supply as the feature collection
+        // Store gate id and gate name as feature properties
         const features = filteredGates.flatMap((gate) =>
             gate.geometry.features.map((feature) => ({
                 ...feature,
@@ -171,16 +188,7 @@ const useGateLayers = () => {
             pickable: true,
             onClick(pickingInfo) {
                 const gateId = pickingInfo.object?.properties?.gateId;
-                if (gateId) {
-                    const gate = gateManager.gates.get(gateId);
-                    if (gate) {
-                        setSelectionFeatureCollection(JSON.parse(JSON.stringify(gate.geometry)));
-                        setEditingGateId(gateId);
-                        const panMode = Tools["pan"].mode;
-                        setSelectionMode(new panMode());
-                        setSelectedTool("Pan");
-                    }
-                }
+                onEditGate(gateId);
             },
         });
     }, [
@@ -188,20 +196,19 @@ const useGateLayers = () => {
         chartId,
         editingGateId,
         gateManager,
-        setSelectionFeatureCollection,
-        setEditingGateId,
-        setSelectionMode,
-        setSelectedTool,
+        onEditGate,
         cx,
         cy,
     ]);
 
-    const getCursor = useCallback(({isDragging}: {isDragging: boolean, isHovering: boolean}) => {
-        if (draggingId || isDragging)
-            return "grabbing";
+    const getCursor = useCallback(
+        ({ isDragging }: { isDragging: boolean; isHovering: boolean }) => {
+            if (draggingId || isDragging) return "grabbing";
 
-        return "grab";
-    }, [draggingId]);
+            return "grab";
+        },
+        [draggingId],
+    );
 
     const dragPan = !(draggingId || isHoveringLabel);
 

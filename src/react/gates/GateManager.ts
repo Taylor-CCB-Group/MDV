@@ -6,10 +6,11 @@ import { extractCoords, isPointInGate } from "./gateUtils";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
 const GATES_COLUMN_NAME = "__gates__";
+const GATE_NONE_VALUE = "N/A";
 /**
  * Class which manages the gating operations
  * Creates a gates column if it doesn't exist, loads the gates column if it's not loaded
- * Adds new gates and assigns it to the respective cells in the column
+ * Contains the gate lifecycle methods for adding, updating and deleting
  */
 export class GateManager {
     gates: Map<string, Gate> = new Map();
@@ -31,6 +32,13 @@ export class GateManager {
         this.initializeGateColumn();
     }
 
+    /**
+     * Load the gates column if not loaded yet
+     * Add the new gate to the gates map
+     * Update all the cells inside the gate geometry with the gate name
+     * Update the data store with the new gate
+     * @param gate - new gate to be added
+     */
     async addGate(gate: Gate) {
         // Ensure column data is loaded
         await this.ensureGatesColumnDataLoaded();
@@ -39,7 +47,10 @@ export class GateManager {
             ...gate,
             geometry: JSON.parse(JSON.stringify(gate.geometry)), // Only clone geometry
         };
-        this.gates.set(gate.id, clonedGate);
+
+        action(() => {
+            this.gates.set(gate.id, clonedGate);
+        })();
 
         // Update the cells with the gate
         this.updateCellsWithGate(clonedGate, true);
@@ -50,6 +61,13 @@ export class GateManager {
         }
     }
 
+    /**
+     * Update the gate object with the updated gate
+     * Update the cells inside the gate only if the geometry or name or columns change exist
+     * Update the datastore
+     * @param gateId - gate id
+     * @param updates - updated gate object (partial or full)
+     */
     updateGate(gateId: string, updates: Partial<Gate>) {
         const gate = this.gates.get(gateId);
         if (!gate) {
@@ -80,6 +98,12 @@ export class GateManager {
         }
     }
 
+    /**
+     * Remove the gate name from the cells in gate column
+     * Remove the gate from the gates object
+     * Rebuild the values array to remove deleted values (required for filtering)
+     * Update the datastore
+     */
     deleteGate(gateId: string) {
         const gate = this.gates.get(gateId);
         if (!gate) {
@@ -93,6 +117,7 @@ export class GateManager {
             this.gates.delete(gateId);
         })();
 
+        this.rebuildValuesArray();
         this.updateDataStoreWithGates();
 
         if (this.gateColumn) {
@@ -100,7 +125,10 @@ export class GateManager {
         }
     }
 
-    // todo: Add NA or some empty value initially which will be used for filtering
+    /**
+     * Get or create the gate column
+     * Initialise the gate column with empty value initially
+     */
     private initializeGateColumn() {
         const existingCol = this.dataStore.columnIndex[GATES_COLUMN_NAME];
         if (existingCol && existingCol.datatype === "multitext") {
@@ -109,12 +137,12 @@ export class GateManager {
         } else {
             // Create a new column
             const column = {
-                name: "Gates",
+                name: "gates",
                 field: GATES_COLUMN_NAME,
                 datatype: "multitext" as const,
                 editable: false, // as of now
                 delimiter: "," as const,
-                values: [] as string[],
+                values: [GATE_NONE_VALUE] as string[],
                 stringLength: 10,
             };
 
@@ -122,6 +150,11 @@ export class GateManager {
             const dataArray = new Uint16Array(data);
 
             dataArray.fill(65535);
+
+            // Mark the first value of all cells as 'N/A' initially
+            for (let i=0; i<this.dataStore.size; i++) {
+                dataArray[i * column.stringLength] = 0;
+            }
 
             // Add the column to datastore
             this.dataStore.addColumn(column, data, true);
@@ -132,6 +165,10 @@ export class GateManager {
         this.loadGatesFromConfig();
     }
 
+    /**
+     * Load the gates stored in the dataStore.config or dataStore
+     * Rebuild the gates column with the stored gates
+     */
     private async loadGatesFromConfig() {
         // Get the stored gates
         const savedGates = this.dataStore.config.gates || this.dataStore.gates;
@@ -147,10 +184,13 @@ export class GateManager {
             }
         }
 
-        // await this.ensureGatesColumnDataLoaded();
         await this.rebuildGatesColumnWhenReady();
     }
 
+    /**
+     * Load the gates column if not loaded
+     * Rebuild the gates column
+     */
     public async rebuildGatesColumnWhenReady() {
         if (this.gates.size > 0) {
             // Ensure column data is loaded before updating gate column
@@ -159,6 +199,10 @@ export class GateManager {
         }
     }
 
+    /**
+     * Check if the gates column is loaded or not
+     * Load the column explicitly if not loaded yet
+     */
     private async ensureGatesColumnDataLoaded() {
         if (!this.gateColumn) {
             this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
@@ -197,7 +241,7 @@ export class GateManager {
 
         // Populate the gate names for all cells with empty array
         for (let i = 0; i < this.dataStore.size; i++) {
-            this.setGateNamesForCell(i, []);
+            this.setGateNamesForCell(i, [GATE_NONE_VALUE]);
         }
 
         // Recompute gate membership
@@ -220,6 +264,13 @@ export class GateManager {
         }
     }
 
+    /**
+     * Get gate names for each cell
+     * To add the gate name to the cell, check if it inside and add the gate name
+     * To remove, remove the gate from the cell if the cell already has the gate name
+     * @param gate - Gate object
+     * @param add - true if add, false if remove
+     */
     private updateCellsWithGate(gate: Gate, add: boolean) {
         if (!this.gateColumn) return;
 
@@ -249,19 +300,26 @@ export class GateManager {
                 // Add the gate name to the cell if it is inside the gate
                 const isInside = isPointInGate(x, y, gate);
                 if (isInside && !gateNames.includes(gate.name)) {
-                    newGateNames = [...gateNames, gate.name];
+                    const currentGates = gateNames.filter((g) => g !== GATE_NONE_VALUE);
+                    newGateNames = [...currentGates, gate.name];
                     this.setGateNamesForCell(i, newGateNames);
                 }
             } else {
                 // Remove the gate name from the cell if it previously was inside the gate
                 if (gateNames.includes(gate.name)) {
                     newGateNames = gateNames.filter((gateName) => gateName !== gate.name);
+                    if (newGateNames.length === 0) newGateNames = [GATE_NONE_VALUE];
                     this.setGateNamesForCell(i, newGateNames);
                 }
             }
         }
     }
 
+    /**
+     * Get the value index of the gates associated with the cells
+     * @param cellIndex - Index of the cell in dataStore
+     * @returns gate names for the cell
+     */
     private getGateNamesForCell(cellIndex: number): string[] {
         if (!this.gateColumn || !this.gateColumn.stringLength) return [];
 
@@ -279,6 +337,11 @@ export class GateManager {
         return gateNames;
     }
 
+    /**
+     * Assign the value indices of all gate names to the cell
+     * @param cellIndex - Index of the cell in dataStore
+     * @param gateNames - Gate names to update the cell with
+     */
     private setGateNamesForCell(cellIndex: number, gateNames: string[]) {
         if (!this.gateColumn || !this.gateColumn.stringLength) return;
 
@@ -297,6 +360,11 @@ export class GateManager {
         }
     }
 
+    /**
+     * Update the datastore and datastore.config with the gates
+     * Add the gates column to dirtyMetaData to persist
+     * Notify dataStore.dirtyColumns that data of this column is changed
+     */
     public updateDataStoreWithGates() {
         const gatesArray = this.gatesArray;
         // Update dataStore and config with the new gates array
@@ -309,6 +377,9 @@ export class GateManager {
         }
     }
 
+    /**
+     * Get or add the index of the value of the gate name
+     */
     private getOrAddValueIndex(gateName: string): number {
         if (!this.gateColumn) {
             throw new Error("Gate column not initialized");
@@ -325,10 +396,38 @@ export class GateManager {
         return index;
     }
 
+    /**
+     * Remove the gate name from the values array
+     * This is required for the selection dialog to be in sync with the current gates
+     * and not show the deleted gates
+     * Reassign the indices of the cells with the updated values array so the cells 
+     * have the latest index value of the updated values array
+     */
+    private rebuildValuesArray() {
+        if (!this.gateColumn) return;
+    
+        // Read current gate names per cell
+        const gateNamesPerCell: string[][] = [];
+        for (let i = 0; i < this.dataStore.size; i++) {
+            gateNamesPerCell[i] = this.getGateNamesForCell(i);
+        }
+    
+        // Replace values with only current gate names (so selection dialog dropdown stays in sync)
+        const currentGateNames = [GATE_NONE_VALUE, ...Array.from(this.gates.values()).map((g) => g.name).sort()];
+        this.gateColumn.values.length = 0;
+        this.gateColumn.values.push(...currentGateNames);
+    
+        // Write back each cell so indices point into the new values
+        for (let i = 0; i < this.dataStore.size; i++) {
+            this.setGateNamesForCell(i, gateNamesPerCell[i]);
+        }
+    }
+
     toJSON(): Gate[] {
         return this.gatesArray;
     }
 
+    // Getter for the computed gatesArray, create a deep clone of geometry
     get gatesArray(): Gate[] {
         return Array.from(this.gates.values()).map((gate) => ({
             ...gate,
