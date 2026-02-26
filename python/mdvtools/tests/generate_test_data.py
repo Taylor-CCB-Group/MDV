@@ -19,11 +19,13 @@ from mdvtools.conversions import convert_scanpy_to_mdv
 
 
 def _add_unique_column_to_project(project, n_rows):
-    """Add a unique-typed column to the first datasource for manual testing of unique column edit/round-trip."""
+    """Add a unique-typed column for manual testing of unique column edit/round-trip.
+    Prefers datasource 'cells' when present so row count matches AnnData n_obs.
+    """
     names = project.get_datasource_names()
     if not names:
         return
-    ds_name = names[0]
+    ds_name = "cells" if "cells" in names else names[0]
     cell_ids = [f"cell_{i}" for i in range(n_rows)]
     project.set_column(
         ds_name,

@@ -27,7 +27,7 @@ def project(tmp_path):
 
 def test_unique_column_round_trip_via_set_column(project):
     """set_column with many unique strings should produce a readable unique column."""
-    values = [f"item_{i}" for i in range(10)]
+    values = [f"item_{i}" for i in range(5)]
     project.set_column("ds", {"name": "labels", "datatype": "unique"}, values)
 
     meta = project.get_column_metadata("ds", "labels")
@@ -177,6 +177,8 @@ def test_none_values_in_raw_data(project):
         "stringLength": 5,
     }
     project.set_column_with_raw_data("ds", col, values)
+    readback = project.get_column("ds", "nones")
+    assert readback == ["a", "", "b", "", "c"]
 
 
 # ── missing / invalid stringLength ───────────────────────────────────
