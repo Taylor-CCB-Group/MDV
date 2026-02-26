@@ -27,7 +27,7 @@ class SocketIOContextRequest(FlaskRequest):
 def mdv_socketio(app: Flask):
     """
     Experimental and not to be trusted pending design work etc.
-    
+
     Do we have a SocketIO for the entire app and route messages internally,
     - yes probably.
     What `path` should it use? We'll need to make sure it is compatible with
@@ -40,8 +40,15 @@ def mdv_socketio(app: Flask):
     global socketio
     # allow cors for localhost:5170-5179
     # cors = [f"http://localhost:{i}" for i in range(5170,5180)]
-    socketio = SocketIO(app, cors_allowed_origins="*")
-    log("socketio initialized with cors_allowed_origins wildcard")
+
+    # Get the API root path for SocketIO path configuration
+    api_root = app.config.get('mdv_api_root', '/')
+    if api_root != '/' and not api_root.endswith('/'):
+        api_root += '/'
+    socketio_path = f"{api_root}socket.io"
+
+    socketio = SocketIO(app, cors_allowed_origins="*", path=socketio_path)
+    log(f"socketio initialized with cors_allowed_origins wildcard and path={socketio_path}")
 
     # @socketio.on("message")
     # def message(data):
