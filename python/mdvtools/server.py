@@ -288,6 +288,7 @@ def create_app(
 
     @project_bp.route("/save_state", access_level='editable', methods=["POST"])
     def save_data():
+        # Frontend sends decoded column data; unique columns are string[] from ChartManager getMd()
         success = True
         try:
             state = request.json
