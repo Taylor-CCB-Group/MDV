@@ -4,7 +4,24 @@ import type { DataSource } from "./charts";
 import _ from "lodash";
 import { toPng } from "html-to-image";
 
-export type View = any;
+/** Per–data-source view config (panel layout and optional highlight state). */
+export type ViewDataDataSource = {
+    panelWidth?: number;
+    layout?: string;
+    /** Persisted row indices to highlight when the view is loaded. */
+    highlight?: number[];
+};
+
+/** View state: dataSources keyed by data source name, initialCharts, optional links. */
+export type View = {
+    name?: string;
+    dataSources: Record<string, ViewDataDataSource>;
+    initialCharts: Record<string, unknown[]>;
+    links?: unknown[];
+    viewImage?: string;
+    [key: string]: unknown;
+};
+
 export type UpdatedColumns = any;
 export type MetaData = any;
 export type ChartError = any;
