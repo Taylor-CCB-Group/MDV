@@ -175,14 +175,14 @@ export const GeneNetworkChartComponent = observer(() => {
         const scrollTop = container.scrollTop;
         const containerHeight = container.clientHeight;
 
-        const firstVisibleIndex = Math.floor(scrollTop / ROW_TOTAL_HEIGHT);
-        const lastVisibleIndex = Math.min(
-            visibleRowIndices.length - 1,
-            Math.floor((scrollTop + containerHeight) / ROW_TOTAL_HEIGHT),
-        );
+        const targetRowTop = targetVisibleIndex * ROW_TOTAL_HEIGHT;
+        const targetRowBottom = targetRowTop + ROW_TOTAL_HEIGHT;
+        const viewportBottom = scrollTop + containerHeight;
+        const isFullyVisible =
+            targetRowTop >= scrollTop && targetRowBottom <= viewportBottom;
 
-        // Only scroll if the target row is outside the actual viewport
-        if (targetVisibleIndex < firstVisibleIndex || targetVisibleIndex > lastVisibleIndex) {
+        // Only scroll if the target row is not fully visible in the viewport
+        if (!isFullyVisible) {
             if (lastScrolledGeneIndexRef.current !== targetVisibleIndex) {
                 lastScrolledGeneIndexRef.current = targetVisibleIndex;
                 rowVirtualizer.scrollToIndex(targetVisibleIndex, {
