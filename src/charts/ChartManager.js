@@ -1138,11 +1138,9 @@ export class ChartManager {
                     const baseIndex = i * stringLength;
 
                     if (!cl.data || baseIndex + stringLength > cl.data.length) {
-                        console.error(
-                            `Index out of bounds for column ${c} at row ${i}. Skipping.`
+                        throw new Error(
+                            `Invalid unique-column buffer for '${c}' at row ${i} (stringLength=${stringLength}).`
                         );
-                        arr[i] = "";
-                        continue;
                     }
 
                     const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
