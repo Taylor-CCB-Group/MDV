@@ -8,6 +8,23 @@ import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { action } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
+import { InputEditor } from "slickgrid-react";
+
+/**
+ * Text editor that sets the HTML input maxLength so the user cannot type
+ * more than the allowed characters. Used by unique columns as of now.
+ */
+export class TextEditorWithMaxLength extends InputEditor {
+    init(): void {
+        super.init();
+        const maxLen = this.columnEditor?.maxLength;
+        const input = this.editorDomElement as HTMLInputElement | undefined;
+        if (maxLen != null && input) {
+            // Limit the characters to max length
+            input.setAttribute("maxLength", String(maxLen));
+        }
+    }
+}
 /**
  * Hook for managing SlickGrid React component state.
  * 
@@ -104,7 +121,13 @@ const useSlickGridReact = () => {
                 name: col.name,
                 sortable: true,
                 width: colWidth,
-                editor: isColumnEditable ? { model: Editors.text } : null,
+                editor: isColumnEditable
+                    ? col.datatype === "unique" && col.stringLength
+                        // using a custom text editor to limit the characters to string length
+                        //! we might need to think of increasing the string length in this case
+                        ? { model: TextEditorWithMaxLength, maxLength: col.stringLength }
+                        : { model: Editors.text }
+                    : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
                     menu: {
