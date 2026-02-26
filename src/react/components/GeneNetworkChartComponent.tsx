@@ -219,9 +219,15 @@ export const GeneNetworkChartComponent = observer(() => {
         currentVisibleIndex?: number,
     ) => {
         if (isRange && currentVisibleIndex !== undefined) {
+            const maxVisibleIndex = visibleRowIndices.length - 1;
+            if (maxVisibleIndex < 0) return;
+
             let anchorVisibleIndex: number;
             if (rangeAnchorGeneIndex !== null) {
-                anchorVisibleIndex = rangeAnchorGeneIndex;
+                anchorVisibleIndex = Math.min(
+                    Math.max(rangeAnchorGeneIndex, 0),
+                    maxVisibleIndex,
+                );
             } else {
                 if (lastClickedIndex !== null) {
                     const anchorFromMap = rowIndexToVisibleIndex.get(lastClickedIndex);
@@ -231,11 +237,16 @@ export const GeneNetworkChartComponent = observer(() => {
                 }
                 setRangeAnchorGeneIndex(anchorVisibleIndex);
             }
-            const start = Math.min(anchorVisibleIndex, currentVisibleIndex);
-            const end = Math.max(anchorVisibleIndex, currentVisibleIndex);
+            const safeCurrentVisibleIndex = Math.min(
+                Math.max(currentVisibleIndex, 0),
+                maxVisibleIndex,
+            );
+            const start = Math.min(anchorVisibleIndex, safeCurrentVisibleIndex);
+            const end = Math.max(anchorVisibleIndex, safeCurrentVisibleIndex);
             const allRangeIndices: number[] = [];
             for (let i = start; i <= end; i++) {
-                allRangeIndices.push(visibleRowIndices[i]);
+                const nextRowIndex = visibleRowIndices[i];
+                if (nextRowIndex !== undefined) allRangeIndices.push(nextRowIndex);
             }
             highlightRows(allRangeIndices);
             setLastClickedIndex(rowIndex);
