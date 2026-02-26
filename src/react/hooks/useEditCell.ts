@@ -116,12 +116,6 @@ const useEditCell = (
                 // Set new value
                 setCellValueFromString(editedCol, dataIndex, newValueString);
 
-                setFeedbackAlert({
-                    type: "success",
-                    message: `Updated value ${oldValue} with ${updatedValue} in column: ${columnName}`,
-                    title: "Edit Successful",
-                });
-
                 // Update the dataStore and rerender the grid
                 dataStore.dataChanged([columnName]);
                 const grid = gridRef.current?.slickGrid;
