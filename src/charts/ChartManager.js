@@ -884,6 +884,19 @@ export class ChartManager {
         // We are relying on the config being stable/settled when these promises resolve.
         console.log('after await Promise.all(chartPromises);');
 
+        // Restore highlighted indices from view data (e.g. after loading or switching view)
+        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
+            const spec = this.viewData.dataSources[dsName];
+            const highlight = spec?.highlight;
+            const dstore = this.dsIndex[dsName]?.dataStore;
+            if (!dstore?.dataHighlighted) continue;
+            if (Array.isArray(highlight) && highlight.length > 0) {
+                dstore.dataHighlighted(highlight, null);
+            } else {
+                dstore.dataHighlighted([], null);
+            }
+        }
+
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
         this._inInit = false;
@@ -1215,6 +1228,16 @@ export class ChartManager {
 
         const view = JSON.parse(JSON.stringify(this.viewData));
         view.initialCharts = initialCharts;
+        for (const ds of this.dataSources) {
+            const h = ds.dataStore.getHighlightedData?.();
+            if (!view.dataSources[ds.name]) view.dataSources[ds.name] = {};
+            if (Array.isArray(h) && h.length > 0) {
+                view.dataSources[ds.name].highlight = [...h];
+            } else {
+                // biome-ignore lint/performance/noDelete: setting it to undefined would mean there would still be the key, not a perf issue here.
+                delete view.dataSources[ds.name].highlight;
+            }
+        }
         const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
         return {
             view: view,
