@@ -623,11 +623,16 @@ class MDVProject:
         return data
 
     def set_column_with_raw_data(self, datasource, column, raw_data):
-        """Adds or updates a column with raw data
+        """Adds or updates a column with raw data.
+
         Args:
             datasource (str): The name of the datasource.
-            column (dict): The complete metadata for the column
-            raw_data (list|array): The raw binary data for the column
+            column (dict): The complete metadata for the column (must include
+                stringLength for datatype 'unique').
+            raw_data (list|array): The raw data for the column. For numeric
+                datatypes this is the numeric array; for text/text16 the
+                encoded indices; for unique, string-like or bytes (decoded
+                string[] when called from save_state).
         """
         h5 = self._get_h5_handle()
         cid = column["field"]
@@ -636,10 +641,58 @@ class MDVProject:
             raise AttributeError(f"{datasource} is not a group")
         if ds.get(cid):
             del ds[cid]
+        num_rows = len(raw_data)
         dt = numpy_dtypes.get(column["datatype"])
         if not dt:
-            dt = h5py.string_dtype("utf-8", column["stringLength"])
-        ds.create_dataset(cid, len(raw_data), data=raw_data, dtype=dt)
+            # Handle unique columns - need stringLength
+            if column["datatype"] == "unique":
+                string_length = column.get("stringLength")
+                if not isinstance(string_length, (int, numpy.integer)) or int(string_length) <= 0:
+                    raise ValueError(
+                        f"Column {cid} of type 'unique' requires 'stringLength' in metadata"
+                    )
+                string_length = int(string_length)
+                
+                # No conversion: "raw" means the caller supplies string-like data.
+                # Frontend (save_state) sends decoded string[] from getMd(); direct callers must pass strings/bytes.
+                if len(raw_data) > 0 and any(
+                    isinstance(v, (int, float, numpy.integer, numpy.floating))
+                    for v in raw_data
+                ):
+                    raise ValueError(
+                        f"Column {cid} of type 'unique' expects array of strings (or bytes); "
+                        f"got numeric data. Use set_column() for int-to-string conversion."
+                    )
+                # Compute max byte length (handling None, str, and bytes)
+                if len(raw_data) > 0:
+                    def _byte_len(v):
+                        if v is None:
+                            return 0
+                        if isinstance(v, (bytes, bytearray, numpy.bytes_)):
+                            return len(v)
+                        if not isinstance(v, (str, numpy.str_)):
+                            raise ValueError(
+                                f"Column {cid} of type 'unique' expects string-like values, got {type(v).__name__}."
+                            )
+                        return len(str(v).encode("utf-8"))
+                    max_str_len = max(_byte_len(v) for v in raw_data)
+                    if max_str_len > string_length:
+                        string_length = max_str_len
+                        # Update column metadata so it persists correctly (JS decoder uses stringLength)
+                        column["stringLength"] = string_length
+                # Normalize only None/bytes for storage; no int/float conversion
+                raw_data = [
+                    ""
+                    if v is None
+                    else (v.decode("utf-8") if isinstance(v, (bytes, bytearray, numpy.bytes_)) else str(v))
+                    for v in raw_data
+                ]
+                dt = h5py.string_dtype("utf-8", string_length)
+            else:
+                raise ValueError(
+                    f"Unknown datatype: {column['datatype']} for column {cid}"
+                )
+        ds.create_dataset(cid, num_rows, data=raw_data, dtype=dt)
         ds = self.get_datasource_metadata(datasource)
         cols = ds["columns"]
         ind = [c for c, x in enumerate(cols) if x["field"] == cid]
@@ -656,9 +709,10 @@ class MDVProject:
             datasource (str): The name of the datasource.
             column (str|dict):  metadata for the column. Can be a string with the column's name,
                 although datatype should also be included as the inferred datatype
-                is not always correct
-            raw_data (list|array): Anything that can be converted into a pandas Series
-            The data should be in the correct order
+                is not always correct.
+            data (list|array): Anything that can be converted into a pandas Series.
+                The data should be in the correct order. For datatype 'unique',
+                int/numeric are converted to string (e.g. CSV-inferred cell_id).
         """
         if isinstance(column, str):
             column = {"name": column}
@@ -1527,6 +1581,12 @@ class MDVProject:
             # TODO also copy any linked avivator images
 
     def save_state(self, state):
+        """Apply state from frontend (e.g. POST /save_state).
+
+        For updatedColumns, the frontend sends column data already decoded: unique
+        columns come as string[] from ChartManager getMd() (Uint8Array decoded by
+        stringLength). set_column_with_raw_data() expects that form (no int/float).
+        """
         # update/add or view
         # view will be deleted if view is null
         if state.get("currentView"):
@@ -2161,6 +2221,9 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
+            # unique: ensure string (e.g. CSV-inferred int cell_id)
+            if pandas.api.types.is_numeric_dtype(data):
+                data = data.astype(str)
             max_len = max(data.str.len())
             utf8_type = h5py.string_dtype("utf-8", int(max_len))
             col["datatype"] = "unique"
