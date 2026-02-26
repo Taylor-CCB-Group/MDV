@@ -187,7 +187,7 @@ export const GeneNetworkChartComponent = observer(() => {
                 lastScrolledGeneIndexRef.current = targetVisibleIndex;
                 rowVirtualizer.scrollToIndex(targetVisibleIndex, {
                     align: "center",
-                    behavior: "smooth",
+                    behavior: "auto",
                 });
             }
         } else if (lastScrolledGeneIndexRef.current === targetVisibleIndex) {
@@ -267,7 +267,7 @@ export const GeneNetworkChartComponent = observer(() => {
 
         rowVirtualizer.scrollToIndex(visibleIndex, {
             align: "center",
-            behavior: "smooth",
+            behavior: "auto",
         });
 
         const rowElement = rowRefs.current.get(rowIndex);
