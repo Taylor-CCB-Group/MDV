@@ -27,67 +27,67 @@
 
 
 import {BWSource} from "./bigwig.js";
-import {FeatureSource,FastaSequence,BigBedFeatureSource,TabixBedFeatureSource} from "./feature.js";
+import {FastaSequence,BigBedFeatureSource,TabixBedFeatureSource} from "./feature.js";
 
 
 class MLVTrack{
-	constructor(config){
-		this.config=config;
-	}
+    constructor(config){
+        this.config=config;
+    }
 
-	_setFeatureSource(){
-		//overriden by tracks with feature sources
-	}
+    _setFeatureSource(){
+        //overriden by tracks with feature sources
+    }
 
-	drawScale(ctx){
-		//overidden in tracks with scale
-	}
+    drawScale(ctx){
+        //overidden in tracks with scale
+    }
 
-	getConfig(){
-		return JSON.parse(JSON.stringify(this.config));
-	}
+    getConfig(){
+        return JSON.parse(JSON.stringify(this.config));
+    }
 
-	setConfigAttribute(attribute,value){
+    setConfigAttribute(attribute,value){
         if (value == null){
             delete this.config[attribute];
             return;
         }
-		this.config[attribute]=value;
-    	if (attribute==="url"){
-    		this._setFeatureSource();
-    	}
+        this.config[attribute]=value;
+        if (attribute==="url"){
+            this._setFeatureSource();
+        }
     }
 
     setColorFunction(func){
-		this.color_function=func;
-	}
-    getFeatureAt(genomicLocation, chr,yOffset, bpPerPixel){
-    	return null;
+        this.color_function=func;
     }
-
+    getFeatureAt(genomicLocation, chr,yOffset, bpPerPixel){
+        return null;
+    }
+    //not actually used anymore - remove ?
     setConfig(config){
-    	if (this.config.url !== config.url){
-    		this.config=config;
-    		this._setFeatureSource();
-    	}
-    	else{
-    		this._setFeatureSource();
-    	}
+        if (this.config.url !== config.url){
+            this.config=config;
+            this._setFeatureSource();
+        }
+        else{
+            this._setFeatureSource();
+        }
     }
 
      /**
-	* Retrieves the features requested, the default is just to get the features
-	* from the feature source 
-	* @param {string} chr - The chromosome 
-	* @param {integer} bpStart - The start of the range from which to obtain features
-	* @param {integer} bpEnd - The end of the range from which to obtain features 
-	* @param {boolean} force - If true then cached features should not be used
-	* but fresh features retrieved
-	* @param {Object} data - contains bp  ber pixel and width of the canvas 
-	*/
-	getFeatures (chr, bpStart, bpEnd,force,data) {
-		return this.feature_source.getFeatures(chr,bpStart,bpEnd,force,data);
-	}
+    * Retrieves the features requested, the default is just to get the features
+    * from the feature source 
+    * @param {string} chr - The chromosome 
+    * @param {integer} bpStart - The start of the range from which to obtain features
+    * @param {integer} bpEnd - The end of the range from which to obtain features 
+    * @param {boolean} force - If true then cached features should not be used
+    * but fresh features retrieved
+    * @param {Object} data - contains bp  ber pixel and width of the canvas 
+    */
+    getFeatures (chr, bpStart, bpEnd,force,data) {
+        return this.feature_source.getFeatures(chr,bpStart,bpEnd,force,data);
+    }
 
 
     getSettings(panel){
@@ -135,119 +135,119 @@ class MLVTrack{
     }
 
 
-	static calculateLabel(url){
-		if (typeof url !== "string"){
-			url = url[0];
-		}
-		let arr =url.split("/");
-		let label= arr[arr.length-1];
-		arr= label.split(".");
-		label = arr[0];
-		return label;
-	}
+    static calculateLabel(url){
+        if (typeof url !== "string"){
+            url = url[0];
+        }
+        let arr =url.split("/");
+        let label= arr[arr.length-1];
+        arr= label.split(".");
+        label = arr[0];
+        return label;
+    }
 
-	addExtraControls(div,panel){
-	}
+    addExtraControls(div,panel){
+    }
 
-	static getTypeFromURL(url){
-		let config={}
-		if (typeof url !== "string"){
-			return config;
-		}
-			if (url.endsWith("bw")){
-				config.type="bigwig";
-				config.format="wig";
-				
-			}
-			else if (url.endsWith(".bed.gz")){
-				config.type="bed";
-				config.format="feature"
+    static getTypeFromURL(url){
+        let config={}
+        if (typeof url !== "string"){
+            return config;
+        }
+            if (url.endsWith("bw")){
+                config.type="bigwig";
+                config.format="wig";
+                
+            }
+            else if (url.endsWith(".bed.gz")){
+                config.type="bed";
+                config.format="feature"
 
-			}
-			else if (url.endsWith(".bb") && !(config.type)){
-				config.type="bigbed";
-				config.format="feature"
+            }
+            else if (url.endsWith(".bb") && !(config.type)){
+                config.type="bigbed";
+                config.format="feature"
 
-			}
-			else if (url.endsWith(".fasta")){
-				config.type="fasta";
-				config.format="sequence";
-			}
-			else if (url.endsWith(".bam")){
-				config.type="bam";
-				config.format="alignment";
-			}
-		return config;
+            }
+            else if (url.endsWith(".fasta")){
+                config.type="fasta";
+                config.format="sequence";
+            }
+            else if (url.endsWith(".bam")){
+                config.type="bam";
+                config.format="alignment";
+            }
+        return config;
 
-	}
+    }
 
-	static parseConfig(con){
-		let config = JSON.parse(JSON.stringify(con));
-		
-		if (!(config.type) && config.url){
-			let info = MLVTrack.getTypeFromURL(config.url);
-			if (info.type){
-				config.type=info.type;
-				config.format=info.format;
-			}
-		}
-		if (config.type==="bed" || config.type==="bigbed"){
-			config.format="feature";
-		}
-		if (!config.short_label && config.url){
-			config.short_label=MLVTrack.calculateLabel(config.url);
-		}
-		
-		if (!config.track_id){
-			config.track_id=config.url;
-		}
+    static parseConfig(con){
+        let config = JSON.parse(JSON.stringify(con));
+        
+        if (!(config.type) && config.url){
+            let info = MLVTrack.getTypeFromURL(config.url);
+            if (info.type){
+                config.type=info.type;
+                config.format=info.format;
+            }
+        }
+        if (config.type==="bed" || config.type==="bigbed"){
+            config.format="feature";
+        }
+        if (!config.short_label && config.url){
+            config.short_label=MLVTrack.calculateLabel(config.url);
+        }
+        
+        if (!config.track_id){
+            config.track_id=config.url;
+        }
 
-		if (config.format==="feature"){
-			config.displayMode = config.displayMode || "COLLAPSED";    // COLLAPSED | EXPANDED | SQUISHED
-        	config.labelDisplayMode = "SLANT";
-        	config.squishedCallHeight = config.squishedCallHeight || 30;
-        	config.expandedCallHeight = config.expandedCallHeight || 15;
-        	config.featureHeight=config.featureHeight || 12;
-		
-		}
+        if (config.format==="feature"){
+            config.displayMode = config.displayMode || "COLLAPSED";    // COLLAPSED | EXPANDED | SQUISHED
+            config.labelDisplayMode = "SLANT";
+            config.squishedCallHeight = config.squishedCallHeight || 30;
+            config.expandedCallHeight = config.expandedCallHeight || 15;
+            config.featureHeight=config.featureHeight || 12;
+        
+        }
 
-		if (config.format==="wig" || config.type==="bigwig"){
-			if (!config.scale){
-				config.scale="dynamic";
-			}
-			if (!config.min_y){
-				config.min_y=0;
-			}
-			if (!config.max_y){
-				config.max_y=100;
-			}
-			if (!config.height){
-				config.height=100;
-			}
-		}
-		if (config.type==="bam"){
-			if (!config.featureHeight){
-				config.featureHeight=12;
-			}
-		}
-		if (!config.height){
-			config.height=100;
-		}
+        if (config.format==="wig" || config.type==="bigwig"){
+            if (!config.scale){
+                config.scale="dynamic";
+            }
+            if (!config.min_y){
+                config.min_y=0;
+            }
+            if (!config.max_y){
+                config.max_y=100;
+            }
+            if (!config.height){
+                config.height=100;
+            }
+        }
+        if (config.type==="bam"){
+            if (!config.featureHeight){
+                config.featureHeight=12;
+            }
+        }
+        if (!config.height){
+            config.height=100;
+        }
 
-		if (!config.color){
-			if (config.type==="bam"){
-				config.color="#D3D3D3";
-			}
-			else{
-				//config.color="black";
-			}
-		}
-		if (!config.opacity){
-			config.opacity=1.0;
-		}
+        if (!config.color){
+            if (config.type==="bam"){
+                config.color="#D3D3D3";
+            }
+            else{
+                //config.color="black";
+            }
+        }
+        if (!config.opacity){
+            config.opacity=1.0;
+        }
            
-		return config;
-	}
+        return config;
+    }
 
     drawMessage(options){
         const ctx = options.context;
@@ -265,19 +265,19 @@ class MLVTrack{
 
 
 
-	
-	static getTrack(config){
-		config=MLVTrack.parseConfig(config);
-		let cl= MLVTrack.track_types[config.type];
-		if (!cl){
-			throw new Error("Track type "+ config.type+" not recognised")
-		}
+    
+    static getTrack(config){
+        config=MLVTrack.parseConfig(config);
+        let cl= MLVTrack.track_types[config.type];
+        if (!cl){
+            throw new Error("Track type "+ config.type+" not recognised")
+        }
         // pjt: nb, simple bed FeatureSource is not used anywhere and we have no way of loading simple bed files
         // config.type = "bed" is used for tabix indexed bed files
-		return new cl["class"](config);
+        return new cl["class"](config);
 
-	}
-		
+    }
+        
 }
 
 MLVTrack.custom_tracks={};
@@ -292,11 +292,11 @@ MLVTrack.track_types={}
 
 
 class RulerTrack extends MLVTrack{
-	constructor(config){
-		if (!config){
-			config={"track_id":"ruler"+RulerTrack.count,format:"ruler",short_label:"Ruler",type:"ruler"};
-		}
-		super(config);
+    constructor(config){
+        if (!config){
+            config={"track_id":"ruler"+RulerTrack.count,format:"ruler",short_label:"Ruler",type:"ruler"};
+        }
+        super(config);
         this.height = 30;
         this.config.height=30;
         this.name = "";
@@ -327,7 +327,7 @@ class RulerTrack extends MLVTrack{
         // Find starting point closest to the current origin
         let nTick = Math.floor(options.bpStart / spacing) - 1;
         let x = 0;
-		let y_pos=options.top+this.height;
+        let y_pos=options.top+this.height;
         //canvas.setProperties({textAlign: 'center'});
         Graphics.setProperties(ctx, fontStyle );
         const shim = 2;
@@ -452,13 +452,13 @@ class RulerTrack extends MLVTrack{
 RulerTrack.count=0;
 
 MLVTrack.track_types["ruler"]={
-	"class":RulerTrack,
-	name:"Ruler"
+    "class":RulerTrack,
+    name:"Ruler"
 
 }
 
 export class TickSpacing{
-	constructor(majorTick, majorUnit, unitMultiplier) {
+    constructor(majorTick, majorUnit, unitMultiplier) {
         this.majorTick = majorTick;
         this.majorUnit = majorUnit;
         this.unitMultiplier = unitMultiplier;
@@ -468,31 +468,31 @@ export class TickSpacing{
 
  
 class MLVBedTrack extends MLVTrack{
-	constructor(config){
-		super(config);
-		this._setFeatureSource();
-		this.filter_function=null;
-		this.color_function=null;
-		
-	}
+    constructor(config){
+        super(config);
+        this._setFeatureSource();
+        this.filter_function=null;
+        this.color_function=null;
+        
+    }
 
-	_setFeatureSource(){
-		this.feature_source= new TabixBedFeatureSource(this.config);
-	}
+    _setFeatureSource(){
+        this.feature_source= new TabixBedFeatureSource(this.config);
+    }
 
-	setFilterFunction(func){
-		this.filter_function=func;
-	}
-	
+    setFilterFunction(func){
+        this.filter_function=func;
+    }
+    
 
-	getCurrentFeatures(chr,start,end){
-		return this.feature_source.featureCache.queryFeatures(chr,start,end);
-	}
-	
-	drawFeatures(options) {
-		let max_y_val=0;
+    getCurrentFeatures(chr,start,end){
+        return this.feature_source.featureCache.queryFeatures(chr,start,end);
+    }
+    
+    drawFeatures(options) {
+        let max_y_val=0;
         var track = this,
-        	py,
+            py,
             featureList = options.features,
             ctx = options.context,
             bpPerPixel = options.bpPerPixel,
@@ -501,11 +501,11 @@ class MLVBedTrack extends MLVTrack{
             pixelHeight = options.pixelHeight,
             offset=0,
             bpEnd = bpStart + pixelWidth * bpPerPixel + 1;
-	 	let top=0;
-       	if(options.top){
+         let top=0;
+           if(options.top){
            top=options.top;
-       	}
-       	this.top=top;
+           }
+           this.top=top;
         let conf = this.config;
         let windowX = 0;
         let windowX1 = windowX + pixelWidth;
@@ -514,23 +514,23 @@ class MLVBedTrack extends MLVTrack{
         this.config.expandedCallHeight = (this.config.featureHeight/2)+2;
         let ki=null;
         if (featureList.length>50000){
-        	ki=Math.round(featureList.length/50000)+1;
+            ki=Math.round(featureList.length/50000)+1;
         }
 
 
 
         if (featureList) {
-        	let opacity = this.config.opacity?this.config.opacity:1;
-        	ctx.globalAlpha=opacity;
+            let opacity = this.config.opacity?this.config.opacity:1;
+            ctx.globalAlpha=opacity;
 
             for (var gene, i = 0, len = featureList.length; i < len; i++) {
-            	if (ki && i%ki!==0){
-            		continue;
-            	}
+                if (ki && i%ki!==0){
+                    continue;
+                }
                 gene = featureList[i];
                 if (this.filter_function && !this.filter_function(gene)){
-                	gene.display=false;
-                	continue;
+                    gene.display=false;
+                    continue;
                 }
                 gene.display=true;
                 if (gene.end < bpStart) continue;
@@ -538,27 +538,29 @@ class MLVBedTrack extends MLVTrack{
                 let coord = this.calculateFeatureCoordinates(gene, bpStart,bpPerPixel);
                 let h = conf.featureHeight
                 if (conf.displayMode === "SQUISHED" && gene.row != undefined) {
-            		h = conf.featureHeight / 2;
-            		py = conf.expandedCallHeight * gene.row + 2;
-        		} else if (conf.displayMode === "EXPANDED" && gene.row != undefined) {
-            		py = conf.squishedCallHeight * gene.row + 5;
-        		} else {
+                    h = conf.featureHeight / 2;
+                    py = conf.expandedCallHeight * gene.row + 2;
+                } else if (conf.displayMode === "EXPANDED" && gene.row != undefined) {
+                    py = conf.squishedCallHeight * gene.row + 5;
+                } else {
              // collapsed
-           			 py = 5;
-        		}
-        		py+=top;
-        		if (py+h>max_y_val){
-        			max_y_val=py+h;
-        		}
-        		coord.py=py;
-        		coord.h=h;
-        		let info={bpPerPixel:bpPerPixel,bpStart:bpStart,pixelWidth:pixelWidth}
-        		if (this.color_function){
-        			gene.color=this.color_function(gene);
-        		}
-        		
+                        py = 5;
+                }
+                py+=top;
+                if (py+h>max_y_val){
+                    max_y_val=py+h;
+                }
+                coord.py=py;
+                coord.h=h;
+                let info={bpPerPixel:bpPerPixel,bpStart:bpStart,pixelWidth:pixelWidth}
+                if (this.color_function){
+                    gene.color=this.color_function(gene);
+                }
+                
                 this.renderFeature(gene,coord,ctx,info,options.textColor);
-                this.renderFeatureLabel(ctx, gene, coord.px, coord.px1, py, windowX, windowX1,options.textColor);
+                if (this.config.displayMode != "SQUISHED" && !this.config.hideLabels) {
+                    this.renderFeatureLabel(ctx, gene, coord.px, coord.px1, py, windowX, windowX1,options.textColor);
+                }
             }
             ctx.globalAlpha=1;
         }
@@ -567,16 +569,12 @@ class MLVBedTrack extends MLVTrack{
         }
         this.bottom=max_y_val;
         if (this.config.displayMode==="COLLAPSED"){
-        	max_y_val+=25;
+            max_y_val+=25;
         }	
-    	return max_y_val;
+        return max_y_val;
     }
-        
-           
 
-    
-  
-	 /**
+    /**
      * @param ctx       the canvas 2d context
      * @param feature
      * @param featureX  feature start x-coordinate
@@ -585,17 +583,12 @@ class MLVBedTrack extends MLVTrack{
      * @param windowX   visible window start x-coordinate
      * @param windowX1  visible window end x-coordinate
      */
-  
-
-
-
-	renderFeatureLabel(ctx, feature, featureX, featureX1, featureY, windowX, windowX1,defaultColor) {
-		let info = this.config;
-        var geneFontStyle, transform,
+    renderFeatureLabel(ctx, feature, featureX, featureX1, featureY, windowX, windowX1,defaultColor) {
+        let info = this.config;
+        let geneFontStyle, transform,
             boxX, boxX1,    // label should be centered between these two x-coordinates
             labelX, labelY,
             textFitsInBox;
-
         // feature outside of viewable window
         if (featureX1 < windowX || featureX > windowX1) {
             boxX = featureX;
@@ -605,64 +598,49 @@ class MLVBedTrack extends MLVTrack{
             boxX = Math.max(featureX, windowX);
             boxX1 = Math.min(featureX1, windowX1);
         }
-
         let text= feature.name;
         if (this.label_function){
-        	text=this.label_function(feature);
+            text=this.label_function(feature);
         }
-       
-
-        //if (igv.browser.selection && "genes" === this.config.type && feature.name !== undefined) {
-            // TODO -- for gtex, figure out a better way to do this
-            //geneColor = igv.browser.selection.colorForGene(feature.name);
-      //  }
-
         textFitsInBox = (boxX1 - boxX) > ctx.measureText(text).width;
-        //geneColor="black";
-
-        if ((textFitsInBox) && info.displayMode != "SQUISHED" && text) {
+        if ((textFitsInBox)  && text) {
             geneFontStyle = {
                 font: '10px PT Sans',
                 textAlign: 'center',
                 fillStyle: info.color || defaultColor,
                 strokeStyle: info.color || defaultColor
             };
-
             if (info.displayMode === "COLLAPSED" && info.labelDisplayMode === "SLANT") {
                 transform = {rotate: {angle: 45}};
                 delete geneFontStyle.textAlign;
             }
-
             labelX = boxX + ((boxX1 - boxX) / 2);
             labelY = getFeatureLabelY(featureY, transform);
-
             Graphics.fillText(ctx, text, labelX, labelY, geneFontStyle, transform);
         }
         function getFeatureLabelY(featureY, transform) {
-        	return transform ? featureY + info.featureHeight+14 : featureY + info.featureHeight+7;
-    	}
+            return transform ? featureY + info.featureHeight+14 : featureY + info.featureHeight+7;
+        }
     }
 
 
 
-	calculateFeatureCoordinates(feature, bpStart, xScale) {
-    	var px = Math.round((feature.start-1 - bpStart) / xScale),
+    calculateFeatureCoordinates(feature, bpStart, xScale) {
+        var px = Math.round((feature.start-1 - bpStart) / xScale),
         px1 = Math.round((feature.end - bpStart) / xScale),
         pw = px1 - px;
-
         if (pw < 3) {
-        	pw = 3;
+            pw = 3;
             px -= 1;
         }
-
         return {
-        	px: px,
+            px: px,
             px1: px1,
             pw: pw
         };
-	}
+    }
 
-	/**
+    /**
      * Renders the feature to the canvas
      * @param feature - The feature itself
      * @param coord An object containing information on where to draw the feature
@@ -673,9 +651,9 @@ class MLVBedTrack extends MLVTrack{
      * bpStart.bpPerPixel and pixelWidth
      * 
      */
-	
-	renderFeature(feature, coord,ctx,info,defaultColor){
-		var e,x, cy, direction, exon, ePx, ePx1, ePxU, ePw, py2, h2, 
+    
+    renderFeature(feature, coord,ctx,info,defaultColor){
+        var e,x, cy, direction, exon, ePx, ePx1, ePxU, ePw, py2, h2, 
             step = 20,
             color = this.config.color || defaultColor;
         if (feature.color) {
@@ -690,11 +668,11 @@ class MLVBedTrack extends MLVTrack{
         h2 = coord.h / 2;
         py2 = cy - h2 / 2;
 
-		let exonCount = feature.exons ? feature.exons.length : 0;
-			if (exonCount == 0) {
-            	// single-exon transcript
-            	ctx.fillRect(coord.px, coord.py, coord.pw, coord.h);
-        	}
+        let exonCount = feature.exons ? feature.exons.length : 0;
+            if (exonCount == 0) {
+                // single-exon transcript
+                ctx.fillRect(coord.px, coord.py, coord.pw, coord.h);
+            }
         else{
             // multi-exon transcript
             coord.px=Math.max(coord.px,0);
@@ -754,10 +732,10 @@ class MLVBedTrack extends MLVTrack{
             }
         }
 
-	}
+    }
 
-	getFeatureAt(genomicLocation, chr, coord, bpPerPixel) {
-		let yOffset=coord.y-this.top;
+    getFeatureAt(genomicLocation, chr, coord, bpPerPixel) {
+        let yOffset=coord.y-this.top;
         // We use the featureCache property rather than method to avoid async load.  If the
         // feature is not already loaded this won't work,  but the user wouldn't be mousing over it either.
         if (this.feature_source.featureCache) {
@@ -804,26 +782,26 @@ class MLVBedTrack extends MLVTrack{
 }
 
 MLVTrack.track_types["bed"]={
-	"class":MLVBedTrack,
-	name:"bed(tabix)"
+    "class":MLVBedTrack,
+    name:"bed(tabix)"
 }
 
 
 class MLVBigBedTrack extends MLVBedTrack{
-	constructor(config){
-		super(config);
-		
-	}
-	_setFeatureSource(){
-		this.feature_source=new BigBedFeatureSource(this.config);
-	}
+    constructor(config){
+        super(config);
+        
+    }
+    _setFeatureSource(){
+        this.feature_source=new BigBedFeatureSource(this.config);
+    }
 
 }
 
 MLVTrack.track_types["bigbed"]={
-	"class":MLVBigBedTrack,
-	"name":"BigBed"
-	
+    "class":MLVBigBedTrack,
+    "name":"BigBed"
+    
 }
 
 
@@ -831,15 +809,15 @@ MLVTrack.track_types["bigbed"]={
 
 
 class MLVWigTrack extends MLVTrack{
-	constructor(config){
-		config.format="wig";
-		super(config);
-		this._setFeatureSource();
-	}
+    constructor(config){
+        config.format="wig";
+        super(config);
+        this._setFeatureSource();
+    }
 
-	_setFeatureSource(){
-		this.feature_source=new BWSource(this.config);	
-	}
+    _setFeatureSource(){
+        this.feature_source=new BWSource(this.config);	
+    }
     getSettings(panel) {
         return [
             ...super.getSettings(panel),
@@ -855,65 +833,65 @@ class MLVWigTrack extends MLVTrack{
         ]
     }
 
-	drawScale(pixel_height,ctx,defaultColor){
-		if (this.config.scale_link_to && this.config.group){
-			return;
-		}
-	
-		let	top=this.top;
-		let	bot = this.bottom;
-		
-		ctx.fillStyle=defaultColor;
+    drawScale(pixel_height,ctx,defaultColor){
+        if (this.config.scale_link_to && this.config.group){
+            return;
+        }
+    
+        let	top=this.top;
+        let	bot = this.bottom;
+        
+        ctx.fillStyle=defaultColor;
         ctx.strokeStyle=defaultColor;
 
-		ctx.beginPath();
-		ctx.moveTo(0,top);
-		ctx.lineTo(0,bot);
-		ctx.moveTo(0,top);
-		ctx.lineTo(20,top);
-		ctx.moveTo(0,bot);
-		ctx.lineTo(20,bot);
-		ctx.font="12px Arial";
-		ctx.stroke();
-		ctx.textBaseline="top";
-		
-		if (this.max_y != null){
-		    ctx.fillText(this.max_y.toFixed(2),20,top);
-		    ctx.textBaseline="alphabetic";
-		    ctx.fillText(this.min_y,20,bot);
-		}
+        ctx.beginPath();
+        ctx.moveTo(0,top);
+        ctx.lineTo(0,bot);
+        ctx.moveTo(0,top);
+        ctx.lineTo(20,top);
+        ctx.moveTo(0,bot);
+        ctx.lineTo(20,bot);
+        ctx.font="12px Arial";
+        ctx.stroke();
+        ctx.textBaseline="top";
+        
+        if (this.max_y != null){
+            ctx.fillText(this.max_y.toFixed(2),20,top);
+            ctx.textBaseline="alphabetic";
+            ctx.fillText(this.min_y,20,bot);
+        }
 
-	}
+    }
 
 
 
-	
-	
-	
-	
-	drawFeatures(options) {
-		let self = this,
-	    features = options.features,
-	    color=this.config.color,
-	    ctx = options.context,
-	    bpPerPixel = options.bpPerPixel,
-	    bpStart = options.bpStart,
-	    pixelWidth = options.pixelWidth,
-	    pixelHeight =options.pixelHeight,
-	    y_offset=options.top,
-	    bpEnd = bpStart + pixelWidth * bpPerPixel + 1,
-	    featureValueRange;
-	    if (this.config.group){
+    
+    
+    
+    
+    drawFeatures(options) {
+        let self = this,
+        features = options.features,
+        color=this.config.color,
+        ctx = options.context,
+        bpPerPixel = options.bpPerPixel,
+        bpStart = options.bpStart,
+        pixelWidth = options.pixelWidth,
+        pixelHeight =options.pixelHeight,
+        y_offset=options.top,
+        bpEnd = bpStart + pixelWidth * bpPerPixel + 1,
+        featureValueRange;
+        if (this.config.group){
             pixelHeight=options.height;
-	    }
-	    else {
-	    	pixelHeight=this.config.height;	
-	    }
-	    if (!color){
-	    	color="black";       
-	    }
-	    this.prev_coords={x:0,y:0};
-		
+        }
+        else {
+            pixelHeight=this.config.height;	
+        }
+        if (!color){
+            color="black";       
+        }
+        this.prev_coords={x:0,y:0};
+        
         if (features) {
             if (this.scale_link_to) {
                 let t = this.scale_link_to.config;
@@ -1080,35 +1058,35 @@ class MLVWigTrack extends MLVTrack{
         this.bottom=y_offset+pixelHeight;
         
         return this.bottom;
-	}
+    }
 }
 
 
 
 MLVTrack.track_types["bigwig"]={
-	"class":MLVWigTrack,
-	name:"BigWig"
+    "class":MLVWigTrack,
+    name:"BigWig"
 }
 
 
  class LineTrack extends MLVWigTrack{
-	 constructor(config){
-		 super(config);
-		 this.is_line=true;
-	 }
-	 
-	 getFeatures(chr, bpStart, bpEnd) {
-		 return new Promise(function (fulfill, reject) {
-			 fulfill([]);
-	     });
-	 }
-	 
-	 
+     constructor(config){
+         super(config);
+         this.is_line=true;
+     }
+     
+     getFeatures(chr, bpStart, bpEnd) {
+         return new Promise(function (fulfill, reject) {
+             fulfill([]);
+         });
+     }
+     
+     
  }
 
 MLVTrack.track_types["line"]={
-	"class":LineTrack,
-	name:"Line Track"
+    "class":LineTrack,
+    name:"Line Track"
 }
 
 
@@ -1116,20 +1094,20 @@ MLVTrack.track_types["line"]={
 
 class SequenceTrack extends MLVTrack{
     constructor(config){
-		super(config) 
+        super(config) 
         this._setFeatureSource(config);
         this.sequenceType = config.sequenceType || "dna";  
         this.height = 15;
     }
 
     _setFeatureSource(config){
-    	this.feature_source = new FastaSequence(config.url);
+        this.feature_source = new FastaSequence(config.url);
     }
 
 
 
     getFeatures(chr, bpStart, bpEnd,force,data) {
-		let self = this;
+        let self = this;
         return new Promise(function (fulfill, reject) {
             if (data.bpPerPixel > 1/*igv.browser.trackViewportWidthBP() > 30000*/) {
                 fulfill(null);
@@ -1199,8 +1177,8 @@ class SequenceTrack extends MLVTrack{
 
 
 MLVTrack.track_types["fasta"]={
-	"class":SequenceTrack,
-	name:"Fasta"
+    "class":SequenceTrack,
+    name:"Fasta"
 }
 
 
@@ -1396,41 +1374,33 @@ class Graphics{
                 ctx[q % 2 == 0 ? 'moveTo' : 'lineTo'](x1, y1);
             }
             ctx[q % 2 == 0 ? 'moveTo' : 'lineTo'](x2, y2);
-
             ctx.restore();
         }
-
-
-    
-
         static doPath(ctx, x, y) {
-
-
-        	var i, len = x.length;
-        	for (i = 0; i < len; i++) {
-        		x[i] = Math.round(x[i]);
-        		y[i] = Math.round(y[i]);
-        	}
-
-        	ctx.beginPath();
-        	ctx.moveTo(x[0], y[0]);
-        	for (i = 1; i < len; i++) {
-        		ctx.lineTo(x[i], y[i]);
-        	}
-        	ctx.closePath();
+            var i, len = x.length;
+            for (i = 0; i < len; i++) {
+                x[i] = Math.round(x[i]);
+                y[i] = Math.round(y[i]);
+            }
+            ctx.beginPath();
+            ctx.moveTo(x[0], y[0]);
+            for (i = 1; i < len; i++) {
+                ctx.lineTo(x[i], y[i]);
+            }
+            ctx.closePath();
         }
 
 }
 
 Graphics.nucleotideColors={
-	"A":"green",
-	"T":"red",
-	"G":"gray",
-	"C":"blue",
-	"a":"green",
-	"t":"red",
-	"c":"blue",
-	"g":"gray"
+    "A":"green",
+    "T":"red",
+    "G":"gray",
+    "C":"blue",
+    "a":"green",
+    "t":"red",
+    "c":"blue",
+    "g":"gray"
 
 }
 

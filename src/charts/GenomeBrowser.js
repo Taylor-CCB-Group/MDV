@@ -1,11 +1,15 @@
 import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
+import { useDataSources } from "@/react/hooks";
+import {loadColumn} from "@/dataloaders/DataLoaderUtil"
+
 
 class GenomeBrowser extends BaseChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
         const c = this.config;
+        this.links=[];
         c.view_margins = c.view_margins || { type: "percentage", value: 20 };
         this.contentDiv.style.width = "100%";
         this.contentDiv.style.height = "100%";
@@ -78,7 +82,61 @@ class GenomeBrowser extends BaseChart {
                     this.onDataHighlighted({ indexes: [0] });
                 }
             }
+            //setup links to other datastores if specified
+            //i.e. the browser update if a region is highlighted in another datastore
+           
+            if (c.sync_with_datastores){
+                const dsources = useDataSources();  
+                for (let ds of c.sync_with_datastores){
+                    const dobj= dsources.find(x=>x.name===ds);
+                    if (dobj){
+                        this.linkToOtherDataStore(dobj.dataStore);
+                    }
+                    
+                }
+
+            }
         });
+    }
+
+
+    //link this genome browser to another datastore
+    async linkToOtherDataStore(dataStore){
+        const gb = dataStore.genome_browser;
+        if (gb){
+            const tname = `${dataStore.name}_base_track`;
+            //ensure  the genomic coordinates are loaded in the datastore
+            //not sure why loadColumn only loads a single column,
+            //but I don't want to mess with it
+            for (const col of gb.location_fields){
+                await loadColumn(dataStore.name,col);
+            }
+            //display the the default track from the other datastore
+            //in the browser
+            if (!this.browser.getTrack(tname)){
+                this.browser.addTrack({
+                    short_label:gb.default_track.label,
+                    track_id:tname,
+                    url: gb.default_track.url,
+                    decode_function:"generic",
+                    displayMode:"EXPANDED",
+                    height:20
+                },2);
+                this.browser.update();
+            }
+            //listen to the other datastore for highlighted data
+            const lid = `gb_${this.config.id}_${dataStore.name}`;
+            dataStore.addListener(lid,(type,data)=>{
+                if (type==="data_highlighted"){
+                    this.onDataHighlighted(data);
+                }
+            });
+            //store info about the link
+            this.links.push({
+                listener_id:lid,
+                dataStore:dataStore
+            });
+        }
     }
 
     onBrowserAction(type, data, e) {
@@ -230,14 +288,20 @@ class GenomeBrowser extends BaseChart {
     }
 
     getConfig() {
+        //this method is now called before the browser is created
+        //the values it adds to the config should be added dynamically
+        //when the user adds a track etc
         const config = super.getConfig();
         const b = this.browser;
-        config.tracks = this.browser.getAllTrackConfigs();
-        config.genome_location = {
-            chr: b.chr,
-            start: b.start,
-            end: b.end,
-        };
+        if (b){
+            config.genome_location = {
+                chr: b.chr,
+                start: b.start,
+                end: b.end,
+            };
+            config.tracks = this.browser.getAllTrackConfigs();
+        }
+    
         return config;
     }
 
@@ -294,12 +358,14 @@ class GenomeBrowser extends BaseChart {
 
     //called when a feature is highlighted
     onDataHighlighted(data) {
-        if (data.source === this) {
-            return;
-        }
-        const p = this.config.param;
-        const vm = this.config.view_margins;
-        const o = this.dataStore.getRowAsObject(data.indexes[0], p);
+        //if (data.source === this) {
+        //    return;
+        //}
+        const ds = data.dataStore || this.dataStore;
+        const p = ds.genome_browser.location_fields;
+        let  vm = this.dataStore===ds?this.config.view_margins:ds.genome_browser?.default_parameters?.view_margins;
+        vm = vm || this.config.view_margins
+        const o = ds.getRowAsObject(data.indexes[0], p);
         //some basic checks
         const st = o[p[2]] > o[p[1]] ? o[p[1]] : o[p[2]];
         let en = o[p[2]] > o[p[1]] ? o[p[2]] : o[p[1]];
@@ -373,6 +439,13 @@ class GenomeBrowser extends BaseChart {
                 }
             }
             //this.browser.track_order=track_order;
+        }
+
+        const textColor = getComputedStyle(this.contentDiv).getPropertyValue('color');
+        // set the highlighted region
+        this.browser.removeAllHighlightedRegions();
+        if (this.config.highlight_selected_region){
+            this.browser.setHighlightedRegion({chr:o[p[0]],start:st-1,end:en},"_highlight",textColor,0.3);
         }
         let margin = 1000;
         if (vm.type === "percentage") {
@@ -494,6 +567,10 @@ class GenomeBrowser extends BaseChart {
             this.cellDim.destroy(notify);
             this.dataLink.dataStore.removeListener(`gb_${this.config.id}`);
         }
+        //remove any listeners to other datastores
+        for (let l of this.links){
+            l.dataStore.removeListener(l.listener_id);
+        }
         super.remove();
     }
 
@@ -561,6 +638,20 @@ class GenomeBrowser extends BaseChart {
                 }
             },
         });
+        
+        settings.push({
+            label:"Highlight Selected Region",
+            type:"check",
+            current_value:c.highlight_selected_region,
+            func:x=>{
+                c.highlight_selected_region=x;
+                const d = this.dataStore.getHighlightedData();
+                if (d){
+                    this.onDataHighlighted({indexes:[d]});
+                }
+              
+            }
+        })
         return settings;
     }
 }
