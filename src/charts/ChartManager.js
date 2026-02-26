@@ -888,11 +888,12 @@ export class ChartManager {
         for (const dsName of Object.keys(this.viewData.dataSources || {})) {
             const spec = this.viewData.dataSources[dsName];
             const highlight = spec?.highlight;
-            if (highlight && Array.isArray(highlight) && highlight.length > 0) {
-                const dstore = this.dsIndex[dsName]?.dataStore;
-                if (dstore?.dataHighlighted) {
-                    dstore.dataHighlighted(highlight, null);
-                }
+            const dstore = this.dsIndex[dsName]?.dataStore;
+            if (!dstore?.dataHighlighted) continue;
+            if (Array.isArray(highlight) && highlight.length > 0) {
+                dstore.dataHighlighted(highlight, null);
+            } else {
+                dstore.dataHighlighted([], null);
             }
         }
 
@@ -1229,9 +1230,12 @@ export class ChartManager {
         view.initialCharts = initialCharts;
         for (const ds of this.dataSources) {
             const h = ds.dataStore.getHighlightedData?.();
-            if (h && Array.isArray(h) && h.length > 0) {
-                if (!view.dataSources[ds.name]) view.dataSources[ds.name] = {};
+            if (!view.dataSources[ds.name]) view.dataSources[ds.name] = {};
+            if (Array.isArray(h) && h.length > 0) {
                 view.dataSources[ds.name].highlight = [...h];
+            } else {
+                // biome-ignore lint/performance/noDelete: setting it to undefined would mean there would still be the key, not a perf issue here.
+                delete view.dataSources[ds.name].highlight;
             }
         }
         const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
