@@ -118,7 +118,9 @@ const useSlickGridReact = () => {
             cols.push({
                 id: col.field,
                 field: col.field,
-                name: col.name,
+                name: isColumnEditable
+                ? `<span class="mdv-col-editable-icon mdi mdi-square-edit-outline" title="This column is editable, click on cell to edit" aria-hidden="true"></span><span class="mdv-col-name-text">${col.name}</span>`
+                : col.name,
                 sortable: true,
                 width: colWidth,
                 editor: isColumnEditable
