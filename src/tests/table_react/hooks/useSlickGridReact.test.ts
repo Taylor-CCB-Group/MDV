@@ -6,6 +6,8 @@ import type { TableChartReactConfig } from "@/react/components/TableChartReactWr
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
+const editorClassName = "TextEditorWithMaxLength";
+
 // Mock all the context hooks
 vi.mock("@/react/context", () => ({
     useDataStore: () => mockDataStore,
@@ -55,6 +57,15 @@ describe("useSlickGridReact", () => {
                 values: ["Alice", "Bob", "Charlie"],
                 editable: false,
             },
+            {
+                field: "id",
+                name: "Id",
+                datatype: "unique",
+                values: ["AB", "A"],
+                data: new Uint32Array([65, 66, 65, 0]),
+                stringLength: 2,
+                editable: true,
+            }
         ] as any;
 
         mockSortedIndices = new Uint32Array([0, 1, 2]);
@@ -87,7 +98,7 @@ describe("useSlickGridReact", () => {
         test("should create column definitions without index column", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
-            expect(result.current.columnDefs).toHaveLength(2);
+            expect(result.current.columnDefs).toHaveLength(3);
             expect(result.current.columnDefs[0].field).toBe("age");
             expect(result.current.columnDefs[1].field).toBe("name");
         });
@@ -101,7 +112,7 @@ describe("useSlickGridReact", () => {
 
             const { result } = renderHook(() => useSlickGridReact());
 
-            expect(result.current.columnDefs).toHaveLength(3);
+            expect(result.current.columnDefs).toHaveLength(4);
             expect(result.current.columnDefs[0].field).toBe("__index__");
             expect(result.current.columnDefs[1].field).toBe("age");
             expect(result.current.columnDefs[2].field).toBe("name");
@@ -152,6 +163,28 @@ describe("useSlickGridReact", () => {
             });
 
             expect(result.current.isColumnEditable).toBe(true);
+        });
+
+        test("should not have editor for non-editable column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const uniqueCol = result.current.columnDefs.find((col) => col.field === "name");
+            expect(uniqueCol?.editor).toBeNull();
+        });
+
+        test("should have editor for editable integer column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const uniqueCol = result.current.columnDefs.find((col) => col.field === "age");
+            expect(uniqueCol?.editor).toBeTruthy();
+        });
+
+        test("should have the custom editor for the unique editable column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const uniqueCol = result.current.columnDefs.find((col) => col.field === "id");
+            expect(uniqueCol?.editor?.model?.name).toBe("TextEditorWithMaxLength");
+            expect(uniqueCol?.editor?.maxLength).toBe(2);
         });
     });
 
@@ -210,7 +243,7 @@ describe("useSlickGridReact", () => {
         test("should update column defs when include_index changes", () => {
             const { result, rerender } = renderHook(() => useSlickGridReact());
 
-            expect(result.current.columnDefs).toHaveLength(2);
+            expect(result.current.columnDefs).toHaveLength(3);
 
             act(() => {
                 runInAction(() => {
@@ -220,7 +253,7 @@ describe("useSlickGridReact", () => {
 
             rerender();
 
-            expect(result.current.columnDefs).toHaveLength(3);
+            expect(result.current.columnDefs).toHaveLength(4);
             expect(result.current.columnDefs[0].field).toBe("__index__");
         });
 

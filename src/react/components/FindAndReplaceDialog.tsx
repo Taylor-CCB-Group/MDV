@@ -60,7 +60,7 @@ const FindAndReplaceDialog = ({
     const [findText, setFindText] = useState("");
     const [replaceText, setReplaceText] = useState("");
 
-    const title = `Find ${isColumnEditable ? "And Replace" : ""} ${columnName ? `in "${columnName}"` : ""}`;
+    const title = `Find${isColumnEditable ? " And Replace" : ""}${columnName ? ` in "${columnName}"` : ""}`;
 
     // Clear the find and replace text before closing
     const onDialogClose = useCallback(() => {
@@ -111,7 +111,12 @@ const FindAndReplaceDialog = ({
                             size="small"
                             value={findText}
                             onChange={(e) => setFindText(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleFind(findText)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && findText.trim()) {
+                                    e.preventDefault();
+                                    handleFind(findText);
+                                }
+                            }}
                             sx={{ flexGrow: 1 }}
                         />
                     </Box>
@@ -165,7 +170,12 @@ const FindAndReplaceDialog = ({
                                     size="small"
                                     value={replaceText}
                                     onChange={(e) => setReplaceText(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleReplace(findText, replaceText)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && replaceText.trim()) {
+                                            e.preventDefault();
+                                            handleReplace(findText, replaceText)
+                                        }
+                                    }}
                                     sx={{ flexGrow: 1 }}
                                 />
                             </Box>

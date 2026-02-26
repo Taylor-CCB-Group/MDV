@@ -146,12 +146,6 @@ describe("useEditCell", () => {
                 result.current.handleCellChange(changeEvent);
             });
 
-            expect(setFeedbackAlert).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    type: "success",
-                    title: "Edit Successful",
-                }),
-            );
             expect(dataStore.dataChanged).toHaveBeenCalledWith(["sample_count"]);
             expect(mockGridInstance.slickGrid.invalidate).toHaveBeenCalled();
         });

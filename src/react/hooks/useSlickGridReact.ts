@@ -8,6 +8,23 @@ import SlickGridDataProvider from "../utils/SlickGridDataProvider";
 import { action } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
+import { InputEditor } from "slickgrid-react";
+
+/**
+ * Text editor that sets the HTML input maxLength so the user cannot type
+ * more than the allowed characters. Used by unique columns as of now.
+ */
+export class TextEditorWithMaxLength extends InputEditor {
+    init(): void {
+        super.init();
+        const maxLen = this.columnEditor?.maxLength;
+        const input = this.editorDomElement as HTMLInputElement | undefined;
+        if (maxLen != null && input) {
+            // Limit the characters to max length
+            input.setAttribute("maxLength", String(maxLen));
+        }
+    }
+}
 /**
  * Hook for managing SlickGrid React component state.
  * 
@@ -101,10 +118,18 @@ const useSlickGridReact = () => {
             cols.push({
                 id: col.field,
                 field: col.field,
-                name: col.name,
+                name: isColumnEditable
+                ? `<span class="mdv-col-editable-icon mdi mdi-square-edit-outline" title="This column is editable, click on cell to edit" aria-hidden="true"></span><span class="mdv-col-name-text">${col.name}</span>`
+                : col.name,
                 sortable: true,
                 width: colWidth,
-                editor: isColumnEditable ? { model: Editors.text } : null,
+                editor: isColumnEditable
+                    ? col.datatype === "unique" && col.stringLength
+                        // using a custom text editor to limit the characters to string length
+                        //! we might need to think of increasing the string length in this case
+                        ? { model: TextEditorWithMaxLength, maxLength: col.stringLength }
+                        : { model: Editors.text }
+                    : null,
                 cssClass: isColumnEditable ? "mdv-editable-cell" : "",
                 header: {
                     menu: {
@@ -170,18 +195,19 @@ const useSlickGridReact = () => {
                 grid.setData(dataProvider, true);
                 grid.render();
                 
-                //? Do we need this? We are syncing the sort in the useEffect below which does the same.
                 // Apply initial sort if config.sort is set
-                // if (config.sort) {
-                //     suppressSortSyncRef.current = true;
-                //     grid.setSortColumn(config.sort.columnId, config.sort.ascending);
-                //     suppressSortSyncRef.current = false;
-                // }
+                // we need this because the useEffect for sort sync won't run if grid is null
+                // and it won't rerun if we don't initially set the config.sort
+                if (config.sort) {
+                    suppressSortSyncRef.current = true;
+                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                    suppressSortSyncRef.current = false;
+                }
 
                 attachEventHandlers(e.detail);
             }
         },
-        [dataProvider, chart],
+        [dataProvider, chart, config.sort],
     );
 
     /**

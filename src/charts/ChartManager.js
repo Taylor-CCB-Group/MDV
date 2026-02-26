@@ -1111,7 +1111,6 @@ export class ChartManager {
                 editable: true,
                 field: cl.field,
             };
-
             const numRows = dataStore.size;
             
             // Add stringLength to metadata for unique and multitext columns if stringLength property exists
@@ -1129,7 +1128,7 @@ export class ChartManager {
                     console.error(
                         `Column ${c} has invalid or missing stringLength: ${stringLength}.`
                     );
-                    // Fallback as empty values for all rows to keep it consistent with other columns
+                    // Fallback as empty values to keep it consistent with other columns
                     return { metadata: md, data: new Array(numRows).fill("") };
                 }
 
@@ -1139,17 +1138,15 @@ export class ChartManager {
                     const baseIndex = i * stringLength;
 
                     if (!cl.data || baseIndex + stringLength > cl.data.length) {
-                        console.error(
-                            `Index out of bounds for column ${c} at row ${i}. Skipping.`
+                        throw new Error(
+                            `Invalid unique-column buffer for '${c}' at row ${i} (stringLength=${stringLength}).`
                         );
-                        arr[i] = "";
-                        continue;
                     }
 
-                    const rowBytes = cl.data.slice(baseIndex, baseIndex + stringLength);
+                    const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
                     const decoded = textDecoder.decode(rowBytes);
                     // Remove null padding characters
-                    arr[i] = decoded.replace(/\0/g, '');
+                    arr[i] = decoded.replace(/\0+$/, "");
                 }
             } else {
                 // For other datatypes, get the values from data array

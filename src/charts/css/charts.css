@@ -732,6 +732,13 @@ select, input, textarea {
         font-weight: 600 !important;
     }
 
+    /* Editable icon: never shrink so it's always visible */
+    .slick-column-name .mdv-col-editable-icon {
+        flex-shrink: 0 !important;
+        flex-grow: 0 !important;
+        margin-right: 2px;
+    }
+
     .slick-header {
         width: 100% !important;
     }
@@ -767,5 +774,13 @@ select, input, textarea {
 
     .slick-menu-item:hover:not(.slick-menu-item-divider) {
         background-color: var(--border_menu_bar_color);
+    }
+
+    .mdi {
+        display: inline-flex;
+        align-items: center;
+        font-size: 18px;
+        width: 1em;
+        height: 1em;
     }
 }

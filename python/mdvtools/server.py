@@ -15,7 +15,6 @@ from mdvtools.server_utils import (
 
 import webbrowser
 import json
-from mdvtools.llm.code_manipulation import parse_view_name
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
@@ -50,13 +49,6 @@ from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
 logger.info("server.py module loaded")
-def log(*args, **kwargs):
-    """
-    Log info-level messages using the module logger.
-    Behaves similarly to print, but sends output to logger.info.
-    """
-    msg = " ".join(str(arg) for arg in args)
-    logger.info(msg)
 
 routes = set()
 
@@ -68,6 +60,14 @@ def create_app(
     project: MDVProject,
     options: Optional[MDVServerOptions] = None,
 ):
+    def log(*args, **kwargs):
+        """
+        Log info-level messages using the module logger.
+        Behaves similarly to print, but sends output to logger.info.
+        """
+        msg = " ".join(str(arg) for arg in args)
+        logger.info(f"[{project.id} - '{project.dir.split('/')[-1]}'] {msg}", **kwargs)
+    
     if options is None:
         options = MDVServerOptions()
 
@@ -288,6 +288,7 @@ def create_app(
 
     @project_bp.route("/save_state", access_level='editable', methods=["POST"])
     def save_data():
+        # Frontend sends decoded column data; unique columns are string[] from ChartManager getMd()
         success = True
         try:
             state = request.json
