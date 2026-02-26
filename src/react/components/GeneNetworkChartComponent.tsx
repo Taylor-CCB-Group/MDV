@@ -53,7 +53,7 @@ export const GeneNetworkChartComponent = observer(() => {
     }, [filteredIndices, highlightedIndices]);
 
     const ROW_HEIGHT = 150;
-    const ROW_VERTICAL_GAP = 16; // vertical space between items
+    const ROW_VERTICAL_GAP = 10; // vertical space between items
     const ROW_TOTAL_HEIGHT = ROW_HEIGHT + ROW_VERTICAL_GAP;
 
     // Set up virtualizer for efficient rendering of large gene lists
@@ -349,7 +349,7 @@ export const GeneNetworkChartComponent = observer(() => {
     };
 
     return (
-        <div className="absolute w-[100%] h-[100%] overflow-y-auto text-sm h-full flex flex-col">
+        <div className="absolute w-[100%] h-[100%] text-sm h-full flex flex-col">
             {visibleRowIndices.length > 0 ? (
                 <>
                     <div
