@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useGateManager } from "../gates/useGateManager";
 import { useParamColumns } from "../hooks";
 import type { Gate } from "../gates/types";
-import { computeCentroid, generateGateId } from "../gates/gateUtils";
+import { computeCentroid, DEFAULT_GATE_COLOR, generateGateId } from "../gates/gateUtils";
 import { useSpatialLayers } from "../spatial_context";
 import { action } from "mobx";
 import { getEmptyFeatureCollection } from "../deck_state";
@@ -31,7 +31,7 @@ const useGateActions = () => {
     }, [chart.config]);
 
     const onSaveGate = useCallback(
-        (gateName: string) => {
+        (gateName: string, color: [number, number, number] = DEFAULT_GATE_COLOR) => {
             if (gateManager.hasGateName(gateName)) {
                 throw new Error("A gate with this name already exists");
             }
@@ -52,6 +52,7 @@ const useGateActions = () => {
                 columns: [xCol.field, yCol.field],
                 createdAt: Date.now(),
                 labelPosition: centroid,
+                color: color ?? DEFAULT_GATE_COLOR,
             };
 
             // Add to gate store
@@ -142,6 +143,16 @@ const useGateActions = () => {
         clearSelection();
     }, [setEditingGateId, clearSelection]);
 
+    /**
+     * Update the color of the gate
+     */
+    const onColorChange = useCallback(
+        (gateId: string, color: [number, number, number]) => {
+            gateManager.updateGate(gateId, { color });
+        },
+        [gateManager],
+    );
+
     return {
         onSaveGate,
         onDeleteGate,
@@ -150,6 +161,7 @@ const useGateActions = () => {
         onEditGate,
         onConfirmEditGate,
         onCancelEditGate,
+        onColorChange,
     };
 };
 

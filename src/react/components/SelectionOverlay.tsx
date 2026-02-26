@@ -6,7 +6,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
 import DoneOutlinedIcon from '@mui/icons-material/DoneOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
 import { useCallback, useMemo, useState } from "react";
 import { useSpatialLayers } from "../spatial_context";
 import { observer } from "mobx-react-lite";
@@ -168,6 +168,7 @@ export default observer(function SelectionOverlay() {
         onEditGate,
         onConfirmEditGate,
         onCancelEditGate,
+        onColorChange,
     } = useGateActions();
 
     const toolsToShow = useMemo(
@@ -259,13 +260,13 @@ export default observer(function SelectionOverlay() {
                 </IconWithTooltip>
                 {hasSelection && !editingGateId && (
                     <IconWithTooltip
-                        tooltipText={"Save selection as gate"}
+                        tooltipText={"Save selection as Gate"}
                         onClick={() => setGateDialogOpen(true)}
                         iconButtonProps={{
                             "aria-label": "Save Gate",
                         }}
                     >
-                        <AddOutlinedIcon color="success" />
+                        <AddCircleOutlinedIcon />
                     </IconWithTooltip>
                 )}
                 {editingGateId && (
@@ -316,6 +317,7 @@ export default observer(function SelectionOverlay() {
                 onRenameGate={onRenameGate}
                 onExportClick={onExportClick}
                 onEdit={onEditGate}
+                onColorChange={onColorChange}
             />
         </>
     );

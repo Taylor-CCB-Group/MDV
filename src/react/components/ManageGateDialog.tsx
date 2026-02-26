@@ -15,6 +15,7 @@ import {
     TableCell,
     TableHead,
     TableRow,
+    Tooltip,
     Typography,
 } from "@mui/material";
 import IconWithTooltip from "./IconWithTooltip";
@@ -24,10 +25,13 @@ import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useCallback, useState } from "react";
 import type { Gate } from "../gates/types";
+import { DEFAULT_GATE_COLOR } from "../gates/gateUtils";
 import GateNameDialog from "./GateNameDialog";
 import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
 import { PenBoxIcon } from "lucide-react";
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
+import { truncateGateLabel } from "../hooks/useGateLayers";
+import { hexToRgb, rgbToHex } from "@/utilities/Utilities";
 
 export type ManageGateDialogType = {
     open: boolean;
@@ -37,6 +41,7 @@ export type ManageGateDialogType = {
     onEdit: (gateId: string) => void;
     onRenameGate: (gateId: string, newName: string) => void;
     onExportClick: (gateId: string) => void;
+    onColorChange: (gateId: string, color: [number, number, number]) => void;
 };
 
 const ManageGateDialog = ({
@@ -47,6 +52,7 @@ const ManageGateDialog = ({
     onEdit,
     onRenameGate,
     onExportClick,
+    onColorChange,
 }: ManageGateDialogType) => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -90,10 +96,29 @@ const ManageGateDialog = ({
                             },
                         }}
                     >
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>
+                                    <Typography variant="button" color="text.secondary">
+                                        Name
+                                    </Typography>
+                                </TableCell>
+                                <TableCell sx={{ width: 48, minWidth: 48 }}>
+                                    <Typography variant="button" color="text.secondary">
+                                        Color
+                                    </Typography>
+                                </TableCell>
+                                <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
+                                    <Typography variant="button" color="text.secondary">
+                                        Actions
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        </TableHead>
                         <TableBody>
                             {gatesArray.length === 0 ? (
                                 <TableRow>
-                                <TableCell colSpan={2} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                                     <Typography color="textSecondary">
                                         No gates yet. Draw a selection on the chart and save it as a gate.
                                     </Typography>
@@ -103,7 +128,26 @@ const ManageGateDialog = ({
                                 gatesArray.map((gate) => (
                                 <TableRow key={gate.id}>
                                     <TableCell>
-                                        <Typography variant="subtitle1">{gate.name}</Typography>
+                                        <Tooltip title={gate.name}>
+                                            <Typography variant="subtitle1">{truncateGateLabel(gate.name, 30)}</Typography>
+                                        </Tooltip>
+                                    </TableCell>
+                                    <TableCell sx={{ width: 48, minWidth: 48, textAlign: "center" }}>
+                                        <input
+                                            type="color"
+                                            value={rgbToHex(gate.color ?? DEFAULT_GATE_COLOR)}
+                                            onChange={(e) =>
+                                                onColorChange(gate.id, hexToRgb(e.target.value))
+                                            }
+                                            style={{
+                                                width: 25,
+                                                height: 25,
+                                                padding: 0,
+                                                borderRadius: 4,
+                                                cursor: "pointer",
+                                            }}
+                                            aria-label={`Color for ${gate.name}`}
+                                        />
                                     </TableCell>
                                     <TableCell align="right" sx={{ width: 48, minWidth: 48 }}>
                                         <IconWithTooltip
@@ -187,6 +231,7 @@ const ManageGateDialog = ({
                         onRenameGate(renameGateId, gateName);
                     }}
                     name={gatesArray.find((g) => g.id === renameGateId)?.name ?? ""}
+                    isEditName
                 />
             )}
 

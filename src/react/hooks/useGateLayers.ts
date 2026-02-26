@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGateManager } from "../gates/useGateManager";
 import { useChartID, useConfig, useParamColumns } from "../hooks";
 import type { LoadedDataColumn } from "@/charts/charts";
-import { computeCentroid } from "../gates/gateUtils";
+import { computeCentroid, DEFAULT_GATE_COLOR } from "../gates/gateUtils";
 import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
@@ -11,11 +11,10 @@ import useGateActions from "./useGateActions";
 
 const MAX_LABEL_LENGTH = 18;
 
-function truncateGateLabel(name: string, maxLen: number = MAX_LABEL_LENGTH) {
+export function truncateGateLabel(name: string, maxLen: number = MAX_LABEL_LENGTH) {
     if (name.length <= maxLen) return name;
     return `${name.slice(0, maxLen - 1)}...`;
 }
-//todo: Be able to drag and drop a gate overlay layer
 const useGateLayers = () => {
     const gateManager = useGateManager();
     const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
@@ -31,19 +30,12 @@ const useGateLayers = () => {
     const hasRebuiltGateColumnRef = useRef(false);
     const chartId = useChartID();
     const { selectionProps } = useSpatialLayers();
-    const {
-        onEditGate
-    } = useGateActions();
-    const {
-        editingGateId,
-        selectionFeatureCollection,
-    } = selectionProps;
+    const { onEditGate } = useGateActions();
+    const { editingGateId, selectionFeatureCollection } = selectionProps;
 
     const relevantGates = useMemo(() => {
         if (!cx || !cy) return [];
-        return gateManager.gatesArray.filter(
-            (gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field
-        );
+        return gateManager.gatesArray.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
     }, [gateManager.gatesArray, cx, cy]);
 
     useEffect(() => {
@@ -77,6 +69,7 @@ const useGateLayers = () => {
                 position: [position[0], position[1], z] as [number, number, number],
                 text: truncateGateLabel(gate.name),
                 gateId: gate.id,
+                gateColor: gate.color ?? DEFAULT_GATE_COLOR,
             };
         });
 
@@ -87,7 +80,10 @@ const useGateLayers = () => {
             getText: (d: { text: string }) => d.text,
             getSize: 12,
             getColor: [255, 255, 255, 255],
-            getBackgroundColor: [0, 0, 0, 100],
+            getBackgroundColor: (d: { gateColor: [number, number, number] }) => {
+                const c = d.gateColor ?? DEFAULT_GATE_COLOR;
+                return [c[0], c[1], c[2], 220];
+            },
             getTextAnchor: "middle",
             getAlignmentBaseline: "center",
             padding: [3, 8],
@@ -98,7 +94,7 @@ const useGateLayers = () => {
             updateTriggers: {
                 getPosition: [gates.length, dragPos, selectionFeatureCollection],
                 getColor: [draggingId],
-                getBackgroundColor: [draggingId],
+                getBackgroundColor: [draggingId, relevantGates],
             },
             onHover(pickingInfo) {
                 if (pickingInfo.index !== -1) {
@@ -162,7 +158,7 @@ const useGateLayers = () => {
         const filteredGates = relevantGates.filter((gate) => gate.id !== editingGateId);
 
         // Create the objects of features to supply as the feature collection
-        // Store gate id and gate name as feature properties
+        // Store gate id, gate name, and gate color as feature properties
         const features = filteredGates.flatMap((gate) =>
             gate.geometry.features.map((feature) => ({
                 ...feature,
@@ -170,6 +166,7 @@ const useGateLayers = () => {
                     ...feature.properties,
                     gateId: gate.id,
                     gateName: gate.name,
+                    gateColor: gate.color ?? DEFAULT_GATE_COLOR,
                 },
             })),
         );
@@ -181,8 +178,14 @@ const useGateLayers = () => {
                 features,
             } as any,
             filled: true,
-            getFillColor: [76, 175, 80, 30], // Semi-transparent green fill
-            getLineColor: [76, 175, 80, 200], // Green border
+            getFillColor: (d: { properties?: { gateColor?: [number, number, number] } }) => {
+                const c = d.properties?.gateColor ?? DEFAULT_GATE_COLOR;
+                return [c[0], c[1], c[2], 30];
+            },
+            getLineColor: (d: { properties?: { gateColor?: [number, number, number] } }) => {
+                const c = d.properties?.gateColor ?? DEFAULT_GATE_COLOR;
+                return [c[0], c[1], c[2], 200];
+            },
             getLineWidth: 2,
             lineWidthMinPixels: 4,
             pickable: true,
@@ -191,15 +194,7 @@ const useGateLayers = () => {
                 onEditGate(gateId);
             },
         });
-    }, [
-        relevantGates,
-        chartId,
-        editingGateId,
-        gateManager,
-        onEditGate,
-        cx,
-        cy,
-    ]);
+    }, [relevantGates, chartId, editingGateId, gateManager, onEditGate, cx, cy]);
 
     const getCursor = useCallback(
         ({ isDragging }: { isDragging: boolean; isHovering: boolean }) => {

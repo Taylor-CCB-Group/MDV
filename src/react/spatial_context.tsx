@@ -129,6 +129,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
 
+    // todo: we need to do something about editing gate color
     const editableLayer = useMemo(() => {
         return new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,

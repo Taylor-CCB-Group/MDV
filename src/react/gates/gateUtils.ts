@@ -2,6 +2,8 @@ import type { FeatureCollection, Polygon } from "@turf/helpers";
 import type { Gate } from "./types";
 import { v4 as uuid } from "uuid";
 
+export const DEFAULT_GATE_COLOR: [number, number, number] = [76, 175, 80];
+
 /**
  * Extract the coordinates of the gate selection from it's feature collection
  *
