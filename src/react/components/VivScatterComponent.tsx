@@ -27,9 +27,9 @@ import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
-import { trace } from "mobx";
 import { useOuterContainer } from "../screen_state";
 import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
+import useGateLayers from "../hooks/useGateLayers";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -102,6 +102,12 @@ const Main = observer(({
     const { showJson } = useConfig<VivRoiConfig>();
     // passing showJson from here to make use of this being `observer`
     const jsonLayer = useJsonLayer(showJson);
+
+    const {
+        gateLabelLayer,
+        gateDisplayLayer,
+        controllerOptions,
+    } = useGateLayers();
     
     // Get field contour legend data
     const config = useConfig<DualContourLegacyConfig>();
@@ -204,6 +210,7 @@ const Main = observer(({
             contrast,
         ],
     );
+
     const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
             getTooltip,
@@ -211,7 +218,14 @@ const Main = observer(({
                 zIndex: "-1",
             },
             //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-            layers: [jsonLayer, scatterplotLayer, selectionLayer],
+            // layers: [jsonLayer, scatterplotLayer, selectionLayer],
+            layers: [
+                jsonLayer, 
+                scatterplotLayer, 
+                selectionLayer, 
+                gateDisplayLayer, 
+                gateLabelLayer,
+            ].filter(l => l !== null),
             id: `${id}deck`,
             // deviceProps: {
             //     webgl: {                    
@@ -222,6 +236,7 @@ const Main = observer(({
             // },
             controller: {
                 doubleClickZoom: false,
+                dragPan: controllerOptions.dragPan,
             },
             // deviceProps: {
             //     // todo - get this working more usefully.
@@ -229,11 +244,14 @@ const Main = observer(({
             // }
         }),
         [
+            gateLabelLayer,
+            gateDisplayLayer,
             scatterplotLayer,
             selectionLayer,
             jsonLayer,
             id,
             getTooltip,
+            controllerOptions,
         ],
     );
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...

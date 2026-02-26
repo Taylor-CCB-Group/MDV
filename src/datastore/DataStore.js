@@ -76,6 +76,7 @@ class DataStore {
         this.syncColumnColors = [];
         this.linkColumns = [];
         this.regions = config.regions;
+        this.gates = config.gates;
 
         //for react / mobx... makeAutoObservable causes problems with webworker.postMessage:
         // `DOMException: Failed to execute 'postMessage' on 'Worker': [object Array] could not be cloned.`

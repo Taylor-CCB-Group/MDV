@@ -1,12 +1,12 @@
-import { IconButton, Tooltip } from "@mui/material";
+import { IconButton, type IconButtonProps, Tooltip, type TooltipProps } from "@mui/material";
 import type React from "react";
 
 export type IconWithTooltipProps = {
     children: React.ReactNode;
     tooltipText: string;
-    onClick: () => void;
-    tooltipProps?: object;
-    iconButtonProps?: object;
+    onClick: React.MouseEventHandler<HTMLButtonElement>;
+    tooltipProps?: TooltipProps;
+    iconButtonProps?: IconButtonProps;
 };
 
 const IconWithTooltip = ({ children, tooltipText, onClick, tooltipProps, iconButtonProps }: IconWithTooltipProps) => {

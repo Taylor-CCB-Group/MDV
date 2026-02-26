@@ -1111,9 +1111,10 @@ export class ChartManager {
                 editable: true,
                 field: cl.field,
             };
+            const numRows = dataStore.size;
             
-            // Add stringLength to metadata for unique columns (required by server)
-            if (cl.datatype === "unique" && cl.stringLength) {
+            // Add stringLength to metadata for unique and multitext columns if stringLength property exists
+            if ((cl.datatype === "unique" || cl.datatype === "multitext") && cl.stringLength) {
                 md.stringLength = cl.stringLength;
             }
             
@@ -1127,11 +1128,10 @@ export class ChartManager {
                     console.error(
                         `Column ${c} has invalid or missing stringLength: ${stringLength}.`
                     );
-                    // Fallback as empty array for now
-                    return { metadata: md, data: [] };
+                    // Fallback as empty values to keep it consistent with other columns
+                    return { metadata: md, data: new Array(numRows).fill("") };
                 }
 
-                const numRows = dataStore.size;
                 arr = new Array(numRows);
                 
                 for (let i = 0; i < numRows; i++) {

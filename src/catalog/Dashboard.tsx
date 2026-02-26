@@ -40,12 +40,12 @@ import {
     type SortOrder,
     sortProjects,
 } from "./utils/projectUtils";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
 import usePermissions from "./PermissionsContext";
 import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
@@ -451,7 +451,7 @@ const Dashboard: React.FC = () => {
                     )}
                 </Container>
                 {error && (
-                    <ReusableDialog
+                    <ReusableAlertDialog
                         open={isErrorModalOpen}
                         handleClose={closeErrorModal}
                         isAlertErrorComponent

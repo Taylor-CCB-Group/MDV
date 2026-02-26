@@ -1,8 +1,8 @@
 import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import { getPostData } from "@/dataloaders/DataLoaderUtil";
 import { useCallback, useEffect, useState } from "react";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 
 export type ProjectStateHandlerType = {
     root: string;
@@ -67,7 +67,7 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
 
     return (
         <>
-            <ReusableDialog
+            <ReusableAlertDialog
                 open={permissionDenied}
                 handleClose={() => setPermissionDenied(false)}
                 component={
@@ -75,7 +75,7 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
                 }
             />
 
-            <ReusableDialog
+            <ReusableAlertDialog
                 open={confirmSave}
                 handleClose={() => setConfirmSave(false)}
                 component={
@@ -90,7 +90,7 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
                 onConfirmClick={handleConfirmProceed}
             />
 
-            <ReusableDialog
+            <ReusableAlertDialog
                 open={errorDialogOpen}
                 handleClose={() => setErrorDialogOpen(false)}
                 component={<DebugErrorComponent error={{ message: error?.message as string, stack: error?.stack }} />}

@@ -61,10 +61,10 @@ const DebugErrorComponent = ({
             setMetaData({
                 ...extraMetadata,
                 // Create the key traceback or stack only if the value exists
-                ...(error?.traceback != null && {
+                ...(error?.traceback && {
                     traceback: error?.traceback,
                 }),
-                ...(error?.stack != null && { stack: error?.stack }),
+                ...(error?.stack && { stack: error?.stack }),
             });
     }, [extraMetadata, error]);
 

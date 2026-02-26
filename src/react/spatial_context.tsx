@@ -13,6 +13,7 @@ import { action, toJS } from "mobx";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type { FieldName } from "@/charts/charts";
+import type { Tool } from "./components/SelectionOverlay";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -26,8 +27,13 @@ export type RangeState = {
     rangeDimension: RangeDimension;
     selectionFeatureCollection: FeatureCollection;
     editableLayer: MonkeyPatchEditableGeoJsonLayer;
+    editingGateId: string | null;
+    setEditingGateId: (id: string | null) => void;
+    setSelectionFeatureCollection: (newSelection: FeatureCollection) => void
     selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
+    selectedTool: Tool;
+    setSelectedTool: (tool: Tool) => void;
     modelMatrix: Matrix4;
 };
 export type MeasureState = {
@@ -95,15 +101,18 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         chart.config.selectionFeatureCollection = newSelection;
     }), []);
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
+    const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
+    const [editingGateId, setEditingGateId] = useState<string | null>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
 
     useEffect(() => {
-        console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
             setSelectionFeatureCollection(getEmptyFeatureCollection());
+            setEditingGateId(null);
         }
     }, [chart, setSelectionFeatureCollection]);
+
     useEffect(() => {
         if (coords.length === 0) {
             chart.resetButton.style.display = "none";
@@ -116,15 +125,18 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         filterPoly(coords);
     }, [coords, filterPoly, removeFilter, chart]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
+    
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
+
+    // todo: we need to do something about editing gate color
     const editableLayer = useMemo(() => {
         return new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection as any,
             mode: selectionMode,
-            getFillColor: [140, 140, 140, 50],
-            getLineColor: [255, 255, 255, 200],
+            getFillColor: editingGateId ? [76, 175, 80, 30] : [140, 140, 140, 50],
+            getLineColor: editingGateId ? [76, 175, 80, 200] : [255, 255, 255, 200],
             getLineWidth: 1,
             getEditHandlePointRadius: 2,
             editHandlePointStrokeWidth: 1,
@@ -160,15 +172,21 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             }
         })
     }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
-        setSelectionFeatureCollection
+        setSelectionFeatureCollection, editingGateId
     ]);
+
     return {
         editableLayer,
         rangeDimension,
         selectionFeatureCollection,
         selectionMode,
         setSelectionMode,
-        modelMatrix
+        setSelectionFeatureCollection,
+        modelMatrix,
+        editingGateId,
+        setEditingGateId,
+        selectedTool,
+        setSelectedTool,
     };
 }
 function useCreateMeasure() {
@@ -236,6 +254,6 @@ export function useSpatialLayers() {
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
     return {
         getTooltip, scatterProps, selectionLayer: rectRange.editableLayer,
-        selectionProps: rectRange
+        selectionProps: rectRange,
     };
 }

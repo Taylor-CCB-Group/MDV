@@ -19,10 +19,10 @@ import { useProject } from "@/modules/ProjectContext";
 import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
 import { useState } from "react";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import ChatButtons from "./ChatButtons";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 
 const MenuBarComponent = () => {
     const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
@@ -140,7 +140,7 @@ const MenuBarComponent = () => {
                 </Toolbar>
             </AppBar>
             {error && (
-                <ReusableDialog
+                <ReusableAlertDialog
                     open={open}
                     handleClose={() => setOpen(false)}
                     component={<DebugErrorComponent error={error} />}
