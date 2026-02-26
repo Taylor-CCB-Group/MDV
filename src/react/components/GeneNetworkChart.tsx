@@ -5,7 +5,6 @@ import { GeneNetworkChartComponent } from "./GeneNetworkChartComponent";
 import { g, isArray } from "@/lib/utils";
 
 export type GeneNetworkConfig = {
-    mode?: "filtered" | "observableFields";
     /** Whether to auto-scroll to highlighted genes coming from external interactions. */
     autoScroll?: boolean;
 } & BaseConfig;
@@ -16,7 +15,6 @@ class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
         div: string | HTMLDivElement,
         config: GeneNetworkConfig & BaseConfig,
     ) {
-        if (!config.mode) config.mode = "filtered";
         if (config.autoScroll === undefined) config.autoScroll = true;
         super(dataStore, div, config, GeneNetworkChartComponent);
     }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useLayoutEffect, useState, useEffect, useCallback, type MouseEvent, type KeyboardEvent } from "react";
+import { useMemo, useRef, useLayoutEffect, useState, useCallback, type MouseEvent, type KeyboardEvent } from "react";
 import { observer } from "mobx-react-lite";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useChart } from "../context";
@@ -30,67 +30,27 @@ export const GeneNetworkChartComponent = observer(() => {
     const filteredIndices = useSimplerFilteredIndices();
     const highlightRows = useHighlightRows();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const geneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
     const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
     const [focusedGeneIndex, setFocusedGeneIndex] = useState<number | null>(null);
     const [rangeAnchorGeneIndex, setRangeAnchorGeneIndex] = useState<number | null>(null);
     const prevHighlightedIndicesRef = useRef<number[] | null>(null);
     const lastScrolledGeneIndexRef = useRef<number | null>(null);
 
-    const mode = chart.config.mode || "filtered";
-
-    // Get gene IDs based on display mode
-    const { geneIds, geneHighlightCounts } = useMemo(() => {
-        const highlightCounts = new Map<string, number>();
-        
-        // First, count how many highlighted rows each gene has
-        const highlightedGeneIds = new Set<string>();
-        for (let i = 0; i < highlightedIndices.length; i++) {
-            const index = highlightedIndices[i];
-            try {
-                const geneId = getTextValue(column, index);
-                if (geneId) {
-                    highlightedGeneIds.add(geneId);
-                    highlightCounts.set(geneId, (highlightCounts.get(geneId) || 0) + 1);
-                }
-            } catch (e) {
-                // Skip invalid indices
-            }
+    // Row-centric model: visible list is filtered indices only; no string identity, no getTextValue in memo.
+    const { visibleRowIndices, rowIndexToVisibleIndex, highlightedRowSet } = useMemo(() => {
+        const visible = [...filteredIndices];
+        const map = new Map<number, number>();
+        for (let i = 0; i < visible.length; i++) {
+            map.set(visible[i], i);
         }
-
-        if (mode === "observableFields") {
-            // ObservableFields mode: show highlighted if any, otherwise filtered
-            if (highlightedIndices.length > 0) {
-                return {
-                    geneIds: Array.from(highlightedGeneIds),
-                    geneHighlightCounts: highlightCounts,
-                };
-            }
-            // Fall through to filtered logic
-        }
-
-        // Filtered mode: get unique gene IDs from filtered indices
-        const geneIdSet = new Set<string>();
-        try {
-            for (let i = 0; i < filteredIndices.length; i++) {
-                const index = filteredIndices[i];
-                const geneId = getTextValue(column, index);
-                if (geneId) {
-                    geneIdSet.add(geneId);
-                }
-            }
-        } catch (e) {
-            console.error("Error getting filtered gene IDs:", e);
-        }
-        
+        const highlighted = new Set(highlightedIndices);
         return {
-            geneIds: Array.from(geneIdSet),
-            geneHighlightCounts: highlightCounts,
+            visibleRowIndices: visible,
+            rowIndexToVisibleIndex: map,
+            highlightedRowSet: highlighted,
         };
-    }, [mode, highlightedIndices, filteredIndices, column]);
-
-    // No cap needed now that we have virtualisation
-    const visibleGeneIds = geneIds;
+    }, [filteredIndices, highlightedIndices]);
 
     const ROW_HEIGHT = 150;
     const ROW_VERTICAL_GAP = 16; // vertical space between items
@@ -99,7 +59,7 @@ export const GeneNetworkChartComponent = observer(() => {
     // Set up virtualizer for efficient rendering of large gene lists
     // Using fixed height of gene card plus a vertical gap between items
     const rowVirtualizer = useVirtualizer({
-        count: visibleGeneIds.length,
+        count: visibleRowIndices.length,
         getScrollElement: () => scrollContainerRef.current,
         estimateSize: () => ROW_TOTAL_HEIGHT,
         overscan: 5, // Render a few extra items for smoother scrolling
@@ -110,7 +70,7 @@ export const GeneNetworkChartComponent = observer(() => {
     const autoScroll = chart.config.autoScroll ?? true;
     useLayoutEffect(() => {
         if (!autoScroll) return;
-        if (highlightedIndices.length === 0 || visibleGeneIds.length === 0) return;
+        if (highlightedIndices.length === 0 || visibleRowIndices.length === 0) return;
         if (!scrollContainerRef.current) return;
 
         // Only auto-scroll when highlighted indices actually change (not on scroll/layout changes)
@@ -163,12 +123,11 @@ export const GeneNetworkChartComponent = observer(() => {
             } else {
                 // Mixed or unclear contraction: pick closer end to previous focus
                 if (focusedGeneIndex !== null) {
-                    // Map focusedGeneIndex (gene list index) back to nearest row index in current selection
-                    // Find the row index closest to focusedGeneIndex
+                    const focusedRowIndex = visibleRowIndices[focusedGeneIndex];
                     let closest = currSorted[0];
-                    let minDist = Math.abs(closest - focusedGeneIndex);
+                    let minDist = Math.abs(closest - focusedRowIndex);
                     for (const idx of currSorted) {
-                        const dist = Math.abs(idx - focusedGeneIndex);
+                        const dist = Math.abs(idx - focusedRowIndex);
                         if (dist < minDist) {
                             closest = idx;
                             minDist = dist;
@@ -204,20 +163,8 @@ export const GeneNetworkChartComponent = observer(() => {
             return; // Don't auto-scroll while user is interacting with this component
         }
 
-        // Helper: map a data row index to the gene list index
-        const getGeneListIndexForRowIndex = (rowIndex: number): number | null => {
-            try {
-                const geneId = getTextValue(column, rowIndex);
-                if (!geneId) return null;
-                const idx = visibleGeneIds.indexOf(geneId);
-                return idx === -1 ? null : idx;
-            } catch {
-                return null;
-            }
-        };
-
-        const targetGeneIndex = getGeneListIndexForRowIndex(targetRowIndex);
-        if (targetGeneIndex == null) {
+        const targetVisibleIndex = rowIndexToVisibleIndex.get(targetRowIndex) ?? null;
+        if (targetVisibleIndex == null) {
             return;
         }
 
@@ -230,27 +177,26 @@ export const GeneNetworkChartComponent = observer(() => {
 
         const firstVisibleIndex = Math.floor(scrollTop / ROW_TOTAL_HEIGHT);
         const lastVisibleIndex = Math.min(
-            visibleGeneIds.length - 1,
+            visibleRowIndices.length - 1,
             Math.floor((scrollTop + containerHeight) / ROW_TOTAL_HEIGHT),
         );
 
-        // Only scroll if the target gene is outside the actual viewport
-        if (targetGeneIndex < firstVisibleIndex || targetGeneIndex > lastVisibleIndex) {
-            if (lastScrolledGeneIndexRef.current !== targetGeneIndex) {
-                lastScrolledGeneIndexRef.current = targetGeneIndex;
-                rowVirtualizer.scrollToIndex(targetGeneIndex, {
+        // Only scroll if the target row is outside the actual viewport
+        if (targetVisibleIndex < firstVisibleIndex || targetVisibleIndex > lastVisibleIndex) {
+            if (lastScrolledGeneIndexRef.current !== targetVisibleIndex) {
+                lastScrolledGeneIndexRef.current = targetVisibleIndex;
+                rowVirtualizer.scrollToIndex(targetVisibleIndex, {
                     align: "center",
                     behavior: "smooth",
                 });
             }
-        } else if (lastScrolledGeneIndexRef.current === targetGeneIndex) {
-            // If it's now visible, clear the last scrolled ref
+        } else if (lastScrolledGeneIndexRef.current === targetVisibleIndex) {
             lastScrolledGeneIndexRef.current = null;
         }
     }, [
         highlightedIndices,
-        visibleGeneIds,
-        column,
+        visibleRowIndices,
+        rowIndexToVisibleIndex,
         autoScroll,
         focusedGeneIndex,
         rangeAnchorGeneIndex,
@@ -258,133 +204,82 @@ export const GeneNetworkChartComponent = observer(() => {
         ROW_TOTAL_HEIGHT
     ]);
 
-    const setGeneRef = (geneId: string, element: HTMLDivElement | null) => {
+    const setRowRef = (rowIndex: number, element: HTMLDivElement | null) => {
         if (element) {
-            geneRefs.current.set(geneId, element);
+            rowRefs.current.set(rowIndex, element);
         } else {
-            geneRefs.current.delete(geneId);
+            rowRefs.current.delete(rowIndex);
         }
     };
 
-    const getIndicesForGeneId = useCallback((geneId: string): number[] => {
-        const indices: number[] = [];
-        for (let i = 0; i < filteredIndices.length; i++) {
-            const index = filteredIndices[i];
-            try {
-                const value = getTextValue(column, index);
-                if (value === geneId) {
-                    indices.push(index);
-                }
-            } catch {
-                // Skip invalid indices
-            }
-        }
-        return indices;
-    }, [filteredIndices, column]);
-
     const handleGeneSelection = useCallback((
-        geneId: string,
+        rowIndex: number,
         isToggle: boolean,
         isRange: boolean,
-        currentGeneIndex?: number,
+        currentVisibleIndex?: number,
     ) => {
-        // including a reference so linter doesn't think this is an unneeded dependency
-        filteredIndices; // changes to this are important, even though not used directly
-        const geneRowIndices = getIndicesForGeneId(geneId);
-        if (geneRowIndices.length === 0) return;
-
-        // Shift: select a continuous range of genes (not just row indices)
-        if (isRange && currentGeneIndex !== undefined) {
-            // Use rangeAnchorGeneIndex if set, otherwise establish a new anchor
-            let anchorGeneIndex: number;
+        if (isRange && currentVisibleIndex !== undefined) {
+            let anchorVisibleIndex: number;
             if (rangeAnchorGeneIndex !== null) {
-                anchorGeneIndex = rangeAnchorGeneIndex;
+                anchorVisibleIndex = rangeAnchorGeneIndex;
             } else {
-                // Starting a new range selection - find anchor from lastClickedIndex or use current
-                anchorGeneIndex = -1;
                 if (lastClickedIndex !== null) {
-                    // Find which gene corresponds to lastClickedIndex
-                    for (let i = 0; i < visibleGeneIds.length; i++) {
-                        const testGeneId = visibleGeneIds[i];
-                        const testIndices = getIndicesForGeneId(testGeneId);
-                        if (testIndices.some(idx => idx === lastClickedIndex)) {
-                            anchorGeneIndex = i;
-                            break;
-                        }
-                    }
+                    const anchorFromMap = rowIndexToVisibleIndex.get(lastClickedIndex);
+                    anchorVisibleIndex = anchorFromMap ?? currentVisibleIndex;
+                } else {
+                    anchorVisibleIndex = currentVisibleIndex;
                 }
-                // If we couldn't find it, use the current gene index as anchor
-                if (anchorGeneIndex === -1) {
-                    anchorGeneIndex = currentGeneIndex;
-                }
-                setRangeAnchorGeneIndex(anchorGeneIndex);
+                setRangeAnchorGeneIndex(anchorVisibleIndex);
             }
-
-            // Select all genes from anchor to current
-            const start = Math.min(anchorGeneIndex, currentGeneIndex);
-            const end = Math.max(anchorGeneIndex, currentGeneIndex);
+            const start = Math.min(anchorVisibleIndex, currentVisibleIndex);
+            const end = Math.max(anchorVisibleIndex, currentVisibleIndex);
             const allRangeIndices: number[] = [];
             for (let i = start; i <= end; i++) {
-                const rangeGeneId = visibleGeneIds[i];
-                const rangeGeneIndices = getIndicesForGeneId(rangeGeneId);
-                allRangeIndices.push(...rangeGeneIndices);
+                allRangeIndices.push(visibleRowIndices[i]);
             }
             highlightRows(allRangeIndices);
-            const currentIndex = Math.min(...geneRowIndices);
-            setLastClickedIndex(currentIndex);
+            setLastClickedIndex(rowIndex);
             return;
         }
 
-        // Ctrl/Cmd: toggle this gene's rows in the current selection
         if (isToggle) {
             const currentSet = new Set(highlightedIndices);
-            const allSelected = geneRowIndices.every((idx) => currentSet.has(idx));
-
-            if (allSelected) {
-                geneRowIndices.forEach((idx) => currentSet.delete(idx));
+            if (currentSet.has(rowIndex)) {
+                currentSet.delete(rowIndex);
             } else {
-                geneRowIndices.forEach((idx) => currentSet.add(idx));
+                currentSet.add(rowIndex);
             }
-
             const newIndices = Array.from(currentSet).sort((a, b) => a - b);
             highlightRows(newIndices);
-            setLastClickedIndex(Math.min(...geneRowIndices));
+            setLastClickedIndex(rowIndex);
             return;
         }
 
-        // Plain: replace selection with this gene's rows
-        highlightRows(geneRowIndices);
-        setLastClickedIndex(Math.min(...geneRowIndices));
-        // Clear range anchor when doing plain selection
+        highlightRows([rowIndex]);
+        setLastClickedIndex(rowIndex);
         setRangeAnchorGeneIndex(null);
-    }, [filteredIndices, highlightedIndices, lastClickedIndex, highlightRows, getIndicesForGeneId, visibleGeneIds, rangeAnchorGeneIndex]);
+    }, [highlightedIndices, lastClickedIndex, highlightRows, visibleRowIndices, rowIndexToVisibleIndex, rangeAnchorGeneIndex]);
 
-    const focusGeneAtIndex = useCallback((index: number, shouldSelect: boolean, isRange: boolean, isToggle: boolean) => {
-        if (index < 0 || index >= visibleGeneIds.length) return;
-        
-        const geneId = visibleGeneIds[index];
-        setFocusedGeneIndex(index);
-        
-        // Scroll to the gene using virtualizer
-        rowVirtualizer.scrollToIndex(index, {
+    const focusGeneAtIndex = useCallback((visibleIndex: number, shouldSelect: boolean, isRange: boolean, isToggle: boolean) => {
+        if (visibleIndex < 0 || visibleIndex >= visibleRowIndices.length) return;
+        const rowIndex = visibleRowIndices[visibleIndex];
+        setFocusedGeneIndex(visibleIndex);
+
+        rowVirtualizer.scrollToIndex(visibleIndex, {
             align: "center",
             behavior: "smooth",
         });
-        
-        // Focus the gene card element
-        const geneElement = geneRefs.current.get(geneId);
-        if (geneElement) {
-            // Find the Paper element (GeneNetworkInfoComponent) within the gene element
-            const paperElement = geneElement.querySelector('[tabindex="0"]') as HTMLElement;
-            if (paperElement) {
-                paperElement.focus();
-            }
+
+        const rowElement = rowRefs.current.get(rowIndex);
+        if (rowElement) {
+            const paperElement = rowElement.querySelector('[tabindex="0"]') as HTMLElement;
+            if (paperElement) paperElement.focus();
         }
-        
+
         if (shouldSelect) {
-            handleGeneSelection(geneId, isToggle, isRange, index);
+            handleGeneSelection(rowIndex, isToggle, isRange, visibleIndex);
         }
-    }, [visibleGeneIds, rowVirtualizer, handleGeneSelection]);
+    }, [visibleRowIndices, rowVirtualizer, handleGeneSelection]);
 
     // Container-level keyboard handler for arrow key navigation
     const handleContainerKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
@@ -411,92 +306,54 @@ export const GeneNetworkChartComponent = observer(() => {
             if (focusedGeneIndex === null) {
                 newIndex = 0;
             } else {
-                newIndex = Math.min(focusedGeneIndex + 1, visibleGeneIds.length - 1);
+                newIndex = Math.min(focusedGeneIndex + 1, visibleRowIndices.length - 1);
             }
         } else {
-            // ArrowUp
             if (focusedGeneIndex === null) {
-                newIndex = visibleGeneIds.length - 1;
+                newIndex = visibleRowIndices.length - 1;
             } else {
                 newIndex = Math.max(focusedGeneIndex - 1, 0);
             }
         }
 
         focusGeneAtIndex(newIndex, shouldSelect, isRange, isToggle);
-    }, [focusedGeneIndex, visibleGeneIds, focusGeneAtIndex]);
+    }, [focusedGeneIndex, visibleRowIndices.length, focusGeneAtIndex]);
 
-    const handleGeneClick = (geneId: string, event: MouseEvent<HTMLDivElement>) => {
+    const handleGeneClick = (rowIndex: number, event: MouseEvent<HTMLDivElement>) => {
         event.preventDefault();
         event.stopPropagation();
-
-        // Update focused gene index when clicked
-        const index = visibleGeneIds.indexOf(geneId);
-        if (index !== -1) {
-            setFocusedGeneIndex(index);
-        }
-
+        const visibleIndex = rowIndexToVisibleIndex.get(rowIndex);
+        if (visibleIndex !== undefined) setFocusedGeneIndex(visibleIndex);
         const isToggle = event.ctrlKey || event.metaKey;
         const isRange = event.shiftKey;
-        
-        // Clear range anchor when clicking (not extending with keyboard)
-        if (!isRange) {
-            setRangeAnchorGeneIndex(null);
-        }
-        
-        handleGeneSelection(geneId, isToggle, isRange, index);
+        if (!isRange) setRangeAnchorGeneIndex(null);
+        handleGeneSelection(rowIndex, isToggle, isRange, visibleIndex);
     };
 
-    const handleGeneKeyDown = (geneId: string, event: KeyboardEvent<HTMLDivElement>) => {
-        // Handle arrow keys - let them bubble to container handler
+    const handleGeneKeyDown = (rowIndex: number, event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-            // Update focused index when arrow key is pressed on a gene card
-            const index = visibleGeneIds.indexOf(geneId);
-            if (index !== -1) {
-                setFocusedGeneIndex(index);
-            }
-            // Let the event bubble to container handler for navigation
+            const visibleIndex = rowIndexToVisibleIndex.get(rowIndex);
+            if (visibleIndex !== undefined) setFocusedGeneIndex(visibleIndex);
             return;
         }
-
-        // Only handle Space key for selection
-        if (event.key !== " " && event.key !== "Spacebar") {
-            return;
-        }
-
-        // Avoid interfering with OS-level shortcuts (e.g. meta+space)
-        if (event.metaKey || event.ctrlKey) {
-            return;
-        }
-
+        if (event.key !== " " && event.key !== "Spacebar") return;
+        if (event.metaKey || event.ctrlKey) return;
         event.preventDefault();
         event.stopPropagation();
-
-        // Update focused gene index when Space is pressed
-        const index = visibleGeneIds.indexOf(geneId);
-        if (index !== -1) {
-            setFocusedGeneIndex(index);
-        }
-
-        // Keyboard Space:
-        // - plain Space toggles this gene
-        // - Shift+Space selects a range (like Shift-click)
+        const visibleIndex = rowIndexToVisibleIndex.get(rowIndex);
+        if (visibleIndex !== undefined) setFocusedGeneIndex(visibleIndex);
         const isRange = event.shiftKey;
         const isToggle = !isRange;
-        
-        // Clear range anchor when using Space (not extending with keyboard)
-        if (!isRange) {
-            setRangeAnchorGeneIndex(null);
-        }
-        
-        handleGeneSelection(geneId, isToggle, isRange, index);
+        if (!isRange) setRangeAnchorGeneIndex(null);
+        handleGeneSelection(rowIndex, isToggle, isRange, visibleIndex);
     };
 
     return (
         <div className="absolute w-[100%] h-[100%] overflow-y-auto text-sm h-full flex flex-col">
-            {visibleGeneIds.length > 0 ? (
+            {visibleRowIndices.length > 0 ? (
                 <>
-                    <div 
-                        ref={scrollContainerRef} 
+                    <div
+                        ref={scrollContainerRef}
                         className="flex-1 min-h-0 overflow-y-auto"
                         onKeyDown={handleContainerKeyDown}
                     >
@@ -505,14 +362,19 @@ export const GeneNetworkChartComponent = observer(() => {
                             style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
                         >
                             {rowVirtualizer.getVirtualItems().map((virtualItem: { index: number; start: number }) => {
-                                const geneId = visibleGeneIds[virtualItem.index];
-                                const highlightCount = geneHighlightCounts.get(geneId) || 0;
-                                const isHighlighted = highlightCount > 0;
+                                const rowIndex = visibleRowIndices[virtualItem.index];
+                                let geneId: string;
+                                try {
+                                    geneId = getTextValue(column, rowIndex);
+                                } catch {
+                                    geneId = "";
+                                }
+                                const isHighlighted = highlightedRowSet.has(rowIndex);
                                 return (
                                     <div
-                                        key={geneId}
-                                        ref={(el) => setGeneRef(geneId, el)}
-                                        data-gene-id={geneId}
+                                        key={rowIndex}
+                                        ref={(el) => setRowRef(rowIndex, el)}
+                                        data-row-index={rowIndex}
                                         data-index={virtualItem.index}
                                         className="absolute left-0 w-full px-2"
                                         style={{
@@ -524,8 +386,8 @@ export const GeneNetworkChartComponent = observer(() => {
                                             <GeneNetworkInfoComponent
                                                 geneId={geneId}
                                                 isHighlighted={isHighlighted}
-                                                onCardClick={(event) => handleGeneClick(geneId, event)}
-                                                onCardKeyDown={(event) => handleGeneKeyDown(geneId, event)}
+                                                onCardClick={(event) => handleGeneClick(rowIndex, event)}
+                                                onCardKeyDown={(event) => handleGeneKeyDown(rowIndex, event)}
                                             />
                                         </div>
                                     </div>
@@ -535,11 +397,7 @@ export const GeneNetworkChartComponent = observer(() => {
                     </div>
                 </>
             ) : (
-                <div>
-                    {mode === "observableFields" && highlightedIndices.length === 0
-                        ? "No filtered data. Apply filters to see genes."
-                        : "No gene IDs found."}
-                </div>
+                <div>No gene IDs found.</div>
             )}
         </div>
     );
