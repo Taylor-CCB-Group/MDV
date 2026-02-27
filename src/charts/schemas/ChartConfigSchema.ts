@@ -189,6 +189,11 @@ export const SelectionDialogConfigSchema = BaseConfigSchema.extend({
     // Additional selection dialog specific properties
 }).describe("Configuration for selection dialogs allowing user interaction");
 
+export const GeneInfoSchema = BaseConfigSchema.extend({
+    type: z.literal("geneNetwork").describe("Gene information from genenetwork.nl API"),
+    autoScroll: z.boolean().optional().describe("Automatically scroll to highlighted items")
+}).describe("Configuration for chart allowing for selection of genes with information retrieved from genenetwork.nl API");
+
 // Register all chart-specific schemas with the registry
 // This establishes the pattern for future co-location of schemas with chart implementations
 registerChartConfigSchema("scatter_plot", ScatterPlotConfigSchema, { version: "1" });
@@ -211,6 +216,7 @@ registerChartConfigSchema("row_chart", RowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("stacked_row_chart", StackedRowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("row_summary_box", RowSummaryBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("selection_dialog", SelectionDialogConfigSchema, { version: "1" });
+registerChartConfigSchema("geneNetwork", GeneInfoSchema, { version: "1" });
 
 // Build union of all chart configuration types from the registry
 // This ensures the union is derived from registered schemas, establishing the pattern
