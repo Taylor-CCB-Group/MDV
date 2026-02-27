@@ -34,5 +34,6 @@
         "dist",
         "vite-dist",
         "python",
+        "scripts"
     ]
 }

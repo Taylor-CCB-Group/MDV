@@ -3,6 +3,7 @@
   "version": "0.0.2",
   "description": "Multi Dimensional Viewer (MDV) is tool for analyzing, annotating  and sharing multi dimensional data.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.   &nbsp; ![summary](images/summary.png)",
   "main": "index.js",
+  "type": "module",
   "directories": {
     "example": "examples"
   },
@@ -15,6 +16,7 @@
     "build-flask-vite": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "build-flask-dockerjs": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./dist/flask",
     "build-flask-docker-hotfix": "cross-env build=desktop_pt vite build --outDir ./python/dist_hotfix/flask",
+    "build-schemas": "cd scripts && node --experimental-strip-types ./generate-schemas.ts",
     "docs-env-setup": "python -m venv docsenv && source docsenv/bin/activate && cd docs && pip install -r requirements.txt && npm run build-docs-nix",
     "build-docs": "sphinx-build -M html docs/maindocs docs/maindocs/_build",
     "build-docs-nix": "source docsenv/bin/activate && npm run build-docs",

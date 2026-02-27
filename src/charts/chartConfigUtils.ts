@@ -8,6 +8,8 @@ import type DataStore from "@/datastore/DataStore";
 import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "./BaseChart";
 import type { TooltipConfig } from "@/react/scatter_state";
+import { getChartConfigSchema } from "./schemas/ChartConfigRegistry";
+import { BaseConfigSchema } from "./schemas/ChartConfigSchema";
 
 /**
  * This is a utility module for handling the serialisation and deserialisation of chart configurations.
@@ -154,6 +156,8 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
  * for observing changes to the config object.
  * 
  * Implementation notes in progress:
+ * - with the addition of zod schema passing in here, we should be associating the resulting return-type more formally
+ *   with generic `C`
  * - should we have functions that only operate on config objects?
  *   (in future we might not even need Chart objects, just config objects and components that can render them)
  * - is the config.set property safe?
@@ -163,6 +167,36 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
  * @param chart
  */
 export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<C>>(originalConfig: C, chart: T) {
+    // Validate the config using the registered schema for this chart type
+    // This happens before any deserialization to catch schema violations early
+    const schema = getChartConfigSchema(originalConfig.type, originalConfig.version);
+    if (schema) {
+        try {
+            // Validate and parse the config - this will throw if invalid
+            schema.parse(originalConfig);
+        } catch (error) {
+            // In development, we want to fail loudly to surface issues
+            // In production, we could optionally log and continue, but for now we fail loudly
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(
+                `Invalid chart config for type '${originalConfig.type}': ${errorMessage}. This indicates a schema mismatch - the config does not match the expected structure.`
+            );
+        }
+    } else {
+        // If no schema is registered for this type, fall back to BaseConfigSchema validation
+        // This provides basic validation even for unregistered chart types
+        try {
+            BaseConfigSchema.parse(originalConfig);
+        } catch (error) {
+            // Log a warning but don't throw - unregistered types might be legacy or experimental
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(
+                `No schema registered for chart type '${originalConfig.type}', ` +
+                `but base config validation failed: ${errorMessage}`
+            );
+        }
+    }
+    
     let config: C = JSON.parse(JSON.stringify(originalConfig));
     if (!config.id) {
         // what about when we duplicate a chart?

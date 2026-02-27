@@ -43,6 +43,7 @@ const geneNetworkApiResponseSchema = z.object({
             pValue: z.number(),
         })).optional(),
     }).optional(),
+    // actually I think the celltype info is more interesting than currently expressed here.
     celltypes: z.object({
         fixed: z.object({
             header: z.array(z.any()).optional(),

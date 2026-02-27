@@ -36,6 +36,7 @@ class ProjectChatProtocol(Protocol):
 chat_enabled = True # pending server extension config mechanism
 try:
     from mdvtools.llm.langchain_mdv import ProjectChat as _ProjectChat # type: ignore
+    # from mdvtools.llm.structured_project_chat import StructuredProjectChat as _ProjectChat # type: ignore
     # raise Exception("test error in import langchain_mdv")
 except Exception as e:
     msg = str(e)

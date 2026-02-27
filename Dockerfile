@@ -2,8 +2,6 @@
 # warning - we had an obscure npm error with cross-env not found, and it seems like using an earlier nodejs version fixed it
 # for some reason node_modules/.bin wasn't populated after `RUN npm install` - but manually running it in the container worked
 # not sure if there's a way of pinning a more specific build of the base image. May want to see if we can reproduce this issue outside of docker.
-# revisiting in 2026: node20 is reaching EOL, and we have a "npm warn EBADENGINE Unsupported engine" related to "vite-plugin-glsl" in npm install
-# changing to node22 again.
 FROM nikolaik/python-nodejs:python3.12-nodejs22 AS frontend-builder
 
 # ARG and ENV for build information, to be passed in from the CI pipeline
@@ -98,7 +96,7 @@ WORKDIR /app/python
 #16 20.81 
 #16 20.81 Warning: The current project could not be installed: [Errno 2] No such file or directory: '/app/python/README.md'
 #16 20.81 If you do not want to install the current project use --no-root.
-#16 20.81 If you want to use Poetry only for dependency management but not for packaging, you can disable package mode by setting package-mode = false in your pyproject.toml file.
+#16 20.81 If you want to use Poetry only for dependency management but not for packaging, you can disable package-mode = false in your pyproject.toml file.
 #16 20.81 In a future version of Poetry this warning will become an error!
 # seems to be ok to first install with --no-root for dependencies, then install the root package later
 # we don't want to set package-mode = false in pyproject.toml
