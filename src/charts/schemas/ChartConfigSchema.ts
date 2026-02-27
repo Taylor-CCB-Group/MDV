@@ -41,7 +41,7 @@ export const FieldSpecsSchema = z.array(FieldSpecSchema).describe("Array of fiel
 
 export const GridStackConfigSchema = z.object({
     gssize: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional().describe("GridStack size as [width, height] in grid units"),
-    gsposition: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional().describe("GridStack position as [x, y] coordinates"),
+    gsposition: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]).optional().describe("GridStack position as [x, y] coordinates"),
 }).describe("GridStack layout configuration for dashboard positioning");
 
 // Base configuration that all charts extend
