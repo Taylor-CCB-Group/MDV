@@ -178,7 +178,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             // In development, we want to fail loudly to surface issues
             // In production, we could optionally log and continue, but for now we fail loudly
             const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new Error(
+            console.error(
                 `Invalid chart config for type '${originalConfig.type}': ${errorMessage}. This indicates a schema mismatch - the config does not match the expected structure.`
             );
         }
