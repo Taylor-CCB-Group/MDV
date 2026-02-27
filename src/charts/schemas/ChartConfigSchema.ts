@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { registerChartConfigSchema, getAllChartConfigSchemas } from "./ChartConfigRegistry";
 
 // Basic data types that can be stored in columns
 export const DataTypeSchema = z.enum([
@@ -47,11 +48,13 @@ export const GridStackConfigSchema = z.object({
 export const BaseConfigSchema = GridStackConfigSchema.extend({
     id: z.string().describe("Unique identifier for the chart instance"),
     size: z.tuple([z.number(), z.number()]).describe("Chart dimensions as [width, height] in pixels"),
+    //nb: seems like tables in default view have e.g. `title: ["cells"]`
     title: z.string().describe("Display title for the chart"),
-    legend: z.string().describe("Legend text describing the chart's purpose"),
+    legend: z.string().optional().describe("Legend text describing the chart's purpose"),
     type: z.string().describe("Chart type identifier (e.g., 'scatter_plot', 'bar_chart')"),
     param: FieldSpecsSchema.describe("Array of field specifications defining the data columns used by this chart"),
     title_color: z.string().optional().describe("CSS color value for the chart title"),
+    version: z.string().optional().describe("Schema version for this chart configuration (used for future migration support)"),
 }).describe("Base configuration shared by all chart types, including layout, styling, and data mapping");
 
 // todo - this should be a union of all the color config options, not applied to all charts
@@ -186,31 +189,38 @@ export const SelectionDialogConfigSchema = BaseConfigSchema.extend({
     // Additional selection dialog specific properties
 }).describe("Configuration for selection dialogs allowing user interaction");
 
-// Union of all chart configuration types
-export const ChartConfigSchema = z.union([
-    ScatterPlotConfigSchema,
-    BarChartConfigSchema,
-    HistogramConfigSchema,
-    HeatmapConfigSchema,
-    DotPlotConfigSchema,
-    BoxPlotConfigSchema,
-    ViolinPlotConfigSchema,
-    PieChartConfigSchema,
-    TableConfigSchema,
-    TextBoxConfigSchema,
-    WordcloudConfigSchema,
-    SankeyConfigSchema,
-    MultiLineChartConfigSchema,
-    MultiBoxPlotConfigSchema,
-    AbundanceBoxPlotConfigSchema,
-    DensityScatterConfigSchema,
-    RowChartConfigSchema,
-    StackedRowChartConfigSchema,
-    RowSummaryBoxConfigSchema,
-    SelectionDialogConfigSchema,
-    // Fallback for any other chart types
-    BaseConfigSchema
-]).describe("Union of all possible chart configuration types, allowing for type-safe chart creation");
+// Register all chart-specific schemas with the registry
+// This establishes the pattern for future co-location of schemas with chart implementations
+registerChartConfigSchema("scatter_plot", ScatterPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("bar_chart", BarChartConfigSchema, { version: "1" });
+registerChartConfigSchema("histogram", HistogramConfigSchema, { version: "1" });
+registerChartConfigSchema("heatmap", HeatmapConfigSchema, { version: "1" });
+registerChartConfigSchema("dot_plot", DotPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("pie_chart", PieChartConfigSchema, { version: "1" });
+registerChartConfigSchema("table", TableConfigSchema, { version: "1" });
+registerChartConfigSchema("text_box", TextBoxConfigSchema, { version: "1" });
+registerChartConfigSchema("wordcloud", WordcloudConfigSchema, { version: "1" });
+registerChartConfigSchema("sankey", SankeyConfigSchema, { version: "1" });
+registerChartConfigSchema("multi_line_chart", MultiLineChartConfigSchema, { version: "1" });
+registerChartConfigSchema("multi_box_plot", MultiBoxPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("abundance_box_plot", AbundanceBoxPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("density_scatter", DensityScatterConfigSchema, { version: "1" });
+registerChartConfigSchema("row_chart", RowChartConfigSchema, { version: "1" });
+registerChartConfigSchema("stacked_row_chart", StackedRowChartConfigSchema, { version: "1" });
+registerChartConfigSchema("row_summary_box", RowSummaryBoxConfigSchema, { version: "1" });
+registerChartConfigSchema("selection_dialog", SelectionDialogConfigSchema, { version: "1" });
+
+// Build union of all chart configuration types from the registry
+// This ensures the union is derived from registered schemas, establishing the pattern
+// for future co-location where schemas register themselves as side-effects
+const registeredSchemas = getAllChartConfigSchemas();
+const allSchemas = registeredSchemas.length > 0 
+    ? [...registeredSchemas, BaseConfigSchema]
+    : [BaseConfigSchema];
+export const ChartConfigSchema = z.union(allSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]])
+    .describe("Union of all possible chart configuration types, allowing for type-safe chart creation");
 
 // Schema for view configuration
 export const ViewConfigSchema = z.object({
