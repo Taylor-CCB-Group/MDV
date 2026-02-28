@@ -133,7 +133,7 @@ const MenuBarComponent = () => {
                     <Box sx={{ display: "flex", alignItems: "center" }}>
                         <ChatButtons />
                         <ToggleThemeWrapper />
-                        <IconWithTooltip tooltipText="View Datasource Metadata" onClick={handleDebugButtonClick}>
+                        <IconWithTooltip tooltipText="Debug / Report issue" onClick={handleDebugButtonClick}>
                             <PestControlIcon sx={{height: "1.5rem", width: "1.5rem"}} />
                         </IconWithTooltip>
                     </Box>

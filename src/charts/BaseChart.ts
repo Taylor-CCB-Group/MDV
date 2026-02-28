@@ -186,7 +186,7 @@ class BaseChart<T extends BaseConfig> {
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
             menu.push({
-                text: "debug chart",
+                text: "debug / report chart",
                 icon: "fas fa-bug",
                 func: () => {
                     window.mdv.debugChart = this;
