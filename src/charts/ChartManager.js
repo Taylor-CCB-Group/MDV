@@ -1836,7 +1836,7 @@ export class ChartManager {
                 typeof(error) === "string" ?
                     { message: error }
                     :
-                    { message: "An error occurred while creating the chart" }
+                    { message: "An error occurred while creating the chart" };
             createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
