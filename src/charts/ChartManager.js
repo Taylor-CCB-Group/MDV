@@ -1765,7 +1765,7 @@ export class ChartManager {
                     height: `${height}px`,
                     left: `${left}px`,
                     top: `${top}px`,
-                    background: t.main_panel_color,
+                    background: "var(--main_panel_color)",
                     zIndex: "2",
                     display: "flex",
                     alignItems: "center",
@@ -1814,14 +1814,7 @@ export class ChartManager {
             this.clearInfoAlerts();
             spinner.remove();
             ellipsis.remove();
-            // const id = this.createInfoAlert(
-            //     `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
-            //     {
-            //         type: "warning",
-            //     },
-            // );
-            // const idiv = this.infoAlerts[id].div;
-            // idiv.onclick = () => idiv.remove();
+            div.style.border = "1px solid var(--border_menu_bar_color)";
             const debugNode = createEl(
                 "div",
                 {
@@ -1837,7 +1830,14 @@ export class ChartManager {
                 },
                 div,
             );
-            createMdvPortal(ErrorComponentReactWrapper({ error, height, width, extraMetaData: { config } }), debugNode);
+            const errorObj = error instanceof Error ? 
+                error 
+                :
+                typeof(error) === "string" ?
+                    { message: error }
+                    :
+                    { message: "An error occurred while creating the chart" };
+            createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {
