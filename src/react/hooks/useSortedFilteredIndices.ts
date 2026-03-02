@@ -35,6 +35,9 @@ function sortDecodedStrings(
  * For unique columns, we decode the data and sort it
  * For all other columns we directly sort it, we put the null and
  * NaN values at the end
+ * 
+ * For multitext columns, we get the display value and sort it
+ * The N/A values are moved to the end for multitext
  *
  * Returns a new Uint32Array of sorted indices
  */

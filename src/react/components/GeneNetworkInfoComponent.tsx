@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from
 import { useQuery } from "@tanstack/react-query";
 import { Paper, Typography, Link } from "@mui/material";
 import z from "zod";
+import clsx from "clsx";
 
 // Zod schema for GeneNetwork API response
 const geneNetworkApiResponseSchema = z.object({
@@ -160,23 +161,22 @@ export function GeneNetworkInfoComponent({
     return (
         <Paper
             ref={containerRef}
-            variant={isHighlighted ? "elevation" : "outlined"}
-            elevation={isHighlighted ? 2 : 0}
+            variant="outlined"
             tabIndex={onCardClick || onCardKeyDown ? 0 : undefined}
+            className={clsx(
+                "h-[150px] w-full overflow-hidden flex flex-col rounded-md transition-shadow",
+                onCardClick ? "cursor-pointer" : "cursor-default",
+                "focus:outline-none focus:ring-2 focus:ring-offset-1",
+            )}
             sx={{
                 p: 1.5,
-                m: 1,
-                borderRadius: 1,
-                minHeight: 100,
-                border: isHighlighted ? "2px solid" : undefined,
-                borderColor: isHighlighted ? "primary.main" : undefined,
-                cursor: onCardClick ? "pointer" : "default",
-                outline: "none",
-                "&:focus-visible": {
-                    outline: "2px solid",
-                    outlineColor: "primary.main",
-                    outlineOffset: "2px",
-                },
+                // Ensure border color is applied (MUI might override)
+                ...(isHighlighted && {
+                    borderColor: "rgb(59, 130, 246)", // blue-500
+                }),
+                "&:focus": {
+                    borderWidth: "2px"
+                }
             }}
             onClick={handleCardClick}
             onKeyDown={handleKeyDown}
@@ -210,22 +210,38 @@ export function GeneNetworkInfoComponent({
             {isVisible && geneInfo && (
                 <>
                     <div className="flex items-start justify-between">
-                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                            Gene Information for {geneInfo.geneName}
+                        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5, lineHeight: 1.2 }}>
+                            {geneInfo.geneName}
                         </Typography>
                     </div>
-                    <Typography variant="body2">
+                    <Typography variant="body2" sx={{ mb: 0.5, lineHeight: 1.3 }}>
                         <strong>Gene ID:</strong> {geneInfo.geneId}
                     </Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    <Typography 
+                        variant="body2" 
+                        sx={{ 
+                            mb: 0.5, 
+                            lineHeight: 1.3,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                        }}
+                    >
                         <strong>Description:</strong> {geneInfo.geneDescription}
                     </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ mt: "auto", lineHeight: 1.3 }}>
                         <Link
                             href={`https://www.genenetwork.nl/gene/${geneInfo.geneId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             tabIndex={-1}
+                            sx={{
+                                "&:hover": {
+                                    fontWeight: 600,
+                                },
+                            }}
                         >
                             More info on GeneNetwork
                         </Link>
@@ -235,6 +251,11 @@ export function GeneNetworkInfoComponent({
                             target="_blank"
                             rel="noopener noreferrer"
                             tabIndex={-1}
+                            sx={{
+                                "&:hover": {
+                                    fontWeight: 600,
+                                },
+                            }}
                         >
                             Open on genecards.org
                         </Link>
