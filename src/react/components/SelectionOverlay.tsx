@@ -212,10 +212,12 @@ export default observer(function SelectionOverlay() {
         ));
     }, [selectedTool, setSelectedTool, toolsToShow]);
 
-    const relevantGates = useMemo(() => 
-        gateManager.gatesArray.filter(
+    const relevantGates = useMemo(() => {
+        if (!cx || !cy) return [];
+        return gateManager.gatesArray.filter(
             (gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field
         )
+    }
     , [gateManager.gatesArray, cx, cy]);
 
     const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
