@@ -64,6 +64,7 @@ import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
+import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 
 
 //order of column data in an array buffer
@@ -202,6 +203,11 @@ export class ChartManager {
             this.dsIndex[d.name] = ds;
             this._addDSListeners(ds);
             this.columnsLoading[d.name] = {};
+            try {
+                getOrCreateGateManager(ds.dataStore);
+            } catch (err) {
+                console.error(`Failed to initialise gates for datasource "${d.name}"`, err);
+            }
         }
         if (listener) {
             this.addListener("_default", listener);

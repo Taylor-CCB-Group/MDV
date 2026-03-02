@@ -9,20 +9,22 @@ import { GateManager } from "./GateManager";
  */
 const gateManagers = new WeakMap<DataStore, GateManager>();
 
+export function getOrCreateGateManager(dataStore: DataStore) {
+    let gateManager = gateManagers.get(dataStore);
+
+    if (!gateManager) {
+        gateManager = new GateManager(dataStore);
+        gateManagers.set(dataStore, gateManager);
+    }
+
+    return gateManager;
+}
+
 /**
  * Hook to get the GateManager for the current chart's datasource
  */
 export function useGateManager() {
     const dataStore = useDataStore();
 
-    return useMemo(() => {
-        let gateManager = gateManagers.get(dataStore);
-
-        if (!gateManager) {
-            gateManager = new GateManager(dataStore);
-            gateManagers.set(dataStore, gateManager);
-        }
-
-        return gateManager;
-    }, [dataStore]);
+    return useMemo(() => getOrCreateGateManager(dataStore), [dataStore]);
 }
