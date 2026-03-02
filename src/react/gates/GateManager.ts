@@ -75,6 +75,8 @@ export class GateManager {
             return;
         }
 
+        const previousGate = {...gate};
+
         const updatedGate = {
             ...gate,
             ...updates,
@@ -88,6 +90,9 @@ export class GateManager {
         const cellUpdatedNeeded = "geometry" in updates || "name" in updates || "columns" in updates;
 
         if (cellUpdatedNeeded) {
+            // Remove the previous membership
+            this.updateCellsWithGate(previousGate, false);
+            // Add new membership
             this.updateCellsWithGate(updatedGate, true);
         }
 
