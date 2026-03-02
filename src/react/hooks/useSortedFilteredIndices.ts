@@ -4,18 +4,38 @@ import type { TableChartReactConfig } from "../components/TableChartReactWrapper
 import { useDataStore } from "../context";
 import { autorun } from "mobx";
 
+function sortDecodedStrings(
+    indices: Uint32Array,
+    decodedData: Record<number, string>,
+    ascending: boolean,
+    isEmpty: (str: string) => boolean,
+): void {
+    indices.sort((a, b) => {
+        const strA = decodedData[a];
+        const strB = decodedData[b];
+        const aIsEmpty = isEmpty(strA);
+        const bIsEmpty = isEmpty(strB);
+        if (aIsEmpty && bIsEmpty) return 0;
+        if (aIsEmpty) return 1;
+        if (bIsEmpty) return -1;
+        // Cursor's recommendation to naturally sort the string when there is a numeric part in it
+        const collator = new Intl.Collator(undefined, { numeric: true });
+        const comparison = collator.compare(strA, strB);
+        return ascending ? comparison : -comparison;
+    });
+}
 /**
  * Hook that sorts the filtered indices based on the config.sort
- * 
+ *
  * - Follows the logic of sorting in DataModel.sort()
  * - Uses Mobx autorun to react to config.sort changes
  * - Updates the indices when any of these change: filteredIndices,
  * dataStore or config.sort
- * 
+ *
  * For unique columns, we decode the data and sort it
- * For all other columns we directly sort it, we put the null and 
+ * For all other columns we directly sort it, we put the null and
  * NaN values at the end
- * 
+ *
  * Returns a new Uint32Array of sorted indices
  */
 const useSortedFilteredIndices = () => {
@@ -68,7 +88,7 @@ const useSortedFilteredIndices = () => {
 
                 if (!length || typeof length !== "number" || length <= 0) {
                     console.error(
-                        `Column ${columnId} of type 'unique' has invalid or missing stringLength: ${length}.`,
+                        `Column ${columnId} of type ${colInfo.datatype} has invalid or missing stringLength: ${length}.`,
                     );
                     setSortedFilteredIndices(indices);
                     return;
@@ -90,21 +110,36 @@ const useSortedFilteredIndices = () => {
                 }
 
                 // Sort the indices by comparing decoded strings
-                indices.sort((a, b) => {
-                    const strA = decodedData[a];
-                    const strB = decodedData[b];
+                sortDecodedStrings(indices, decodedData, ascending, (s) => !s || s.trim() === "");
+                setSortedFilteredIndices(new Uint32Array(indices));
+            } else if (colInfo.datatype === "multitext") {
+                const decodedData: Record<number, string> = {};
+                const length = colInfo.stringLength;
 
-                    // Handle null/undefined and empty strings
-                    const aIsEmpty = !strA || strA.trim() === "";
-                    const bIsEmpty = !strB || strB.trim() === "";
+                if (!length || typeof length !== "number" || length <= 0) {
+                    console.error(
+                        `Column ${columnId} of type ${colInfo.datatype} has invalid or missing stringLength: ${length}.`,
+                    );
+                    setSortedFilteredIndices(indices);
+                    return;
+                }
 
-                    if (aIsEmpty && bIsEmpty) return 0;
-                    if (aIsEmpty) return 1;
-                    if (bIsEmpty) return -1;
+                for (let i = 0; i < indices.length; i++) {
+                    const dataIndex = indices[i];
+                    if (!data || dataIndex * length + length > data.length) {
+                        console.error(`Index out of bounds for the column ${columnId}, skipping.`);
+                        decodedData[dataIndex] = "";
+                        continue;
+                    }
 
-                    const comparison = strA.localeCompare(strB);
-                    return ascending ? comparison : -comparison;
-                });
+                    const rowValue = Array.from(data?.slice?.(dataIndex * length, dataIndex * length + length))
+                        .filter((x) => x !== 65535)
+                        .map((x) => colInfo.values[x] ?? "")
+                        .join(", ");
+                    decodedData[dataIndex] = rowValue;
+                }
+
+                sortDecodedStrings(indices, decodedData, ascending, (s) => !s || s.trim() === "" || s.trim() === "N/A");
                 setSortedFilteredIndices(new Uint32Array(indices));
             } else {
                 // All other datatypes
