@@ -18,22 +18,25 @@ export function truncateGateLabel(name: string, maxLen: number = MAX_LABEL_LENGT
     return `${name.slice(0, maxLen - ELLIPSIS.length)}${ELLIPSIS}`;
 }
 const useGateLayers = () => {
+    const chartId = useChartID();
     const gateManager = useGateManager();
     const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const config = useConfig<DeckScatterConfig>();
-    const { dimension } = config;
-    const is2d = dimension === "2d";
-    const [draggingId, setDraggingId] = useState<string | null>(null);
-    const [isHoveringLabel, setIsHoveringLabel] = useState(false);
-    const draggingIdRef = useRef<string | null>(null);
-    const [dragPos, setDragPos] = useState<[number, number] | null>(null);
-    const gates = gateManager.gatesArray;
-    const hasRebuiltGateColumnRef = useRef(false);
-    const chartId = useChartID();
     const { selectionProps } = useSpatialLayers();
     const { onEditGate } = useGateActions();
+    const { dimension } = config;
+    const is2d = dimension === "2d";
     const { editingGateId, selectionFeatureCollection } = selectionProps;
+    const gates = gateManager.gatesArray;
+
+
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [isHoveringLabel, setIsHoveringLabel] = useState(false);
+    const [dragPos, setDragPos] = useState<[number, number] | null>(null);
+    const hasRebuiltGateColumnRef = useRef(false);
+    const draggingIdRef = useRef<string | null>(null);
+    const dragPosRef = useRef<[number, number] | null>(null);
 
     const relevantGates = useMemo(() => {
         if (!cx || !cy) return [];
@@ -107,11 +110,12 @@ const useGateLayers = () => {
             },
             onDrag(pickingInfo) {
                 const currentId = draggingIdRef.current;
-                if (!currentId || !dragPos || !pickingInfo.object || !pickingInfo.coordinate) return;
+                if (!currentId || !pickingInfo.object || !pickingInfo.coordinate) return;
 
                 const currentPosition: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]];
 
                 // Update the drag position of the label with the current dragged position
+                dragPosRef.current = currentPosition;
                 setDragPos(currentPosition);
             },
             onDragStart(pickingInfo) {
@@ -121,19 +125,22 @@ const useGateLayers = () => {
                 // Set teh dragging id and drag position state
                 draggingIdRef.current = pickingInfo.object.gateId;
                 setDraggingId(pickingInfo.object.gateId);
-                setDragPos([pickingInfo.coordinate[0], pickingInfo.coordinate[1]]);
+                const startPos: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]]
+                dragPosRef.current = startPos;
+                setDragPos(startPos);
                 return true;
             },
             onDragEnd() {
                 const currentId = draggingIdRef.current;
                 if (!currentId) return;
 
-                const position = dragPos;
+                const position = dragPosRef.current;
                 if (position) {
                     // Update the label position of the gate, when the dragging ends
                     gateManager.updateGate(currentId, { labelPosition: position });
                 }
                 draggingIdRef.current = null;
+                dragPosRef.current = null;
                 setDraggingId(null);
                 setDragPos(null);
             },
