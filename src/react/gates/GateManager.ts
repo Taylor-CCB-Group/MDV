@@ -41,7 +41,8 @@ export class GateManager {
      */
     async addGate(gate: Gate) {
         // Ensure column data is loaded
-        await this.ensureGatesColumnDataLoaded();
+        const loaded = await this.ensureGatesColumnDataLoaded();
+        if (!loaded || !this.gateColumn?.data) return;
 
         const clonedGate = {
             ...gate,
@@ -199,38 +200,40 @@ export class GateManager {
     public async rebuildGatesColumnWhenReady() {
         if (this.gates.size > 0) {
             // Ensure column data is loaded before updating gate column
-            await this.ensureGatesColumnDataLoaded();
-            await this.rebuildGateColumn();
+            const loaded = await this.ensureGatesColumnDataLoaded();
+            if (loaded) await this.rebuildGateColumn();
         }
     }
 
     /**
      * Check if the gates column is loaded or not
      * Load the column explicitly if not loaded yet
+     * @returns true if gate column data is loaded, false otherwise
      */
-    private async ensureGatesColumnDataLoaded() {
+    private async ensureGatesColumnDataLoaded(): Promise<boolean> {
         if (!this.gateColumn) {
             this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
             if (!this.gateColumn) {
                 console.error("No gates column in the dataStore");
-                return;
+                return false;
             }
         }
 
         if (this.gateColumn.data) {
-            // Gate column data already loaded
-            return;
+            return true;
         }
 
-        // Explicitly load the column data
         try {
             await loadColumn(this.dataStore.name, GATES_COLUMN_NAME);
             this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
-            if (!this.gateColumn.data) {
+            if (!this.gateColumn?.data) {
                 console.error("Failed to load gates column data");
+                return false;
             }
+            return true;
         } catch (error) {
             console.error("Failed to load gates column data:", error);
+            return false;
         }
     }
 
@@ -240,7 +243,7 @@ export class GateManager {
      * Recompute gates for the cells
      */
     private async rebuildGateColumn() {
-        if (!this.gateColumn) {
+        if (!this.gateColumn?.data) {
             return;
         }
 
@@ -277,7 +280,7 @@ export class GateManager {
      * @param add - true if add, false if remove
      */
     private updateCellsWithGate(gate: Gate, add: boolean) {
-        if (!this.gateColumn) return;
+        if (!this.gateColumn?.data) return;
 
         const [xField, yField] = gate.columns;
 
@@ -326,7 +329,7 @@ export class GateManager {
      * @returns gate names for the cell
      */
     private getGateNamesForCell(cellIndex: number): string[] {
-        if (!this.gateColumn || !this.gateColumn.stringLength) return [];
+        if (!this.gateColumn?.data || !this.gateColumn.stringLength) return [];
 
         const baseIndex = cellIndex * this.gateColumn.stringLength;
         const gateNames: string[] = [];
@@ -348,7 +351,7 @@ export class GateManager {
      * @param gateNames - Gate names to update the cell with
      */
     private setGateNamesForCell(cellIndex: number, gateNames: string[]) {
-        if (!this.gateColumn || !this.gateColumn.stringLength) return;
+        if (!this.gateColumn?.data || !this.gateColumn.stringLength) return;
 
         const baseIndex = cellIndex * this.gateColumn.stringLength;
         const maxValues = Math.min(gateNames.length, this.gateColumn.stringLength);
