@@ -10,10 +10,12 @@ import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
 
 const MAX_LABEL_LENGTH = 18;
+const ELLIPSIS = "...";
 
 export function truncateGateLabel(name: string, maxLen: number = MAX_LABEL_LENGTH) {
     if (name.length <= maxLen) return name;
-    return `${name.slice(0, maxLen - 1)}...`;
+    if (maxLen <= ELLIPSIS.length) return name.slice(0, maxLen);
+    return `${name.slice(0, maxLen - ELLIPSIS.length)}${ELLIPSIS}`;
 }
 const useGateLayers = () => {
     const gateManager = useGateManager();
