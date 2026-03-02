@@ -14,6 +14,8 @@ import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import { isDatatypeNumeric } from "@/lib/utils";
+import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
+import { logValidationError } from "@/lib/validationLogging";
 
 
 class DataStore {
@@ -40,6 +42,18 @@ class DataStore {
      * rotations applied to them
      */
     constructor(size, config = {}, dataLoader = null) {
+        // Best-effort, non-fatal validation of the datasource config.
+        // This logs schema violations and records them for later inspection
+        // in the debug dialog, but does not modify the incoming config.
+        const result = DataSourceSchema.safeParse(config);
+        if (!result.success) {
+            logValidationError({
+                context: "datasource",
+                name: config?.name,
+                rawConfig: config,
+                error: result.error,
+            });
+        }
         // by keeping a reference to the original config metadata, we can later compare
         // it to new config from server to determine if it has changed etc.
         this.config = config;

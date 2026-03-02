@@ -10,6 +10,7 @@ import type { BaseConfig } from "./BaseChart";
 import type { TooltipConfig } from "@/react/scatter_state";
 import { getChartConfigSchema } from "./schemas/ChartConfigRegistry";
 import { BaseConfigSchema } from "./schemas/ChartConfigSchema";
+import { logValidationError } from "@/lib/validationLogging";
 
 /**
  * This is a utility module for handling the serialisation and deserialisation of chart configurations.
@@ -76,13 +77,12 @@ export function serialiseConfig(config: any) {
     // n.b. now using `toJSON()` in favour of `toString()` where possible - but there isn't a default `toJSON()` 
     // for arbitrary objects, so still using stringification here.
     const serialized = JSON.parse(JSON.stringify(config));
-    
+
     //! pending more generic approach to serialising queries...
     //in principle, react-based charts shouldn't have any trouble with the above...
     // if (config.color_by) {
     //     serialized.color_by = getConcreteFieldName(config.color_by);
     // }
-    console.log('processed config:', serialized);
     return serialized;
 }
 /**
@@ -170,31 +170,10 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     // Validate the config using the registered schema for this chart type
     // This happens before any deserialization to catch schema violations early
     const schema = getChartConfigSchema(originalConfig.type, originalConfig.version);
-    if (schema) {
-        try {
-            // Validate and parse the config - this will throw if invalid
-            schema.parse(originalConfig);
-        } catch (error) {
-            // In development, we want to fail loudly to surface issues
-            // In production, we could optionally log and continue, but for now we fail loudly
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(
-                `Invalid chart config for type '${originalConfig.type}': ${errorMessage}. This indicates a schema mismatch - the config does not match the expected structure.`
-            );
-        }
-    } else {
-        // If no schema is registered for this type, fall back to BaseConfigSchema validation
-        // This provides basic validation even for unregistered chart types
-        try {
-            BaseConfigSchema.parse(originalConfig);
-        } catch (error) {
-            // Log a warning but don't throw - unregistered types might be legacy or experimental
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(
-                `No schema registered for chart type '${originalConfig.type}', ` +
-                `but base config validation failed: ${errorMessage}`
-            );
-        }
+    const validate = schema ?? BaseConfigSchema;
+    const result = validate.safeParse(originalConfig);
+    if (!result.success) {
+        logValidationError({ context: "chart", rawConfig: originalConfig, error: result.error });
     }
     
     let config: C = JSON.parse(JSON.stringify(originalConfig));
@@ -234,8 +213,6 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             });
         }
     }
-    
-    console.log(config.type, 'processed config:', config);
     
     // Handle queries - any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap
     // **we need better analysis of conditions under which this is still relevant.**
