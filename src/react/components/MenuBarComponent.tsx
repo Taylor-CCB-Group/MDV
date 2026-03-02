@@ -75,7 +75,17 @@ const MenuBarComponent = () => {
                 const { class: omit, ...props } = v;
                 return [k, props];
             });
-            new DebugChartReactWrapper({ chartTypes, datasources, views, state, buildInfo });
+            const ve = window.mdv?.validationErrors;
+            const hasValidationErrors =
+                ve && ((ve.datasources?.length ?? 0) > 0 || (ve.charts?.length ?? 0) > 0);
+            new DebugChartReactWrapper({
+                chartTypes,
+                datasources,
+                views,
+                state,
+                buildInfo,
+                ...(hasValidationErrors && { validationErrors: ve }),
+            });
         } catch (error) {
             setError(error instanceof Error ? {
                 message: error.message,

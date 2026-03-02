@@ -27,6 +27,7 @@ export type BaseConfig = {
     type: string;
     param: FieldSpecs;
     title_color?: string;
+    version?: string; // Schema version for future migration support
 } & ColorConfig;
 /**
  * All chart config types include a color configuration, (although not all charts use it).
