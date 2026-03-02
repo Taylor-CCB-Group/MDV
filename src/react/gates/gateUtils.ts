@@ -37,8 +37,8 @@ export function isPointInPolygon(point: [number, number], polygon: [number, numb
     const [x, y] = point;
     let minX = Number.MAX_VALUE;
     let minY = Number.MAX_VALUE;
-    let maxX = Number.MIN_VALUE;
-    let maxY = Number.MIN_VALUE;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
 
     for (const [px, py] of polygon) {
         minX = Math.min(minX, px);
