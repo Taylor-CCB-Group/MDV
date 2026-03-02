@@ -32,7 +32,12 @@ const useGateActions = () => {
 
     const onSaveGate = useCallback(
         (gateName: string, color: [number, number, number] = DEFAULT_GATE_COLOR) => {
-            if (gateManager.hasGateName(gateName)) {
+            const validGateName = gateName.trim();
+            if (!validGateName) {
+                throw new Error("Gate name cannot be empty");
+            }
+
+            if (gateManager.hasGateName(validGateName)) {
                 throw new Error("A gate with this name already exists");
             }
 
@@ -47,7 +52,7 @@ const useGateActions = () => {
             // Create gate
             const gate: Gate = {
                 id: generateGateId(),
-                name: gateName.trim(),
+                name: validGateName,
                 geometry: selectionFeatureCollection,
                 columns: [xCol.field, yCol.field],
                 createdAt: Date.now(),
@@ -73,10 +78,14 @@ const useGateActions = () => {
 
     const onRenameGate = useCallback(
         (gateId: string, newName: string) => {
-            if (gateManager.hasGateName(newName)) {
+            const validGateName = newName.trim();
+            if (!validGateName) {
+                throw new Error("Gate name cannot be empty");
+            }
+            if (gateManager.hasGateName(validGateName)) {
                 throw new Error("A gate with this name already exists");
             }
-            gateManager.updateGate(gateId, { name: newName });
+            gateManager.updateGate(gateId, { name: validGateName });
         },
         [gateManager],
     );
