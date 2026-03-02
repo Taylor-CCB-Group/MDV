@@ -45,6 +45,7 @@ class DataStore {
         // Best-effort, non-fatal validation of the datasource config.
         // This logs schema violations and records them for later inspection
         // in the debug dialog, but does not modify the incoming config.
+        // nb - we could probably change this constructor signature to use size from config
         const result = DataSourceSchema.safeParse(config);
         if (!result.success) {
             logValidationError({
