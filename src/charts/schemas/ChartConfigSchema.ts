@@ -44,12 +44,20 @@ export const GridStackConfigSchema = z.object({
     gsposition: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]).optional().describe("GridStack position as [x, y] coordinates"),
 }).describe("GridStack layout configuration for dashboard positioning");
 
+// Allow `title` to be provided as either a string or a single-element string[]
+const TitleSchema = z.preprocess((val) => {
+    if (Array.isArray(val) && val.length === 1 && typeof val[0] === "string") {
+        return val[0];
+    }
+    return val;
+}, z.string()).describe("Display title for the chart");
+
 // Base configuration that all charts extend
 export const BaseConfigSchema = GridStackConfigSchema.extend({
     id: z.string().describe("Unique identifier for the chart instance"),
     size: z.tuple([z.number(), z.number()]).describe("Chart dimensions as [width, height] in pixels"),
-    //nb: seems like tables in default view have e.g. `title: ["cells"]`
-    title: z.string().describe("Display title for the chart"),
+    //nb: seems like tables in default view have e.g. `title: [\"cells\"]`
+    title: TitleSchema,
     legend: z.string().optional().describe("Legend text describing the chart's purpose"),
     type: z.string().describe("Chart type identifier (e.g., 'scatter_plot', 'bar_chart')"),
     param: FieldSpecsSchema.describe("Array of field specifications defining the data columns used by this chart"),
