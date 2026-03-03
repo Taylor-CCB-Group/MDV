@@ -137,6 +137,12 @@ export function useRegionScale() {
     const regionScale = chart.dataStore.regions?.scale;
     const regionUnit = chart.dataStore.regions?.scale_unit;
 
+    // Fix for the scatterplot not showing suggested by cursor
+    // guard against missing or invalid scale to avoid NaNs downstream
+    if (!regionScale || !Number.isFinite(regionScale) || regionScale === 0) {
+        return 1;
+    }
+
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
     //MDVProject.set_region_scale assumes that all regions have the same scale?
