@@ -130,6 +130,12 @@ const useSortedFilteredIndices = () => {
             } else if (colInfo.datatype === "multitext") {
                 const decodedData: Record<number, string> = {};
                 const length = colInfo.stringLength;
+                const values = colInfo.values;
+
+                if (!values || !Array.isArray(values)) {
+                    setSortedFilteredIndices(indices);
+                    return;
+                }
 
                 if (!length || typeof length !== "number" || length <= 0) {
                     console.error(
@@ -151,13 +157,20 @@ const useSortedFilteredIndices = () => {
                     // Get the display value of the row by joining the values by the separator - ', '
                     const rowValue = Array.from(data?.slice?.(dataIndex * length, dataIndex * length + length))
                         .filter((x) => x !== 65535)
-                        .map((x) => colInfo.values[x] ?? "")
+                        .map((x) => values[x] ?? "")
                         .join(", ");
                     decodedData[dataIndex] = rowValue;
                 }
 
                 // Sort decoded displayed strings
-                sortDecodedStrings(indices, decodedData, ascending, (s) => !s || s.trim() === "" || s.trim() === "N/A");
+                //! Treating 'N/A' as the empty value for multitext as the gates column uses it 
+                sortDecodedStrings(indices, decodedData, ascending, (s) => {
+                    if (!s || s.trim() === "") return true;
+                    // Check if the parts of the value are empty, like: "N/A, N/A"
+                    return s.split(",")
+                        .map((v) => v.trim())
+                        .every((part) => part === "" || part === "N/A");
+                });
                 setSortedFilteredIndices(new Uint32Array(indices));
 
             } else if (colInfo.datatype === "text" || colInfo.datatype === "text16") {
@@ -176,7 +189,7 @@ const useSortedFilteredIndices = () => {
                     const dataIndex = indices[i];
                     // Get the value index (values array index)
                     const valueIndex = data?.[dataIndex];
-                    
+
                     const isValidValueIndex = valueIndex != null && valueIndex >= 0 && valueIndex < values.length
                     decodedData[dataIndex] =
                         isValidValueIndex
@@ -188,7 +201,7 @@ const useSortedFilteredIndices = () => {
                 setSortedFilteredIndices(new Uint32Array(indices));
 
             } else {
-                // All other datatypes (numeric, etc.)
+                // Numeric datatypes
                 indices.sort((a, b) => {
                     const valueA = data?.[a];
                     const valueB = data?.[b];
