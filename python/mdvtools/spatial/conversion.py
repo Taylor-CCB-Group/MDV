@@ -27,31 +27,6 @@ class SpatialDataConversionArgs:
     density: bool = False
     point_transform: str = "auto"
 
-def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversionArgs"):
-    """Processes a single SpatialData object path."""
-    # imports need to be here for the separate process
-    from mdvtools.spatial.conversion import _try_read_zarr, _resolve_regions_for_table
-    from mdvtools.spatial.mermaid import sdata_to_mermaid
-    import os
-
-    sdata_name = os.path.basename(sdata_path)
-    sdata = _try_read_zarr(sdata_path)
-    if sdata is None:
-        return None
-    print(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n")
-    print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
-    adata_objects = []
-    all_regions = {}
-    for table_name, adata in sdata.tables.items():
-        _resolve_regions_for_table(sdata, table_name, sdata_name, conversion_args)
-        adata.obs["spatialdata_path"] = sdata_name
-        adata.obs["table_name"] = table_name
-        adata_objects.append(adata)
-        if "regions" in adata.uns.get("mdv", {}):
-            all_regions.update(adata.uns["mdv"]["regions"])
-
-    return sdata_name, sdata, adata_objects, all_regions
-
 
 REGION_FIELD = "spatial_region"
 @dataclass
