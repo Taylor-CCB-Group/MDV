@@ -56,9 +56,24 @@ describe("detectDataIsLog1p", () => {
 		expect(detectDataIsLog1p(data)).toBe(true);
 	});
 
-	test("returns true for empty array", () => {
+	test("returns null for empty array (inconclusive)", () => {
 		const data = new Float32Array([]);
+		expect(detectDataIsLog1p(data)).toBe(null);
+	});
+
+	test("returns null for all-NaN array (inconclusive)", () => {
+		const data = new Float32Array([NaN, NaN, NaN, NaN]);
+		expect(detectDataIsLog1p(data)).toBe(null);
+	});
+
+	test("returns true for sparse data with NaN and non-negative values", () => {
+		const data = new Float32Array([NaN, 0.5, NaN, NaN, 2.3, NaN]);
 		expect(detectDataIsLog1p(data)).toBe(true);
+	});
+
+	test("returns false for sparse data with NaN and negative values", () => {
+		const data = new Float32Array([NaN, -0.5, NaN, NaN, 2.3, NaN]);
+		expect(detectDataIsLog1p(data)).toBe(false);
 	});
 
 	test("returns false for typical z-scored data with negatives", () => {

@@ -5,6 +5,7 @@ import {
 	welfordFinalize,
 	welchTTest,
 	log2FoldChange,
+	clampEffectSize,
 	benjaminiHochberg,
 	tDistPValue,
 	computeGeneStats,
@@ -188,6 +189,29 @@ describe("log2FoldChange", () => {
 	});
 });
 
+// ── clampEffectSize ─────────────────────────────────────────────────────────
+
+describe("clampEffectSize", () => {
+	test("clamps extreme positive values to 10", () => {
+		expect(clampEffectSize(23.5)).toBe(10);
+	});
+
+	test("clamps extreme negative values to -10", () => {
+		expect(clampEffectSize(-25.0)).toBe(-10);
+	});
+
+	test("passes through moderate values unchanged", () => {
+		expect(clampEffectSize(3.5)).toBe(3.5);
+		expect(clampEffectSize(-2.1)).toBe(-2.1);
+		expect(clampEffectSize(0)).toBe(0);
+	});
+
+	test("boundary values", () => {
+		expect(clampEffectSize(10)).toBe(10);
+		expect(clampEffectSize(-10)).toBe(-10);
+	});
+});
+
 // ── Benjamini-Hochberg Correction ───────────────────────────────────────────
 
 describe("benjaminiHochberg", () => {
@@ -296,14 +320,15 @@ describe("computeGeneStats", () => {
 		expect(result.meanReference).toBeCloseTo(11, 4);
 	});
 
-	test("handles NaN values in expression data", () => {
+	test("treats NaN values as zero (sparse data convention)", () => {
 		const values = [1, NaN, 3, 10, NaN, 12];
 		const groups = [0, 0, 0, 1, 1, 1];
 		const { v, g, f } = makeArrays(values, groups);
 
 		const result = computeGeneStats("TestGene", v, g, f, 0, -1);
 
-		expect(result.meanTarget).toBeCloseTo(2, 4); // (1+3)/2
-		expect(result.meanReference).toBeCloseTo(11, 4); // (10+12)/2
+		// NaN treated as 0: group 0 = [1, 0, 3] mean=4/3, group 1 = [10, 0, 12] mean=22/3
+		expect(result.meanTarget).toBeCloseTo(4 / 3, 4);
+		expect(result.meanReference).toBeCloseTo(22 / 3, 4);
 	});
 });

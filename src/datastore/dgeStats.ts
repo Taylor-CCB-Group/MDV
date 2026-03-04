@@ -199,6 +199,12 @@ export function log2FoldChange(meanTarget: number, meanReference: number): numbe
 	return Math.log2(numFC / denFC);
 }
 
+/** Clamp extreme effect sizes for display/storage. */
+export const MAX_EFFECT_SIZE = 10;
+export function clampEffectSize(value: number): number {
+	return Math.max(-MAX_EFFECT_SIZE, Math.min(MAX_EFFECT_SIZE, value));
+}
+
 /**
  * Adaptive effect size that handles both log1p-normalized and z-scored data.
  *
@@ -214,13 +220,20 @@ export function computeEffectSize(meanTarget: number, meanReference: number, dat
 
 /**
  * Detect whether expression data is log1p-normalized (all >= 0) or z-scored
- * (has negative values) by sampling values from a Float32Array.
+ * (has negative values) by examining non-NaN values from a Float32Array.
+ *
+ * Returns null if all values are NaN (inconclusive — caller should try
+ * another gene).
  */
-export function detectDataIsLog1p(values: Float32Array): boolean {
+export function detectDataIsLog1p(values: Float32Array): boolean | null {
+	let hasFinite = false;
 	for (let i = 0; i < values.length; i++) {
-		if (values[i] < 0) return false;
+		const v = values[i];
+		if (Number.isNaN(v)) continue;
+		hasFinite = true;
+		if (v < 0) return false;
 	}
-	return true;
+	return hasFinite ? true : null;
 }
 
 // ── Benjamini-Hochberg Correction ───────────────────────────────────────────
@@ -286,8 +299,8 @@ export function computeGeneStats(
 
 	for (let i = 0; i < values.length; i++) {
 		if (filterArray[i] !== 0) continue;
-		const val = values[i];
-		if (Number.isNaN(val)) continue;
+		// NaN in sparse columns means zero expression, not missing data
+		const val = Number.isNaN(values[i]) ? 0 : values[i];
 
 		const group = groupAssignments[i];
 		if (group === targetGroup) {

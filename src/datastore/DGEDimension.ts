@@ -145,6 +145,21 @@ export class DGERunner {
 			}
 
 			allBatchResults.push(...batchResult.results);
+
+			if (b === 0) {
+				const top5 = [...batchResult.results]
+					.filter(r => !Number.isNaN(r.pval))
+					.sort((a, b) => a.pval - b.pval)
+					.slice(0, 5);
+				console.log(`[DGE diag] Batch 0 results (${batchResult.results.length} genes, ${loadedNames.length} loaded):`);
+				for (const r of top5) {
+					console.log(`[DGE diag]   ${r.gene}: effectSize=${r.effectSize.toFixed(4)}, pval=${r.pval.toExponential(3)}, meanTarget=${r.meanTarget.toFixed(4)}, meanRef=${r.meanReference.toFixed(4)}`);
+				}
+				const allPvals = batchResult.results.map(r => r.pval).filter(p => !Number.isNaN(p));
+				const sigCount = allPvals.filter(p => p < 0.05).length;
+				console.log(`[DGE diag]   Batch 0 sig (p<0.05): ${sigCount}/${allPvals.length}, NaN p-values: ${batchResult.results.length - allPvals.length}`);
+			}
+
 			onProgress?.(b + 1, totalBatches);
 		}
 

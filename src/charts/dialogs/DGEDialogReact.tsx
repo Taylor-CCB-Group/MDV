@@ -17,6 +17,7 @@ import {
 	findDGECapableDatasources,
 } from "../../datastore/dgeIntegration";
 import type { DGEIntegrationResult } from "../../datastore/dgeIntegration";
+import { getRandomString } from "../../utilities/Utilities";
 
 interface DGEDialogContentProps {
 	dataStore: DataStore;
@@ -45,9 +46,13 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		return col?.values ?? [];
 	}, [dataStore, groupColumn]);
 
+	const safeTargetGroup = selectedColumnValues.includes(targetGroup) ? targetGroup : "";
+	const safeReferenceGroup = referenceGroup === "rest" || selectedColumnValues.includes(referenceGroup)
+		? referenceGroup : "rest";
+
 	const referenceOptions = useMemo(() => {
-		return ["rest", ...selectedColumnValues.filter((v: string) => v !== targetGroup)];
-	}, [selectedColumnValues, targetGroup]);
+		return ["rest", ...selectedColumnValues.filter((v: string) => v !== safeTargetGroup)];
+	}, [selectedColumnValues, safeTargetGroup]);
 
 	useEffect(() => {
 		if (categoricalColumns.length > 0 && !groupColumn) {
@@ -68,11 +73,16 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		setResult(null);
 		setProgress({ done: 0, total: 0 });
 
+		console.log("=== DGE RUN START ===");
+		console.log("groupColumn:", groupColumn, "target:", safeTargetGroup, "reference:", safeReferenceGroup);
+		console.log("dataStore:", dataStore.name, "size:", dataStore.size);
+
 		try {
 			const cm = window.mdv?.chartManager;
 			if (!cm) throw new Error("ChartManager not available");
 
 			const pairs = findDGECapableDatasources(cm);
+			console.log("DGE-capable pairs:", pairs);
 			const pair = pairs.find((p) => p.cellsDsName === dataStore.name);
 			if (!pair) throw new Error("No gene expression link found for this datasource");
 
@@ -82,18 +92,36 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 				pair.genesDsName,
 				{
 					groupColumn,
-					targetGroup,
-					referenceGroup,
+					targetGroup: safeTargetGroup,
+					referenceGroup: safeReferenceGroup,
 				},
 				(done, total) => setProgress({ done, total }),
 			);
 
 			setResult(dgeResult);
 
+			// Verify DGE columns exist on genes DS before charting
+			const gDS = cm.dsIndex[pair.genesDsName]?.dataStore;
+			if (gDS) {
+				for (const f of ["dge_effect_size", "dge_neg_log10_pval_adj"]) {
+					const c = gDS.columnIndex[f];
+					if (!c) { console.error("[DGE] column missing:", f); continue; }
+					const d = c.data;
+					if (!d) { console.error("[DGE] column has no data:", f); continue; }
+					let valid = 0, nanCount = 0, min = Infinity, max = -Infinity;
+					for (let i = 0; i < d.length; i++) {
+						if (Number.isNaN(d[i])) { nanCount++; } else { valid++; if (d[i] < min) min = d[i]; if (d[i] > max) max = d[i]; }
+					}
+					console.log(`[DGE] genes DS col "${f}": length=${d.length}, valid=${valid}, NaN=${nanCount}, min=${min}, max=${max}, minMax=`, c.minMax);
+				}
+				console.log("[DGE] genes DS size:", gDS.size, "columnsWithData:", gDS.columnsWithData.filter((x: string) => x.startsWith("dge_")));
+			}
+
 			try {
 				await cm.addChart(pair.genesDsName, {
+					id: `dge_volcano_${getRandomString()}`,
 					type: "wgl_scatter_plot",
-					title: `DGE: ${targetGroup} vs ${referenceGroup}`,
+					title: `DGE: ${safeTargetGroup} vs ${safeReferenceGroup}`,
 					param: ["dge_effect_size", "dge_neg_log10_pval_adj"],
 					size: [500, 400],
 				}, true);
@@ -105,7 +133,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		} finally {
 			setRunning(false);
 		}
-	}, [dataStore.name, groupColumn, targetGroup, referenceGroup]);
+	}, [dataStore.name, groupColumn, safeTargetGroup, safeReferenceGroup]);
 
 	const sigCount = result
 		? result.results.filter((r) => r.pvalAdj < 0.05).length
@@ -132,7 +160,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 			<FormControl fullWidth size="small">
 				<InputLabel>Target Group</InputLabel>
 				<Select
-					value={targetGroup}
+					value={safeTargetGroup}
 					label="Target Group"
 					onChange={(e) => setTargetGroup(e.target.value)}
 					disabled={running || selectedColumnValues.length === 0}
@@ -148,7 +176,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 			<FormControl fullWidth size="small">
 				<InputLabel>Reference</InputLabel>
 				<Select
-					value={referenceGroup}
+					value={safeReferenceGroup}
 					label="Reference"
 					onChange={(e) => setReferenceGroup(e.target.value)}
 					disabled={running || selectedColumnValues.length === 0}
@@ -164,7 +192,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 			<Button
 				variant="contained"
 				onClick={handleRun}
-				disabled={running || !groupColumn || !targetGroup}
+				disabled={running || !groupColumn || !safeTargetGroup}
 				fullWidth
 			>
 				{running ? "Running..." : "Run DGE"}

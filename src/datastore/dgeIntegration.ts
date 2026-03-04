@@ -7,7 +7,7 @@
 
 import type { DGEConfig, DGERunResult, EffectSizeLabel } from "./DGEDimension";
 import { DGERunner } from "./DGEDimension";
-import { detectDataIsLog1p } from "./dgeStats";
+import { detectDataIsLog1p, clampEffectSize } from "./dgeStats";
 import { getRowsAsColumnsLinks, getFieldName } from "../links/link_utils";
 
 type ChartManager = {
@@ -55,6 +55,20 @@ export async function runDGEOnDataStore(
 	if (!groupCol) throw new Error(`Group column "${config.groupColumn}" not found`);
 	if (!groupCol.values) throw new Error(`Group column "${config.groupColumn}" is not categorical`);
 
+	// Normalize group assignments into a Uint8Array SharedArrayBuffer.
+	// Text columns use Uint8Array, text16 columns use Uint16Array — we need
+	// a consistent Uint8Array for the DGE worker regardless of source type.
+	const nCells = cellsDs.size as number;
+	const groupSAB = new SharedArrayBuffer(nCells);
+	const groupArr = new Uint8Array(groupSAB);
+	if (groupCol.datatype === "text16") {
+		const src = new Uint16Array(groupCol.buffer);
+		for (let i = 0; i < nCells; i++) groupArr[i] = src[i];
+	} else {
+		const src = new Uint8Array(groupCol.buffer);
+		groupArr.set(src);
+	}
+
 	// Resolve gene fields from the rows_as_columns link
 	const racLinks = getRowsAsColumnsLinks(cellsDs);
 	if (racLinks.length === 0) {
@@ -84,16 +98,58 @@ export async function runDGEOnDataStore(
 		geneRowIndices.push(rowIndex);
 	}
 
-	// Detect data type by sampling the first gene column
-	const sampleField = geneFields[0];
-	await chartManager.loadColumnSetAsync([sampleField], cellsDsName);
-	const sampleCol = cellsDs.columnIndex[sampleField];
-	const sampleBuf = sampleCol?.buffer as SharedArrayBuffer | null;
-	const dataIsLog1p = sampleBuf ? detectDataIsLog1p(new Float32Array(sampleBuf)) : true;
-
-	// Prepare group buffer
-	const groupBuffer = groupCol.buffer as SharedArrayBuffer;
+	// ── Diagnostics: group column ──
 	const groupValues: string[] = groupCol.values;
+	const targetIdx = groupValues.indexOf(config.targetGroup);
+	const refIdx = config.referenceGroup === "rest" ? -1 : groupValues.indexOf(config.referenceGroup);
+	const groupCounts = new Map<number, number>();
+	for (let i = 0; i < nCells; i++) {
+		groupCounts.set(groupArr[i], (groupCounts.get(groupArr[i]) ?? 0) + 1);
+	}
+	const filterArr = new Uint8Array(cellsDs.filterBuffer);
+	let filteredCount = 0;
+	for (let i = 0; i < nCells; i++) if (filterArr[i] !== 0) filteredCount++;
+	console.log("[DGE diag] Group column:", config.groupColumn, "datatype:", groupCol.datatype);
+	console.log("[DGE diag] Group values:", groupValues);
+	console.log("[DGE diag] Target:", config.targetGroup, `(idx=${targetIdx})`, "Reference:", config.referenceGroup, `(idx=${refIdx})`);
+	console.log("[DGE diag] Group distribution:", Object.fromEntries([...groupCounts].map(([k, v]) => [groupValues[k] ?? `?${k}`, v])));
+	console.log("[DGE diag] Total cells:", nCells, "Filtered out:", filteredCount, "Active:", nCells - filteredCount);
+	console.log("[DGE diag] Total genes:", geneFields.length);
+
+	// Detect data type by sampling genes until we find one with non-NaN values.
+	// Sparse all-NaN genes are inconclusive; we need a gene with real expression.
+	let dataIsLog1p = true;
+	const MAX_PROBE = Math.min(20, geneFields.length);
+	const probeFields = geneFields.slice(0, MAX_PROBE);
+	await chartManager.loadColumnSetAsync(probeFields, cellsDsName);
+
+	for (let gi = 0; gi < probeFields.length; gi++) {
+		const col = cellsDs.columnIndex[probeFields[gi]];
+		const buf = col?.buffer as SharedArrayBuffer | null;
+		if (!buf) continue;
+		const arr = new Float32Array(buf);
+		const detection = detectDataIsLog1p(arr);
+		if (detection !== null) {
+			dataIsLog1p = detection;
+			// Diagnostics for the gene that resolved detection
+			let min = Infinity, max = -Infinity, sum = 0, nonzero = 0, nanCount = 0;
+			for (let i = 0; i < arr.length; i++) {
+				const v = arr[i];
+				if (Number.isNaN(v)) { nanCount++; continue; }
+				if (v < min) min = v;
+				if (v > max) max = v;
+				sum += v;
+				if (v !== 0) nonzero++;
+			}
+			console.log(`[DGE diag] Data type detected from gene #${gi} "${geneNames[gi]}" field="${probeFields[gi]}"`);
+			console.log(`[DGE diag]   buffer length=${arr.length}, min=${min}, max=${max}, mean=${(sum / arr.length).toFixed(4)}, nonzero=${nonzero}, NaN=${nanCount}`);
+			console.log(`[DGE diag]   dataIsLog1p=${dataIsLog1p}`);
+			break;
+		}
+		if (gi === probeFields.length - 1) {
+			console.warn(`[DGE diag] All ${MAX_PROBE} probed genes were all-NaN; defaulting to dataIsLog1p=true`);
+		}
+	}
 
 	const dgeConfig: DGEConfig = {
 		groupColumn: config.groupColumn,
@@ -107,8 +163,8 @@ export async function runDGEOnDataStore(
 		const result = await runner.run(
 			dgeConfig,
 			cellsDs.filterBuffer as SharedArrayBuffer,
-			cellsDs.size as number,
-			groupBuffer,
+			nCells,
+			groupSAB,
 			groupValues,
 			geneFields,
 			geneNames,
@@ -162,8 +218,9 @@ function writeResultsToGenesDS(
 		const rowIdx = valueToRowIndex.get(gene.gene);
 		if (rowIdx === undefined) continue;
 
-		columns[0].data[rowIdx] = gene.effectSize;
-		columns[1].data[rowIdx] = gene.effectSize;
+		const clampedES = clampEffectSize(gene.effectSize);
+		columns[0].data[rowIdx] = clampedES;
+		columns[1].data[rowIdx] = clampedES;
 		columns[2].data[rowIdx] = gene.pval;
 		columns[3].data[rowIdx] = gene.pvalAdj;
 		columns[4].data[rowIdx] = gene.negLog10Pval;
