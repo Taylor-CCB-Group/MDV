@@ -31,6 +31,7 @@ export interface DGERunResult {
 	results: DGEFullResult[];
 	elapsed: number;
 	effectSizeLabel: EffectSizeLabel;
+	skippedGenes: number;
 }
 
 type ColumnLoader = (columns: string[]) => Promise<void>;
@@ -95,8 +96,9 @@ export class DGERunner {
 			}
 		}
 
-		const allBatchResults: GeneResult[] = [];
+			const allBatchResults: GeneResult[] = [];
 		const totalBatches = Math.ceil(geneFields.length / batchSize);
+		let skippedGenes = 0;
 
 		for (let b = 0; b < totalBatches; b++) {
 			const start = b * batchSize;
@@ -106,13 +108,21 @@ export class DGERunner {
 
 			await loadColumns(batchFields);
 
+			const loadedNames: string[] = [];
 			const geneBuffers: SharedArrayBuffer[] = [];
-			for (const field of batchFields) {
-				const buf = getColumnBuffer(field);
+			for (let i = 0; i < batchFields.length; i++) {
+				const buf = getColumnBuffer(batchFields[i]);
 				if (!buf) {
-					throw new Error(`Column buffer not found for field: ${field}`);
+					skippedGenes++;
+					continue;
 				}
+				loadedNames.push(batchNames[i]);
 				geneBuffers.push(buf);
+			}
+
+			if (geneBuffers.length === 0) {
+				onProgress?.(b + 1, totalBatches);
+				continue;
 			}
 
 			const input: DGEBatchInput = {
@@ -122,7 +132,7 @@ export class DGERunner {
 				targetGroup: targetIdx,
 				referenceGroup: referenceIdx,
 				geneBuffers,
-				geneNames: batchNames,
+				geneNames: loadedNames,
 				batchIndex: b,
 				dataIsLog1p,
 			};
@@ -136,6 +146,10 @@ export class DGERunner {
 
 			allBatchResults.push(...batchResult.results);
 			onProgress?.(b + 1, totalBatches);
+		}
+
+		if (skippedGenes > 0) {
+			console.warn(`DGE: skipped ${skippedGenes} genes due to failed column loads`);
 		}
 
 		const pvals = allBatchResults.map((r) => r.pval);
@@ -155,6 +169,7 @@ export class DGERunner {
 			results,
 			elapsed: performance.now() - t0,
 			effectSizeLabel: dataIsLog1p ? "log2fc" : "mean_diff",
+			skippedGenes,
 		};
 	}
 

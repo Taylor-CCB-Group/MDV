@@ -199,6 +199,11 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 					<Typography variant="caption">
 						Effect size: {result.effectSizeLabel === "log2fc" ? "log2 fold change" : "mean difference"}
 					</Typography>
+					{result.skippedGenes > 0 && (
+						<Typography variant="caption" display="block" sx={{ mt: 0.5, opacity: 0.85 }}>
+							{result.skippedGenes} genes skipped (failed to load)
+						</Typography>
+					)}
 				</Box>
 			)}
 		</Box>
