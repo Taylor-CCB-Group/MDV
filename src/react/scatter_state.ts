@@ -142,6 +142,12 @@ export function useRegionScale() {
         return 1;
     }
 
+    // Fix for the scatterplot not showing suggested by cursor
+    // guard against missing or invalid scale to avoid NaNs downstream
+    if (!regionScale || !Number.isFinite(regionScale) || regionScale === 0) {
+        return 1;
+    }
+
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
     //MDVProject.set_region_scale assumes that all regions have the same scale?
@@ -298,8 +304,14 @@ function useShouldFilterNaN() {
         ? (typeof colorBySpec === "string" ? colorBySpec : "column" in colorBySpec ? colorBySpec.column?.field : undefined)
         : undefined;
     const colorColumn = useFieldSpec(colorByField);
-    const shouldFilter = !!(chart.config.hideMissing && colorColumn && !isDatatypeCategorical(colorColumn.datatype));
-    return { shouldFilter, colorColumn };
+    const hideMissing = !!chart.config.hideMissing;
+    const fallbackOnZero = !!chart.config.fallbackOnZero;
+    const isNumericColor = !!(colorColumn && !isDatatypeCategorical(colorColumn.datatype));
+    // We only apply the deck.gl DataFilterExtension when `hideMissing` is enabled and the
+    // color column is numeric. `fallbackOnZero` then extends what counts as \"missing\"
+    // inside the filter (zeros as well as NaN/Inf), but does not by itself trigger filtering.
+    const shouldFilter = hideMissing && isNumericColor;
+    return { shouldFilter, colorColumn, fallbackOnZero };
 }
 
 /**
@@ -334,7 +346,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     );
     const contourLayers = useLegacyDualContour(hoveredFieldId);
 
-    const { shouldFilter: shouldFilterNaN, colorColumn } = useShouldFilterNaN();
+    const { shouldFilter: shouldFilterMissing, colorColumn, fallbackOnZero } = useShouldFilterNaN();
 
     // todo - Tooltip should be a separate component
     // would rather not even need to call a hook here, but just have some
@@ -420,10 +432,15 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             ...({
                 // todo - consider lower overhead version of this.
                 // future work https://deck.gl/docs/developer-guide/performance#use-binary-data
-                //currently useFieldSpec is typed as DataColumn|undefined, 
+                //currently useFieldSpec is typed as DataColumn|undefined,
                 //if not undefined is guaranteed to be loaded but we may change how we manage lazy-loading.
-                getFilterValue: shouldFilterNaN && colorColumn?.data 
-                    ? (i: number) => Number.isFinite(colorColumn.data[i]) ? 1 : 0
+                getFilterValue: shouldFilterMissing && colorColumn?.data
+                    ? (i: number) => {
+                        const v = colorColumn.data[i];
+                        if (!Number.isFinite(v)) return 0;
+                        if (fallbackOnZero && v === 0) return 0;
+                        return 1;
+                    }
                     : (_: number) => 1,
                 filterRange: [0.5, 1],
             } as any),
@@ -431,7 +448,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 getFillColor: colorBy,
                 getLineWidth,
                 getPosition: [cx, cy, cz],
-                getFilterValue: [colorColumn, shouldFilterNaN],
+                getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero],
             },
             pickable: true,
             onHover: (info) => {
@@ -481,8 +498,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         getLineWidth,
         contourLayers,
         config.dimension,
-        shouldFilterNaN,
+        shouldFilterMissing,
         colorColumn,
+        fallbackOnZero,
     ]);
     // this should take into account axis margins... not chart.contentDiv,
     // but the actual area where the scatterplot is rendered

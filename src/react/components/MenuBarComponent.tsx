@@ -75,7 +75,17 @@ const MenuBarComponent = () => {
                 const { class: omit, ...props } = v;
                 return [k, props];
             });
-            new DebugChartReactWrapper({ chartTypes, datasources, views, state, buildInfo });
+            const ve = window.mdv?.validationErrors;
+            const hasValidationErrors =
+                ve && ((ve.datasources?.length ?? 0) > 0 || (ve.charts?.length ?? 0) > 0);
+            new DebugChartReactWrapper({
+                chartTypes,
+                datasources,
+                views,
+                state,
+                buildInfo,
+                ...(hasValidationErrors && { validationErrors: ve }),
+            });
         } catch (error) {
             setError(error instanceof Error ? {
                 message: error.message,
@@ -133,7 +143,7 @@ const MenuBarComponent = () => {
                     <Box sx={{ display: "flex", alignItems: "center" }}>
                         <ChatButtons />
                         <ToggleThemeWrapper />
-                        <IconWithTooltip tooltipText="View Datasource Metadata" onClick={handleDebugButtonClick}>
+                        <IconWithTooltip tooltipText="Debug / Report issue" onClick={handleDebugButtonClick}>
                             <PestControlIcon sx={{height: "1.5rem", width: "1.5rem"}} />
                         </IconWithTooltip>
                     </Box>

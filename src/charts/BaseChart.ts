@@ -27,6 +27,7 @@ export type BaseConfig = {
     type: string;
     param: FieldSpecs;
     title_color?: string;
+    version?: string; // Schema version for future migration support
 } & ColorConfig;
 /**
  * All chart config types include a color configuration, (although not all charts use it).
@@ -186,7 +187,7 @@ class BaseChart<T extends BaseConfig> {
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
             menu.push({
-                text: "debug chart",
+                text: "debug / report chart",
                 icon: "fas fa-bug",
                 func: () => {
                     window.mdv.debugChart = this;

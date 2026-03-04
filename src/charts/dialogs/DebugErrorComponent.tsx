@@ -1,4 +1,5 @@
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
+import { DEBUG_ERROR_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 import {
     Check,
     ContentCopy,
@@ -10,19 +11,17 @@ import {
     Alert,
     AlertTitle,
     Box,
-    Button,
     CircularProgress,
     Collapse,
     Container,
     Divider,
     IconButton,
+    Link,
     Paper,
     Snackbar,
-    TextareaAutosize,
     Tooltip,
     Typography,
 } from "@mui/material";
-import axios from "axios";
 import { useEffect, useState } from "react";
 import JsonView from "react18-json-view";
 
@@ -55,7 +54,6 @@ const DebugErrorComponent = ({
     const [emailSent, setEmailSent] = useState(false);
     const [emailNotSent, setEmailNotSent] = useState(false);
     const [metaData, setMetaData] = useState<Record<string, unknown> | null>(null);
-
     useEffect(() => {
         if (extraMetadata || error?.stack || error?.traceback)
             setMetaData({
@@ -66,7 +64,7 @@ const DebugErrorComponent = ({
                 }),
                 ...(error?.stack && { stack: error?.stack }),
             });
-    }, [extraMetadata, error]);
+    }, [extraMetadata, error?.stack, error?.traceback]);
 
     // todo: Uncomment later
     //todo: Add the logic to send the error details to the email address and display the corresponding message to user
@@ -127,6 +125,7 @@ const DebugErrorComponent = ({
                     color: "var(--text_color)",
                     height: "95%",
                     width: "95%",
+                    overflow: "auto",
                 }}
             >
                 {isLoading ? (
@@ -193,31 +192,29 @@ const DebugErrorComponent = ({
                                 }}
                             >
                                 {title}
-                                {metaData && (
-                                    <Tooltip title="Copy error details">
-                                        <IconButton
-                                            size="small"
-                                            onClick={handleCopy}
-                                            sx={{
-                                                ml: 1,
-                                                color: "var(--text_color_error)",
-                                                "&:hover": {
-                                                    backgroundColor:
-                                                        "var(--background_color)",
-                                                },
-                                            }}
-                                        >
-                                            {copied ? (
-                                                <Check />
-                                            ) : (
-                                                <ContentCopy />
-                                            )}
-                                        </IconButton>
-                                    </Tooltip>
-                                )}
+                                <Tooltip title="Copy error details">
+                                    <IconButton
+                                        size="small"
+                                        onClick={handleCopy}
+                                        sx={{
+                                            ml: 1,
+                                            color: "var(--text_color_error)",
+                                            "&:hover": {
+                                                backgroundColor:
+                                                    "var(--background_color)",
+                                            },
+                                        }}
+                                    >
+                                        {copied ? (
+                                            <Check />
+                                        ) : (
+                                            <ContentCopy />
+                                        )}
+                                    </IconButton>
+                                </Tooltip>
                             </AlertTitle>
 
-                            <div style={{ marginTop: "12px" }}>
+                            <div style={{ marginTop: "12px", maxHeight: "40vh", overflow: "auto" }}>
                                 <Typography
                                     sx={{
                                         margin: "0 0 12px 0",
@@ -272,6 +269,7 @@ const DebugErrorComponent = ({
                                                 style={{
                                                     whiteSpace: "pre-wrap",
                                                     wordBreak: "break-word",
+                                                    padding: "10px"
                                                 }}
                                                 src={{
                                                     ...metaData, 
@@ -303,17 +301,22 @@ const DebugErrorComponent = ({
                                 color: "text.primary",
                             }}
                         >
-                            <Typography variant="h6" sx={{ mb: 2, color: "text.primary" }}>
-                                We are sorry for the inconvenience.
-                            </Typography>
                             <Typography sx={{ mb: 2 }}>
-                                To help us diagnose and fix the problem, please
-                                copy the error information on the top right corner and send us.
+                                {DEBUG_ERROR_REPORT_MESSAGE[0]}
+                                {' '}
+                                <Link 
+                                    href={`mailto:${MDV_EMAIL}?subject=MDV%20Error%20Report`} 
+                                    sx={{ 
+                                        textDecoration: "none", 
+                                        "&.MuiLink-root": { color: "info.main" } 
+                                    }}
+                                >
+                                    {MDV_EMAIL}
+                                </Link>
                             </Typography>
                             {metaData && (
                                 <Typography sx={{ mb: 2 }}>
-                                    Please remove any sensitive information from
-                                    the error details above before sending.
+                                    {DEBUG_ERROR_REPORT_MESSAGE[1]}
                                 </Typography>
                             )}
                             {/* <TextareaAutosize
