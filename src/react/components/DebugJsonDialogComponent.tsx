@@ -6,6 +6,9 @@ import "react18-json-view/src/dark.css";
 import { useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import "../../utilities/css/JsonDialogStyles.css";
+import { Accordion, AccordionDetails, AccordionSummary, Divider, Link, Typography } from "@mui/material";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 
 type JSONObject = { [key: string]: any };
 
@@ -68,21 +71,53 @@ export default function ({ json, header }: { json: any; header?: string }) {
     );
 
     return (
-        <div className="max-h-[90vh] overflow-auto p-4">
+        <div className="overflow-auto p-4" style={{ userSelect: "text" }}>
             {header && <h2 className="text-lg font-semibold mb-4">{header}</h2>}
+            <Accordion sx={{
+                border: "1px solid var(--border_menu_bar_color)",
+                mb: 2,
+            }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">
+                        Report an issue or a bug
+                    </Typography>
+                </AccordionSummary>
+                <Divider />
+                <AccordionDetails sx={{ mt: 1 }}>
+                    <Typography>
+                        {DEBUG_JSON_REPORT_MESSAGE[0]}
+                        {' '}
+                        <Link 
+                            href={`mailto:${MDV_EMAIL}?subject=MDV%20Bug%20Report`} 
+                            sx={{ 
+                                textDecoration: "none",
+                                "&.MuiLink-root": { color: "info.main" }
+                            }}
+                        >
+                            {MDV_EMAIL}
+                        </Link>
+                    </Typography>
+                    <Typography sx={{mt: 1}}>
+                        {DEBUG_JSON_REPORT_MESSAGE[1]}
+                    </Typography>
+                    <Typography sx={{mt: 1}}>
+                        {DEBUG_JSON_REPORT_MESSAGE[2]}
+                    </Typography>
+                </AccordionDetails>
+            </Accordion>
             <input
                 type="text"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder="Filter..."
-                className="w-full mb-4 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                className="w-full mb-4 mt-4 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             />
             <JsonView 
                 src={filteredJson} 
                 style={{
-                    backgroundColor: 'transparent',
                     fontSize: '0.875rem',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                    padding: "10px"
                 }}
                 collapsed={1}
             />

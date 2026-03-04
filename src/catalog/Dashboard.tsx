@@ -9,6 +9,7 @@ import {
 } from "@mui/icons-material";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
+import HelpIcon from "@mui/icons-material/Help";
 import {
     AppBar,
     Backdrop,
@@ -46,6 +47,7 @@ import usePermissions from "./PermissionsContext";
 import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import HelpDialog from "./HelpDialog";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
@@ -75,6 +77,7 @@ const Dashboard: React.FC = () => {
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [open, setOpen] = useState(false);
+    const [helpDialogOpen, setHelpDialogOpen] = useState(false);
     const theme = useTheme();
 
     const isLoading = projectsLoading || permissionsLoading;
@@ -159,7 +162,7 @@ const Dashboard: React.FC = () => {
                                 display: "flex",
                                 alignItems: "center",
                                 width: 400,
-                                mr: 2, // Add margin to the right
+                                mr: 2,
                             }}
                         >
                             <InputBase
@@ -177,18 +180,35 @@ const Dashboard: React.FC = () => {
                             </IconButton>
                         </Paper>
                         {authEnabled && <UserProfile />}
-                        <IconButton
-                            sx={{ ml: 1 }}
-                            onClick={toggleColorMode}
-                            color="inherit"
-                            data-testid="theme_toggle_catalog"
+                        <Tooltip title="Toggle theme">
+                            <IconButton
+                                sx={{ mr: 2 }}
+                                onClick={toggleColorMode}
+                                color="inherit"
+                                data-testid="theme_toggle_catalog"
+                                aria-label="Toggle theme"
+                            >
+                                {mode === "dark" ? (
+                                    <Brightness4Icon />
+                                ) : (
+                                    <Brightness7Icon />
+                                )}
+                            </IconButton>
+                        </Tooltip>
+                        <Button
+                            variant="outlined"
+                            startIcon={<HelpIcon />}
+                            onClick={() => setHelpDialogOpen(true)}
+                            sx={{
+                                borderWidth: 1.5,
+                                borderRadius: 2,
+                                textTransform: "none",
+                                px: 1.5,
+                                py: 0.75,
+                            }}
                         >
-                            {mode === "dark" ? (
-                                <Brightness4Icon />
-                            ) : (
-                                <Brightness7Icon />
-                            )}
-                        </IconButton>
+                            Help / Feedback
+                        </Button>
                     </Toolbar>
                 </AppBar>
 
@@ -464,6 +484,12 @@ const Dashboard: React.FC = () => {
                 )}
                 {open && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
+                )}
+                {helpDialogOpen && (
+                    <HelpDialog
+                        open={helpDialogOpen}
+                        onClose={() => setHelpDialogOpen(false)}
+                    />
                 )}
             </Box>
             {isLoading && (
