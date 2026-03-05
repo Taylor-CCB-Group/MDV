@@ -153,7 +153,9 @@ export async function runDGEOnDataStore(
 		groupColumn: config.groupColumn,
 		targetGroup: config.targetGroup,
 		referenceGroup: config.referenceGroup,
-		batchSize: config.batchSize ?? 50,
+		// Adjust this parameter to control the DGE batch size (number of genes per request).
+		// Higher values (e.g. 500-1000) are faster but use more memory per batch.
+		batchSize: config.batchSize ?? 2000,
 	};
 
 	const runner = new DGERunner();

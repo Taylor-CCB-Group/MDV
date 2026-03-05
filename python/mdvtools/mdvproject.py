@@ -1755,6 +1755,7 @@ class MDVProject:
         byte_list = []
         gr = h5[group]
         if not isinstance(gr, h5py.Group):
+            h5.close()
             raise TypeError("Expected 'gr' to be of type h5py.Group.")
         for column in columns:
             sg = column.get("subgroup")
@@ -1770,6 +1771,27 @@ class MDVProject:
                 byte_list.append(numpy.array(data).tobytes())
         h5.close()
         return b"".join(byte_list)
+
+    def yield_byte_data(self, columns, group):
+        """
+        Generator version of get_byte_data for HTTP streaming.
+        Yields bytes for each column one by one to avoid large memory allocations
+        and Content-Length mismatches.
+        """
+        with h5py.File(self.h5file, "r") as h5:
+            gr = h5[group]
+            if not isinstance(gr, h5py.Group):
+                raise TypeError("Expected 'gr' to be of type h5py.Group.")
+            for column in columns:
+                sg = column.get("subgroup")
+                if sg:
+                    sgindex = int(column["sgindex"])
+                    yield get_subgroup_bytes(
+                        gr[sg], sgindex, column.get("sgtype") == "sparse"
+                    )
+                else:
+                    data = gr[column["field"]]
+                    yield numpy.array(data).tobytes()
 
     def set_region_data(
         self,

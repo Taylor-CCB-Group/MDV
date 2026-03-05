@@ -82,7 +82,7 @@ export class DGERunner {
 		dataIsLog1p = true,
 	): Promise<DGERunResult> {
 		const t0 = performance.now();
-		const batchSize = config.batchSize ?? 50;
+		const batchSize = config.batchSize ?? 2000;
 
 		const targetIdx = groupValues.indexOf(config.targetGroup);
 		if (targetIdx < 0) {
