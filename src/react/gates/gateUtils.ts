@@ -3,6 +3,8 @@ import type { Gate } from "./types";
 import { v4 as uuid } from "uuid";
 
 export const DEFAULT_GATE_COLOR: [number, number, number] = [76, 175, 80];
+export const SELECTION_FILL_COLOR: [number, number, number, number] = [200, 200, 200, 50];
+export const SELECTION_LINE_COLOR: [number, number, number, number] = [150, 150, 150, 255];
 
 /**
  * Extract the coordinates of the gate selection from it's feature collection

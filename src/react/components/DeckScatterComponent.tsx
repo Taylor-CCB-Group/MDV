@@ -260,7 +260,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }, [chartWidth, chartHeight, config.dimension, id]);
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [gateLabelLayer, gateDisplayLayer, scatterplotLayer, greyScatterplotLayer,  selectionLayer, axisLinesLayer, 
+    const layers = [gateLabelLayer, gateDisplayLayer, selectionLayer, scatterplotLayer, greyScatterplotLayer, axisLinesLayer, 
     ].filter(x => x !== null);
     
     const outerContainer = useOuterContainer();
@@ -316,7 +316,18 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     // initialViewState={viewState} //consider not using react state for this        
                     views={view}
                     onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
-                    getTooltip={getTooltip}
+                    // todo: refactor and have a cleaner logic
+                    getTooltip={(info) => {
+                        const layerId = info?.layer?.id;
+                        const obj = info?.object;
+                        if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
+                            return { html: `<strong>${obj.properties.gateName}</strong><br/><small>Click on the label to edit</small>` };
+                        }
+                        if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
+                            return { html: `<strong>${obj.text}</strong><br/><small>Click on the label to edit</small>` };
+                        }
+                        return getTooltip();
+                    }}
                     getCursor={({ isDragging }) => {
                         return isDragging ? "grabbing" : "crosshair";
                     }}

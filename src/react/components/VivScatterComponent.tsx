@@ -213,7 +213,18 @@ const Main = observer(({
 
     const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
-            getTooltip,
+            // todo: refactor and have a cleaner logic
+            getTooltip: (info: any) => {
+                const layerId = info?.layer?.id;
+                const obj = info?.object;
+                if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
+                    return { html: `<strong>${obj.properties.gateName}</strong><br/><small>Click on the label to edit</small>` };
+                }
+                if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
+                    return { html: `<strong>${obj.text}</strong><br/><small>Click on the label to edit</small>` };
+                }
+                return getTooltip();
+            },
             style: {
                 zIndex: "-1",
             },
@@ -221,9 +232,9 @@ const Main = observer(({
             // layers: [jsonLayer, scatterplotLayer, selectionLayer],
             layers: [
                 jsonLayer, 
-                scatterplotLayer, 
                 selectionLayer, 
                 gateDisplayLayer, 
+                scatterplotLayer, 
                 gateLabelLayer,
             ].filter(l => l !== null),
             id: `${id}deck`,

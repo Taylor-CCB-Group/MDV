@@ -30,7 +30,6 @@ const useGateLayers = () => {
     const { editingGateId, selectionFeatureCollection } = selectionProps;
     const gates = gateManager.gatesArray;
 
-
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [isHoveringLabel, setIsHoveringLabel] = useState(false);
     const [dragPos, setDragPos] = useState<[number, number] | null>(null);
@@ -101,6 +100,13 @@ const useGateLayers = () => {
                 getColor: [draggingId],
                 getBackgroundColor: [draggingId, relevantGates],
             },
+            // Making the label onClick to enable gate editing
+            // As the scatterplot onclick is getting affected by gate display onclicks
+            onClick(pickingInfo) {
+                const gateId = pickingInfo.object?.gateId;
+                if (!gateId) return;
+                onEditGate(gateId);
+            },
             onHover(pickingInfo) {
                 if (pickingInfo.index !== -1) {
                     setIsHoveringLabel(true);
@@ -157,6 +163,7 @@ const useGateLayers = () => {
         chartId,
         editingGateId,
         relevantGates,
+        onEditGate,
         selectionFeatureCollection,
     ]);
 
@@ -196,14 +203,10 @@ const useGateLayers = () => {
                 return [c[0], c[1], c[2], 200];
             },
             getLineWidth: 2,
-            lineWidthMinPixels: 4,
+            lineWidthMinPixels: 2.5,
             pickable: true,
-            onClick(pickingInfo) {
-                const gateId = pickingInfo.object?.properties?.gateId;
-                onEditGate(gateId);
-            },
         });
-    }, [relevantGates, chartId, editingGateId, gateManager, onEditGate, cx, cy]);
+    }, [relevantGates, chartId, editingGateId, gateManager, cx, cy]);
 
     const getCursor = useCallback(
         ({ isDragging }: { isDragging: boolean; isHovering: boolean }) => {

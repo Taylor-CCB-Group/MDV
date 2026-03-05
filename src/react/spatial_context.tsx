@@ -14,6 +14,8 @@ import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type { FieldName } from "@/charts/charts";
 import type { Tool } from "./components/SelectionOverlay";
+import { useGateManager } from "./gates/useGateManager";
+import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -91,6 +93,7 @@ function useScatterModelMatrix() {
 function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
+    const gateManager = useGateManager();
     // making selectionFeatureCollection part of config, so it can be persisted
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
@@ -105,6 +108,30 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
+
+    const getFillColor = useCallback((): [number, number, number, number] => {
+        if (!editingGateId) return SELECTION_FILL_COLOR; // Neutral grey fill
+
+        const gate = gateManager.gates.get(editingGateId);
+        const [r, g, b] = gate?.color ?? DEFAULT_GATE_COLOR;
+        
+        return [r, g, b, 45]; // lower opacity of original color
+    }, [editingGateId, gateManager]);
+    
+    const getLineColor = useCallback((): [number, number, number, number] => {
+        
+        if (!editingGateId) return SELECTION_LINE_COLOR; // Dark grey selection line
+        const gate = gateManager.gates.get(editingGateId);
+        const [r, g, b] = gate?.color ?? DEFAULT_GATE_COLOR;
+
+        // brighten the color to make it look highlighted
+        return [
+            Math.min(255, r + 60),
+            Math.min(255, g + 60),
+            Math.min(255, b + 60),
+            255,
+        ];
+    }, [editingGateId, gateManager]);
 
     useEffect(() => {
         chart.removeFilter = () => {
@@ -135,9 +162,10 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection as any,
             mode: selectionMode,
-            getFillColor: editingGateId ? [76, 175, 80, 30] : [140, 140, 140, 50],
-            getLineColor: editingGateId ? [76, 175, 80, 200] : [255, 255, 255, 200],
-            getLineWidth: 1,
+            getFillColor,
+            getLineColor,
+            getLineWidth: 2,
+            lineWidthMinPixels: 2.5,
             getEditHandlePointRadius: 2,
             editHandlePointStrokeWidth: 1,
             editHandleIconSizeScale: 1,
@@ -146,7 +174,6 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 const intermediate = h.properties.editHandleType === "intermediate";
                 return [0, 0, intermediate ? 200 : 0, 255]
             },
-            lineWidthMinPixels: 1,
             selectedFeatureIndexes,
             // adding `action` here gets rid of warnings but doesn't help with performance.
             onEdit: action(({ updatedData }) => {
@@ -172,7 +199,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             }
         })
     }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
-        setSelectionFeatureCollection, editingGateId
+        setSelectionFeatureCollection, getFillColor, getLineColor,
     ]);
 
     return {
