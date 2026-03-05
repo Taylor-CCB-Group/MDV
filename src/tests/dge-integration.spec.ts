@@ -6,6 +6,74 @@ import {
 	computeGeneStats,
 } from "@/datastore/dgeStats";
 
+// ── sgtype-driven detection logic ───────────────────────────────────────────
+// Mirrors the decision tree in dgeIntegration.ts: runDGEOnDataStore
+
+function resolveDataIsLog1p(
+	sgType: string | undefined,
+	probeValues: Float32Array | null,
+): { dataIsLog1p: boolean; source: "metadata" | "probe" | "default" } {
+	if (sgType === "sparse") {
+		return { dataIsLog1p: true, source: "metadata" };
+	}
+	if (probeValues) {
+		const detection = detectDataIsLog1p(probeValues);
+		if (detection !== null) {
+			return { dataIsLog1p: detection, source: "probe" };
+		}
+	}
+	return { dataIsLog1p: true, source: "default" };
+}
+
+describe("sgtype-driven data detection", () => {
+	test("sparse sgtype -> dataIsLog1p=true without probing", () => {
+		const result = resolveDataIsLog1p("sparse", null);
+		expect(result.dataIsLog1p).toBe(true);
+		expect(result.source).toBe("metadata");
+	});
+
+	test("sparse sgtype takes precedence even if probe data has negatives", () => {
+		const zScoredData = new Float32Array([-1.5, 0.2, -0.8, 1.1]);
+		const result = resolveDataIsLog1p("sparse", zScoredData);
+		expect(result.dataIsLog1p).toBe(true);
+		expect(result.source).toBe("metadata");
+	});
+
+	test("dense sgtype -> falls back to probing", () => {
+		const log1pData = new Float32Array([0, 0.5, 1.2, 0, 3.1]);
+		const result = resolveDataIsLog1p("dense", log1pData);
+		expect(result.dataIsLog1p).toBe(true);
+		expect(result.source).toBe("probe");
+	});
+
+	test("dense sgtype with z-scored data -> detects z-scored via probe", () => {
+		const zScoredData = new Float32Array([-1.5, 0.2, -0.8, 1.1]);
+		const result = resolveDataIsLog1p("dense", zScoredData);
+		expect(result.dataIsLog1p).toBe(false);
+		expect(result.source).toBe("probe");
+	});
+
+	test("undefined sgtype -> falls back to probing", () => {
+		const log1pData = new Float32Array([0, 0.5, 1.2, 0, 3.1]);
+		const result = resolveDataIsLog1p(undefined, log1pData);
+		expect(result.dataIsLog1p).toBe(true);
+		expect(result.source).toBe("probe");
+	});
+
+	test("dense sgtype with all-NaN probe data -> defaults to log1p", () => {
+		const allNaN = new Float32Array([NaN, NaN, NaN, NaN]);
+		const result = resolveDataIsLog1p("dense", allNaN);
+		expect(result.dataIsLog1p).toBe(true);
+		expect(result.source).toBe("default");
+	});
+
+	test("undefined sgtype with no probe data -> defaults to log1p", () => {
+		const result = resolveDataIsLog1p(undefined, null);
+		expect(result.dataIsLog1p).toBe(true);
+		expect(result.source).toBe("default");
+	});
+});
+
 describe("computeEffectSize", () => {
 	test("uses log2FC formula for log1p data", () => {
 		const result = computeEffectSize(2.0, 1.0, true);

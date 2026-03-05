@@ -116,38 +116,36 @@ export async function runDGEOnDataStore(
 	console.log("[DGE diag] Total cells:", nCells, "Filtered out:", filteredCount, "Active:", nCells - filteredCount);
 	console.log("[DGE diag] Total genes:", geneFields.length);
 
-	// Detect data type by sampling genes until we find one with non-NaN values.
-	// Sparse all-NaN genes are inconclusive; we need a gene with real expression.
+	// Determine whether expression data is log1p-normalized or z-scored.
+	// Prefer the subgroup storage type from datasources.json metadata:
+	//   sparse → data preserves zero structure → log1p (z-scoring densifies)
+	//   dense / missing → ambiguous, fall back to probing gene values
+	const sgType = link.subgroups[sgKey]?.type as string | undefined;
 	let dataIsLog1p = true;
-	const MAX_PROBE = Math.min(20, geneFields.length);
-	const probeFields = geneFields.slice(0, MAX_PROBE);
-	await chartManager.loadColumnSetAsync(probeFields, cellsDsName);
 
-	for (let gi = 0; gi < probeFields.length; gi++) {
-		const col = cellsDs.columnIndex[probeFields[gi]];
-		const buf = col?.buffer as SharedArrayBuffer | null;
-		if (!buf) continue;
-		const arr = new Float32Array(buf);
-		const detection = detectDataIsLog1p(arr);
-		if (detection !== null) {
-			dataIsLog1p = detection;
-			// Diagnostics for the gene that resolved detection
-			let min = Infinity, max = -Infinity, sum = 0, nonzero = 0, nanCount = 0;
-			for (let i = 0; i < arr.length; i++) {
-				const v = arr[i];
-				if (Number.isNaN(v)) { nanCount++; continue; }
-				if (v < min) min = v;
-				if (v > max) max = v;
-				sum += v;
-				if (v !== 0) nonzero++;
+	if (sgType === "sparse") {
+		dataIsLog1p = true;
+		console.log("[DGE diag] sgtype=sparse -> dataIsLog1p=true (from metadata)");
+	} else {
+		console.log(`[DGE diag] sgtype=${sgType ?? "undefined"} -> probing genes for detection`);
+		const MAX_PROBE = Math.min(20, geneFields.length);
+		const probeFields = geneFields.slice(0, MAX_PROBE);
+		await chartManager.loadColumnSetAsync(probeFields, cellsDsName);
+
+		for (let gi = 0; gi < probeFields.length; gi++) {
+			const col = cellsDs.columnIndex[probeFields[gi]];
+			const buf = col?.buffer as SharedArrayBuffer | null;
+			if (!buf) continue;
+			const arr = new Float32Array(buf);
+			const detection = detectDataIsLog1p(arr);
+			if (detection !== null) {
+				dataIsLog1p = detection;
+				console.log(`[DGE diag] Probed gene #${gi} "${geneNames[gi]}" -> dataIsLog1p=${dataIsLog1p}`);
+				break;
 			}
-			console.log(`[DGE diag] Data type detected from gene #${gi} "${geneNames[gi]}" field="${probeFields[gi]}"`);
-			console.log(`[DGE diag]   buffer length=${arr.length}, min=${min}, max=${max}, mean=${(sum / arr.length).toFixed(4)}, nonzero=${nonzero}, NaN=${nanCount}`);
-			console.log(`[DGE diag]   dataIsLog1p=${dataIsLog1p}`);
-			break;
-		}
-		if (gi === probeFields.length - 1) {
-			console.warn(`[DGE diag] All ${MAX_PROBE} probed genes were all-NaN; defaulting to dataIsLog1p=true`);
+			if (gi === probeFields.length - 1) {
+				console.warn(`[DGE diag] All ${MAX_PROBE} probed genes were all-NaN; defaulting to dataIsLog1p=true`);
+			}
 		}
 	}
 
