@@ -203,11 +203,6 @@ export class ChartManager {
             this.dsIndex[d.name] = ds;
             this._addDSListeners(ds);
             this.columnsLoading[d.name] = {};
-            try {
-                getOrCreateGateManager(ds.dataStore);
-            } catch (err) {
-                console.error(`Failed to initialise gates for datasource "${d.name}"`, err);
-            }
         }
         if (listener) {
             this.addListener("_default", listener);
@@ -312,8 +307,16 @@ export class ChartManager {
             this._loadView(config, dataLoader, true);
         }
 
-        //add links
+        //add links and create gate manager for each datasource
         for (const ds of this.dataSources) {
+
+            // Gate manager is created after initialising the config
+            try {
+                getOrCreateGateManager(ds.dataStore);
+            } catch (err) {
+                console.error(`Failed to initialise gates for datasource "${ds.name}"`, err);
+            }
+
             const links = ds.dataStore.links;
             if (links) {
                 for (const ods in links) {
