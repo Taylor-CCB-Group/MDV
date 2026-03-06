@@ -97,6 +97,11 @@ export class GateManager {
             this.updateCellsWithGate(updatedGate, true);
         }
 
+        if ("name" in updates) {
+            // Update the values array when the gate is renamed
+            this.rebuildValuesArray();
+        }
+
         this.updateDataStoreWithGates();
 
         if (this.gateColumn) {
