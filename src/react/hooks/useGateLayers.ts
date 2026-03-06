@@ -64,8 +64,8 @@ const useGateLayers = () => {
                 // If the label is getting dragged, we use the dragging position
                 position = dragPos;
             } else {
-                // Get the label position of the gate for normal gates
-                position = gate.labelPosition;
+                // Get the label position of the gate for normal gates, compute centroid if it doesn't exist
+                position = gate.labelPosition ?? computeCentroid(gate.geometry);
             }
             // Get the average of z if it exists
             const z = is2d ? 0 : cz?.minMax ? (cz.minMax[0] + cz.minMax[1]) / 2 : 0;
