@@ -2,7 +2,7 @@ import type DataStore from "@/datastore/DataStore";
 import type { Gate } from "./types";
 import { action, computed, makeObservable, observable } from "mobx";
 import type { LoadedDataColumn } from "@/charts/charts";
-import { extractCoords, isPointInGate } from "./gateUtils";
+import { extractCoords, isPointInPolygon } from "./gateUtils";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
 const GATES_COLUMN_NAME = "__gates__";
@@ -306,7 +306,7 @@ export class GateManager {
 
             if (add) {
                 // Add the gate name to the cell if it is inside the gate
-                const isInside = isPointInGate(x, y, gate);
+                const isInside = isPointInPolygon([x, y], polygonCoords);
                 if (isInside && !gateNames.includes(gate.name)) {
                     const currentGates = gateNames.filter((g) => g !== GATE_NONE_VALUE);
                     newGateNames = [...currentGates, gate.name];

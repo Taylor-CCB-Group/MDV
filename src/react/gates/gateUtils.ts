@@ -65,12 +65,6 @@ export function isPointInPolygon(point: [number, number], polygon: [number, numb
     return inside;
 }
 
-export function isPointInGate(x: number, y: number, gate: Gate): boolean {
-    const polygonCoords = extractCoords(gate.geometry);
-    if (polygonCoords.length === 0) return false;
-    return isPointInPolygon([x, y], polygonCoords);
-}
-
 /**
  * Calculate the average of the coordinates to get the centroid of the gate
  */
