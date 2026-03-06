@@ -66,20 +66,36 @@ export function isPointInPolygon(point: [number, number], polygon: [number, numb
 }
 
 /**
- * Calculate the average of the coordinates to get the centroid of the gate
+ * Area-weighted centroid of a polygon using the shoelace formula.
+ * Uses the polygon's actual shape and area so the result is stable and lies
+ * inside the polygon; ignores closing duplicate vertex and uneven vertex density.
+ * @param geometry - Feature collection
+ * @returns [cx, cy] or [0, 0] if empty or degenerate (zero area)
  */
 export function computeCentroid(geometry: FeatureCollection): [number, number] {
     const polygonCoords = extractCoords(geometry);
     if (polygonCoords.length === 0) return [0, 0];
 
-    let sumX = 0;
-    let sumY = 0;
-    for (const [x, y] of polygonCoords) {
-        sumX += x;
-        sumY += y;
-    }
+    // LLM generated shoelace formula code for computing centroid
+    const n = polygonCoords.length;
+    let signedArea = 0;
+    let cx = 0;
+    let cy = 0;
 
-    return [sumX / polygonCoords.length, sumY / polygonCoords.length] as [number, number];
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        const [xi, yi] = polygonCoords[i];
+        const [xj, yj] = polygonCoords[j];
+        const cross = xi * yj - xj * yi;
+        signedArea += cross;
+        cx += (xi + xj) * cross;
+        cy += (yi + yj) * cross;
+    }
+    signedArea *= 0.5;
+    if (Math.abs(signedArea) < 1e-10) return [0, 0];
+    cx /= 6 * signedArea;
+    cy /= 6 * signedArea;
+    return [cx, cy] as [number, number];
 }
 
 export function generateGateId(): string {
