@@ -64,6 +64,7 @@ import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
+import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 
 
 //order of column data in an array buffer
@@ -306,8 +307,16 @@ export class ChartManager {
             this._loadView(config, dataLoader, true);
         }
 
-        //add links
+        //add links and create gate manager for each datasource
         for (const ds of this.dataSources) {
+
+            // Gate manager is created after initialising the config
+            try {
+                getOrCreateGateManager(ds.dataStore);
+            } catch (err) {
+                console.error(`Failed to initialise gates for datasource "${ds.name}"`, err);
+            }
+
             const links = ds.dataStore.links;
             if (links) {
                 for (const ods in links) {
@@ -1126,8 +1135,8 @@ export class ChartManager {
             };
             const numRows = dataStore.size;
             
-            // Add stringLength to metadata for unique columns (required by server)
-            if (cl.datatype === "unique" && cl.stringLength) {
+            // Add stringLength to metadata for unique and multitext columns if stringLength property exists
+            if ((cl.datatype === "unique" || cl.datatype === "multitext") && cl.stringLength) {
                 md.stringLength = cl.stringLength;
             }
             
