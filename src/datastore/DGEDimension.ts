@@ -10,6 +10,7 @@ import { benjaminiHochberg } from "./dgeStats";
 import type { GeneResult } from "./dgeStats";
 import type { DGEBatchInput, DGEBatchOutput } from "./dgeWorker";
 import { processBatch } from "./dgeWorker";
+import { DEFAULT_DGE_BATCH_SIZE } from "../lib/constants";
 
 export interface DGEConfig {
 	groupColumn: string;
@@ -65,7 +66,7 @@ export class DGERunner {
 	 * @param getColumnBuffer  Function that returns the SharedArrayBuffer for a loaded column
 	 * @param onProgress       Optional progress callback (batchesDone, totalBatches)
 	 * @param useWorker        Whether to use a Web Worker (true) or compute in-thread (false)
-	 * @param dataIsLog1p      Whether data is log1p-normalized (true) or z-scored (false)
+	 * @param dataType         Type of data (log1p, linear, or zscored)
 	 */
 	async run(
 		config: DGEConfig,
@@ -79,10 +80,10 @@ export class DGERunner {
 		getColumnBuffer: GetColumnBuffer,
 		onProgress?: (done: number, total: number) => void,
 		useWorker = false,
-		dataIsLog1p = true,
+		dataType: "log1p" | "linear" | "zscored" = "log1p",
 	): Promise<DGERunResult> {
 		const t0 = performance.now();
-		const batchSize = config.batchSize ?? 2000;
+		const batchSize = config.batchSize ?? DEFAULT_DGE_BATCH_SIZE;
 
 		const targetIdx = groupValues.indexOf(config.targetGroup);
 		if (targetIdx < 0) {
@@ -134,7 +135,7 @@ export class DGERunner {
 				geneBuffers,
 				geneNames: loadedNames,
 				batchIndex: b,
-				dataIsLog1p,
+				dataType,
 			};
 
 			let batchResult: DGEBatchOutput;
@@ -183,7 +184,7 @@ export class DGERunner {
 			config,
 			results,
 			elapsed: performance.now() - t0,
-			effectSizeLabel: dataIsLog1p ? "log2fc" : "mean_diff",
+			effectSizeLabel: dataType === "log1p" || dataType === "linear" ? "log2fc" : "mean_diff",
 			skippedGenes,
 		};
 	}

@@ -187,53 +187,62 @@ export function welchTTest(g1: GroupStats, g2: GroupStats): TTestResult {
 
 // ── Effect Size / Fold Change ────────────────────────────────────────────────
 
-const PSEUDOCOUNT = 1e-9;
+const PSEUDOCOUNT = 1e-6;
 
 /**
  * Log2 fold change matching Scanpy's formula for log1p-normalized data:
- *   log2((expm1(meanTarget) + 1e-9) / (expm1(meanRef) + 1e-9))
+ *   log2((expm1(meanTarget) + 1e-6) / (expm1(meanRef) + 1e-6))
  */
-export function log2FoldChange(meanTarget: number, meanReference: number): number {
-	const numFC = Math.expm1(meanTarget) + PSEUDOCOUNT;
-	const denFC = Math.expm1(meanReference) + PSEUDOCOUNT;
+export function log2FoldChange(meanTarget: number, meanReference: number, isLog1p: boolean): number {
+	const valT = isLog1p ? Math.expm1(meanTarget) : meanTarget;
+	const valR = isLog1p ? Math.expm1(meanReference) : meanReference;
+	const numFC = Math.max(0, valT) + PSEUDOCOUNT;
+	const denFC = Math.max(0, valR) + PSEUDOCOUNT;
 	return Math.log2(numFC / denFC);
 }
 
 /** Clamp extreme effect sizes for display/storage. */
 export const MAX_EFFECT_SIZE = 10;
 export function clampEffectSize(value: number): number {
+	if (Number.isNaN(value)) return NaN;
 	return Math.max(-MAX_EFFECT_SIZE, Math.min(MAX_EFFECT_SIZE, value));
 }
 
 /**
- * Adaptive effect size that handles both log1p-normalized and z-scored data.
+ * Adaptive effect size that handles log1p-normalized, linear, and z-scored data.
  *
- * - Log1p data (all non-negative): Scanpy's expm1-based log2 fold change
+ * - Log1p/Linear data (non-negative): Log2 fold change
  * - Z-scored data (has negatives): simple mean difference (target - reference)
  */
-export function computeEffectSize(meanTarget: number, meanReference: number, dataIsLog1p: boolean): number {
-	if (dataIsLog1p) {
-		return log2FoldChange(meanTarget, meanReference);
+export function computeEffectSize(meanTarget: number, meanReference: number, dataType: "log1p" | "linear" | "zscored"): number {
+	if (dataType === "zscored") {
+		return meanTarget - meanReference;
 	}
-	return meanTarget - meanReference;
+	return log2FoldChange(meanTarget, meanReference, dataType === "log1p");
 }
 
 /**
- * Detect whether expression data is log1p-normalized (all >= 0) or z-scored
- * (has negative values) by examining non-NaN values from a Float32Array.
+ * Detect the data type by examining non-NaN values from a Float32Array.
  *
- * Returns null if all values are NaN (inconclusive — caller should try
- * another gene).
+ * Returns null if all values are NaN (inconclusive).
  */
-export function detectDataIsLog1p(values: Float32Array): boolean | null {
+export function detectDataType(values: Float32Array): "log1p" | "linear" | "zscored" | null {
 	let hasFinite = false;
+	let hasNegative = false;
+	let maxVal = -Infinity;
+
 	for (let i = 0; i < values.length; i++) {
 		const v = values[i];
 		if (Number.isNaN(v)) continue;
 		hasFinite = true;
-		if (v < 0) return false;
+		if (v < 0) hasNegative = true;
+		if (v > maxVal) maxVal = v;
 	}
-	return hasFinite ? true : null;
+
+	if (!hasFinite) return null;
+	if (hasNegative) return "zscored";
+	// Heuristic: log1p-normalized data rarely has values > 20 (e^20 is huge)
+	return maxVal > 20 ? "linear" : "log1p";
 }
 
 // ── Benjamini-Hochberg Correction ───────────────────────────────────────────
@@ -282,7 +291,7 @@ export interface GeneResult {
  * @param filterArray     Uint8Array where 0 = visible, >0 = filtered out
  * @param targetGroup     Index of the target group
  * @param referenceGroup  Index of reference group, or -1 for "rest"
- * @param dataIsLog1p     If true, use Scanpy log2FC; if false, use mean difference
+ * @param dataType        Type of data (log1p, linear, or zscored)
  */
 export function computeGeneStats(
 	geneName: string,
@@ -291,7 +300,7 @@ export function computeGeneStats(
 	filterArray: Uint8Array,
 	targetGroup: number,
 	referenceGroup: number,
-	dataIsLog1p = true,
+	dataType: "log1p" | "linear" | "zscored" = "log1p",
 ): GeneResult {
 	const accTarget = welfordCreate();
 	const accRef = welfordCreate();
@@ -316,7 +325,7 @@ export function computeGeneStats(
 
 	return {
 		gene: geneName,
-		effectSize: computeEffectSize(statsTarget.mean, statsRef.mean, dataIsLog1p),
+		effectSize: computeEffectSize(statsTarget.mean, statsRef.mean, dataType),
 		pval: ttest.pValue,
 		meanTarget: statsTarget.mean,
 		meanReference: statsRef.mean,

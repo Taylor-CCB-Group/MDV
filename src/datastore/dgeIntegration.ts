@@ -7,8 +7,9 @@
 
 import type { DGEConfig, DGERunResult, EffectSizeLabel } from "./DGEDimension";
 import { DGERunner } from "./DGEDimension";
-import { detectDataIsLog1p, clampEffectSize } from "./dgeStats";
+import { clampEffectSize } from "./dgeStats";
 import { getRowsAsColumnsLinks, getFieldName } from "../links/link_utils";
+import { DEFAULT_DGE_BATCH_SIZE } from "../lib/constants";
 
 type ChartManager = {
 	dsIndex: Record<string, { dataStore: any; name: string } | undefined>;
@@ -116,38 +117,51 @@ export async function runDGEOnDataStore(
 	console.log("[DGE diag] Total cells:", nCells, "Filtered out:", filteredCount, "Active:", nCells - filteredCount);
 	console.log("[DGE diag] Total genes:", geneFields.length);
 
-	// Determine whether expression data is log1p-normalized or z-scored.
+	// Determine whether expression data is log1p-normalized, linear, or z-scored.
 	// Prefer the subgroup storage type from datasources.json metadata:
-	//   sparse → data preserves zero structure → log1p (z-scoring densifies)
+	//   sparse → data preserves zero structure → log1p or linear (z-scoring densifies)
 	//   dense / missing → ambiguous, fall back to probing gene values
 	const sgType = link.subgroups[sgKey]?.type as string | undefined;
-	let dataIsLog1p = true;
+	let dataType: "log1p" | "linear" | "zscored" = "log1p";
 
 	if (sgType === "sparse") {
-		dataIsLog1p = true;
-		console.log("[DGE diag] sgtype=sparse -> dataIsLog1p=true (from metadata)");
+		// Even for sparse, we probe to distinguish log1p vs linear
+		console.log("[DGE diag] sgtype=sparse -> probing genes to distinguish log1p vs linear");
 	} else {
 		console.log(`[DGE diag] sgtype=${sgType ?? "undefined"} -> probing genes for detection`);
-		const MAX_PROBE = Math.min(20, geneFields.length);
-		const probeFields = geneFields.slice(0, MAX_PROBE);
-		await chartManager.loadColumnSetAsync(probeFields, cellsDsName);
-
-		for (let gi = 0; gi < probeFields.length; gi++) {
-			const col = cellsDs.columnIndex[probeFields[gi]];
-			const buf = col?.buffer as SharedArrayBuffer | null;
-			if (!buf) continue;
-			const arr = new Float32Array(buf);
-			const detection = detectDataIsLog1p(arr);
-			if (detection !== null) {
-				dataIsLog1p = detection;
-				console.log(`[DGE diag] Probed gene #${gi} "${geneNames[gi]}" -> dataIsLog1p=${dataIsLog1p}`);
-				break;
-			}
-			if (gi === probeFields.length - 1) {
-				console.warn(`[DGE diag] All ${MAX_PROBE} probed genes were all-NaN; defaulting to dataIsLog1p=true`);
-			}
-		}
 	}
+
+	const MAX_PROBE = Math.min(50, geneFields.length);
+	const probeFields = geneFields.slice(0, MAX_PROBE);
+	await chartManager.loadColumnSetAsync(probeFields, cellsDsName);
+
+	let globalMaxVal = -Infinity;
+	let globalHasNegative = false;
+	let anyFinite = false;
+
+	for (let gi = 0; gi < probeFields.length; gi++) {
+		const col = cellsDs.columnIndex[probeFields[gi]];
+		const buf = col?.buffer as SharedArrayBuffer | null;
+		if (!buf) continue;
+		const arr = new Float32Array(buf);
+		for (let j = 0; j < arr.length; j++) {
+			const v = arr[j];
+			if (Number.isNaN(v)) continue;
+			anyFinite = true;
+			if (v < 0) { globalHasNegative = true; break; }
+			if (v > globalMaxVal) globalMaxVal = v;
+		}
+		if (globalHasNegative || globalMaxVal > 20) break;
+	}
+
+	if (!anyFinite) {
+		console.warn(`[DGE diag] All ${MAX_PROBE} probed genes were all-NaN; defaulting to dataType=log1p`);
+	} else if (globalHasNegative) {
+		dataType = "zscored";
+	} else {
+		dataType = globalMaxVal > 20 ? "linear" : "log1p";
+	}
+	console.log(`[DGE diag] Data type detection: globalMax=${globalMaxVal.toFixed(1)}, hasNeg=${globalHasNegative} -> dataType=${dataType}`);
 
 	const dgeConfig: DGEConfig = {
 		groupColumn: config.groupColumn,
@@ -155,7 +169,7 @@ export async function runDGEOnDataStore(
 		referenceGroup: config.referenceGroup,
 		// Adjust this parameter to control the DGE batch size (number of genes per request).
 		// Higher values (e.g. 500-1000) are faster but use more memory per batch.
-		batchSize: config.batchSize ?? 2000,
+		batchSize: config.batchSize ?? DEFAULT_DGE_BATCH_SIZE,
 	};
 
 	const runner = new DGERunner();
@@ -177,7 +191,7 @@ export async function runDGEOnDataStore(
 			},
 			onProgress,
 			false,
-			dataIsLog1p,
+			dataType,
 		);
 
 		writeResultsToGenesDS(genesDs, result, link.valueToRowIndex);

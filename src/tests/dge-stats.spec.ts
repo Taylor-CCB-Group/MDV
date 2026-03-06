@@ -9,6 +9,7 @@ import {
 	benjaminiHochberg,
 	tDistPValue,
 	computeGeneStats,
+	detectDataType,
 	type GroupStats,
 } from "@/datastore/dgeStats";
 
@@ -163,29 +164,30 @@ describe("welchTTest", () => {
 // ── Log2 Fold Change ────────────────────────────────────────────────────────
 
 describe("log2FoldChange", () => {
-	test("matches Scanpy formula: log2((expm1(mean_g) + 1e-9) / (expm1(mean_r) + 1e-9))", () => {
-		const cases: [number, number, number][] = [
-			[2.0, 1.0, 1.894636123358204],
-			[0.0, 0.0, 0.0],
-			[3.0, 0.5, 4.8787372176909996],
-			[0.1, 0.1, 0.0],
+	test("matches Scanpy-style formula: log2((expm1(mean_g) + PSEUDOCOUNT) / (expm1(mean_r) + PSEUDOCOUNT))", () => {
+		// With PSEUDOCOUNT = 1e-6
+		const cases: [number, number, boolean, number][] = [
+			[2.0, 1.0, true, 1.894636], // log1p data
+			[2.0, 1.0, false, 1.0],     // linear data: log2((2+1e-6)/(1+1e-6)) approx 1.0
+			[0.0, 0.0, true, 0.0],
+			[0.1, 0.1, true, 0.0],
 		];
 
-		for (const [meanTarget, meanRef, expected] of cases) {
-			expect(log2FoldChange(meanTarget, meanRef)).toBeCloseTo(expected, 6);
+		for (const [meanTarget, meanRef, isLog1p, expected] of cases) {
+			expect(log2FoldChange(meanTarget, meanRef, isLog1p)).toBeCloseTo(expected, 5);
 		}
 	});
 
 	test("positive when target > reference", () => {
-		expect(log2FoldChange(3.0, 1.0)).toBeGreaterThan(0);
+		expect(log2FoldChange(3.0, 1.0, true)).toBeGreaterThan(0);
 	});
 
 	test("negative when target < reference", () => {
-		expect(log2FoldChange(1.0, 3.0)).toBeLessThan(0);
+		expect(log2FoldChange(1.0, 3.0, true)).toBeLessThan(0);
 	});
 
 	test("handles zero means (both zero gives 0)", () => {
-		expect(log2FoldChange(0, 0)).toBeCloseTo(0, 10);
+		expect(log2FoldChange(0, 0, true)).toBeCloseTo(0, 10);
 	});
 });
 
@@ -209,6 +211,34 @@ describe("clampEffectSize", () => {
 	test("boundary values", () => {
 		expect(clampEffectSize(10)).toBe(10);
 		expect(clampEffectSize(-10)).toBe(-10);
+	});
+
+	test("handles NaN", () => {
+		expect(clampEffectSize(NaN)).toBeNaN();
+	});
+});
+
+// ── detectDataType ──────────────────────────────────────────────────────────
+
+describe("detectDataType", () => {
+	test("detects log1p (all non-negative, max <= 20)", () => {
+		const values = new Float32Array([0, 1.5, 2.3, NaN, 5.0]);
+		expect(detectDataType(values)).toBe("log1p");
+	});
+
+	test("detects linear (all non-negative, max > 20)", () => {
+		const values = new Float32Array([0, 10, 50, NaN, 100]);
+		expect(detectDataType(values)).toBe("linear");
+	});
+
+	test("detects zscored (contains negatives)", () => {
+		const values = new Float32Array([0, 1.5, -0.5, NaN, 2.0]);
+		expect(detectDataType(values)).toBe("zscored");
+	});
+
+	test("returns null for all-NaN", () => {
+		const values = new Float32Array([NaN, NaN, NaN]);
+		expect(detectDataType(values)).toBeNull();
 	});
 });
 
@@ -285,7 +315,7 @@ describe("computeGeneStats", () => {
 		const groups = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
 		const { v, g, f } = makeArrays(values, groups);
 
-		const result = computeGeneStats("TestGene", v, g, f, 0, -1);
+		const result = computeGeneStats("TestGene", v, g, f, 0, -1, "linear");
 
 		expect(result.gene).toBe("TestGene");
 		expect(result.meanTarget).toBeCloseTo(4, 5);

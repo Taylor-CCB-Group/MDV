@@ -29,11 +29,21 @@ To handle large datasets without multiple passes through the data, we use **Welf
 ### Adaptive Effect Size
 The engine automatically detects the normalization of the input data and selects the appropriate effect size metric:
 
-*   **Log1p-normalized data**: Uses **Log2 Fold Change (Log2FC)**.
-    *   Formula: `log2((expm1(meanTarget) + 1e-9) / (expm1(meanRef) + 1e-9))`
-    *   Matches Scanpy's implementation for log-normalized data.
-*   **Z-scored/Dense data**: Uses **Mean Difference** (`meanTarget - meanReference`).
-    *   Detected automatically if negative values are present in the expression matrix.
+*   **Log1p-normalized data**: Uses **Log2 Fold Change (Log2FC)** with `expm1` back-transformation.
+*   **Linear / raw count data**: Uses **Log2 Fold Change (Log2FC)** directly on means (no `expm1`).
+*   **Z-scored data**: Uses **Mean Difference** (`meanTarget - meanReference`).
+
+Detection is automatic via a multi-gene probe (see gotcha below).
+
+### Gotcha: Data Type Detection for Sparse Raw Counts
+
+> **If the volcano plot shows many genes clamped at exactly ±10 effect size, or highly-expressed housekeeping genes have implausible log2FC values, check that data type detection is working correctly.**
+
+The engine probes the first 50 genes to decide if expression values are log1p-normalized (small non-negative, max ≤ 20), linear/raw counts (non-negative, max > 20), or z-scored (has negatives). For **sparse raw count data**, most genes have very low counts (1–3 per cell) which look identical to log1p-normalized values. If detection breaks at the first gene it finds, it may misclassify raw counts as log1p — causing `expm1()` to be applied to already-linear values, which exponentially inflates fold changes for highly-expressed genes.
+
+**The fix** (implemented in `dgeIntegration.ts`): the probe loop scans across **all** 50 sampled genes, tracking the global maximum value, and only decides after examining all of them. It exits early only when it finds a definitive signal (a negative value → z-scored, or a value > 20 → linear).
+
+Even with correct detection, genes expressed exclusively in one group (e.g., 72 UC cells, 0 Healthy cells) will produce mathematically extreme fold changes that are clamped to ±10. This is expected for very sparse genes and can be mitigated with a minimum cell count filter if needed.
 
 ## 4. Performance & Scalability
 
@@ -58,13 +68,12 @@ To prevent the backend from crashing when requesting thousands of columns at onc
 ## 6. Configuration & Troubleshooting
 
 ### Adjusting Batch Size
-If the UI feels sluggish or you encounter memory errors, you can adjust the `batchSize` in the three places listed below. All three should be kept in sync.
+If the UI feels sluggish or you encounter memory errors, you can adjust the default DGE batch size in the following centralized location:
 
-| Priority | File | Location | Purpose |
-| :--- | :--- | :--- | :--- |
-| **1 (UI)** | `src/charts/dialogs/DGEDialogReact.tsx` | Inside `handleRun`, the `batchSize: 2000` passed to `runDGEOnDataStore` | Controls the value actually sent when the user clicks "Run DGE". This takes precedence over the defaults below. |
-| **2 (Integration)** | `src/datastore/dgeIntegration.ts` | Line ~158: `batchSize: config.batchSize ?? 2000` | Default used when `batchSize` is not passed from the UI. |
-| **3 (Engine)** | `src/datastore/DGEDimension.ts` | Line ~85: `const batchSize = config.batchSize ?? 2000` | Final internal fallback used by the core DGE calculation loop. |
+*   **File:** `src/lib/constants.ts`
+*   **Constant:** `DEFAULT_DGE_BATCH_SIZE`
+
+This single source of truth is used as the default fallback in both the integration layer (`dgeIntegration.ts`) and the core DGE engine (`DGEDimension.ts`).
 
 **After making changes** you must perform a hard browser refresh (Cmd+Shift+R or Ctrl+F5) to clear the cached JavaScript.
 

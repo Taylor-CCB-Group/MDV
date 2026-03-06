@@ -21,7 +21,7 @@ export interface DGEBatchInput {
 	geneBuffers: SharedArrayBuffer[];
 	geneNames: string[];
 	batchIndex: number;
-	dataIsLog1p: boolean;
+	dataType: "log1p" | "linear" | "zscored";
 }
 
 export interface DGEBatchOutput {
@@ -48,7 +48,7 @@ export function processBatch(msg: DGEBatchInput): DGEBatchOutput {
 				filterArray,
 				msg.targetGroup,
 				msg.referenceGroup,
-				msg.dataIsLog1p,
+				msg.dataType,
 			),
 		);
 	}

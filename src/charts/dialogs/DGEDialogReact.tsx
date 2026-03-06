@@ -94,7 +94,6 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 					groupColumn,
 					targetGroup: safeTargetGroup,
 					referenceGroup: safeReferenceGroup,
-					batchSize: 2000,
 				},
 				(done, total) => setProgress({ done, total }),
 			);
