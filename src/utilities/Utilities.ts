@@ -76,3 +76,17 @@ export function hexToRgb(hex: string): [number, number, number] {
     const n = Number.parseInt(hex.slice(1), 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
+
+/**
+ * Escape strings to avoid XSS risk
+ * @param s - unsafe string
+ * @returns - safe escaped string
+ */
+export function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}

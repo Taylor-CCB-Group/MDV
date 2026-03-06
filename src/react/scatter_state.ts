@@ -30,6 +30,7 @@ import type { FeatureCollection } from "@turf/helpers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getEmptyFeatureCollection } from "./deck_state";
+import { escapeHtml } from "@/utilities/Utilities";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
@@ -359,7 +360,10 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
-                    return `<strong>${col.name}:</strong> ${col.data ? col.getValue(data[i]) : "loading..."}`;
+                    // Sanitise the strings before passing
+                    const value = col.data ? col.getValue(data[i]) : "loading...";
+                    const strValue = value === undefined || value === null ? "" : String(value);
+                    return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
             });
         },
         [tooltipCols, data],

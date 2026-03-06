@@ -17,6 +17,7 @@ import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import useGateLayers from "../hooks/useGateLayers";
+import { escapeHtml } from "@/utilities/Utilities";
 
 //todo this should be in a common place etc.
 const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -320,10 +321,14 @@ const DeckScatter = observer(function DeckScatterComponent() {
                         const layerId = info?.layer?.id;
                         const obj = info?.object;
                         if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
-                            return { html: `<strong>${obj.properties.gateName}</strong><br/><small>Click on the label to edit</small>` };
+                            return { 
+                                html: `<strong>${escapeHtml(obj.properties.gateName)}</strong><br/><small>Click on the label to edit</small>` 
+                            };
                         }
                         if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
-                            return { html: `<strong>${obj.text}</strong><br/><small>Click on the label to edit</small>` };
+                            return { 
+                                html: `<strong>${escapeHtml(obj.text)}</strong><br/><small>Click on the label to edit</small>` 
+                            };
                         }
                         return getTooltip();
                     }}
