@@ -173,7 +173,6 @@ const DeckScatter = observer(function DeckScatterComponent() {
         gateLabelLayer,
         gateDisplayLayer,
         controllerOptions,
-        getCursor,
     } = useGateLayers();
 
     // this should move in to scatter_state, common with viv...

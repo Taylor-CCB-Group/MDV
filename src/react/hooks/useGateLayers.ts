@@ -208,22 +208,13 @@ const useGateLayers = () => {
         });
     }, [relevantGates, chartId, editingGateId, gateManager, cx, cy]);
 
-    const getCursor = useCallback(
-        ({ isDragging }: { isDragging: boolean; isHovering: boolean }) => {
-            if (draggingId || isDragging) return "grabbing";
-
-            return "grab";
-        },
-        [draggingId],
-    );
-
+    // To disable drag pan for the deck controller when label is being dragged or hovered
     const dragPan = !(draggingId || isHoveringLabel);
 
     return {
         gateLabelLayer,
         gateDisplayLayer,
         controllerOptions: { dragPan },
-        getCursor,
     };
 };
 
