@@ -15,7 +15,7 @@ import { hexToRgb, rgbToHex } from "@/utilities/Utilities";
 export type GateNameDialogType = {
     open: boolean;
     onClose: () => void;
-    onSaveGate: (gateName: string, color?: [number, number, number]) => void;
+    onSaveGate: (gateName: string, color?: [number, number, number]) => Promise<void>;
     name?: string;
     isEditName?: boolean;
 };
@@ -33,7 +33,7 @@ const GateNameDialog = ({ open, onClose, onSaveGate, name, isEditName }: GateNam
         }
     }, [open, name]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         // Validate name
         if (!gateName.trim()) {
             setError("Gate name cannot be empty");
@@ -42,9 +42,9 @@ const GateNameDialog = ({ open, onClose, onSaveGate, name, isEditName }: GateNam
 
         try {
             if (isEditName) {
-                onSaveGate(gateName);
+                await onSaveGate(gateName);
             } else {
-                onSaveGate(gateName, color);
+                await onSaveGate(gateName, color);
             }
             handleClose();
         } catch (err) {

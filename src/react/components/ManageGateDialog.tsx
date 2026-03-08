@@ -37,11 +37,11 @@ export type ManageGateDialogType = {
     open: boolean;
     onClose: () => void;
     gatesArray: Gate[];
-    onDelete: (gateId: string) => void;
+    onDelete: (gateId: string) => Promise<void>;
     onEdit: (gateId: string) => void;
-    onRenameGate: (gateId: string, newName: string) => void;
+    onRenameGate: (gateId: string, newName: string) => Promise<void>;
     onExportClick: (gateId: string) => void;
-    onColorChange: (gateId: string, color: [number, number, number]) => void;
+    onColorChange: (gateId: string, color: [number, number, number]) => Promise<void>;
 };
 
 const ManageGateDialog = ({
@@ -136,8 +136,8 @@ const ManageGateDialog = ({
                                         <input
                                             type="color"
                                             value={rgbToHex(gate.color ?? DEFAULT_GATE_COLOR)}
-                                            onChange={(e) =>
-                                                onColorChange(gate.id, hexToRgb(e.target.value))
+                                            onChange={async (e) =>
+                                                await onColorChange(gate.id, hexToRgb(e.target.value))
                                             }
                                             style={{
                                                 width: 25,
@@ -227,8 +227,8 @@ const ManageGateDialog = ({
                     onClose={() => {
                         setRenameGateId(null);
                     }}
-                    onSaveGate={(gateName) => {
-                        onRenameGate(renameGateId, gateName);
+                    onSaveGate={async (gateName) => {
+                        await onRenameGate(renameGateId, gateName);
                     }}
                     name={gatesArray.find((g) => g.id === renameGateId)?.name ?? ""}
                     isEditName
@@ -243,8 +243,8 @@ const ManageGateDialog = ({
                     onClose={() => {
                         setDeleteGateId(null);
                     }}
-                    onConfirm={() => {
-                        onDelete(deleteGateId);
+                    onConfirm={async () => {
+                        await onDelete(deleteGateId);
                         setDeleteGateId(null);
                     }}
                     isDelete

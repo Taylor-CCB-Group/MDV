@@ -275,7 +275,9 @@ export default observer(function SelectionOverlay() {
                     <>
                         <IconWithTooltip
                             tooltipText={"Confirm"}
-                            onClick={onConfirmEditGate}
+                            onClick={() => 
+                                { onConfirmEditGate().catch(console.error) }
+                            }
                             iconButtonProps={{
                                 sx: {
                                     color: "green",

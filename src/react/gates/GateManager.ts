@@ -69,7 +69,9 @@ export class GateManager {
      * @param gateId - gate id
      * @param updates - updated gate object (partial or full)
      */
-    updateGate(gateId: string, updates: Partial<Gate>) {
+    async updateGate(gateId: string, updates: Partial<Gate>) {
+        const loaded = await this.ensureGatesColumnDataLoaded();
+        if (!loaded || !this.gateColumn?.data) return;
         const gate = this.gates.get(gateId);
         if (!gate) {
             console.error(`Gate ${gateId} not found`);
@@ -115,7 +117,9 @@ export class GateManager {
      * Rebuild the values array to remove deleted values (required for filtering)
      * Update the datastore
      */
-    deleteGate(gateId: string) {
+    async deleteGate(gateId: string) {
+        const loaded = await this.ensureGatesColumnDataLoaded();
+        if (!loaded || !this.gateColumn?.data) return;
         const gate = this.gates.get(gateId);
         if (!gate) {
             console.error(`Gate ${gateId} not found`);

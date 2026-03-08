@@ -31,7 +31,7 @@ const useGateActions = () => {
     }, [chart.config]);
 
     const onSaveGate = useCallback(
-        (gateName: string, color: [number, number, number] = DEFAULT_GATE_COLOR) => {
+        async (gateName: string, color: [number, number, number] = DEFAULT_GATE_COLOR) => {
             const validGateName = gateName.trim();
             if (!validGateName) {
                 throw new Error("Gate name cannot be empty");
@@ -61,7 +61,7 @@ const useGateActions = () => {
             };
 
             // Add to gate store
-            gateManager.addGate(gate);
+            await gateManager.addGate(gate);
 
             // Clear selection
             clearSelection();
@@ -70,14 +70,14 @@ const useGateActions = () => {
     );
 
     const onDeleteGate = useCallback(
-        (gateId: string) => {
-            gateManager.deleteGate(gateId);
+        async (gateId: string) => {
+            await gateManager.deleteGate(gateId);
         },
         [gateManager],
     );
 
     const onRenameGate = useCallback(
-        (gateId: string, newName: string) => {
+        async (gateId: string, newName: string) => {
             const validGateName = newName.trim();
             if (!validGateName) {
                 throw new Error("Gate name cannot be empty");
@@ -85,7 +85,7 @@ const useGateActions = () => {
             if (gateManager.hasGateName(validGateName)) {
                 throw new Error("A gate with this name already exists");
             }
-            gateManager.updateGate(gateId, { name: validGateName });
+            await gateManager.updateGate(gateId, { name: validGateName });
         },
         [gateManager],
     );
@@ -134,12 +134,12 @@ const useGateActions = () => {
      * Update the gate with the new geometry and label position of the gate
      * Compute centroid of label position of editing gate
      */
-    const onConfirmEditGate = useCallback(() => {
+    const onConfirmEditGate = useCallback(async () => {
         if (!editingGateId) return;
         const currentGeometry = chart.config.selectionFeatureCollection;
 
         const newLabelPosition = computeCentroid(currentGeometry);
-        gateManager.updateGate(editingGateId, { geometry: currentGeometry, labelPosition: newLabelPosition });
+        await gateManager.updateGate(editingGateId, { geometry: currentGeometry, labelPosition: newLabelPosition });
         setEditingGateId(null);
         clearSelection();
     }, [gateManager, clearSelection, chart.config, setEditingGateId, editingGateId]);
@@ -156,8 +156,8 @@ const useGateActions = () => {
      * Update the color of the gate
      */
     const onColorChange = useCallback(
-        (gateId: string, color: [number, number, number]) => {
-            gateManager.updateGate(gateId, { color });
+        async (gateId: string, color: [number, number, number]) => {
+            await gateManager.updateGate(gateId, { color });
         },
         [gateManager],
     );

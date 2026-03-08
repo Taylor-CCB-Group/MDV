@@ -143,7 +143,7 @@ const useGateLayers = () => {
                 const position = dragPosRef.current;
                 if (position) {
                     // Update the label position of the gate, when the dragging ends
-                    gateManager.updateGate(currentId, { labelPosition: position });
+                    gateManager.updateGate(currentId, { labelPosition: position }).catch(console.error);
                 }
                 draggingIdRef.current = null;
                 dragPosRef.current = null;
