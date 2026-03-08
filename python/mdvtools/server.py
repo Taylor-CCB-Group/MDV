@@ -298,6 +298,39 @@ def create_app(
 
         return jsonify({"success": success})
 
+    @project_bp.route("/rename_view", access_level='editable', methods=["POST"])
+    def rename_view():
+        data = request.json
+        if not data or "old_name" not in data or "new_name" not in data:
+            return jsonify({"success": False, "error": "Request must contain 'old_name' and 'new_name'"}), 400
+        try:
+            project.rename_view(data["old_name"], data["new_name"])
+            return jsonify({"success": True})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
+    @project_bp.route("/reorder_views", access_level='editable', methods=["POST"])
+    def reorder_views():
+        data = request.json
+        if not data or "order" not in data:
+            return jsonify({"success": False, "error": "Request must contain 'order'"}), 400
+        try:
+            project.reorder_views(data["order"])
+            return jsonify({"success": True})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
+    @project_bp.route("/set_gallery_default", access_level='editable', methods=["POST"])
+    def set_gallery_default():
+        data = request.json
+        if not data or "show" not in data:
+            return jsonify({"success": False, "error": "Request must contain 'show'"}), 400
+        try:
+            project.set_gallery_default(bool(data["show"]))
+            return jsonify({"success": True})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
     # Utility Functions
     def create_temp_folder(base_path):
         """

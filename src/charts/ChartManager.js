@@ -141,7 +141,8 @@ export class ChartManager {
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
      * @param {boolean?} [config.chat_enabled] 
-     * @param {string?} [config.mdv_api_root] 
+     * @param {string?} [config.mdv_api_root]
+     * @param {boolean?} [config.show_gallery_on_open] whether to open the gallery view by default
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
      * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
      * 

@@ -144,4 +144,17 @@ async function loadData() {
         config,
         listener as any, //jsdoc 🙄
     );
+
+    // After ChartManager initialises, auto-open gallery if flagged in project config
+    if (config.show_gallery_on_open) {
+        // Wait for the view to finish loading before opening the gallery
+        const tryOpenGallery = () => {
+            if (cm.viewManager) {
+                cm.viewManager.setShowGallery(true);
+            } else {
+                setTimeout(tryOpenGallery, 200);
+            }
+        };
+        setTimeout(tryOpenGallery, 500);
+    }
 }

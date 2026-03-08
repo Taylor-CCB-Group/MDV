@@ -254,7 +254,8 @@ export const ChartManagerConfigSchema = z.object({
     gridstack: z.boolean().optional().describe("Whether to use GridStack for chart layout"),
     chat_enabled: z.boolean().optional().describe("Whether chat functionality is enabled"),
     mdv_api_root: z.string().optional().describe("Root URL for MDV API endpoints"),
-    onlyView: ViewConfigSchema.optional().describe("Single view configuration when only one view is needed")
+    onlyView: ViewConfigSchema.optional().describe("Single view configuration when only one view is needed"),
+    show_gallery_on_open: z.boolean().optional().describe("Whether to show the gallery view by default when the project is opened"),
 }).describe("Top-level configuration for the chart manager controlling the entire dashboard");
 
 // Export types

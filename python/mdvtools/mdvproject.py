@@ -1702,6 +1702,40 @@ class MDVProject:
                 state["initial_view"] = state["all_views"][0]
         self.state = state
 
+    def rename_view(self, old_name: str, new_name: str):
+        """Rename a view: update the key in views.json and the entry in state.json."""
+        views = self.views
+        if old_name not in views:
+            raise ValueError(f"View '{old_name}' does not exist")
+        if new_name in views and new_name != old_name:
+            raise ValueError(f"View '{new_name}' already exists")
+        view_data = views.pop(old_name)
+        view_data["name"] = new_name
+        views[new_name] = view_data
+        self.views = views
+
+        state = self.state
+        idx = state["all_views"].index(old_name)
+        state["all_views"][idx] = new_name
+        if state.get("initial_view") == old_name:
+            state["initial_view"] = new_name
+        self.state = state
+
+    def reorder_views(self, order: list):
+        """Set the order of views in state.json all_views."""
+        state = self.state
+        existing = set(state["all_views"])
+        if set(order) != existing:
+            raise ValueError("Reorder list must contain exactly the same view names")
+        state["all_views"] = order
+        self.state = state
+
+    def set_gallery_default(self, show: bool):
+        """Set whether the gallery view should open by default when the project loads."""
+        state = self.state
+        state["show_gallery_on_open"] = show
+        self.state = state
+
     def convert_data_to_binary(self, outdir=None):
         if not outdir:
             outdir = self.dir
