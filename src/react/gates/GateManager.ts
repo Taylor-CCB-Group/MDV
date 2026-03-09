@@ -7,6 +7,7 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
 const GATES_COLUMN_NAME = "__gates__";
 const GATE_NONE_VALUE = "N/A";
+const GATES_COLUMN_STRING_LENGTH = 24;
 /**
  * Class which manages the gating operations
  * Creates a gates column if it doesn't exist, loads the gates column if it's not loaded
@@ -158,7 +159,7 @@ export class GateManager {
                 editable: false, // as of now
                 delimiter: "," as const,
                 values: [GATE_NONE_VALUE] as string[],
-                stringLength: 10,
+                stringLength: GATES_COLUMN_STRING_LENGTH,
             };
 
             const data = new SharedArrayBuffer(this.dataStore.size * column.stringLength * 2);
@@ -361,11 +362,17 @@ export class GateManager {
      */
     private setGateNamesForCell(cellIndex: number, gateNames: string[]) {
         if (!this.gateColumn?.data || !this.gateColumn.stringLength) return;
+        const capacity = this.gateColumn.stringLength;
 
-        const baseIndex = cellIndex * this.gateColumn.stringLength;
-        const maxValues = Math.min(gateNames.length, this.gateColumn.stringLength);
+        if (capacity < gateNames.length) {
+            // Logging this for now
+            console.error("Gate names exceed the capacity and are being truncated");
+        }
 
-        for (let i = 0; i < this.gateColumn.stringLength; i++) {
+        const baseIndex = cellIndex * capacity;
+        const maxValues = Math.min(gateNames.length, capacity);
+
+        for (let i = 0; i < capacity; i++) {
             this.gateColumn.data[baseIndex + i] = 65535;
         }
 
