@@ -1130,7 +1130,8 @@ export class ChartManager {
                 values: cl.values,
                 datatype: cl.datatype,
                 name: cl.name,
-                editable: true,
+                // Use the existing editable field value if it exists, default to true
+                editable: cl.editable ?? true,
                 field: cl.field,
             };
             const numRows = dataStore.size;
