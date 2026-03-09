@@ -157,6 +157,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // const outerContainer = useOuterContainer();
 
     // todo: we need to do something about editing gate color
+    //! When the dev tools are open, there is lagging while dragging this layer
     const editableLayer = useMemo(() => {
         return new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,

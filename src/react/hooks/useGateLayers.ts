@@ -33,7 +33,6 @@ const useGateLayers = () => {
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [isHoveringLabel, setIsHoveringLabel] = useState(false);
     const [dragPos, setDragPos] = useState<[number, number] | null>(null);
-    const hasRebuiltGateColumnRef = useRef(false);
     const draggingIdRef = useRef<string | null>(null);
     const dragPosRef = useRef<[number, number] | null>(null);
 
@@ -44,8 +43,7 @@ const useGateLayers = () => {
 
     useEffect(() => {
         // Wait for columns to be loaded to update the gates column
-        if (!cx || !cy || hasRebuiltGateColumnRef.current) return;
-        hasRebuiltGateColumnRef.current = true;
+        if (!cx || !cy) return;
         gateManager.rebuildGatesColumnWhenReady().catch(console.error);
     }, [cx, cy, gateManager]);
 
