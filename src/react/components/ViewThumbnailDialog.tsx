@@ -22,7 +22,6 @@ import {
     Check as CheckIcon,
     Clear as ClearIcon,
     Close as CloseIcon,
-    Image as ImageIcon,
 } from "@mui/icons-material";
 import {
     useCallback,
@@ -35,59 +34,12 @@ import {
 import { ErrorBoundary } from "react-error-boundary";
 import { stringContainsAll } from "@/lib/utils";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
+import { useChartManager } from "../hooks";
+import ViewImageComponent from "./ViewImageComponent";
 
 export type ViewThumbnailDialogProps = {
     open: boolean;
     setOpen: Dispatch<SetStateAction<boolean>>;
-};
-
-export type ViewImageComponentProps = {
-    imgSrc: string;
-    viewName: string;
-};
-
-export const ViewImageComponent = ({ imgSrc, viewName }: ViewImageComponentProps) => {
-    const [hasError, setHasError] = useState(!imgSrc);
-
-    const ZOOM_LEVEL = 1.75;
-    const VERTICAL_OFFSET_PERCENT = 25;
-    const baseWidth = `${100 / ZOOM_LEVEL}%`;
-
-    return (
-        <Box
-            sx={{
-                width: "100%",
-                height: "100%",
-                aspectRatio: 3 / 2,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "flex-start",
-                overflow: "hidden",
-            }}
-        >
-            {!hasError ? (
-                <img
-                    src={imgSrc}
-                    alt={`${viewName} snapshot`}
-                    style={{
-                        width: baseWidth,
-                        height: "auto",
-                        transform: `scale(${ZOOM_LEVEL}) translateY(${VERTICAL_OFFSET_PERCENT}%)`,
-                        transition: "transform 0.2s ease-in-out",
-                        transformOrigin: "center top",
-                    }}
-                    onError={() => setHasError(true)}
-                />
-            ) : (
-                <ImageIcon
-                    sx={{
-                        fontSize: "5rem",
-                        color: "text.secondary",
-                    }}
-                />
-            )}
-        </Box>
-    );
 };
 
 type ViewEntry = { name: string; image: string };
@@ -95,8 +47,9 @@ type ViewEntry = { name: string; image: string };
 type RenameState = { index: number; value: string } | null;
 
 const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
-    const viewManager = window.mdv.chartManager.viewManager;
-    const config = window.mdv.chartManager.config;
+    const cm = useChartManager();
+    const viewManager = cm.viewManager;
+    const config = cm.config;
     const isEditMode = config.permission === "edit" || config.permission === "owner";
 
     const [viewList, setViewList] = useState<ViewEntry[]>([]);
@@ -119,6 +72,8 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const [galleryDefault, setGalleryDefault] = useState<boolean>(
         Boolean(config.show_gallery_on_open),
     );
+
+    const isFilterActive = filterText.trim() !== "";
 
     const getViewList = useCallback(async () => {
         setLoading(true);
@@ -236,9 +191,10 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         reordered.splice(targetIndex, 0, moved);
         setFilteredViewList(reordered);
 
-        // Also update the master viewList to match
-        setViewList(reordered);
-        setOrderChanged(true);
+        if (!isFilterActive) {
+            setViewList(reordered);
+            setOrderChanged(true);
+        }
         dragIndexRef.current = null;
     };
 
@@ -250,7 +206,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const handleSaveOrder = async () => {
         setSavingOrder(true);
         try {
-            await viewManager.reorderViews(filteredViewList.map((v) => v.name));
+            await viewManager.reorderViews(viewList.map((v) => v.name));
             setOrderChanged(false);
         } catch {
             // order stays changed so user can retry
@@ -336,7 +292,9 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                     color="text.secondary"
                                     sx={{ mb: 2, display: "block" }}
                                 >
-                                    Drag cards to reorder views. Double-click a name to rename.
+                                    {isFilterActive
+                                        ? "Clear the filter to reorder views. Double-click a name to rename."
+                                        : "Drag cards to reorder views. Double-click a name to rename."}
                                 </Typography>
                             )}
 
@@ -362,25 +320,25 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                             <Grid2
                                                 key={`${view.name}-${index}`}
                                                 size={{ md: 4, sm: 6 }}
-                                                draggable={isEditMode}
+                                                draggable={isEditMode && !isFilterActive}
                                                 onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
-                                                    if (isEditMode) handleDragStart(e, index);
+                                                    if (isEditMode && !isFilterActive) handleDragStart(e, index);
                                                 }}
                                                 onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
-                                                    if (isEditMode) handleDragOver(e, index);
+                                                    if (isEditMode && !isFilterActive) handleDragOver(e, index);
                                                 }}
                                                 onDragLeave={() => {
                                                     if (isEditMode) handleDragLeave();
                                                 }}
                                                 onDrop={(e: React.DragEvent<HTMLDivElement>) => {
-                                                    if (isEditMode) handleDrop(e, index);
+                                                    if (isEditMode && !isFilterActive) handleDrop(e, index);
                                                 }}
                                                 onDragEnd={() => {
                                                     if (isEditMode) handleDragEnd();
                                                 }}
                                                 sx={{
                                                     opacity: isDragTarget ? 0.5 : 1,
-                                                    cursor: isEditMode ? "grab" : "default",
+                                                    cursor: isEditMode && !isFilterActive ? "grab" : "default",
                                                     transition: "opacity 0.15s",
                                                 }}
                                             >
@@ -555,7 +513,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                 </ErrorBoundary>
             </DialogContent>
             <DialogActions>
-                {isEditMode && orderChanged && (
+                {isEditMode && orderChanged && !isFilterActive && (
                     <Button
                         onClick={handleSaveOrder}
                         color="primary"

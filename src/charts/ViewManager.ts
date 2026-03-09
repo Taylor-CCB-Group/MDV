@@ -309,19 +309,12 @@ class ViewManager {
         await this.addView(viewName, {}, true);
     }
 
-    checkUnsavedState(action: () => void) {
-        if (this.hasUnsavedChanges()) {
-            this.cm.showSaveViewDialog(action);
-        } else {
-            action();
-        }
-    }
-
     @action
     setShowGallery(show: boolean) {
         this.showGallery = show;
     }
 
+    @action
     async renameView(oldName: string, newName: string) {
         try {
             const root = getProjectRoot();
@@ -338,6 +331,7 @@ class ViewManager {
         }
     }
 
+    @action
     async reorderViews(newOrder: string[]) {
         try {
             const root = getProjectRoot();
@@ -350,6 +344,7 @@ class ViewManager {
         }
     }
 
+    @action
     async setGalleryDefault(show: boolean) {
         try {
             const root = getProjectRoot();
@@ -359,6 +354,14 @@ class ViewManager {
         } catch (error) {
             console.error("error setting gallery default", error);
             throw error;
+        }
+    }
+
+    checkUnsavedState(action: () => void) {
+        if (this.hasUnsavedChanges()) {
+            this.cm.showSaveViewDialog(action);
+        } else {
+            action();
         }
     }
 
