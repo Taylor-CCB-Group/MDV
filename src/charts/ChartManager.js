@@ -688,6 +688,11 @@ export class ChartManager {
                             });
                         }
                     }
+
+                    // Open the view gallery on initial load if show_gallery_on_open is true
+                    if (firstTime && config.show_gallery_on_open) {
+                        this.viewManager.setShowGallery(true);
+                    }
                 } catch (error) {
                     console.error("Error during view initialization:", error);
                     // Consider adding user-facing error handling here
@@ -706,6 +711,10 @@ export class ChartManager {
                             console.log("Error occurred: ", state.chartErrors);
                             return false;
                         });
+                    }
+                    // Open the view gallery on initial load if show_gallery_on_open is true
+                    if (firstTime && config.show_gallery_on_open) {
+                        this.viewManager.setShowGallery(true);
                     }
             });
         }
