@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ImageIcon from "@mui/icons-material/Image";
 
 export type ViewImageComponentProps = {
@@ -9,6 +9,11 @@ export type ViewImageComponentProps = {
 
 const ViewImageComponent = ({ imgSrc, viewName }: ViewImageComponentProps) => {
     const [hasError, setHasError] = useState(!imgSrc);
+
+    useEffect(() => {
+        // update hasError when imgSrc updates
+        setHasError(!imgSrc);
+    }, [imgSrc]);
 
     const ZOOM_LEVEL = 1.75;
     const VERTICAL_OFFSET_PERCENT = 25;
