@@ -1702,6 +1702,59 @@ class MDVProject:
                 state["initial_view"] = state["all_views"][0]
         self.state = state
 
+    def rename_view(self, old_name: str, new_name: str):
+        """Rename a view: update the key in views.json and the entry in state.json."""
+        new_name = (new_name or "").strip()
+        if not new_name:
+            raise ValueError("View name cannot be empty")
+
+        with self.lock("write"):
+            views = self.views
+            state = self.state
+
+            if old_name not in views:
+                raise ValueError(f"View '{old_name}' does not exist")
+            if old_name not in state.get("all_views", []):
+                raise ValueError(f"View '{old_name}' is missing from state.json")
+            if new_name in views and new_name != old_name:
+                raise ValueError(f"View '{new_name}' already exists")
+
+            view_data = views.pop(old_name)
+            view_data["name"] = new_name
+            views[new_name] = view_data
+
+            idx = state["all_views"].index(old_name)
+            state["all_views"][idx] = new_name
+            if state.get("initial_view") == old_name:
+                state["initial_view"] = new_name
+
+            # Updating view.json and state.json at the same time to avoid stale values in either files
+            self.views = views
+            self.state = state
+
+    def reorder_views(self, order: list[str]):
+        """Set the order of views in state.json all_views."""
+        state = self.state
+        existing = state["all_views"]
+        valid_views = list[str](self.views.keys())
+        # Performing type, length, duplication and source of truth checks
+        if (
+            not isinstance(order, list)
+            or len(order) != len(existing)
+            or len(set[str](order)) != len(order) 
+            or set[str](order) != set[str](existing)
+            or set[str](order) != set[str](valid_views)
+        ):
+            raise ValueError("Reorder list must contain exactly the same view names")
+        state["all_views"] = order
+        self.state = state
+
+    def set_gallery_default(self, show: bool):
+        """Set whether the gallery view should open by default when the project loads."""
+        state = self.state
+        state["show_gallery_on_open"] = show
+        self.state = state
+
     def convert_data_to_binary(self, outdir=None):
         if not outdir:
             outdir = self.dir
