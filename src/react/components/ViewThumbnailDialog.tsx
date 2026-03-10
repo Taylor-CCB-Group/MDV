@@ -1,15 +1,10 @@
 import {
     Box,
     Button,
-    Card,
-    CardActionArea,
-    Checkbox,
-    Chip,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
-    Divider,
     FormControlLabel,
     IconButton,
     TextField,
@@ -17,25 +12,24 @@ import {
     Grid2,
     CircularProgress,
     InputAdornment,
+    Checkbox,
 } from "@mui/material";
-import {
-    Check as CheckIcon,
-    Clear as ClearIcon,
-    Close as CloseIcon,
-} from "@mui/icons-material";
-import {
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-    type Dispatch,
-    type SetStateAction,
-} from "react";
+import { Clear as ClearIcon, Close as CloseIcon } from "@mui/icons-material";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from "@dnd-kit/core";
+import { arrayMove, SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { stringContainsAll } from "@/lib/utils";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { useChartManager } from "../hooks";
-import ViewImageComponent from "./ViewImageComponent";
+import { ViewGalleryCard } from "./ViewGalleryCard";
 
 export type ViewThumbnailDialogProps = {
     open: boolean;
@@ -62,9 +56,6 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const [renameError, setRenameError] = useState<string>("");
     const [renameSaving, setRenameSaving] = useState(false);
 
-    // Drag-and-drop state
-    const dragIndexRef = useRef<number | null>(null);
-    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [orderChanged, setOrderChanged] = useState(false);
     const [savingOrder, setSavingOrder] = useState(false);
 
@@ -74,9 +65,11 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     );
 
     const isFilterActive = filterText.trim() !== "";
+    const canReorder = isEditMode && !isFilterActive;
 
     const getViewList = useCallback(async () => {
         setLoading(true);
+        // Fetch the view list
         const list = await viewManager.getViewDetails();
         setViewList(list);
         setFilteredViewList(list);
@@ -84,6 +77,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     }, [viewManager]);
 
     useEffect(() => {
+        // When dialog opens, refresh the list and reset edit/drag state.
         if (viewManager && open) {
             getViewList();
             setOrderChanged(false);
@@ -96,12 +90,14 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         setOpen(false);
     };
 
+    // Switch to the selected view. Ignore click if user is in the middle of renaming.
     const handleCardClick = async (name: string) => {
         if (renaming !== null) return;
         viewManager.checkAndChangeView(name);
         onClose();
     };
 
+    // Filter views by searched text
     const onInputChange = (inputText: string) => {
         setFilterText(inputText);
         const input = inputText.toLowerCase().split(" ");
@@ -130,6 +126,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         setRenameError("");
     };
 
+    // Validate the input then update both viewList and filteredViewList.
     const commitRename = async () => {
         if (!renaming) return;
         const trimmed = renaming.value.trim();
@@ -138,22 +135,28 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
             return;
         }
         const oldName = filteredViewList[renaming.index].name;
+
+        // same name
         if (trimmed === oldName) {
             cancelRename();
             return;
         }
+
+        // name already exists
         if (viewList.some((v) => v.name === trimmed)) {
             setRenameError("A view with that name already exists");
             return;
         }
         setRenameSaving(true);
+
         try {
             await viewManager.renameView(oldName, trimmed);
-            // Update local lists
+            // Update the local states
             const updateEntry = (v: ViewEntry) =>
                 v.name === oldName ? { ...v, name: trimmed } : v;
             setViewList((prev) => prev.map(updateEntry));
             setFilteredViewList((prev) => prev.map(updateEntry));
+            // Reset the rename states
             setRenaming(null);
             setRenameError("");
         } catch {
@@ -163,46 +166,28 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         }
     };
 
-    // ── Drag-and-drop helpers ───────────────────────────────────────────────────
+    // Only start a drag after the pointer moves 8px; avoids triggering drag on image click.
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    );
 
-    const handleDragStart = (e: React.DragEvent, index: number) => {
-        dragIndexRef.current = index;
-        e.dataTransfer.effectAllowed = "move";
-    };
-
-    const handleDragOver = (e: React.DragEvent, index: number) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setDragOverIndex(index);
-    };
-
-    const handleDragLeave = () => {
-        setDragOverIndex(null);
-    };
-
-    const handleDrop = (e: React.DragEvent, targetIndex: number) => {
-        e.preventDefault();
-        setDragOverIndex(null);
-        const srcIndex = dragIndexRef.current;
-        if (srcIndex === null || srcIndex === targetIndex) return;
-
-        const reordered = [...filteredViewList];
-        const [moved] = reordered.splice(srcIndex, 1);
-        reordered.splice(targetIndex, 0, moved);
-        setFilteredViewList(reordered);
-
-        if (!isFilterActive) {
+    // On drop: resolve indices by view name (id), reorder with arrayMove, update both lists and mark order changed.
+    const handleDragEnd = useCallback(
+        (event: DragEndEvent) => {
+            const { active, over } = event;
+            if (!over || active.id === over.id || !canReorder) return;
+            const oldIndex = filteredViewList.findIndex((v) => v.name === active.id);
+            const newIndex = filteredViewList.findIndex((v) => v.name === over.id);
+            if (oldIndex === -1 || newIndex === -1) return;
+            const reordered = arrayMove(filteredViewList, oldIndex, newIndex);
+            setFilteredViewList(reordered);
             setViewList(reordered);
             setOrderChanged(true);
-        }
-        dragIndexRef.current = null;
-    };
+        },
+        [filteredViewList, canReorder],
+    );
 
-    const handleDragEnd = () => {
-        dragIndexRef.current = null;
-        setDragOverIndex(null);
-    };
-
+    // Persist the current order to the backend. Uses full viewList so order is always complete.
     const handleSaveOrder = async () => {
         setSavingOrder(true);
         try {
@@ -213,6 +198,11 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         } finally {
             setSavingOrder(false);
         }
+    };
+
+    const handleResetOrder = async () => {
+        await getViewList();
+        setOrderChanged(false);
     };
 
     // ── Gallery default checkbox ────────────────────────────────────────────────
@@ -226,6 +216,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         }
     };
 
+    // todo: need a way to reset the order
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
             <DialogTitle>
@@ -288,13 +279,13 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
 
                             {isEditMode && (
                                 <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ mb: 2, display: "block" }}
+                                    variant="body1"
+                                    color="textDisabled"
+                                    sx={{ mb: 3, display: "flex", justifyContent: "center" }}
                                 >
-                                    {isFilterActive
-                                        ? "Clear the filter to reorder views. Double-click a name to rename."
-                                        : "Drag cards to reorder views. Double-click a name to rename."}
+                                    {canReorder
+                                        ? "Drag cards to reorder views. Double-click a name to rename."
+                                        : "Clear the filter to reorder views. Double-click a name to rename."}
                                 </Typography>
                             )}
 
@@ -310,186 +301,44 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                     <Typography variant="h6">No views found</Typography>
                                 </Box>
                             ) : (
-                                <Grid2 container spacing={4}>
-                                    {filteredViewList.map((view, index) => {
-                                        const isRenaming =
-                                            renaming !== null && renaming.index === index;
-                                        const isDragTarget = dragOverIndex === index;
-
-                                        return (
-                                            <Grid2
-                                                key={`${view.name}-${index}`}
-                                                size={{ md: 4, sm: 6 }}
-                                                draggable={isEditMode && !isFilterActive}
-                                                onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
-                                                    if (isEditMode && !isFilterActive) handleDragStart(e, index);
-                                                }}
-                                                onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
-                                                    if (isEditMode && !isFilterActive) handleDragOver(e, index);
-                                                }}
-                                                onDragLeave={() => {
-                                                    if (isEditMode) handleDragLeave();
-                                                }}
-                                                onDrop={(e: React.DragEvent<HTMLDivElement>) => {
-                                                    if (isEditMode && !isFilterActive) handleDrop(e, index);
-                                                }}
-                                                onDragEnd={() => {
-                                                    if (isEditMode) handleDragEnd();
-                                                }}
-                                                sx={{
-                                                    opacity: isDragTarget ? 0.5 : 1,
-                                                    cursor: isEditMode && !isFilterActive ? "grab" : "default",
-                                                    transition: "opacity 0.15s",
-                                                }}
-                                            >
-                                                <Card
-                                                    sx={{
-                                                        boxShadow: isDragTarget ? 8 : 20,
-                                                        bgcolor: "inherit",
-                                                        outline: isDragTarget
-                                                            ? "2px dashed"
-                                                            : "none",
-                                                        outlineColor: isDragTarget
-                                                            ? "primary.main"
-                                                            : "transparent",
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <SortableContext
+                                        items={filteredViewList.map((v) => v.name)}
+                                        strategy={rectSortingStrategy}
+                                        disabled={!canReorder}
+                                    >
+                                        <Grid2 container spacing={4}>
+                                            {filteredViewList.map((view, index) => (
+                                                <ViewGalleryCard
+                                                    key={view.name}
+                                                    view={view}
+                                                    index={index}
+                                                    isEditMode={isEditMode}
+                                                    canReorder={canReorder}
+                                                    isRenaming={renaming !== null && renaming.index === index}
+                                                    renameValue={renaming?.index === index ? renaming.value : ""}
+                                                    renameError={renameError}
+                                                    renameSaving={renameSaving}
+                                                    onCardClick={handleCardClick}
+                                                    onStartRename={startRename}
+                                                    onRenameChange={(value) =>
+                                                        setRenaming((r) => (r ? { ...r, value } : null))
+                                                    }
+                                                    onRenameKeyDown={(e) => {
+                                                        if (e.key === "Enter") commitRename();
+                                                        if (e.key === "Escape") cancelRename();
                                                     }}
-                                                >
-                                                    <CardActionArea
-                                                        onClick={() =>
-                                                            !isRenaming &&
-                                                            handleCardClick(view.name)
-                                                        }
-                                                        sx={{
-                                                            cursor: isRenaming
-                                                                ? "default"
-                                                                : "pointer",
-                                                        }}
-                                                    >
-                                                        <Box
-                                                            sx={{
-                                                                padding: "1%",
-                                                                bgcolor: "background.default",
-                                                                position: "relative",
-                                                            }}
-                                                        >
-                                                            {isEditMode && (
-                                                                <Chip
-                                                                    label={index + 1}
-                                                                    size="small"
-                                                                    sx={{
-                                                                        position: "absolute",
-                                                                        top: 8,
-                                                                        left: 8,
-                                                                        zIndex: 1,
-                                                                        fontWeight: "bold",
-                                                                        minWidth: 28,
-                                                                    }}
-                                                                />
-                                                            )}
-                                                            <ViewImageComponent
-                                                                imgSrc={view.image}
-                                                                viewName={view.name}
-                                                            />
-                                                        </Box>
-                                                        <Divider />
-                                                        <Box
-                                                            sx={{
-                                                                display: "flex",
-                                                                justifyContent: "center",
-                                                                alignItems: "center",
-                                                                paddingY: "3%",
-                                                                paddingX: "4%",
-                                                                minHeight: 52,
-                                                            }}
-                                                            onClick={(e: React.MouseEvent) => {
-                                                                if (isEditMode) e.stopPropagation();
-                                                            }}
-                                                        >
-                                                            {isRenaming ? (
-                                                                <Box
-                                                                    sx={{
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        gap: 0.5,
-                                                                        width: "100%",
-                                                                    }}
-                                                                    onClick={(e: React.MouseEvent) =>
-                                                                        e.stopPropagation()
-                                                                    }
-                                                                >
-                                                                    <TextField
-                                                                        autoFocus
-                                                                        size="small"
-                                                                        value={renaming.value}
-                                                                        error={Boolean(renameError)}
-                                                                        helperText={renameError}
-                                                                        disabled={renameSaving}
-                                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                                                            setRenaming({
-                                                                                ...renaming,
-                                                                                value: e.target.value,
-                                                                            })
-                                                                        }
-                                                                        onKeyDown={(e: React.KeyboardEvent) => {
-                                                                            if (e.key === "Enter")
-                                                                                commitRename();
-                                                                            if (e.key === "Escape")
-                                                                                cancelRename();
-                                                                        }}
-                                                                        sx={{ flex: 1 }}
-                                                                    />
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        color="primary"
-                                                                        disabled={renameSaving}
-                                                                        onClick={(e: React.MouseEvent) => {
-                                                                            e.stopPropagation();
-                                                                            commitRename();
-                                                                        }}
-                                                                        title="Save name"
-                                                                    >
-                                                                        {renameSaving ? (
-                                                                            <CircularProgress
-                                                                                size={16}
-                                                                            />
-                                                                        ) : (
-                                                                            <CheckIcon fontSize="small" />
-                                                                        )}
-                                                                    </IconButton>
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        disabled={renameSaving}
-                                                                        onClick={(e: React.MouseEvent) => {
-                                                                            e.stopPropagation();
-                                                                            cancelRename();
-                                                                        }}
-                                                                        title="Cancel"
-                                                                    >
-                                                                        <ClearIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                </Box>
-                                                            ) : (
-                                                                <Typography
-                                                                    sx={{ fontWeight: "bold" }}
-                                                                    onDoubleClick={(e: React.MouseEvent) => {
-                                                                        if (isEditMode) startRename(e, index);
-                                                                    }}
-                                                                    title={
-                                                                        isEditMode
-                                                                            ? "Double-click to rename"
-                                                                            : undefined
-                                                                    }
-                                                                >
-                                                                    {view.name}
-                                                                </Typography>
-                                                            )}
-                                                        </Box>
-                                                    </CardActionArea>
-                                                </Card>
-                                            </Grid2>
-                                        );
-                                    })}
-                                </Grid2>
+                                                    onCommitRename={commitRename}
+                                                    onCancelRename={cancelRename}
+                                                />
+                                            ))}
+                                        </Grid2>
+                                    </SortableContext>
+                                </DndContext>
                             )}
 
                             {isEditMode && (
@@ -513,20 +362,25 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                 </ErrorBoundary>
             </DialogContent>
             <DialogActions>
-                {isEditMode && orderChanged && !isFilterActive && (
-                    <Button
-                        onClick={handleSaveOrder}
-                        color="primary"
-                        variant="contained"
-                        disabled={savingOrder}
-                        sx={{ mr: "auto", ml: 2 }}
-                    >
-                        {savingOrder ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}
-                        Save Order
-                    </Button>
+                {orderChanged && canReorder && (
+                    <Box sx={{ display: "flex", justifyContent: "flex-start", mr: "auto" }}>
+                        <Button
+                            onClick={handleSaveOrder}
+                            color="primary"
+                            variant="contained"
+                            disabled={savingOrder}
+                            sx={{ ml: 2 }}
+                        >
+                            {savingOrder ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}
+                            Save Order
+                        </Button>
+                        <Button color="error" sx={{ ml: 1 }} onClick={handleResetOrder}>
+                            Reset
+                        </Button>
+                    </Box>
                 )}
-                <Button onClick={onClose} color="primary" sx={{ mr: 2 }}>
-                    Cancel
+                <Button onClick={onClose} color="error" sx={{ mr: 2 }}>
+                    Close
                 </Button>
             </DialogActions>
         </Dialog>
