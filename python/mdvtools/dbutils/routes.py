@@ -61,7 +61,7 @@ def register_routes(app, ENABLE_AUTH):
                 abort(404)
             return send_file(path, mimetype="image/png")
 
-        logger.info("Route registered: /logo")
+        logger.info("Route registered: /secondary_logo")
 
         @app.route('/extension_config', methods=['GET'])
         def extension_config():
