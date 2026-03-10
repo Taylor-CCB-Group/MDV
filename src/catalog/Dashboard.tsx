@@ -78,6 +78,7 @@ const Dashboard: React.FC = () => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [open, setOpen] = useState(false);
     const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+    const [customLogoVisible, setCustomLogoVisible] = useState(true);
     const theme = useTheme();
 
     const isLoading = projectsLoading || permissionsLoading;
@@ -153,6 +154,17 @@ const Dashboard: React.FC = () => {
                             }}
                             alt="MDV Projects Logo"
                             src={mdvLogo}
+                        />
+                        <Box
+                            component="img"
+                            sx={{
+                                height: 40,
+                                ml: 1,
+                                display: customLogoVisible ? "block" : "none",
+                            }}
+                            alt="Custom deployment logo"
+                            src="secondary_logo"
+                            onError={() => setCustomLogoVisible(false)}
                         />
                         <Box sx={{ flexGrow: 1 }} />
                         <Paper
