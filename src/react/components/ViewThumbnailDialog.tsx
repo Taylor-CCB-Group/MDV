@@ -64,6 +64,8 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const [galleryDefault, setGalleryDefault] = useState<boolean>(
         Boolean(config.show_gallery_on_open),
     );
+    // keep track of saving galleryDefault request and avoid overlapping requests
+    const [savingGalleryDefault, setSavingGalleryDefault] = useState(false);
 
     const isFilterActive = filterText.trim() !== "";
     const canReorder = isEditMode && !isFilterActive;
@@ -209,14 +211,16 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     };
 
     // ── Gallery default checkbox ────────────────────────────────────────────────
-
+    // Update UI only after API succeeds and block toggles
     const handleGalleryDefaultChange = async (checked: boolean) => {
-        setGalleryDefault(checked);
+        setSavingGalleryDefault(true);
         try {
             await viewManager.setGalleryDefault(checked);
+            setGalleryDefault(checked);
         } catch {
             console.error("Failed to change gallery default");
-            setGalleryDefault(!checked);
+        } finally {
+            setSavingGalleryDefault(false);
         }
     };
 
@@ -343,6 +347,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                         control={
                                             <Checkbox
                                                 checked={galleryDefault}
+                                                disabled={savingGalleryDefault}
                                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                                                     handleGalleryDefaultChange(e.target.checked)
                                                 }
