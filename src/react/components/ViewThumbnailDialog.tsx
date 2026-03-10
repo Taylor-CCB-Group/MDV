@@ -320,7 +320,11 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                                     }
                                                     onRenameKeyDown={(e) => {
                                                         if (e.key === "Enter") commitRename();
-                                                        if (e.key === "Escape") cancelRename();
+                                                        if (e.key === "Escape") {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            cancelRename();
+                                                        }
                                                     }}
                                                     onCommitRename={commitRename}
                                                     onCancelRename={cancelRename}

@@ -141,6 +141,7 @@ export function ViewGalleryCard({
                                     e.stopPropagation();
                                     onCommitRename();
                                 }}
+                                aria-label="Save name"
                                 title="Save name"
                             >
                                 {renameSaving ? (
@@ -156,6 +157,7 @@ export function ViewGalleryCard({
                                     e.stopPropagation();
                                     onCancelRename();
                                 }}
+                                aria-label="Cancel rename"
                                 title="Cancel"
                             >
                                 <ClearIcon fontSize="small" color="error" />
@@ -163,9 +165,19 @@ export function ViewGalleryCard({
                         </Box>
                     ) : (
                         <Typography
+                            component={"span"}
                             sx={{ fontWeight: "bold" }}
                             onDoubleClick={(e) => isEditMode && onStartRename(e, index)}
                             title={isEditMode ? "Double-click to rename" : undefined}
+                            tabIndex={isEditMode ? 0 : undefined} // make label focusable
+                            role={isEditMode ? "button" : undefined}
+                            onKeyDown={(e) => {
+                                if (!isEditMode) return;
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    onStartRename(e as unknown as React.MouseEvent, index);
+                                }
+                            }}
                         >
                             {view.name}
                         </Typography>
