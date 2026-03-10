@@ -30,6 +30,7 @@ import { stringContainsAll } from "@/lib/utils";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { useChartManager } from "../hooks";
 import { ViewGalleryCard } from "./ViewGalleryCard";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
 export type ViewThumbnailDialogProps = {
     open: boolean;
@@ -212,27 +213,16 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         try {
             await viewManager.setGalleryDefault(checked);
         } catch {
+            console.error("Failed to change gallery default");
             setGalleryDefault(!checked);
         }
     };
 
-    // todo: need a way to reset the order
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
             <DialogTitle>
                 Browse View Gallery
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
-                        color: (theme: any) => theme.palette.grey[500],
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
+                <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
             <DialogContent dividers sx={{ height: "95vh" }}>
                 <ErrorBoundary
