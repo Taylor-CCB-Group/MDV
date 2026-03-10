@@ -39,7 +39,7 @@ export type ViewThumbnailDialogProps = {
 
 type ViewEntry = { name: string; image: string };
 
-type RenameState = { index: number; value: string } | null;
+type RenameState = { name: string; value: string } | null;
 
 const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const cm = useChartManager();
@@ -88,6 +88,8 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     }, [viewManager, getViewList, open]);
 
     const onClose = () => {
+        cancelRename();
+        setFilterText("");
         setOpen(false);
     };
 
@@ -100,6 +102,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
 
     // Filter views by searched text
     const onInputChange = (inputText: string) => {
+        setRenaming(null);
         setFilterText(inputText);
         const input = inputText.toLowerCase().split(" ");
         const tempList = viewList.filter((view) => {
@@ -116,9 +119,9 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
 
     // ── Rename helpers ──────────────────────────────────────────────────────────
 
-    const startRename = (e: React.MouseEvent, index: number) => {
+    const startRename = (e: React.MouseEvent, viewName: string) => {
         e.stopPropagation();
-        setRenaming({ index, value: filteredViewList[index].name });
+        setRenaming({ name: viewName, value: viewName });
         setRenameError("");
     };
 
@@ -135,7 +138,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
             setRenameError("Name cannot be empty");
             return;
         }
-        const oldName = filteredViewList[renaming.index].name;
+        const oldName = renaming.name;
 
         // same name
         if (trimmed === oldName) {
@@ -309,8 +312,8 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                                     index={index}
                                                     isEditMode={isEditMode}
                                                     canReorder={canReorder}
-                                                    isRenaming={renaming !== null && renaming.index === index}
-                                                    renameValue={renaming?.index === index ? renaming.value : ""}
+                                                    isRenaming={renaming !== null && renaming.name === view.name}
+                                                    renameValue={renaming?.name === view.name ? renaming.value : ""}
                                                     renameError={renameError}
                                                     renameSaving={renameSaving}
                                                     onCardClick={handleCardClick}

@@ -27,7 +27,7 @@ export type ViewGalleryCardProps = {
     renameError: string;
     renameSaving: boolean;
     onCardClick: (name: string) => void;
-    onStartRename: (e: React.MouseEvent, index: number) => void;
+    onStartRename: (e: React.MouseEvent, viewName: string) => void;
     onRenameChange: (value: string) => void;
     onRenameKeyDown: (e: React.KeyboardEvent) => void;
     onCommitRename: () => void;
@@ -166,8 +166,8 @@ export function ViewGalleryCard({
                     ) : (
                         <Typography
                             component={"span"}
-                            sx={{ fontWeight: "bold" }}
-                            onDoubleClick={(e) => isEditMode && onStartRename(e, index)}
+                            sx={{ fontWeight: "bold", width: "100%", textAlign: "center" }}
+                            onDoubleClick={(e) => isEditMode && onStartRename(e, view.name)}
                             title={isEditMode ? "Double-click to rename" : undefined}
                             tabIndex={isEditMode ? 0 : undefined} // make label focusable
                             role={isEditMode ? "button" : undefined}
@@ -175,7 +175,7 @@ export function ViewGalleryCard({
                                 if (!isEditMode) return;
                                 if (e.key === "Enter") {
                                     e.preventDefault();
-                                    onStartRename(e as unknown as React.MouseEvent, index);
+                                    onStartRename(e as unknown as React.MouseEvent, view.name);
                                 }
                             }}
                         >
