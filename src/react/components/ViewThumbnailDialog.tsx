@@ -78,8 +78,9 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     }, [viewManager]);
 
     useEffect(() => {
-        // When dialog opens, refresh the list and reset edit/drag state.
+        // When dialog opens, refresh the list and reset edit/drag state
         if (viewManager && open) {
+            setFilterText("");
             getViewList();
             setOrderChanged(false);
             setRenaming(null);
@@ -88,8 +89,6 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     }, [viewManager, getViewList, open]);
 
     const onClose = () => {
-        cancelRename();
-        setFilterText("");
         setOpen(false);
     };
 
