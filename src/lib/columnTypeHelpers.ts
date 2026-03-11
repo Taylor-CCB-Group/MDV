@@ -107,3 +107,59 @@ export function allColumnsLoaded(columns: DataColumn<DataType>[]): columns is Lo
     return columns.every(isColumnLoaded);
 }
 
+export type NumericColumnData = Float32Array | Int32Array | Uint32Array;
+export type NumericArrayType = "float32" | "int32" | "uint32";
+export type SharedNumericColumnData = {
+    arrayType: NumericArrayType;
+    data: SharedArrayBuffer;
+    byteOffset: number;
+    length: number;
+};
+
+export function getNumericColumnData(column: DataColumn<NumberDataType>): NumericColumnData {
+    const { data, datatype, field } = column;
+    if (!data) {
+        throw new Error(`Expected numeric column ${field} to have loaded data.`);
+    }
+    if (datatype === "double" && data instanceof Float32Array) return data;
+    if (datatype === "int32" && data instanceof Int32Array) return data;
+    if (datatype === "integer" && data instanceof Uint32Array) return data;
+    throw new Error(`Unexpected data buffer for numeric column ${field}.`);
+}
+
+export function copyNumericColumnDataToSharedArray(
+    source: NumericColumnData,
+    target: SharedArrayBuffer,
+): NumericArrayType {
+    if (source instanceof Int32Array) {
+        new Int32Array(target).set(source);
+        return "int32";
+    }
+    if (source instanceof Uint32Array) {
+        new Uint32Array(target).set(source);
+        return "uint32";
+    }
+    new Float32Array(target).set(source);
+    return "float32";
+}
+
+export function getSharedNumericColumnData(source: NumericColumnData): SharedNumericColumnData {
+    const byteOffset = source.byteOffset;
+    const length = source.length;
+    if (source.buffer instanceof SharedArrayBuffer) {
+        return {
+            arrayType:
+                source instanceof Int32Array
+                    ? "int32"
+                    : source instanceof Uint32Array
+                      ? "uint32"
+                      : "float32",
+            data: source.buffer,
+            byteOffset,
+            length,
+        };
+    }
+    const data = new SharedArrayBuffer(source.byteLength);
+    const arrayType = copyNumericColumnDataToSharedArray(source, data);
+    return { arrayType, data, byteOffset: 0, length };
+}
