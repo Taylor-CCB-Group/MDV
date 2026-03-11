@@ -1,13 +1,17 @@
 import type { ColumnName } from "@/charts/charts";
-import type { DataModel } from "@/table/DataModel";
+import type DataStore from "@/datastore/DataStore";
+import { DataModel } from "@/table/DataModel";
 
 /**
  * Create a ReadableStream that will provide data incrementally from the rows and columns
  * selected in the dataModel.
+ * @param includeIndex - prepend index column if true, else ignore it
  */
 export async function getExportCsvStream(
     dataModel: DataModel,
-    delimiter = "\t", newline = "\n"
+    delimiter = "\t",
+    newline = "\n",
+    includeIndex = true
 ) {
     const columns: ColumnName[] = dataModel.columns;
     const dataStore = dataModel.dataStore;
@@ -21,14 +25,16 @@ export async function getExportCsvStream(
         async start(controller) {
             try {
                 // Write the headers first
-                const header = ["index", ...columns].join(delimiter) + newline;
+                const header = (includeIndex ? ["index", ...columns] : columns).join(delimiter) + newline;
                 controller.enqueue(encoder.encode(header)); // Add header to stream
 
                 // Write each row of data incrementally
                 for (let i = 0; i < len; i++) {
                     const index = indexes[i];
                     const o = dataStore.getRowAsObject(index, columns);
-                    const line = [i.toString()].concat(columns.map((x) => o[x].toString())).join(delimiter) + newline;
+                    const rowValues = columns.map((x) => o[x].toString());
+                    // prepend index column if includeIndex is true
+                    const line = (includeIndex ? [i.toString(), ...rowValues] : rowValues).join(delimiter) + newline;
 
                     // Enqueue each encoded line to the stream
                     controller.enqueue(encoder.encode(line));
@@ -51,4 +57,26 @@ export async function getExportCsvStream(
     });
 
     return stream; // Return the ReadableStream
+}
+
+export type TableExportOptions = {
+    includeIndex?: boolean;
+    delimiter?: string;
+    newline?: string;
+};
+
+/**
+ * Export table data as a blob. Creates a temporary DataModel and uses includeIndex to include index column.
+ */
+export async function getTableExportBlob(
+    dataStore: DataStore,
+    columns: string[],
+    options: TableExportOptions = {}
+): Promise<Blob> {
+    const { includeIndex = true, delimiter = "\t", newline = "\n" } = options;
+    const dataModel = new DataModel(dataStore, { autoupdate: false });
+    dataModel.setColumns(columns);
+    const stream = await getExportCsvStream(dataModel, delimiter, newline, includeIndex);
+    const response = new Response(stream);
+    return response.blob();
 }
