@@ -22,13 +22,18 @@ import {
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from "lucide-react";
-import HistogramWidget, { type HistogramLayer } from "./HistogramWidget";
+import HistogramWidget, {
+    type HistogramLayer,
+    type HistogramScaleType,
+} from "./HistogramWidget";
 import { useDebounce } from "use-debounce";
 
 type Range = [number, number];
+type ScaleMode = "auto" | HistogramScaleType;
 const HISTOGRAM_BINS = 80;
 const HISTOGRAM_WIDTH = 240;
 const HISTOGRAM_HEIGHT = 48;
+const SCALE_MODE_ORDER: ScaleMode[] = ["auto", "linear", "log"];
 
 export default function MainVivColorDialog({
     vivStores,
@@ -163,6 +168,30 @@ const clampRange = (range: Range, domain: Range): Range => [
 const sortRange = ([start, end]: Range): Range =>
     start <= end ? [start, end] : [end, start];
 
+const nextScaleMode = (mode: ScaleMode): ScaleMode =>
+    SCALE_MODE_ORDER[(SCALE_MODE_ORDER.indexOf(mode) + 1) % SCALE_MODE_ORDER.length];
+
+const resolveAutoXScale = (domain: Range): HistogramScaleType => {
+    const [min, max] = domain;
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+        return "linear";
+    }
+    const shiftedMin = Math.min(Math.abs(min), Math.abs(max)) < 1e-9
+        ? 1e-9
+        : Math.max(1e-9, Math.min(Math.abs(min), Math.abs(max)));
+    const shiftedMax = Math.max(Math.abs(min), Math.abs(max), shiftedMin);
+    return shiftedMax / shiftedMin > 500 ? "log" : "linear";
+};
+
+const resolveAutoYScale = (histogram: number[]): HistogramScaleType => {
+    const nonZero = histogram.filter((value) => value > 0);
+    if (nonZero.length < 2) return "linear";
+    const min = Math.min(...nonZero);
+    const max = Math.max(...nonZero);
+    const mean = nonZero.reduce((sum, value) => sum + value, 0) / nonZero.length;
+    return max / min > 50 || max / Math.max(1, mean) > 10 ? "log" : "linear";
+};
+
 const buildHistogram = (
     values: ArrayLike<number>,
     domain: Range,
@@ -196,6 +225,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const rasterData = raster[index]?.data;
     const color = colors[index] ?? [37, 99, 235];
     const [liveValue, setLiveValue] = useState<Range | null>(limits);
+    const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
+    const [yScaleMode, setYScaleMode] = useState<ScaleMode>("auto");
 
     useEffect(() => {
         setLiveValue(limits);
@@ -223,12 +254,21 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         channelsStore.setState({ contrastLimits: nextContrastLimits });
     }, [channelsStore, debouncedValue, index, limits]);
 
+    const histogramData = useMemo(
+        () => buildHistogram(rasterData ?? [], domain, HISTOGRAM_BINS),
+        [domain, rasterData],
+    );
+
+    const resolvedXScale = useMemo(
+        () => (xScaleMode === "auto" ? resolveAutoXScale(domain) : xScaleMode),
+        [domain, xScaleMode],
+    );
+    const resolvedYScale = useMemo(
+        () => (yScaleMode === "auto" ? resolveAutoYScale(histogramData) : yScaleMode),
+        [histogramData, yScaleMode],
+    );
+
     const layers = useMemo<HistogramLayer[]>(() => {
-        const histogramData = buildHistogram(
-            rasterData ?? [],
-            domain,
-            HISTOGRAM_BINS,
-        );
         const maxCount = Math.max(1, ...histogramData);
         const highlightData = new Array(HISTOGRAM_BINS).fill(0);
         if (
@@ -249,21 +289,18 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                 id: `channel-${index}`,
                 data: histogramData,
                 color: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.55)`,
-                variant: "bars",
-                widthFactor: 0.9,
-                inset: 0.05,
-                radius: 0.2,
+                variant: "line",
             },
             {
                 id: `channel-${index}-pixel`,
                 data: highlightData,
-                color: "rgba(217, 119, 6, 0.95)",
+                color: "rgba(255, 255, 255, 0.95)",
                 variant: "markers",
                 widthFactor: 0.35,
                 hidden: highlightData.every((value) => value === 0),
             },
         ];
-    }, [color, domain, index, pixelValue, rasterData]);
+    }, [color, domain, histogramData, index, pixelValue]);
 
     if (!domains[index] || !contrastLimits[index] || isChannelLoading[index]) {
         return <div className="h-12 px-2 text-sm">Loading...</div>;
@@ -288,12 +325,41 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
     return (
         <div className="px-2">
+            <div className="mb-1 flex items-center justify-end gap-1 text-[10px]">
+                <button
+                    type="button"
+                    className="rounded border px-1.5 py-0.5"
+                    onClick={() => setXScaleMode((mode) => nextScaleMode(mode))}
+                >
+                    X:{xScaleMode === "auto" ? resolvedXScale : xScaleMode}
+                </button>
+                <button
+                    type="button"
+                    className="rounded border px-1.5 py-0.5"
+                    onClick={() => setYScaleMode((mode) => nextScaleMode(mode))}
+                >
+                    Y:{yScaleMode === "auto" ? resolvedYScale : yScaleMode}
+                </button>
+            </div>
             <HistogramWidget
                 layers={layers}
                 width={HISTOGRAM_WIDTH}
                 height={HISTOGRAM_HEIGHT}
                 bins={HISTOGRAM_BINS}
+                xScaleType={resolvedXScale}
+                yScaleType={resolvedYScale}
                 brush={brush}
+                markers={[
+                    {
+                        id: `pixel-value-${index}`,
+                        value: pixelValue,
+                        color: "rgba(255, 255, 255, 0.95)",
+                        hidden:
+                            !Number.isFinite(pixelValue) ||
+                            pixelValue < domain[0] ||
+                            pixelValue > domain[1],
+                    },
+                ]}
             />
         </div>
     );

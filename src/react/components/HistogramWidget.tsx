@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
 type Range = [number, number];
+export type HistogramScaleType = "linear" | "log";
 
 export type HistogramBrushConfig = {
     value: Range | null;
@@ -14,10 +15,17 @@ export type HistogramLayer = {
     id: string;
     data: number[];
     color: string;
-    variant?: "bars" | "markers";
+    variant?: "bars" | "markers" | "line";
     inset?: number;
     widthFactor?: number;
     radius?: number;
+    hidden?: boolean;
+};
+
+export type HistogramMarker = {
+    id: string;
+    value: number;
+    color: string;
     hidden?: boolean;
 };
 
@@ -26,16 +34,29 @@ type HistogramWidgetProps = {
     width: number;
     height: number;
     bins: number;
+    xScaleType?: HistogramScaleType;
+    yScaleType?: HistogramScaleType;
     brush?: HistogramBrushConfig;
+    markers?: HistogramMarker[];
     onVisibleOnce?: () => void;
     rootMargin?: string;
 };
+
+const createScale = (
+    scaleType: HistogramScaleType,
+    domain: Range,
+    range: Range,
+) =>
+    scaleType === "log"
+        ? d3.scaleSymlog().domain(domain).range(range)
+        : d3.scaleLinear().domain(domain).range(range);
 
 const useBrushX = (
     ref: React.RefObject<SVGSVGElement>,
     brushConfig: HistogramBrushConfig | undefined,
     histoWidth: number,
     histoHeight: number,
+    xScaleType: HistogramScaleType,
 ) => {
     const brushRef = useRef<ReturnType<typeof d3.brushX> | null>(null);
     const minMax = brushConfig?.minMax;
@@ -45,7 +66,7 @@ const useBrushX = (
         if (!ref.current || !minMax || !setValue) return;
 
         const svg = d3.select(ref.current);
-        const xScale = d3.scaleLinear().domain(minMax).range([0, histoWidth]);
+        const xScale = createScale(xScaleType, minMax, [0, histoWidth]);
         const brush = d3.brushX()
             .handleSize(1)
             .extent([[0, -2], [histoWidth, histoHeight + 2]])
@@ -65,18 +86,18 @@ const useBrushX = (
         const brushGroup = svg.append("g").attr("class", "brush").call(brush);
         brushGroup
             .selectAll(".selection")
-            .attr("fill", "rgba(37, 99, 235, 0.12)")
-            .attr("stroke", "rgba(37, 99, 235, 0.75)")
+            .attr("fill", "rgba(255, 255, 255, 0.08)")
+            .attr("stroke", "rgba(229, 231, 235, 0.95)")
             .attr("vector-effect", "non-scaling-stroke");
         brushGroup
             .selectAll(".handle")
-            .attr("fill", "rgba(37, 99, 235, 0.95)")
+            .attr("fill", "rgba(255, 255, 255, 0.95)")
             .attr("vector-effect", "non-scaling-stroke");
 
         return () => {
             svg.select(".brush").remove();
         };
-    }, [ref, histoWidth, histoHeight, minMax, setValue]);
+    }, [ref, histoWidth, histoHeight, minMax, setValue, xScaleType]);
 
     const [debouncedValue] = useDebounce(brushConfig?.value, 100, {
         equalityFn: (a, b) => {
@@ -89,7 +110,7 @@ const useBrushX = (
     const setBrushValue = useCallback((value: Range | null | undefined) => {
         if (!brushRef.current || !ref.current || !minMax) return;
         const svg = d3.select(ref.current);
-        const xScale = d3.scaleLinear().domain(minMax).range([0, histoWidth]);
+        const xScale = createScale(xScaleType, minMax, [0, histoWidth]);
 
         if (!value) {
             // @ts-ignore d3 brush typings are not worth fighting here
@@ -101,7 +122,7 @@ const useBrushX = (
         const x1 = xScale(end);
         // @ts-ignore d3 brush typings are not worth fighting here
         svg.select(".brush").call(brushRef.current.move, [x0, x1]);
-    }, [histoWidth, minMax, ref]);
+    }, [histoWidth, minMax, ref, xScaleType]);
 
     useEffect(() => {
         setBrushValue(debouncedValue);
@@ -113,12 +134,15 @@ export default function HistogramWidget({
     width,
     height,
     bins,
+    xScaleType = "linear",
+    yScaleType = "linear",
     brush,
+    markers = [],
     onVisibleOnce,
     rootMargin = "0px 0px 100px 0px",
 }: HistogramWidgetProps) {
     const ref = useRef<SVGSVGElement>(null);
-    useBrushX(ref, brush, width, height);
+    useBrushX(ref, brush, width, height, xScaleType);
 
     const padding = 2;
     const visibleLayers = useMemo(
@@ -126,8 +150,15 @@ export default function HistogramWidget({
         [layers],
     );
     const maxValue = Math.max(1, ...visibleLayers.flatMap((layer) => layer.data));
-    const yScale = (height - 2 * padding) / maxValue;
-    const barWidth = width / bins;
+    const xDomain = brush?.minMax ?? ([0, bins] as Range);
+    const xScale = useMemo(
+        () => createScale(xScaleType, xDomain, [0, width]),
+        [width, xDomain, xScaleType],
+    );
+    const yScale = useMemo(
+        () => createScale(yScaleType, [0, maxValue], [height - padding, padding]),
+        [height, maxValue, padding, yScaleType],
+    );
 
     const [hasTriggeredVisible, setHasTriggeredVisible] = useState(false);
     useEffect(() => {
@@ -142,13 +173,20 @@ export default function HistogramWidget({
     }, [onVisibleOnce, hasTriggeredVisible, rootMargin]);
 
     const createBars = useCallback((data: number[]) => data.map((count, index) => {
-        const barHeight = count * yScale;
+        const startValue =
+            xDomain[0] + ((xDomain[1] - xDomain[0]) * index) / bins;
+        const endValue =
+            xDomain[0] + ((xDomain[1] - xDomain[0]) * (index + 1)) / bins;
+        const x0 = xScale(startValue);
+        const x1 = xScale(endValue);
+        const y = yScale(count);
         return {
-            x: index * barWidth,
-            y: height - padding - barHeight,
-            height: barHeight,
+            x: Math.min(x0, x1),
+            y,
+            width: Math.max(0.5, Math.abs(x1 - x0)),
+            height: Math.max(0, height - padding - y),
         };
-    }), [barWidth, height, yScale]);
+    }), [bins, height, padding, xDomain, xScale, yScale]);
 
     return (
         <svg
@@ -167,30 +205,65 @@ export default function HistogramWidget({
                         return (
                             <line
                                 key={`${layer.id}-${index}`}
-                                x1={bar.x + barWidth / 2}
-                                x2={bar.x + barWidth / 2}
+                                x1={bar.x + bar.width / 2}
+                                x2={bar.x + bar.width / 2}
                                 y1={height - padding}
                                 y2={Math.max(padding, bar.y)}
                                 stroke={layer.color}
-                                strokeWidth={Math.max(1.2, barWidth * (layer.widthFactor ?? 0.35))}
+                                strokeWidth={Math.max(1.2, bar.width * (layer.widthFactor ?? 0.35))}
                                 strokeLinecap="round"
                                 vectorEffect="non-scaling-stroke"
                             />
                         );
                     });
                 }
+                if (layer.variant === "line") {
+                    const points = bars
+                        .map((bar, index) =>
+                            `${bar.x + bar.width / 2},${layer.data[index] === 0 ? height - padding : bar.y}`,
+                        )
+                        .join(" ");
+                    return (
+                        <polyline
+                            key={layer.id}
+                            points={points}
+                            fill="none"
+                            stroke={layer.color}
+                            strokeWidth={1.5}
+                            vectorEffect="non-scaling-stroke"
+                        />
+                    );
+                }
                 return bars.map((bar, index) => (
                     <rect
                         key={`${layer.id}-${index}`}
-                        x={bar.x + barWidth * (layer.inset ?? 0)}
+                        x={bar.x + bar.width * (layer.inset ?? 0)}
                         y={bar.y}
-                        width={Math.max(0.4, barWidth * (layer.widthFactor ?? 1))}
+                        width={Math.max(0.4, bar.width * (layer.widthFactor ?? 1))}
                         height={Math.max(0, bar.height)}
                         fill={layer.color}
                         rx={layer.radius ?? 0}
                     />
                 ));
             })}
+            {markers
+                .filter((marker) => !marker.hidden)
+                .map((marker) => {
+                    const x = xScale(marker.value);
+                    return (
+                        <line
+                            key={marker.id}
+                            x1={x}
+                            x2={x}
+                            y1={padding}
+                            y2={height - padding}
+                            stroke={marker.color}
+                            strokeWidth={1.5}
+                            strokeDasharray="2 2"
+                            vectorEffect="non-scaling-stroke"
+                        />
+                    );
+                })}
         </svg>
     );
 }

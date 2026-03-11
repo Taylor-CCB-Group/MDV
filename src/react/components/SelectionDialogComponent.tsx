@@ -41,7 +41,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { useHighlightedIndices } from "../selectionHooks";
-import HistogramWidget, { type HistogramLayer } from "./HistogramWidget";
+import HistogramWidget, {
+    type HistogramLayer,
+    type HistogramScaleType,
+} from "./HistogramWidget";
 import {
     getNumericColumnData,
     getSharedNumericColumnData,
@@ -430,6 +433,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
 type Range = [number, number];
+type ScaleMode = "auto" | HistogramScaleType;
 type set2d = (v: Range | null) => void; //nb, setting undefined can actually be problematic
 type RangeProps = ReturnType<typeof useRangeFilter> & {
     setValue: set2d,
@@ -438,10 +442,37 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     histoWidth: number, //number of bins
     histoHeight: number, //height of the histogram
 };
+const SCALE_MODE_ORDER: ScaleMode[] = ["auto", "linear", "log"];
+
+const nextScaleMode = (mode: ScaleMode): ScaleMode =>
+    SCALE_MODE_ORDER[(SCALE_MODE_ORDER.indexOf(mode) + 1) % SCALE_MODE_ORDER.length];
+
+const resolveAutoXScale = (domain: Range): HistogramScaleType => {
+    const [min, max] = domain;
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+        return "linear";
+    }
+    const shiftedMin = Math.min(Math.abs(min), Math.abs(max)) < 1e-9
+        ? 1e-9
+        : Math.max(1e-9, Math.min(Math.abs(min), Math.abs(max)));
+    const shiftedMax = Math.max(Math.abs(min), Math.abs(max), shiftedMin);
+    return shiftedMax / shiftedMin > 500 ? "log" : "linear";
+};
+
+const resolveAutoYScale = (histogram: number[]): HistogramScaleType => {
+    const nonZero = histogram.filter((value) => value > 0);
+    if (nonZero.length < 2) return "linear";
+    const min = Math.min(...nonZero);
+    const max = Math.max(...nonZero);
+    const mean = nonZero.reduce((sum, value) => sum + value, 0) / nonZero.length;
+    return max / min > 50 || max / Math.max(1, mean) > 10 ? "log" : "linear";
+};
 
 const Histogram = observer((props: RangeProps) => {
     const { overallHistogram, filteredHistogram, highlightedHistogram, overallHistogramError, queryHistogram } = props;
     const { histoWidth, histoHeight } = props;
+    const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
+    const [yScaleMode, setYScaleMode] = useState<ScaleMode>("auto");
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const overallColor = prefersDarkMode ? "rgba(255,255,255,0.35)" : "rgba(15,23,42,0.22)";
     const filteredColor = prefersDarkMode ? "rgba(96,165,250,0.8)" : "rgba(37,99,235,0.78)";
@@ -450,6 +481,14 @@ const Histogram = observer((props: RangeProps) => {
     const backgroundData = overallHistogram.length > 0 ? overallHistogram : emptyHistogram;
     const filteredData = filteredHistogram.length > 0 ? filteredHistogram : emptyHistogram;
     const highlightedData = highlightedHistogram.length > 0 ? highlightedHistogram : emptyHistogram;
+    const resolvedXScale = useMemo(
+        () => (xScaleMode === "auto" ? resolveAutoXScale(props.minMax) : xScaleMode),
+        [props.minMax, xScaleMode],
+    );
+    const resolvedYScale = useMemo(
+        () => (yScaleMode === "auto" ? resolveAutoYScale(backgroundData) : yScaleMode),
+        [backgroundData, yScaleMode],
+    );
     useEffect(() => {
         if (!overallHistogramError) return;
         console.error("Failed to query overall histogram", overallHistogramError);
@@ -489,11 +528,29 @@ const Histogram = observer((props: RangeProps) => {
     }, [queryHistogram]);
     return (
         <>
+        <div className="mb-1 flex items-center justify-end gap-1 text-[10px] opacity-75">
+            <button
+                type="button"
+                className="rounded border px-1.5 py-0.5"
+                onClick={() => setXScaleMode((mode) => nextScaleMode(mode))}
+            >
+                X:{xScaleMode === "auto" ? resolvedXScale : xScaleMode}
+            </button>
+            <button
+                type="button"
+                className="rounded border px-1.5 py-0.5"
+                onClick={() => setYScaleMode((mode) => nextScaleMode(mode))}
+            >
+                Y:{yScaleMode === "auto" ? resolvedYScale : yScaleMode}
+            </button>
+        </div>
         <HistogramWidget
             layers={layers}
             width={histoWidth}
             height={histoHeight}
             bins={HISTOGRAM_BINS}
+            xScaleType={resolvedXScale}
+            yScaleType={resolvedYScale}
             brush={brush}
             onVisibleOnce={handleVisibleOnce}
         />
