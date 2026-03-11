@@ -109,6 +109,9 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             );
             save.click();
             save.remove();
+        } catch (err) {
+            console.error("Failed to download table data: ", err);
+            alert("Failed to download table data");
         } finally {
             this.setDownloadIcon(false);
         }
