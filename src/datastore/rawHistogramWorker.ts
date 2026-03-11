@@ -20,7 +20,8 @@ self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
     const hist = new Array(bins).fill(0);
     const binWidth = (max - min) / bins;
     for (let i = 0; i < dataArray.length; i++) {
-        const bin = Math.floor((dataArray[i] - min) / binWidth);
+        const value = dataArray[i];
+        const bin = value === max ? bins - 1 : Math.floor((value - min) / binWidth);
         if (bin >= 0 && bin < bins) {
             hist[bin]++;
         }
