@@ -1,7 +1,6 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler, useSimplerFilteredIndices } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
-import { type AutocompleteRenderGetTagProps, createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
@@ -43,11 +42,44 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+import { useHighlightedIndices } from "../selectionHooks";
 
 
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
+const HISTOGRAM_BINS = 100;
+
+function createHistogram(
+    originalData: Float32Array | Int32Array,
+    min: number,
+    max: number,
+    bins: number,
+    indices?: ArrayLike<number>,
+) {
+    if (bins <= 0 || max <= min) return new Array(bins).fill(0);
+    const histogram = new Array(bins).fill(0);
+    const binWidth = (max - min) / bins;
+    const addValue = (value: number) => {
+        if (Number.isNaN(value)) return;
+        const bin = value === max ? bins - 1 : Math.floor((value - min) / binWidth);
+        if (bin >= 0 && bin < bins) {
+            histogram[bin]++;
+        }
+    };
+
+    if (indices) {
+        for (let i = 0; i < indices.length; i++) {
+            addValue(originalData[indices[i]]);
+        }
+        return histogram;
+    }
+
+    for (let i = 0; i < originalData.length; i++) {
+        addValue(originalData[i]);
+    }
+    return histogram;
+}
 
 type Props<K extends DataType> = {
     column: DataColumn<K>;
@@ -363,7 +395,10 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         filter.filter("filterRange", [column.field], { min, max }, true);
     }, [column, filter, debouncedValue]);
 
-    const [histogram, setHistogram] = useState<number[]>([]);
+    const [overallHistogram, setOverallHistogram] = useState<number[]>([]);
+    const filteredIndices = useSimplerFilteredIndices();
+    const highlightedIndices = useHighlightedIndices();
+    const numericData = column.data as Float32Array | Int32Array;
     // this could be a more general utility function - expect to extract soon
     const queryHistogram = useCallback(async () => {
         // waste of life trying to use Dimension class.
@@ -372,22 +407,44 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         // });
         const worker = new Worker(new URL("../../datastore/rawHistogramWorker.ts", import.meta.url));
         worker.onmessage = (event) => {
-            setHistogram(event.data);
+            setOverallHistogram(event.data);
             worker.terminate();
         };
         const isInt32 = column.datatype === "int32";
-        const originalData = column.data as Float32Array | Int32Array;
+        const originalData = numericData;
         const data = new SharedArrayBuffer(originalData.length * 4);
-        new Float32Array(data).set(originalData);
-        worker.postMessage({ data, min: column.minMax[0], max: column.minMax[1], bins: 100, isFloat: isInt32 });
-    }, [column]);
+        if (isInt32) {
+            new Int32Array(data).set(originalData as Int32Array);
+        } else {
+            new Float32Array(data).set(originalData as Float32Array);
+        }
+        worker.postMessage({ data, min: column.minMax[0], max: column.minMax[1], bins: HISTOGRAM_BINS, isInt32 });
+    }, [column, numericData]);
+
+    const filteredHistogram = useMemo(
+        () => createHistogram(numericData, column.minMax[0], column.minMax[1], HISTOGRAM_BINS, filteredIndices),
+        [numericData, column.minMax, filteredIndices],
+    );
+    const highlightedHistogram = useMemo(
+        () => createHistogram(numericData, column.minMax[0], column.minMax[1], HISTOGRAM_BINS, highlightedIndices),
+        [numericData, column.minMax, highlightedIndices],
+    );
 
     const [low, high] = value || column.minMax;
     const [min, max] = column.minMax;
     const lowFraction = (low - min) / (max - min);
     const highFraction = (high - min) / (max - min);
 
-    return { value, step, histogram, lowFraction, highFraction, queryHistogram };
+    return {
+        value,
+        step,
+        overallHistogram,
+        filteredHistogram,
+        highlightedHistogram,
+        lowFraction,
+        highFraction,
+        queryHistogram,
+    };
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
 type Range = [number, number];
@@ -491,21 +548,27 @@ const useBrushX = (
     }, [debouncedValue, setBrushValue]);
 };
 const Histogram = observer((props: RangeProps) => {
-    const { histogram: data, queryHistogram, value } = props;
+    const { overallHistogram, filteredHistogram, highlightedHistogram, queryHistogram } = props;
     const { histoWidth, histoHeight } = props;
     const ref = useRef<SVGSVGElement>(null);
     useBrushX(ref, props);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = histoWidth;
     const height = histoHeight;
-    const lineColor = prefersDarkMode ? '#fff' : '#000';
-    // Find max value for vertical scaling
-    const maxValue = Math.max(...data);
+    const overallColor = prefersDarkMode ? "rgba(255,255,255,0.35)" : "rgba(15,23,42,0.22)";
+    const filteredColor = prefersDarkMode ? "rgba(96,165,250,0.8)" : "rgba(37,99,235,0.78)";
+    const highlightColor = prefersDarkMode ? "rgba(251,191,36,0.95)" : "rgba(217,119,6,0.95)";
+    const emptyHistogram = useMemo(() => new Array(HISTOGRAM_BINS).fill(0), []);
+    const backgroundData = overallHistogram.length > 0 ? overallHistogram : emptyHistogram;
+    const filteredData = filteredHistogram.length > 0 ? filteredHistogram : emptyHistogram;
+    const highlightedData = highlightedHistogram.length > 0 ? highlightedHistogram : emptyHistogram;
+    const maxValue = Math.max(1, ...backgroundData, ...filteredData);
+    const maxHighlightedValue = Math.max(1, ...highlightedData);
 
-    // Define the padding and scaling factor
     const padding = 2;
-    const xStep = data.length / (width + 1); // Space between points
-    const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
+    const yScale = (height - 2 * padding) / maxValue;
+    const highlightHeightScale = Math.max(12, height * 0.18) / maxHighlightedValue;
+    const barWidth = width / HISTOGRAM_BINS;
 
     const [hasQueried, setHasQueried] = useState(false);
     useEffect(() => {
@@ -521,14 +584,22 @@ const Histogram = observer((props: RangeProps) => {
         return () => observer.disconnect();
     }, [queryHistogram, hasQueried]);
 
-    // Generate the points for the polyline
-    // ??? useMemo was wrong ????
-    const points = useMemo(() => data.map((value, index) => {
-        const x = index * xStep;
-        const y = height - padding - value * yScale;
-        return `${x},${y}`;
-    }).join(' '), [data, xStep, yScale, height]);
-    const v = value || props.minMax;
+    // biome-ignore lint/correctness/useExhaustiveDependencies: padding is used inside map function
+    const createBarData = useCallback((data: number[], scale: number) => data.map((count, index) => {
+        const barHeight = count * scale;
+        return {
+            x: index * barWidth,
+            y: height - padding - barHeight,
+            height: barHeight,
+        };
+    }), [barWidth, height, padding]);
+
+    const backgroundBars = useMemo(() => createBarData(backgroundData, yScale), [backgroundData, createBarData, yScale]);
+    const filteredBars = useMemo(() => createBarData(filteredData, yScale), [filteredData, createBarData, yScale]);
+    const highlightBars = useMemo(
+        () => createBarData(highlightedData, highlightHeightScale),
+        [highlightedData, createBarData, highlightHeightScale],
+    );
     return (
         <>
         <svg width={'100%'} height={height}
@@ -537,19 +608,62 @@ const Histogram = observer((props: RangeProps) => {
         ref={ref}
         cursor="move"
         >
-            {/* Background polyline (the simple line connecting data points) */}
-            <polyline
-                points={points}
-                fill="none"
-                stroke={lineColor}
-                strokeWidth="1.5"
-                // many thanks to ChatGPT for the following line (and the rest of the component
-                // but this would have been a real pain to figure out on my own)
-                vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
-            />
+            {backgroundBars.map((bar, index) => (
+                <rect
+                    // biome-ignore lint/suspicious/noArrayIndexKey: histogram bar index is invariant
+                    key={`overall-${index}`}
+                    x={bar.x}
+                    y={bar.y}
+                    width={Math.max(0.6, barWidth - 0.2)}
+                    height={Math.max(0, bar.height)}
+                    fill={overallColor}
+                    />
+                ))}
+            {filteredBars.map((bar, index) => (
+                <rect
+                    // biome-ignore lint/suspicious/noArrayIndexKey: histogram bar index is invariant
+                    key={`filtered-${index}`}
+                    x={bar.x + barWidth * 0.15}
+                    y={bar.y}
+                    width={Math.max(0.4, barWidth * 0.7)}
+                    height={Math.max(0, bar.height)}
+                    fill={filteredColor}
+                    rx={0.4}
+                    />
+                ))}
+            {highlightBars.map((bar, index) => {
+                if (highlightedData[index] === 0) return null;
+                return (
+                    <line
+                        // biome-ignore lint/suspicious/noArrayIndexKey: histogram bar index is invariant
+                        key={`highlight-${index}`}
+                        x1={bar.x + barWidth / 2}
+                        x2={bar.x + barWidth / 2}
+                        y1={height - padding}
+                        y2={Math.max(padding, bar.y)}
+                        stroke={highlightColor}
+                        strokeWidth={Math.max(1.2, barWidth * 0.35)}
+                        strokeLinecap="round"
+                        vectorEffect="non-scaling-stroke"
+                    />
+                );
+            })}
             {/* d3.brushX will add more elements as a side-effect, handled in hook */}
         </svg>
-        {/* <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p> */}
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-75">
+            <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: overallColor }} />
+                overall
+            </span>
+            <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: filteredColor }} />
+                filtered
+            </span>
+            <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: highlightColor }} />
+                highlighted
+            </span>
+        </div>
         </>
     );
 });
