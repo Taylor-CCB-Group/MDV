@@ -3,6 +3,22 @@ import type DataStore from "@/datastore/DataStore";
 import { DataModel } from "@/table/DataModel";
 
 /**
+ * Escape a field if it contains delimiter, newline or quote
+ * Wrap it in double quotes
+ */
+function escapeField(value: string, delimiter: string) {
+    if (
+        value.includes(delimiter) ||
+        value.includes("\n") ||
+        value.includes("\r") ||
+        value.includes('"')
+    ) {
+        return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+}
+
+/**
  * Create a ReadableStream that will provide data incrementally from the rows and columns
  * selected in the dataModel.
  * @param includeIndex - prepend index column if true, else ignore it
@@ -25,7 +41,11 @@ export async function getExportCsvStream(
         async start(controller) {
             try {
                 // Write the headers first
-                const header = (includeIndex ? ["index", ...columns] : columns).join(delimiter) + newline;
+                const headerParts = includeIndex ? ["index", ...columns] : columns;
+                // escape the header fields
+                const header = headerParts
+                    .map((name) => escapeField(String(name), delimiter))
+                    .join(delimiter) + newline;
                 controller.enqueue(encoder.encode(header)); // Add header to stream
 
                 // Write each row of data incrementally
@@ -33,8 +53,12 @@ export async function getExportCsvStream(
                     const index = indexes[i];
                     const o = dataStore.getRowAsObject(index, columns);
                     const rowValues = columns.map((x) => (o[x] ?? "").toString());
+                    const lineParts = includeIndex ? [index.toString(), ...rowValues] : rowValues
                     // prepend index column if includeIndex is true
-                    const line = (includeIndex ? [index.toString(), ...rowValues] : rowValues).join(delimiter) + newline;
+                    // escape the row fields
+                    const line = lineParts
+                        .map((val) => escapeField(val, delimiter))
+                        .join(delimiter) + newline;
 
                     // Enqueue each encoded line to the stream
                     controller.enqueue(encoder.encode(line));
