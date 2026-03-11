@@ -7,6 +7,7 @@ import { action } from "mobx";
 import type { SlickgridReactInstance } from "slickgrid-react";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
 import { createEl } from "@/utilities/ElementsTyped";
+import { DataModel } from "@/table/DataModel";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -98,7 +99,9 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         // Set the icon to spinner
         this.setDownloadIcon(true);
         try {
-            const blob = await getTableExportBlob(this.dataStore, columns, {
+            const dataModel = new DataModel(this.dataStore, { autoupdate: false });
+            dataModel.setColumns(columns);
+            const blob = await getTableExportBlob(dataModel, {
                 includeIndex: this.config.include_index ?? true,
             });
 

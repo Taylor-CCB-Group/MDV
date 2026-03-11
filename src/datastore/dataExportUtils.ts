@@ -1,6 +1,5 @@
 import type { ColumnName } from "@/charts/charts";
-import type DataStore from "@/datastore/DataStore";
-import { DataModel } from "@/table/DataModel";
+import type { DataModel } from "@/table/DataModel";
 
 /**
  * Escape a field if it contains delimiter, newline or quote
@@ -27,7 +26,7 @@ export async function getExportCsvStream(
     dataModel: DataModel,
     delimiter = "\t",
     newline = "\n",
-    includeIndex = true
+    includeIndex = true,
 ) {
     const columns: ColumnName[] = dataModel.columns;
     const dataStore = dataModel.dataStore;
@@ -94,15 +93,17 @@ export type TableExportOptions = {
  * Export table data as a blob. Creates a temporary DataModel and uses includeIndex to include index column.
  */
 export async function getTableExportBlob(
-    dataStore: DataStore,
-    columns: string[],
+    dataModel: DataModel,
     options: TableExportOptions = {}
 ): Promise<Blob> {
     // Default includeIndex to true to keep it consistent in all places
     const { includeIndex = true, delimiter = "\t", newline = "\n" } = options;
-    const dataModel = new DataModel(dataStore, { autoupdate: false });
-    dataModel.setColumns(columns);
-    const stream = await getExportCsvStream(dataModel, delimiter, newline, includeIndex);
+    const stream = await getExportCsvStream(
+        dataModel, 
+        delimiter, 
+        newline, 
+        includeIndex, 
+    );
     const response = new Response(stream);
     return response.blob();
 }
