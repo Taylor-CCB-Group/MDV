@@ -936,7 +936,7 @@ function useResetButton() {
         };
         ds.addListener(k, resetAll);
         return () => ds.removeListener(k);
-    }, [ds, id, conf.filters]);
+    }, [ds, id, conf.filters, conf.noClearFilters]);
 }
 
 const SelectionDialogComponent = () => {
