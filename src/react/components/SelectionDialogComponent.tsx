@@ -442,10 +442,15 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     histoWidth: number, //number of bins
     histoHeight: number, //height of the histogram
 };
-const SCALE_MODE_ORDER: ScaleMode[] = ["auto", "linear", "log"];
-
-const nextScaleMode = (mode: ScaleMode): ScaleMode =>
-    SCALE_MODE_ORDER[(SCALE_MODE_ORDER.indexOf(mode) + 1) % SCALE_MODE_ORDER.length];
+const toggleScaleMode = (
+    mode: ScaleMode,
+    resolvedMode: HistogramScaleType,
+): ScaleMode => {
+    if (mode === "auto") {
+        return resolvedMode === "log" ? "linear" : "log";
+    }
+    return mode === "log" ? "linear" : "log";
+};
 
 const resolveAutoXScale = (domain: Range): HistogramScaleType => {
     const [min, max] = domain;
@@ -528,22 +533,6 @@ const Histogram = observer((props: RangeProps) => {
     }, [queryHistogram]);
     return (
         <>
-        <div className="mb-1 flex items-center justify-end gap-1 text-[10px] opacity-75">
-            <button
-                type="button"
-                className="rounded border px-1.5 py-0.5"
-                onClick={() => setXScaleMode((mode) => nextScaleMode(mode))}
-            >
-                X:{xScaleMode === "auto" ? resolvedXScale : xScaleMode}
-            </button>
-            <button
-                type="button"
-                className="rounded border px-1.5 py-0.5"
-                onClick={() => setYScaleMode((mode) => nextScaleMode(mode))}
-            >
-                Y:{yScaleMode === "auto" ? resolvedYScale : yScaleMode}
-            </button>
-        </div>
         <HistogramWidget
             layers={layers}
             width={histoWidth}
@@ -552,6 +541,14 @@ const Histogram = observer((props: RangeProps) => {
             xScaleType={resolvedXScale}
             yScaleType={resolvedYScale}
             brush={brush}
+            scaleControls={{
+                xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
+                yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
+                onToggleX: () =>
+                    setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
+                onToggleY: () =>
+                    setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
+            }}
             onVisibleOnce={handleVisibleOnce}
         />
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-75">

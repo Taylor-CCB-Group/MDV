@@ -33,7 +33,15 @@ type ScaleMode = "auto" | HistogramScaleType;
 const HISTOGRAM_BINS = 80;
 const HISTOGRAM_WIDTH = 240;
 const HISTOGRAM_HEIGHT = 48;
-const SCALE_MODE_ORDER: ScaleMode[] = ["auto", "linear", "log"];
+const toggleScaleMode = (
+    mode: ScaleMode,
+    resolvedMode: HistogramScaleType,
+): ScaleMode => {
+    if (mode === "auto") {
+        return resolvedMode === "log" ? "linear" : "log";
+    }
+    return mode === "log" ? "linear" : "log";
+};
 
 export default function MainVivColorDialog({
     vivStores,
@@ -168,9 +176,6 @@ const clampRange = (range: Range, domain: Range): Range => [
 const sortRange = ([start, end]: Range): Range =>
     start <= end ? [start, end] : [end, start];
 
-const nextScaleMode = (mode: ScaleMode): ScaleMode =>
-    SCALE_MODE_ORDER[(SCALE_MODE_ORDER.indexOf(mode) + 1) % SCALE_MODE_ORDER.length];
-
 const resolveAutoXScale = (domain: Range): HistogramScaleType => {
     const [min, max] = domain;
     if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
@@ -196,18 +201,39 @@ const buildHistogram = (
     values: ArrayLike<number>,
     domain: Range,
     bins: number,
-): number[] => {
+    xScaleType: HistogramScaleType,
+): { counts: number[]; edges: number[] } => {
     const [min, max] = domain;
     if (values.length === 0) {
-        return new Array(bins).fill(0);
+        return {
+            counts: new Array(bins).fill(0),
+            edges: Array.from({ length: bins + 1 }, (_, index) =>
+                min + ((max - min) * index) / bins,
+            ),
+        };
     }
     const adjustedDomain: Range =
         min === max ? [min, min + 1] : [min, max];
-    const histogram = d3
-        .bin<number, number>()
-        .domain(adjustedDomain)
-        .thresholds(bins)(Array.from(values));
-    return histogram.map((bin) => bin.length);
+    const baseHistogram = d3.bin<number, number>().domain(adjustedDomain);
+    const histogram =
+        xScaleType === "log"
+            ? baseHistogram.thresholds(
+                  Array.from({ length: bins - 1 }, (_, index) => {
+                      const t = (index + 1) / bins;
+                      return d3
+                          .scaleSymlog()
+                          .domain(adjustedDomain)
+                          .range([0, 1])
+                          .invert(t);
+                  }),
+              )(Array.from(values))
+            : baseHistogram.thresholds(bins)(Array.from(values));
+    const counts = histogram.map((bin) => bin.length);
+    const edges = [
+        histogram[0]?.x0 ?? adjustedDomain[0],
+        ...histogram.map((bin) => bin.x1 ?? adjustedDomain[1]),
+    ];
+    return { counts, edges };
 };
 
 const ChannelHistogram = ({ index }: { index: number }) => {
@@ -254,22 +280,21 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         channelsStore.setState({ contrastLimits: nextContrastLimits });
     }, [channelsStore, debouncedValue, index, limits]);
 
-    const histogramData = useMemo(
-        () => buildHistogram(rasterData ?? [], domain, HISTOGRAM_BINS),
-        [domain, rasterData],
-    );
-
     const resolvedXScale = useMemo(
         () => (xScaleMode === "auto" ? resolveAutoXScale(domain) : xScaleMode),
         [domain, xScaleMode],
     );
+    const histogram = useMemo(
+        () => buildHistogram(rasterData ?? [], domain, HISTOGRAM_BINS, resolvedXScale),
+        [domain, rasterData, resolvedXScale],
+    );
     const resolvedYScale = useMemo(
-        () => (yScaleMode === "auto" ? resolveAutoYScale(histogramData) : yScaleMode),
-        [histogramData, yScaleMode],
+        () => (yScaleMode === "auto" ? resolveAutoYScale(histogram.counts) : yScaleMode),
+        [histogram.counts, yScaleMode],
     );
 
     const layers = useMemo<HistogramLayer[]>(() => {
-        const maxCount = Math.max(1, ...histogramData);
+        const maxCount = Math.max(1, ...histogram.counts);
         const highlightData = new Array(HISTOGRAM_BINS).fill(0);
         if (
             Number.isFinite(pixelValue) &&
@@ -277,17 +302,20 @@ const ChannelHistogram = ({ index }: { index: number }) => {
             pixelValue >= domain[0] &&
             pixelValue <= domain[1]
         ) {
-            const fraction = (pixelValue - domain[0]) / (domain[1] - domain[0]);
-            const highlightIndex = Math.min(
-                HISTOGRAM_BINS - 1,
-                Math.max(0, Math.floor(fraction * HISTOGRAM_BINS)),
+            const highlightIndex = Math.max(
+                0,
+                histogram.edges.findIndex((edge, i) =>
+                    i < histogram.edges.length - 1 &&
+                    pixelValue >= edge &&
+                    pixelValue <= histogram.edges[i + 1],
+                ),
             );
             highlightData[highlightIndex] = maxCount;
         }
         return [
             {
                 id: `channel-${index}`,
-                data: histogramData,
+                data: histogram.counts,
                 color: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.55)`,
                 variant: "line",
             },
@@ -300,7 +328,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                 hidden: highlightData.every((value) => value === 0),
             },
         ];
-    }, [color, domain, histogramData, index, pixelValue]);
+    }, [color, domain, histogram.counts, histogram.edges, index, pixelValue]);
 
     if (!domains[index] || !contrastLimits[index] || isChannelLoading[index]) {
         return <div className="h-12 px-2 text-sm">Loading...</div>;
@@ -325,30 +353,23 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
     return (
         <div className="px-2">
-            <div className="mb-1 flex items-center justify-end gap-1 text-[10px]">
-                <button
-                    type="button"
-                    className="rounded border px-1.5 py-0.5"
-                    onClick={() => setXScaleMode((mode) => nextScaleMode(mode))}
-                >
-                    X:{xScaleMode === "auto" ? resolvedXScale : xScaleMode}
-                </button>
-                <button
-                    type="button"
-                    className="rounded border px-1.5 py-0.5"
-                    onClick={() => setYScaleMode((mode) => nextScaleMode(mode))}
-                >
-                    Y:{yScaleMode === "auto" ? resolvedYScale : yScaleMode}
-                </button>
-            </div>
             <HistogramWidget
                 layers={layers}
                 width={HISTOGRAM_WIDTH}
                 height={HISTOGRAM_HEIGHT}
                 bins={HISTOGRAM_BINS}
+                binEdges={histogram.edges}
                 xScaleType={resolvedXScale}
                 yScaleType={resolvedYScale}
                 brush={brush}
+                scaleControls={{
+                    xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
+                    yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
+                    onToggleX: () =>
+                        setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
+                    onToggleY: () =>
+                        setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
+                }}
                 markers={[
                     {
                         id: `pixel-value-${index}`,
