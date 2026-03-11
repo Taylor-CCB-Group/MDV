@@ -34,7 +34,7 @@ export async function getExportCsvStream(
                     const o = dataStore.getRowAsObject(index, columns);
                     const rowValues = columns.map((x) => o[x].toString());
                     // prepend index column if includeIndex is true
-                    const line = (includeIndex ? [i.toString(), ...rowValues] : rowValues).join(delimiter) + newline;
+                    const line = (includeIndex ? [index.toString(), ...rowValues] : rowValues).join(delimiter) + newline;
 
                     // Enqueue each encoded line to the stream
                     controller.enqueue(encoder.encode(line));
@@ -73,7 +73,7 @@ export async function getTableExportBlob(
     columns: string[],
     options: TableExportOptions = {}
 ): Promise<Blob> {
-    const { includeIndex = true, delimiter = "\t", newline = "\n" } = options;
+    const { includeIndex = false, delimiter = "\t", newline = "\n" } = options;
     const dataModel = new DataModel(dataStore, { autoupdate: false });
     dataModel.setColumns(columns);
     const stream = await getExportCsvStream(dataModel, delimiter, newline, includeIndex);
