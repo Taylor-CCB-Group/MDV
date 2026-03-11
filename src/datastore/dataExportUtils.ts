@@ -32,7 +32,7 @@ export async function getExportCsvStream(
                 for (let i = 0; i < len; i++) {
                     const index = indexes[i];
                     const o = dataStore.getRowAsObject(index, columns);
-                    const rowValues = columns.map((x) => o[x].toString());
+                    const rowValues = columns.map((x) => (o[x] ?? "").toString());
                     // prepend index column if includeIndex is true
                     const line = (includeIndex ? [index.toString(), ...rowValues] : rowValues).join(delimiter) + newline;
 
@@ -48,7 +48,8 @@ export async function getExportCsvStream(
 
                 // Close the stream when finished
                 controller.close();
-                alert("Export complete");
+                // commenting this as this blocks the UI (coderabbit)
+                // alert("Export complete");
             } catch (err) {
                 console.error('Stream writing failed:', err);
                 controller.error(err); // Signal an error in the stream
