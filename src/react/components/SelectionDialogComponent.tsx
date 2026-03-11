@@ -14,7 +14,6 @@ import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
 import { useChart, useDataStore } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
-import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import * as d3 from 'd3';
@@ -43,6 +42,11 @@ import { CSS } from '@dnd-kit/utilities';
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { useHighlightedIndices } from "../selectionHooks";
+import {
+    getNumericColumnData,
+    getSharedNumericColumnData,
+    type NumericColumnData,
+} from "@/lib/columnTypeHelpers";
 
 
 
@@ -51,7 +55,7 @@ const checkedIcon = <CheckBoxIcon fontSize="small" />;
 const HISTOGRAM_BINS = 100;
 
 function createHistogram(
-    originalData: Float32Array | Int32Array,
+    originalData: NumericColumnData,
     min: number,
     max: number,
     bins: number,
@@ -362,12 +366,12 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
  * state with mobx in the config.filters object.
  */
 function useRangeFilter(column: DataColumn<NumberDataType>) {
-    const filter = useDimensionFilter(column) as RangeDimension;
+    const filter = useDimensionFilter(column);
     const conf = useConfig<SelectionDialogConfig>()
     //nb - we may want to allow value to be null, rather than defaulting to minMax
     //relates to e.g. clearBrush function
     // const value = (filters[column.field] || column.minMax) as [number, number];
-    const fVal = conf.filters[column.field] as RangeFilter | null;
+    const fVal = useFilterConfig(column);
     // if (!isArray(fVal)) throw new Error("Expected range filter to be an array");
     const value = fVal;
     // const value = fVal;
@@ -398,7 +402,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const [overallHistogram, setOverallHistogram] = useState<number[]>([]);
     const filteredIndices = useSimplerFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
-    const numericData = column.data as Float32Array | Int32Array;
+    const numericData = getNumericColumnData(column);
     // this could be a more general utility function - expect to extract soon
     const queryHistogram = useCallback(async () => {
         // waste of life trying to use Dimension class.
@@ -410,16 +414,17 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
             setOverallHistogram(event.data);
             worker.terminate();
         };
-        const isInt32 = column.datatype === "int32";
-        const originalData = numericData;
-        const data = new SharedArrayBuffer(originalData.length * 4);
-        if (isInt32) {
-            new Int32Array(data).set(originalData as Int32Array);
-        } else {
-            new Float32Array(data).set(originalData as Float32Array);
-        }
-        worker.postMessage({ data, min: column.minMax[0], max: column.minMax[1], bins: HISTOGRAM_BINS, isInt32 });
-    }, [column, numericData]);
+        const { data, arrayType, byteOffset, length } = getSharedNumericColumnData(numericData);
+        worker.postMessage({
+            data,
+            min: column.minMax[0],
+            max: column.minMax[1],
+            bins: HISTOGRAM_BINS,
+            arrayType,
+            byteOffset,
+            length,
+        });
+    }, [column.minMax, numericData]);
 
     const filteredHistogram = useMemo(
         () => createHistogram(numericData, column.minMax[0], column.minMax[1], HISTOGRAM_BINS, filteredIndices),
