@@ -2,6 +2,7 @@ import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamC
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import CachedIcon from '@mui/icons-material/Cached';
@@ -53,6 +54,50 @@ import {
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 const HISTOGRAM_BINS = 100;
+
+type WorkerHistogramInput = {
+    data: SharedArrayBuffer;
+    min: number;
+    max: number;
+    bins: number;
+    arrayType: "float32" | "int32" | "uint32";
+    byteOffset: number;
+    length: number;
+};
+
+function queryHistogramWorker(input: WorkerHistogramInput, signal?: AbortSignal) {
+    return new Promise<number[]>((resolve, reject) => {
+        const worker = new Worker(new URL("../../datastore/rawHistogramWorker.ts", import.meta.url));
+        let settled = false;
+
+        const finish = (callback: () => void) => {
+            if (settled) return;
+            settled = true;
+            worker.terminate();
+            callback();
+        };
+
+        const onAbort = () => {
+            finish(() => reject(new DOMException("Histogram query aborted", "AbortError")));
+        };
+
+        worker.onmessage = (event) => {
+            finish(() => resolve(event.data));
+        };
+
+        worker.onerror = (event) => {
+            finish(() => reject(event.error ?? new Error(event.message || "Histogram worker failed")));
+        };
+
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+            onAbort();
+            return;
+        }
+
+        worker.postMessage(input);
+    });
+}
 
 function createHistogram(
     originalData: NumericColumnData,
@@ -399,32 +444,38 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         filter.filter("filterRange", [column.field], { min, max }, true);
     }, [column, filter, debouncedValue]);
 
-    const [overallHistogram, setOverallHistogram] = useState<number[]>([]);
     const filteredIndices = useSimplerFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
     const numericData = getNumericColumnData(column);
-    // this could be a more general utility function - expect to extract soon
+    const overallHistogramQuery = useQuery<number[]>({
+        queryKey: [
+            "selection-dialog-overall-histogram",
+            column.field,
+            column.datatype,
+            column.minMax[0],
+            column.minMax[1],
+            numericData.length,
+        ],
+        queryFn: ({ signal }) => {
+            const { data, arrayType, byteOffset, length } = getSharedNumericColumnData(numericData);
+            return queryHistogramWorker({
+                data,
+                min: column.minMax[0],
+                max: column.minMax[1],
+                bins: HISTOGRAM_BINS,
+                arrayType,
+                byteOffset,
+                length,
+            }, signal);
+        },
+        enabled: false,
+        retry: false,
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+    const overallHistogram = overallHistogramQuery.data ?? [];
     const queryHistogram = useCallback(async () => {
-        // waste of life trying to use Dimension class.
-        // filter.getBinsAsync(column.name, { bins: 100 }).then((histogram) => {
-        //     setHistogram(histogram);
-        // });
-        const worker = new Worker(new URL("../../datastore/rawHistogramWorker.ts", import.meta.url));
-        worker.onmessage = (event) => {
-            setOverallHistogram(event.data);
-            worker.terminate();
-        };
-        const { data, arrayType, byteOffset, length } = getSharedNumericColumnData(numericData);
-        worker.postMessage({
-            data,
-            min: column.minMax[0],
-            max: column.minMax[1],
-            bins: HISTOGRAM_BINS,
-            arrayType,
-            byteOffset,
-            length,
-        });
-    }, [column.minMax, numericData]);
+        await overallHistogramQuery.refetch();
+    }, [overallHistogramQuery]);
 
     const filteredHistogram = useMemo(
         () => createHistogram(numericData, column.minMax[0], column.minMax[1], HISTOGRAM_BINS, filteredIndices),
@@ -446,6 +497,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         overallHistogram,
         filteredHistogram,
         highlightedHistogram,
+        overallHistogramError: overallHistogramQuery.error,
         lowFraction,
         highFraction,
         queryHistogram,
@@ -553,7 +605,7 @@ const useBrushX = (
     }, [debouncedValue, setBrushValue]);
 };
 const Histogram = observer((props: RangeProps) => {
-    const { overallHistogram, filteredHistogram, highlightedHistogram, queryHistogram } = props;
+    const { overallHistogram, filteredHistogram, highlightedHistogram, overallHistogramError, queryHistogram } = props;
     const { histoWidth, histoHeight } = props;
     const ref = useRef<SVGSVGElement>(null);
     useBrushX(ref, props);
@@ -588,6 +640,10 @@ const Histogram = observer((props: RangeProps) => {
         // queryHistogram();
         return () => observer.disconnect();
     }, [queryHistogram, hasQueried]);
+    useEffect(() => {
+        if (!overallHistogramError) return;
+        console.error("Failed to query overall histogram", overallHistogramError);
+    }, [overallHistogramError]);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: padding is used inside map function
     const createBarData = useCallback((data: number[], scale: number) => data.map((count, index) => {
