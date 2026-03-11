@@ -1,11 +1,12 @@
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
-import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
 import TableChartReactComponent from "./TableChartReactComponent";
 import { g } from "@/lib/utils";
 import { action } from "mobx";
 import type { SlickgridReactInstance } from "slickgrid-react";
+import { DataModel } from "@/table/DataModel";
+import { createEl } from "@/utilities/ElementsTyped";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -47,14 +48,70 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
 
 class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     gridRef?: { current: SlickgridReactInstance | null };
-    
+    private downloadIconSpan: HTMLSpanElement | null = null;
+
     constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
         // Adapt config before calling super constructor, which will make the config observable
         // This ensures all properties exist and are properly initialized before makeAutoObservable runs
         config = adaptConfig(config);
         super(dataStore, div, config, TableChartComponent);
 
-        // todo: Add download (like the legacy version) and other features
+        // Download data
+        this.downloadIconSpan = this.addMenuIcon("fas fa-download", "Download data", {
+            func: () => {
+                this.downloadData();
+            },
+        }) as HTMLSpanElement;
+    }
+
+    private setDownloadIcon(downloading: boolean) {
+        if (!this.downloadIconSpan) return;
+        const icon = this.downloadIconSpan.firstElementChild as HTMLElement | null;
+        if (!icon) return;
+        // Show spinner when downloading
+        if (downloading) {
+            icon.classList.remove("fa-download");
+            icon.classList.add("fa-spinner", "fa-spin");
+            this.downloadIconSpan.style.pointerEvents = "none";
+        } else {
+            icon.classList.remove("fa-spinner", "fa-spin");
+            icon.classList.add("fa-download");
+            this.downloadIconSpan.style.pointerEvents = "";
+        }
+    }
+
+    async downloadData() {
+        const param = this.config.param;
+        // If no columns are displayed, prompt an alert
+        if (!param || !Array.isArray(param) || param.length === 0) {
+            alert("Add columns to the table before downloading");
+            return;
+        }
+        
+        // Set the icon to spinner
+        this.setDownloadIcon(true);
+        try {
+            // Create a temporary data model
+            const dataModel = new DataModel(this.dataStore, { autoupdate: false });
+            dataModel.setColumns(param);
+            dataModel.updateModel();
+
+            const blob = await dataModel.getDataAsBlob();
+
+            const save = createEl(
+                "a",
+                {
+                    download: `${this.dataStore.name}.txt`,
+                    target: "_blank",
+                    href: window.URL.createObjectURL(blob),
+                },
+                document.body,
+            );
+            save.click();
+            save.remove();
+        } finally {
+            this.setDownloadIcon(false);
+        }
     }
 
     getConfig() {
