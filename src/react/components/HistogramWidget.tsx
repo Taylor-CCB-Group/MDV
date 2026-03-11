@@ -38,7 +38,6 @@ const useBrushX = (
     histoHeight: number,
 ) => {
     const brushRef = useRef<ReturnType<typeof d3.brushX> | null>(null);
-    const [initialValue] = useState(brushConfig?.value);
     const minMax = brushConfig?.minMax;
     const setValue = brushConfig?.setValue;
 
@@ -46,19 +45,16 @@ const useBrushX = (
         if (!ref.current || !minMax || !setValue) return;
 
         const svg = d3.select(ref.current);
+        const xScale = d3.scaleLinear().domain(minMax).range([0, histoWidth]);
         const brush = d3.brushX()
             .handleSize(1)
             .extent([[0, -2], [histoWidth, histoHeight + 2]])
             .on("brush end", (event) => {
                 if (!event.sourceEvent) return;
                 if (event.selection) {
-                    const [start, end] = event.selection.map((x: number) => {
-                        if (!ref.current) return 0;
-                        const { width } = ref.current.getBoundingClientRect();
-                        const r = width / histoWidth;
-                        const normalizedX = (r * x) / width;
-                        return minMax[0] + normalizedX * (minMax[1] - minMax[0]);
-                    });
+                    const [start, end] = event.selection.map((x: number) =>
+                        xScale.invert(x),
+                    );
                     setValue([start, end]);
                 } else {
                     setValue(null);
@@ -67,20 +63,20 @@ const useBrushX = (
 
         brushRef.current = brush;
         const brushGroup = svg.append("g").attr("class", "brush").call(brush);
-        if (initialValue) {
-            const [start, end] = initialValue.map(
-                (v) => ((v - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth,
-            );
-            brushGroup.call(brush.move, [start, end]);
-        }
-
-        brushGroup.selectAll(".selection").attr("vector-effect", "non-scaling-stroke");
-        brushGroup.selectAll(".handle").attr("vector-effect", "non-scaling-stroke");
+        brushGroup
+            .selectAll(".selection")
+            .attr("fill", "rgba(37, 99, 235, 0.12)")
+            .attr("stroke", "rgba(37, 99, 235, 0.75)")
+            .attr("vector-effect", "non-scaling-stroke");
+        brushGroup
+            .selectAll(".handle")
+            .attr("fill", "rgba(37, 99, 235, 0.95)")
+            .attr("vector-effect", "non-scaling-stroke");
 
         return () => {
             svg.select(".brush").remove();
         };
-    }, [ref, histoWidth, histoHeight, initialValue, minMax, setValue]);
+    }, [ref, histoWidth, histoHeight, minMax, setValue]);
 
     const [debouncedValue] = useDebounce(brushConfig?.value, 100, {
         equalityFn: (a, b) => {
@@ -93,6 +89,7 @@ const useBrushX = (
     const setBrushValue = useCallback((value: Range | null | undefined) => {
         if (!brushRef.current || !ref.current || !minMax) return;
         const svg = d3.select(ref.current);
+        const xScale = d3.scaleLinear().domain(minMax).range([0, histoWidth]);
 
         if (!value) {
             // @ts-ignore d3 brush typings are not worth fighting here
@@ -100,8 +97,8 @@ const useBrushX = (
             return;
         }
         const [start, end] = value;
-        const x0 = ((start - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth;
-        const x1 = ((end - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth;
+        const x0 = xScale(start);
+        const x1 = xScale(end);
         // @ts-ignore d3 brush typings are not worth fighting here
         svg.select(".brush").call(brushRef.current.move, [x0, x1]);
     }, [histoWidth, minMax, ref]);

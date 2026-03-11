@@ -1,11 +1,11 @@
-import { useId, useMemo } from "react";
+import * as d3 from "d3";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { shallow } from "zustand/shallow";
 import {
     type VivContextType,
     VivProvider,
     useChannelsStore,
     useChannelsStoreApi,
-    useImageSettingsStoreApi,
     useLoader,
     useMetadata,
     useViewerStore,
@@ -22,6 +22,13 @@ import {
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from "lucide-react";
+import HistogramWidget, { type HistogramLayer } from "./HistogramWidget";
+import { useDebounce } from "use-debounce";
+
+type Range = [number, number];
+const HISTOGRAM_BINS = 80;
+const HISTOGRAM_WIDTH = 240;
+const HISTOGRAM_HEIGHT = 48;
 
 export default function MainVivColorDialog({
     vivStores,
@@ -115,7 +122,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                             c: Number.parseInt(e.target.value),
                         };
                         setIsChannelLoading(index, true);
-                        const { domain: domains, contrastLimits } =
+                        const { domain: domains, contrastLimits, raster } =
                             await getSingleSelectionStats({
                                 loader,
                                 selection,
@@ -124,6 +131,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                         const newProps = {
                             domains,
                             contrastLimits, //, leaving out colors for now - keep existing color
+                            raster,
                         };
                         setPropertiesForChannel(index, newProps);
                         setIsChannelLoading(index, false);
@@ -144,6 +152,150 @@ const ChannelChooser = ({ index }: { index: number }) => {
                 ))}
             </select>
         </>
+    );
+};
+
+const clampRange = (range: Range, domain: Range): Range => [
+    Math.max(domain[0], Math.min(range[0], domain[1])),
+    Math.max(domain[0], Math.min(range[1], domain[1])),
+];
+
+const sortRange = ([start, end]: Range): Range =>
+    start <= end ? [start, end] : [end, start];
+
+const buildHistogram = (
+    values: ArrayLike<number>,
+    domain: Range,
+    bins: number,
+): number[] => {
+    const [min, max] = domain;
+    if (values.length === 0) {
+        return new Array(bins).fill(0);
+    }
+    const adjustedDomain: Range =
+        min === max ? [min, min + 1] : [min, max];
+    const histogram = d3
+        .bin<number, number>()
+        .domain(adjustedDomain)
+        .thresholds(bins)(Array.from(values));
+    return histogram.map((bin) => bin.length);
+};
+
+const ChannelHistogram = ({ index }: { index: number }) => {
+    const contrastLimits = useChannelsStore((state) => state.contrastLimits);
+    const { colors, domains, raster } = useChannelsStore(({ colors, domains, raster }) => ({
+        colors,
+        domains,
+        raster,
+    }));
+    const pixelValue = useViewerStore((state) => state.pixelValues[index]);
+    const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
+    const channelsStore = useChannelsStoreApi();
+    const domain = domains[index] ?? ([0, 1] as Range);
+    const limits = contrastLimits[index] ?? domain;
+    const rasterData = raster[index]?.data;
+    const color = colors[index] ?? [37, 99, 235];
+    const [liveValue, setLiveValue] = useState<Range | null>(limits);
+
+    useEffect(() => {
+        setLiveValue(limits);
+    }, [limits]);
+
+    const [debouncedValue] = useDebounce(liveValue, 10, {
+        equalityFn: (a, b) => {
+            if (!a && !b) return true;
+            if (!a || !b) return false;
+            return a[0] === b[0] && a[1] === b[1];
+        },
+    });
+
+    useEffect(() => {
+        if (!debouncedValue) return;
+        if (debouncedValue.some((value) => Number.isNaN(value))) return;
+        if (
+            debouncedValue[0] === limits[0] &&
+            debouncedValue[1] === limits[1]
+        ) {
+            return;
+        }
+        const nextContrastLimits = [...channelsStore.getState().contrastLimits];
+        nextContrastLimits[index] = debouncedValue;
+        channelsStore.setState({ contrastLimits: nextContrastLimits });
+    }, [channelsStore, debouncedValue, index, limits]);
+
+    const layers = useMemo<HistogramLayer[]>(() => {
+        const histogramData = buildHistogram(
+            rasterData ?? [],
+            domain,
+            HISTOGRAM_BINS,
+        );
+        const maxCount = Math.max(1, ...histogramData);
+        const highlightData = new Array(HISTOGRAM_BINS).fill(0);
+        if (
+            Number.isFinite(pixelValue) &&
+            domain[0] !== domain[1] &&
+            pixelValue >= domain[0] &&
+            pixelValue <= domain[1]
+        ) {
+            const fraction = (pixelValue - domain[0]) / (domain[1] - domain[0]);
+            const highlightIndex = Math.min(
+                HISTOGRAM_BINS - 1,
+                Math.max(0, Math.floor(fraction * HISTOGRAM_BINS)),
+            );
+            highlightData[highlightIndex] = maxCount;
+        }
+        return [
+            {
+                id: `channel-${index}`,
+                data: histogramData,
+                color: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.55)`,
+                variant: "bars",
+                widthFactor: 0.9,
+                inset: 0.05,
+                radius: 0.2,
+            },
+            {
+                id: `channel-${index}-pixel`,
+                data: highlightData,
+                color: "rgba(217, 119, 6, 0.95)",
+                variant: "markers",
+                widthFactor: 0.35,
+                hidden: highlightData.every((value) => value === 0),
+            },
+        ];
+    }, [color, domain, index, pixelValue, rasterData]);
+
+    if (!domains[index] || !contrastLimits[index] || isChannelLoading[index]) {
+        return <div className="h-12 px-2 text-sm">Loading...</div>;
+    }
+
+    const handleBrushValue = useCallback(
+        (value: Range | null) => {
+            if (!value) return;
+            setLiveValue(sortRange(clampRange(value, domain)));
+        },
+        [domain],
+    );
+
+    const brush = useMemo(
+        () => ({
+            value: liveValue,
+            setValue: handleBrushValue,
+            minMax: domain,
+        }),
+        [domain, handleBrushValue, liveValue],
+    );
+
+    return (
+        <div className="px-2">
+            <HistogramWidget
+                layers={layers}
+                width={HISTOGRAM_WIDTH}
+                height={HISTOGRAM_HEIGHT}
+                bins={HISTOGRAM_BINS}
+                brush={brush}
+            />
+        </div>
     );
 };
 
@@ -204,12 +356,10 @@ const BrightnessContrast = ({ index }: { index: number }) => {
 };
 
 const ChannelController = ({ index }: { index: number }) => {
-    const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
-    const { colors, domains, channelsVisible, removeChannel } =
+    const { colors, channelsVisible, removeChannel } =
         useChannelsStore(
-            ({ colors, domains, channelsVisible, removeChannel }) => ({
+            ({ colors, channelsVisible, removeChannel }) => ({
                 colors,
-                domains,
                 channelsVisible,
                 removeChannel,
             }),
@@ -221,7 +371,6 @@ const ChannelController = ({ index }: { index: number }) => {
     if (!metadata) throw "no metadata"; //TODO type metadata
     const channelVisible = channelsVisible[index];
     const color = colors[index];
-    const colorString = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
     // not sure I want to be using material.ui... consider adding a widget abstration layer.
     // not jumping right in with using it for all layout etc because I don't want to be tied to it.
     // Starting to use tailwind here.
@@ -231,13 +380,6 @@ const ChannelController = ({ index }: { index: number }) => {
             gridTemplateColumns: "0.4fr 0.1fr 0.1fr 1fr 0.1fr",
         }),
         [],
-    );
-    const sliderStyle = useMemo(
-        () => ({
-            color: colorString,
-            marginLeft: "10px",
-        }),
-        [colorString],
     );
     return (
         <>
@@ -263,21 +405,7 @@ const ChannelController = ({ index }: { index: number }) => {
                         channelsStore.setState({ colors: newColors });
                     }}
                 />
-                <Slider
-                    size="small"
-                    //slotProps={{ thumb: {  } }} //todo smaller thumb
-                    disabled={isChannelLoading[index]}
-                    style={sliderStyle}
-                    value={limits[index]}
-                    min={domains[index][0]}
-                    max={domains[index][1]}
-                    valueLabelDisplay="auto"
-                    onChange={(_, v) => {
-                        limits[index] = v as [number, number];
-                        const contrastLimits = [...limits];
-                        channelsStore.setState({ contrastLimits });
-                    }}
-                />
+                <ChannelHistogram index={index} />
                 <button
                     type="button"
                     className="pl-4"
@@ -324,11 +452,12 @@ const AddChannel = () => {
                     ids: String(Math.random()),
                     channelsVisible: true,
                 });
-                const { domain: domains, contrastLimits } =
+                const { domain: domains, contrastLimits, raster } =
                     await getSingleSelectionStats({ loader, selection, use3d });
                 const newProps = {
                     domains,
                     contrastLimits,
+                    raster,
                 };
                 setPropertiesForChannel(index, newProps);
                 setIsChannelLoading(index, false);
