@@ -1,7 +1,7 @@
 import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler, useSimplerFilteredIndices } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useId, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
@@ -15,9 +15,7 @@ import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
 import { useChart, useDataStore } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
-import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
-import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
@@ -43,92 +41,19 @@ import { CSS } from '@dnd-kit/utilities';
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { useHighlightedIndices } from "../selectionHooks";
+import HistogramWidget, { type HistogramLayer } from "./HistogramWidget";
 import {
     getNumericColumnData,
     getSharedNumericColumnData,
-    type NumericColumnData,
 } from "@/lib/columnTypeHelpers";
+import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
+import { useDebounce } from "use-debounce";
 
 
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 const HISTOGRAM_BINS = 100;
-
-type WorkerHistogramInput = {
-    data: SharedArrayBuffer;
-    min: number;
-    max: number;
-    bins: number;
-    arrayType: "float32" | "int32" | "uint32";
-    byteOffset: number;
-    length: number;
-};
-
-function queryHistogramWorker(input: WorkerHistogramInput, signal?: AbortSignal) {
-    return new Promise<number[]>((resolve, reject) => {
-        const worker = new Worker(new URL("../../datastore/rawHistogramWorker.ts", import.meta.url));
-        let settled = false;
-
-        const finish = (callback: () => void) => {
-            if (settled) return;
-            settled = true;
-            worker.terminate();
-            callback();
-        };
-
-        const onAbort = () => {
-            finish(() => reject(new DOMException("Histogram query aborted", "AbortError")));
-        };
-
-        worker.onmessage = (event) => {
-            finish(() => resolve(event.data));
-        };
-
-        worker.onerror = (event) => {
-            finish(() => reject(event.error ?? new Error(event.message || "Histogram worker failed")));
-        };
-
-        signal?.addEventListener("abort", onAbort, { once: true });
-        if (signal?.aborted) {
-            onAbort();
-            return;
-        }
-
-        worker.postMessage(input);
-    });
-}
-
-function createHistogram(
-    originalData: NumericColumnData,
-    min: number,
-    max: number,
-    bins: number,
-    indices?: ArrayLike<number>,
-) {
-    if (bins <= 0 || max <= min) return new Array(bins).fill(0);
-    const histogram = new Array(bins).fill(0);
-    const binWidth = (max - min) / bins;
-    const addValue = (value: number) => {
-        if (Number.isNaN(value)) return;
-        const bin = value === max ? bins - 1 : Math.floor((value - min) / binWidth);
-        if (bin >= 0 && bin < bins) {
-            histogram[bin]++;
-        }
-    };
-
-    if (indices) {
-        for (let i = 0; i < indices.length; i++) {
-            addValue(originalData[indices[i]]);
-        }
-        return histogram;
-    }
-
-    for (let i = 0; i < originalData.length; i++) {
-        addValue(originalData[i]);
-    }
-    return histogram;
-}
 
 type Props<K extends DataType> = {
     column: DataColumn<K>;
@@ -514,104 +439,10 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     histoHeight: number, //height of the histogram
 };
 
-const useBrushX = (
-    ref: React.RefObject<SVGSVGElement>,
-    { value, setValue, minMax, histoWidth, histoHeight }: RangeProps //consider different typing here
-) => {
-    const brushRef = useRef<(ReturnType<typeof d3.brushX>) | null>(null);
-    // we need to be able to respond to changes in value - but without causing an infinite loop
-    // or having the brush reset on every render
-    const [initialValue] = useState(value);
-
-    useEffect(() => {
-        if (!ref.current) return;
-
-        const svg = d3.select(ref.current);
-        // Set up brush
-        const brush = d3.brushX()
-            .handleSize(1)
-            .extent([[0, -2], [histoWidth, histoHeight+2]])
-            .on("brush end", (event) => {
-                if (event.selection) {
-                    const [start, end] = event.selection.map((x: number) => {
-                        if (!ref.current) {
-                            console.error("No ref.current in brush event handler");
-                            return 0;
-                        }
-                        const { width } = ref.current.getBoundingClientRect();
-                        // Normalize x-coordinate to [minMax[0], minMax[1]]
-                        const r = width / histoWidth;
-                        const normalizedX = r * x / width;
-                        return minMax[0] + normalizedX * (minMax[1] - minMax[0]);
-                    });
-                    setValue([start, end]);
-                } else {
-                    // warning - the null value here does behave distinctly differently from undefined
-                    // e.g. as of this writing, the reset button will be glitchy if we don't use null here
-                    setValue(null); // null - reset to full range if brush is cleared
-                }
-            });
-
-        brushRef.current = brush;
-
-        // Apply the brush to the SVG
-        const brushGroup = svg.append("g").attr("class", "brush").call(brush);
-        // Initialize brush selection based on the initial value
-        if (initialValue) {
-            const [start, end] = initialValue.map(
-                (v) => ((v - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth
-            );
-            brushGroup.call(brush.move, [start, end]); // Move the brush to the initial selection
-        }
-
-        // Apply `vectorEffect` directly to handles
-        brushGroup.selectAll(".selection").attr("vector-effect", "non-scaling-stroke");
-        brushGroup.selectAll(".handle").attr("vector-effect", "non-scaling-stroke");
-
-        // Cleanup on unmount
-        return () => {
-            svg.select(".brush").remove();
-        };
-    }, [ref, setValue, minMax, histoWidth, histoHeight, initialValue]);
-
-    const [debouncedValue] = useDebounce(value, 100, { 
-        equalityFn: (a, b) => {
-            //although the type of input argument is [number, number] | null - they are undefined when component is unmounted
-            //! which causes an exception here which breaks the whole chart
-            //so rather than checking === null, we check for falsy values
-            if (!a && !b) return true;
-            if (!a || !b) return false;
-            return a[0] === b[0] && a[1] === b[1];
-        }
-    });
-    const setBrushValue = useCallback<set2d>((v) => {
-        if (!brushRef.current || !ref.current) return;
-        const svg = d3.select(ref.current);
-
-        if (!v) {
-            // throw new Error("this is actually ok, but I want to test the error handling");
-            //@ts-ignore life is too short
-            svg.select(".brush").call(brushRef.current.move, null);
-            return;
-        }
-        const [start, end] = v;
-        const x0 = (start - minMax[0]) / (minMax[1] - minMax[0]) * histoWidth;
-        const x1 = (end - minMax[0]) / (minMax[1] - minMax[0]) * histoWidth;
-        //@ts-ignore life is too short
-        svg.select(".brush").call(brushRef.current.move, [x0, x1]);
-    }, [minMax, histoWidth, ref]);//why doesn't biome think we need brushRef?
-    useEffect(() => {
-        setBrushValue(debouncedValue);
-    }, [debouncedValue, setBrushValue]);
-};
 const Histogram = observer((props: RangeProps) => {
     const { overallHistogram, filteredHistogram, highlightedHistogram, overallHistogramError, queryHistogram } = props;
     const { histoWidth, histoHeight } = props;
-    const ref = useRef<SVGSVGElement>(null);
-    useBrushX(ref, props);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
-    const width = histoWidth;
-    const height = histoHeight;
     const overallColor = prefersDarkMode ? "rgba(255,255,255,0.35)" : "rgba(15,23,42,0.22)";
     const filteredColor = prefersDarkMode ? "rgba(96,165,250,0.8)" : "rgba(37,99,235,0.78)";
     const highlightColor = prefersDarkMode ? "rgba(251,191,36,0.95)" : "rgba(217,119,6,0.95)";
@@ -619,98 +450,53 @@ const Histogram = observer((props: RangeProps) => {
     const backgroundData = overallHistogram.length > 0 ? overallHistogram : emptyHistogram;
     const filteredData = filteredHistogram.length > 0 ? filteredHistogram : emptyHistogram;
     const highlightedData = highlightedHistogram.length > 0 ? highlightedHistogram : emptyHistogram;
-    const maxValue = Math.max(1, ...backgroundData, ...filteredData);
-    const maxHighlightedValue = Math.max(1, ...highlightedData);
-
-    const padding = 2;
-    const yScale = (height - 2 * padding) / maxValue;
-    const highlightHeightScale = Math.max(12, height * 0.18) / maxHighlightedValue;
-    const barWidth = width / HISTOGRAM_BINS;
-
-    const [hasQueried, setHasQueried] = useState(false);
-    useEffect(() => {
-        if (!ref.current) return;
-        const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && !hasQueried) {
-                setHasQueried(true);
-                queryHistogram();
-            }
-        }, { rootMargin: '0px 0px 100px 0px' });
-        observer.observe(ref.current);
-        // queryHistogram();
-        return () => observer.disconnect();
-    }, [queryHistogram, hasQueried]);
     useEffect(() => {
         if (!overallHistogramError) return;
         console.error("Failed to query overall histogram", overallHistogramError);
     }, [overallHistogramError]);
-
-    // biome-ignore lint/correctness/useExhaustiveDependencies: padding is used inside map function
-    const createBarData = useCallback((data: number[], scale: number) => data.map((count, index) => {
-        const barHeight = count * scale;
-        return {
-            x: index * barWidth,
-            y: height - padding - barHeight,
-            height: barHeight,
-        };
-    }), [barWidth, height, padding]);
-
-    const backgroundBars = useMemo(() => createBarData(backgroundData, yScale), [backgroundData, createBarData, yScale]);
-    const filteredBars = useMemo(() => createBarData(filteredData, yScale), [filteredData, createBarData, yScale]);
-    const highlightBars = useMemo(
-        () => createBarData(highlightedData, highlightHeightScale),
-        [highlightedData, createBarData, highlightHeightScale],
-    );
+    const layers = useMemo<HistogramLayer[]>(() => [
+        {
+            id: "overall",
+            data: backgroundData,
+            color: overallColor,
+            variant: "bars",
+            widthFactor: 0.8,
+        },
+        {
+            id: "filtered",
+            data: filteredData,
+            color: filteredColor,
+            variant: "bars",
+            inset: 0.15,
+            widthFactor: 0.7,
+            radius: 0.4,
+        },
+        {
+            id: "highlighted",
+            data: highlightedData,
+            color: highlightColor,
+            variant: "markers",
+            widthFactor: 0.35,
+        },
+    ], [backgroundData, filteredData, highlightedData, overallColor, filteredColor, highlightColor]);
+    const brush = useMemo(() => ({
+        value: props.value,
+        setValue: props.setValue,
+        minMax: props.minMax,
+    }), [props.value, props.setValue, props.minMax]);
+    const handleVisibleOnce = useCallback(() => {
+        void queryHistogram();
+    }, [queryHistogram]);
     return (
         <>
-        <svg width={'100%'} height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-        ref={ref}
-        cursor="move"
-        >
-            {backgroundBars.map((bar, index) => (
-                <rect
-                    // biome-ignore lint/suspicious/noArrayIndexKey: histogram bar index is invariant
-                    key={`overall-${index}`}
-                    x={bar.x}
-                    y={bar.y}
-                    width={Math.max(0.6, barWidth - 0.2)}
-                    height={Math.max(0, bar.height)}
-                    fill={overallColor}
-                    />
-                ))}
-            {filteredBars.map((bar, index) => (
-                <rect
-                    // biome-ignore lint/suspicious/noArrayIndexKey: histogram bar index is invariant
-                    key={`filtered-${index}`}
-                    x={bar.x + barWidth * 0.15}
-                    y={bar.y}
-                    width={Math.max(0.4, barWidth * 0.7)}
-                    height={Math.max(0, bar.height)}
-                    fill={filteredColor}
-                    rx={0.4}
-                    />
-                ))}
-            {highlightBars.map((bar, index) => {
-                if (highlightedData[index] === 0) return null;
-                return (
-                    <line
-                        // biome-ignore lint/suspicious/noArrayIndexKey: histogram bar index is invariant
-                        key={`highlight-${index}`}
-                        x1={bar.x + barWidth / 2}
-                        x2={bar.x + barWidth / 2}
-                        y1={height - padding}
-                        y2={Math.max(padding, bar.y)}
-                        stroke={highlightColor}
-                        strokeWidth={Math.max(1.2, barWidth * 0.35)}
-                        strokeLinecap="round"
-                        vectorEffect="non-scaling-stroke"
-                    />
-                );
-            })}
-            {/* d3.brushX will add more elements as a side-effect, handled in hook */}
-        </svg>
+        <HistogramWidget
+            layers={layers}
+            width={histoWidth}
+            height={histoHeight}
+            bins={HISTOGRAM_BINS}
+            brush={brush}
+            onVisibleOnce={handleVisibleOnce}
+        />
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-75">
             <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: overallColor }} />
