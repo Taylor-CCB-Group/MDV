@@ -73,7 +73,8 @@ export async function getTableExportBlob(
     columns: string[],
     options: TableExportOptions = {}
 ): Promise<Blob> {
-    const { includeIndex = false, delimiter = "\t", newline = "\n" } = options;
+    // Default includeIndex to true to keep it consistent in all places
+    const { includeIndex = true, delimiter = "\t", newline = "\n" } = options;
     const dataModel = new DataModel(dataStore, { autoupdate: false });
     dataModel.setColumns(columns);
     const stream = await getExportCsvStream(dataModel, delimiter, newline, includeIndex);
