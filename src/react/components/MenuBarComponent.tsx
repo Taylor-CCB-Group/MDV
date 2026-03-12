@@ -151,7 +151,7 @@ const MenuBarComponent = () => {
                         >
                             <Chip
                                 variant="outlined"
-                                sx={{ mr: 2, fontSize: "15px", cursor: "pointer" }}
+                                sx={{ mr: 2, fontSize: "15px" }}
                                 label={config.permission === "edit" ? "Editable" : "View Only"}
                             />
                         </CustomTooltip>
