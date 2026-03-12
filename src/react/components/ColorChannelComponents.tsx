@@ -578,10 +578,8 @@ const ChannelController = ({ index }: { index: number }) => {
                         top: "-14px",
                         color: "hsl(var(--muted-foreground))",
                         opacity: isHovered ? 1 : 0,
-                        visibility: isHovered ? "visible" : "hidden",
-                        transition: "opacity 0.3s, visibility 0.3s",
+                        transition: "opacity 0.3s",
                         "&:focus": {
-                            visibility: "visible",
                             opacity: 1,
                         },
                     }}
