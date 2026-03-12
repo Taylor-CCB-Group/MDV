@@ -419,14 +419,15 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                     max={0.9}
                     step={0.01}
                     onChange={(_, v) => {
-                        contrast[index] = v as number;
+                        if (isArray(v)) return;
                         const newContrast = [...contrast];
+                        newContrast[index] = v;
                         channelsStore.setState({ contrast: newContrast });
                     }}
                     onClick={(e) => {
                         if (e.detail === 2) {
-                            contrast[index] = 0.5;
                             const newContrast = [...contrast];
+                            newContrast[index] = 0.5;
                             channelsStore.setState({ contrast: newContrast });
                         }
                     }}
@@ -473,6 +474,8 @@ const ChannelController = ({ index }: { index: number }) => {
 
     if (!metadata) throw "no metadata"; //TODO type metadata
     if (!color) return null;
+
+    const hasPendingLoads = isChannelLoading.some(Boolean);
 
     return (
         <Accordion
@@ -563,6 +566,7 @@ const ChannelController = ({ index }: { index: number }) => {
                     </div>
                 </div>
                 <IconButton
+                    disabled={hasPendingLoads}
                     onClick={(event) => {
                         event.stopPropagation();
                         removeChannel(index);
