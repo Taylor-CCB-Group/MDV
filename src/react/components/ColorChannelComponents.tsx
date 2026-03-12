@@ -12,16 +12,21 @@ import {
 } from "./avivatorish/state";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
     Checkbox,
     FormControl,
+    IconButton,
     InputLabel,
     MenuItem,
     Select,
     Slider,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
-import { X } from "lucide-react";
 import HistogramWidget, {
     type HistogramLayer,
     type HistogramScaleType,
@@ -32,7 +37,7 @@ type Range = [number, number];
 type ScaleMode = "auto" | HistogramScaleType;
 const HISTOGRAM_BINS = 80;
 const HISTOGRAM_WIDTH = 240;
-const HISTOGRAM_HEIGHT = 48;
+const HISTOGRAM_HEIGHT = 78;
 const toggleScaleMode = (
     mode: ScaleMode,
     resolvedMode: HistogramScaleType,
@@ -126,7 +131,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
             <select
                 disabled={isChannelLoading[index]}
                 value={selections[index].c}
-                className="w-full p-1"
+                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-sm outline-none transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
                 onChange={async (e) => {
                     // see Avivator Controller.jsx onSelectionChange
                     try {
@@ -331,7 +336,11 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     }, [color, domain, histogram.counts, histogram.edges, index, pixelValue]);
 
     if (!domains[index] || !contrastLimits[index] || isChannelLoading[index]) {
-        return <div className="h-12 px-2 text-sm">Loading...</div>;
+        return (
+            <div className="flex h-[68px] items-center rounded-md border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                Loading histogram
+            </div>
+        );
     }
 
     const handleBrushValue = useCallback(
@@ -352,7 +361,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     );
 
     return (
-        <div className="px-2">
+        <div className="flex h-full min-h-[94px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-1.5">
             <HistogramWidget
                 layers={layers}
                 width={HISTOGRAM_WIDTH}
@@ -393,52 +402,87 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     return (
-        <div className="col-span-5 pl-2 pr-2 flex items-center gap-4">
-            contrast:
-            <Slider
-                size="small"
-                disabled={isChannelLoading[index]}
-                value={contrast[index]}
-                min={0.1}
-                max={0.9}
-                step={0.01}
-                onChange={(_, v) => {
-                    contrast[index] = v as number;
-                    const newContrast = [...contrast];
-                    channelsStore.setState({ contrast: newContrast });
+        <Accordion
+            disableGutters
+            elevation={0}
+            defaultExpanded={false}
+            sx={{
+                gridColumn: "1 / -1",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: "6px",
+                backgroundColor: "hsl(var(--muted) / 0.35)",
+                "&:before": { display: "none" },
+            }}
+        >
+            <AccordionSummary
+                expandIcon={<ExpandMoreIcon fontSize="small" />}
+                sx={{
+                    minHeight: "34px",
+                    px: 1,
+                    "& .MuiAccordionSummary-content": {
+                        my: 0.5,
+                    },
                 }}
-                onClick={(e) => {
-                    // reset value on double-click
-                    if (e.detail === 2) {
-                        contrast[index] = 0.5;
-                        const newContrast = [...contrast];
-                        channelsStore.setState({ contrast: newContrast });
-                    }
-                }}
-            />
-            brightness:
-            <Slider
-                size="small"
-                disabled={isChannelLoading[index]}
-                value={brightness[index]}
-                min={0.01}
-                max={0.99}
-                step={0.01}
-                onChange={(_, v) => {
-                    brightness[index] = v as number;
-                    const newbrightness = [...brightness];
-                    channelsStore.setState({ brightness: newbrightness });
-                }}
-                onClick={(e) => {
-                    // reset value on double-click
-                    if (e.detail === 2) {
-                        brightness[index] = 0.5;
-                        const newbrightness = [...brightness];
-                        channelsStore.setState({ brightness: newbrightness });
-                    }
-                }}
-            />
-        </div>
+            >
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                    Tone controls
+                </span>
+            </AccordionSummary>
+            <AccordionDetails sx={{ px: 1, pb: 1, pt: 0 }}>
+                <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                    <div className="flex items-center gap-2">
+                        <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                            Contrast
+                        </span>
+                        <Slider
+                            size="small"
+                            disabled={isChannelLoading[index]}
+                            value={contrast[index]}
+                            min={0.1}
+                            max={0.9}
+                            step={0.01}
+                            onChange={(_, v) => {
+                                contrast[index] = v as number;
+                                const newContrast = [...contrast];
+                                channelsStore.setState({ contrast: newContrast });
+                            }}
+                            onClick={(e) => {
+                                if (e.detail === 2) {
+                                    contrast[index] = 0.5;
+                                    const newContrast = [...contrast];
+                                    channelsStore.setState({ contrast: newContrast });
+                                }
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                            Brightness
+                        </span>
+                        <Slider
+                            size="small"
+                            disabled={isChannelLoading[index]}
+                            value={brightness[index]}
+                            min={0.01}
+                            max={0.99}
+                            step={0.01}
+                            onChange={(_, v) => {
+                                brightness[index] = v as number;
+                                const newbrightness = [...brightness];
+                                channelsStore.setState({ brightness: newbrightness });
+                            }}
+                            onClick={(e) => {
+                                if (e.detail === 2) {
+                                    brightness[index] = 0.5;
+                                    const newbrightness = [...brightness];
+                                    channelsStore.setState({ brightness: newbrightness });
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+            </AccordionDetails>
+        </Accordion>
     );
 };
 
@@ -454,54 +498,82 @@ const ChannelController = ({ index }: { index: number }) => {
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
+    const [isHovered, setIsHovered] = useState(false);
 
     if (!metadata) throw "no metadata"; //TODO type metadata
     const channelVisible = channelsVisible[index];
     const color = colors[index];
-    // not sure I want to be using material.ui... consider adding a widget abstration layer.
-    // not jumping right in with using it for all layout etc because I don't want to be tied to it.
-    // Starting to use tailwind here.
-    // memoizing styles to avoid re-rendering - not sure how to translate to tailwind, not thought about it much yet.
-    const gridStyle = useMemo(
-        () => ({
-            gridTemplateColumns: "0.4fr 0.1fr 0.1fr 1fr 0.1fr",
-        }),
-        [],
-    );
     return (
         <>
             <div
-                className="grid justify-start items-center p-1"
-                style={gridStyle}
+                className="relative grid grid-cols-[minmax(10rem,0.95fr)_minmax(0,1.15fr)] gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2 shadow-sm"
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
             >
-                <ChannelChooser index={index} />
-                <Checkbox
-                    checked={channelVisible}
-                    disabled={isChannelLoading[index]}
-                    onChange={() => {
-                        channelsVisible[index] = !channelVisible;
-                        const visible = [...channelsVisible];
-                        channelsStore.setState({ channelsVisible: visible });
+                <div
+                    className="min-h-[94px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2"
+                    style={{
+                        boxShadow: `inset 3px 0 0 rgb(${color[0]}, ${color[1]}, ${color[2]})`,
                     }}
-                />
-                <PopoverPicker
-                    color={color}
-                    onChange={(c) => {
-                        colors[index] = c;
-                        const newColors = [...colors];
-                        channelsStore.setState({ colors: newColors });
-                    }}
-                />
-                <ChannelHistogram index={index} />
-                <button
-                    type="button"
-                    className="pl-4"
+                >
+                    <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                        <span>Channel</span>
+                        <div className="flex items-center gap-1.5">
+                            <Checkbox
+                                checked={channelVisible}
+                                disabled={isChannelLoading[index]}
+                                sx={{
+                                    padding: "2px",
+                                    color: "hsl(var(--muted-foreground))",
+                                    "&.Mui-checked": {
+                                        color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
+                                    },
+                                }}
+                                onChange={() => {
+                                    channelsVisible[index] = !channelVisible;
+                                    const visible = [...channelsVisible];
+                                    channelsStore.setState({ channelsVisible: visible });
+                                }}
+                            />
+                            <div className="h-7 min-w-8 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm">
+                                <PopoverPicker
+                                    color={color}
+                                    onChange={(c) => {
+                                        colors[index] = c;
+                                        const newColors = [...colors];
+                                        channelsStore.setState({ colors: newColors });
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <ChannelChooser index={index} />
+                </div>
+                <div className="min-w-0 self-stretch">
+                    <ChannelHistogram index={index} />
+                </div>
+                <IconButton
                     onClick={() => {
                         removeChannel(index);
                     }}
+                    size="small"
+                    aria-label="remove channel"
+                    sx={{
+                        position: "absolute",
+                        right: "-14px",
+                        top: "-14px",
+                        color: "hsl(var(--muted-foreground))",
+                        opacity: isHovered ? 1 : 0,
+                        visibility: isHovered ? "visible" : "hidden",
+                        transition: "opacity 0.3s, visibility 0.3s",
+                        "&:focus": {
+                            visibility: "visible",
+                            opacity: 1,
+                        },
+                    }}
                 >
-                    <X />
-                </button>
+                    <HighlightOffIcon fontSize="small" />
+                </IconButton>
                 <BrightnessContrast index={index} />
             </div>
         </>
@@ -527,7 +599,7 @@ const AddChannel = () => {
     return (
         <button
             type="button"
-            className="p-2 rounded-lg bg-slate-400"
+            className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-sm transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canAddChannel}
             onClick={async () => {
                 // would be nice to have less repition of this code here and in ChannelController
@@ -558,7 +630,7 @@ const AddChannel = () => {
 export const Test = () => {
     const ids = useChannelsStore(({ ids }) => ids);
     return (
-        <div className="bg-[hsl(var(--input))] w-full">
+        <div className="w-full space-y-2 bg-[hsl(var(--background))] p-2">
             {ids.map((id, i) => (
                 <ChannelController key={id} index={i} />
             ))}

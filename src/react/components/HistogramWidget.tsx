@@ -214,14 +214,14 @@ export default function HistogramWidget({
                 <div className="pointer-events-none absolute right-1 top-1 z-10 flex items-center gap-1 text-[10px] opacity-75">
                     <button
                         type="button"
-                        className="pointer-events-auto rounded border bg-[hsl(var(--background)/0.78)] px-1.5 py-0.5 backdrop-blur-sm"
+                        className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-sm"
                         onClick={scaleControls.onToggleX}
                     >
                         X:{scaleControls.xLabel}
                     </button>
                     <button
                         type="button"
-                        className="pointer-events-auto rounded border bg-[hsl(var(--background)/0.78)] px-1.5 py-0.5 backdrop-blur-sm"
+                        className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-sm"
                         onClick={scaleControls.onToggleY}
                     >
                         Y:{scaleControls.yLabel}
