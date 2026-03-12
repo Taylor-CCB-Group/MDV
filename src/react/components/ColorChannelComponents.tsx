@@ -181,6 +181,8 @@ const clampRange = (range: Range, domain: Range): Range => [
 const sortRange = ([start, end]: Range): Range =>
     start <= end ? [start, end] : [end, start];
 
+const rangesEqual = (a: Range, b: Range) => a[0] === b[0] && a[1] === b[1];
+
 const resolveAutoXScale = (domain: Range): HistogramScaleType => {
     const [min, max] = domain;
     if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
@@ -256,8 +258,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const [yScaleMode, setYScaleMode] = useState<ScaleMode>("auto");
 
     useEffect(() => {
-        setLiveValue(limits);
-    }, [limits]);
+        setLiveValue(rangesEqual(limits, domain) ? null : limits);
+    }, [domain, limits]);
 
     const [debouncedValue] = useDebounce(liveValue, 10, {
         equalityFn: (a, b) => {
@@ -268,18 +270,15 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     });
 
     useEffect(() => {
-        if (!debouncedValue) return;
-        if (debouncedValue.some((value) => Number.isNaN(value))) return;
-        if (
-            debouncedValue[0] === limits[0] &&
-            debouncedValue[1] === limits[1]
-        ) {
+        const nextValue = debouncedValue ?? domain;
+        if (nextValue.some((value) => Number.isNaN(value))) return;
+        if (rangesEqual(nextValue, limits)) {
             return;
         }
         const nextContrastLimits = [...channelsStore.getState().contrastLimits];
-        nextContrastLimits[index] = debouncedValue;
+        nextContrastLimits[index] = nextValue;
         channelsStore.setState({ contrastLimits: nextContrastLimits });
-    }, [channelsStore, debouncedValue, index, limits]);
+    }, [channelsStore, debouncedValue, domain, index, limits]);
 
     const resolvedXScale = useMemo(
         () => (xScaleMode === "auto" ? resolveAutoXScale(domain) : xScaleMode),
@@ -336,8 +335,12 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
     const handleBrushValue = useCallback(
         (value: Range | null) => {
-            if (!value) return;
-            setLiveValue(sortRange(clampRange(value, domain)));
+            if (!value) {
+                setLiveValue(null);
+                return;
+            }
+            const nextValue = sortRange(clampRange(value, domain));
+            setLiveValue(rangesEqual(nextValue, domain) ? null : nextValue);
         },
         [domain],
     );
