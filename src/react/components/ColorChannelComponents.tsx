@@ -32,12 +32,16 @@ import HistogramWidget, {
     type HistogramScaleType,
 } from "./HistogramWidget";
 import { useDebounce } from "use-debounce";
+import { isArray } from "@/lib/utils";
 
 type Range = [number, number];
 type ScaleMode = "auto" | HistogramScaleType;
 const HISTOGRAM_BINS = 80;
 const HISTOGRAM_WIDTH = 240;
 const HISTOGRAM_HEIGHT = 78;
+const stopAccordionToggle = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+};
 const toggleScaleMode = (
     mode: ScaleMode,
     resolvedMode: HistogramScaleType,
@@ -402,87 +406,59 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     return (
-        <Accordion
-            disableGutters
-            elevation={0}
-            defaultExpanded={false}
-            sx={{
-                gridColumn: "1 / -1",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "6px",
-                backgroundColor: "hsl(var(--muted) / 0.35)",
-                "&:before": { display: "none" },
-            }}
-        >
-            <AccordionSummary
-                expandIcon={<ExpandMoreIcon fontSize="small" />}
-                sx={{
-                    minHeight: "34px",
-                    px: 1,
-                    "& .MuiAccordionSummary-content": {
-                        my: 0.5,
-                    },
-                }}
-            >
-                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
-                    Tone controls
+        <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+            <div className="flex items-center gap-2">
+                <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                    Contrast
                 </span>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 1, pb: 1, pt: 0 }}>
-                <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-                    <div className="flex items-center gap-2">
-                        <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
-                            Contrast
-                        </span>
-                        <Slider
-                            size="small"
-                            disabled={isChannelLoading[index]}
-                            value={contrast[index]}
-                            min={0.1}
-                            max={0.9}
-                            step={0.01}
-                            onChange={(_, v) => {
-                                contrast[index] = v as number;
-                                const newContrast = [...contrast];
-                                channelsStore.setState({ contrast: newContrast });
-                            }}
-                            onClick={(e) => {
-                                if (e.detail === 2) {
-                                    contrast[index] = 0.5;
-                                    const newContrast = [...contrast];
-                                    channelsStore.setState({ contrast: newContrast });
-                                }
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
-                            Brightness
-                        </span>
-                        <Slider
-                            size="small"
-                            disabled={isChannelLoading[index]}
-                            value={brightness[index]}
-                            min={0.01}
-                            max={0.99}
-                            step={0.01}
-                            onChange={(_, v) => {
-                                brightness[index] = v as number;
-                                const newbrightness = [...brightness];
-                                channelsStore.setState({ brightness: newbrightness });
-                            }}
-                            onClick={(e) => {
-                                if (e.detail === 2) {
-                                    brightness[index] = 0.5;
-                                    const newbrightness = [...brightness];
-                                    channelsStore.setState({ brightness: newbrightness });
-                                }
-                            }}
-                        />
-                    </div>
-                </div>
-            </AccordionDetails>
-        </Accordion>
+                <Slider
+                    size="small"
+                    disabled={isChannelLoading[index]}
+                    value={contrast[index]}
+                    min={0.1}
+                    max={0.9}
+                    step={0.01}
+                    onChange={(_, v) => {
+                        contrast[index] = v as number;
+                        const newContrast = [...contrast];
+                        channelsStore.setState({ contrast: newContrast });
+                    }}
+                    onClick={(e) => {
+                        if (e.detail === 2) {
+                            contrast[index] = 0.5;
+                            const newContrast = [...contrast];
+                            channelsStore.setState({ contrast: newContrast });
+                        }
+                    }}
+                />
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                    Brightness
+                </span>
+                <Slider
+                    size="small"
+                    disabled={isChannelLoading[index]}
+                    value={brightness[index]}
+                    min={0.01}
+                    max={0.99}
+                    step={0.01}
+                    onChange={(_, v) => {
+                        if (isArray(v)) return;
+                        const newBrightness = [...brightness];
+                        newBrightness[index] = v;
+                        channelsStore.setState({ brightness: newBrightness });
+                    }}
+                    onClick={(e) => {
+                        if (e.detail === 2) {
+                            const newBrightness = [...brightness];
+                            newBrightness[index] = 0.5;
+                            channelsStore.setState({ brightness: newBrightness });
+                        }
+                    }}
+                />
+            </div>
+        </div>
     );
 };
 
@@ -499,51 +475,96 @@ const ChannelController = ({ index }: { index: number }) => {
     if (!color) return null;
 
     return (
-        <>
-            <div
-                className="relative grid grid-cols-[minmax(10rem,0.95fr)_minmax(0,1.15fr)] gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2 shadow-sm"
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
+        <Accordion
+            disableGutters
+            defaultExpanded={false}
+            elevation={0}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            sx={{
+                position: "relative",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: "8px",
+                backgroundColor: "hsl(var(--background))",
+                boxShadow: "0 1px 2px hsl(var(--foreground) / 0.04)",
+                "&:before": { display: "none" },
+            }}
+        >
+            <AccordionSummary
+                expandIcon={<ExpandMoreIcon fontSize="small" />}
+                sx={{
+                    px: 1.25,
+                    py: 0.75,
+                    minHeight: "unset",
+                    "& .MuiAccordionSummary-content": {
+                        my: 0,
+                        minWidth: 0,
+                    },
+                    "& .MuiAccordionSummary-expandIconWrapper": {
+                        color: "hsl(var(--muted-foreground))",
+                    },
+                }}
             >
-                <div className="min-h-[94px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2">
-                    <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
-                        <div className="flex items-center gap-2">
-                            <span>Channel</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <Checkbox
-                                checked={channelVisible}
-                                disabled={isChannelLoading[index]}
-                                size="small"
-                                sx={{ padding: "2px" }}
-                                onChange={() => {
-                                    const channelsVisible =
-                                        channelsStore.getState().channelsVisible;
-                                    channelsVisible[index] = !channelVisible;
-                                    const visible = [...channelsVisible];
-                                    channelsStore.setState({ channelsVisible: visible });
-                                }}
-                            />
-                            <div className="h-7 min-w-8 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm">
-                                <PopoverPicker
-                                    color={color}
-                                    onChange={(c) => {
-                                        const colors = channelsStore.getState().colors;
-                                        colors[index] = c;
-                                        const newColors = [...colors];
-                                        channelsStore.setState({ colors: newColors });
+                <div
+                    className="grid w-full min-w-0 grid-cols-[minmax(11rem,0.95fr)_minmax(0,1.15fr)] gap-2"
+                    onClick={stopAccordionToggle}
+                    onFocus={stopAccordionToggle}
+                >
+                    <div className="flex min-h-[86px] min-w-0 flex-col justify-between rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5">
+                        <div className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                            <div className="flex items-center gap-2">
+                                <span
+                                    className="h-2.5 w-2.5 rounded-full border border-black/10"
+                                    style={{
+                                        backgroundColor: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
                                     }}
                                 />
+                                <span>Channel</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Checkbox
+                                    checked={channelVisible}
+                                    disabled={isChannelLoading[index]}
+                                    size="small"
+                                    sx={{ padding: "2px" }}
+                                    onClick={stopAccordionToggle}
+                                    onFocus={stopAccordionToggle}
+                                    onChange={() => {
+                                        const channelsVisible =
+                                            channelsStore.getState().channelsVisible;
+                                        channelsVisible[index] = !channelVisible;
+                                        const visible = [...channelsVisible];
+                                        channelsStore.setState({ channelsVisible: visible });
+                                    }}
+                                />
+                                <div
+                                    className="h-7 min-w-9 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm"
+                                    onClick={stopAccordionToggle}
+                                    onFocus={stopAccordionToggle}
+                                >
+                                    <PopoverPicker
+                                        color={color}
+                                        onChange={(c) => {
+                                            const colors = channelsStore.getState().colors;
+                                            colors[index] = c;
+                                            const newColors = [...colors];
+                                            channelsStore.setState({ colors: newColors });
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
+                        <div onClick={stopAccordionToggle} onFocus={stopAccordionToggle}>
+                            <ChannelChooser index={index} />
+                        </div>
                     </div>
-                    <ChannelChooser index={index} />
-                </div>
-                <div className="min-w-0 self-stretch">
-                    <ChannelHistogram index={index} />
+                    <div className="min-w-0 self-stretch">
+                        <ChannelHistogram index={index} />
+                    </div>
                 </div>
                 <IconButton
-                    onClick={() => {
+                    onClick={(event) => {
+                        event.stopPropagation();
                         removeChannel(index);
                     }}
                     size="small"
@@ -564,9 +585,22 @@ const ChannelController = ({ index }: { index: number }) => {
                 >
                     <HighlightOffIcon fontSize="small" />
                 </IconButton>
-                <BrightnessContrast index={index} />
-            </div>
-        </>
+            </AccordionSummary>
+            <AccordionDetails
+                sx={{
+                    px: 1.25,
+                    pb: 1.25,
+                    pt: 0,
+                }}
+            >
+                <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted) / 0.3)] px-2 py-2">
+                    <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                        Tone controls
+                    </div>
+                    <BrightnessContrast index={index} />
+                </div>
+            </AccordionDetails>
+        </Accordion>
     );
 };
 
