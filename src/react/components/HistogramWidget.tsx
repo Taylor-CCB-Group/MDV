@@ -270,10 +270,12 @@ export default function HistogramWidget({
                                     key={`${layer.id}-${index}`}
                                     x1={bar.x + bar.width / 2}
                                     x2={bar.x + bar.width / 2}
-                                    y1={height - padding}
+                                    y1={height - padding - 2}
                                     y2={Math.max(padding, bar.y)}
                                     stroke={layer.color}
-                                    strokeWidth={Math.max(1.2, bar.width * (layer.widthFactor ?? 0.35))}
+                                    strokeOpacity={0.2}
+                                    strokeWidth={Math.max(0.7, bar.width * (layer.widthFactor ?? 0.18))}
+                                    strokeDasharray="1 3"
                                     strokeLinecap="round"
                                     vectorEffect="non-scaling-stroke"
                                 />
@@ -318,11 +320,12 @@ export default function HistogramWidget({
                                 key={marker.id}
                                 x1={x}
                                 x2={x}
-                                y1={padding}
-                                y2={height - padding}
+                                y1={padding + 4}
+                                y2={height - padding - 4}
                                 stroke={marker.color}
-                                strokeWidth={1.5}
-                                strokeDasharray="2 2"
+                                strokeOpacity={0.22}
+                                strokeWidth={1}
+                                strokeLinecap="round"
                                 vectorEffect="non-scaling-stroke"
                             />
                         );

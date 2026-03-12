@@ -32,6 +32,7 @@ import HistogramWidget, {
     type HistogramScaleType,
 } from "./HistogramWidget";
 import { useDebounce } from "use-debounce";
+import { useTheme } from "../hooks";
 import { isArray } from "@/lib/utils";
 
 type Range = [number, number];
@@ -256,6 +257,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const pixelValue = useViewerStore((state) => state.pixelValues[index]);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const channelsStore = useChannelsStoreApi();
+    const dark = useTheme() === "dark";
     const limits = contrastLimits[index] ?? domain;
     const [liveValue, setLiveValue] = useState<Range | null>(limits);
     const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
@@ -298,24 +300,6 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     );
 
     const layers = useMemo<HistogramLayer[]>(() => {
-        const maxCount = Math.max(1, ...histogram.counts);
-        const highlightData = new Array(HISTOGRAM_BINS).fill(0);
-        if (
-            Number.isFinite(pixelValue) &&
-            domain[0] !== domain[1] &&
-            pixelValue >= domain[0] &&
-            pixelValue <= domain[1]
-        ) {
-            const highlightIndex = Math.max(
-                0,
-                histogram.edges.findIndex((edge, i) =>
-                    i < histogram.edges.length - 1 &&
-                    pixelValue >= edge &&
-                    pixelValue <= histogram.edges[i + 1],
-                ),
-            );
-            highlightData[highlightIndex] = maxCount;
-        }
         return [
             {
                 id: `channel-${index}`,
@@ -323,16 +307,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                 color: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.55)`,
                 variant: "line",
             },
-            {
-                id: `channel-${index}-pixel`,
-                data: highlightData,
-                color: "rgba(255, 255, 255, 0.95)",
-                variant: "markers",
-                widthFactor: 0.35,
-                hidden: highlightData.every((value) => value === 0),
-            },
         ];
-    }, [color, domain, histogram.counts, histogram.edges, index, pixelValue]);
+    }, [color, histogram.counts, index]);
 
     const isHistogramLoading =
         !currentDomain || !contrastLimits[index] || isChannelLoading[index];
@@ -386,7 +362,9 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                         {
                             id: `pixel-value-${index}`,
                             value: pixelValue,
-                            color: "rgba(255, 255, 255, 0.95)",
+                            color: dark
+                                ? "rgba(255, 255, 255, 0.8)"
+                                : "rgba(15, 23, 42, 0.8)",
                             hidden:
                                 !Number.isFinite(pixelValue) ||
                                 pixelValue < domain[0] ||
