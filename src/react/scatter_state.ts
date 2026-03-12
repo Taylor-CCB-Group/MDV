@@ -16,14 +16,11 @@ import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from "./components/VivScatterComponent";
 import SpatialLayer from "@/webgl/SpatialLayer";
-import {
-    ScatterSquareExtension,
-    ScatterDensityExension,
-} from "../webgl/ScatterDeckExtension";
+import { ScatterSquareExtension, ScatterDensityExension } from "../webgl/ScatterDeckExtension";
 import type { LayerExtension } from "@deck.gl/core";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
-import { useHighlightedIndex } from "./selectionHooks";
+import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName, DataColumn, FieldName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
@@ -33,12 +30,15 @@ import { getEmptyFeatureCollection } from "./deck_state";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
-type TooltipContent = null | string | {
-    text?: string;
-    html?: string;
-    className?: string;
-    style?: Partial<CSSStyleDeclaration>;
-};
+type TooltipContent =
+    | null
+    | string
+    | {
+          text?: string;
+          html?: string;
+          className?: string;
+          style?: Partial<CSSStyleDeclaration>;
+      };
 
 export type TooltipConfig = {
     tooltip: {
@@ -72,12 +72,14 @@ export type ScatterPlotConfig = {
     //     // todo: add more options here...
     // };
     category_filters: Array<CategoryFilter>;
-    on_filter: "hide" | "grey", //todo...
+    on_filter: "hide" | "grey"; //todo...
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
     dimension: "2d" | "3d";
     selectionFeatureCollection: FeatureCollection;
-} & TooltipConfig & DualContourLegacyConfig & BaseConfig;
+} & TooltipConfig &
+    DualContourLegacyConfig &
+    BaseConfig;
 
 export type ScatterPlotConfig2D = ScatterPlotConfig & {
     dimension: "2d";
@@ -114,8 +116,8 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
     field_legend: {
-        display: true
-    }
+        display: true,
+    },
 };
 
 export const scatterAxisDefaults: AxisConfig2D = {
@@ -129,7 +131,7 @@ export const scatterAxisDefaults: AxisConfig2D = {
         size: 40,
         tickfont: 10,
     },
-}
+};
 
 export function useRegionScale() {
     const metadata = useMetadata();
@@ -147,13 +149,11 @@ export function useRegionScale() {
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
     //MDVProject.set_region_scale assumes that all regions have the same scale?
     if (!metadata) return 1 / regionScale; // might want to start using this with non-image data that has real units
-    if (!("Pixels" in metadata)) return 1/regionScale;
+    if (!("Pixels" in metadata)) return 1 / regionScale;
     const { Pixels } = metadata;
     if (!Pixels.PhysicalSizeX) return 1 / regionScale;
     if (Pixels.PhysicalSizeXUnit !== regionUnit)
-        console.warn(
-            `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
-        );
+        console.warn(`physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`);
     // if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
     const scale = Pixels.PhysicalSizeX / regionScale;
     return Number.isFinite(scale) ? scale : 1;
@@ -161,7 +161,7 @@ export function useRegionScale() {
 
 /**
  * This hook is used to fit the scatterplot to the data when data filter changes.
- * 
+ *
  * It can be a bit janky when reacting to changes originating from the same view,
  * we should consider a better approach.
  */
@@ -239,15 +239,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
             transitionEasing: (x: number) => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
             // transitionInterpolator: new FlyToInterpolator({speed: 1}), //applicable for MapState - latitude is required
         });
-    }, [
-        data,
-        cx,
-        cy,
-        chartHeight,
-        chartWidth,
-        config.zoom_on_filter,
-        modelMatrix.transformAsPoint,
-    ]);
+    }, [data, cx, cy, chartHeight, chartWidth, config.zoom_on_filter, modelMatrix.transformAsPoint]);
     return viewState;
 }
 
@@ -296,7 +288,11 @@ function useShouldFilterNaN() {
     const chart = useChart();
     const colorBySpec = chart.config.color_by;
     const colorByField: FieldSpec | undefined = colorBySpec
-        ? (typeof colorBySpec === "string" ? colorBySpec : "column" in colorBySpec ? colorBySpec.column?.field : undefined)
+        ? typeof colorBySpec === "string"
+            ? colorBySpec
+            : "column" in colorBySpec
+              ? colorBySpec.column?.field
+              : undefined
         : undefined;
     const colorColumn = useFieldSpec(colorByField);
     const hideMissing = !!chart.config.hideMissing;
@@ -330,16 +326,73 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     const [cx, cy, cz] = params;
     const scale = useRegionScale();
     const hoverInfoRef = useRef<PickingInfo | null>(null);
-    const highlightedIndex = useHighlightedIndex();
-    // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
-    const getLineWidth = useCallback(
-        (i: unknown) => {
-            if (typeof i !== "number") throw new Error("expected index");
-            return i === highlightedIndex ? (0.2 * radiusScale) / scale : 0.0;
+    const scatterKeyboardActiveRef = useRef(false);
+    const highlightedIndices = useHighlightedIndices();
+    const highlightRows = useHighlightRows();
+    const getModifierState = useCallback(
+        (
+            event?: {
+                shiftKey?: boolean;
+                ctrlKey?: boolean;
+                metaKey?: boolean;
+                srcEvent?: unknown;
+                sourceEvent?: unknown;
+            } | null,
+        ) => {
+            const raw = event ?? {};
+            const nested =
+                typeof raw === "object" && raw !== null
+                    ? ((raw.srcEvent ?? raw.sourceEvent) as
+                          | {
+                                shiftKey?: boolean;
+                                ctrlKey?: boolean;
+                                metaKey?: boolean;
+                                srcEvent?: unknown;
+                                sourceEvent?: unknown;
+                            }
+                          | undefined)
+                    : undefined;
+            const resolved = nested ?? raw;
+            return {
+                add: !!resolved.shiftKey,
+                toggle: !!(resolved.ctrlKey || resolved.metaKey),
+            };
         },
-        [radiusScale, highlightedIndex, scale],
+        [],
     );
+    const highlightLineWidth = useMemo(() => (0.2 * radiusScale) / scale, [radiusScale, scale]);
+    const highlightedData = useMemo(() => {
+        if (highlightedIndices.length === 0 || data.length === 0) return [];
+        const visibleRows = new Set<number>(data as Iterable<number>);
+        return highlightedIndices.filter((rowIndex) => visibleRows.has(rowIndex));
+    }, [data, highlightedIndices]);
     const contourLayers = useLegacyDualContour(hoveredFieldId);
+    const updateHighlightedRows = useCallback(
+        (
+            rowIndex: number,
+            modifiers?: {
+                add?: boolean;
+                toggle?: boolean;
+            },
+        ) => {
+            if (rowIndex < 0) return;
+            const { add = false, toggle = false } = modifiers ?? {};
+            if (toggle) {
+                const nextHighlights = new Set(highlightedIndices);
+                if (nextHighlights.has(rowIndex)) nextHighlights.delete(rowIndex);
+                else nextHighlights.add(rowIndex);
+                highlightRows(Array.from(nextHighlights));
+                return;
+            }
+            if (add) {
+                if (highlightedIndices.includes(rowIndex)) return;
+                highlightRows([...highlightedIndices, rowIndex]);
+                return;
+            }
+            highlightRows([rowIndex]);
+        },
+        [highlightRows, highlightedIndices],
+    );
 
     const { shouldFilter: shouldFilterMissing, colorColumn, fallbackOnZero } = useShouldFilterNaN();
 
@@ -354,7 +407,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
-                    return `<strong>${col.name}:</strong> ${col.data ? col.getValue(data[i]) : "loading..."}`;
+                return `<strong>${col.name}:</strong> ${col.data ? col.getValue(data[i]) : "loading..."}`;
             });
         },
         [tooltipCols, data],
@@ -377,7 +430,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 //also should understand if mouse has left deck.gl canvas & hide tooltip
                 //or maybe we actually use something else for rendering the tooltip?
                 html: `<div>${tooltipVal.join("<br/>")}</div>`,
-            }
+            };
             return tooltip;
         },
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
@@ -429,19 +482,19 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 // future work https://deck.gl/docs/developer-guide/performance#use-binary-data
                 //currently useFieldSpec is typed as DataColumn|undefined,
                 //if not undefined is guaranteed to be loaded but we may change how we manage lazy-loading.
-                getFilterValue: shouldFilterMissing && colorColumn?.data
-                    ? (i: number) => {
-                        const v = colorColumn.data[i];
-                        if (!Number.isFinite(v)) return 0;
-                        if (fallbackOnZero && v === 0) return 0;
-                        return 1;
-                    }
-                    : (_: number) => 1,
+                getFilterValue:
+                    shouldFilterMissing && colorColumn?.data
+                        ? (i: number) => {
+                              const v = colorColumn.data[i];
+                              if (!Number.isFinite(v)) return 0;
+                              if (fallbackOnZero && v === 0) return 0;
+                              return 1;
+                          }
+                        : (_: number) => 1,
                 filterRange: [0.5, 1],
             } as any),
             updateTriggers: {
                 getFillColor: colorBy,
-                getLineWidth,
                 getPosition: [cx, cy, cz],
                 getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero],
             },
@@ -449,24 +502,11 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             onHover: (info) => {
                 hoverInfoRef.current = info;
             },
-            stroked: data.length < 1000, //todo make this configurable, and fix issue...
-            // todo figure out why lineWidth 0 still shows up, particularly when zoomed out
-            // can we make it have zero opacity? Seems like lineColor is rgb, not rgba...
-            // >>> may need a layer extension to do this properly; may want that anyway for other reasons <<<
-            getLineWidth,
-            //trying to set line color to same as fill, but it makes things very muddy when zoomed out
-            //getLineColor: i => i === clickIndexRef.current ? [255, 255, 255] : colorBy ?? [200, 200, 200],
-            // lineColorBy...
-            getLineColor: [255, 255, 255],
+            stroked: false,
             // highlightedObjectIndex, // has some undesirable effects, but could be useful when better controlled
-            onClick: ({ index }) => {
-                // setHighlightedObjectIndex(index);
-                //todo properly synchronise state with data store, allow deselection
-                chart.dataStore.dataHighlighted([data[index]], chart);
-                // timeout allowed us to highlight & redraw this chart before heavy blocking filter operations...
-                // but now we get highlight from useHighlightedIndex() we'd need more logic to short-circuit that.
-                // Really want to make the filtering async etc.
-                // setTimeout(()=> chart.dataStore.dataHighlighted([data[index]], chart), 5);
+            onClick: ({ index }, event) => {
+                if (index < 0) return;
+                updateHighlightedRows(data[index], getModifierState(event));
             },
             transitions: {
                 // this leads to weird behaviour when filter changes, looks ok when changing colorBy
@@ -476,6 +516,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             },
             // ...config, //make sure contour properties are passed through
             contourLayers,
+            highlightedData,
+            highlightLineWidth,
+            highlightRadiusScale: radiusScale * 1.15,
             extensions,
         });
     }, [
@@ -489,14 +532,64 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         cz,
         modelMatrix,
         extensions,
-        chart,
-        getLineWidth,
         contourLayers,
+        highlightedData,
+        highlightLineWidth,
         config.dimension,
         shouldFilterMissing,
         colorColumn,
         fallbackOnZero,
+        getModifierState,
+        updateHighlightedRows,
     ]);
+    const onScatterKeyDown = useCallback(
+        (event: React.KeyboardEvent<HTMLDivElement>) => {
+            const isActivateKey = event.key === "Enter" || event.key === " " || event.key === "Spacebar";
+            if (event.key === "Escape") {
+                if (highlightedIndices.length === 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                highlightRows([]);
+                return;
+            }
+            if (!isActivateKey) return;
+            const hoverInfo = hoverInfoRef.current;
+            if (!hoverInfo || hoverInfo.index === -1) return;
+            event.preventDefault();
+            event.stopPropagation();
+            updateHighlightedRows(data[hoverInfo.index], getModifierState(event));
+        },
+        [data, getModifierState, highlightedIndices.length, highlightRows, updateHighlightedRows],
+    );
+    const onScatterGlobalKeyDown = useCallback(
+        (event: KeyboardEvent) => {
+            if (!scatterKeyboardActiveRef.current) return;
+            const isActivateKey = event.key === "Enter" || event.key === " " || event.key === "Spacebar";
+            if (event.key === "Escape") {
+                if (highlightedIndices.length === 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                highlightRows([]);
+                return;
+            }
+            if (!isActivateKey) return;
+            const hoverInfo = hoverInfoRef.current;
+            if (!hoverInfo || hoverInfo.index === -1) return;
+            event.preventDefault();
+            event.stopPropagation();
+            updateHighlightedRows(data[hoverInfo.index], getModifierState(event));
+        },
+        [data, getModifierState, highlightedIndices.length, highlightRows, updateHighlightedRows],
+    );
+    useEffect(() => {
+        window.addEventListener("keydown", onScatterGlobalKeyDown);
+        return () => {
+            window.removeEventListener("keydown", onScatterGlobalKeyDown);
+        };
+    }, [onScatterGlobalKeyDown]);
+    const setScatterKeyboardActive = useCallback((active: boolean) => {
+        scatterKeyboardActiveRef.current = active;
+    }, []);
     // this should take into account axis margins... not chart.contentDiv,
     // but the actual area where the scatterplot is rendered
     // (which may in future be a smaller region within the deck.gl canvas itself)
@@ -532,11 +625,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 return [0, 0];
             }
         },
-        [
-            scatterplotLayer,
-            modelMatrix,
-            boundingClientRect,
-        ],
+        [scatterplotLayer, modelMatrix, boundingClientRect],
     );
     return useMemo(
         () => ({
@@ -545,13 +634,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             modelMatrix,
             viewState,
             unproject,
+            onScatterKeyDown,
+            setScatterKeyboardActive,
         }),
-        [
-            scatterplotLayer,
-            getTooltip,
-            modelMatrix,
-            viewState,
-            unproject,
-        ],
+        [scatterplotLayer, getTooltip, modelMatrix, viewState, unproject, onScatterKeyDown, setScatterKeyboardActive],
     );
 }
