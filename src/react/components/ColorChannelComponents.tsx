@@ -243,18 +243,14 @@ const buildHistogram = (
 
 const ChannelHistogram = ({ index }: { index: number }) => {
     const contrastLimits = useChannelsStore((state) => state.contrastLimits);
-    const { colors, domains, raster } = useChannelsStore(({ colors, domains, raster }) => ({
-        colors,
-        domains,
-        raster,
-    }));
+    const color = useChannelsStore((state) => state.colors[index] ?? [37, 99, 235]);
+    const currentDomain = useChannelsStore((state) => state.domains[index]);
+    const domain = currentDomain ?? ([0, 1] as Range);
+    const rasterData = useChannelsStore((state) => state.raster[index]?.data);
     const pixelValue = useViewerStore((state) => state.pixelValues[index]);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const channelsStore = useChannelsStoreApi();
-    const domain = domains[index] ?? ([0, 1] as Range);
     const limits = contrastLimits[index] ?? domain;
-    const rasterData = raster[index]?.data;
-    const color = colors[index] ?? [37, 99, 235];
     const [liveValue, setLiveValue] = useState<Range | null>(limits);
     const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
     const [yScaleMode, setYScaleMode] = useState<ScaleMode>("auto");
@@ -335,13 +331,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         ];
     }, [color, domain, histogram.counts, histogram.edges, index, pixelValue]);
 
-    if (!domains[index] || !contrastLimits[index] || isChannelLoading[index]) {
-        return (
-            <div className="flex h-[68px] items-center rounded-md border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
-                Loading histogram
-            </div>
-        );
-    }
+    const isHistogramLoading =
+        !currentDomain || !contrastLimits[index] || isChannelLoading[index];
 
     const handleBrushValue = useCallback(
         (value: Range | null) => {
@@ -362,35 +353,41 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
     return (
         <div className="flex h-full min-h-[94px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-1.5">
-            <HistogramWidget
-                layers={layers}
-                width={HISTOGRAM_WIDTH}
-                height={HISTOGRAM_HEIGHT}
-                bins={HISTOGRAM_BINS}
-                binEdges={histogram.edges}
-                xScaleType={resolvedXScale}
-                yScaleType={resolvedYScale}
-                brush={brush}
-                scaleControls={{
-                    xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
-                    yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
-                    onToggleX: () =>
-                        setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
-                    onToggleY: () =>
-                        setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
-                }}
-                markers={[
-                    {
-                        id: `pixel-value-${index}`,
-                        value: pixelValue,
-                        color: "rgba(255, 255, 255, 0.95)",
-                        hidden:
-                            !Number.isFinite(pixelValue) ||
-                            pixelValue < domain[0] ||
-                            pixelValue > domain[1],
-                    },
-                ]}
-            />
+            {isHistogramLoading ? (
+                <div className="flex h-[68px] w-full items-center rounded-md border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                    Loading histogram
+                </div>
+            ) : (
+                <HistogramWidget
+                    layers={layers}
+                    width={HISTOGRAM_WIDTH}
+                    height={HISTOGRAM_HEIGHT}
+                    bins={HISTOGRAM_BINS}
+                    binEdges={histogram.edges}
+                    xScaleType={resolvedXScale}
+                    yScaleType={resolvedYScale}
+                    brush={brush}
+                    scaleControls={{
+                        xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
+                        yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
+                        onToggleX: () =>
+                            setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
+                        onToggleY: () =>
+                            setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
+                    }}
+                    markers={[
+                        {
+                            id: `pixel-value-${index}`,
+                            value: pixelValue,
+                            color: "rgba(255, 255, 255, 0.95)",
+                            hidden:
+                                !Number.isFinite(pixelValue) ||
+                                pixelValue < domain[0] ||
+                                pixelValue > domain[1],
+                        },
+                    ]}
+                />
+            )}
         </div>
     );
 };
@@ -487,22 +484,17 @@ const BrightnessContrast = ({ index }: { index: number }) => {
 };
 
 const ChannelController = ({ index }: { index: number }) => {
-    const { colors, channelsVisible, removeChannel } =
-        useChannelsStore(
-            ({ colors, channelsVisible, removeChannel }) => ({
-                colors,
-                channelsVisible,
-                removeChannel,
-            }),
-        );
+    const color = useChannelsStore((state) => state.colors[index]);
+    const channelVisible = useChannelsStore((state) => state.channelsVisible[index]);
+    const removeChannel = useChannelsStore((state) => state.removeChannel);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
     const [isHovered, setIsHovered] = useState(false);
 
     if (!metadata) throw "no metadata"; //TODO type metadata
-    const channelVisible = channelsVisible[index];
-    const color = colors[index];
+    if (!color) return null;
+
     return (
         <>
             <div
@@ -530,6 +522,8 @@ const ChannelController = ({ index }: { index: number }) => {
                                     },
                                 }}
                                 onChange={() => {
+                                    const channelsVisible =
+                                        channelsStore.getState().channelsVisible;
                                     channelsVisible[index] = !channelVisible;
                                     const visible = [...channelsVisible];
                                     channelsStore.setState({ channelsVisible: visible });
@@ -539,6 +533,7 @@ const ChannelController = ({ index }: { index: number }) => {
                                 <PopoverPicker
                                     color={color}
                                     onChange={(c) => {
+                                        const colors = channelsStore.getState().colors;
                                         colors[index] = c;
                                         const newColors = [...colors];
                                         channelsStore.setState({ colors: newColors });
