@@ -266,6 +266,14 @@ const Main = observer(({
                             2,
                         );
                 }}
+                hoverHooks={{
+                    handleValue: (v: number[]) => {
+                        viewerStore.setState({ pixelValues: v })
+                    },
+                    handleLeave: () => {
+                        viewerStore.setState({ pixelValues: [] })
+                    }
+                }}
                 deckProps={deckProps}
             />
         </>
