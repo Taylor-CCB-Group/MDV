@@ -533,10 +533,9 @@ const ChannelController = ({ index }: { index: number }) => {
                                     onClick={stopAccordionToggle}
                                     onFocus={stopAccordionToggle}
                                     onChange={() => {
-                                        const channelsVisible =
-                                            channelsStore.getState().channelsVisible;
-                                        channelsVisible[index] = !channelVisible;
+                                        const channelsVisible = channelsStore.getState().channelsVisible;
                                         const visible = [...channelsVisible];
+                                        visible[index] = !channelVisible;
                                         channelsStore.setState({ channelsVisible: visible });
                                     }}
                                 />
@@ -549,8 +548,8 @@ const ChannelController = ({ index }: { index: number }) => {
                                         color={color}
                                         onChange={(c) => {
                                             const colors = channelsStore.getState().colors;
-                                            colors[index] = c;
                                             const newColors = [...colors];
+                                            newColors[index] = c;
                                             channelsStore.setState({ colors: newColors });
                                         }}
                                     />
