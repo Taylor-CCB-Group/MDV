@@ -1,4 +1,4 @@
-import { AppBar, Box, Toolbar } from "@mui/material";
+import { AppBar, Box, Chip, Toolbar } from "@mui/material";
 import {
     Home as HomeIcon,
     Save as SaveIcon,
@@ -23,6 +23,7 @@ import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dia
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import ChatButtons from "./ChatButtons";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import CustomTooltip from "./CustomTooltip";
 
 const MenuBarComponent = () => {
     const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
@@ -141,6 +142,19 @@ const MenuBarComponent = () => {
                         )}
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <CustomTooltip 
+                            tooltipText={
+                                config.permission === "edit" ? 
+                                "You can edit views and add data." : 
+                                "You can only view, editing is disabled."
+                            }
+                        >
+                            <Chip
+                                variant="outlined"
+                                sx={{ mr: 2, fontSize: "15px", cursor: "pointer" }}
+                                label={config.permission === "edit" ? "Editable" : "View Only"}
+                            />
+                        </CustomTooltip>
                         <ChatButtons />
                         <ToggleThemeWrapper />
                         <IconWithTooltip tooltipText="Debug / Report issue" onClick={handleDebugButtonClick}>
