@@ -502,25 +502,17 @@ const ChannelController = ({ index }: { index: number }) => {
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                <div
-                    className="min-h-[94px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2"
-                    style={{
-                        boxShadow: `inset 3px 0 0 rgb(${color[0]}, ${color[1]}, ${color[2]})`,
-                    }}
-                >
+                <div className="min-h-[94px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2">
                     <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
-                        <span>Channel</span>
+                        <div className="flex items-center gap-2">
+                            <span>Channel</span>
+                        </div>
                         <div className="flex items-center gap-1.5">
                             <Checkbox
                                 checked={channelVisible}
                                 disabled={isChannelLoading[index]}
-                                sx={{
-                                    padding: "2px",
-                                    color: "hsl(var(--muted-foreground))",
-                                    "&.Mui-checked": {
-                                        color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
-                                    },
-                                }}
+                                size="small"
+                                sx={{ padding: "2px" }}
                                 onChange={() => {
                                     const channelsVisible =
                                         channelsStore.getState().channelsVisible;
