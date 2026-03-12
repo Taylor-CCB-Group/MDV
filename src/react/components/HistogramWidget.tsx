@@ -1,6 +1,7 @@
 import * as d3 from "d3";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { useTheme } from "../hooks";
 
 type Range = [number, number];
 export type HistogramScaleType = "linear" | "log";
@@ -51,6 +52,8 @@ type HistogramWidgetProps = {
     rootMargin?: string;
 };
 
+const formatBrushValue = d3.format(".4~g");
+
 const createScale = (
     scaleType: HistogramScaleType,
     domain: Range,
@@ -70,6 +73,7 @@ const useBrushX = (
     const brushRef = useRef<ReturnType<typeof d3.brushX> | null>(null);
     const minMax = brushConfig?.minMax;
     const setValue = brushConfig?.setValue;
+    const dark = useTheme() === "dark";
 
     useEffect(() => {
         if (!ref.current || !minMax || !setValue) return;
@@ -95,20 +99,19 @@ const useBrushX = (
         const brushGroup = svg.append("g").attr("class", "brush").call(brush);
         brushGroup
             .selectAll(".selection")
-            .attr("fill", "rgba(255, 255, 255, 0.08)")
-            .attr("stroke", "rgba(229, 231, 235, 0.95)")
+            .attr("fill", dark ? "rgba(255, 255, 255, 0.08)" : "rgba(15, 23, 42, 0.08)")
+            .attr("stroke", dark ? "rgba(229, 231, 235, 0.95)" : "rgba(15, 23, 42, 0.7)")
             .attr("vector-effect", "non-scaling-stroke");
         brushGroup
             .selectAll(".handle")
-            .attr("fill", "rgba(255, 255, 255, 0.85)")
-            .attr("stroke", "rgba(156, 163, 175, 0.9)")
-            .attr("stroke-width", 0.5)
+            .attr("fill", dark ? "rgba(229, 231, 235, 0.92)" : "rgba(15, 23, 42, 0.88)")
+            .attr("stroke", "none")
             .attr("vector-effect", "non-scaling-stroke");
 
         return () => {
             svg.select(".brush").remove();
         };
-    }, [ref, histoWidth, histoHeight, minMax, setValue, xScaleType]);
+    }, [dark, ref, histoWidth, histoHeight, minMax, setValue, xScaleType]);
 
     const [debouncedValue] = useDebounce(brushConfig?.value, 100, {
         equalityFn: (a, b) => {
@@ -155,6 +158,7 @@ export default function HistogramWidget({
     rootMargin = "0px 0px 100px 0px",
 }: HistogramWidgetProps) {
     const ref = useRef<SVGSVGElement>(null);
+    const dark = useTheme() === "dark";
     useBrushX(ref, brush, width, height, xScaleType);
 
     const padding = 2;
@@ -208,8 +212,28 @@ export default function HistogramWidget({
         };
     }), [height, padding, resolvedBinEdges, xScale, yScale]);
 
+    const brushValueLabel = useMemo(() => {
+        if (!brush?.value) return null;
+        const [start, end] = brush.value[0] <= brush.value[1]
+            ? brush.value
+            : [brush.value[1], brush.value[0]];
+        return `${formatBrushValue(start)} - ${formatBrushValue(end)}`;
+    }, [brush?.value]);
+
     return (
         <div className="relative w-full">
+            {brushValueLabel ? (
+                <div
+                    className="pointer-events-none absolute left-1 top-1 z-10 rounded px-1 py-0 text-[9px] shadow-sm"
+                    style={{
+                        border: `1px solid ${dark ? "rgba(71, 85, 105, 0.9)" : "rgba(203, 213, 225, 0.95)"}`,
+                        background: dark ? "rgba(15, 23, 42, 0.9)" : "rgba(255, 255, 255, 0.92)",
+                        color: dark ? "rgba(241, 245, 249, 0.95)" : "rgba(15, 23, 42, 0.92)",
+                    }}
+                >
+                    {brushValueLabel}
+                </div>
+            ) : null}
             {scaleControls ? (
                 <div className="pointer-events-none absolute right-1 top-1 z-10 flex items-center gap-1 text-[10px] opacity-75">
                     <button
