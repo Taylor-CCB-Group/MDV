@@ -327,6 +327,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     const scale = useRegionScale();
     const hoverInfoRef = useRef<PickingInfo | null>(null);
     const scatterKeyboardActiveRef = useRef(false);
+    const spaceHighlightActiveRef = useRef(false);
+    const spaceHighlightModeRef = useRef<"add" | "remove">("add");
+    const lastSpaceHighlightedRowRef = useRef(-1);
     const highlightedIndices = useHighlightedIndices();
     const highlightRows = useHighlightRows();
     const getModifierState = useCallback(
@@ -372,16 +375,22 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             rowIndex: number,
             modifiers?: {
                 add?: boolean;
+                remove?: boolean;
                 toggle?: boolean;
             },
         ) => {
             if (rowIndex < 0) return;
-            const { add = false, toggle = false } = modifiers ?? {};
+            const { add = false, remove = false, toggle = false } = modifiers ?? {};
             if (toggle) {
                 const nextHighlights = new Set(highlightedIndices);
                 if (nextHighlights.has(rowIndex)) nextHighlights.delete(rowIndex);
                 else nextHighlights.add(rowIndex);
                 highlightRows(Array.from(nextHighlights));
+                return;
+            }
+            if (remove) {
+                if (!highlightedIndices.includes(rowIndex)) return;
+                highlightRows(highlightedIndices.filter((index) => index !== rowIndex));
                 return;
             }
             if (add) {
@@ -393,6 +402,17 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         },
         [highlightRows, highlightedIndices],
     );
+    const paintHoveredRow = useCallback(() => {
+        const hoverInfo = hoverInfoRef.current;
+        if (!hoverInfo || hoverInfo.index === -1) return;
+        const rowIndex = data[hoverInfo.index];
+        if (rowIndex === undefined || rowIndex === lastSpaceHighlightedRowRef.current) return;
+        lastSpaceHighlightedRowRef.current = rowIndex;
+        updateHighlightedRows(rowIndex, {
+            add: spaceHighlightModeRef.current === "add",
+            remove: spaceHighlightModeRef.current === "remove",
+        });
+    }, [data, updateHighlightedRows]);
 
     const { shouldFilter: shouldFilterMissing, colorColumn, fallbackOnZero } = useShouldFilterNaN();
 
@@ -501,6 +521,12 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             pickable: true,
             onHover: (info) => {
                 hoverInfoRef.current = info;
+                if (!spaceHighlightActiveRef.current) return;
+                if (info.index === -1) {
+                    lastSpaceHighlightedRowRef.current = -1;
+                    return;
+                }
+                paintHoveredRow();
             },
             stroked: false,
             // highlightedObjectIndex, // has some undesirable effects, but could be useful when better controlled
@@ -541,30 +567,11 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         fallbackOnZero,
         getModifierState,
         updateHighlightedRows,
+        paintHoveredRow,
     ]);
-    const onScatterKeyDown = useCallback(
-        (event: React.KeyboardEvent<HTMLDivElement>) => {
-            const isActivateKey = event.key === "Enter" || event.key === " " || event.key === "Spacebar";
-            if (event.key === "Escape") {
-                if (highlightedIndices.length === 0) return;
-                event.preventDefault();
-                event.stopPropagation();
-                highlightRows([]);
-                return;
-            }
-            if (!isActivateKey) return;
-            const hoverInfo = hoverInfoRef.current;
-            if (!hoverInfo || hoverInfo.index === -1) return;
-            event.preventDefault();
-            event.stopPropagation();
-            updateHighlightedRows(data[hoverInfo.index], getModifierState(event));
-        },
-        [data, getModifierState, highlightedIndices.length, highlightRows, updateHighlightedRows],
-    );
     const onScatterGlobalKeyDown = useCallback(
         (event: KeyboardEvent) => {
             if (!scatterKeyboardActiveRef.current) return;
-            const isActivateKey = event.key === "Enter" || event.key === " " || event.key === "Spacebar";
             if (event.key === "Escape") {
                 if (highlightedIndices.length === 0) return;
                 event.preventDefault();
@@ -572,24 +579,44 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 highlightRows([]);
                 return;
             }
-            if (!isActivateKey) return;
-            const hoverInfo = hoverInfoRef.current;
-            if (!hoverInfo || hoverInfo.index === -1) return;
+            if (event.key !== " " && event.key !== "Spacebar") return;
             event.preventDefault();
             event.stopPropagation();
-            updateHighlightedRows(data[hoverInfo.index], getModifierState(event));
+            spaceHighlightModeRef.current = event.shiftKey ? "remove" : "add";
+            if (spaceHighlightActiveRef.current) return;
+            spaceHighlightActiveRef.current = true;
+            lastSpaceHighlightedRowRef.current = -1;
+            paintHoveredRow();
         },
-        [data, getModifierState, highlightedIndices.length, highlightRows, updateHighlightedRows],
+        [highlightedIndices.length, highlightRows, paintHoveredRow],
     );
+    const onScatterGlobalKeyUp = useCallback((event: KeyboardEvent) => {
+        if (event.key !== " " && event.key !== "Spacebar") return;
+        spaceHighlightActiveRef.current = false;
+        lastSpaceHighlightedRowRef.current = -1;
+    }, []);
+    const clearScatterKeyboardState = useCallback(() => {
+        spaceHighlightActiveRef.current = false;
+        spaceHighlightModeRef.current = "add";
+        lastSpaceHighlightedRowRef.current = -1;
+    }, []);
     useEffect(() => {
         window.addEventListener("keydown", onScatterGlobalKeyDown);
+        window.addEventListener("keyup", onScatterGlobalKeyUp);
+        window.addEventListener("blur", clearScatterKeyboardState);
         return () => {
             window.removeEventListener("keydown", onScatterGlobalKeyDown);
+            window.removeEventListener("keyup", onScatterGlobalKeyUp);
+            window.removeEventListener("blur", clearScatterKeyboardState);
         };
-    }, [onScatterGlobalKeyDown]);
-    const setScatterKeyboardActive = useCallback((active: boolean) => {
-        scatterKeyboardActiveRef.current = active;
-    }, []);
+    }, [onScatterGlobalKeyDown, onScatterGlobalKeyUp, clearScatterKeyboardState]);
+    const setScatterKeyboardActive = useCallback(
+        (active: boolean) => {
+            scatterKeyboardActiveRef.current = active;
+            if (!active) clearScatterKeyboardState();
+        },
+        [clearScatterKeyboardState],
+    );
     // this should take into account axis margins... not chart.contentDiv,
     // but the actual area where the scatterplot is rendered
     // (which may in future be a smaller region within the deck.gl canvas itself)
@@ -634,9 +661,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             modelMatrix,
             viewState,
             unproject,
-            onScatterKeyDown,
             setScatterKeyboardActive,
         }),
-        [scatterplotLayer, getTooltip, modelMatrix, viewState, unproject, onScatterKeyDown, setScatterKeyboardActive],
+        [scatterplotLayer, getTooltip, modelMatrix, viewState, unproject, setScatterKeyboardActive],
     );
 }
