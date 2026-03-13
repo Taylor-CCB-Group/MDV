@@ -1,7 +1,7 @@
 from scanpy import AnnData
 import scipy
 import pandas as pd
-from os.path import join, split
+from os.path import join, split, exists
 import os
 import re
 import json
@@ -9,6 +9,7 @@ import gzip
 import copy
 import yaml
 import shutil
+from math import ceil
 import h5py
 import logging
 from pathlib import Path
@@ -690,6 +691,171 @@ def create_regulamentary_project(
         {
             "initialCharts": {
                 "elements": view,
+            }
+        },
+    )
+    return p
+
+def create_capsequm_project(
+    output: str,
+    results_folder: str,
+    extra_bigwigs: list =[]
+):
+    """
+    Creates a CAPSeqUM project from the results folder.
+
+    Args:
+        output (str): Path to the output directory for the MDV project.
+        results_folder (str): Base path to the results directory.
+        extra_bigwigs (list, optional): List of additional bigWig files to include. Defaults to None.
+
+    Returns:
+        MDVProject: The created MDV project object.
+    """
+    p = MDVProject(output, delete_existing=True)
+    # get info from config file
+    with open(join(results_folder,"config.yml"), 'r') as file:
+        config = yaml.safe_load(file)
+    # read  in the oligo data
+    df = pd.read_csv(join(results_folder, "all_oligos.tsv"), sep="\t")
+    #add extra column merging is_best_oligo and pass_filter
+    df["oligo_status"]=["best" if bool(x) else "pass" if bool(y) else "fail"\
+                         for x,y in zip(df["is_best_oligo"], df["pass_filter"])]
+    #get first best oligo to set genome browser location
+    best_df = df[df["oligo_status"] == "best"]
+    first_best = best_df.iloc[0] if not best_df.empty else df.iloc[0]
+    chr_val = first_best["chr"]
+    start_val = first_best["start"] -500
+    stop_val = first_best["stop"] + 500
+
+    #customize some of the columns
+    cols = [
+        {"name": "sequence", "datatype": "unique"},
+        {
+            "name": "oligo_status", 
+            "datatype": "text",
+            "values": ["best", "pass", "fail"],
+            "colors": ["#4CAF50", "#9D9E48", "#F44336"],
+        },
+        {"name": "start", "datatype": "int32"},
+        {"name": "stop", "datatype": "int32"}
+    ]
+    p.add_datasource("oligos", df, columns=cols)
+
+    # make a datasource of the regions
+    regions_file = join(results_folder, "regions", "regions.bed")
+    #does it have features i.e. SNPs
+    features_file  = join(results_folder, "regions","features.bed")
+    has_features = exists(features_file)
+  
+    rds  = pd.read_csv(features_file if has_features else regions_file, sep="\t", header=None)
+    rds.columns = ["chr", "start", "stop","region"]
+    #get failed regions
+    failed_file = join(results_folder, "failed_regions.txt")
+    failed= set()
+    if os.path.exists(failed_file):
+        failed = pd.read_csv(failed_file, sep="\t", header=None)
+        failed.columns = ["region"]
+        failed = set(failed["region"].tolist()) 
+    #add a column to the regions dataframe showing if oligos were found
+    rds["oligos found"] = ["No" if x in failed else "Yes" for x in rds["region"]]
+    p.add_datasource("regions", rds, columns=[ 
+        {"name": "start", "datatype": "int32"},
+        {"name": "stop", "datatype": "int32"},
+        {"name": "region", "datatype": "unique"},
+        {"name": "oligos found", "datatype": "text", 
+         "values":["Yes","No"],"colors":["#4CAF50","#F44336"]}
+    ])
+
+    op = config["oligo_parameters"]
+    # for features (snps) - need wide view margins to see all oligos
+    vm = op["length"]*2 +50 if has_features else 500
+    p.add_genome_browser(
+        "regions", ["chr", "start", "stop"],name="all_regions",
+        extra_params={
+            "default_parameters": {
+                "color_by": "oligos found",
+                "highlight_selected_region": True,
+                "view_margins": {"type": "fixed_length", "value": vm},
+                "color_legend": {"display": False, "pos": [5, 5]}
+            }
+        }
+    )
+
+    #calculate height of track based on overlap i.e. how stacked the oligos are
+    
+    ot_height = ceil(op["length"]/op["step"]) * 7.5
+    extra_params = {
+        "default_parameters": {
+            "color_by": "oligo_status",
+            "highlight_selected_region":True,
+            # will update when regions are selected
+            "sync_with_datastores": [
+                "regions"
+            ],
+            "view_margins": {"type": "fixed_length", "value": 500},
+             "genome_location": {
+                "chr": chr_val,
+                "start": int(start_val),
+                "end": int(stop_val)
+            },
+            "color_legend": {"display": False, "pos": [5, 5]}
+        },
+        "default_track_parameters":{
+            "height":ot_height,
+            "displayMode":"SQUISHED"
+        }
+    }
+
+    p.add_genome_browser("oligos", ["chr", "start", "stop"],extra_params=extra_params)
+    if config.get("genome"):
+        try:
+            p.add_refseq_track("oligos", config["genome"])
+        except Exception as e:
+           logger.warning(f"Could not add refseq track for genome '{config['genome']}'. Reason: {e}")
+
+    tracks =[]
+    if config.get("create_offtarget_bigwig"):
+        tracks.append({"file": join(results_folder, "offtarget.bw"),"color":"#72211F",})
+   
+    
+    if has_features:
+        tracks.append({"file": features_file,"hideLabels":True,"color":"#6B81E4"})
+    original = join(results_folder, "summits", "original_regions.bed")
+    hideLabels=False
+    if exists(original):
+        tracks.append({"file": original,"color":"#A0A0A0" })
+        hideLabels =True
+    tracks.append({
+        "file": join(results_folder, "regions", "regions.bed"),
+        "hideLabels":hideLabels,
+        "name":"Regions" if not exists(original) else "Summit Regions",
+        "color": "#6B81E4",
+    })
+    for bws in extra_bigwigs:
+        tracks.append({"file": bws,"color":"#463B86",})
+    p.add_tracks("oligos", tracks )
+
+    gb = p.get_genome_browser("oligos")
+    gb.update(
+        {
+            "id": "browser",
+            "size": [838,460],
+            "position": [5,5],
+            "title": "oligos",
+        }
+    )
+    tdir = join(split(os.path.abspath(__file__))[0], "templates")
+    with open(join(tdir, "views", "capsequm.json")) as f:
+        views = json.load(f)
+    
+    views["oligos"].append(gb)
+    p.set_view(
+        "default",
+        {
+            "initialCharts": {
+                "oligos": views["oligos"],
+                "regions": views["regions"]
             }
         },
     )
