@@ -16,7 +16,7 @@ import {
     Slider,
 } from "@mui/material";
 import * as d3 from "d3";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { shallow } from "zustand/shallow";
 import { useTheme } from "../hooks";
@@ -525,6 +525,8 @@ const ChannelController = ({ index }: { index: number }) => {
 
 const AddChannel = () => {
     const loader = useLoader();
+    const isAddingChannelRef = useRef(false);
+    const [isAddingChannel, setIsAddingChannel] = useState(false);
     // const { labels } = loader[0];
     // const channelsStore = useChannelsStoreApi();
     const { selections, setPropertiesForChannel } = useChannelsStore(({ selections, setPropertiesForChannel }) => ({
@@ -548,16 +550,22 @@ const AddChannel = () => {
         <button
             type="button"
             className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-sm transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={!canAddChannel}
+            disabled={!canAddChannel || isAddingChannel}
             onClick={async () => {
+                if (isAddingChannelRef.current) {
+                    return;
+                }
+                isAddingChannelRef.current = true;
+                setIsAddingChannel(true);
                 // would be nice to have less repition of this code here and in ChannelController
                 const index = selections.length;
                 let didAddChannel = false;
                 try {
                     setIsChannelLoading(index, true);
+                    const baseSelection = selections[0] ?? {};
                     const selection = {
-                        ...selections[0],
-                        c: index,
+                        ...baseSelection,
+                        c: baseSelection.c ?? 0,
                     };
                     addChannel({
                         selections: selection,
@@ -586,6 +594,9 @@ const AddChannel = () => {
                         return;
                     }
                     setIsChannelLoading(index, false);
+                } finally {
+                    isAddingChannelRef.current = false;
+                    setIsAddingChannel(false);
                 }
             }}
         >
