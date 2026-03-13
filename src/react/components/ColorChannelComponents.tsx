@@ -1,15 +1,7 @@
-import * as d3 from "d3";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { shallow } from "zustand/shallow";
-import {
-    type VivContextType,
-    VivProvider,
-    useChannelsStore,
-    useChannelsStoreApi,
-    useLoader,
-    useMetadata,
-    useViewerStore,
-} from "./avivatorish/state";
+import { resolveAutoHistogramXScaleFromValues, resolveAutoHistogramYScale } from "@/lib/utils";
+import { isArray } from "@/lib/utils";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
 import {
     Accordion,
@@ -23,21 +15,23 @@ import {
     Select,
     Slider,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import HighlightOffIcon from "@mui/icons-material/HighlightOff";
-import { PopoverPicker } from "./ColorPicker";
-import { getSingleSelectionStats } from "./avivatorish/utils";
-import HistogramWidget, {
-    type HistogramLayer,
-    type HistogramScaleType,
-} from "./HistogramWidget";
+import * as d3 from "d3";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { shallow } from "zustand/shallow";
 import { useTheme } from "../hooks";
+import { PopoverPicker } from "./ColorPicker";
+import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
 import {
-    resolveAutoHistogramXScaleFromValues,
-    resolveAutoHistogramYScale,
-} from "@/lib/utils";
-import { isArray } from "@/lib/utils";
+    type VivContextType,
+    VivProvider,
+    useChannelsStore,
+    useChannelsStoreApi,
+    useLoader,
+    useMetadata,
+    useViewerStore,
+} from "./avivatorish/state";
+import { getSingleSelectionStats } from "./avivatorish/utils";
 
 type Range = [number, number];
 type ScaleMode = "auto" | HistogramScaleType;
@@ -47,19 +41,14 @@ const HISTOGRAM_HEIGHT = 78;
 const stopAccordionToggle = (event: React.SyntheticEvent) => {
     event.stopPropagation();
 };
-const toggleScaleMode = (
-    mode: ScaleMode,
-    resolvedMode: HistogramScaleType,
-): ScaleMode => {
+const toggleScaleMode = (mode: ScaleMode, resolvedMode: HistogramScaleType): ScaleMode => {
     if (mode === "auto") {
         return resolvedMode === "log" ? "linear" : "log";
     }
     return mode === "log" ? "linear" : "log";
 };
 
-export default function MainVivColorDialog({
-    vivStores,
-}: { vivStores: VivContextType }) {
+export default function MainVivColorDialog({ vivStores }: { vivStores: VivContextType }) {
     return (
         <VivProvider vivStores={vivStores}>
             <Test />
@@ -68,13 +57,11 @@ export default function MainVivColorDialog({
 }
 
 const ChannelChooserMUI = ({ index }: { index: number }) => {
-    const channels = useMetadata()?.Pixels.Channels.map(
-        (c) => c.Name,
-    ) as string[];
+    const channels = useMetadata()?.Pixels.Channels.map((c) => c.Name) as string[];
     const selections = useChannelsStore(({ selections }) => selections);
     const channelsStore = useChannelsStoreApi();
     const id = useId();
-    const name = channels[selections[index].c];
+    const name = channels[selections[index].c ?? 0];
 
     return (
         <>
@@ -104,9 +91,7 @@ const ChannelChooserMUI = ({ index }: { index: number }) => {
 };
 
 const ChannelChooser = ({ index }: { index: number }) => {
-    const channels = useMetadata()?.Pixels.Channels.map(
-        (c) => c.Name,
-    ) as string[];
+    const channels = useMetadata()?.Pixels.Channels.map((c) => c.Name) as string[];
     const { selections, setPropertiesForChannel } = useChannelsStore(
         ({ selections, setPropertiesForChannel }) => ({
             selections,
@@ -115,18 +100,8 @@ const ChannelChooser = ({ index }: { index: number }) => {
         shallow,
     );
     const loader = useLoader();
-    const {
-        setIsChannelLoading,
-        isChannelLoading,
-        removeIsChannelLoading,
-        use3d,
-    } = useViewerStore(
-        ({
-            setIsChannelLoading,
-            isChannelLoading,
-            removeIsChannelLoading,
-            use3d,
-        }) => ({
+    const { setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d } = useViewerStore(
+        ({ setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d }) => ({
             setIsChannelLoading,
             isChannelLoading,
             removeIsChannelLoading,
@@ -139,7 +114,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
         <>
             <select
                 disabled={isChannelLoading[index]}
-                value={selections[index].c}
+                value={selections[index].c ?? 0}
                 className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-sm outline-none transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
                 onChange={async (e) => {
                     // see Avivator Controller.jsx onSelectionChange
@@ -149,12 +124,15 @@ const ChannelChooser = ({ index }: { index: number }) => {
                             c: Number.parseInt(e.target.value),
                         };
                         setIsChannelLoading(index, true);
-                        const { domain: domains, contrastLimits, raster } =
-                            await getSingleSelectionStats({
-                                loader,
-                                selection,
-                                use3d,
-                            });
+                        const {
+                            domain: domains,
+                            contrastLimits,
+                            raster,
+                        } = await getSingleSelectionStats({
+                            loader,
+                            selection,
+                            use3d,
+                        });
                         const newProps = {
                             domains,
                             contrastLimits, //, leaving out colors for now - keep existing color
@@ -187,8 +165,7 @@ const clampRange = (range: Range, domain: Range): Range => [
     Math.max(domain[0], Math.min(range[1], domain[1])),
 ];
 
-const sortRange = ([start, end]: Range): Range =>
-    start <= end ? [start, end] : [end, start];
+const sortRange = ([start, end]: Range): Range => (start <= end ? [start, end] : [end, start]);
 
 const rangesEqual = (a: Range, b: Range) => a[0] === b[0] && a[1] === b[1];
 
@@ -202,32 +179,22 @@ const buildHistogram = (
     if (values.length === 0) {
         return {
             counts: new Array(bins).fill(0),
-            edges: Array.from({ length: bins + 1 }, (_, index) =>
-                min + ((max - min) * index) / bins,
-            ),
+            edges: Array.from({ length: bins + 1 }, (_, index) => min + ((max - min) * index) / bins),
         };
     }
-    const adjustedDomain: Range =
-        min === max ? [min, min + 1] : [min, max];
+    const adjustedDomain: Range = min === max ? [min, min + 1] : [min, max];
     const baseHistogram = d3.bin<number, number>().domain(adjustedDomain);
     const histogram =
         xScaleType === "log"
             ? baseHistogram.thresholds(
                   Array.from({ length: bins - 1 }, (_, index) => {
                       const t = (index + 1) / bins;
-                      return d3
-                          .scaleSymlog()
-                          .domain(adjustedDomain)
-                          .range([0, 1])
-                          .invert(t);
+                      return d3.scaleSymlog().domain(adjustedDomain).range([0, 1]).invert(t);
                   }),
               )(Array.from(values))
             : baseHistogram.thresholds(bins)(Array.from(values));
     const counts = histogram.map((bin) => bin.length);
-    const edges = [
-        histogram[0]?.x0 ?? adjustedDomain[0],
-        ...histogram.map((bin) => bin.x1 ?? adjustedDomain[1]),
-    ];
+    const edges = [histogram[0]?.x0 ?? adjustedDomain[0], ...histogram.map((bin) => bin.x1 ?? adjustedDomain[1])];
     return { counts, edges };
 };
 
@@ -293,8 +260,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         ];
     }, [color, histogram.counts, index]);
 
-    const isHistogramLoading =
-        !currentDomain || !contrastLimits[index] || isChannelLoading[index];
+    const isHistogramLoading = !currentDomain || !contrastLimits[index] || isChannelLoading[index];
 
     const handleBrushValue = useCallback(
         (value: Range | null) => {
@@ -336,22 +302,15 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                     scaleControls={{
                         xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
                         yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
-                        onToggleX: () =>
-                            setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
-                        onToggleY: () =>
-                            setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
+                        onToggleX: () => setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
+                        onToggleY: () => setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
                     }}
                     markers={[
                         {
                             id: `pixel-value-${index}`,
                             value: pixelValue,
-                            color: dark
-                                ? "rgba(255, 255, 255, 0.8)"
-                                : "rgba(15, 23, 42, 0.8)",
-                            hidden:
-                                !Number.isFinite(pixelValue) ||
-                                pixelValue < domain[0] ||
-                                pixelValue > domain[1],
+                            color: dark ? "rgba(255, 255, 255, 0.8)" : "rgba(15, 23, 42, 0.8)",
+                            hidden: !Number.isFinite(pixelValue) || pixelValue < domain[0] || pixelValue > domain[1],
                         },
                     ]}
                 />
@@ -361,9 +320,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 };
 
 const BrightnessContrast = ({ index }: { index: number }) => {
-    const { contrast, brightness } = useChannelsStore(
-        ({ contrast, brightness }) => ({ contrast, brightness }),
-    );
+    const { contrast, brightness } = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     return (
@@ -568,44 +525,79 @@ const ChannelController = ({ index }: { index: number }) => {
 
 const AddChannel = () => {
     const loader = useLoader();
+    const isAddingChannelRef = useRef(false);
+    const [isAddingChannel, setIsAddingChannel] = useState(false);
     // const { labels } = loader[0];
     // const channelsStore = useChannelsStoreApi();
-    const { selections, setPropertiesForChannel } = useChannelsStore(
-        ({ selections, setPropertiesForChannel }) => ({
-            selections,
-            setPropertiesForChannel,
-        }),
-    );
+    const { selections, setPropertiesForChannel } = useChannelsStore(({ selections, setPropertiesForChannel }) => ({
+        selections,
+        setPropertiesForChannel,
+    }));
     const canAddChannel = selections.length < 6;
-    const addChannel = useChannelsStore((state) => state.addChannel);
-    const { use3d, setIsChannelLoading } = useViewerStore(
-        ({ use3d, setIsChannelLoading }) => ({ use3d, setIsChannelLoading }),
+    const { addChannel, removeChannel } = useChannelsStore((state) => ({
+        addChannel: state.addChannel,
+        removeChannel: state.removeChannel,
+    }));
+    const { use3d, setIsChannelLoading, removeIsChannelLoading } = useViewerStore(
+        ({ use3d, setIsChannelLoading, removeIsChannelLoading }) => ({
+            use3d,
+            setIsChannelLoading,
+            removeIsChannelLoading,
+        }),
         shallow,
     );
     return (
         <button
             type="button"
             className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-sm transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={!canAddChannel}
+            disabled={!canAddChannel || isAddingChannel}
             onClick={async () => {
+                if (isAddingChannelRef.current) {
+                    return;
+                }
+                isAddingChannelRef.current = true;
+                setIsAddingChannel(true);
                 // would be nice to have less repition of this code here and in ChannelController
                 const index = selections.length;
-                setIsChannelLoading(index, true);
-                const selection = { c: 0, z: 0, t: 0 };
-                addChannel({
-                    selections: selection,
-                    ids: String(Math.random()),
-                    channelsVisible: true,
-                });
-                const { domain: domains, contrastLimits, raster } =
-                    await getSingleSelectionStats({ loader, selection, use3d });
-                const newProps = {
-                    domains,
-                    contrastLimits,
-                    raster,
-                };
-                setPropertiesForChannel(index, newProps);
-                setIsChannelLoading(index, false);
+                let didAddChannel = false;
+                try {
+                    setIsChannelLoading(index, true);
+                    const baseSelection = selections[0] ?? {};
+                    const selection = {
+                        ...baseSelection,
+                        c: baseSelection.c ?? 0,
+                    };
+                    addChannel({
+                        selections: selection,
+                        ids: String(Math.random()),
+                        channelsVisible: true,
+                    });
+                    didAddChannel = true;
+                    const {
+                        domain: domains,
+                        contrastLimits,
+                        raster,
+                    } = await getSingleSelectionStats({ loader, selection, use3d });
+                    const newProps = {
+                        domains,
+                        contrastLimits,
+                        raster,
+                    };
+                    setPropertiesForChannel(index, newProps);
+                    setIsChannelLoading(index, false);
+                } catch (error) {
+                    console.error("failed to add channel");
+                    console.error(error);
+                    if (didAddChannel) {
+                        removeChannel(index);
+                        removeIsChannelLoading(index);
+                        return;
+                    }
+                    setIsChannelLoading(index, false);
+                } finally {
+                    isAddingChannelRef.current = false;
+                    setIsAddingChannel(false);
+                }
             }}
         >
             Add channel
