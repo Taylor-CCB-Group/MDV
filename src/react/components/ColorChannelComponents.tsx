@@ -33,11 +33,15 @@ import HistogramWidget, {
 } from "./HistogramWidget";
 import { useDebounce } from "use-debounce";
 import { useTheme } from "../hooks";
+import {
+    resolveAutoHistogramXScaleFromValues,
+    resolveAutoHistogramYScale,
+} from "@/lib/utils";
 import { isArray } from "@/lib/utils";
 
 type Range = [number, number];
 type ScaleMode = "auto" | HistogramScaleType;
-const HISTOGRAM_BINS = 80;
+const HISTOGRAM_BINS = 200;
 const HISTOGRAM_WIDTH = 240;
 const HISTOGRAM_HEIGHT = 78;
 const stopAccordionToggle = (event: React.SyntheticEvent) => {
@@ -188,27 +192,6 @@ const sortRange = ([start, end]: Range): Range =>
 
 const rangesEqual = (a: Range, b: Range) => a[0] === b[0] && a[1] === b[1];
 
-const resolveAutoXScale = (domain: Range): HistogramScaleType => {
-    const [min, max] = domain;
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-        return "linear";
-    }
-    const shiftedMin = Math.min(Math.abs(min), Math.abs(max)) < 1e-9
-        ? 1e-9
-        : Math.max(1e-9, Math.min(Math.abs(min), Math.abs(max)));
-    const shiftedMax = Math.max(Math.abs(min), Math.abs(max), shiftedMin);
-    return shiftedMax / shiftedMin > 500 ? "log" : "linear";
-};
-
-const resolveAutoYScale = (histogram: number[]): HistogramScaleType => {
-    const nonZero = histogram.filter((value) => value > 0);
-    if (nonZero.length < 2) return "linear";
-    const min = Math.min(...nonZero);
-    const max = Math.max(...nonZero);
-    const mean = nonZero.reduce((sum, value) => sum + value, 0) / nonZero.length;
-    return max / min > 50 || max / Math.max(1, mean) > 10 ? "log" : "linear";
-};
-
 const buildHistogram = (
     values: ArrayLike<number>,
     domain: Range,
@@ -287,15 +270,15 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     }, [channelsStore, debouncedValue, domain, index, limits]);
 
     const resolvedXScale = useMemo(
-        () => (xScaleMode === "auto" ? resolveAutoXScale(domain) : xScaleMode),
-        [domain, xScaleMode],
+        () => (xScaleMode === "auto" ? resolveAutoHistogramXScaleFromValues(domain, rasterData) : xScaleMode),
+        [domain, rasterData, xScaleMode],
     );
     const histogram = useMemo(
         () => buildHistogram(rasterData ?? [], domain, HISTOGRAM_BINS, resolvedXScale),
         [domain, rasterData, resolvedXScale],
     );
     const resolvedYScale = useMemo(
-        () => (yScaleMode === "auto" ? resolveAutoYScale(histogram.counts) : yScaleMode),
+        () => (yScaleMode === "auto" ? resolveAutoHistogramYScale(histogram.counts) : yScaleMode),
         [histogram.counts, yScaleMode],
     );
 

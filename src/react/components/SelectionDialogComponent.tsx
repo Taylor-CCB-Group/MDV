@@ -19,7 +19,11 @@ import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../ch
 import { ErrorBoundary } from "react-error-boundary";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
-import { isArray } from "@/lib/utils";
+import {
+    isArray,
+    resolveAutoHistogramXScaleFromHistogram,
+    resolveAutoHistogramYScale,
+} from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import {
     DndContext,
@@ -452,27 +456,6 @@ const toggleScaleMode = (
     return mode === "log" ? "linear" : "log";
 };
 
-const resolveAutoXScale = (domain: Range): HistogramScaleType => {
-    const [min, max] = domain;
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-        return "linear";
-    }
-    const shiftedMin = Math.min(Math.abs(min), Math.abs(max)) < 1e-9
-        ? 1e-9
-        : Math.max(1e-9, Math.min(Math.abs(min), Math.abs(max)));
-    const shiftedMax = Math.max(Math.abs(min), Math.abs(max), shiftedMin);
-    return shiftedMax / shiftedMin > 500 ? "log" : "linear";
-};
-
-const resolveAutoYScale = (histogram: number[]): HistogramScaleType => {
-    const nonZero = histogram.filter((value) => value > 0);
-    if (nonZero.length < 2) return "linear";
-    const min = Math.min(...nonZero);
-    const max = Math.max(...nonZero);
-    const mean = nonZero.reduce((sum, value) => sum + value, 0) / nonZero.length;
-    return max / min > 50 || max / Math.max(1, mean) > 10 ? "log" : "linear";
-};
-
 const Histogram = observer((props: RangeProps) => {
     const { overallHistogram, filteredHistogram, highlightedHistogram, overallHistogramError, queryHistogram } = props;
     const { histoWidth, histoHeight } = props;
@@ -487,11 +470,11 @@ const Histogram = observer((props: RangeProps) => {
     const filteredData = filteredHistogram.length > 0 ? filteredHistogram : emptyHistogram;
     const highlightedData = highlightedHistogram.length > 0 ? highlightedHistogram : emptyHistogram;
     const resolvedXScale = useMemo(
-        () => (xScaleMode === "auto" ? resolveAutoXScale(props.minMax) : xScaleMode),
-        [props.minMax, xScaleMode],
+        () => xScaleMode === "auto" ? resolveAutoHistogramXScaleFromHistogram(props.minMax, backgroundData) : xScaleMode,
+        [backgroundData, props.minMax, xScaleMode],
     );
     const resolvedYScale = useMemo(
-        () => (yScaleMode === "auto" ? resolveAutoYScale(backgroundData) : yScaleMode),
+        () => (yScaleMode === "auto" ? resolveAutoHistogramYScale(backgroundData) : yScaleMode),
         [backgroundData, yScaleMode],
     );
     useEffect(() => {
