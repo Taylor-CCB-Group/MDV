@@ -1142,7 +1142,7 @@ class MDVProject:
         replace_data=False,
         add_to_view: Optional[str] = "default",
         separator="\t"
-    ) -> list[dict[str, str]]:
+    ) -> tuple[list[str], Optional[str]]:
         """Adds a polars dataframe to the project. Each column's datatype will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
