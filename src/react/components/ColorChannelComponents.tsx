@@ -1,5 +1,3 @@
-import { resolveAutoHistogramXScaleFromValues, resolveAutoHistogramYScale } from "@/lib/utils";
-import { isArray } from "@/lib/utils";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
@@ -15,6 +13,7 @@ import {
     Select,
     Slider,
 } from "@mui/material";
+import { isArray, resolveAutoHistogramXScaleFromValues, resolveAutoHistogramYScale } from "@/lib/utils";
 import * as d3 from "d3";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -168,6 +167,82 @@ const clampRange = (range: Range, domain: Range): Range => [
 const sortRange = ([start, end]: Range): Range => (start <= end ? [start, end] : [end, start]);
 
 const rangesEqual = (a: Range, b: Range) => a[0] === b[0] && a[1] === b[1];
+
+const normalizeSampleValue = (value: number, limits: Range) => {
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
+    const [min, max] = limits;
+    const scaled = Math.max(0, (value - min) / Math.max(0.0005, max - min));
+    return Math.min(1, scaled);
+};
+
+const ChannelThumbnail = ({ index }: { index: number }) => {
+    const raster = useChannelsStore((state) => state.raster[index]);
+    const color = useChannelsStore((state) => state.colors[index] ?? [255, 255, 255]);
+    const domain = useChannelsStore((state) => state.domains[index] ?? ([0, 1] as Range));
+    const contrastLimits = useChannelsStore((state) => state.contrastLimits[index] ?? domain);
+    const isChannelLoading = useViewerStore((state) => state.isChannelLoading[index]);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || !raster?.width || !raster?.height || !raster.data) {
+            return;
+        }
+
+        const { width, height, data } = raster;
+        const pixelCount = Math.min(width * height, data.length);
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+            return;
+        }
+
+        const clampedLimits = sortRange(clampRange(contrastLimits, domain));
+        const imageData = context.createImageData(width, height);
+        const pixels = imageData.data;
+
+        for (let sourceIndex = 0; sourceIndex < pixelCount; sourceIndex += 1) {
+            const pixelIndex = sourceIndex * 4;
+            const intensity = normalizeSampleValue(Number(data[sourceIndex]), clampedLimits);
+
+            pixels[pixelIndex] = Math.round(color[0] * intensity);
+            pixels[pixelIndex + 1] = Math.round(color[1] * intensity);
+            pixels[pixelIndex + 2] = Math.round(color[2] * intensity);
+            pixels[pixelIndex + 3] = 255;
+        }
+
+        context.putImageData(imageData, 0, 0);
+    }, [color, contrastLimits, domain, raster]);
+
+    if (isChannelLoading || !raster?.width || !raster?.height || !raster.data?.length) {
+        return (
+            <div className="flex h-[68px] w-full items-center justify-center rounded-md border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                Sample unavailable
+            </div>
+        );
+    }
+
+    const aspectRatio = raster.width / raster.height;
+
+    return (
+        <div className="flex w-full items-center justify-center overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[radial-gradient(circle_at_top,hsl(var(--muted)/0.35),hsl(var(--background)))] p-1">
+            <canvas
+                ref={canvasRef}
+                className="block h-auto w-full max-w-full rounded-sm"
+                style={{
+                    aspectRatio: `${raster.width} / ${raster.height}`,
+                    imageRendering: "pixelated",
+                    maxHeight: aspectRatio > 3 ? "88px" : "120px",
+                    objectFit: "contain",
+                }}
+            />
+        </div>
+    );
+};
 
 const buildHistogram = (
     values: ArrayLike<number>,
@@ -434,12 +509,21 @@ const ChannelController = ({ index }: { index: number }) => {
                     <div className="flex min-h-[86px] min-w-0 flex-col justify-between rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5">
                         <div className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
                             <div className="flex items-center gap-2">
-                                <span
-                                    className="h-2.5 w-2.5 rounded-full border border-black/10"
-                                    style={{
-                                        backgroundColor: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
-                                    }}
-                                />
+                                <div
+                                    className="h-4 w-4 overflow-hidden rounded-full border border-black/10 shadow-sm"
+                                    onClick={stopAccordionToggle}
+                                    onFocus={stopAccordionToggle}
+                                >
+                                    <PopoverPicker
+                                        color={color}
+                                        onChange={(c) => {
+                                            const colors = channelsStore.getState().colors;
+                                            const newColors = [...colors];
+                                            newColors[index] = c;
+                                            channelsStore.setState({ colors: newColors });
+                                        }}
+                                    />
+                                </div>
                                 <span>Channel</span>
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -457,22 +541,10 @@ const ChannelController = ({ index }: { index: number }) => {
                                         channelsStore.setState({ channelsVisible: visible });
                                     }}
                                 />
-                                <div
-                                    className="h-7 min-w-9 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm"
-                                    onClick={stopAccordionToggle}
-                                    onFocus={stopAccordionToggle}
-                                >
-                                    <PopoverPicker
-                                        color={color}
-                                        onChange={(c) => {
-                                            const colors = channelsStore.getState().colors;
-                                            const newColors = [...colors];
-                                            newColors[index] = c;
-                                            channelsStore.setState({ colors: newColors });
-                                        }}
-                                    />
-                                </div>
                             </div>
+                        </div>
+                        <div onClick={stopAccordionToggle} onFocus={stopAccordionToggle}>
+                            <ChannelThumbnail index={index} />
                         </div>
                         <div onClick={stopAccordionToggle} onFocus={stopAccordionToggle}>
                             <ChannelChooser index={index} />
