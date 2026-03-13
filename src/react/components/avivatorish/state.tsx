@@ -1,8 +1,8 @@
-import type { loadOmeTiff, loadOmeZarr } from "@hms-dbmi/viv";
-import { observer } from "mobx-react-lite";
 import { type PropsWithChildren, createContext, useContext } from "react";
+import type { loadOmeTiff, loadOmeZarr } from "@hms-dbmi/viv";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
+import { observer } from "mobx-react-lite";
 import type { EqFn, Selector, ZustandStore } from "./zustandTypes";
 
 // what about loadOmeZarr, loadBioformatsZarr...
@@ -10,11 +10,10 @@ import type { EqFn, Selector, ZustandStore } from "./zustandTypes";
 export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
 export type OME_ZARR = Awaited<ReturnType<typeof loadOmeZarr>>;
 export type PixelSource = OME_TIFF | OME_ZARR;
-export type VivSelection = Record<string, number>;
 
-import { getEntries } from "@/lib/utils";
 // --- copied straight from Avivator's code::: with notes / changes for MDV ---
 import { RENDERING_MODES } from "@hms-dbmi/viv";
+import { getEntries } from "@/lib/utils";
 
 const capitalize = (string: string) => string.charAt(0).toUpperCase() + string.slice(1);
 
@@ -55,7 +54,7 @@ export type ChannelsState = {
         height: number;
         data: ArrayLike<number>;
     }[];
-    selections: VivSelection[];
+    selections: { z: number; c: number; t: number }[];
     loader: any; //TBD
     image: number;
     ids: string[];
@@ -72,7 +71,7 @@ export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
     colors: [],
     domains: [] as [number, number][],
     raster: [],
-    selections: [] as VivSelection[],
+    selections: [] as { z: number; c: number; t: number }[],
     ids: [],
     // not for serialization... think about this.
     loader: [{ labels: [], shape: [] }],
@@ -86,7 +85,7 @@ const DEFAUlT_CHANNEL_VALUES = {
     colors: [255, 255, 255],
     domains: [0, 65535],
     raster: { width: 0, height: 0, data: new Float32Array() },
-    selections: {},
+    selections: { z: 0, c: 0, t: 0 },
     ids: "",
 };
 const DEFAULT_IMAGE_STATE = {
@@ -121,7 +120,7 @@ const DEFAULT_VIEWER_STATE = {
     use3d: false, //not used at the moment, but should be
     useLens: false,
     useColormap: false,
-    globalSelection: {} as VivSelection,
+    globalSelection: { z: 0, t: 0 },
     channelOptions: [] as any[],
     /** type is WIP */
     metadata: null as Metadata | null,
@@ -173,9 +172,14 @@ export type VivContextType = {
     channelsStore: ZustandStore<
         WithToggles<ChannelsState> & {
             toggleIsOn: (index: number) => void;
-            setPropertiesForChannel: (channel: number, newProperties: NewChannelValues) => void;
+            setPropertiesForChannel: (
+                channel: number,
+                newProperties: NewChannelValues,
+            ) => void;
             removeChannel: (channel: number) => void;
-            addChannel: (newProperties: NewChannelValues) => void;
+            addChannel: (
+                newProperties: NewChannelValues,
+            ) => void;
         }
     >;
     imageSettingsStore: ZustandStore<WithToggles<ImageState>>;
@@ -287,9 +291,18 @@ const VivContext = createContext<VivContextType>(null as any);
  * Separate providers - referring to the same `chart.vivStores` - are used both by the chart
  * itself and by the color-change GUI dialog.
  */
-export const VivProvider = observer(({ children, vivStores }: PropsWithChildren & { vivStores: VivContextType }) => {
-    return <VivContext.Provider value={vivStores}>{children}</VivContext.Provider>;
-});
+export const VivProvider = observer(
+    ({
+        children,
+        vivStores,
+    }: PropsWithChildren & { vivStores: VivContextType }) => {
+        return (
+            <VivContext.Provider value={vivStores}>
+                {children}
+            </VivContext.Provider>
+        );
+    },
+);
 
 export type StoreName = keyof VivContextType;
 export type ImageSettingsStore = VivContextType["imageSettingsStore"];
@@ -310,37 +323,49 @@ export const useViewerStoreApi = () => useStoreApi("viewerStore");
 /** should be more-or-less equivalent to equivalent avivator hook -
  * but there can be multiple viv viewers, so we have context for that.
  */
-export function useChannelsStore<U>(selector: Selector<ChannelsStore, U>, equalityFn?: EqFn<U>) {
+export function useChannelsStore<U>(
+    selector: Selector<ChannelsStore, U>,
+    equalityFn?: EqFn<U>,
+) {
     const store = useChannelsStoreApi();
     return useStoreWithEqualityFn(store, selector, equalityFn);
 }
-export function useImageSettingsStore<U>(selector: Selector<ImageSettingsStore, U>, equalityFn?: EqFn<U>) {
+export function useImageSettingsStore<U>(
+    selector: Selector<ImageSettingsStore, U>,
+    equalityFn?: EqFn<U>,
+) {
     const store = useImageSettingsStoreApi();
     return useStoreWithEqualityFn(store, selector, equalityFn);
 }
 
-export function useViewerStore<U>(selector: Selector<ViewerStore, U>, equalityFn?: EqFn<U>) {
+export function useViewerStore<U>(
+    selector: Selector<ViewerStore, U>,
+    equalityFn?: EqFn<U>,
+) {
     const store = useViewerStoreApi();
     return useStoreWithEqualityFn(store, selector, equalityFn);
 }
 
 export const useLoader = () => {
-    const [fullLoader, image] = useChannelsStore((store) => [store.loader, store.image]);
+    const [fullLoader, image] = useChannelsStore((store) => [
+        store.loader,
+        store.image,
+    ]);
     return Array.isArray(fullLoader[0]) ? fullLoader[image] : fullLoader;
 };
 //! todo review the typing here...
-type OME_METADATA = OME_ZARR["metadata"] & {
+type OME_METADATA = OME_ZARR['metadata'] & {
     // in practice, we seem to get something that looks like this...
     // at least, that was true for the first sample I looked at...
     // and at least that allows us to remove some ts-expect-error
     Pixels: {
-        Channels: Array<{ Name: string; SamplesPerPixel: number; Color?: any }>;
+        Channels: Array<{Name: string, SamplesPerPixel: number, Color?: any}>,
         //! I don't think we actually do see these on OME-ZARR
         PhysicalSizeX?: number;
         PhysicalSizeXUnit?: string;
-    };
-};
-export type Metadata = OME_TIFF["metadata"] | OME_METADATA;
+    }
+}
+export type Metadata = OME_TIFF['metadata'] | OME_METADATA;
 //export type Metadata = TiffPreviewProps["metadata"];
 export const useMetadata = (): Metadata | undefined | null => {
     try {

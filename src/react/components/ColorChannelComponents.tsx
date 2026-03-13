@@ -31,7 +31,7 @@ import {
     useMetadata,
     useViewerStore,
 } from "./avivatorish/state";
-import { buildSelectionForSource, getSingleSelectionStats } from "./avivatorish/utils";
+import { getSingleSelectionStats } from "./avivatorish/utils";
 
 type Range = [number, number];
 type ScaleMode = "auto" | HistogramScaleType;
@@ -555,10 +555,10 @@ const AddChannel = () => {
                 let didAddChannel = false;
                 try {
                     setIsChannelLoading(index, true);
-                    const selection = buildSelectionForSource(loader[0], {
-                        selection: selections[0],
-                        overrides: { c: index },
-                    });
+                    const selection = {
+                        ...selections[0],
+                        c: index,
+                    };
                     addChannel({
                         selections: selection,
                         ids: String(Math.random()),

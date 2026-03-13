@@ -1,20 +1,20 @@
-import { Matrix4 } from "@math.gl/core";
+import { useState, useEffect } from "react";
 import { fromBlob, fromUrl } from "geotiff";
-import { useEffect, useState } from "react";
+import { Matrix4 } from "@math.gl/core";
 
 import {
-    AdditiveColormap3DExtensions,
-    ColorPalette3DExtensions,
-    RENDERING_MODES,
-    getChannelStats,
-    loadMultiTiff,
     loadOmeTiff,
     loadOmeZarr,
+    loadMultiTiff,
+    getChannelStats,
+    RENDERING_MODES,
+    ColorPalette3DExtensions,
+    AdditiveColormap3DExtensions,
 } from "@hms-dbmi/viv";
 
-import { isArray } from "@/lib/utils";
 import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
-import type { OME_TIFF, PixelSource, VivSelection } from "./state";
+import { isArray } from "@/lib/utils";
+import type { OME_TIFF, PixelSource } from "./state";
 
 // Import and register JPEG2000 decoder
 import "@/utilities/jpeg2000/Jpeg2000Decoder";
@@ -28,7 +28,11 @@ const MAX_CHANNELS_FOR_SNACKBAR_WARNING = 40;
 function isOmeTiff(urlOrFile: string | File) {
     if (Array.isArray(urlOrFile)) return false; // local Zarr is array of File Objects
     const name = typeof urlOrFile === "string" ? urlOrFile : urlOrFile.name;
-    return name.includes("ome.tiff") || name.includes("ome.tif") || name.includes(".companion.ome");
+    return (
+        name.includes("ome.tiff") ||
+        name.includes("ome.tif") ||
+        name.includes(".companion.ome")
+    );
 }
 export type UrlOrFiles = string | File | File[];
 /**
@@ -52,7 +56,10 @@ function isMultiTiff(urlOrFiles: UrlOrFiles) {
     const filenames = getMultiTiffFilenames(urlOrFiles);
     for (const filename of filenames) {
         const lowerCaseName = filename.toLowerCase();
-        if (!(lowerCaseName.includes(".tiff") || lowerCaseName.includes(".tif"))) return false;
+        if (
+            !(lowerCaseName.includes(".tiff") || lowerCaseName.includes(".tif"))
+        )
+            return false;
     }
     return true;
 }
@@ -79,18 +86,19 @@ async function getTiffImageCount(src: string | File) {
     const tiff = await from(src);
     return tiff.getImageCount();
 }
+/** addresses `c` channel, `z` z-stack index, `t`: time index */
+export type VivSelection = { c: number; z: number; t: number };
 // all very clever but unnecessary abstraction and also wrong:
 // type VivSelection = { [Key in typeof GLOBAL_SLIDER_DIMENSION_FIELDS[number]]?: number };
-type TiffVivSelection = { c: number; z: number; t: number };
 /**
  * Guesses whether string URL or File is one or multiple standard TIFF images.
  */
 async function generateMultiTiffSources(urlOrFiles: UrlOrFiles) {
     const multiTiffFiles = await generateMultiTiffFileArray(urlOrFiles);
-    const sources: [TiffVivSelection[], any][] = [];
+    const sources: [VivSelection[], any][] = [];
     let c = 0;
     for (const tiffFile of multiTiffFiles) {
-        const selections: TiffVivSelection[] = [];
+        const selections: VivSelection[] = [];
         const numImages = await getTiffImageCount(tiffFile);
         for (let i = 0; i < numImages; i++) {
             selections.push({ c, z: 0, t: 0 });
@@ -118,7 +126,9 @@ async function getTotalImageCount(sources: OmeTiffImage[]) {
         z: 0,
         t: 0,
     });
-    const hasSubIFDs = Boolean(representativeGeoTiffImage?.fileDirectory?.SubIFDs);
+    const hasSubIFDs = Boolean(
+        representativeGeoTiffImage?.fileDirectory?.SubIFDs,
+    );
 
     // Non-Bioformats6 pyramids use Image tags for pyramid levels and do not have offsets
     // built in to the format for them, hence the ternary.
@@ -193,13 +203,19 @@ export async function createLoader(
 
             // Show a warning if the total number of channels/images exceeds a fixed amount.
             const totalImageCount = await getTotalImageCount(source);
-            if (!maybeOffsets && totalImageCount > MAX_CHANNELS_FOR_SNACKBAR_WARNING) {
+            if (
+                !maybeOffsets &&
+                totalImageCount > MAX_CHANNELS_FOR_SNACKBAR_WARNING
+            ) {
                 handleOffsetsNotFound(true);
             }
             return source;
         }
 
-        if (isArray(urlOrFile) && typeof urlOrFile[0].arrayBuffer !== "function") {
+        if (
+            isArray(urlOrFile) &&
+            typeof urlOrFile[0].arrayBuffer !== "function"
+        ) {
             throw new UnsupportedBrowserError(
                 "Cannot upload a local Zarr or flat TIFF files with this browser. Try using Chrome, Firefox, or Microsoft Edge.",
             );
@@ -248,31 +264,35 @@ export function getNameFromUrl(url: string) {
 //type DIMENSION_FIELDx = typeof GLOBAL_SLIDER_DIMENSION_FIELDS[number];
 // type DIMENSION_FIELD = "x" | "y" | "z" | "t" | "c"; //?
 type DIMENSION_FIELD = "z" | "t";
-type SourceLike = { labels: string[]; shape: number[] };
 /**
  * Return the midpoint of the global dimensions as a default selection.
- *
+ * 
  * n.b. some of the more abstract way in which dimension could be addressed has been
  * removed in favor of a more direct approach - would be good to verify that the premise
  * is still valid.
  */
-function getDefaultGlobalSelection(dimensions: { name: string; size: number }[]) {
+function getDefaultGlobalSelection(dimensions: {name: string, size: number}[]) {
     const globalSelectableDimensions = dimensions.filter((d) =>
-        GLOBAL_SLIDER_DIMENSION_FIELDS.includes(d.name.toLowerCase() as DIMENSION_FIELD),
-    );
+        GLOBAL_SLIDER_DIMENSION_FIELDS.includes(d.name.toLowerCase()),
+    ) as unknown as DIMENSION_FIELD[];
 
-    const selection: VivSelection = {};
+    const selection: Partial<VivSelection> = {};
     for (const dim of globalSelectableDimensions) {
+        //@ts-ignore
         selection[dim.name] = Math.floor(dim.size / 2);
     }
 
-    return selection;
+    return selection as VivSelection; //!probably not partial at this point?
 }
 
 function isGlobalOrXYDimension(name: string): name is "x" | "y" {
     // normalize name to lowercase
     name = name.toLowerCase();
-    return name === "x" || name === "y" || GLOBAL_SLIDER_DIMENSION_FIELDS.includes(name);
+    return (
+        name === "x" ||
+        name === "y" ||
+        GLOBAL_SLIDER_DIMENSION_FIELDS.includes(name)
+    );
 }
 
 /**
@@ -290,99 +310,45 @@ function zip<A, B>(a: A[], b: B[]): [A, B][] {
     }
     return a.map((val, i) => [val, b[i]]);
 }
-
-function getSourceDimensions({ labels, shape }: SourceLike) {
-    const normalizedLabels = isInterleaved(shape) && shape.length === labels.length + 1 ? [...labels, "c"] : labels;
-    return zip(normalizedLabels, shape).map(([name, size]) => ({
-        key: name.toLowerCase(),
-        name,
-        size,
-    }));
-}
-
-function getSourceDimensionMap(source: SourceLike) {
-    const { shape } = source;
-    const dimensions = getSourceDimensions(source);
-    const dimensionMap = new Map(dimensions.map((dim) => [dim.key, dim]));
-    if (isInterleaved(shape) && !dimensionMap.has("c")) {
-        dimensionMap.set("c", { key: "c", name: "c", size: shape.at(-1) ?? 1 });
-    }
-    return dimensionMap;
-}
-
-function clampSelectionValue(value: number, size: number) {
-    if (!Number.isFinite(value)) {
-        return 0;
-    }
-    return Math.max(0, Math.min(Math.trunc(value), Math.max(0, size - 1)));
-}
-
-export function buildSelectionForSource(
-    source: SourceLike,
-    {
-        selection = {},
-        overrides = {},
-    }: {
-        selection?: VivSelection;
-        overrides?: VivSelection;
-    } = {},
-) {
-    const dimensions = getSourceDimensions(source);
-    const defaultSelection = getDefaultGlobalSelection(dimensions);
-    const dimensionMap = getSourceDimensionMap(source);
-    const nextSelection: VivSelection = {};
-
-    for (const [key, value] of Object.entries({
-        ...defaultSelection,
-        ...selection,
-        ...overrides,
-    })) {
-        const dimension = dimensionMap.get(key.toLowerCase());
-        if (!dimension) {
-            continue;
-        }
-        nextSelection[dimension.name] = clampSelectionValue(value, dimension.size);
-    }
-
-    return nextSelection;
-}
 /**
  * Create a default selection using the midpoint of the available global dimensions,
  * and then the first four available selections from the first selectable channel.
  * @param pixelSource
  */
-export function buildDefaultSelection({ labels, shape }: { labels: string[]; shape: number[] }): VivSelection[] {
+export function buildDefaultSelection({ labels, shape }: { labels: string[], shape: number[] }): VivSelection[] {
     const selection: VivSelection[] = [];
 
-    const dimensions = getSourceDimensions({ labels, shape });
+    const dimensions = zip(labels, shape).map(([name, size]) => ({
+        name,
+        size,
+    }));
 
-    const globalSelection = buildSelectionForSource({ labels, shape });
+    const globalSelection = getDefaultGlobalSelection(dimensions);
 
     // First non-global dimension with some sort of selectable values.
-    const firstNonGlobalSelectableDimension = dimensions.find((dim) => !isGlobalOrXYDimension(dim.name));
+    const firstNonGlobalSelectableDimension = dimensions.find(
+        (dim) => !isGlobalOrXYDimension(dim.name),
+    );
 
     // If there are no additional selectable dimensions, return the global selection.
     if (!firstNonGlobalSelectableDimension) {
         return [globalSelection];
     }
 
-    for (let i = 0; i < Math.min(4, firstNonGlobalSelectableDimension.size); i += 1) {
+    for (
+        let i = 0;
+        i < Math.min(4, firstNonGlobalSelectableDimension.size);
+        i += 1
+    ) {
         //@ts-ignore
         selection.push({
-            ...buildSelectionForSource(
-                { labels, shape },
-                {
-                    selection: globalSelection,
-                    overrides: {
-                        [firstNonGlobalSelectableDimension.name]: i,
-                    },
-                },
-            ),
+            [firstNonGlobalSelectableDimension.name]: i,
+            ...globalSelection,
         });
     }
 
     if (isInterleaved(shape)) {
-        return [buildSelectionForSource({ labels, shape }, { selection: selection[0], overrides: { c: 0 } })];
+        return [{ ...selection[0], c: 0 }];
     }
 
     return selection;
@@ -426,13 +392,10 @@ type LOADER = OME_TIFF | any; //idk
 function narrowLimits(limits: number[]): limits is [number, number] {
     return limits.length === 2;
 }
-function narrowStats(stats: { domain: number[]; contrastLimits: number[] }): stats is {
-    domain: [number, number];
-    contrastLimits: [number, number];
-} {
+function narrowStats(stats: { domain: number[]; contrastLimits: number[] }): stats is { domain: [number, number]; contrastLimits: [number, number] } {
     return narrowLimits(stats.domain) && narrowLimits(stats.contrastLimits);
 }
-export async function getSingleSelectionStats2D({ loader, selection }: { loader: LOADER; selection: VivSelection }) {
+export async function getSingleSelectionStats2D({ loader, selection }: { loader: LOADER, selection: VivSelection}) {
     const data = Array.isArray(loader) ? loader[loader.length - 1] : loader;
     const raster = await data.getRaster({ selection });
     const selectionStats = getChannelStats(raster.data);
@@ -448,7 +411,7 @@ export async function getSingleSelectionStats2D({ loader, selection }: { loader:
     return { domain, contrastLimits, raster };
 }
 
-export async function getSingleSelectionStats3D({ loader, selection }: { loader: LOADER; selection: VivSelection }) {
+export async function getSingleSelectionStats3D({ loader, selection }: { loader: LOADER, selection: VivSelection }) {
     const lowResSource = loader[loader.length - 1];
     const { shape, labels } = lowResSource;
     const sizeZ = shape[labels.indexOf("z")];
@@ -470,29 +433,33 @@ export async function getSingleSelectionStats3D({ loader, selection }: { loader:
             Math.max(stats0.domain[1], statsMid.domain[1], statsTop.domain[1]),
         ] satisfies [number, number],
         contrastLimits: [
-            Math.min(stats0.contrastLimits[0], statsMid.contrastLimits[0], statsTop.contrastLimits[0]),
-            Math.max(stats0.contrastLimits[1], statsMid.contrastLimits[1], statsTop.contrastLimits[1]),
+            Math.min(
+                stats0.contrastLimits[0],
+                statsMid.contrastLimits[0],
+                statsTop.contrastLimits[0],
+            ),
+            Math.max(
+                stats0.contrastLimits[1],
+                statsMid.contrastLimits[1],
+                statsTop.contrastLimits[1],
+            ),
         ] satisfies [number, number],
         raster: rasterMid,
     };
 }
 
-export const getSingleSelectionStats = async ({
-    loader,
-    selection,
-    use3d,
-}: { loader: LOADER; selection: VivSelection; use3d: boolean }) => {
-    const getStats = use3d ? getSingleSelectionStats3D : getSingleSelectionStats2D;
+export const getSingleSelectionStats = async ({ loader, selection, use3d }: { loader: LOADER, selection: VivSelection, use3d: boolean }) => {
+    const getStats = use3d
+        ? getSingleSelectionStats3D
+        : getSingleSelectionStats2D;
     return getStats({ loader, selection });
 };
 
-export const getMultiSelectionStats = async ({
-    loader,
-    selections,
-    use3d,
-}: { loader: LOADER; selections: VivSelection[]; use3d: boolean }) => {
+export const getMultiSelectionStats = async ({ loader, selections, use3d }: { loader: LOADER, selections: VivSelection[], use3d: boolean }) => {
     const stats = await Promise.all(
-        selections.map((selection) => getSingleSelectionStats({ loader, selection, use3d })),
+        selections.map((selection) =>
+            getSingleSelectionStats({ loader, selection, use3d }),
+        ),
     );
     const domains = stats.map((stat) => stat.domain);
     const contrastLimits = stats.map((stat) => stat.contrastLimits);
@@ -528,14 +495,17 @@ export function guessRgb({ Pixels }: any) {
     const { SamplesPerPixel } = Pixels.Channels[0];
 
     const is3Channel8Bit = numChannels === 3 && Pixels.Type === "uint8";
-    const interleavedRgb = Pixels.SizeC === 3 && numChannels === 1 && Pixels.Interleaved;
+    const interleavedRgb =
+        Pixels.SizeC === 3 && numChannels === 1 && Pixels.Interleaved;
 
     return SamplesPerPixel === 3 || is3Channel8Bit || interleavedRgb;
 }
 export function truncateDecimalNumber(value: number, maxLength: number) {
     if (!value && value !== 0) return "";
     const stringValue = value.toString();
-    return stringValue.length > maxLength ? stringValue.substring(0, maxLength).replace(/\.$/, "") : stringValue;
+    return stringValue.length > maxLength
+        ? stringValue.substring(0, maxLength).replace(/\.$/, "")
+        : stringValue;
 }
 
 /**
@@ -556,9 +526,18 @@ export function getBoundingCube(loader: PixelSource) {
     const source = Array.isArray(loader) ? loader[0] : loader;
     const { shape, labels } = source;
     const physicalSizeScalingMatrix = getPhysicalSizeScalingMatrix(source);
-    const xSlice: [number, number] = [0, physicalSizeScalingMatrix[0] * shape[labels.indexOf("x")]];
-    const ySlice: [number, number] = [0, physicalSizeScalingMatrix[5] * shape[labels.indexOf("y")]];
-    const zSlice: [number, number] = [0, physicalSizeScalingMatrix[10] * shape[labels.indexOf("z")]];
+    const xSlice: [number, number] = [
+        0,
+        physicalSizeScalingMatrix[0] * shape[labels.indexOf("x")],
+    ];
+    const ySlice: [number, number] = [
+        0,
+        physicalSizeScalingMatrix[5] * shape[labels.indexOf("y")],
+    ];
+    const zSlice: [number, number] = [
+        0,
+        physicalSizeScalingMatrix[10] * shape[labels.indexOf("z")],
+    ];
     return [xSlice, ySlice, zSlice];
 }
 
@@ -569,7 +548,9 @@ export type RenderingMode = RENDERING_MODES[keyof RENDERING_MODES];
  * @param renderingMode
  */
 export function get3DExtension(colormap: boolean, renderingMode: RenderingMode) {
-    const extensions = colormap ? AdditiveColormap3DExtensions : ColorPalette3DExtensions;
+    const extensions = colormap
+        ? AdditiveColormap3DExtensions
+        : ColorPalette3DExtensions;
     if (renderingMode === RENDERING_MODES.MAX_INTENSITY_PROJECTION) {
         return new extensions.MaximumIntensityProjectionExtension(undefined);
     }
@@ -605,7 +586,7 @@ const SI_PREFIXES = [
     { symbol: "z", exponent: -21 },
     { symbol: "y", exponent: -24 },
 ] as const;
-type SizeUnit = (typeof SI_PREFIXES)[number]["symbol"];
+type SizeUnit = typeof SI_PREFIXES[number]["symbol"];
 /**
  * Convert a size value to meters.
  * @param size Size in original units.
