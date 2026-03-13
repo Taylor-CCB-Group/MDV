@@ -1,8 +1,4 @@
-import {
-    getDefaultInitialViewState,
-    ColorPaletteExtension,
-    DetailView,
-} from "@hms-dbmi/viv";
+import { getDefaultInitialViewState, ColorPaletteExtension, DetailView } from "@hms-dbmi/viv";
 import { observer } from "mobx-react-lite";
 import { useMemo, useEffect, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
@@ -12,13 +8,7 @@ import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend } from "../contour_state";
 import type { DualContourLegacyConfig } from "../contour_state";
 import type { FieldName } from "@/charts/charts";
-import {
-    useLoader,
-    type OME_TIFF,
-    useViewerStoreApi,
-    useChannelsStore,
-    useViewerStore,
-} from "./avivatorish/state";
+import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
@@ -37,13 +27,9 @@ export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move
 export const VivScatter = () => {
     const chart = useChart();
     const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
-    
+
     return (
-        <SpatialAnnotationProvider 
-            chart={chart}
-            hoveredFieldId={hoveredField}
-            setHoveredFieldId={setHoveredField}
-        >
+        <SpatialAnnotationProvider chart={chart} hoveredFieldId={hoveredField} setHoveredFieldId={setHoveredField}>
             <Main hoveredField={hoveredField} setHoveredField={setHoveredField} />
         </SpatialAnnotationProvider>
     );
@@ -80,202 +66,170 @@ const useJsonLayer = (showJson: boolean) => {
     return layer;
 };
 
-const Main = observer(({ 
-    hoveredField, 
-    setHoveredField 
-}: { 
-    hoveredField: FieldName | null;
-    setHoveredField: (fieldId: FieldName | null) => void;
-}) => {
-    // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
-    const ome = useLoader() as OME_TIFF["data"]; // useOmeTiff();
+const Main = observer(
+    ({
+        hoveredField,
+        setHoveredField,
+    }: {
+        hoveredField: FieldName | null;
+        setHoveredField: (fieldId: FieldName | null) => void;
+    }) => {
+        // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
+        const ome = useLoader() as OME_TIFF["data"]; // useOmeTiff();
 
-    const viewerStore = useViewerStoreApi();
-    const [width, height] = useChartSize();
-    const id = useChartID();
-    const detailId = `${id}detail-react`;
-    const outerContainer = useOuterContainer();
+        const viewerStore = useViewerStoreApi();
+        const [width, height] = useChartSize();
+        const id = useChartID();
+        const detailId = `${id}detail-react`;
+        const outerContainer = useOuterContainer();
 
-    // this isn't updating when we tweak the config...
-    const { scatterProps, selectionLayer } = useSpatialLayers();
-    const { scatterplotLayer, getTooltip } = scatterProps;
-    const { showJson } = useConfig<VivRoiConfig>();
-    // passing showJson from here to make use of this being `observer`
-    const jsonLayer = useJsonLayer(showJson);
-    
-    // Get field contour legend data
-    const config = useConfig<DualContourLegacyConfig>();
-    const legendFields = useFieldContourLegend(config.densityFields);
-    
-    // Legend visibility - fixed position in bottom-left
-    const showLegend = config.field_legend.display;
-    
-    // Fixed bottom-left position: 10px from left, 10px from bottom
-    const legendPosition = { x: 10, y: 10 };
-    
-    const handleFieldHover = (fieldId: FieldName | null) => {
-        setHoveredField(fieldId);
-    };
+        // this isn't updating when we tweak the config...
+        const { scatterProps, selectionLayer } = useSpatialLayers();
+        const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
+        const { showJson } = useConfig<VivRoiConfig>();
+        // passing showJson from here to make use of this being `observer`
+        const jsonLayer = useJsonLayer(showJson);
 
-    // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
-    const {
-        colors,
-        contrastLimits,
-        channelsVisible,
-        selections,
-        brightness,
-        contrast,
-    } = useChannelsStore(
-        ({
-            colors,
-            contrastLimits,
-            channelsVisible,
-            selections,
-            brightness,
-            contrast,
-        }) => {
-            return {
-                colors,
-                contrastLimits,
-                channelsVisible,
+        // Get field contour legend data
+        const config = useConfig<DualContourLegacyConfig>();
+        const legendFields = useFieldContourLegend(config.densityFields);
+
+        // Legend visibility - fixed position in bottom-left
+        const showLegend = config.field_legend.display;
+
+        // Fixed bottom-left position: 10px from left, 10px from bottom
+        const legendPosition = { x: 10, y: 10 };
+
+        const handleFieldHover = (fieldId: FieldName | null) => {
+            setHoveredField(fieldId);
+        };
+
+        // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
+        const { colors, contrastLimits, channelsVisible, selections, brightness, contrast } = useChannelsStore(
+            ({ colors, contrastLimits, channelsVisible, selections, brightness, contrast }) => {
+                return {
+                    colors,
+                    contrastLimits,
+                    channelsVisible,
+                    selections,
+                    brightness,
+                    contrast,
+                };
+            },
+            shallow,
+        );
+
+        const viewState = useViewerStore((store) => store.viewState);
+        useViewStateLink();
+        const vsRef = useRef<ViewState>();
+        const vsDebugDivRef = useRef<HTMLPreElement>(null);
+
+        useEffect(() => {
+            if (!ome) return;
+            if (!viewState) {
+                //WIP <-- c.f. Avivator's useViewerStore() hook
+                // setViewState(getDefaultInitialViewState(ome, { width, height }));
+                viewerStore.setState({
+                    viewState: getDefaultInitialViewState(ome, { width, height }),
+                });
+            }
+        }, [ome, width, height, viewState, viewerStore.setState]);
+        const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
+        const detailView = useMemo(
+            () =>
+                new DetailView({
+                    id: detailId,
+                    snapScaleBar: true,
+                    width,
+                    height,
+                }),
+            [detailId, width, height],
+        );
+        useEffect(() => {
+            if (scatterProps.viewState) {
+                viewerStore.setState({ viewState: scatterProps.viewState });
+                // setViewState(scatterProps.viewState);
+                vsRef.current = scatterProps.viewState;
+            }
+        }, [scatterProps.viewState, viewerStore.setState]);
+        const layerConfig = useMemo(
+            () => ({
+                loader: ome,
                 selections,
+                contrastLimits,
+                extensions,
+                colors,
+                channelsVisible,
                 brightness,
                 contrast,
-            };
-        },
-        shallow,
-    );
-
-    const viewState = useViewerStore((store) => store.viewState);
-    useViewStateLink();
-    const vsRef = useRef<ViewState>();
-    const vsDebugDivRef = useRef<HTMLPreElement>(null);
-
-    useEffect(() => {
-        if (!ome) return;
-        if (!viewState) {
-            //WIP <-- c.f. Avivator's useViewerStore() hook
-            // setViewState(getDefaultInitialViewState(ome, { width, height }));
-            viewerStore.setState({
-                viewState: getDefaultInitialViewState(ome, { width, height }),
-            });
-        }
-    }, [ome, width, height, viewState, viewerStore.setState]);
-    const extensions = useMemo(
-        () => [new ColorPaletteExtension(), new VivContrastExtension()],
-        [],
-    );
-    const detailView = useMemo(
-        () =>
-            new DetailView({
-                id: detailId,
-                snapScaleBar: true,
-                width,
-                height,
             }),
-        [detailId, width, height],
-    );
-    useEffect(() => {
-        if (scatterProps.viewState) {
-            viewerStore.setState({ viewState: scatterProps.viewState });
-            // setViewState(scatterProps.viewState);
-            vsRef.current = scatterProps.viewState;
-        }
-    }, [scatterProps.viewState, viewerStore.setState]);
-    const layerConfig = useMemo(
-        () => ({
-            loader: ome,
-            selections,
-            contrastLimits,
-            extensions,
-            colors,
-            channelsVisible,
-            brightness,
-            contrast,
-        }),
-        [
-            ome,
-            selections,
-            contrastLimits,
-            extensions,
-            colors,
-            channelsVisible,
-            brightness,
-            contrast,
-        ],
-    );
-    const deckProps: Partial<DeckGLProps> = useMemo(
-        () => ({
-            getTooltip,
-            style: {
-                zIndex: "-1",
-            },
-            //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-            layers: [jsonLayer, scatterplotLayer, selectionLayer],
-            id: `${id}deck`,
-            // deviceProps: {
-            //     webgl: {                    
-            //         depth: true,
-            //         preserveDrawingBuffer: true,
-            //         antialias: true,
-            //     },
-            // },
-            controller: {
-                doubleClickZoom: false,
-            },
-            // deviceProps: {
-            //     // todo - get this working more usefully.
-            //     debugSpectorJS: true,
-            // }
-        }),
-        [
-            scatterplotLayer,
-            selectionLayer,
-            jsonLayer,
-            id,
-            getTooltip,
-        ],
-    );
-    if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
-    // if (import.meta.env.DEV) trace();
-    return (
-        <>
-            <SelectionOverlay />
-            {showLegend && legendFields.length > 0 && (
-                <FieldContourLegend 
-                    fields={legendFields} 
-                    position={legendPosition}
-                    onFieldHover={handleFieldHover}
-                />
-            )}
-            <MDVivViewer
-                outerContainer={outerContainer}
-                selectionLayer={selectionLayer}
-                views={[detailView]}
-                layerProps={[layerConfig]}
-                viewStates={[{ ...viewState, id: detailId }]}
-                // not really expecting OrbitViewState... yet... but we will for 3D.
-                onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
-                    viewerStore.setState({
-                        viewState: { ...e.viewState, id: detailId },
-                    });
-                    if (vsDebugDivRef.current)
-                        vsDebugDivRef.current.innerText = JSON.stringify(
-                            e.viewState,
-                            null,
-                            2,
-                        );
-                }}
-                hoverHooks={{
-                    handleValue: (v: number[]) => {
-                        viewerStore.setState({ pixelValues: v })
-                    },
-                    handleLeave: () => {
-                        viewerStore.setState({ pixelValues: [] })
-                    }
-                }}
-                deckProps={deckProps}
-            />
-        </>
-    );
-});
+            [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast],
+        );
+        const deckProps: Partial<DeckGLProps> = useMemo(
+            () => ({
+                getTooltip,
+                style: {
+                    zIndex: "-1",
+                },
+                //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
+                layers: [jsonLayer, scatterplotLayer, selectionLayer],
+                id: `${id}deck`,
+                // deviceProps: {
+                //     webgl: {
+                //         depth: true,
+                //         preserveDrawingBuffer: true,
+                //         antialias: true,
+                //     },
+                // },
+                controller: {
+                    doubleClickZoom: false,
+                },
+                // deviceProps: {
+                //     // todo - get this working more usefully.
+                //     debugSpectorJS: true,
+                // }
+            }),
+            [scatterplotLayer, selectionLayer, jsonLayer, id, getTooltip],
+        );
+        if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
+        // if (import.meta.env.DEV) trace();
+        return (
+            <>
+                <SelectionOverlay />
+                {showLegend && legendFields.length > 0 && (
+                    <FieldContourLegend
+                        fields={legendFields}
+                        position={legendPosition}
+                        onFieldHover={handleFieldHover}
+                    />
+                )}
+                <div
+                    aria-label="Spatial scatter plot"
+                    style={{ width: "100%", height: "100%", outline: "none" }}
+                    onMouseDown={() => {
+                        setScatterKeyboardActive(true);
+                    }}
+                    onMouseEnter={() => setScatterKeyboardActive(true)}
+                    onMouseLeave={() => setScatterKeyboardActive(false)}
+                >
+                    <MDVivViewer
+                        outerContainer={outerContainer}
+                        selectionLayer={selectionLayer}
+                        views={[detailView]}
+                        layerProps={[layerConfig]}
+                        viewStates={[{ ...viewState, id: detailId }]}
+                        // not really expecting OrbitViewState... yet... but we will for 3D.
+                        onViewStateChange={(e: { viewState: OrthographicViewState | OrbitViewState }) => {
+                            viewerStore.setState({
+                                viewState: { ...e.viewState, id: detailId },
+                            });
+                            if (vsDebugDivRef.current)
+                                vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
+                        }}
+                        deckProps={deckProps}
+                    />
+                </div>
+            </>
+        );
+    },
+);
