@@ -124,7 +124,7 @@ class ViewManager {
         try {
             const { viewData, dsIndex, contentDiv } = this.cm;
             for (const ds in this.cm.viewData.dataSources) {
-                if (viewData.dataSources[ds].layout === "gridstack") {
+                if (viewData.dataSources[ds]?.layout === "gridstack") {
                     this.cm.gridStack.destroy(dsIndex[ds] as DataSource);
                 }
             }
@@ -221,7 +221,7 @@ class ViewManager {
             if (!isCloneView) {
                 //remove all charts and links
                 for (const ds in viewData.dataSources) {
-                    if (viewData.dataSources[ds].layout === "gridstack") {
+                    if (viewData.dataSources[ds]?.layout === "gridstack") {
                         const d = dsIndex[ds];
                         if (!d) continue;
                         this.cm.gridStack.destroy(d);
@@ -252,7 +252,7 @@ class ViewManager {
                 
                 // Clear existing gridstack instances
                 for (const ds in viewData.dataSources) {
-                    if (viewData.dataSources[ds].layout === "gridstack") {
+                    if (viewData.dataSources[ds]?.layout === "gridstack") {
                         const d = dsIndex[ds];
                         if (!d) continue;
                         this.cm.gridStack.destroy(d);
