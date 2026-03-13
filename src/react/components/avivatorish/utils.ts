@@ -291,12 +291,18 @@ function zip<A, B>(a: A[], b: B[]): [A, B][] {
     return a.map((val, i) => [val, b[i]]);
 }
 
-function getSourceDimensionMap({ labels, shape }: SourceLike) {
-    const dimensions = zip(labels, shape).map(([name, size]) => ({
+function getSourceDimensions({ labels, shape }: SourceLike) {
+    const normalizedLabels = isInterleaved(shape) && shape.length === labels.length + 1 ? [...labels, "c"] : labels;
+    return zip(normalizedLabels, shape).map(([name, size]) => ({
         key: name.toLowerCase(),
         name,
         size,
     }));
+}
+
+function getSourceDimensionMap(source: SourceLike) {
+    const { shape } = source;
+    const dimensions = getSourceDimensions(source);
     const dimensionMap = new Map(dimensions.map((dim) => [dim.key, dim]));
     if (isInterleaved(shape) && !dimensionMap.has("c")) {
         dimensionMap.set("c", { key: "c", name: "c", size: shape.at(-1) ?? 1 });
@@ -321,10 +327,7 @@ export function buildSelectionForSource(
         overrides?: VivSelection;
     } = {},
 ) {
-    const dimensions = zip(source.labels, source.shape).map(([name, size]) => ({
-        name,
-        size,
-    }));
+    const dimensions = getSourceDimensions(source);
     const defaultSelection = getDefaultGlobalSelection(dimensions);
     const dimensionMap = getSourceDimensionMap(source);
     const nextSelection: VivSelection = {};
@@ -351,10 +354,7 @@ export function buildSelectionForSource(
 export function buildDefaultSelection({ labels, shape }: { labels: string[]; shape: number[] }): VivSelection[] {
     const selection: VivSelection[] = [];
 
-    const dimensions = zip(labels, shape).map(([name, size]) => ({
-        name,
-        size,
-    }));
+    const dimensions = getSourceDimensions({ labels, shape });
 
     const globalSelection = buildSelectionForSource({ labels, shape });
 
