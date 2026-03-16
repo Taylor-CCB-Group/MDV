@@ -1,5 +1,5 @@
 import DeckGL from "@deck.gl/react";
-import { OrthographicView, OrbitView } from '@deck.gl/core';
+import { OrthographicView, OrbitView } from "@deck.gl/core";
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
 import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
@@ -20,11 +20,11 @@ import useGateLayers from "../hooks/useGateLayers";
 import { escapeHtml } from "@/utilities/Utilities";
 
 //todo this should be in a common place etc.
-const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
+const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
 
 // const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
- * there should be hooks getting the range of a filtered column 
+ * there should be hooks getting the range of a filtered column
  * so that multiple charts can re-use the computation (but if not used, it's not computed)
  */
 function useZoomOnFilter(data: Uint32Array) {
@@ -36,7 +36,7 @@ function useZoomOnFilter(data: Uint32Array) {
     const { pendingRecenter } = chart;
     useEffect(() => {
         if (chart.ignoreStateUpdate) return;
-        if (data.length === 0) return;// [0, 0, 1, 1];
+        if (data.length === 0) return; // [0, 0, 1, 1];
         if (!pendingRecenter && !config.zoom_on_filter) return;
         //there is also cx.minMax, cy.minMax - but not for filtered indices
         let minX = Number.POSITIVE_INFINITY;
@@ -61,7 +61,7 @@ function useZoomOnFilter(data: Uint32Array) {
         action(() => {
             chart.ignoreStateUpdate = true;
             chart.pendingRecenter = false;
-            
+
             // Calculate range
             const dx = maxX - minX;
             const dy = maxY - minY;
@@ -106,11 +106,10 @@ function useZoomOnFilter(data: Uint32Array) {
     }, [data, cx, cy, cz, width, height, config, pendingRecenter, chart]);
 }
 
-
 /**
  * Currently this implementation is somewhat separate from VivMDVReact / scatter_state,
  * but it should be more unified in the future.
- * 
+ *
  * Things that need work:
  * - GeoJsonEditableLayer & associated selection state
  *  - think about selection in 3d
@@ -136,24 +135,28 @@ const DeckScatter = observer(function DeckScatterComponent() {
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
-    
+
     //todo this shouldn't be repeated here and in AxisComponent
     const xSize = is2d ? config.axis.x.size : 0;
     const ySize = is2d ? config.axis.y.size : 0;
 
-    const margin = useMemo(() => (
-        is2d ? {
-            top: 10,
-            right: 10,
-            bottom: xSize,
-            left: ySize,
-        } : {
-            top: 0,
-            right: 0,
-            bottom: 0,
-            left: 0,
-        }
-    ), [is2d, xSize, ySize]);
+    const margin = useMemo(
+        () =>
+            is2d
+                ? {
+                      top: 10,
+                      right: 10,
+                      bottom: xSize,
+                      left: ySize,
+                  }
+                : {
+                      top: 0,
+                      right: 0,
+                      bottom: 0,
+                      left: 0,
+                  },
+        [is2d, xSize, ySize],
+    );
     const chartWidth = width - margin.left - margin.right;
     //there could be a potential off-by-one/two error somewhere down the line
     //if we don't fully understand reasons for `- 3.5` here.
@@ -166,7 +169,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
     //! beware unproject from here is not what we want, should review
-    const { scatterplotLayer, getTooltip } = scatterProps;
+    const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
 
     const filterValue = useFilterArray();
 
@@ -177,45 +180,49 @@ const DeckScatter = observer(function DeckScatterComponent() {
     } = useGateLayers();
 
     // this should move in to scatter_state, common with viv...
-    const greyScatterplotLayer = useMemo(() => new ScatterplotLayer({
-        id: `scatterplot-layer-grey-${id}`,
-        data: { length: cx.data.length },
-        // pickable: true,
-        opacity,
-        stroked: false,
-        filled: true,
-        radiusScale,
-        getPosition: (_, { target, index }) => {
-            target[0] = cx.data[index];
-            target[1] = cy.data[index];
-            // we need to review whether changes are needed here related to density...
-            if (cz) target[2] = cz.data[index];
-            return target as [number, number];
-        },
-        getFillColor: [200, 200, 200],
-        getLineColor: [0, 0, 0],
-        billboard: true,
-        parameters: {
-            depthTest: false,
-        },
-        transitions: {
-            getPosition: {
-                duration: 100,
-                //https://easings.net/#easeInOutCubic
-                easing: (x: number) => x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2,
-                // type: "spring",
-            },
-        },
-        getFilterValue: (_: any, { index }: { index: number }) => filterValue[index] || 0, //how do we just pass the buffer?
-        filterRange: [0.5, 1],
-        updateTriggers: {
-            //! using `data` as a trigger as `filterValue` was behind by one frame or something
-            getFilterValue: data,
-            getPosition: [cx.data, cy.data, cz?.data],
-        },
-        extensions: [new DataFilterExtension()],
-        visible: greyOnFilter,
-    }), [cx, cy, cz, opacity, radiusScale, id, filterValue, data, greyOnFilter]);
+    const greyScatterplotLayer = useMemo(
+        () =>
+            new ScatterplotLayer({
+                id: `scatterplot-layer-grey-${id}`,
+                data: { length: cx.data.length },
+                // pickable: true,
+                opacity,
+                stroked: false,
+                filled: true,
+                radiusScale,
+                getPosition: (_, { target, index }) => {
+                    target[0] = cx.data[index];
+                    target[1] = cy.data[index];
+                    // we need to review whether changes are needed here related to density...
+                    if (cz) target[2] = cz.data[index];
+                    return target as [number, number];
+                },
+                getFillColor: [200, 200, 200],
+                getLineColor: [0, 0, 0],
+                billboard: true,
+                parameters: {
+                    depthTest: false,
+                },
+                transitions: {
+                    getPosition: {
+                        duration: 100,
+                        //https://easings.net/#easeInOutCubic
+                        easing: (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
+                        // type: "spring",
+                    },
+                },
+                getFilterValue: (_: any, { index }: { index: number }) => filterValue[index] || 0, //how do we just pass the buffer?
+                filterRange: [0.5, 1],
+                updateTriggers: {
+                    //! using `data` as a trigger as `filterValue` was behind by one frame or something
+                    getFilterValue: data,
+                    getPosition: [cx.data, cy.data, cz?.data],
+                },
+                extensions: [new DataFilterExtension()],
+                visible: greyOnFilter,
+            }),
+        [cx, cy, cz, opacity, radiusScale, id, filterValue, data, greyOnFilter],
+    );
 
     const axisLinesLayer = useMemo(() => {
         if (is2d) return null;
@@ -236,7 +243,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
             },
         });
     }, [is2d, id, cx.minMax, cy.minMax, cz?.minMax]);
-    
+
     // we need an OrthographicView to prevent wrapping etc...
     // if in future we have subgraphs sharing a canvas, we will need to
     // make sure that the view is set up correctly for each subgraph.
@@ -265,7 +272,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     
     const outerContainer = useOuterContainer();
     const deckRef = useRef<any>();
-    
+
     // unproject used for updating ranges - use deck viewport instead of layer
     const unproject = useCallback((coords: [number, number]) => {
         if (!deckRef.current?.deck) {
@@ -286,7 +293,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
         if (deckRef.current) {
             try {
                 // const deck: Deck<any> = deckRef.current.deck;
-                const deck = deckRef.current.deck;// as Deck<any>;
+                const deck = deckRef.current.deck; // as Deck<any>;
                 return rebindMouseEvents(deck, selectionLayer);
             } catch (e) {
                 console.error(
@@ -296,7 +303,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
             }
         }
     }, [outerContainer]);
-    
+
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.
     // const controller = useMemo(() => ({inertia: 10+Math.random()}), [outerContainer])
