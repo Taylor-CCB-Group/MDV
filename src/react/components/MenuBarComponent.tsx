@@ -34,6 +34,9 @@ const MenuBarComponent = () => {
     const { root, mainApiRoute } = useProject();
     const { buildInfo } = useBuildInfo();
 
+    const isEditable = config.permission === "edit";
+    const ariaLabel = isEditable ? "editable" : "view only";
+
     const handleHomeButtonClick = () => {
         // todo: uncomment when we fix state issues
         // viewManager.checkUnsavedState(() => {
@@ -116,7 +119,7 @@ const MenuBarComponent = () => {
                                 <ViewThumbnailComponent />
                             </Box>
                         )}
-                        {config.permission === "edit" && (
+                        {isEditable && (
                             <>
                                 <IconWithTooltip tooltipText="Save View" onClick={handleSaveButtonClick}>
                                     <SaveIcon />
@@ -126,7 +129,7 @@ const MenuBarComponent = () => {
                                 </IconWithTooltip>
                             </>
                         )}
-                        {config.permission === "edit" && config.all_views && (
+                        {isEditable && config.all_views && (
                             <>
                                 <IconWithTooltip tooltipText="Create New View" onClick={handleCreateViewClick}>
                                     <AddIcon />
@@ -136,7 +139,7 @@ const MenuBarComponent = () => {
                                 </IconWithTooltip>
                             </>
                         )}
-                        {config.permission === "edit" && (
+                        {isEditable && (
                             <IconWithTooltip tooltipText="Add Datasource" onClick={handleAddDataSourceClick}>
                                 <CloudUploadIcon />
                             </IconWithTooltip>
@@ -145,16 +148,21 @@ const MenuBarComponent = () => {
                     <Box sx={{ display: "flex", alignItems: "center" }}>
                         <CustomTooltip 
                             tooltipText={
-                                config.permission === "edit" ? 
+                                isEditable ? 
                                 "You can edit views and add data." : 
                                 "You can only view, editing is disabled."
                             }
                         >
-                            <Box sx={{ marginRight: "10px", marginBottom: "2px" }}>
+                            <Box
+                                role="img"
+                                aria-label={ariaLabel}
+                                tabIndex={0}
+                                sx={{ marginRight: "10px", marginBottom: "2px" }}
+                            >
                                 {
-                                    config.permission === "edit" ? 
-                                        <LockOpenIcon height={18} /> :
-                                        <LockIcon height={18} /> 
+                                    isEditable ? 
+                                        <LockOpenIcon height={18} aria-hidden="true" focusable="false" /> :
+                                        <LockIcon height={18} aria-hidden="true" focusable="false" /> 
                                 }
                             </Box>
                         </CustomTooltip>
