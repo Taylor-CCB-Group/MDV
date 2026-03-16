@@ -312,37 +312,48 @@ const DeckScatter = observer(function DeckScatterComponent() {
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
-                <DeckGL
-                    ref={deckRef}
-                    layers={layers}
-                    useDevicePixels={true}
-                    controller={{
-                        dragPan: controllerOptions.dragPan,
+                <div
+                    aria-label="Scatter plot"
+                    style={{ width: "100%", height: "100%", outline: "none" }}
+                    onMouseDown={(event) => {
+                        setScatterKeyboardActive(true);
                     }}
-                    viewState={viewState}
-                    // initialViewState={viewState} //consider not using react state for this        
-                    views={view}
-                    onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
-                    // todo: refactor and have a cleaner logic
-                    getTooltip={(info) => {
-                        const layerId = info?.layer?.id;
-                        const obj = info?.object;
-                        if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
-                            return { 
-                                html: `<strong>${escapeHtml(obj.properties.gateName)}</strong><br/><small>Click on the label to edit</small>` 
-                            };
-                        }
-                        if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
-                            return { 
-                                html: `<strong>${escapeHtml(obj.text)}</strong><br/><small>Click on the label to edit</small>` 
-                            };
-                        }
-                        return getTooltip();
-                    }}
-                    getCursor={({ isDragging }) => {
-                        return isDragging ? "grabbing" : "crosshair";
-                    }}
-                />
+                    onMouseEnter={() => setScatterKeyboardActive(true)}
+                    onMouseLeave={() => setScatterKeyboardActive(false)}
+                >
+                    <DeckGL
+                        ref={deckRef}
+                        layers={layers}
+                        useDevicePixels={true}
+                        controller={{
+                            dragPan: controllerOptions.dragPan,
+                        }}
+                        viewState={viewState}
+                        // initialViewState={viewState} //consider not using react state for this        
+                        views={view}
+                        onViewStateChange={(v) => {
+                            action(() => (config.viewState = v.viewState))();
+                        }}
+                        getTooltip={(info) => {
+                            const layerId = info?.layer?.id;
+                            const obj = info?.object;
+                            if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
+                                return { 
+                                    html: `<strong>${escapeHtml(obj.properties.gateName)}</strong><br/><small>Click on the label to edit</small>` 
+                                };
+                            }
+                            if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
+                                return { 
+                                    html: `<strong>${escapeHtml(obj.text)}</strong><br/><small>Click on the label to edit</small>` 
+                                };
+                            }
+                            return getTooltip();
+                        }}
+                        getCursor={({ isDragging }) => {
+                            return isDragging ? "grabbing" : "crosshair";
+                        }}
+                    />
+                </div>
             </AxisComponent>
         </>
     );

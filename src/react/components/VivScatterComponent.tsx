@@ -86,7 +86,7 @@ const Main = observer(
 
         // this isn't updating when we tweak the config...
         const { scatterProps, selectionLayer } = useSpatialLayers();
-        const { scatterplotLayer, getTooltip } = scatterProps;
+        const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
         const { showJson } = useConfig<VivRoiConfig>();
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
@@ -184,7 +184,6 @@ const Main = observer(
 
         const deckProps: Partial<DeckGLProps> = useMemo(
             () => ({
-                // todo: refactor and have a cleaner logic
                 getTooltip: (info: any) => {
                     const layerId = info?.layer?.id;
                     const obj = info?.object;
@@ -251,26 +250,36 @@ const Main = observer(
                         onFieldHover={handleFieldHover}
                     />
                 )}
-                <MDVivViewer
-                    outerContainer={outerContainer}
-                    selectionLayer={selectionLayer}
-                    views={[detailView]}
-                    layerProps={[layerConfig]}
-                    viewStates={[{ ...viewState, id: detailId }]}
-                    // not really expecting OrbitViewState... yet... but we will for 3D.
-                    onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
-                        viewerStore.setState({
-                            viewState: { ...e.viewState, id: detailId },
-                        });
-                        if (vsDebugDivRef.current)
-                            vsDebugDivRef.current.innerText = JSON.stringify(
-                                e.viewState,
-                                null,
-                                2,
-                            );
+                <div
+                    aria-label="Spatial scatter plot"
+                    style={{ width: "100%", height: "100%", outline: "none" }}
+                    onMouseDown={() => {
+                        setScatterKeyboardActive(true);
                     }}
-                    deckProps={deckProps}
-                />
+                    onMouseEnter={() => setScatterKeyboardActive(true)}
+                    onMouseLeave={() => setScatterKeyboardActive(false)}
+                >
+                    <MDVivViewer
+                        outerContainer={outerContainer}
+                        selectionLayer={selectionLayer}
+                        views={[detailView]}
+                        layerProps={[layerConfig]}
+                        viewStates={[{ ...viewState, id: detailId }]}
+                        // not really expecting OrbitViewState... yet... but we will for 3D.
+                        onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
+                            viewerStore.setState({
+                                viewState: { ...e.viewState, id: detailId },
+                            });
+                            if (vsDebugDivRef.current)
+                                vsDebugDivRef.current.innerText = JSON.stringify(
+                                    e.viewState,
+                                    null,
+                                    2,
+                                );
+                        }}
+                        deckProps={deckProps}
+                    />
+                </div>
             </>
         );
 });
