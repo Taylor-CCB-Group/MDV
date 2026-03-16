@@ -1701,12 +1701,15 @@ class MDVProject:
             if name in state["all_views"]:
                 state["all_views"].remove(name)
             else:
-                logger.warn(f"'{name}' not found in all_views when removing...")
+                logger.warning(f"'{name}' not found in all_views when removing...")
             iv = state.get("initial_view")
             # if the deleted view is the default view then
             # change the default view to the first view in the list
-            if iv:
-                state["initial_view"] = state["all_views"][0]
+            if iv and iv == name:
+                # will frontend etc have a problem with this being None?
+                # not particularly - it'll load with AddView dialog, which is about as graceful as we could hope for.
+                # there was a potential error here when removing final view...
+                state["initial_view"] = state["all_views"][0] if state["all_views"] else None
         logger.info(f"set_view complete without error")
         self.state = state
 
