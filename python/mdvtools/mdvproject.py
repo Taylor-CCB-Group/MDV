@@ -1682,6 +1682,7 @@ class MDVProject:
         # remove the view
         else:
             if views.get(name):
+                logger.info(f"deleting view '{name}'")
                 del views[name]
         self.views = views
 
@@ -1694,12 +1695,21 @@ class MDVProject:
                 state["initial_view"] = name
         # delete from list
         else:
-            state["all_views"].remove(name)
+            # error: list.remove(x): x not in list
+            # could it be that there are multiple MDVProject instances in the server and self.state isn't updated?
+            # but also... in multi-user concurrent kind of scenario this kind of state could easily be out-of-sync.
+            if name in state["all_views"]:
+                state["all_views"].remove(name)
+            else:
+                logger.warning(f"'{name}' not found in all_views when removing...")
             iv = state.get("initial_view")
             # if the deleted view is the default view then
             # change the default view to the first view in the list
-            if iv:
-                state["initial_view"] = state["all_views"][0]
+            if iv and iv == name:
+                # will frontend etc have a problem with this being None?
+                # not particularly - it'll load with AddView dialog, which is about as graceful as we could hope for.
+                # there was a potential error here when removing final view...
+                state["initial_view"] = state["all_views"][0] if state["all_views"] else None
         self.state = state
 
     def rename_view(self, old_name: str, new_name: str):
