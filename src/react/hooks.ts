@@ -85,7 +85,7 @@ export function useChartDoc() {
  */
 export function useTheme() {
     const chartManager = useChartManager();
-    const [theme, setTheme] = useState(chartManager.theme);
+    const [theme, setTheme] = useState<"dark" | "light">(chartManager.theme);
 
     useEffect(() => {
         const disposer = autorun(() => {

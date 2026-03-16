@@ -272,6 +272,7 @@ class MDVivViewerWrapper extends React.PureComponent<
             onHover(info, event);
         }
         if (!hoverHooks || !coordinate || !layer) {
+            hoverHooks?.handleLeave?.();
             return null;
         }
         const { handleValue = () => {}, handleCoordnate = () => {} } =
@@ -358,6 +359,7 @@ class MDVivViewerWrapper extends React.PureComponent<
             randomize,
             useDevicePixels = true,
             deckProps,
+            hoverHooks,
         } = this.props;
         const { viewStates } = this.state;
         const deckGLViews = views.map((view) => view.getDeckGlView());
@@ -393,21 +395,26 @@ class MDVivViewerWrapper extends React.PureComponent<
             layers.push(scaleBarLayer);
         }
         return (
-            <DeckGL
-                // MDV: we mess with deck internals via ref to get eventManager to work in popouts
-                ref={this.state.deckRef}
-                // eslint-disable-next-line react/jsx-props-no-spreading
-                {...(deckProps ?? {})}
-                layerFilter={this.layerFilter}
-                layers={layers}
-                onViewStateChange={this._onViewStateChange}
-                views={deckGLViews}
-                viewState={viewStates}
-                useDevicePixels={useDevicePixels}
-                getCursor={({ isDragging }) => {
-                    return isDragging ? "grabbing" : "crosshair";
-                }}
-            />
+            <div
+                className="h-full w-full"
+                onMouseLeave={() => hoverHooks?.handleLeave?.()}
+            >
+                <DeckGL
+                    // MDV: we mess with deck internals via ref to get eventManager to work in popouts
+                    ref={this.state.deckRef}
+                    // eslint-disable-next-line react/jsx-props-no-spreading
+                    {...(deckProps ?? {})}
+                    layerFilter={this.layerFilter}
+                    layers={layers}
+                    onViewStateChange={this._onViewStateChange}
+                    views={deckGLViews}
+                    viewState={viewStates}
+                    useDevicePixels={useDevicePixels}
+                    getCursor={({ isDragging }) => {
+                        return isDragging ? "grabbing" : "crosshair";
+                    }}
+                />
+            </div>
         );
     }
 }

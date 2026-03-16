@@ -19,7 +19,11 @@ import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../ch
 import { ErrorBoundary } from "react-error-boundary";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
-import { isArray } from "@/lib/utils";
+import {
+    isArray,
+    resolveAutoHistogramXScaleFromHistogram,
+    resolveAutoHistogramYScale,
+} from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import {
     DndContext,
@@ -41,7 +45,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { useHighlightedIndices } from "../selectionHooks";
-import HistogramWidget, { type HistogramLayer } from "./HistogramWidget";
+import HistogramWidget, {
+    type HistogramLayer,
+    type HistogramScaleType,
+} from "./HistogramWidget";
 import {
     getNumericColumnData,
     getSharedNumericColumnData,
@@ -430,6 +437,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
 type Range = [number, number];
+type ScaleMode = "auto" | HistogramScaleType;
 type set2d = (v: Range | null) => void; //nb, setting undefined can actually be problematic
 type RangeProps = ReturnType<typeof useRangeFilter> & {
     setValue: set2d,
@@ -438,10 +446,21 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     histoWidth: number, //number of bins
     histoHeight: number, //height of the histogram
 };
+const toggleScaleMode = (
+    mode: ScaleMode,
+    resolvedMode: HistogramScaleType,
+): ScaleMode => {
+    if (mode === "auto") {
+        return resolvedMode === "log" ? "linear" : "log";
+    }
+    return mode === "log" ? "linear" : "log";
+};
 
 const Histogram = observer((props: RangeProps) => {
     const { overallHistogram, filteredHistogram, highlightedHistogram, overallHistogramError, queryHistogram } = props;
     const { histoWidth, histoHeight } = props;
+    const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
+    const [yScaleMode, setYScaleMode] = useState<ScaleMode>("auto");
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const overallColor = prefersDarkMode ? "rgba(255,255,255,0.35)" : "rgba(15,23,42,0.22)";
     const filteredColor = prefersDarkMode ? "rgba(96,165,250,0.8)" : "rgba(37,99,235,0.78)";
@@ -450,6 +469,14 @@ const Histogram = observer((props: RangeProps) => {
     const backgroundData = overallHistogram.length > 0 ? overallHistogram : emptyHistogram;
     const filteredData = filteredHistogram.length > 0 ? filteredHistogram : emptyHistogram;
     const highlightedData = highlightedHistogram.length > 0 ? highlightedHistogram : emptyHistogram;
+    const resolvedXScale = useMemo(
+        () => xScaleMode === "auto" ? resolveAutoHistogramXScaleFromHistogram(props.minMax, backgroundData) : xScaleMode,
+        [backgroundData, props.minMax, xScaleMode],
+    );
+    const resolvedYScale = useMemo(
+        () => (yScaleMode === "auto" ? resolveAutoHistogramYScale(backgroundData) : yScaleMode),
+        [backgroundData, yScaleMode],
+    );
     useEffect(() => {
         if (!overallHistogramError) return;
         console.error("Failed to query overall histogram", overallHistogramError);
@@ -494,7 +521,17 @@ const Histogram = observer((props: RangeProps) => {
             width={histoWidth}
             height={histoHeight}
             bins={HISTOGRAM_BINS}
+            xScaleType={resolvedXScale}
+            yScaleType={resolvedYScale}
             brush={brush}
+            scaleControls={{
+                xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
+                yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
+                onToggleX: () =>
+                    setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
+                onToggleY: () =>
+                    setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
+            }}
             onVisibleOnce={handleVisibleOnce}
         />
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-75">
