@@ -1240,7 +1240,14 @@ export class ChartManager {
         view.initialCharts = initialCharts;
         for (const ds of this.dataSources) {
             const h = ds.dataStore.getHighlightedData?.();
-            if (!view.dataSources[ds.name]) view.dataSources[ds.name] = {};
+            // adding empty entries to view.dataSources here is no-bueno.
+            if (!view.dataSources[ds.name]) {
+                // not expecting that there should be any highlight data to save when the dataSource is not part of the view
+                if (h) {
+                    console.warn(`unexpected highlighted data for dataSource '${ds.name}' which is not part of current viewData`);
+                }
+                continue;
+            }
             if (Array.isArray(h) && h.length > 0) {
                 view.dataSources[ds.name].highlight = [...h];
             } else {
