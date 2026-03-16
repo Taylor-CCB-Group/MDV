@@ -24,6 +24,7 @@ import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import ChatButtons from "./ChatButtons";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import CustomTooltip from "./CustomTooltip";
+import { LockIcon, LockOpenIcon } from "lucide-react";
 
 const MenuBarComponent = () => {
     const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
@@ -149,11 +150,13 @@ const MenuBarComponent = () => {
                                 "You can only view, editing is disabled."
                             }
                         >
-                            <Chip
-                                variant="outlined"
-                                sx={{ mr: 2, fontSize: "15px" }}
-                                label={config.permission === "edit" ? "Editable" : "View Only"}
-                            />
+                            <Box sx={{ marginRight: "10px", marginBottom: "2px" }}>
+                                {
+                                    config.permission === "edit" ? 
+                                        <LockOpenIcon height={18} /> :
+                                        <LockIcon height={18} /> 
+                                }
+                            </Box>
                         </CustomTooltip>
                         <ChatButtons />
                         <ToggleThemeWrapper />
