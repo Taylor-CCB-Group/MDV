@@ -124,11 +124,12 @@ export function getNumericColumnData(column: DataColumn<NumberDataType>): Numeri
     if (datatype === "double" && data instanceof Float32Array) return data;
     if (datatype === "int32" && data instanceof Int32Array) return data;
     if (datatype === "integer" && data instanceof Uint32Array) return data; // oops... "integer" was never Uint32Array?
+    if (datatype === "integer" && data instanceof Float32Array) return data; // oops... "integer" was never Uint32Array?
     // somehow it was falling through to here for a 'double' column with Float32Array???
     // but then when reproducing - looks like an 'integer' with Float32Array, which is what DataStore actually uses...
     // anyway, throw here is unproductive.
     // throw new Error(`Unexpected data buffer for numeric column ${field}.`);
-    console.warn(`Unexpected buffer type ${data} for '${column.field}' (${column.datatype})`);
+    console.warn(`Unexpected buffer type for '${column.field}' (${column.datatype})`);
     return data;
 }
 
