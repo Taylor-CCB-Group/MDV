@@ -293,7 +293,8 @@ def create_app(
         try:
             state = request.json
             project.save_state(state)
-        except Exception:
+        except Exception as e:
+            logger.error(e)
             success = False
 
         return jsonify({"success": success})
