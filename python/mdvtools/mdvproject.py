@@ -1710,7 +1710,6 @@ class MDVProject:
                 # not particularly - it'll load with AddView dialog, which is about as graceful as we could hope for.
                 # there was a potential error here when removing final view...
                 state["initial_view"] = state["all_views"][0] if state["all_views"] else None
-        logger.info(f"set_view complete without error")
         self.state = state
 
     def rename_view(self, old_name: str, new_name: str):
