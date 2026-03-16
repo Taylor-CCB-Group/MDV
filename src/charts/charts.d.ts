@@ -44,7 +44,7 @@ export type NumberDataType = "integer" | "double" | "int32";
 type DataStructureTypes = {
     int32: Int32Array;
     double: Float32Array; //why is it called 'double'???
-    integer: Uint32Array;
+    integer: Uint32Array; //lies... DataStore is loading these as Float32Array...
     text16: Uint16Array;
     text: Uint8Array;
     unique: Uint8Array; //raw bytes of strings to be decoded
