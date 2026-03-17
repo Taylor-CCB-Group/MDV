@@ -1,9 +1,7 @@
 import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
-import RectangleOutlinedIcon from "@mui/icons-material/RectangleOutlined";
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
+import PhotoSizeSelectSmallIcon from '@mui/icons-material/PhotoSizeSelectSmall';
 import DoneOutlinedIcon from '@mui/icons-material/DoneOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
@@ -29,7 +27,7 @@ import { useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
 import { getEmptyFeatureCollection } from "../deck_state";
 import { TuneOutlined } from "@mui/icons-material";
-import { LassoIcon, PentagonIcon, SplineIcon, SquareIcon } from "lucide-react";
+import { LassoIcon, SplineIcon } from "lucide-react";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -79,13 +77,13 @@ export const Tools = {
     },
     rectangle: {
         name: "Rectangle",
-        ToolIcon: SquareIcon,
+        ToolIcon: PhotoSizeSelectSmallIcon,
         mode: RectangleMode
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
     polygon: {
         name: "Polygon",
-        ToolIcon: PentagonIcon,
+        ToolIcon: PolylineOutlinedIcon,
         mode: PolygonMode
     },
     freehand: {
