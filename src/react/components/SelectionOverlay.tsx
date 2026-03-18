@@ -5,7 +5,7 @@ import PhotoSizeSelectSmallIcon from '@mui/icons-material/PhotoSizeSelectSmall';
 import DoneOutlinedIcon from '@mui/icons-material/DoneOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSpatialLayers } from "../spatial_context";
 import { observer } from "mobx-react-lite";
 import GateNameDialog from "./GateNameDialog";
@@ -21,13 +21,13 @@ import {
 } from '@deck.gl-community/editable-layers';
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
-import ManageGateDialog from "./ManageGateDialog";
 import useGateActions from "../hooks/useGateActions";
-import { useParamColumns, useTheme } from "../hooks";
+import { useChartID, useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
 import { getEmptyFeatureCollection } from "../deck_state";
 import { TuneOutlined } from "@mui/icons-material";
 import { LassoIcon, SplineIcon } from "lucide-react";
+import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -143,6 +143,7 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
 
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
+    const chartId = useChartID();
     const { 
         setSelectionMode, 
         selectionFeatureCollection,
@@ -155,7 +156,7 @@ export default observer(function SelectionOverlay() {
     const [cx, cy] = useParamColumns();
     
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
-    const [manageGateDialogOpen, setManageGateDialogOpen] = useState(false);
+    const manageGateByChartRef = useRef<Map<string, ManageGateDialogWrapper>>(new Map());
     const theme = useTheme();
 
     const {
@@ -168,6 +169,17 @@ export default observer(function SelectionOverlay() {
         onCancelEditGate,
         onColorChange,
     } = useGateActions();
+
+    useEffect(() => {
+        // close the open dialog when unmounting the component
+        return () => {
+          const dlg = manageGateByChartRef.current.get(chartId);
+          if (dlg) {
+            setTimeout(() => dlg.close(), 0);
+          }
+          manageGateByChartRef.current.delete(chartId);
+        };
+      }, [chartId]);
 
     const toolsToShow = useMemo(
         () =>
@@ -218,6 +230,39 @@ export default observer(function SelectionOverlay() {
     }
     , [gateManager.gatesArray, cx, cy]);
 
+    const onManageGatesClick = useCallback(() => {
+        console.log("chart id: ", chartId, manageGateByChartRef.current);
+        if (manageGateByChartRef.current.get(chartId)) {
+            // a dialog already exists
+            return;
+        }
+        
+        // Create a new manage gates dialog for a chart
+        const dialog = new ManageGateDialogWrapper({
+            gatesArray: relevantGates,
+            onDelete: onDeleteGate,
+            onColorChange,
+            onRenameGate,
+            onExportClick,
+            onEdit: onEditGate,
+            onClose: () => {
+                // remove the entry of the dialog
+                manageGateByChartRef.current.delete(chartId);
+            }
+        });
+
+        // create a new entry for the dialog for a chart
+        manageGateByChartRef.current.set(chartId, dialog);
+    }, [
+        relevantGates, 
+        onDeleteGate, 
+        onEditGate, 
+        onColorChange, 
+        onRenameGate, 
+        onExportClick, 
+        chartId
+    ]);
+
     const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
     
     return (
@@ -245,7 +290,7 @@ export default observer(function SelectionOverlay() {
                 />
                 <IconWithTooltip
                     tooltipText={"Manage Gates"}
-                    onClick={() => setManageGateDialogOpen(true)}
+                    onClick={onManageGatesClick}
                     iconButtonProps={{
                         sx: {
                             color: "var(--text_color)",
@@ -309,17 +354,6 @@ export default observer(function SelectionOverlay() {
                 open={gateDialogOpen}
                 onClose={() => setGateDialogOpen(false)}
                 onSaveGate={onSaveGate}
-            />
-            <ManageGateDialog
-                open={manageGateDialogOpen}
-                onClose={() => setManageGateDialogOpen(false)}
-                // Passing gatesArray directly as there are no mutations to the array
-                gatesArray={relevantGates}
-                onDelete={onDeleteGate}
-                onRenameGate={onRenameGate}
-                onExportClick={onExportClick}
-                onEdit={onEditGate}
-                onColorChange={onColorChange}
             />
         </>
     );
