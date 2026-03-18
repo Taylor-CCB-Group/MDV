@@ -112,3 +112,6 @@ addopts = [
     "--tb=short",
     "--strict-markers"
 ]
+
+[project.scripts]
+mdvtools = "mdvtools.cli:cli"
