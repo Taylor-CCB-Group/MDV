@@ -83,23 +83,23 @@ make test
 make test-performance
 
 # All tests
-poetry run pytest mdvtools/
+uv run -- pytest mdvtools/
 ```
 
 ### Test Markers
 
 ```bash
 # Run only performance tests
-poetry run pytest -m performance
+uv run -- pytest -m performance
 
 # Run everything except performance tests
-poetry run pytest -m "not performance"
+uv run -- pytest -m "not performance"
 
 # Run slow tests
-poetry run pytest -m slow
+uv run -- pytest -m slow
 
 # Run integration tests
-poetry run pytest -m integration
+uv run -- pytest -m integration
 ```
 
 ## Performance Test Dataset Sizes
