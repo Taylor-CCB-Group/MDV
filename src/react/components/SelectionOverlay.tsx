@@ -197,7 +197,8 @@ export default observer(function SelectionOverlay() {
             return;
         }
 
-        if (!editingGateId) {
+        // Get empty feature collection if gate is not editing and tool is not modify
+        if (!editingGateId && tool !== "Modify") {
             setSelectionFeatureCollection(getEmptyFeatureCollection());
         }
         //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
