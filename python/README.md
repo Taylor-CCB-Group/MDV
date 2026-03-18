@@ -18,21 +18,13 @@ python -m venv c:\path\to\myenv
 c:\path\to\myenv\Scripts\activate.bat
 ```
 
-### Install poetry
+### Install uv
 
-Install poetry if it is not already installed. This can be done with the official installer:
+Install `uv` if it is not already installed. This can be done with:
 
 ```
-curl -sSL https://install.python-poetry.org | python3 -
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-
-Or with pipx:
-```
-pip install pipx
-pipx install poetry
-```
-
-See the [poetry installation instructions](https://python-poetry.org/docs/#installing-with-pipx) for more details and troubleshooting.
 
 ### Install MDV
 
@@ -40,7 +32,7 @@ To install MDV, run:
 
 ```
 cd MDV/python
-poetry install --with dev
+uv sync --group dev --frozen
 ```
 
 ## Quick Start
@@ -208,14 +200,14 @@ make test-auth
 To run all core tests including performance tests:
 
 ```bash
-poetry run pytest mdvtools/tests
+uv run -- pytest mdvtools/tests
 ```
 
-Auth and backend tests depend on optional Poetry groups that are not installed by `pnpm run python-setup`.
+Auth and backend tests depend on optional dependency groups that are not installed by `pnpm run python-setup`.
 Install those groups first if you want to run the separated suites:
 
 ```bash
-poetry install --with dev,backend,auth
+uv sync --group dev --group backend --group auth --frozen
 ```
 
 ### Performance Testing in CI
