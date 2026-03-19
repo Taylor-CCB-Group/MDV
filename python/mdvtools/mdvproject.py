@@ -1026,9 +1026,9 @@ class MDVProject:
             track_name = track.get("name", fname.split(".")[0])
             track_type= track.get("type")
             if not track_type:
-                if ".bed" in fname or fname.endswith(".bb"):
+                if fname.endswith((".bb",".bed.gz", ",bed")):
                     track_type = "bed"
-                elif ".bigwig" in fname or fname.endswith(".bw"):
+                elif fname.endswith((".bw", ".bigwig")):
                     track_type = "wig"
             if not track_type:
                 raise AttributeError(f" the type of track {fname} cannot be deduced")
