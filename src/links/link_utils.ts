@@ -42,6 +42,7 @@ export type HighlightColumnLink = {
     targets: LinkTarget[];
 };
 
+/** this is unused, but we may want to review introducing related functionality */
 export function addHighlightColumnLink(
     link: HighlightColumnLink,
     cm: ChartManager,

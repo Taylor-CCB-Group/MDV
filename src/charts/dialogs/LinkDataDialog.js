@@ -70,6 +70,7 @@ class LinkDataDialog extends BaseDialog {
         this.listenerID = getRandomString();
         this.ds.dataStore.addListener(this.listenerID, (type, data) => {
             if (type === "data_highlighted") {
+                // reviewing whether this needs to be updated, or should this file be removed now?
                 this.clearList();
                 this.addIdsToList(data.indexes);
             }

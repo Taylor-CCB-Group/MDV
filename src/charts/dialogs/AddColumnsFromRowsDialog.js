@@ -171,6 +171,7 @@ class AddColumnsFromRowsDialog extends BaseDialog {
                 const tds = this.ds_to.dataStore;
                 tds.addListener(this.rn, (type, data) => {
                     if (type === "data_highlighted") {
+                        // reviewing whether this needs to be updated, or should this file be removed now?
                         const l = data.indexes.length;
                         if (l === 1) {
                             const index = data.indexes[0];
