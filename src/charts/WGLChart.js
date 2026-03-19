@@ -43,7 +43,7 @@ class WGLChart extends SVGChart {
     }
 
     onDataHighlighted(data) {
-        this.app.setHighlightPoints(data.indexes);
+        this.app.setHighlightPoints(data.indexes?.length ? data.indexes : null);
         this.app.refresh();
     }
 

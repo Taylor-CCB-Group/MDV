@@ -392,6 +392,8 @@ export class ChartManager {
                             resultSet,
                         );
                     } else if (type === "data_highlighted") {
+                        // todo - review whether this whole valuesetLink is really relevant,
+                        // and if so whether to consider empty highlight logic here.
                         await this._getColumnsAsync(ds.name, [
                             link.source_column,
                         ]);
@@ -895,6 +897,7 @@ export class ChartManager {
         console.log('after await Promise.all(chartPromises);');
 
         // Restore highlighted indices from view data (e.g. after loading or switching view)
+        // this should probably happen before chart init so that they have stable config when finished
         for (const dsName of Object.keys(this.viewData.dataSources || {})) {
             const spec = this.viewData.dataSources[dsName];
             const highlight = spec?.highlight;

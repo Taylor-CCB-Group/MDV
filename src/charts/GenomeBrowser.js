@@ -358,13 +358,15 @@ class GenomeBrowser extends BaseChart {
 
     //called when a feature is highlighted
     onDataHighlighted(data) {
-        //if (data.source === this) {
-        //    return;
-        //}
+        if (data.indexes.length === 0) {
+             this.browser.removeAllHighlightedRegions();
+             return;
+        }
         const ds = data.dataStore || this.dataStore;
         const p = ds.genome_browser.location_fields;
         let  vm = this.dataStore===ds?this.config.view_margins:ds.genome_browser?.default_parameters?.view_margins;
         vm = vm || this.config.view_margins
+      
         const o = ds.getRowAsObject(data.indexes[0], p);
         //some basic checks
         const st = o[p[2]] > o[p[1]] ? o[p[1]] : o[p[2]];
