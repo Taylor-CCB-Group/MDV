@@ -1045,11 +1045,10 @@ class MDVProject:
                         i_file = track["file"] + ".tbi"
                         if not exists(i_file):
                             raise FileNotFoundError(f"Index file {i_file} not found")
+                        shutil.copyfile(i_file, f"{to_file}.tbi")
                     to_file = join(self.trackfolder, fname)
                     shutil.copy(track["file"], to_file)
-                    # for .gz also need to copy index
-                    if fname.endswith(".gz"):
-                        shutil.copyfile(i_file, f"{to_file}.tbi")
+                        
                 # assume its a just a bed file- compress and index it
                 else:
                     check_htslib()
