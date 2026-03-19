@@ -1026,12 +1026,12 @@ class MDVProject:
             track_name = track.get("name", fname.split(".")[0])
             track_type= track.get("type")
             if not track_type:
-                if fname.endswith((".bb",".bed.gz", ",bed")):
+                if fname.endswith((".bb",".bed.gz", ".bed")):
                     track_type = "bed"
                 elif fname.endswith((".bw", ".bigwig")):
                     track_type = "wig"
             if not track_type:
-                raise AttributeError(f" the type of track {fname} cannot be deduced")
+                raise AttributeError(f"The type of track {fname} cannot be deduced")
             #no need to do anything - will be served from the original location
             if track["file"].startswith("http"):
                 url = track["file"]
@@ -1040,13 +1040,15 @@ class MDVProject:
                     raise FileNotFoundError(f"Track file {track['file']} does not exist")
                 # tracks already compressed and indexed - just copy to tracks folder
                 if track_type == "wig" or fname.endswith(".gz") or fname.endswith(".bb"):
-                    to_file = join(self.trackfolder, fname)
-                    shutil.copy(track["file"], to_file)
-                    # for .gz also need to copy index
+                    # For .gz files, verify index exists before copying
                     if fname.endswith(".gz"):
                         i_file = track["file"] + ".tbi"
                         if not exists(i_file):
                             raise FileNotFoundError(f"Index file {i_file} not found")
+                    to_file = join(self.trackfolder, fname)
+                    shutil.copy(track["file"], to_file)
+                    # for .gz also need to copy index
+                    if fname.endswith(".gz"):
                         shutil.copyfile(i_file, f"{to_file}.tbi")
                 # assume its a just a bed file- compress and index it
                 else:
