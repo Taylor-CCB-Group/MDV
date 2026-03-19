@@ -41,6 +41,7 @@ datatype_mappings = {
     "float64": "double",
     "float32": "double",
     "object": "text",
+    "str":"text",
     "category": "text",
     "bool": "text",
     "int32": "double",

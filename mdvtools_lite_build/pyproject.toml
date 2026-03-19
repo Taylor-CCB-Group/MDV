@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mdvtools"
-version = "1.2.2"
+version = "1.2.3"
 authors = [
     { name= "Martin Sergeant", email="m.j.sergeant1@googlemail.com"},
     { name= "PeterTodd", email="peter.todd@well.ox.ac.uk"},
@@ -18,12 +18,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
- "fasteners==0.19",
- "spatialdata==0.5.0",
- "spatialdata-io==0.3.0",
- "setuptools==80.9.0",
- "pandas==2.3.3",
+ "fasteners>=0.19",
+ "spatialdata==0.7.2",
+ "spatialdata-io==0.6.0",
+ "pandas<3.0",
  "Flask>=2.2.0",
+ "ome-zarr==0.13.0",
  "h5py>=3.5.0",
  "mudata>=0.2.3",
  "pyyaml>=5.3",
