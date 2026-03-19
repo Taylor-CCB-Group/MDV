@@ -8,6 +8,9 @@ import type DataStore from "@/datastore/DataStore";
 import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "./BaseChart";
 import type { TooltipConfig } from "@/react/scatter_state";
+import { getChartConfigSchema } from "./schemas/ChartConfigRegistry";
+import { BaseConfigSchema } from "./schemas/ChartConfigSchema";
+import { logValidationError } from "@/lib/validationLogging";
 
 /**
  * This is a utility module for handling the serialisation and deserialisation of chart configurations.
@@ -74,13 +77,12 @@ export function serialiseConfig(config: any) {
     // n.b. now using `toJSON()` in favour of `toString()` where possible - but there isn't a default `toJSON()` 
     // for arbitrary objects, so still using stringification here.
     const serialized = JSON.parse(JSON.stringify(config));
-    
+
     //! pending more generic approach to serialising queries...
     //in principle, react-based charts shouldn't have any trouble with the above...
     // if (config.color_by) {
     //     serialized.color_by = getConcreteFieldName(config.color_by);
     // }
-    console.log('processed config:', serialized);
     return serialized;
 }
 /**
@@ -154,6 +156,8 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
  * for observing changes to the config object.
  * 
  * Implementation notes in progress:
+ * - with the addition of zod schema passing in here, we should be associating the resulting return-type more formally
+ *   with generic `C`
  * - should we have functions that only operate on config objects?
  *   (in future we might not even need Chart objects, just config objects and components that can render them)
  * - is the config.set property safe?
@@ -163,6 +167,15 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
  * @param chart
  */
 export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<C>>(originalConfig: C, chart: T) {
+    // Validate the config using the registered schema for this chart type
+    // This happens before any deserialization to catch schema violations early
+    const schema = getChartConfigSchema(originalConfig.type, originalConfig.version);
+    const validate = schema ?? BaseConfigSchema;
+    const result = validate.safeParse(originalConfig);
+    if (!result.success) {
+        logValidationError({ context: "chart", rawConfig: originalConfig, error: result.error });
+    }
+    
     let config: C = JSON.parse(JSON.stringify(originalConfig));
     if (!config.id) {
         // what about when we duplicate a chart?
@@ -200,8 +213,6 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             });
         }
     }
-    
-    console.log(config.type, 'processed config:', config);
     
     // Handle queries - any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap
     // **we need better analysis of conditions under which this is still relevant.**

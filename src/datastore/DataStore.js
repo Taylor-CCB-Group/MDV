@@ -14,6 +14,8 @@ import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import { isDatatypeNumeric } from "@/lib/utils";
+import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
+import { logValidationError } from "@/lib/validationLogging";
 
 
 class DataStore {
@@ -40,6 +42,19 @@ class DataStore {
      * rotations applied to them
      */
     constructor(size, config = {}, dataLoader = null) {
+        // Best-effort, non-fatal validation of the datasource config.
+        // This logs schema violations and records them for later inspection
+        // in the debug dialog, but does not modify the incoming config.
+        // nb - we could probably change this constructor signature to use size from config
+        const result = DataSourceSchema.safeParse(config);
+        if (!result.success) {
+            logValidationError({
+                context: "datasource",
+                name: config?.name,
+                rawConfig: config,
+                error: result.error,
+            });
+        }
         // by keeping a reference to the original config metadata, we can later compare
         // it to new config from server to determine if it has changed etc.
         this.config = config;
@@ -90,9 +105,12 @@ class DataStore {
         // for re-usable filteredIndices
         this.addListener(
             "invalidateFilteredIndicesCache",
-            action(() => {
+            action((type, _data) => {
                 //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
-                this._filteredIndicesPromise = null;
+                // Make the promise null only if the data is filtered, changed or added
+                if (type === "filtered" || type === "data_changed" || type === "data_added") {
+                    this._filteredIndicesPromise = null;
+                }
             }),
         );
 
@@ -1233,6 +1251,7 @@ class DataStore {
         let size = newSize;
         if (c.datatype === "integer" || c.datatype === "double") {
             size = size * 4;
+            // not what's expected for "integer"... or "double", for that matter.
             arrType = Float32Array;
         } else if (c.datatype === "int32") {
             size = size * 4;
@@ -1475,7 +1494,11 @@ class DataStore {
             const max = ov.max == null ? c.minMax[1] : ov.max;
             const bins = config.bins || 100;
             const interval_size = (max - min) / bins;
-            const fallbackColor = config.asArray ? [255, 255, 255] : "#ffffff";
+            // not ideal way of getting theme - also, won't update dynamically.
+            const dark = window.mdv?.chartManager.theme === "dark";
+            const white = config.asArray ? [255, 255, 255] : "#ffffff";
+            const black = config.asArray ? [0, 0, 0] : "#000000";
+            const fallbackColor = ov.hideMissing ? undefined : (dark ? black : white);
             //the actual function - bins the value and returns the color for that bin
             function getColor(v) {
                 if (isFallback(v)) return fallbackColor;

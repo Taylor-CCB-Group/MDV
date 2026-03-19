@@ -22,6 +22,10 @@
         --title_bar_height: 31px;
         --resizer-size: 10px;
         --resizer-offset: -10px;
+        --row_even_background: #404040;
+        --row_odd_background: #303030;
+        --header_menu_background: #252525;
+        --scroll_bar_track: #424242;
     }
 }
 @media (prefers-color-scheme: light) {
@@ -47,6 +51,10 @@
         --title_bar_height: 31px;
         --resizer-size: 10px;
         --resizer-offset: -10px;
+        --row_even_background: white;
+        --row_odd_background: #fafafa;
+        --header_menu_background: #fafafa;
+        --scroll_bar_track: #f1f1f1;
     }
 }
 
@@ -68,6 +76,10 @@
     --menu-gradient: linear-gradient(#444, #222);
     --tooltip_background_color: #f5f5f5;
     --tooltip_text_color: #222;
+    --row_even_background: #404040;
+    --row_odd_background: #303030;
+    --header_menu_background: #252525;
+    --scroll_bar_track: #424242;
 }
 
 .light {
@@ -87,10 +99,21 @@
     --menu-gradient: linear-gradient(white, darkgray);
     --tooltip_background_color: #222;
     --tooltip_text_color: #f5f5f5;
+    --row_even_background: white;
+    --row_odd_background: #fafafa;
+    --header_menu_background: #fafafa;
+    --scroll_bar_track: #f1f1f1;
 }
 :root {
     font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
     --button_color: #1266f1;
+    --background_color_success: #eefded;
+    --background_color_info: #edf5fd;
+    --background_color_warning: #fdfded;
+    --text_color_success: #215f26;
+    --text_color_info: #21425f;
+    --text_color_warning: #5f5f21;
+    --scroll_bar_thumb: #828282;
 }
 .dark a {
     color: #1266f1;
@@ -638,4 +661,126 @@ select, input, textarea {
 
 .tippy-arrow:before {
    color: var(--tooltip_background_color);
+}
+
+/* Slick Grid React styles */
+
+.slickgrid-react-container {
+    .grid-pane, 
+    .slickgrid-container,
+    .slick-viewport {
+        width: 100%;
+        height: 100%;
+    }
+
+    .slickgrid-container {
+        border: 0.5px solid var(--border_menu_bar_color);
+    }
+
+    .slick-pane-top {
+        border-top-width: 1px;
+        border-top-color: var(--border_menu_bar_color) !important;
+    }
+
+    .grid-canvas {
+        background-color: transparent !important;
+    }
+
+    .slick-viewport {
+        scrollbar-color: var(--scroll_bar_thumb) var(--scroll_bar_track) !important;
+      }
+
+    .slick-cell, .slick-header-column {
+        border: 0.5px solid transparent !important;
+        border-right-color: var(--border_menu_bar_color) !important;
+        border-bottom-color: var(--border_menu_bar_color) !important;
+        font-size: 13px !important;
+    }
+
+    .slick-cell {
+        padding: 2px 4px !important;
+        line-height: 20px !important;
+    }
+
+    .slick-empty-data-warning {
+        display: none !important;
+    }
+
+    .slick-header-column {
+        display: flex !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .slick-header-column * {
+        height: auto;
+        /* max-width: 100% !important; */
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        flex-grow: 1;
+    }
+    
+    .slick-column-name {
+        /* width: 100%; */
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        /* border: 4px solid gray; */
+        max-width: 80% !important;
+        font-weight: 600 !important;
+    }
+
+    /* Editable icon: never shrink so it's always visible */
+    .slick-column-name .mdv-col-editable-icon {
+        flex-shrink: 0 !important;
+        flex-grow: 0 !important;
+        margin-right: 2px;
+    }
+
+    .slick-header {
+        width: 100% !important;
+    }
+
+    .slick-header-column,
+    .slick-header-menu,
+    .slick-pane-header {
+        background-color: var(--background_color) !important;
+        color: var(--text_color) !important;
+    }
+
+    .slick-row.even:hover, .slick-row.odd:hover {
+        background-color: var(--border_menu_bar_color) !important;
+    }
+
+    .slick-header-menu-button,
+    .slick-row.odd,
+    .slick-row.even {
+        color: var(--text_color) !important;
+    }
+
+    .slick-cell.selected {
+        background-color: var(--background_color_error) !important;
+    }
+
+    .slick-row.odd {
+        background-color: var(--row_odd_background) !important;
+    }
+
+    .slick-row.even {
+        background-color: var(--row_even_background) !important;
+    }
+
+    .slick-menu-item:hover:not(.slick-menu-item-divider) {
+        background-color: var(--border_menu_bar_color);
+    }
+
+    .mdi {
+        display: inline-flex;
+        align-items: center;
+        font-size: 18px;
+        width: 1em;
+        height: 1em;
+    }
 }

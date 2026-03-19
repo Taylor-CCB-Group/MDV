@@ -9,6 +9,10 @@ import type { Framebuffer } from "@luma.gl/core";
 export type SpatialLayerProps = ScatterplotLayerProps & {
     //pending typing that allows for other kinds of layers etc
     contourLayers: ContourLayerProps[];
+    highlightedData?: number[];
+    highlightLineWidth?: number;
+    highlightRadiusScale?: number;
+    highlightLineColor?: [number, number, number];
 };
 type DensityLayerProps = ScatterplotLayerProps & {
     // are framebuffers appropriate for use as props?
@@ -33,9 +37,7 @@ class DensityLayer extends Layer<DensityLayerProps> {
         console.log(`Initialising DensityLayer '${this.props.id}'`);
         const framebuffer = device.createFramebuffer({
             ...size,
-            colorAttachments: [
-                device.createTexture({ format: "r32float", ...size }),
-            ],
+            colorAttachments: [device.createTexture({ format: "r32float", ...size })],
         });
         this.setState({ framebuffer });
     }
@@ -85,7 +87,13 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     }
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
         // order matters here, we should make a ui where we can easily control it
-        const { contourLayers } = this.props;
+        const {
+            contourLayers,
+            highlightedData = [],
+            highlightLineWidth = 1,
+            highlightRadiusScale,
+            highlightLineColor = [255, 255, 255],
+        } = this.props;
         // future work:
         // const densityLayers = contourLayers.map((layer) => {
         //     const { extensions, ...p } = this.getSubLayerProps(layer);
@@ -103,18 +111,8 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 .filter((l) => l)
                 .map((props) => {
                     const { extensions, ...p } = this.getSubLayerProps(props);
-                    // todo: maybe encapsulate this in a different way
-                    //patch so that it doesn't try to use incompatible extensions used by the ScatterplotLayer
-                    //up for review...
-                    if (extensions && extensions.length > 0) {
-                        console.log(
-                            "pending review how extensions interact with sublayers - filtering out from subLayerProps",
-                            extensions,
-                        );
-                    }
                     return new HeatmapLayer({
                         ...p,
-                        // extensions: [],
                         _subLayerProps: {
                             triangle: {
                                 type: TriangleLayerContours,
@@ -139,8 +137,24 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                     id: "spatial.scatterplot",
                 }),
             ),
+            highlightedData.length > 0
+                ? new ScatterplotLayer(
+                      this.getSubLayerProps({
+                          ...this.props,
+                          data: highlightedData,
+                          id: "spatial.highlight",
+                          filled: false,
+                          stroked: true,
+                          pickable: false,
+                          radiusScale: highlightRadiusScale ?? this.props.radiusScale,
+                          getLineWidth: highlightLineWidth,
+                          getLineColor: highlightLineColor,
+                          lineWidthMinPixels: 1,
+                      }),
+                  )
+                : null,
             // ...densityLayers,
-        ];
+        ].filter(Boolean) as LayersList;
     }
     draw(opts: any) {
         super.draw(opts);

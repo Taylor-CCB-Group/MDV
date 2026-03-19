@@ -16,7 +16,10 @@ export function useHighlightedIndex() {
  */
 export function useHighlightedIndices() {
     const dataStore = useDataStore();
-    const [highlightedIndices, setHighlightedIndices] = useState<number[]>([]);
+    // Create a copy to avoid a reference to mutable state - not that we anticipate an actual issue in this case.
+    const [highlightedIndices, setHighlightedIndices] = useState<number[]>(
+        dataStore.highightedData?.slice() || []
+    );
     const listenerId = useId();
 
     useEffect(() => {

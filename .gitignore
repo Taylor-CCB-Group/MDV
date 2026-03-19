@@ -70,3 +70,11 @@ logs/
 
 # Generated test data
 tests_playwright/test-data/temp/
+
+# Generated schema outputs (JSON & Python)
+/schemas/chart-config-schema.json
+/scripts/schemas/chart-config-schema.json
+/scripts/schemas/datasource-schema.json
+/scripts/schemas/datasources-array-schema.json
+/python/mdvtools/llm/structured_schemas.py
+/scripts/python/mdvtools/llm/structured_schemas.py

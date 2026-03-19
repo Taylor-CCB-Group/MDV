@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 import numpy as np
+from ..serverlite import serve_project
 # nb, main spatialdata import should happen lazily
 # so user doesn't have to wait and see lots of scary unrelated output if they input bad arguments.
 if TYPE_CHECKING:
@@ -25,31 +26,6 @@ class SpatialDataConversionArgs:
     link: bool = False
     density: bool = False
     point_transform: str = "auto"
-
-def _process_sdata_path(sdata_path: str, conversion_args: "SpatialDataConversionArgs"):
-    """Processes a single SpatialData object path."""
-    # imports need to be here for the separate process
-    from mdvtools.spatial.conversion import _try_read_zarr, _resolve_regions_for_table
-    from mdvtools.spatial.mermaid import sdata_to_mermaid
-    import os
-
-    sdata_name = os.path.basename(sdata_path)
-    sdata = _try_read_zarr(sdata_path)
-    if sdata is None:
-        return None
-    print(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n")
-    print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
-    adata_objects = []
-    all_regions = {}
-    for table_name, adata in sdata.tables.items():
-        _resolve_regions_for_table(sdata, table_name, sdata_name, conversion_args)
-        adata.obs["spatialdata_path"] = sdata_name
-        adata.obs["table_name"] = table_name
-        adata_objects.append(adata)
-        if "regions" in adata.uns.get("mdv", {}):
-            all_regions.update(adata.uns["mdv"]["regions"])
-
-    return sdata_name, sdata, adata_objects, all_regions
 
 
 REGION_FIELD = "spatial_region"
@@ -728,25 +704,39 @@ def _set_default_image_view(mdv: "MDVProject", args: SpatialDataConversionArgs):
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
     Convert all SpatialData objects in a folder to MDV format.
+    
     Args:
         spatialdata_path: Path to the folder containing the SpatialData objects
         output_folder: Path to the output folder for the MDV project
         preserve_existing: Whether to preserve existing project data in output folder
         serve: Whether to serve the project after conversion
+    
     Returns:
         MDVProject: The MDV project object
+    
     Raises:
         ValueError: If the SpatialData objects cannot be found or the project cannot be created
         Exception: For other unexpected errors during conversion
+    
+    Note on modifications:
+        This function modifies the AnnData tables in-place by adding:
+        - obs columns: "spatialdata_path", "table_name", "x", "y", "spatial_region"
+        - uns["mdv"] metadata: regions, point_transform, is_spatial
+        
+        When args.link is True:
+            - Original SpatialData files are NOT modified (symlinked)
+            - Table modifications exist only in the merged AnnData object written to MDV
+        
+        When args.link is False:
+            - SpatialData objects are copied and written with modified tables
+            - The written SpatialData objects contain the modified tables
     """
     # imports can be slow, so doing them here rather than at the top of the file
     from anndata import concat as ad_concat
-    from concurrent.futures import ProcessPoolExecutor
-
-    # from mdvtools.spatial.spatial_conversion import convert_spatialdata_to_mdv
     from mdvtools.conversions import convert_scanpy_to_mdv
     from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.build_info import get_build_info
+    from mdvtools.spatial.mermaid import sdata_to_mermaid
     
     # Print version banner if build info is available
     build_info = get_build_info()
@@ -767,27 +757,44 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         # we haven't actually yet determined whether any of the paths are really sdata...
         # this happens when the folder is totally empty.
         raise ValueError(f"No SpatialData objects found in the folder '{args.spatialdata_path}'")
+    
     sdata_objects: dict[str, SpatialData] = {}
     adata_objects: list[AnnData] = []
     all_regions: dict[str, dict] = {}
     names: set[str] = set()
-    with ProcessPoolExecutor() as executor:
-        results = executor.map(_process_sdata_path, sdata_paths, [args] * len(sdata_paths))
-
-    for result in results:
-        if result is None:
+    
+    # Process each SpatialData object sequentially
+    # Removed ProcessPoolExecutor to avoid pickling issues with lazy zarr arrays in SpatialData objects
+    for sdata_path in sdata_paths:
+        sdata_name = os.path.basename(sdata_path)
+        sdata = _try_read_zarr(sdata_path)
+        if sdata is None:
             continue
         
-        sdata_name, sdata, adatas, regions = result
         if sdata_name in names:
             raise ValueError(
                 f"SpatialData object with name '{sdata_name}' already processed. Please ensure names are unique."
             )
-        
         names.add(sdata_name)
+        
+        print(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n")
+        print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
+        
+        # Process tables and modify them in-place
+        # These modifications will be:
+        # - Included in the merged AnnData object (always)
+        # - Written to the copied SpatialData objects (when args.link is False)
+        # - NOT written to original files (when args.link is True, files are symlinked)
+        for table_name, adata in sdata.tables.items():
+            _resolve_regions_for_table(sdata, table_name, sdata_name, args)
+            adata.obs["spatialdata_path"] = sdata_name
+            adata.obs["table_name"] = table_name
+            adata_objects.append(adata)
+            if "regions" in adata.uns.get("mdv", {}):
+                all_regions.update(adata.uns["mdv"]["regions"])
+        
+        # Store the (potentially modified) SpatialData object
         sdata_objects[sdata_name] = sdata
-        adata_objects.extend(adatas)
-        all_regions.update(regions)
 
     if len(adata_objects) == 0:
         raise ValueError("No tables found in any SpatialData objects - this is not yet supported.")
@@ -816,12 +823,14 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     )
     if args.link:
         print(f"Linking spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
+        print("NOTE: Original SpatialData files are not modified. Table modifications exist only in the merged MDV project.")
         os.symlink(
             os.path.abspath(args.spatialdata_path), 
             os.path.join(mdv.dir, "spatial"), target_is_directory=True
         )
     else:
         print(f"Copying spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
+        print("NOTE: SpatialData objects are written with modified tables (added obs columns and uns metadata).")
         os.makedirs(
             f"{mdv.dir}/spatial", exist_ok=True
         )  # pretty sure sdata.write will do this anyway
@@ -878,7 +887,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     add_readme_to_project(mdv, merged_adata, args)
     if args.serve:
         print(f"Serving project at {args.output_folder}")
-        mdv.serve()
+        serve_project(mdv)
     else:
         print(f"Project saved to {args.output_folder}")
 

@@ -5,7 +5,7 @@ import type { DataColumn, DataType } from "@/charts/charts";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
-import { isArray, matchString, parseDelimitedString } from "@/lib/utils";
+import { isArray } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";

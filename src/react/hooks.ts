@@ -3,12 +3,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useChart, useDataStore } from "./context";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
-import { action, autorun } from "mobx";
+import { action, autorun, runInAction } from "mobx";
 import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
-import { isArray, matchString, notEmpty, parseDelimitedString } from "@/lib/utils";
+import { isArray, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
@@ -77,6 +77,25 @@ export function useChartID(): string {
 export function useChartDoc() {
     const chart = useChart();
     return chart.__doc__;
+}
+
+/**
+ * Get the theme of the app
+ * @returns mode of theme (dark/light)
+ */
+export function useTheme() {
+    const chartManager = useChartManager();
+    const [theme, setTheme] = useState<"dark" | "light">(chartManager.theme);
+
+    useEffect(() => {
+        const disposer = autorun(() => {
+            setTheme(chartManager.theme);
+        });
+
+        return () => disposer();
+    }, [chartManager]);
+
+    return theme;
 }
 
 /**
@@ -200,10 +219,10 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
 /**
  * version of {@link useParamColumns} which returns a sorted column array based on config.order
  */
-export function useOrderedParamColumns(): LoadedDataColumn<DataType>[] {
+export function useOrderedParamColumns<T extends { order?: Record<string, number> } = SelectionDialogConfig>(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
-    const config = useConfig<SelectionDialogConfig>();
+    const config = useConfig<T>();
     const [orderedParams, setOrderedParams] = useState<LoadedDataColumn<DataType>[]>([]);
 
     useEffect(() => {
@@ -574,8 +593,8 @@ export const usePasteHandler = <T, V = T>({
 
             // Find the option which matches the pasted text
             const matched = options.find((option) => {
-                const optionLower = getLabel(option).toLowerCase().split(" ");
-                return matchString(optionLower, itemLower);
+                const optionLower = getLabel(option).toLowerCase();
+                return itemLower === optionLower;
             });
 
             if (matched) {
@@ -589,8 +608,8 @@ export const usePasteHandler = <T, V = T>({
             // Filters the options to get the options which match the pasted text
             const matched = options.filter((option) => 
                 itemLower.some((item) => {
-                    const optionLower = getLabel(option).toLowerCase().split(" ");
-                    return matchString(optionLower, item);
+                    const optionLower = getLabel(option).toLowerCase();
+                    return item === optionLower;
                 })
             );
 

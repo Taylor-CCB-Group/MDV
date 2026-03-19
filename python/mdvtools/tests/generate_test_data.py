@@ -18,6 +18,22 @@ from mdvtools.tests.mock_anndata import create_minimal_anndata
 from mdvtools.conversions import convert_scanpy_to_mdv
 
 
+def _add_unique_column_to_project(project, n_rows):
+    """Add a unique-typed column for manual testing of unique column edit/round-trip.
+    Prefers datasource 'cells' when present so row count matches AnnData n_obs.
+    """
+    names = project.get_datasource_names()
+    if not names:
+        return
+    ds_name = "cells" if "cells" in names else names[0]
+    cell_ids = [f"cell_{i}" for i in range(n_rows)]
+    project.set_column(
+        ds_name,
+        {"name": "cell_id", "field": "cell_id", "datatype": "unique", "editable": True},
+        cell_ids,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Generate test MDV projects from mock or scanpy data.',
@@ -29,6 +45,9 @@ Examples:
 
   # Create project from mock data (large)
   python -m mdvtools.tests.generate_test_data ~/mdv/test_large --mock --n-cells 1000000 --n-genes 5000
+
+  # Create project with a unique column for manual integration testing (edit from frontend)
+  python -m mdvtools.tests.generate_test_data ~/mdv/test_unique --mock --with-unique-column
 
   # Create project from scanpy dataset
   python -m mdvtools.tests.generate_test_data ~/mdv/test_pbmc3k --scanpy pbmc3k_processed
@@ -76,6 +95,11 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
         '--force',
         action='store_true',
         help='Overwrite existing project'
+    )
+    parser.add_argument(
+        '--with-unique-column',
+        action='store_true',
+        help='Add a unique-typed column (e.g. cell_id) to the first datasource for manual testing of unique column edit/round-trip'
     )
     
     args = parser.parse_args()
@@ -151,6 +175,11 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
     # Add provenance to state
     state["provenance"] = provenance
     project.state = state
+    
+    if args.with_unique_column:
+        n_rows = args.n_cells if args.mock else adata.n_obs
+        _add_unique_column_to_project(project, n_rows)
+        print("  Added unique column to first datasource for manual integration testing.")
     
     print(f"✓ Created MDV project at {output_path}")
     print(f"  Provenance: {provenance['source']} data, {provenance['parameters']}")

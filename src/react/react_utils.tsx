@@ -9,10 +9,12 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 import { createFilterOptions } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AUTOCOMPLETE_OPTIONS_LIMIT } from "@/lib/constants";
 
 // todo - think about whether this might lead to unexpected future issues
+
 // consider virtualization etc
-const filterOptions = createFilterOptions<any>({ limit: 256 });
+const filterOptions = createFilterOptions<any>({ limit: AUTOCOMPLETE_OPTIONS_LIMIT });
 /** This makes sure any material-ui components have an appropriate theme applied, including
  * setting `container` in `defaultProps` of any `<Popper>` and `<Popover>` components
  * which should ensure that tooltips / dropdowns etc work correctly without needing to manually

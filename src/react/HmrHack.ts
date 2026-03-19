@@ -7,6 +7,7 @@ import "./components/HighlightedFeatureChart";
 import "./components/GeneNetworkChart";
 import "./components/SelectionDialogReact";
 import "../charts/dialogs/AddColumnsFromRowsDialogReact";
+import "../react/components/TableChartReactWrapper";
 
 /**
  * Charts are registered with ChartManager by being added to a BaseChart.types object,

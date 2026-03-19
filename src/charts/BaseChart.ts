@@ -27,6 +27,7 @@ export type BaseConfig = {
     type: string;
     param: FieldSpecs;
     title_color?: string;
+    version?: string; // Schema version for future migration support
 } & ColorConfig;
 /**
  * All chart config types include a color configuration, (although not all charts use it).
@@ -41,7 +42,8 @@ export type ColorConfig = {
     log_color_scale?: boolean;
     trim_color_scale?: keyof Quantiles | "none";
     color_overlay?: number;
-    fallbackOnZero?: boolean;    
+    fallbackOnZero?: boolean;
+    hideMissing?: boolean;
 };
 export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
 export type ColorOptions = any;
@@ -185,7 +187,7 @@ class BaseChart<T extends BaseConfig> {
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
             menu.push({
-                text: "debug chart",
+                text: "debug / report chart",
                 icon: "fas fa-bug",
                 func: () => {
                     window.mdv.debugChart = this;
@@ -598,6 +600,7 @@ class BaseChart<T extends BaseConfig> {
             overideValues: {
                 colorLogScale: this.config.log_color_scale,
                 fallbackOnZero: this.config.fallbackOnZero,
+                hideMissing: this.config.hideMissing,
             },
         };
         this._addTrimmedColor(column, conf);
@@ -857,6 +860,19 @@ class BaseChart<T extends BaseConfig> {
                 current_value: c.fallbackOnZero || false,
                 func: (x) => {
                     c.fallbackOnZero = x;
+                    if (c.color_by) {
+                        //@ts-expect-error color_by
+                        this.colorByColumn?.(c.color_by);
+                    }
+                },
+            });
+            colorSettings.push({
+                label: "Hide missing values",
+                type: "check",
+
+                current_value: c.hideMissing || false,
+                func: (x) => {
+                    c.hideMissing = x;
                     if (c.color_by) {
                         //@ts-expect-error color_by
                         this.colorByColumn?.(c.color_by);

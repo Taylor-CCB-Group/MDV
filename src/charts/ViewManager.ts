@@ -3,8 +3,26 @@ import type ChartManager from "./ChartManager";
 import type { DataSource } from "./charts";
 import _ from "lodash";
 import { toPng } from "html-to-image";
+import { getPostData, getProjectRoot } from "@/dataloaders/DataLoaderUtil";
 
-export type View = any;
+/** Per–data-source view config (panel layout and optional highlight state). */
+export type ViewDataDataSource = {
+    panelWidth?: number;
+    layout?: string;
+    /** Persisted row indices to highlight when the view is loaded. */
+    highlight?: number[];
+};
+
+/** View state: dataSources keyed by data source name, initialCharts, optional links. */
+export type View = {
+    name?: string;
+    dataSources: Record<string, ViewDataDataSource>;
+    initialCharts: Record<string, unknown[]>;
+    links?: unknown[];
+    viewImage?: string;
+    [key: string]: unknown;
+};
+
 export type UpdatedColumns = any;
 export type MetaData = any;
 export type ChartError = any;
@@ -33,6 +51,7 @@ class ViewManager {
     @observable accessor current_view = "";
     @observable accessor all_views: string[];
     @observable accessor lastSavedState: State;
+    @observable accessor showGallery = false;
     private cm: ChartManager;
 
     constructor(current_view = "", all_views: string[] = []) {
@@ -288,6 +307,54 @@ class ViewManager {
     @action
     async saveAsView(viewName: string) {
         await this.addView(viewName, {}, true);
+    }
+
+    @action
+    setShowGallery(show: boolean) {
+        this.showGallery = show;
+    }
+
+    @action
+    async renameView(oldName: string, newName: string) {
+        try {
+            const root = getProjectRoot();
+            const resp = await getPostData(`${root}/rename_view`, { old_name: oldName, new_name: newName });
+            if (!resp?.success) throw new Error(resp?.error ?? "Rename failed");
+            const updated = this.all_views.map((v) => (v === oldName ? newName : v));
+            this.setAllViews(updated);
+            if (this.current_view === oldName) {
+                this.setView(newName);
+            }
+        } catch (error) {
+            console.error("error renaming view", error);
+            throw error;
+        }
+    }
+
+    @action
+    async reorderViews(newOrder: string[]) {
+        try {
+            const root = getProjectRoot();
+            const resp = await getPostData(`${root}/reorder_views`, { order: newOrder });
+            if (!resp?.success) throw new Error(resp?.error ?? "Reorder failed");
+            this.setAllViews(newOrder);
+        } catch (error) {
+            console.error("error reordering views", error);
+            throw error;
+        }
+    }
+
+    @action
+    async setGalleryDefault(show: boolean) {
+        try {
+            const root = getProjectRoot();
+            const resp = await getPostData(`${root}/set_gallery_default`, { show });
+            if (!resp?.success) throw new Error(resp?.error ?? "Set gallery default failed");
+            this.cm.config.show_gallery_on_open = show;
+        } catch (error) {
+            console.error("error setting gallery default", error);
+            throw error;
+        }
     }
 
     checkUnsavedState(action: () => void) {

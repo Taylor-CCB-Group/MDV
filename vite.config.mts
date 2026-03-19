@@ -33,7 +33,7 @@ function getRollupOptions(): RollupOptions {
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
-                entryFileNames: 'js/mdv.js',
+                entryFileNames: 'mdv.js',
                 assetFileNames: (assetInfo) => {
                     //todo: match webpack behaviour with assetsDir / css-loader.
                     if (assetInfo?.name?.includes('index.css')) return 'assets/mdv.css';
@@ -119,6 +119,7 @@ const proxy = [
     '/api_root',
     '/rescan_projects',
     '/login_dev',
+    '/secondary_logo',
 // biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config
 ].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {}) as Record<string, ProxyOptions>;
 // (failed) attempt to let this proxy without cors_allowed_origins wildcard on server
@@ -159,7 +160,7 @@ export default defineConfig(env => {
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
     return ({
-    base: "./",
+    base: process.env.asset_base || "./",
     server: {
         headers: {
             "Cross-Origin-Embedder-Policy": "require-corp",
@@ -172,9 +173,9 @@ export default defineConfig(env => {
         strictPort: true,
         proxy,
     },
-    publicDir: 'examples', //used for netlify.toml??... the rest is noise.
+    publicDir: process.env.exclude_dir?false:'examples', //used for netlify.toml??... the rest is noise.
     build: {
-        sourcemap: true,
+        sourcemap: !process.env.nomap,
         rollupOptions: { 
             ...getRollupOptions(),
             external: ['./python/**'],
@@ -197,7 +198,7 @@ export default defineConfig(env => {
         })
     ],
     worker: {
-        format: 'iife',
+        format: (process.env.worker_format || 'iife') as 'es' | 'iife',
     },
     resolve: {
         alias: {

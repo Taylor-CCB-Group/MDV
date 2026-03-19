@@ -141,7 +141,8 @@ export class ChartManager {
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
      * @param {boolean?} [config.chat_enabled] 
-     * @param {string?} [config.mdv_api_root] 
+     * @param {string?} [config.mdv_api_root]
+     * @param {boolean?} [config.show_gallery_on_open] whether to open the gallery view by default
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
      * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
      * 
@@ -687,6 +688,11 @@ export class ChartManager {
                             });
                         }
                     }
+
+                    // Open the view gallery on initial load if show_gallery_on_open is true
+                    if (firstTime && config.show_gallery_on_open) {
+                        this.viewManager.setShowGallery(true);
+                    }
                 } catch (error) {
                     console.error("Error during view initialization:", error);
                     // Consider adding user-facing error handling here
@@ -705,6 +711,10 @@ export class ChartManager {
                             console.log("Error occurred: ", state.chartErrors);
                             return false;
                         });
+                    }
+                    // Open the view gallery on initial load if show_gallery_on_open is true
+                    if (firstTime && config.show_gallery_on_open) {
+                        this.viewManager.setShowGallery(true);
                     }
             });
         }
@@ -883,6 +893,19 @@ export class ChartManager {
         // is it ever with a value that would cause the chart.getConfig() to have a different result?
         // We are relying on the config being stable/settled when these promises resolve.
         console.log('after await Promise.all(chartPromises);');
+
+        // Restore highlighted indices from view data (e.g. after loading or switching view)
+        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
+            const spec = this.viewData.dataSources[dsName];
+            const highlight = spec?.highlight;
+            const dstore = this.dsIndex[dsName]?.dataStore;
+            if (!dstore?.dataHighlighted) continue;
+            if (Array.isArray(highlight) && highlight.length > 0) {
+                dstore.dataHighlighted(highlight, null);
+            } else {
+                dstore.dataHighlighted([], null);
+            }
+        }
 
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
@@ -1111,10 +1134,51 @@ export class ChartManager {
                 editable: true,
                 field: cl.field,
             };
-            const arr = new Array(cl.data.length);
-            for (let i = 0; i < cl.data.length; i++) {
-                arr[i] = cl.data[i];
+            const numRows = dataStore.size;
+            
+            // Add stringLength to metadata for unique columns (required by server)
+            if (cl.datatype === "unique" && cl.stringLength) {
+                md.stringLength = cl.stringLength;
             }
+            
+            let arr;
+            if (cl.datatype === "unique") {
+                // For unique columns, convert Uint8Array to array of strings (expected by server)
+                const textDecoder = new TextDecoder();
+                const stringLength = cl.stringLength;
+
+                if (!stringLength || typeof stringLength !== "number" || stringLength <= 0) {
+                    console.error(
+                        `Column ${c} has invalid or missing stringLength: ${stringLength}.`
+                    );
+                    // Fallback as empty values to keep it consistent with other columns
+                    return { metadata: md, data: new Array(numRows).fill("") };
+                }
+
+                arr = new Array(numRows);
+                
+                for (let i = 0; i < numRows; i++) {
+                    const baseIndex = i * stringLength;
+
+                    if (!cl.data || baseIndex + stringLength > cl.data.length) {
+                        throw new Error(
+                            `Invalid unique-column buffer for '${c}' at row ${i} (stringLength=${stringLength}).`
+                        );
+                    }
+
+                    const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
+                    const decoded = textDecoder.decode(rowBytes);
+                    // Remove null padding characters
+                    arr[i] = decoded.replace(/\0+$/, "");
+                }
+            } else {
+                // For other datatypes, get the values from data array
+                arr = new Array(cl.data.length);
+                for (let i = 0; i < cl.data.length; i++) {
+                    arr[i] = cl.data[i];
+                }
+            }
+            
             return { metadata: md, data: arr };
         }
     }
@@ -1174,6 +1238,23 @@ export class ChartManager {
 
         const view = JSON.parse(JSON.stringify(this.viewData));
         view.initialCharts = initialCharts;
+        for (const ds of this.dataSources) {
+            const h = ds.dataStore.getHighlightedData?.();
+            // adding empty entries to view.dataSources here is no-bueno.
+            if (!view.dataSources[ds.name]) {
+                // not expecting that there should be any highlight data to save when the dataSource is not part of the view
+                if (h) {
+                    console.warn(`unexpected highlighted data for dataSource '${ds.name}' which is not part of current viewData`);
+                }
+                continue;
+            }
+            if (Array.isArray(h) && h.length > 0) {
+                view.dataSources[ds.name].highlight = [...h];
+            } else {
+                // biome-ignore lint/performance/noDelete: setting it to undefined would mean there would still be the key, not a perf issue here.
+                delete view.dataSources[ds.name].highlight;
+            }
+        }
         const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
         return {
             view: view,
@@ -1701,7 +1782,7 @@ export class ChartManager {
                     height: `${height}px`,
                     left: `${left}px`,
                     top: `${top}px`,
-                    background: t.main_panel_color,
+                    background: "var(--main_panel_color)",
                     zIndex: "2",
                     display: "flex",
                     alignItems: "center",
@@ -1750,14 +1831,7 @@ export class ChartManager {
             this.clearInfoAlerts();
             spinner.remove();
             ellipsis.remove();
-            // const id = this.createInfoAlert(
-            //     `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
-            //     {
-            //         type: "warning",
-            //     },
-            // );
-            // const idiv = this.infoAlerts[id].div;
-            // idiv.onclick = () => idiv.remove();
+            div.style.border = "1px solid var(--border_menu_bar_color)";
             const debugNode = createEl(
                 "div",
                 {
@@ -1773,7 +1847,14 @@ export class ChartManager {
                 },
                 div,
             );
-            createMdvPortal(ErrorComponentReactWrapper({ error, height, width, extraMetaData: { config } }), debugNode);
+            const errorObj = error instanceof Error ? 
+                error 
+                :
+                typeof(error) === "string" ?
+                    { message: error }
+                    :
+                    { message: "An error occurred while creating the chart" };
+            createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {

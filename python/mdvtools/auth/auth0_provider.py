@@ -416,7 +416,8 @@ class Auth0Provider(AuthProvider):
             max_pagination_rate_limit_retries: int = 5,
             pagination_retry_delay: float = 2.0,
             per_page: int = 50,
-            max_role_fetch_retries: int = 3
+            max_role_fetch_retries: int = 3,
+            user_processing_delay: float = 1.0
         ):
             self.auth0 = auth0
             self.all_projects = all_projects
@@ -430,6 +431,7 @@ class Auth0Provider(AuthProvider):
             self.pagination_retry_delay = pagination_retry_delay
             self.per_page = per_page
             self.max_role_fetch_retries = max_role_fetch_retries
+            self.user_processing_delay = user_processing_delay
         
         def to_dict(self) -> Dict[str, int]:
             """Convert context stats to dictionary."""
@@ -541,7 +543,7 @@ class Auth0Provider(AuthProvider):
         )
                 
         # Add delay between role requests to avoid rate limiting
-        time.sleep(0.2)  # 200ms delay between requests
+        time.sleep(context.user_processing_delay)
         
         # Fetch user's roles with retry mechanism
         roles = self._fetch_user_roles_with_retry(auth0_id, context)
@@ -634,7 +636,7 @@ class Auth0Provider(AuthProvider):
         logging.warning(
             f"Rate limit hit ({new_count}/{context.max_pagination_rate_limit_retries}). "
             f"Possible issues: frequent calls, concurrent execution, batch size ({context.per_page}), "
-            f"or insufficient delays (1s pages, 0.2s roles). Retrying in {context.pagination_retry_delay}s..."
+            f"or insufficient delays (1s pages, {context.user_processing_delay}s roles). Retrying in {context.pagination_retry_delay}s..."
         )
     
     def _log_sync_statistics(self, initial_user_count: int, initial_admin_count: int) -> None:
@@ -656,21 +658,21 @@ class Auth0Provider(AuthProvider):
             f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
         )
         
-    def sync_users_to_db(self) -> None:
+    def sync_users_to_db(self, user_processing_delay: float = 1.0) -> None:
         """
         Syncs users from Auth0 to the application's database using UserService and UserProjectService.
         Implements rate limiting and retry logic for Auth0 API calls.
         
-        WARNING: This function makes many Auth0 Management API calls and should be called sparingly.
-        Known call sites:
-        - On application startup (acceptable)
-        - From manage_project_permissions.py script (acceptable)
-        - Previously, from project_manager_extension when showing share dialog (PROBLEMATIC - may cause rate limiting)
+        WARNING: This function makes many Auth0 Management API calls and should be called manually only.
+        This function should only be called from manage_project_permissions.py script.
+        
+        Args:
+            user_processing_delay: Delay in seconds between processing each user (default: 1.0)
         
         Design concerns:
         - Auth0 Management API has strict rate limits (typically 2 req/sec for free tier)
         - This function makes 1 + N*2 API calls where N = number of users (list users + list_roles per user)
-        - If called frequently (e.g., on every share dialog open), will hit rate limits quickly
+        - If called frequently, will hit rate limits quickly
         - Consider: caching, background jobs, or incremental sync instead of full sync on-demand
         """
         from mdvtools.dbutils.dbmodels import Project
@@ -702,7 +704,8 @@ class Auth0Provider(AuthProvider):
             sync_context = self.SyncContext(
                 auth0=auth0,
                 all_projects=all_projects,
-                page=0
+                page=0,
+                user_processing_delay=user_processing_delay
             )
             
             # Fetch users from Auth0 connection with pagination
