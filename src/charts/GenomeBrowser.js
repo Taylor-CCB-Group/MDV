@@ -299,6 +299,10 @@ class GenomeBrowser extends BaseChart {
         }
         const p = this.config.param;
         const vm = this.config.view_margins;
+        if (data.indexes.length === 0) {
+             this.browser.removeAllHighlightedRegions();
+             return;
+        }
         const o = this.dataStore.getRowAsObject(data.indexes[0], p);
         //some basic checks
         const st = o[p[2]] > o[p[1]] ? o[p[1]] : o[p[2]];
