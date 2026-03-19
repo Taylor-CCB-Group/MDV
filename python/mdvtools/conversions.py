@@ -699,7 +699,7 @@ def create_regulamentary_project(
 def create_capsequm_project(
     output: str,
     results_folder: str,
-    extra_bigwigs: list =[]
+    extra_bigwigs: list | None = None
 ):
     """
     Creates a CAPSeqUM project from the results folder.
@@ -712,6 +712,8 @@ def create_capsequm_project(
     Returns:
         MDVProject: The created MDV project object.
     """
+    if extra_bigwigs is None:
+        extra_bigwigs = []
     p = MDVProject(output, delete_existing=True)
     # get info from config file
     with open(join(results_folder,"config.yml"), 'r') as file:
@@ -783,8 +785,11 @@ def create_capsequm_project(
     )
 
     #calculate height of track based on overlap i.e. how stacked the oligos are
-    
-    ot_height = ceil(op["length"]/op["step"]) * 7.5
+    step = op.get("step", 1)
+    if step <= 0:
+        logger.warning(f"Invalid step value {step} in oligo parameters. Defaulting to 1.")
+        step = 1
+    ot_height = ceil(op["length"]/step) * 7.5
     extra_params = {
         "default_parameters": {
             "color_by": "oligo_status",

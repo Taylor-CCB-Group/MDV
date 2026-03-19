@@ -972,7 +972,7 @@ class MDVProject:
         if dt:
             for t in dt:
                 gb["tracks"].append(t)
-        if info["default_parameters"]:
+        if info.get("default_parameters"):
             gb.update(info["default_parameters"])
         return gb
 
@@ -1021,7 +1021,7 @@ class MDVProject:
             if not isinstance(track, dict):
                 raise TypeError("Each track must be a dictionary")
             if  "file" not in track:
-                raise ValueError("Each track must have specify a local or remote file")
+                raise ValueError("Each track must specify a local or remote file")
             fname = basename(track["file"])
             track_name = track.get("name", fname.split(".")[0])
             track_type= track.get("type")
@@ -1051,7 +1051,7 @@ class MDVProject:
                 # assume its a just a bed file- compress and index it
                 else:
                     check_htslib()
-                    t_file = join(track["file"])
+                    t_file = track["file"]
                     o_file = join(self.trackfolder, fname)
                     create_bed_gz_file(t_file, o_file)        
                     fname= fname+".gz"
