@@ -1040,13 +1040,13 @@ class MDVProject:
                     raise FileNotFoundError(f"Track file {track['file']} does not exist")
                 # tracks already compressed and indexed - just copy to tracks folder
                 if track_type == "wig" or fname.endswith(".gz") or fname.endswith(".bb"):
+                    to_file = join(self.trackfolder, fname)
                     # For .gz files, verify index exists before copying
                     if fname.endswith(".gz"):
                         i_file = track["file"] + ".tbi"
                         if not exists(i_file):
                             raise FileNotFoundError(f"Index file {i_file} not found")
                         shutil.copyfile(i_file, f"{to_file}.tbi")
-                    to_file = join(self.trackfolder, fname)
                     shutil.copy(track["file"], to_file)
                         
                 # assume its a just a bed file- compress and index it
