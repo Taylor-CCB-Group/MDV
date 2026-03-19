@@ -725,7 +725,7 @@ def create_capsequm_project(
     best_df = df[df["oligo_status"] == "best"]
     first_best = best_df.iloc[0] if not best_df.empty else df.iloc[0]
     chr_val = first_best["chr"]
-    start_val = first_best["start"] -500
+    start_val = max(0, first_best["start"] - 500)
     stop_val = first_best["stop"] + 500
 
     #customize some of the columns
