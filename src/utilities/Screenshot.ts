@@ -48,7 +48,8 @@ const shouldIncludeCaptureNode = (node: HTMLElement | SVGElement, root: HTMLElem
 };
 
 /**
- * 
+ * Creates a png dataUrl image from a given DOM element, with some filtering of
+ * out-of-bounds elements and tooltips etc.
  */
 export default async (root: HTMLDivElement) => {
     const bounds = root.getBoundingClientRect();
