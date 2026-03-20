@@ -22,7 +22,7 @@ const useGateActions = () => {
         setSelectionFeatureCollection,
         setSelectionMode,
     } = selectionProps;
-    const chart = useChart<DeckScatterConfig>();
+    const chart = useChart<DeckScatterConfig & {region?: string}>();
 
     const clearSelection = useCallback(() => {
         action(() => {
@@ -60,13 +60,17 @@ const useGateActions = () => {
                 color: color ?? DEFAULT_GATE_COLOR,
             };
 
+            if (chart.config?.region) {
+                gate.region = chart.config.region;
+            }
+
             // Add to gate store
             await gateManager.addGate(gate);
 
             // Clear selection
             clearSelection();
         },
-        [gateManager, paramColumns, selectionFeatureCollection, clearSelection],
+        [gateManager, paramColumns, selectionFeatureCollection, clearSelection, chart.config],
     );
 
     const onDeleteGate = useCallback(

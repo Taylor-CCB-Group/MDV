@@ -1,4 +1,7 @@
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
     Divider,
     ListItemIcon,
     ListItemText,
@@ -12,12 +15,13 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import IconWithTooltip from "./IconWithTooltip";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DEFAULT_GATE_COLOR } from "../gates/gateUtils";
 import GateNameDialog from "./GateNameDialog";
 import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
@@ -35,6 +39,7 @@ export type ManageGateDialogType = {
     onRenameGate: (gateId: string, newName: string) => Promise<void>;
     onExportClick: (gateId: string) => void;
     onColorChange: (gateId: string, color: [number, number, number]) => Promise<void>;
+    activeRegion?: string;
 };
 
 const ManageGateDialogContent = ({
@@ -45,11 +50,20 @@ const ManageGateDialogContent = ({
     onRenameGate,
     onExportClick,
     onColorChange,
+    activeRegion,
 }: ManageGateDialogType) => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [renameGateId, setRenameGateId] = useState<string | null>(null);
     const [deleteGateId, setDeleteGateId] = useState<string | null>(null);
+
+    const regionSpecificGates = useMemo(() => 
+        gatesArray.filter((gate) => gate.region === activeRegion), 
+    [gatesArray, activeRegion]);
+
+    const globalGates = useMemo(() => 
+        gatesArray.filter((gate) => gate.region === undefined), 
+    [gatesArray]);
 
     const handleMenuOpen = useCallback((event: React.MouseEvent<HTMLButtonElement>, gateId: string) => {
         event.stopPropagation();
@@ -72,11 +86,12 @@ const ManageGateDialogContent = ({
         setDeleteGateId(gateId);
     }, []);
 
-    return (
-        <>
+    const renderGateTable = useCallback(
+        (gates: Gate[]) => (
             <Table
                 sx={{
-                    mb: 3,
+                    mb: 1,
+                    width: "100%",
                     "& .MuiTableCell-head": {
                         fontWeight: 600,
                     },
@@ -102,16 +117,14 @@ const ManageGateDialogContent = ({
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                    {gatesArray.length === 0 ? (
+                    {gates.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
-                                <Typography color="textSecondary">
-                                    No gates yet. Draw a selection on the chart and save it as a gate.
-                                </Typography>
+                            <TableCell colSpan={3} align="center" sx={{ py: 2 }}>
+                                <Typography color="text.secondary">No gates in this section.</Typography>
                             </TableCell>
                         </TableRow>
                     ) : (
-                        gatesArray.map((gate) => (
+                        gates.map((gate) => (
                             <TableRow key={gate.id}>
                                 <TableCell>
                                     <Tooltip title={gate.name}>
@@ -150,6 +163,49 @@ const ManageGateDialogContent = ({
                     )}
                 </TableBody>
             </Table>
+        ),
+        [onColorChange, handleMenuOpen],
+    );
+
+    return (
+        <>
+            {gatesArray.length === 0 ? (
+                <Typography color="textSecondary" sx={{ py: 2 }}>
+                    No gates yet. Draw a selection on the chart and save it as a gate.
+                </Typography>
+            ) : (
+                <>
+                    {activeRegion && (
+                        <Accordion disableGutters sx={{ display: "block" }} defaultExpanded>
+                            <AccordionSummary
+                                expandIcon={<ExpandMoreIcon />}
+                                sx={{ minHeight: 56 }}
+                            >
+                                <Typography variant="h6">
+                                    "{activeRegion}" gates
+                                </Typography>
+                            </AccordionSummary>
+                            <AccordionDetails sx={{ display: "block", pt: 0 }}>
+                                {renderGateTable(regionSpecificGates)}
+                            </AccordionDetails>
+                        </Accordion>
+                    )}
+
+                    <Accordion disableGutters sx={{ display: "block", mt: 2 }} defaultExpanded>
+                        <AccordionSummary
+                            expandIcon={<ExpandMoreIcon />}
+                            sx={{ minHeight: 56 }}
+                        >
+                            <Typography variant="h6">
+                                Global gates
+                            </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ display: "block", pt: 0 }}>
+                            {renderGateTable(globalGates)}
+                        </AccordionDetails>
+                    </Accordion>
+                </>
+            )}
             {selectedId && (
                 <Menu
                     anchorEl={anchorEl}

@@ -22,12 +22,13 @@ import {
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
 import useGateActions from "../hooks/useGateActions";
-import { useChartID, useParamColumns, useTheme } from "../hooks";
+import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
 import { getEmptyFeatureCollection } from "../deck_state";
 import { TuneOutlined } from "@mui/icons-material";
 import { LassoIcon, SplineIcon } from "lucide-react";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
+import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -144,6 +145,7 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
     const chartId = useChartID();
+    const config = useConfig<DeckScatterConfig & {region?: string}>();
     const { 
         setSelectionMode, 
         selectionFeatureCollection,
@@ -175,7 +177,7 @@ export default observer(function SelectionOverlay() {
         return () => {
           const dlg = manageGateByChartRef.current.get(chartId);
           if (dlg) {
-            setTimeout(() => dlg.close(), 0);
+            setTimeout(() => dlg?.close(), 0);
           }
           manageGateByChartRef.current.delete(chartId);
         };
@@ -226,13 +228,20 @@ export default observer(function SelectionOverlay() {
     const relevantGates = useMemo(() => {
         if (!cx || !cy) return [];
         return gateManager.gatesArray.filter(
-            (gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field
+            (gate) => {
+                if (gate.columns[0] === cx.field && gate.columns[1] === cy.field) {
+                    if (config?.region) {
+                        return gate.region === undefined || config.region === gate.region;
+                    }
+                    return true;
+                }
+                return false;
+            }
         )
     }
-    , [gateManager.gatesArray, cx, cy]);
+    , [gateManager.gatesArray, cx, cy, config]);
 
     const onManageGatesClick = useCallback(() => {
-        console.log("chart id: ", chartId, manageGateByChartRef.current);
         if (manageGateByChartRef.current.get(chartId)) {
             // a dialog already exists
             return;
@@ -249,7 +258,8 @@ export default observer(function SelectionOverlay() {
             onClose: () => {
                 // remove the entry of the dialog
                 manageGateByChartRef.current.delete(chartId);
-            }
+            },
+            activeRegion: config?.region,
         });
 
         // create a new entry for the dialog for a chart
@@ -261,7 +271,8 @@ export default observer(function SelectionOverlay() {
         onColorChange, 
         onRenameGate, 
         onExportClick, 
-        chartId
+        chartId,
+        config,
     ]);
 
     const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);

@@ -22,7 +22,7 @@ const useGateLayers = () => {
     const gateManager = useGateManager();
     const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
-    const config = useConfig<DeckScatterConfig>();
+    const config = useConfig<DeckScatterConfig & { region?: string }>();
     const { selectionProps } = useSpatialLayers();
     const { onEditGate } = useGateActions();
     const { dimension } = config;
@@ -38,8 +38,16 @@ const useGateLayers = () => {
 
     const relevantGates = useMemo(() => {
         if (!cx || !cy) return [];
-        return gateManager.gatesArray.filter((gate) => gate.columns[0] === cx.field && gate.columns[1] === cy.field);
-    }, [gateManager.gatesArray, cx, cy]);
+        return gateManager.gatesArray.filter((gate) => {
+            if (gate.columns[0] === cx.field && gate.columns[1] === cy.field) {
+                if (config?.region) {
+                    return gate.region === undefined || config.region === gate.region;
+                }
+                return true;
+            }
+            return false;
+        });
+    }, [gateManager.gatesArray, cx, cy, config]);
 
     useEffect(() => {
         // Wait for columns to be loaded to update the gates column

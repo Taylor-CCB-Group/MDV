@@ -79,7 +79,7 @@ export class GateManager {
             return;
         }
 
-        const previousGate = {...gate};
+        const previousGate = { ...gate };
 
         const updatedGate = {
             ...gate,
@@ -91,7 +91,8 @@ export class GateManager {
             this.gates.set(gateId, updatedGate);
         })();
 
-        const cellUpdatedNeeded = "geometry" in updates || "name" in updates || "columns" in updates;
+        const cellUpdatedNeeded =
+            "geometry" in updates || "name" in updates || "columns" in updates || "region" in updates;
 
         if (cellUpdatedNeeded) {
             // Remove the previous membership
@@ -168,7 +169,7 @@ export class GateManager {
             dataArray.fill(65535);
 
             // Mark the first value of all cells as 'N/A' initially
-            for (let i=0; i<this.dataStore.size; i++) {
+            for (let i = 0; i < this.dataStore.size; i++) {
                 dataArray[i * column.stringLength] = 0;
             }
 
@@ -257,6 +258,20 @@ export class GateManager {
             return;
         }
 
+        // If any gates are region-scoped, ensure the region column is loaded first
+        const regionField = this.dataStore.regions?.region_field;
+        const hasRegionScopedGates = Array.from(this.gates.values()).some((g) => g.region !== undefined);
+        if (hasRegionScopedGates && regionField) {
+            const regionCol = this.dataStore.columnIndex[regionField];
+            if (!regionCol?.data) {
+                try {
+                    await loadColumn(this.dataStore.name, regionField);
+                } catch (error) {
+                    console.error(`Failed to load region column '${regionField}' for gate membership`, error);
+                }
+            }
+        }
+
         // Populate the gate names for all cells with empty array
         for (let i = 0; i < this.dataStore.size; i++) {
             this.setGateNamesForCell(i, [GATE_NONE_VALUE]);
@@ -303,7 +318,22 @@ export class GateManager {
         const polygonCoords = extractCoords(gate.geometry);
         if (polygonCoords.length === 0) return;
 
+        const gateRegion = gate.region;
+        const regionField = this.dataStore.regions?.region_field;
+        const regionCol = gateRegion !== undefined && regionField
+            ? this.dataStore.columnIndex[regionField]
+            : null;
+
+        // If region column isn't loaded, skip
+        if (gateRegion !== undefined && !regionCol?.data) return;
+
         for (let i = 0; i < this.dataStore.size; i++) {
+            // Skip rows not in this gate's region (for region-scoped gates).
+            if (gateRegion !== undefined && regionCol?.data) {
+                const rowRegion = regionCol.getValue(i);
+                if (rowRegion !== gateRegion) continue;
+            }
+
             const x = xCol.data[i];
             const y = yCol.data[i];
 
@@ -424,23 +454,28 @@ export class GateManager {
      * Remove the gate name from the values array
      * This is required for the selection dialog to be in sync with the current gates
      * and not show the deleted gates
-     * Reassign the indices of the cells with the updated values array so the cells 
+     * Reassign the indices of the cells with the updated values array so the cells
      * have the latest index value of the updated values array
      */
     private rebuildValuesArray() {
         if (!this.gateColumn) return;
-    
+
         // Read current gate names per cell
         const gateNamesPerCell: string[][] = [];
         for (let i = 0; i < this.dataStore.size; i++) {
             gateNamesPerCell[i] = this.getGateNamesForCell(i);
         }
-    
+
         // Replace values with only current gate names (so selection dialog dropdown stays in sync)
-        const currentGateNames = [GATE_NONE_VALUE, ...Array.from(this.gates.values()).map((g) => g.name).sort()];
+        const currentGateNames = [
+            GATE_NONE_VALUE,
+            ...Array.from(this.gates.values())
+                .map((g) => g.name)
+                .sort(),
+        ];
         this.gateColumn.values.length = 0;
         this.gateColumn.values.push(...currentGateNames);
-    
+
         // Write back each cell so indices point into the new values
         for (let i = 0; i < this.dataStore.size; i++) {
             this.setGateNamesForCell(i, gateNamesPerCell[i]);

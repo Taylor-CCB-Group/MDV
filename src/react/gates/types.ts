@@ -7,5 +7,6 @@ export interface Gate {
     columns: [string, string];
     createdAt: number;
     labelPosition: [number, number];
+    region?: string;
     color?: [number, number, number];
 }
