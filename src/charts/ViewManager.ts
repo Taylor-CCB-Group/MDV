@@ -153,6 +153,7 @@ class ViewManager {
     }
 
     async createImageofView() {
+        const t = performance.now();
         try {
             // aspect ratio doesn't work properly when the window is resized, commenting for now
             const bounds = this.cm.contentDiv.getBoundingClientRect();
@@ -161,6 +162,8 @@ class ViewManager {
                 canvasWidth: 250,
                 canvasHeight: 250 / aspect,
             });
+            const dt = performance.now() - t;
+            console.log(`createImageOfView took ${(dt/1000).toFixed(1)}s`);
             return dataUrl;
         } catch (error) {
             console.error("error while creating image", error);
@@ -185,6 +188,7 @@ class ViewManager {
     // Save the current state
     @action
     async saveView(errorHandler?: (state: State) => boolean) {
+        const t = performance.now();
         try {
             const imageUrl = await this.createImageofView();
             const state = this.cm.getState();
@@ -206,6 +210,7 @@ class ViewManager {
         } catch (error) {
             console.error("error while saving view", error);
         }
+        console.log(`view saved in ${((performance.now() - t)/1000).toFixed(1)}s`);
     }
 
     // Add a new view
