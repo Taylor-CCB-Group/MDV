@@ -2,7 +2,7 @@ import { action, observable, toJS } from "mobx";
 import type ChartManager from "./ChartManager";
 import type { DataSource } from "./charts";
 import _ from "lodash";
-import { toPng } from "html-to-image";
+import screenshot from "@/utilities/Screenshot";
 import { getPostData, getProjectRoot } from "@/dataloaders/DataLoaderUtil";
 
 /** Per–data-source view config (panel layout and optional highlight state). */
@@ -156,12 +156,8 @@ class ViewManager {
         const t = performance.now();
         try {
             // aspect ratio doesn't work properly when the window is resized, commenting for now
-            const bounds = this.cm.contentDiv.getBoundingClientRect();
-            const aspect = bounds.width / bounds.height;
-            const dataUrl = await toPng(this.cm.contentDiv, {
-                canvasWidth: 250,
-                canvasHeight: 250 / aspect,
-            });
+            const root = this.cm.contentDiv;
+            const dataUrl = await screenshot(root);
             const dt = performance.now() - t;
             console.log(`createImageOfView took ${(dt/1000).toFixed(1)}s`);
             return dataUrl;
