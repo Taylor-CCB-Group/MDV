@@ -5,7 +5,9 @@ from flask import (
     request,
     make_response,
     jsonify,
-    current_app
+    current_app,
+    Response,
+    stream_with_context
 )
 from mdvtools.server_utils import (
     send_file,
@@ -196,10 +198,12 @@ def create_app(
                 raise Exception(
                     "Request must contain JSON with 'columns' and 'data_source'"
                 )
-            bytes_ = project.get_byte_data(data["columns"], data["data_source"])
-            response = make_response(bytes_)
-            response.headers.set("Content-Type", "application/octet-stream")
-            return response
+            
+            # Use streaming to avoid large memory allocations and Content-Length mismatches
+            return Response(
+                stream_with_context(project.yield_byte_data(data["columns"], data["data_source"])),
+                mimetype="application/octet-stream"
+            )
         except Exception as e:
             log(e)
             return "Problem handling request", 400
