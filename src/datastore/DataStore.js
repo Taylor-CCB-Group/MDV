@@ -1252,6 +1252,7 @@ class DataStore {
         let size = newSize;
         if (c.datatype === "integer" || c.datatype === "double") {
             size = size * 4;
+            // not what's expected for "integer"... or "double", for that matter.
             arrType = Float32Array;
         } else if (c.datatype === "int32") {
             size = size * 4;
