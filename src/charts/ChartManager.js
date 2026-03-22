@@ -544,7 +544,7 @@ export class ChartManager {
 
     _setUpChangeLayoutMenu(ds) {
         this.layoutMenus[ds.name] = new ContextMenu(() => {
-            const lo = this.viewData.dataSources[ds.name].layout || "absolute";
+            const lo = this.viewData.dataSources[ds.name]?.layout || "absolute";
             return [
                 {
                     text: "Absolute",
@@ -562,6 +562,7 @@ export class ChartManager {
 
     changeLayout(type, ds) {
         const view = this.viewData.dataSources[ds.name];
+        if (!view) return;
         const current = view.layout || "absolute";
         if (type === current) {
             return;
@@ -1225,7 +1226,7 @@ export class ChartManager {
                 const config = chart.getConfig();
                 const div = chart.getDiv();
                 const d = this.viewData.dataSources[chInfo.dataSource.name];
-                if (d.layout === "gridstack") {
+                if (d?.layout === "gridstack") {
                    //this is handled by gridstack now
                 } else {
                     config.position = [div.offsetLeft, div.offsetTop];
@@ -2388,7 +2389,7 @@ export class ChartManager {
         if (
             ds &&
             this.gridStack &&
-            this.viewData.dataSources[ds.name].layout === "gridstack"
+            this.viewData.dataSources[ds.name]?.layout === "gridstack"
         ) {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;

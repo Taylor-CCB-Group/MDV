@@ -261,7 +261,8 @@ type UploadActionType =
     | "SET_CONFLICT_DATA"
     | "SET_SHOW_CONFLICT_DIALOG"
     | "SET_UPLOAD_METHOD"
-    | "SET_SOCKETIO_CLIENT";
+    | "SET_SOCKETIO_CLIENT"
+    | "SET_REDIRECTING_TO_VIEW";
 
 // Reducer function
 const DEFAULT_REDUCER_STATE = {
@@ -279,6 +280,7 @@ const DEFAULT_REDUCER_STATE = {
     conflictData: null as { temp_folder: string } | null,
     uploadMethod: USE_SOCKETIO_UPLOAD ? 'socketio' : 'http' as 'http' | 'socketio',
     socketioClient: null as SocketIOUploadClient | null,
+    redirectingToView: null as string | null,
 } as const;
 type ReducerState = typeof DEFAULT_REDUCER_STATE;
 // TODO - would be good to type this, this is not how I should be spending my weekend.
@@ -309,7 +311,9 @@ type ReducerPayload<T extends UploadActionType> = T extends "SET_SELECTED_FILES"
                           ? 'http' | 'socketio'
                           : T extends "SET_SOCKETIO_CLIENT"
                             ? SocketIOUploadClient | null
-                            : never;
+                            : T extends "SET_REDIRECTING_TO_VIEW"
+                                ? string | null
+                                : never;
 type ReducerAction<T extends UploadActionType> = {
     type: T;
     payload: ReducerPayload<T>;
@@ -347,6 +351,8 @@ const reducer = <T extends UploadActionType>(
             return { ...state, uploadMethod: action.payload };
         case "SET_SOCKETIO_CLIENT":
             return { ...state, socketioClient: action.payload };
+        case "SET_REDIRECTING_TO_VIEW":
+            return { ...state, redirectingToView: action.payload };
         default:
             return state;
     }
@@ -924,10 +930,26 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 );
                 if (response.status === 200) {
                     dispatch({ type: "SET_IS_UPLOADING", payload: false });
-                    dispatch({ type: "SET_SUCCESS", payload: true });
 
                     if (fileConfig.type === "tiff") {
                         chartManager.saveState();
+                    }
+
+                    const viewName = response.data?.created_view ?? response.data?.view;
+                    if (viewName) {
+                        dispatch({ type: "SET_REDIRECTING_TO_VIEW", payload: viewName });
+                        const projectPath = root.startsWith("http") ? new URL(root).pathname : root;
+                        const { origin } = window.location;
+                        if (import.meta.env.DEV) {
+                            const params = new URLSearchParams();
+                            params.set("dir", projectPath);
+                            params.set("view", viewName);
+                            window.location.href = `${origin}/?${params.toString()}`;
+                        } else {
+                            window.location.href = `${origin}${projectPath}?view=${encodeURIComponent(viewName)}`;
+                        }
+                    } else {
+                        dispatch({ type: "SET_SUCCESS", payload: true });
                     }
                 } else {
                     throw new Error(
@@ -1034,11 +1056,29 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         console.log('SocketIO upload success:', result);
                         dispatch({ type: "SET_IS_UPLOADING", payload: false });
                         dispatch({ type: "SET_IS_INSERTING", payload: false });
-                        dispatch({ type: "SET_SUCCESS", payload: true });
+                        // dispatch({ type: "SET_SUCCESS", payload: true });
                         
                         if (fileConfig.type === "tiff") {
                             chartManager.saveState();
                         }
+
+                        const viewName = result?.result?.created_view ?? result?.result?.view;
+                        if (viewName) {
+                            dispatch({ type: "SET_REDIRECTING_TO_VIEW", payload: viewName });
+                            const projectPath = root.startsWith("http") ? new URL(root).pathname : root;
+                            const { origin } = window.location;
+                            if (import.meta.env.DEV) {
+                                const params = new URLSearchParams();
+                                params.set("dir", projectPath);
+                                params.set("view", viewName);
+                                window.location.href = `${origin}/?${params.toString()}`;
+                            } else {
+                                window.location.href = `${origin}${projectPath}?view=${encodeURIComponent(viewName)}`;
+                            }
+                        } else {
+                            dispatch({ type: "SET_SUCCESS", payload: true });
+                        }
+
                     }
                 });
 
@@ -1155,6 +1195,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 dispatch({ type: "SET_FILE_TYPE", payload: null });
                 dispatch({ type: "SET_FILE_SUMMARY", payload: null });
                 dispatch({ type: "SET_SOCKETIO_CLIENT", payload: null });
+                dispatch({ type: "SET_REDIRECTING_TO_VIEW", payload: null });
                 onResize(450, 320);
                 onClose();
             }
@@ -1230,7 +1271,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     </div>
                 )} */}
 
-                {state.isUploading ? (
+                {state.redirectingToView ? (
+                    <StatusContainer>
+                        <Message>Redirecting to your new view…</Message>
+                        <Spinner />
+                    </StatusContainer>
+                ) : state.isUploading ? (
                     <StatusContainer>
                         <Message>
                             {"Your file is being uploaded, please wait..."}

@@ -1224,7 +1224,7 @@ class MDVProject:
         replace_data=False,
         add_to_view: Optional[str] = "default",
         separator="\t"
-    ) -> list[dict[str, str]]:
+    ) -> tuple[list[str], Optional[str]]:
         """Adds a polars dataframe to the project. Each column's datatype will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
@@ -1280,6 +1280,8 @@ class MDVProject:
                     )
             
             print("got passed the ds check")
+
+            has_existing_datasources = len(self.datasources) > 0
             
             # Open HDF5 file and handle group creation
             try:
@@ -1334,6 +1336,7 @@ class MDVProject:
             
             print("Updated datasource metadata")
             
+            created_view = None
             # Add to view if specified
             if add_to_view:
                 # TablePlot parameters
@@ -1365,6 +1368,10 @@ class MDVProject:
                     v["initialCharts"][name].append(table_plot_json)
                     
                 self.set_view(add_to_view, v)
+            elif has_existing_datasources:
+                created_view = self.create_view_with_all_datasources(
+                    view_name=f"View: {name}", make_default=False
+                )
             
             # Update the project's update timestamp using the dedicated method
             if self.backend_db:
@@ -1372,12 +1379,30 @@ class MDVProject:
                 ProjectService.set_project_update_timestamp(self.id)
             
             print(f"In MDVProject.add_datasource_polars: Added datasource successfully '{name}'")
-            return dodgy_columns
+            return (dodgy_columns, created_view)
 
         except Exception as e:
             print(f"Error in MDVProject.add_datasource_polars : Error adding datasource '{name}': {e}")
             raise  # Re-raise the exception to propagate it to the caller
 
+    def create_view_with_all_datasources(self, view_name, make_default=False):
+        """
+        Create a new view containing all current datasources, each with a table plot.
+        Each datasource entry gets layout "gridstack" so the frontend does not crash on missing layout.
+        """
+        all_ds = self.datasources
+        view_data = {"dataSources": {}, "initialCharts": {}}
+        for ds in all_ds:
+            ds_name = ds["name"]
+            view_data["dataSources"][ds_name] = {"layout": "gridstack"}
+            columns = [x["field"] for x in ds.get("columns", [])]
+            if columns:
+                table_plot = self.create_table_plot(ds_name, columns, [792, 472], [10, 10])
+                view_data["initialCharts"][ds_name] = [self.convert_plot_to_json(table_plot)]
+            else:
+                view_data["initialCharts"][ds_name] = []
+        self.set_view(view_name, view_data, make_default=make_default)
+        return view_name
 
     def create_table_plot(self, title, params, size, position):
         """Create and configure a TablePlot instance with the given parameters."""

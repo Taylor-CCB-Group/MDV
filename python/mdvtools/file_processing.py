@@ -35,15 +35,22 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
             print("Found existing progress file, attempting to resume...")
             # The add_datasource_polars method will handle the resumption logic
         
+        has_existing_datasources = len(project.datasources) > 0
+
+        add_to_view_param = None if has_existing_datasources else (view or "default")
+        
         # Add the datasource to the project with resume flag
-        dodgy_columns = project.add_datasource_polars(
+        result = project.add_datasource_polars(
             name=original_filename,
             dataframe=filepath,
-            add_to_view=view,
+            add_to_view=add_to_view_param,
             supplied_columns_only=supplied_only,
             replace_data=replace,
             separator=","
         )
+
+        dodgy_columns = result[0]
+        created_view = result[1] if len(result) > 1 else None
         
         # Get and return the metadata
         metadata = project.get_datasource_metadata(original_filename)
@@ -52,6 +59,9 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
         if dodgy_columns:
             result["dodgy_columns"] = dodgy_columns
             result["warning"] = f"Some columns could not be processed: {dodgy_columns}"
+
+        if created_view:
+            result["created_view"] = created_view
         
         return result
         
@@ -79,6 +89,8 @@ def anndata_processing(project, filepath, original_filename):
     print(f"Filepath: {filepath}")
 
     try:
+        had_existing_datasources = len(project.datasources) > 0
+
         # Read the AnnData file
         anndata = sc.read(filepath)
         
@@ -86,6 +98,14 @@ def anndata_processing(project, filepath, original_filename):
         convert_scanpy_to_mdv(project.dir, anndata)
         
         result = {"success": True, "message": "AnnData processed successfully"}
+        created_view = None
+
+        if had_existing_datasources:
+            created_view = project.create_view_with_all_datasources(
+                view_name=f"View: {original_filename}", make_default=False
+            )
+            result["created_view"] = created_view
+
         return result
         
     except Exception as e:
