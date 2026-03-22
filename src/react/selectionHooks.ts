@@ -23,9 +23,9 @@ export function useHighlightedIndices() {
     const listenerId = useId();
 
     useEffect(() => {
-        const listener = (type: string, data: { indexes: number[] | { [k: number]: number } }) => {
+        const listener = (type: string, data: { indexes: number[] | Record<number, number> }) => {
             if (type === "data_highlighted") {
-                // Handle both array and object formats
+                // Handle both array and object formats (is this necessary?)
                 const indices = Array.isArray(data.indexes) 
                     ? data.indexes 
                     : Object.values(data.indexes);

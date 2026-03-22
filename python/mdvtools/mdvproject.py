@@ -13,7 +13,7 @@ import warnings
 import shutil
 import random
 import string
-from os.path import join, split, exists
+from os.path import join, split, exists, basename
 from pathlib import Path
 import scipy.sparse
 from werkzeug.utils import secure_filename
@@ -41,6 +41,7 @@ datatype_mappings = {
     "float64": "double",
     "float32": "double",
     "object": "text",
+    "str":"text",
     "category": "text",
     "bool": "text",
     "int32": "double",
@@ -896,7 +897,7 @@ class MDVProject:
             raise AttributeError(
                 f"genome browser track already exists for {datasource}"
             )
-        track_name = f"{secure_filename(datasource)}.bed"
+        track_name = f"{secure_filename(name)}.bed"
         if not custom_track:
             # get all the genome locations
             loc = [self.get_column(datasource, x) for x in parameters]
@@ -939,19 +940,23 @@ class MDVProject:
     def get_genome_browser(self, datasource):
         ds = self.get_datasource_metadata(datasource)
         info = ds.get("genome_browser")
+        if not info:
+            raise AttributeError(f"no genome browser for {datasource}")
+        default_track =  {
+            "short_label": info["default_track"]["label"],
+            "url": info["default_track"]["url"],
+            "track_id": "_base_track",
+            "decode_function": "generic",
+            "height": 15,
+            "displayMode": "EXPANDED"
+        }
+        if info.get("default_track_parameters"):
+            default_track.update(info["default_track_parameters"])
+        
         gb = {
             "type": "genome_browser",
             "param": info["location_fields"],
-            "tracks": [
-                {
-                    "short_label": info["default_track"]["label"],
-                    "url": info["default_track"]["url"],
-                    "track_id": "_base_track",
-                    "decode_function": "generic",
-                    "height": 15,
-                    "displayMode": "EXPANDED",
-                }
-            ],
+            "tracks": [default_track]
         }
         at = info.get("atac_bam_track")
         if at:
@@ -968,7 +973,7 @@ class MDVProject:
         if dt:
             for t in dt:
                 gb["tracks"].append(t)
-        if info["default_parameters"]:
+        if info.get("default_parameters"):
             gb.update(info["default_parameters"])
         return gb
 
@@ -999,6 +1004,83 @@ class MDVProject:
         # copy to tracks folder
         shutil.copy(reft, join(self.trackfolder, f"{genome}.bed.gz"))
         shutil.copy(reft + ".tbi", join(self.trackfolder, f"{genome}.bed.gz.tbi"))
+        self.set_datasource_metadata(ds)
+
+    def add_tracks(self,datasource: str,tracks: list[dict]) :
+        """Adds a list of tracks to the datasource's genome browser.
+        
+        Args:
+            tracks (list[dict]): A list of track dictionaries to add.
+            datasource (str): The name of the datasource to which the tracks will be added.
+        """
+        ds = self.get_datasource_metadata(datasource)
+        gb = ds.get("genome_browser")
+        if not gb:
+            raise AttributeError(f"no genome browser for {datasource}")
+        dt = gb.get("default_tracks", [])
+        for track in tracks:
+            if not isinstance(track, dict):
+                raise TypeError("Each track must be a dictionary")
+            if  "file" not in track:
+                raise ValueError("Each track must specify a local or remote file")
+            fname = basename(track["file"])
+            track_name = track.get("name", fname.split(".")[0])
+            track_type= track.get("type")
+            if not track_type:
+                if fname.endswith((".bb",".bed.gz", ".bed")):
+                    track_type = "bed"
+                elif fname.endswith((".bw", ".bigwig")):
+                    track_type = "wig"
+            if not track_type:
+                raise AttributeError(f"The type of track {fname} cannot be deduced")
+            #no need to do anything - will be served from the original location
+            if track["file"].startswith("http"):
+                url = track["file"]
+            else:
+                if not exists(track["file"]):
+                    raise FileNotFoundError(f"Track file {track['file']} does not exist")
+                # tracks already compressed and indexed - just copy to tracks folder
+                if track_type == "wig" or fname.endswith(".gz") or fname.endswith(".bb"):
+                    to_file = join(self.trackfolder, fname)
+                    # For .gz files, verify index exists before copying
+                    if fname.endswith(".gz"):
+                        i_file = track["file"] + ".tbi"
+                        if not exists(i_file):
+                            raise FileNotFoundError(f"Index file {i_file} not found")
+                        shutil.copyfile(i_file, f"{to_file}.tbi")
+                    shutil.copy(track["file"], to_file)
+                        
+                # assume its a just a bed file- compress and index it
+                else:
+                    check_htslib()
+                    t_file = track["file"]
+                    o_file = join(self.trackfolder, fname)
+                    create_bed_gz_file(t_file, o_file)        
+                    fname= fname+".gz"
+                url = f"./tracks/{fname}"
+            #will need to adapt this for other browsers
+            mtrack ={
+                "short_label": track_name,
+                "url": url,
+                "track_id": track.get("id",track_name),
+                "color": track.get("color", "black"),
+            }
+
+            if track_type== "bed":
+                mtrack["type"] = "bed"
+                mtrack["format"] = "feature"
+                mtrack["featureHeight"] = track.get("featureHeight", 10)
+                mtrack["height"] = mtrack["featureHeight"] + 12
+                mtrack["displayMode"] = track.get("displayMode", "EXPANDED")
+            elif track_type == "wig":
+                mtrack["type"] = "bigwig"
+                mtrack["format"]="wig"
+                mtrack["height"] = track.get("height", 50)
+            for param in ["hideLabels"]:
+                if track.get(param):
+                    mtrack[param] = track[param]
+            dt.append(mtrack)
+        gb["default_tracks"] = dt
         self.set_datasource_metadata(ds)
 
     def add_datasource(
@@ -1707,6 +1789,7 @@ class MDVProject:
         # remove the view
         else:
             if views.get(name):
+                logger.info(f"deleting view '{name}'")
                 del views[name]
         self.views = views
 
@@ -1719,12 +1802,21 @@ class MDVProject:
                 state["initial_view"] = name
         # delete from list
         else:
-            state["all_views"].remove(name)
+            # error: list.remove(x): x not in list
+            # could it be that there are multiple MDVProject instances in the server and self.state isn't updated?
+            # but also... in multi-user concurrent kind of scenario this kind of state could easily be out-of-sync.
+            if name in state["all_views"]:
+                state["all_views"].remove(name)
+            else:
+                logger.warning(f"'{name}' not found in all_views when removing...")
             iv = state.get("initial_view")
             # if the deleted view is the default view then
             # change the default view to the first view in the list
-            if iv:
-                state["initial_view"] = state["all_views"][0]
+            if iv and iv == name:
+                # will frontend etc have a problem with this being None?
+                # not particularly - it'll load with AddView dialog, which is about as graceful as we could hope for.
+                # there was a potential error here when removing final view...
+                state["initial_view"] = state["all_views"][0] if state["all_views"] else None
         self.state = state
 
     def rename_view(self, old_name: str, new_name: str):
