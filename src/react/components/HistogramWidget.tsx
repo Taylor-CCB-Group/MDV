@@ -157,14 +157,45 @@ export default function HistogramWidget({
     onVisibleOnce,
     rootMargin = "0px 0px 100px 0px",
 }: HistogramWidgetProps) {
+    const containerRef = useRef<HTMLDivElement>(null);
     const ref = useRef<SVGSVGElement>(null);
     const dark = useTheme() === "dark";
-    useBrushX(ref, brush, width, height, xScaleType);
+    const [isVisible, setIsVisible] = useState(
+        typeof IntersectionObserver === "undefined",
+    );
+    const [hasTriggeredCallback, setHasTriggeredCallback] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current || typeof IntersectionObserver === "undefined") return;
+        const observer = new IntersectionObserver((entries) => {
+            setIsVisible(entries[0]?.isIntersecting ?? false);
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (!containerRef.current || !onVisibleOnce || hasTriggeredCallback) return;
+        if (typeof IntersectionObserver === "undefined") {
+            setHasTriggeredCallback(true);
+            onVisibleOnce();
+            return;
+        }
+        const observer = new IntersectionObserver((entries) => {
+            if (!entries[0]?.isIntersecting || hasTriggeredCallback) return;
+            setHasTriggeredCallback(true);
+            onVisibleOnce();
+        }, { rootMargin });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, [onVisibleOnce, hasTriggeredCallback, rootMargin]);
+
+    useBrushX(ref, isVisible ? brush : undefined, width, height, xScaleType);
 
     const padding = 2;
     const visibleLayers = useMemo(
-        () => layers.filter((layer) => !layer.hidden),
-        [layers],
+        () => (isVisible ? layers.filter((layer) => !layer.hidden) : []),
+        [isVisible, layers],
     );
     const maxValue = Math.max(1, ...visibleLayers.flatMap((layer) => layer.data));
     const xDomain = brush?.minMax ?? ([0, bins] as Range);
@@ -177,26 +208,15 @@ export default function HistogramWidget({
         [height, maxValue, padding, yScaleType],
     );
 
-    const [hasTriggeredVisible, setHasTriggeredVisible] = useState(false);
-    useEffect(() => {
-        if (!ref.current || !onVisibleOnce || hasTriggeredVisible) return;
-        const observer = new IntersectionObserver((entries) => {
-            if (!entries[0].isIntersecting || hasTriggeredVisible) return;
-            setHasTriggeredVisible(true);
-            onVisibleOnce();
-        }, { rootMargin });
-        observer.observe(ref.current);
-        return () => observer.disconnect();
-    }, [onVisibleOnce, hasTriggeredVisible, rootMargin]);
-
     const resolvedBinEdges = useMemo(() => {
+        if (!isVisible) return [];
         if (binEdges && binEdges.length === bins + 1) {
             return binEdges;
         }
         return Array.from({ length: bins + 1 }, (_, index) =>
             xDomain[0] + ((xDomain[1] - xDomain[0]) * index) / bins,
         );
-    }, [binEdges, bins, xDomain]);
+    }, [binEdges, bins, isVisible, xDomain]);
 
     const createBars = useCallback((data: number[]) => data.map((count, index) => {
         const startValue = resolvedBinEdges[index];
@@ -221,7 +241,7 @@ export default function HistogramWidget({
     }, [brush?.value]);
 
     return (
-        <div className="relative w-full">
+        <div className="relative w-full" ref={containerRef}>
             {brushValueLabel ? (
                 <div
                     className="pointer-events-none absolute left-1 top-1 z-10 rounded px-1 py-0 text-[9px] shadow-sm"
@@ -252,85 +272,99 @@ export default function HistogramWidget({
                     </button>
                 </div>
             ) : null}
-            <svg
-                width="100%"
-                height={height}
-                viewBox={`0 0 ${width} ${height}`}
-                preserveAspectRatio="none"
-                ref={ref}
-                cursor={brush ? "move" : "default"}
-            >
-                {visibleLayers.map((layer) => {
-                    const bars = createBars(layer.data);
-                    if (layer.variant === "markers") {
-                        return bars.map((bar, index) => {
-                            if (layer.data[index] === 0) return null;
+            {isVisible ? (
+                <svg
+                    width="100%"
+                    height={height}
+                    viewBox={`0 0 ${width} ${height}`}
+                    preserveAspectRatio="none"
+                    ref={ref}
+                    cursor={brush ? "move" : "default"}
+                >
+                    {visibleLayers.map((layer) => {
+                        const bars = createBars(layer.data);
+                        if (layer.variant === "markers") {
+                            return bars.map((bar, index) => {
+                                if (layer.data[index] === 0) return null;
+                                return (
+                                    <line
+                                        key={`${layer.id}-${index}`}
+                                        x1={bar.x + bar.width / 2}
+                                        x2={bar.x + bar.width / 2}
+                                        y1={height - padding - 2}
+                                        y2={Math.max(padding, bar.y)}
+                                        stroke={layer.color}
+                                        strokeOpacity={0.2}
+                                        strokeWidth={Math.max(0.7, bar.width * (layer.widthFactor ?? 0.18))}
+                                        strokeDasharray="1 3"
+                                        strokeLinecap="round"
+                                        vectorEffect="non-scaling-stroke"
+                                    />
+                                );
+                            });
+                        }
+                        if (layer.variant === "line") {
+                            const points = bars
+                                .map((bar, index) =>
+                                    `${bar.x + bar.width / 2},${layer.data[index] === 0 ? height - padding : bar.y}`,
+                                )
+                                .join(" ");
+                            return (
+                                <polyline
+                                    key={layer.id}
+                                    points={points}
+                                    fill="none"
+                                    stroke={layer.color}
+                                    strokeWidth={1.5}
+                                    vectorEffect="non-scaling-stroke"
+                                />
+                            );
+                        }
+                        return bars.map((bar, index) => (
+                            <rect
+                                key={`${layer.id}-${index}`}
+                                x={bar.x + bar.width * (layer.inset ?? 0)}
+                                y={bar.y}
+                                width={Math.max(0.4, bar.width * (layer.widthFactor ?? 1))}
+                                height={Math.max(0, bar.height)}
+                                fill={layer.color}
+                                rx={layer.radius ?? 0}
+                            />
+                        ));
+                    })}
+                    {markers
+                        .filter((marker) => !marker.hidden)
+                        .map((marker) => {
+                            const x = xScale(marker.value);
                             return (
                                 <line
-                                    key={`${layer.id}-${index}`}
-                                    x1={bar.x + bar.width / 2}
-                                    x2={bar.x + bar.width / 2}
-                                    y1={height - padding - 2}
-                                    y2={Math.max(padding, bar.y)}
-                                    stroke={layer.color}
-                                    strokeOpacity={0.2}
-                                    strokeWidth={Math.max(0.7, bar.width * (layer.widthFactor ?? 0.18))}
-                                    strokeDasharray="1 3"
+                                    key={marker.id}
+                                    x1={x}
+                                    x2={x}
+                                    y1={padding + 4}
+                                    y2={height - padding - 4}
+                                    stroke={marker.color}
+                                    strokeOpacity={0.22}
+                                    strokeWidth={1}
                                     strokeLinecap="round"
                                     vectorEffect="non-scaling-stroke"
                                 />
                             );
-                        });
-                    }
-                    if (layer.variant === "line") {
-                        const points = bars
-                            .map((bar, index) =>
-                                `${bar.x + bar.width / 2},${layer.data[index] === 0 ? height - padding : bar.y}`,
-                            )
-                            .join(" ");
-                        return (
-                            <polyline
-                                key={layer.id}
-                                points={points}
-                                fill="none"
-                                stroke={layer.color}
-                                strokeWidth={1.5}
-                                vectorEffect="non-scaling-stroke"
-                            />
-                        );
-                    }
-                    return bars.map((bar, index) => (
-                        <rect
-                            key={`${layer.id}-${index}`}
-                            x={bar.x + bar.width * (layer.inset ?? 0)}
-                            y={bar.y}
-                            width={Math.max(0.4, bar.width * (layer.widthFactor ?? 1))}
-                            height={Math.max(0, bar.height)}
-                            fill={layer.color}
-                            rx={layer.radius ?? 0}
-                        />
-                    ));
-                })}
-                {markers
-                    .filter((marker) => !marker.hidden)
-                    .map((marker) => {
-                        const x = xScale(marker.value);
-                        return (
-                            <line
-                                key={marker.id}
-                                x1={x}
-                                x2={x}
-                                y1={padding + 4}
-                                y2={height - padding - 4}
-                                stroke={marker.color}
-                                strokeOpacity={0.22}
-                                strokeWidth={1}
-                                strokeLinecap="round"
-                                vectorEffect="non-scaling-stroke"
-                            />
-                        );
-                    })}
-            </svg>
+                        })}
+                </svg>
+            ) : (
+                <div
+                    aria-hidden="true"
+                    style={{
+                        height,
+                        borderRadius: 4,
+                        border: `1px solid ${dark ? "rgba(71, 85, 105, 0.45)" : "rgba(203, 213, 225, 0.9)"}`,
+                        background: dark
+                            ? "linear-gradient(180deg, rgba(30, 41, 59, 0.45), rgba(15, 23, 42, 0.2))"
+                            : "linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.7))",
+                    }}
+                />
+            )}
         </div>
     );
 }
