@@ -17,9 +17,10 @@ import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
-import { trace } from "mobx";
 import { useOuterContainer } from "../screen_state";
 import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
+import useGateLayers from "../hooks/useGateLayers";
+import { escapeHtml } from "@/utilities/Utilities";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -89,6 +90,12 @@ const Main = observer(
         const { showJson } = useConfig<VivRoiConfig>();
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
+
+        const {
+            gateLabelLayer,
+            gateDisplayLayer,
+            controllerOptions,
+        } = useGateLayers();
 
         // Get field contour legend data
         const config = useConfig<DualContourLegacyConfig>();
@@ -163,19 +170,49 @@ const Main = observer(
                 brightness,
                 contrast,
             }),
-            [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast],
+                [
+                ome,
+                selections,
+                contrastLimits,
+                extensions,
+                colors,
+                channelsVisible,
+                brightness,
+                contrast,
+            ],
         );
+
         const deckProps: Partial<DeckGLProps> = useMemo(
             () => ({
-                getTooltip,
+                getTooltip: (info: any) => {
+                    const layerId = info?.layer?.id;
+                    const obj = info?.object;
+                    if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
+                        return { 
+                            html: `<strong>${escapeHtml(obj.properties.gateName)}</strong><br/><small>Click on the label to edit</small>` 
+                        };
+                    }
+                    if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
+                        return { 
+                            html: `<strong>${escapeHtml(obj.text)}</strong><br/><small>Click on the label to edit</small>` 
+                        };
+                    }
+                    return getTooltip();
+                },
                 style: {
                     zIndex: "-1",
                 },
                 //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-                layers: [jsonLayer, scatterplotLayer, selectionLayer],
+                layers: [
+                    jsonLayer, 
+                    gateDisplayLayer, 
+                    selectionLayer, 
+                    scatterplotLayer, 
+                    gateLabelLayer,
+                ].filter(l => l !== null),
                 id: `${id}deck`,
                 // deviceProps: {
-                //     webgl: {
+                //     webgl: {                    
                 //         depth: true,
                 //         preserveDrawingBuffer: true,
                 //         antialias: true,
@@ -183,13 +220,23 @@ const Main = observer(
                 // },
                 controller: {
                     doubleClickZoom: false,
+                    dragPan: controllerOptions.dragPan,
                 },
                 // deviceProps: {
                 //     // todo - get this working more usefully.
                 //     debugSpectorJS: true,
                 // }
             }),
-            [scatterplotLayer, selectionLayer, jsonLayer, id, getTooltip],
+            [
+                gateLabelLayer,
+                gateDisplayLayer,
+                scatterplotLayer,
+                selectionLayer,
+                jsonLayer,
+                id,
+                getTooltip,
+                controllerOptions,
+            ],
         );
         if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
         // if (import.meta.env.DEV) trace();
@@ -197,8 +244,8 @@ const Main = observer(
             <>
                 <SelectionOverlay />
                 {showLegend && legendFields.length > 0 && (
-                    <FieldContourLegend
-                        fields={legendFields}
+                    <FieldContourLegend 
+                        fields={legendFields} 
                         position={legendPosition}
                         onFieldHover={handleFieldHover}
                     />
@@ -219,17 +266,20 @@ const Main = observer(
                         layerProps={[layerConfig]}
                         viewStates={[{ ...viewState, id: detailId }]}
                         // not really expecting OrbitViewState... yet... but we will for 3D.
-                        onViewStateChange={(e: { viewState: OrthographicViewState | OrbitViewState }) => {
+                        onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
                             viewerStore.setState({
                                 viewState: { ...e.viewState, id: detailId },
                             });
                             if (vsDebugDivRef.current)
-                                vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
+                                vsDebugDivRef.current.innerText = JSON.stringify(
+                                    e.viewState,
+                                    null,
+                                    2,
+                                );
                         }}
                         deckProps={deckProps}
                     />
                 </div>
             </>
         );
-    },
-);
+});
