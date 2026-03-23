@@ -5,7 +5,8 @@ import { Matrix4 } from "@math.gl/core";
 import { CompositeMode, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { useChartID, useRangeDimension2D } from "./hooks";
+import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
@@ -110,10 +111,30 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             removeFilter();
             return;
         }
-        // todo - consider whether the shape is a simple AABB & apply faster filter if so.
-        //rangeDimension.filterPoly(coords, [cols[0], cols[1]]); //this doesn't notify 🙄
         chart.resetButton.style.display = "inline";
-        filterPoly(coords);
+
+        const ds = chart.dataStore;
+        const regionField = ds.regions?.region_field;
+        // todo: make use of gate.region when this is merged with gate branch
+        const regionValue = (chart.config as ScatterPlotConfig & { region?: string }).region;
+
+        if (regionField && regionValue) {
+            const regionOptions: FilterPolyRegionOpts = { regionField, regionValue };
+            if (ds.columnIndex[regionField]?.data) {
+                filterPoly(coords, regionOptions);
+            } else {
+                // Load the region if it's not loaded
+                loadColumn(ds.name, regionField)
+                    .then(() => filterPoly(coords, regionOptions))
+                    .catch((error) => {
+                        console.error(`Could not load region column '${regionField}':`, error);
+                        filterPoly(coords); // fallback: polygon-only
+                    });
+            }
+        } else {
+            // No active region (or no region metadata): plain polygon filter.
+            filterPoly(coords);
+        }
     }, [coords, filterPoly, removeFilter, chart]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
     // we might be able to pass this to modeConfig, if it knows what to do with it?
