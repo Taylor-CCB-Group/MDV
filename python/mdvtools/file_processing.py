@@ -46,7 +46,8 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
             add_to_view=add_to_view_param,
             supplied_columns_only=supplied_only,
             replace_data=replace,
-            separator=","
+            separator=",",
+            preserve_views_on_replace=True
         )
 
         dodgy_columns = result[0]

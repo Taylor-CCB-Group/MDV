@@ -1223,7 +1223,8 @@ class MDVProject:
         supplied_columns_only=False,
         replace_data=False,
         add_to_view: Optional[str] = "default",
-        separator="\t"
+        separator="\t",
+        preserve_views_on_replace: bool = False,
     ) -> tuple[list[str], Optional[str]]:
         """Adds a polars dataframe to the project. Each column's datatype will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
@@ -1237,6 +1238,7 @@ class MDVProject:
             replace_data (bool, optional): If True, the existing datasource will be overwritten, Default is False,
             add_to_view (string, optional): The datasource will be added to the specified view.
             separator (str, optional): If a path to text file is supplied, then this should be the file's delimiter.
+            preserve_views_on_replace (bool, optional): If True and replace_data is True, existing views are preserved when replacing datasource.
         """
         dodgy_columns = []  # To hold any columns that can't be added
         gr = None  # Initialize the group variable
@@ -1261,6 +1263,8 @@ class MDVProject:
             # Get columns to add using polars-compatible function.
             # Pass num_rows to avoid recalculating it for LazyFrames.
             columns = get_column_info_polars(columns, dataframe, supplied_columns_only, num_rows)
+
+            has_existing_datasources = len(self.datasources) > 0
             
             # Check if the datasource already exists
             try:
@@ -1273,15 +1277,13 @@ class MDVProject:
             if ds:
                 # Delete the existing datasource if replace_data is True
                 if replace_data:
-                    self.delete_datasource(name)
+                    self.delete_datasource(name, delete_views=not preserve_views_on_replace)
                 else:
                     raise FileExistsError(
                         f"Attempt to create datasource '{name}' failed because it already exists."
                     )
             
             print("got passed the ds check")
-
-            has_existing_datasources = len(self.datasources) > 0
             
             # Open HDF5 file and handle group creation
             try:
@@ -1397,7 +1399,7 @@ class MDVProject:
         while self.get_view(view_name):
             suffix += 1
             view_name = f"{base_name} ({suffix})"
-            
+
         view_data = {"dataSources": {}, "initialCharts": {}}
         for ds in all_ds:
             ds_name = ds["name"]
