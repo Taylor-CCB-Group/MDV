@@ -1391,6 +1391,13 @@ class MDVProject:
         Each datasource entry gets layout "gridstack" so the frontend does not crash on missing layout.
         """
         all_ds = self.datasources
+        base_name = view_name
+        suffix = 0
+
+        while self.get_view(view_name):
+            suffix += 1
+            view_name = f"{base_name} ({suffix})"
+            
         view_data = {"dataSources": {}, "initialCharts": {}}
         for ds in all_ds:
             ds_name = ds["name"]
