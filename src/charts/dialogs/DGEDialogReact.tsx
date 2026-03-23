@@ -160,6 +160,22 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 	return (
 		<Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 2, minWidth: 350 }}>
 			<FormControl fullWidth size="small">
+				<InputLabel>DGE Datasource</InputLabel>
+				<Select
+					value={selectedGenesDsName}
+					label="Genes Datasource"
+					onChange={(e) => setSelectedGenesDsName(e.target.value)}
+					disabled={running || genesDatasourceOptions.length <= 1}
+				>
+					{genesDatasourceOptions.map((name: string) => (
+						<MenuItem key={name} value={name}>
+							{name}
+						</MenuItem>
+					))}
+				</Select>
+			</FormControl>
+
+			<FormControl fullWidth size="small">
 				<InputLabel>Grouping Column</InputLabel>
 				<Select
 					value={groupColumn}
@@ -170,22 +186,6 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 					{categoricalColumns.map((c: any) => (
 						<MenuItem key={c.field} value={c.field}>
 							{c.name}
-						</MenuItem>
-					))}
-				</Select>
-			</FormControl>
-
-			<FormControl fullWidth size="small">
-				<InputLabel>Genes Datasource</InputLabel>
-				<Select
-					value={selectedGenesDsName}
-					label="Genes Datasource"
-					onChange={(e) => setSelectedGenesDsName(e.target.value)}
-					disabled={running || genesDatasourceOptions.length <= 1}
-				>
-					{genesDatasourceOptions.map((name: string) => (
-						<MenuItem key={name} value={name}>
-							{name}
 						</MenuItem>
 					))}
 				</Select>
