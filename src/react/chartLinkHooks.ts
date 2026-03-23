@@ -66,7 +66,9 @@ export const useViewStateLink = () => {
                     c.viewerStore?.setState({ viewState: newViewState });
                 });
             });
-            thisChart.ignoreStateUpdate = false;
+            queueMicrotask(() => {
+                thisChart.ignoreStateUpdate = false;
+            });
         });
         return unsubscribe;
     }, [
