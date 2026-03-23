@@ -196,7 +196,7 @@ run_docker_compose() {
     fi
   fi
 
-  echo "Pulling latest Docker images..."
+  echo "Pulling stable Docker images..."
   docker compose -f "$compose_file" pull
 
   echo "Starting Docker Compose..."
