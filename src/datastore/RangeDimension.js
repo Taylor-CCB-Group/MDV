@@ -39,11 +39,14 @@ class RangeDimension extends Dimension {
 
     /**
      * Polygon containment filter on x/y columns.
-     *
+     * 
      * args can be either:
      *   - an array of polygon vertices
      *   - { points, regionField, regionValue } to additionally restrict rows to a
      *     specific region value.
+     * 
+     * @param {Array<[number, number]> | { points: Array<[number, number]>, regionField: string, regionValue: string }} args 
+     *
      */
     filterPoly(args, columns) {
         const points = Array.isArray(args) ? args : args.points;
@@ -90,6 +93,12 @@ class RangeDimension extends Dimension {
                 return false;
             }
 
+            // For region-scoped gates, check that this row belongs to the gate's region
+            if (isRegionScoped) {
+                if (!regionData || wantedRegionIndex === -1) return false;
+                if (regionData[i] !== wantedRegionIndex) return false;
+            }
+
             // Ray-casting algorithm: count edge crossings to determine if point is inside polygon.
             let inside = false;
             for (let curr = 0, prev = points.length - 1; curr < points.length; prev = curr++) {
@@ -103,15 +112,7 @@ class RangeDimension extends Dimension {
                 if (intersect) inside = !inside;
             }
 
-            if (!inside) return false;
-
-            // For region-scoped gates, check that this row belongs to the gate's region
-            if (isRegionScoped) {
-                if (!regionData || wantedRegionIndex === -1) return false;
-                return regionData[i] === wantedRegionIndex;
-            }
-
-            return true;
+            return inside;
         };
 
         return this.filterPredicate({ predicate }, columns);
