@@ -25,6 +25,9 @@ jobs:
         with:
           install: true
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -49,10 +52,10 @@ jobs:
           echo "release_notes=$RELEASE_NOTES" >> $GITHUB_OUTPUT
           echo "Release notes: $RELEASE_NOTES"
 
-      - name: Build and push linux/amd64 image
+      - name: Build and push multi-arch image
         run: |
           echo "Building and pushing image..."
-          docker buildx build --platform linux/amd64 \
+          docker buildx build --platform linux/amd64,linux/arm64 \
             --build-arg GIT_COMMIT_DATE="${{ steps.build_metadata.outputs.git_commit_date }}" \
             --build-arg GIT_BRANCH_NAME="${{ steps.build_metadata.outputs.git_branch_name }}" \
             --build-arg GIT_COMMIT_HASH="${{ steps.build_metadata.outputs.git_commit_hash }}" \
@@ -68,4 +71,3 @@ jobs:
             --cache-from=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv:cache \
             --cache-to=type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/mdv:cache,mode=max \
             --push .
-

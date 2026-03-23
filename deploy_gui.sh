@@ -143,6 +143,12 @@ run_docker_compose() {
     fi
   fi
 
+  zenity --info --text="Pulling stable Docker images..."
+  if ! docker compose -f "$compose_file" pull; then
+    zenity --error --text="Error: Failed to pull Docker images."
+    exit 1
+  fi
+
   zenity --info --text="Starting Docker Compose..."
   if ! docker compose -f "$compose_file" up -d; then
     zenity --error --text="Error: Failed to start Docker Compose."
@@ -185,10 +191,9 @@ fi
 
 create_or_validate_env_file
 
-DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-secrets-local.yml"
+DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/main/docker-local.yml"
 run_docker_compose "$DOCKER_COMPOSE_URL"
 
 zenity --info --title="Deployment Complete" --text="MDV application deployed successfully!\nClick OK to proceed."
 
 open_browser
-
