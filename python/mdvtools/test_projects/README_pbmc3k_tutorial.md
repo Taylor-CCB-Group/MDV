@@ -13,21 +13,20 @@ From the MDV folder:
     `npm i`
 (If you don't have node installed so that you can run the npm command please download it from here: https://nodejs.org/en/download)
 
-2. Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically, provided that you have Python 3.12 installed and Poetry is available in your PATH:
+2. Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically, provided that you have Python 3.12 installed and `uv` is available in your PATH:
     `npm run python-setup`
 
 This is equvalent to running the following commands, so in case it doesn't work run these:
-    `python -m venv venv`\
-    `source venv/bin/activate`\
     `cd python`\
-    `poetry install --with dev`\
+    `uv sync --group dev --frozen`\
+    `cd ..`\
     `npm run build-flask-vite`
 
 NOTE:
 In case python does not run because the default is python3, try again the above commands replacing python with python3.
-On Windows systems the `source venv/bin/activate` command will not work, instead you need to run `venv/Scripts/activate.bat`
+On Windows systems `uv` creates the virtual environment at `python/.venv`. If you need to activate it, run `python/.venv/Scripts/activate.bat` (otherwise you can just use `uv run`).
 
-In case poetry does not work, or you do not want to use it, install mdvtools using pip by:
+In case uv does not work, or you do not want to use it, install mdvtools using pip by:
 `pip install -e python`
 
 After the setup is done, please follow the instructions below:

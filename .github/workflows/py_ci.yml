@@ -23,19 +23,20 @@ jobs:
     strategy:
       matrix:
         python-version: [ 3.12 ]
-        poetry-version: [ 1.7.1 ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - run: pipx install poetry
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
 
-      - run: poetry install --with dev,backend,auth
-      - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.25"
+          cache-dependency-glob: "**/uv.lock"
+
+      - run: uv sync --group dev --group backend --group auth --frozen
 
       - run: make test
 
@@ -46,23 +47,21 @@ jobs:
     strategy:
       matrix:
         python-version: [3.12]
-        pyright-version: [1.1.402]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - run: pipx install poetry
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
-
-      - run: poetry install --with dev,backend,auth
-      - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
-
-      - uses: jakebailey/pyright-action@v2
+      
+      - uses: astral-sh/setup-uv@v7
         with:
-          version: ${{ matrix.pyright-version }}
+          version: "0.9.25"
+          cache-dependency-glob: "**/uv.lock"
+
+      - run: uv sync --group dev --group backend --group auth --frozen
+      - run: make type
   # ruff job is disabled for now pending making it run cleanly...
   # ruff:
   #   defaults:

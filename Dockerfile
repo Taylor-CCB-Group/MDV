@@ -41,7 +41,7 @@ RUN echo "Environment variables set:" && \
 
 # Install system packages as root (these require root privileges)
 # this layer will change less frequently than the others, so it's good to have it first
-# Install HDF5 library, for some reason poetry can't install it in this context as of now
+# Install HDF5 library, for some reason Python dependency tools can't install it in this context as of now
 # see https://github.com/h5py/h5py/issues/2146 for similar-ish issue
 RUN apt-get update && apt-get install -y libhdf5-dev || (cat /var/log/apt/term.log && exit 1)
 RUN apt-get install -y netcat-openbsd || (cat /var/log/apt/term.log && exit 1)
@@ -52,57 +52,50 @@ RUN apt-get install -y iputils-ping || (cat /var/log/apt/term.log && exit 1)
 USER pn
 WORKDIR /app
 
-# Configure poetry for the pn user - let it create virtual environments for isolation
+# Configure uv for the pn user - uv manages a project venv under `python/.venv`
 # 
 # VIRTUAL ENVIRONMENTS IN DOCKER CONSIDERATIONS:
 # 
 # PROS of using virtual environments (current approach):
-# - Security: poetry install runs in isolated environment, can't affect system packages
+# - Security: uv sync runs in isolated environment, can't affect system packages
 # - Permission isolation: avoids conflicts with system-installed packages like certifi
-# - Standard practice: how poetry is intended to be used
+# - Standard practice: how uv is intended to be used
 # - Safer with untrusted code: LLM-generated code runs in more isolated environment
 # 
 # CONS of using virtual environments:
-# - Less convenient for terminal use: need to run `poetry shell` or `poetry run` for commands
+# - Less convenient for terminal use: need to run `uv run` for commands
 # - Seems redundant: container already provides isolation from host system
 # - Extra layer: adds complexity when debugging dependency issues
 # - Performance: slight overhead from virtual environment activation
 # 
 # PROS of disabling virtual environments (previous approach):
 # - Convenience: can run python/pip commands directly in terminal without activation
-# - Simpler: no need to remember to use `poetry run` or `poetry shell`
+# - Simpler: no need to remember to use `uv run` for commands
 # - Direct access: easier to inspect installed packages and run ad-hoc scripts
 # 
 # CONS of disabling virtual environments:
 # - Permission conflicts: user can't modify system packages (the current issue)
-# - Security risk: poetry install can affect system Python environment
+# - Security risk: uv sync can affect system Python environment
 # - Mixing concerns: system packages and project packages in same namespace
 # 
 # DECISION: Using virtual environments for security and permission isolation,
 # `.bashrc` is used to activate the virtual environment automatically.
-RUN poetry config virtualenvs.in-project true
+# uv sync uses `.venv` in the project directory by default.
+# We rely on the base image having `uv` installed (as per your note).
 
 # Prefer binary wheels to avoid slow/fragile source builds (e.g., numcodecs on arm64)
 ENV PIP_PREFER_BINARY=1
 
-# Install Python dependencies using Poetry
-# this should be early in the process because it's less likely to change
-# copy poetry files first to cache the install step (with correct ownership)
+# Install Python dependencies using uv
+# This should be early in the process because it's less likely to change.
+# Copy uv/lock files first to cache the dependency sync step (with correct ownership).
 COPY --chown=pn:pn python/pyproject.toml ./python/
-COPY --chown=pn:pn python/poetry.lock ./python/
+COPY --chown=pn:pn python/uv.lock ./python/
+COPY --chown=pn:pn python/README.md ./python/
 WORKDIR /app/python
-# trouble with this is that it doesn't have the mdvtools code yet...
-# still worth installing heavy dependencies here
-# BUT - 
-#16 20.81 Installing the current project: mdvtools (0.0.1)
-#16 20.81 
-#16 20.81 Warning: The current project could not be installed: [Errno 2] No such file or directory: '/app/python/README.md'
-#16 20.81 If you do not want to install the current project use --no-root.
-#16 20.81 If you want to use Poetry only for dependency management but not for packaging, you can disable package mode by setting package-mode = false in your pyproject.toml file.
-#16 20.81 In a future version of Poetry this warning will become an error!
-# seems to be ok to first install with --no-root for dependencies, then install the root package later
-# we don't want to set package-mode = false in pyproject.toml
-RUN poetry install --with dev,backend,auth --no-root
+# The first layer does not include the full source tree yet,
+# so we sync dependencies without installing the project itself.
+RUN uv sync --no-install-project --frozen --group dev --group backend --group auth
 
 WORKDIR /app
 # copy the package.json and package-lock.json as a separate step so npm install can be cached (with correct ownership)
@@ -133,7 +126,7 @@ WORKDIR /app/python
 # installing again so we have mdvtools as a module, on top of the previous install layer with dependencies
 # this step should be very fast
 # if we don't have this, the server itself runs, but anything that doesn't run from this workdir will fail to import mdvtools
-RUN poetry install --with dev,backend,auth 
+RUN uv sync --frozen --group dev --group backend --group auth
 
 # Expose the port that Flask will run on
 EXPOSE 5055 
@@ -141,8 +134,8 @@ EXPOSE 5055
 # something changed causing npm to need this in order for `source` to work in npm scripts
 RUN npm config set script-shell "/bin/bash"
 
-# Add automatic poetry shell activation for terminal use
-RUN echo 'cd /app/python && $(poetry env activate)' >> ~/.bashrc && \
+# Add automatic uv venv activation for terminal use
+RUN echo 'cd /app/python && source .venv/bin/activate' >> ~/.bashrc && \
     echo 'cd /app' >> ~/.bashrc
 
 #USER root
@@ -165,7 +158,7 @@ USER pn
 # 
 # Multi-worker (Redis required):
 #   -w 4  # or any number > 1
-CMD ["poetry", "run", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
-#CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
+CMD ["uv", "run", "--", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
+#CMD ["uv", "run", "--", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 
