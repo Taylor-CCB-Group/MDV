@@ -41,9 +41,12 @@ const useGateLayers = () => {
         return gateManager.gatesArray.filter((gate) => {
             if (gate.columns[0] === cx.field && gate.columns[1] === cy.field) {
                 if (config?.region) {
+                    // For viv plot, we show gates which are both global 
+                    // and which has a region same as the plot's region
                     return gate.region === undefined || config.region === gate.region;
                 }
-                return true;
+                // For deck scatterplot, we only show gates which are global (no region)
+                return gate.region === undefined;
             }
             return false;
         });

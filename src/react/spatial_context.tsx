@@ -151,8 +151,10 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
 
         const ds = chart.dataStore;
         const regionField = ds.regions?.region_field;
-        // todo: make use of gate.region when this is merged with gate branch
-        const regionValue = (chart.config as ScatterPlotConfig & { region?: string }).region;
+        // Get the region value of the gate if it exists
+        const regionValue = editingGateId
+            ? gateManager.gates.get(editingGateId)?.region
+            : undefined;
 
         // Guard async callbacks with cancellation flag so only the latest
         // effect run calls the filterPoly thereby avoiding stale polygon filter if
@@ -182,7 +184,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         return () => {
             cancelled = true;
         }
-    }, [coords, filterPoly, removeFilter, chart]);
+    }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
     
     // we might be able to pass this to modeConfig, if it knows what to do with it?
