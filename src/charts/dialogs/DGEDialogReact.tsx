@@ -28,6 +28,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 	const [groupColumn, setGroupColumn] = useState("");
 	const [targetGroup, setTargetGroup] = useState("");
 	const [referenceGroup, setReferenceGroup] = useState("rest");
+	const [selectedGenesDsName, setSelectedGenesDsName] = useState("");
 	const [running, setRunning] = useState(false);
 	const [progress, setProgress] = useState({ done: 0, total: 0 });
 	const [result, setResult] = useState<DGEIntegrationResult | null>(null);
@@ -50,6 +51,15 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 	const safeReferenceGroup = referenceGroup === "rest" || selectedColumnValues.includes(referenceGroup)
 		? referenceGroup : "rest";
 
+	const genesDatasourceOptions = useMemo(() => {
+		const cm = window.mdv?.chartManager;
+		if (!cm) return [];
+		return findDGECapableDatasources(cm)
+			.filter((p) => p.cellsDsName === dataStore.name)
+			.map((p) => p.genesDsName)
+			.sort((a, b) => a.localeCompare(b));
+	}, [dataStore.name]);
+
 	const referenceOptions = useMemo(() => {
 		return ["rest", ...selectedColumnValues.filter((v: string) => v !== safeTargetGroup)];
 	}, [selectedColumnValues, safeTargetGroup]);
@@ -67,6 +77,16 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		}
 	}, [selectedColumnValues]);
 
+	useEffect(() => {
+		if (genesDatasourceOptions.length === 0) {
+			setSelectedGenesDsName("");
+			return;
+		}
+		if (!genesDatasourceOptions.includes(selectedGenesDsName)) {
+			setSelectedGenesDsName(genesDatasourceOptions[0]);
+		}
+	}, [genesDatasourceOptions, selectedGenesDsName]);
+
 	const handleRun = useCallback(async () => {
 		setRunning(true);
 		setError(null);
@@ -80,16 +100,14 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		try {
 			const cm = window.mdv?.chartManager;
 			if (!cm) throw new Error("ChartManager not available");
-
-			const pairs = findDGECapableDatasources(cm);
-			console.log("DGE-capable pairs:", pairs);
-			const pair = pairs.find((p) => p.cellsDsName === dataStore.name);
-			if (!pair) throw new Error("No gene expression link found for this datasource");
+			if (!selectedGenesDsName) {
+				throw new Error("Select a linked genes datasource");
+			}
 
 			const dgeResult = await runDGEOnDataStore(
 				cm,
-				pair.cellsDsName,
-				pair.genesDsName,
+				dataStore.name,
+				selectedGenesDsName,
 				{
 					groupColumn,
 					targetGroup: safeTargetGroup,
@@ -101,7 +119,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 			setResult(dgeResult);
 
 			// Verify DGE columns exist on genes DS before charting
-			const gDS = cm.dsIndex[pair.genesDsName]?.dataStore;
+			const gDS = cm.dsIndex[selectedGenesDsName]?.dataStore;
 			if (gDS) {
 				for (const f of ["dge_effect_size", "dge_neg_log10_pval_adj"]) {
 					const c = gDS.columnIndex[f];
@@ -118,7 +136,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 			}
 
 			try {
-				await cm.addChart(pair.genesDsName, {
+				await cm.addChart(selectedGenesDsName, {
 					id: `dge_volcano_${getRandomString()}`,
 					type: "wgl_scatter_plot",
 					title: `DGE: ${safeTargetGroup} vs ${safeReferenceGroup}`,
@@ -133,7 +151,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		} finally {
 			setRunning(false);
 		}
-	}, [dataStore.name, groupColumn, safeTargetGroup, safeReferenceGroup]);
+	}, [dataStore.name, groupColumn, safeTargetGroup, safeReferenceGroup, selectedGenesDsName]);
 
 	const sigCount = result
 		? result.results.filter((r) => r.pvalAdj < 0.05).length
@@ -152,6 +170,22 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 					{categoricalColumns.map((c: any) => (
 						<MenuItem key={c.field} value={c.field}>
 							{c.name}
+						</MenuItem>
+					))}
+				</Select>
+			</FormControl>
+
+			<FormControl fullWidth size="small">
+				<InputLabel>Genes Datasource</InputLabel>
+				<Select
+					value={selectedGenesDsName}
+					label="Genes Datasource"
+					onChange={(e) => setSelectedGenesDsName(e.target.value)}
+					disabled={running || genesDatasourceOptions.length <= 1}
+				>
+					{genesDatasourceOptions.map((name: string) => (
+						<MenuItem key={name} value={name}>
+							{name}
 						</MenuItem>
 					))}
 				</Select>
@@ -192,7 +226,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 			<Button
 				variant="contained"
 				onClick={handleRun}
-				disabled={running || !groupColumn || !safeTargetGroup}
+				disabled={running || !groupColumn || !safeTargetGroup || !selectedGenesDsName}
 				fullWidth
 			>
 				{running ? "Running..." : "Run DGE"}

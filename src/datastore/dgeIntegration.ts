@@ -75,7 +75,11 @@ export async function runDGEOnDataStore(
 	if (racLinks.length === 0) {
 		throw new Error(`No rows_as_columns link found for "${cellsDsName}"`);
 	}
-	const { linkedDs, link } = racLinks[0];
+	const selectedLink = racLinks.find((entry) => entry.linkedDs.name === genesDsName);
+	if (!selectedLink) {
+		throw new Error(`No rows_as_columns link found from "${cellsDsName}" to "${genesDsName}"`);
+	}
+	const { linkedDs, link } = selectedLink;
 	await link.initPromise;
 
 	if (!link.valueToRowIndex) {

@@ -1,9 +1,12 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
 import {
 	computeEffectSize,
 	log2FoldChange,
 	computeGeneStats,
 } from "@/datastore/dgeStats";
+import { runDGEOnDataStore } from "@/datastore/dgeIntegration";
+import * as linkUtils from "@/links/link_utils";
+import { DGERunner } from "@/datastore/DGEDimension";
 
 // ── Data type detection logic ───────────────────────────────────────────────
 // Mirrors the multi-gene probe loop in dgeIntegration.ts: runDGEOnDataStore.
@@ -237,5 +240,167 @@ describe("gene ordering alignment", () => {
 		const idx = valueToRowIndex.get("UnknownGene");
 		expect(idx).toBeUndefined();
 		expect(column[0]).toBeNaN();
+	});
+});
+
+describe("runDGEOnDataStore link selection", () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	function makeGenesDs(size: number) {
+		const columnIndex: Record<string, any> = {};
+		return {
+			size,
+			columnIndex,
+			addColumn: vi.fn((meta: any, buffer: SharedArrayBuffer) => {
+				columnIndex[meta.field] = { ...meta, buffer, data: new Float32Array(buffer) };
+			}),
+			setColumnData: vi.fn((field: string, buffer: SharedArrayBuffer) => {
+				columnIndex[field] = { ...(columnIndex[field] ?? { field }), buffer, data: new Float32Array(buffer) };
+			}),
+			dataChanged: vi.fn(),
+		};
+	}
+
+	test("uses selected genes datasource link when multiple rows_as_columns links exist", async () => {
+		const nCells = 3;
+		const groupBuffer = new SharedArrayBuffer(nCells);
+		new Uint8Array(groupBuffer).set([0, 1, 0]);
+		const filterBuffer = new SharedArrayBuffer(nCells);
+
+		const cellsDs: any = {
+			size: nCells,
+			name: "cells",
+			columnIndex: {
+				group: {
+					datatype: "text",
+					values: ["target", "ref"],
+					buffer: groupBuffer,
+				},
+			},
+			filterBuffer,
+		};
+
+		const genesRna = makeGenesDs(3);
+		const genesProtein = makeGenesDs(3);
+		const linksByField: Record<string, any> = {
+			rna: {
+				linkedDs: { name: "rna", dataStore: { columnIndex: { gene_name: { data: new Uint8Array([0, 1, 2]) } } } },
+				link: {
+					name_column: "gene_name",
+					subgroups: { sg_rna: { type: "sparse", name: "RNA", label: "RNA" } },
+					valueToRowIndex: new Map<string, number>([["GeneA", 0], ["GeneB", 1]]),
+					initPromise: Promise.resolve(),
+				},
+			},
+			protein: {
+				linkedDs: { name: "protein", dataStore: { columnIndex: { feature_name: { data: new Uint8Array([0, 1, 2]) } } } },
+				link: {
+					name_column: "feature_name",
+					subgroups: { sg_protein: { type: "sparse", name: "Protein", label: "Protein" } },
+					valueToRowIndex: new Map<string, number>([["GeneA", 2], ["GeneB", 0]]),
+					initPromise: Promise.resolve(),
+				},
+			},
+		};
+
+		vi.spyOn(linkUtils, "getRowsAsColumnsLinks").mockImplementation(() => [
+			linksByField.rna,
+			linksByField.protein,
+		]);
+		vi.spyOn(linkUtils, "getFieldName").mockImplementation((sg, value, idx) => `${sg}|${value}|${idx}`);
+		vi.spyOn(DGERunner.prototype, "run").mockResolvedValue({
+			results: [
+				{
+					gene: "GeneB",
+					pval: 0.01,
+					pvalAdj: 0.02,
+					negLog10Pval: 2,
+					negLog10PvalAdj: 1.7,
+					effectSize: 1.5,
+				},
+			],
+			effectSizeLabel: "log2fc",
+			skippedGenes: 0,
+			elapsed: 10,
+		} as any);
+		vi.spyOn(DGERunner.prototype, "destroy").mockImplementation(() => {});
+
+		const chartManager: any = {
+			dsIndex: {
+				cells: { dataStore: cellsDs, name: "cells" },
+				rna: { dataStore: genesRna, name: "rna" },
+				protein: { dataStore: genesProtein, name: "protein" },
+			},
+			loadColumnSetAsync: vi.fn(async (columns: string[]) => {
+				for (const field of columns) {
+					if (!cellsDs.columnIndex[field]) {
+						const buf = new SharedArrayBuffer(nCells * 4);
+						new Float32Array(buf).set([0, 1, 2]);
+						cellsDs.columnIndex[field] = { buffer: buf };
+					}
+				}
+			}),
+		};
+
+		await runDGEOnDataStore(chartManager, "cells", "protein", {
+			groupColumn: "group",
+			targetGroup: "target",
+			referenceGroup: "ref",
+		});
+
+		const esCol = genesProtein.columnIndex.dge_effect_size.data as Float32Array;
+		expect(esCol[0]).toBeCloseTo(1.5, 5);
+		expect(esCol[2]).toBeNaN();
+		expect(genesRna.columnIndex.dge_effect_size).toBeUndefined();
+	});
+
+	test("throws clear error when selected genes datasource is not linked", async () => {
+		const nCells = 2;
+		const groupBuffer = new SharedArrayBuffer(nCells);
+		new Uint8Array(groupBuffer).set([0, 1]);
+		const cellsDs: any = {
+			size: nCells,
+			name: "cells",
+			columnIndex: {
+				group: { datatype: "text", values: ["A", "B"], buffer: groupBuffer },
+			},
+			filterBuffer: new SharedArrayBuffer(nCells),
+		};
+		const genesRna = makeGenesDs(2);
+
+		vi.spyOn(linkUtils, "getRowsAsColumnsLinks").mockReturnValue([
+			{
+				linkedDs: { name: "rna", dataStore: { columnIndex: { gene_name: { data: new Uint8Array([0, 1]) } } } },
+				link: {
+					name_column: "gene_name",
+					subgroups: { sg_rna: { type: "sparse", name: "RNA", label: "RNA" } },
+					valueToRowIndex: new Map<string, number>(),
+					initPromise: Promise.resolve(),
+				},
+			},
+		] as any);
+
+		const chartManager: any = {
+			dsIndex: {
+				cells: { dataStore: cellsDs, name: "cells" },
+				rna: { dataStore: genesRna, name: "rna" },
+				protein: { dataStore: makeGenesDs(2), name: "protein" },
+			},
+			loadColumnSetAsync: vi.fn(async () => {}),
+		};
+
+		await expect(
+			runDGEOnDataStore(chartManager, "cells", "protein", {
+				groupColumn: "group",
+				targetGroup: "A",
+				referenceGroup: "B",
+			}),
+		).rejects.toThrow('No rows_as_columns link found from "cells" to "protein"');
 	});
 });
