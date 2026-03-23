@@ -118,6 +118,11 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         // todo: make use of gate.region when this is merged with gate branch
         const regionValue = (chart.config as ScatterPlotConfig & { region?: string }).region;
 
+        // Guard async callbacks with cancellation flag so only the latest
+        // effect run calls the filterPoly thereby avoiding stale polygon filter if
+        // the older effect is resolved later
+        let cancelled = false;
+
         if (regionField && regionValue) {
             const regionOptions: FilterPolyRegionOpts = { regionField, regionValue };
             if (ds.columnIndex[regionField]?.data) {
@@ -125,15 +130,21 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             } else {
                 // Load the region if it's not loaded
                 loadColumn(ds.name, regionField)
-                    .then(() => filterPoly(coords, regionOptions))
+                    .then(() => {
+                        if (!cancelled) filterPoly(coords, regionOptions);
+                    })
                     .catch((error) => {
                         console.error(`Could not load region column '${regionField}':`, error);
-                        filterPoly(coords); // fallback: polygon-only
+                        if (!cancelled) filterPoly(coords); // fallback: polygon-only
                     });
             }
         } else {
             // No active region (or no region metadata): plain polygon filter.
             filterPoly(coords);
+        }
+
+        return () => {
+            cancelled = true;
         }
     }, [coords, filterPoly, removeFilter, chart]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
