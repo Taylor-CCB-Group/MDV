@@ -14,6 +14,8 @@ import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
 
+/** Region constraint for `filterPoly` — restricts the polygon filter to rows in a specific region. */
+export type FilterPolyRegionOpts = { regionField: string; regionValue: string };
 
 /**
  * Get the chart's config.
@@ -529,12 +531,26 @@ export function useRangeDimension2D() {
     const { param } = useConfig();
     if (!isArray(param)) throw "expecting param to be array";
     const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
-    const filterPoly = useCallback((coords: [number, number][]) => {
-        // const transformed = coords.map((c) => modelMatrix.transformAsPoint(c));
-        const transformed = s === 1 ? coords : coords.map((c) => c.map((v) => v * s));
-        //@ts-expect-error not assignable to string[]
-        rangeDimension.filter("filterPoly", cols, transformed);
-    }, [rangeDimension, cols, s]);
+    const filterPoly = useCallback(
+        (coords: [number, number][], region?: FilterPolyRegionOpts) => {
+            // Apply coordinate scaling if required (e.g. image vs data coordinate systems).
+            const points = s === 1 ? coords : (coords.map((c) => c.map((v) => v * s)) as [number, number][]);
+
+            if (region) {
+                // Region-scoped: pass `{ points, regionField, regionValue }` so that
+                // RangeDimension.filterPoly restricts the filter to that region's rows.
+                rangeDimension.filter("filterPoly", [...cols, region.regionField] as string[], {
+                    points,
+                    regionField: region.regionField,
+                    regionValue: region.regionValue,
+                });
+            } else {
+                //@ts-expect-error cols is string | MultiColumnQuery[], filter expects string[]
+                rangeDimension.filter("filterPoly", cols, points);
+            }
+        },
+        [rangeDimension, cols, s],
+    );
     const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
     return { filterPoly, removeFilter, rangeDimension };
 }

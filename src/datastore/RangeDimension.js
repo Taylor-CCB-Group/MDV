@@ -38,10 +38,19 @@ class RangeDimension extends Dimension {
     }
 
     /**
-     * @param {Array<[number, number]>} args
+     * Polygon containment filter on x/y columns.
+     *
+     * args can be either:
+     *   - an array of polygon vertices
+     *   - { points, regionField, regionValue } to additionally restrict rows to a
+     *     specific region value.
      */
     filterPoly(args, columns) {
-        const points = args;
+        const points = Array.isArray(args) ? args : args.points;
+        const regionField = Array.isArray(args) ? undefined : args.regionField;
+        const regionValue = Array.isArray(args) ? undefined : args.regionValue;
+
+        // Compute bounding box
         let minX = Number.MAX_VALUE;
         let minY = Number.MAX_VALUE;
         let maxX = Number.MIN_VALUE;
@@ -59,12 +68,17 @@ class RangeDimension extends Dimension {
             data1 = this.parent.columnIndex[columns[0]].data;
         }
         const data2 = this.parent.columnIndex[columns[1]].data;
-        const vs = points;
+
+        // For region-scoped gates, resolve the region column and the index of the
+        // wanted region value once — before the per-row loop — so it's not repeated.
+        const isRegionScoped = Boolean(regionField && regionValue != null);
+        const regionCol = isRegionScoped ? this.parent.columnIndex[regionField] : null;
+        const regionData = regionCol?.data ?? null;
+        const wantedRegionIndex = regionCol?.values ? regionCol.values.indexOf(regionValue) : -1;
 
         const predicate = (i) => {
             const x = data1[i];
             const y = data2[i];
-            let inside = false;
             if (
                 x < minX ||
                 x > maxX ||
@@ -75,18 +89,29 @@ class RangeDimension extends Dimension {
             ) {
                 return false;
             }
-            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-                const xi = vs[i][0];
-                const yi = vs[i][1];
-                const xj = vs[j][0];
-                const yj = vs[j][1];
 
+            // Ray-casting algorithm: count edge crossings to determine if point is inside polygon.
+            let inside = false;
+            for (let curr = 0, prev = points.length - 1; curr < points.length; prev = curr++) {
+                const xi = points[curr][0];
+                const yi = points[curr][1];
+                const xj = points[prev][0];
+                const yj = points[prev][1];
                 const intersect =
                     yi > y !== yj > y &&
                     x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
                 if (intersect) inside = !inside;
             }
-            return inside;
+
+            if (!inside) return false;
+
+            // For region-scoped gates, check that this row belongs to the gate's region
+            if (isRegionScoped) {
+                if (!regionData || wantedRegionIndex === -1) return false;
+                return regionData[i] === wantedRegionIndex;
+            }
+
+            return true;
         };
 
         return this.filterPredicate({ predicate }, columns);
