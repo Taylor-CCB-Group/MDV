@@ -1,24 +1,18 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, beforeAll } from 'vitest';
+// Load link_utils before chartConfigUtils so Vitest uses Vite transform (not vi.importActual / Node strip-types).
+import { RowsAsColsQuery } from '@/links/link_utils';
 import {
   deserialiseParam,
   initialiseChartConfig,
   getConcreteFieldNames
 } from '../charts/chartConfigUtils';
-import { RowsAsColsQuery } from '../links/link_utils';
 import type DataStore from '../datastore/DataStore';
 import type BaseChartT from '../charts/BaseChart';
 import type { BaseConfig } from '../charts/BaseChart';
 type BaseChart = BaseChartT<BaseConfig>
 
-// Mock the RowsAsColsQuery static method (path must match @/ imports for Vitest 4 module runner)
-vi.mock('@/links/link_utils', async () => {
-  const actual = await vi.importActual('@/links/link_utils');
-  return {
-    ...actual,
-    RowsAsColsQuery: {
-      fromSerialized: vi.fn(),
-    }
-  };
+beforeAll(() => {
+  vi.spyOn(RowsAsColsQuery, 'fromSerialized');
 });
 
 describe('chartConfigUtils - deserialisation', () => {
@@ -27,6 +21,7 @@ describe('chartConfigUtils - deserialisation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(RowsAsColsQuery.fromSerialized).mockReset();
 
     mockDataStore = {
       name: 'test-datastore',
@@ -64,7 +59,7 @@ describe('chartConfigUtils - deserialisation', () => {
         fields: ['gene1', 'gene2'],
       };
 
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
       const result = deserialiseParam(mockDataStore as DataStore, mockQuery);
 
@@ -73,7 +68,7 @@ describe('chartConfigUtils - deserialisation', () => {
     });
 
     test('throws on invalid param', () => {
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(null);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(null as any);
 
       expect(() => {
         deserialiseParam(mockDataStore as DataStore, { type: 'RowsAsColsQuery' } as any);
@@ -130,7 +125,7 @@ describe('chartConfigUtils - deserialisation', () => {
         fields: ['gene1', 'gene2'],
       };
 
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
       const config = {
         id: 'test-id',
@@ -160,7 +155,7 @@ describe('chartConfigUtils - deserialisation', () => {
         fields: ['gene1'],
       };
 
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
       const config = {
         id: 'test-id',
@@ -194,7 +189,7 @@ describe('chartConfigUtils - deserialisation', () => {
         fields: ['gene1'],
       };
 
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
       const config = {
         id: 'test-id',
@@ -224,7 +219,7 @@ describe('chartConfigUtils - deserialisation', () => {
         fields: ['gene1', 'gene2'],
       };
 
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
       const config = {
         id: 'test-id',
@@ -255,7 +250,7 @@ describe('chartConfigUtils - deserialisation', () => {
         fields: ['gene1'],
       };
 
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
       const config = {
         id: 'test-id',
@@ -308,7 +303,7 @@ describe('chartConfigUtils - deserialisation', () => {
       });
 
       // Now deserialize it back
-      (RowsAsColsQuery.fromSerialized as any).mockReturnValue(mockQueryInstance);
+      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
       const result = initialiseChartConfig(parsedConfig, mockChart as BaseChart);
 

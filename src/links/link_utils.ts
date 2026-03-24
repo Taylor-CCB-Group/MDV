@@ -258,17 +258,14 @@ export type RowsAsColsQuerySerialized = {
 } & RowsAsColsPrefs;
 
 class DeserializedQueryError extends Error {
-    serialized: RowsAsColsQuerySerialized;
-    dataStore: DataStore;
     constructor(
-        serialized: RowsAsColsQuerySerialized,
-        dataStore: DataStore,
+        // maybe something more generic or tailored in future
+        public readonly serialized: RowsAsColsQuerySerialized,
+        public readonly dataStore: DataStore,
         message: string
     ) {
         super(message);
         this.name = 'DeserializedQueryError';
-        this.serialized = serialized;
-        this.dataStore = dataStore;
     }
 
     // Helper to suggest fixes in UI (not really useful but something to maybe build on later)
@@ -300,26 +297,16 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     // perhaps if rather than just link.observableFields, we have two separate arrays (!or iterators!)
     // and the computed properties can choose between them based on config flags.
     // (i.e. for highlighted vs filtered data)
-    // Plain fields + makeObservable (no `accessor`) so Vitest/Node type-stripping can parse this file.
-    maxItems: number;
-    link: RowsAsColslink;
-    linkedDsName: string;
-    constructor(link: RowsAsColslink, linkedDsName: string, maxItems = 1) {
-        this.link = link;
-        this.linkedDsName = linkedDsName;
+    @observable accessor maxItems: number;
+    constructor(public link: RowsAsColslink, public linkedDsName: string, maxItems = 1) {
         this.maxItems = maxItems;
-        makeObservable(this, {
-            link: observable,
-            linkedDsName: observable,
-            maxItems: observable,
-            columns: computed,
-            fields: computed,
-        });
     }
+    @computed
     get columns() {
         //how would we pause this?
         return this.link.observableFields.slice(0, this.maxItems).map(f => f.column);
     }
+    @computed
     get fields() {
         return this.columns.map(c => c.field);
     }
@@ -412,22 +399,17 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
      * accessing the `column` property will add the column to the parent DataStore.
      */
     class RAColumn implements IRowAsColumn {
-        index: number;
-        constructor(index: number) {
-            this.index = index;
-            makeObservable(this, {
-                name: computed,
-                fieldName: computed,
-                column: computed,
-            });
-        }
+        constructor(public index: number) {}
+        @computed
         get name() {
             // if I don't have `as string` here, it's inferred as string | number
             return tds.getRowText(this.index, link.name_column) as string;
         }
+        @computed
         get fieldName(): FieldName {
             return getFieldName(sg, this.name, this.index);
         }
+        @computed
         get column(): DataColumn<DataType> {
             //https://mobx.js.org/computeds.html
             //"They should not have side effects or update other observables."
