@@ -123,7 +123,6 @@
     "tippy.js": "^6.3.7",
     "use-debounce": "^10.0.2",
     "uuid": "^11.0.3",
-    "vite-plugin-node-polyfills": "^0.25.0",
     "wordcloud": "^1.2.2",
     "zod": "^3.25.49",
     "zustand": "^5.0.6"
@@ -149,7 +148,7 @@
     "@types/react-dom": "^18.2.14",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@typescript/native-preview": "^7.0.0-dev.20250723.1",
-    "@vitejs/plugin-react": "^5.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
     "@welldone-software/why-did-you-render": "^8.0.3",
     "autoprefixer": "^10.4.19",
     "cross-env": "^7.0.3",
@@ -165,9 +164,9 @@
     "typedoc-plugin-missing-exports": "^4.0.0",
     "typedoc-plugin-rename-defaults": "^0.7.3",
     "typescript": "^5.8.3",
-    "vite": "^7.3.1",
+    "vite": "^8.0.2",
     "vite-plugin-glsl": "^1.5.6",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.1"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.20.1",

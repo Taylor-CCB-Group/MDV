@@ -42,7 +42,7 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
     deps: {
       optimizer: {
-        web: {
+        client: {
           enabled: true,
         },
         ssr: {
