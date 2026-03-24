@@ -42,7 +42,9 @@ test('TagModel can be instantiated and creates a __tags column if needed', async
     addListener: vi.fn(),
     data: new Int32Array(10),
   };
-  (DataModel as any).mockImplementation(() => mockDataModelInstance);
+  (DataModel as any).mockImplementation(function mockDataModel() {
+    return mockDataModelInstance;
+  });
 
   const tagModel = await TagModel.create(mockDataStoreInstance as unknown as DataStore);
 
@@ -94,7 +96,9 @@ test('getTags should handle undefined values in the column', async () => {
     addListener: vi.fn(),
     data: new Int32Array(3),
   };
-  (DataModel as any).mockImplementation(() => mockDataModelInstance);
+  (DataModel as any).mockImplementation(function mockDataModel() {
+    return mockDataModelInstance;
+  });
 
   const tagModel = await TagModel.create(mockDataStoreInstance as any);
 

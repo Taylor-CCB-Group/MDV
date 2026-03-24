@@ -4,8 +4,8 @@ import { RowsAsColsQuery } from '../links/link_utils';
 import type DataStore from '../datastore/DataStore';
 
 // Mock the RowsAsColsQuery static method
-vi.mock('../links/link_utils', async () => {
-  const actual = await vi.importActual('../links/link_utils');
+vi.mock('@/links/link_utils', async () => {
+  const actual = await vi.importActual('@/links/link_utils');
   return {
     ...actual,
     RowsAsColsQuery: {

@@ -10,9 +10,9 @@ import type BaseChartT from '../charts/BaseChart';
 import type { BaseConfig } from '../charts/BaseChart';
 type BaseChart = BaseChartT<BaseConfig>
 
-// Mock the RowsAsColsQuery static method
-vi.mock('../links/link_utils', async () => {
-  const actual = await vi.importActual('../links/link_utils');
+// Mock the RowsAsColsQuery static method (path must match @/ imports for Vitest 4 module runner)
+vi.mock('@/links/link_utils', async () => {
+  const actual = await vi.importActual('@/links/link_utils');
   return {
     ...actual,
     RowsAsColsQuery: {
