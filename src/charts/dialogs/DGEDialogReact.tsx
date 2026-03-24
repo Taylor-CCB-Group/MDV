@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	Box,
 	Button,
@@ -18,6 +18,8 @@ import {
 } from "../../datastore/dgeIntegration";
 import type { DGEIntegrationResult } from "../../datastore/dgeIntegration";
 import { getRandomString } from "../../utilities/Utilities";
+import { useChartManager } from "@/react/hooks";
+import type { DGEChartManager } from "../../datastore/dgeIntegration";
 
 interface DGEDialogContentProps {
 	dataStore: DataStore;
@@ -25,6 +27,7 @@ interface DGEDialogContentProps {
 }
 
 function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
+	const chartManager = useChartManager() as unknown as DGEChartManager;
 	const [groupColumn, setGroupColumn] = useState("");
 	const [targetGroup, setTargetGroup] = useState("");
 	const [referenceGroup, setReferenceGroup] = useState("rest");
@@ -33,6 +36,19 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 	const [progress, setProgress] = useState({ done: 0, total: 0 });
 	const [result, setResult] = useState<DGEIntegrationResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const isMountedRef = useRef(true);
+	const runAbortRef = useRef<AbortController | null>(null);
+
+	useEffect(() => {
+		// Keep this resilient in React StrictMode (dev), where mount effects
+		// are intentionally mounted/cleaned up/re-mounted.
+		isMountedRef.current = true;
+		return () => {
+			isMountedRef.current = false;
+			runAbortRef.current?.abort();
+			runAbortRef.current = null;
+		};
+	}, []);
 
 	const categoricalColumns = useMemo(() => {
 		return dataStore.columns.filter(
@@ -52,13 +68,11 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		? referenceGroup : "rest";
 
 	const genesDatasourceOptions = useMemo(() => {
-		const cm = window.mdv?.chartManager;
-		if (!cm) return [];
-		return findDGECapableDatasources(cm)
+		return findDGECapableDatasources(chartManager)
 			.filter((p) => p.cellsDsName === dataStore.name)
 			.map((p) => p.genesDsName)
 			.sort((a, b) => a.localeCompare(b));
-	}, [dataStore.name]);
+	}, [chartManager, dataStore.name]);
 
 	const referenceOptions = useMemo(() => {
 		return ["rest", ...selectedColumnValues.filter((v: string) => v !== safeTargetGroup)];
@@ -88,6 +102,10 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 	}, [genesDatasourceOptions, selectedGenesDsName]);
 
 	const handleRun = useCallback(async () => {
+		runAbortRef.current?.abort();
+		const abortController = new AbortController();
+		runAbortRef.current = abortController;
+
 		setRunning(true);
 		setError(null);
 		setResult(null);
@@ -98,8 +116,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		console.log("dataStore:", dataStore.name, "size:", dataStore.size);
 
 		try {
-			const cm = window.mdv?.chartManager;
-			if (!cm) throw new Error("ChartManager not available");
+			const cm = chartManager;
 			if (!selectedGenesDsName) {
 				throw new Error("Select a linked genes datasource");
 			}
@@ -113,8 +130,14 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 					targetGroup: safeTargetGroup,
 					referenceGroup: safeReferenceGroup,
 				},
-				(done, total) => setProgress({ done, total }),
+				(done, total) => {
+					if (isMountedRef.current && !abortController.signal.aborted) {
+						setProgress({ done, total });
+					}
+				},
+				{ signal: abortController.signal },
 			);
+			if (!isMountedRef.current || abortController.signal.aborted) return;
 
 			setResult(dgeResult);
 
@@ -135,23 +158,41 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 				console.log("[DGE] genes DS size:", gDS.size, "columnsWithData:", gDS.columnsWithData.filter((x: string) => x.startsWith("dge_")));
 			}
 
+			const volcanoChartId = `dge_volcano_${getRandomString()}`;
 			try {
 				await cm.addChart(selectedGenesDsName, {
-					id: `dge_volcano_${getRandomString()}`,
+					id: volcanoChartId,
 					type: "wgl_scatter_plot",
 					title: `DGE: ${safeTargetGroup} vs ${safeReferenceGroup}`,
 					param: ["dge_effect_size", "dge_neg_log10_pval_adj"],
 					size: [500, 400],
 				}, true);
-			} catch {
-				// Volcano plot is optional; don't fail the whole operation
+			} catch (err: any) {
+				if (abortController.signal.aborted) return;
+				console.warn("DGE completed but opening volcano plot failed", {
+					error: err,
+					volcanoChartId,
+					selectedGenesDsName,
+					safeTargetGroup,
+					safeReferenceGroup,
+				});
 			}
 		} catch (e: any) {
-			setError(e.message || String(e));
+			if (abortController.signal.aborted || !isMountedRef.current) return;
+			if (e?.name !== "AbortError") {
+				setError(e.message || String(e));
+			}
 		} finally {
-			setRunning(false);
+			const isCurrentRun = runAbortRef.current === abortController;
+			if (isCurrentRun) {
+				runAbortRef.current = null;
+			}
+			// Always settle "running" for the currently tracked run, including aborts.
+			if (isMountedRef.current && isCurrentRun) {
+				setRunning(false);
+			}
 		}
-	}, [dataStore.name, groupColumn, safeTargetGroup, safeReferenceGroup, selectedGenesDsName]);
+	}, [chartManager, dataStore.name, dataStore.size, groupColumn, safeTargetGroup, safeReferenceGroup, selectedGenesDsName]);
 
 	const sigCount = result
 		? result.results.filter((r) => r.pvalAdj < 0.05).length

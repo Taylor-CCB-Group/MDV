@@ -37,6 +37,7 @@ export interface DGERunResult {
 
 type ColumnLoader = (columns: string[]) => Promise<void>;
 type GetColumnBuffer = (field: string) => SharedArrayBuffer | null;
+type AbortLike = AbortSignal | undefined;
 
 /**
  * Standalone DGE runner that works with any DataStore-like data source.
@@ -81,9 +82,17 @@ export class DGERunner {
 		onProgress?: (done: number, total: number) => void,
 		useWorker = false,
 		dataType: "log1p" | "linear" | "zscored" = "log1p",
+		signal?: AbortLike,
 	): Promise<DGERunResult> {
+		const throwIfAborted = () => {
+			if (signal?.aborted) {
+				throw new DOMException("DGE run aborted", "AbortError");
+			}
+		};
+
 		const t0 = performance.now();
 		const batchSize = config.batchSize ?? DEFAULT_DGE_BATCH_SIZE;
+		throwIfAborted();
 
 		const targetIdx = groupValues.indexOf(config.targetGroup);
 		if (targetIdx < 0) {
@@ -102,12 +111,14 @@ export class DGERunner {
 		let skippedGenes = 0;
 
 		for (let b = 0; b < totalBatches; b++) {
+			throwIfAborted();
 			const start = b * batchSize;
 			const end = Math.min(start + batchSize, geneFields.length);
 			const batchFields = geneFields.slice(start, end);
 			const batchNames = geneNames.slice(start, end);
 
 			await loadColumns(batchFields);
+			throwIfAborted();
 
 			const loadedNames: string[] = [];
 			const geneBuffers: SharedArrayBuffer[] = [];
@@ -144,6 +155,7 @@ export class DGERunner {
 			} else {
 				batchResult = processBatch(input);
 			}
+			throwIfAborted();
 
 			allBatchResults.push(...batchResult.results);
 

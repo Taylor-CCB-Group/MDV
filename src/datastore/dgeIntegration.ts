@@ -11,7 +11,7 @@ import { clampEffectSize } from "./dgeStats";
 import { getRowsAsColumnsLinks, getFieldName } from "../links/link_utils";
 import { DEFAULT_DGE_BATCH_SIZE } from "../lib/constants";
 
-type ChartManager = {
+export type DGEChartManager = {
 	dsIndex: Record<string, { dataStore: any; name: string } | undefined>;
 	dataSources: { name: string; dataStore: any }[];
 	loadColumnSetAsync(columns: string[], dataSource: string): Promise<void>;
@@ -30,6 +30,10 @@ export interface DGEIntegrationResult extends DGERunResult {
 	genesDsName: string;
 }
 
+export interface DGEIntegrationRunOptions {
+	signal?: AbortSignal;
+}
+
 /**
  * Run DGE analysis using live MDV DataStore infrastructure.
  *
@@ -39,12 +43,20 @@ export interface DGEIntegrationResult extends DGERunResult {
  * 4. Writes result columns to the genes DataStore
  */
 export async function runDGEOnDataStore(
-	chartManager: ChartManager,
+	chartManager: DGEChartManager,
 	cellsDsName: string,
 	genesDsName: string,
 	config: DGEIntegrationConfig,
 	onProgress?: (done: number, total: number) => void,
+	options?: DGEIntegrationRunOptions,
 ): Promise<DGEIntegrationResult> {
+	const throwIfAborted = () => {
+		if (options?.signal?.aborted) {
+			throw new DOMException("DGE run aborted", "AbortError");
+		}
+	};
+
+	throwIfAborted();
 	const cellsDs = chartManager.dsIndex[cellsDsName]?.dataStore;
 	const genesDs = chartManager.dsIndex[genesDsName]?.dataStore;
 	if (!cellsDs) throw new Error(`DataStore "${cellsDsName}" not found`);
@@ -52,6 +64,7 @@ export async function runDGEOnDataStore(
 
 	// Load group column
 	await chartManager.loadColumnSetAsync([config.groupColumn], cellsDsName);
+	throwIfAborted();
 	const groupCol = cellsDs.columnIndex[config.groupColumn];
 	if (!groupCol) throw new Error(`Group column "${config.groupColumn}" not found`);
 	if (!groupCol.values) throw new Error(`Group column "${config.groupColumn}" is not categorical`);
@@ -81,6 +94,7 @@ export async function runDGEOnDataStore(
 	}
 	const { linkedDs, link } = selectedLink;
 	await link.initPromise;
+	throwIfAborted();
 
 	if (!link.valueToRowIndex) {
 		throw new Error("Link valueToRowIndex not initialized");
@@ -138,6 +152,7 @@ export async function runDGEOnDataStore(
 	const MAX_PROBE = Math.min(50, geneFields.length);
 	const probeFields = geneFields.slice(0, MAX_PROBE);
 	await chartManager.loadColumnSetAsync(probeFields, cellsDsName);
+	throwIfAborted();
 
 	let globalMaxVal = -Infinity;
 	let globalHasNegative = false;
@@ -196,7 +211,9 @@ export async function runDGEOnDataStore(
 			onProgress,
 			false,
 			dataType,
+			options?.signal,
 		);
+		throwIfAborted();
 
 		writeResultsToGenesDS(genesDs, result, link.valueToRowIndex);
 
@@ -270,7 +287,7 @@ function writeResultsToGenesDS(
  * returning the cells DS name and linked genes DS name.
  */
 export function findDGECapableDatasources(
-	chartManager: ChartManager,
+	chartManager: DGEChartManager,
 ): { cellsDsName: string; genesDsName: string }[] {
 	const results: { cellsDsName: string; genesDsName: string }[] = [];
 	for (const ds of chartManager.dataSources) {
