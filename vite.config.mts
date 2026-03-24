@@ -3,7 +3,6 @@ import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
 import glsl from 'vite-plugin-glsl';
-import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -47,7 +46,7 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  * `desktop_pt` just has a little more config setting a .ts input & making sure other things will work with flask template.
  * other methods are supposed to be for replacing other webpack configs.
  */
-function getRollupOptions(): RollupOptions {
+function getRollupOptions() {
     const build = process.env.build || "desktop_pt" as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
