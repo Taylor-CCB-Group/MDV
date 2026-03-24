@@ -1,11 +1,14 @@
-import { defineConfig, type ProxyOptions } from 'vite';
+import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
 import glsl from 'vite-plugin-glsl';
-import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
+
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 // zarrita needed a polyfill for Buffer - seems like a bug
 // seems ok without as long we don't use ZipFileStore (marked experimental anyway)
 // having the polyfill means the build works, but devserver fails with 'cannot import outside a module'
@@ -19,6 +22,23 @@ const port = 5170;
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 // maybe also the various build configurations at some point.
 
+/** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
+function flaskAssetFileNames(assetInfo: { name?: string }): string {
+    const name = assetInfo.name ?? '';
+    if (name.includes('index.css')) return 'assets/mdv.css';
+    if (name === 'mdv.css') return 'assets/mdv.css';
+    if (name === 'catalog.css') return 'assets/catalog.css';
+    if (name === 'desktop_index.css') return 'assets/mdv.css';
+    if (process.env.VITE_ENTRYPOINT) {
+        const { name: entryBase } = path.parse(process.env.VITE_ENTRYPOINT);
+        if (name === `${entryBase}.css`) return 'assets/mdv.css';
+    }
+    const ext = path.extname(name).slice(1).toLowerCase();
+    if (['woff', 'woff2', 'ttf', 'eot'].includes(ext)) return 'assets/[name][extname]';
+    if (ext === 'svg' && /^fa-(brands|regular|solid)-/.test(name)) return 'assets/[name][extname]';
+    return 'img/[name][extname]';
+}
+
 /**
  * shim for various different build configurations.
  * 
@@ -26,7 +46,7 @@ const port = 5170;
  * `desktop_pt` just has a little more config setting a .ts input & making sure other things will work with flask template.
  * other methods are supposed to be for replacing other webpack configs.
  */
-function getRollupOptions(): RollupOptions {
+function getRollupOptions() {
     const build = process.env.build || "desktop_pt" as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
@@ -34,11 +54,7 @@ function getRollupOptions(): RollupOptions {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
                 entryFileNames: 'mdv.js',
-                assetFileNames: (assetInfo) => {
-                    //todo: match webpack behaviour with assetsDir / css-loader.
-                    if (assetInfo?.name?.includes('index.css')) return 'assets/mdv.css';
-                    return 'img/[name][extname]';
-                },
+                assetFileNames: flaskAssetFileNames,
             }
         }
     } if (build === 'desktop_pt') {
@@ -52,13 +68,7 @@ function getRollupOptions(): RollupOptions {
             },
             output: {
                 entryFileNames: 'js/[name].js',
-                assetFileNames: (assetInfo) => {
-                    if (assetInfo.name === 'mdv.css') return 'assets/mdv.css';
-                    if (assetInfo.name === 'catalog.css') return 'assets/catalog.css';
-                    
-                    //not including hash, may impact caching, but more similar to previous webpack behavior
-                    return 'img/[name][extname]';
-                },
+                assetFileNames: flaskAssetFileNames,
             }
         }
     } if (build === 'dev_pt') {
@@ -71,11 +81,7 @@ function getRollupOptions(): RollupOptions {
             input: 'src/modules/desktop_index.js',
             output: {
                 entryFileNames: 'js/mdv.js',
-                assetFileNames: (assetInfo) => {
-                    if (assetInfo.name === 'desktop_index.css') return 'assets/mdv.css';
-                    //not including hash, may impact caching, but more similar to previous webpack behavior
-                    return 'img/[name][extname]';
-                },
+                assetFileNames: flaskAssetFileNames,
             }
         }
     }
@@ -84,16 +90,11 @@ function getRollupOptions(): RollupOptions {
         // with another backend, you can specify it with VITE_ENTRYPOINT environment variable, e.g.
         // `VITE_ENTRYPOINT=path/to/my_index.js npx vite build --outDir path/to/output`
         // (nb, we may change the logic in this config...)
-        const {name} = path.parse(process.env.VITE_ENTRYPOINT);
         return {
             input: process.env.VITE_ENTRYPOINT,
             output: {
                 entryFileNames: 'js/mdv.js',
-                assetFileNames: (assetInfo) => {
-                    if (assetInfo.name === `${name}.css`) return 'assets/mdv.css';
-                    //not including hash, may impact caching, but more similar to previous webpack behavior
-                    return 'img/[name][extname]';
-                },
+                assetFileNames: flaskAssetFileNames,
             }
         }
     }
@@ -137,7 +138,7 @@ proxy['/socket.io'] = {
 //     target: "/catalog_dev.html"
 // };
 
-export default defineConfig(env => {
+export default defineConfig(async (): Promise<UserConfig> => {
     // For local development, try to get Git info. This is guarded by a check for the .git directory
     // to prevent errors in environments where git is not available (like during Docker build, where
     // even in dev environment, the build happens before .git is copied in, for cache purposes).
@@ -159,7 +160,42 @@ export default defineConfig(env => {
     }
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
-    return ({
+    // @vitejs/plugin-react v6 ignores nested babel.plugins; use Rolldown Babel for decorators + TS class features.
+    // Rolldown's Babel plugin types omit Babel `overrides` `test`/`exclude` (valid at runtime).
+    const babelDecorators = await babel({
+        include: /\.(?:[jt]sx?|[cm][jt]s)(?:$|\?)/,
+        overrides: [
+            {
+                test: /\.tsx(?:$|\?)/,
+                plugins: [
+                    ['@babel/plugin-transform-typescript', { allowDeclareFields: true, isTSX: true }],
+                    '@babel/plugin-transform-class-static-block',
+                    ['@babel/plugin-proposal-decorators', { version: '2023-05' }],
+                    ['@babel/plugin-transform-class-properties', { loose: true }],
+                ],
+            },
+            {
+                test: /\.(?:ts|mts|cts)(?:$|\?)/,
+                exclude: /\.tsx(?:$|\?)/,
+                plugins: [
+                    ['@babel/plugin-transform-typescript', { allowDeclareFields: true, isTSX: false }],
+                    '@babel/plugin-transform-class-static-block',
+                    ['@babel/plugin-proposal-decorators', { version: '2023-05' }],
+                    ['@babel/plugin-transform-class-properties', { loose: true }],
+                ],
+            },
+            {
+                test: /\.jsx?(?:$|\?)/,
+                plugins: [
+                    '@babel/plugin-transform-class-static-block',
+                    ['@babel/plugin-proposal-decorators', { version: '2023-05' }],
+                    ['@babel/plugin-transform-class-properties', { loose: true }],
+                ],
+            },
+        ],
+    } as any);
+
+    return {
     base: process.env.asset_base || "./",
     server: {
         headers: {
@@ -183,18 +219,9 @@ export default defineConfig(env => {
     },
     plugins: [
         glsl(),
+        babelDecorators,
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
-            babel: {
-                plugins: [
-                    [
-                        "@babel/plugin-proposal-decorators",
-                        {
-                            version: "2023-05"
-                        }
-                    ]
-                ]
-            }
         })
     ],
     worker: {
@@ -202,7 +229,8 @@ export default defineConfig(env => {
     },
     resolve: {
         alias: {
-            "@": path.resolve(__dirname, "./src"),
+            "@": path.resolve(configDir, "./src"),
         }
     }
-})})
+    } as UserConfig;
+});
