@@ -1,12 +1,15 @@
-import { defineConfig, type ProxyOptions } from 'vite';
+import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
 import glsl from 'vite-plugin-glsl';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
+
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 // zarrita needed a polyfill for Buffer - seems like a bug
 // seems ok without as long we don't use ZipFileStore (marked experimental anyway)
 // having the polyfill means the build works, but devserver fails with 'cannot import outside a module'
@@ -136,7 +139,7 @@ proxy['/socket.io'] = {
 //     target: "/catalog_dev.html"
 // };
 
-export default defineConfig(async () => {
+export default defineConfig(async (): Promise<UserConfig> => {
     // For local development, try to get Git info. This is guarded by a check for the .git directory
     // to prevent errors in environments where git is not available (like during Docker build, where
     // even in dev environment, the build happens before .git is copied in, for cache purposes).
@@ -159,6 +162,7 @@ export default defineConfig(async () => {
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
     // @vitejs/plugin-react v6 ignores nested babel.plugins; use Rolldown Babel for decorators + TS class features.
+    // Rolldown's Babel plugin types omit Babel `overrides` `test`/`exclude` (valid at runtime).
     const babelDecorators = await babel({
         include: /\.(?:[jt]sx?|[cm][jt]s)(?:$|\?)/,
         overrides: [
@@ -190,9 +194,9 @@ export default defineConfig(async () => {
                 ],
             },
         ],
-    });
+    } as any);
 
-    return ({
+    return {
     base: process.env.asset_base || "./",
     server: {
         headers: {
@@ -226,7 +230,8 @@ export default defineConfig(async () => {
     },
     resolve: {
         alias: {
-            "@": path.resolve(__dirname, "./src"),
+            "@": path.resolve(configDir, "./src"),
         }
     }
-})})
+    } as UserConfig;
+});
