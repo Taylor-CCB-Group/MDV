@@ -106,7 +106,7 @@ async function loadData() {
     const config = await fetchJsonConfig(`${root}/state.json`, root, true);
     config.popouturl = undefined;
     // todo: check if this is correct
-    const permission = config?.permission === "edit" || config?.permission === "owner";
+    const permission = config?.permission === "edit";
     const views = await fetchJsonConfig(`${root}/views.json`, root, true);
     //is view in the URL
     const view = urlParams.get("view");

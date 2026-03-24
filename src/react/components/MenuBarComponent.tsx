@@ -1,4 +1,4 @@
-import { AppBar, Box, Toolbar } from "@mui/material";
+import { AppBar, Box, Chip, Toolbar } from "@mui/material";
 import {
     Home as HomeIcon,
     Save as SaveIcon,
@@ -23,6 +23,8 @@ import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dia
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import ChatButtons from "./ChatButtons";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import CustomTooltip from "./CustomTooltip";
+import { LockIcon, LockOpenIcon } from "lucide-react";
 
 const MenuBarComponent = () => {
     const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
@@ -31,6 +33,9 @@ const MenuBarComponent = () => {
     const { viewManager, config, containerDiv } = cm;
     const { root, mainApiRoute } = useProject();
     const { buildInfo } = useBuildInfo();
+
+    const isEditable = config.permission === "edit";
+    const ariaLabel = isEditable ? "editable" : "view only";
 
     const handleHomeButtonClick = () => {
         // todo: uncomment when we fix state issues
@@ -114,7 +119,7 @@ const MenuBarComponent = () => {
                                 <ViewThumbnailComponent />
                             </Box>
                         )}
-                        {config.permission === "edit" && (
+                        {isEditable && (
                             <>
                                 <IconWithTooltip tooltipText="Save View" onClick={handleSaveButtonClick}>
                                     <SaveIcon />
@@ -124,7 +129,7 @@ const MenuBarComponent = () => {
                                 </IconWithTooltip>
                             </>
                         )}
-                        {config.permission === "edit" && config.all_views && (
+                        {isEditable && config.all_views && (
                             <>
                                 <IconWithTooltip tooltipText="Create New View" onClick={handleCreateViewClick}>
                                     <AddIcon />
@@ -134,13 +139,33 @@ const MenuBarComponent = () => {
                                 </IconWithTooltip>
                             </>
                         )}
-                        {config.permission === "edit" && (
+                        {isEditable && (
                             <IconWithTooltip tooltipText="Add Datasource" onClick={handleAddDataSourceClick}>
                                 <CloudUploadIcon />
                             </IconWithTooltip>
                         )}
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <CustomTooltip 
+                            tooltipText={
+                                isEditable ? 
+                                "You can edit views and add data." : 
+                                "You can only view, editing is disabled."
+                            }
+                        >
+                            <Box
+                                role="img"
+                                aria-label={ariaLabel}
+                                tabIndex={0}
+                                sx={{ marginRight: "10px", marginBottom: "2px" }}
+                            >
+                                {
+                                    isEditable ? 
+                                        <LockOpenIcon height={18} aria-hidden="true" focusable="false" /> :
+                                        <LockIcon height={18} aria-hidden="true" focusable="false" /> 
+                                }
+                            </Box>
+                        </CustomTooltip>
                         <ChatButtons />
                         <ToggleThemeWrapper />
                         <IconWithTooltip tooltipText="Debug / Report issue" onClick={handleDebugButtonClick}>
