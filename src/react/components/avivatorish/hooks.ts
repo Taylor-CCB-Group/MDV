@@ -15,7 +15,6 @@ import {
     // type PixelSource,
 } from "./state";
 import {
-    createLoader,
     buildDefaultSelection,
     guessRgb,
     getMultiSelectionStats,
@@ -24,6 +23,7 @@ import {
 } from "./utils";
 import { COLOR_PALLETE, FILL_PIXEL_VALUE } from "./constants";
 import { useVivConfig } from "@/react/context";
+import { getOrCreateVivLoader } from "@/react/viv_loader_cache";
 
 const EMPTY_RASTER = { width: 0, height: 0, data: new Float32Array() };
 
@@ -89,7 +89,7 @@ export const useImage = (
             if (use3d) toggleUse3d();
             if (!source) throw "this should never happen - this is a type-guard";
             const { urlOrFile } = source;
-            const newLoader = await createLoader(
+            const newLoader = await getOrCreateVivLoader(
                 urlOrFile,
                 toggleIsOffsetsSnackbarOn,
                 (message) =>
