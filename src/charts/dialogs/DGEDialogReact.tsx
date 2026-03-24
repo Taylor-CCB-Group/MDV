@@ -101,6 +101,17 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 		}
 	}, [genesDatasourceOptions, selectedGenesDsName]);
 
+	const handleAbort = useCallback(() => {
+		const currentRun = runAbortRef.current;
+		if (!currentRun) return;
+		currentRun.abort();
+		runAbortRef.current = null;
+		if (!isMountedRef.current) return;
+		setRunning(false);
+		setProgress({ done: 0, total: 0 });
+		setError("DGE run aborted.");
+	}, []);
+
 	const handleRun = useCallback(async () => {
 		runAbortRef.current?.abort();
 		const abortController = new AbortController();
@@ -274,7 +285,7 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 			</Button>
 
 			{running && (
-				<Box>
+				<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
 					<LinearProgress
 						variant={progress.total > 0 ? "determinate" : "indeterminate"}
 						value={progress.total > 0 ? (progress.done / progress.total) * 100 : 0}
@@ -284,6 +295,14 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 							? `Loading gene columns... (batch ${progress.done}/${progress.total})`
 							: "Initializing..."}
 					</Typography>
+					<Button
+						variant="outlined"
+						color="warning"
+						onClick={handleAbort}
+						fullWidth
+					>
+						Abort DGE
+					</Button>
 				</Box>
 			)}
 
