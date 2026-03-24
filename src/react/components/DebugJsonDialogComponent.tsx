@@ -3,8 +3,10 @@ import JsonView from "react18-json-view";
 import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
 import "react18-json-view/src/dark.css";
+import { observer } from "mobx-react-lite";
 import { useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { vivLoaderCacheTelemetryObservable } from "../viv_loader_cache";
 import "../../utilities/css/JsonDialogStyles.css";
 import { Accordion, AccordionDetails, AccordionSummary, Divider, Link, Typography } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -62,12 +64,25 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
     return recursiveFilter(obj, []) || {};
 }
 
-export default function ({ json, header }: { json: any; header?: string }) {
+const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
+    json,
+    header,
+}: {
+    json: any;
+    header?: string;
+}) {
     const [filter, setFilter] = useState("");
     const [debouncedFilter] = useDebounce(filter, 300); //why is this returning a tuple?
+    const jsonWithVivTelemetry = useMemo(
+        () => ({
+            ...json,
+            vivLoaderCacheTelemetry: vivLoaderCacheTelemetryObservable.snapshot,
+        }),
+        [json, vivLoaderCacheTelemetryObservable.snapshot],
+    );
     const filteredJson = useMemo(
-        () => filterJSON(json, debouncedFilter),
-        [json, debouncedFilter]
+        () => filterJSON(jsonWithVivTelemetry, debouncedFilter),
+        [jsonWithVivTelemetry, debouncedFilter],
     );
 
     return (
@@ -123,4 +138,6 @@ export default function ({ json, header }: { json: any; header?: string }) {
             />
         </div>
     );
-}
+});
+
+export default DebugJsonDialogComponent;
