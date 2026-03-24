@@ -263,7 +263,7 @@ BaseChart.types["DeckScatter3D"] = {
     },
 };
 BaseChart.types["wgl_scatter_plot_dev"] = {
-    name: "2D Scatter Plot (experimental)",
+    name: "2D Scatter Plot",
     class: DeckScatterReact,
     allow_user_add: true,
     params: [

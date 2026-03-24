@@ -387,7 +387,7 @@ BaseChart.types["VivMdvRegionReact"] = {
         };
     },
     class: VivMdvReact,
-    name: "Viv Scatter Plot (react)",
+    name: "Spatial Image Viewer",
 };
 
 export type VivMdvReactType = typeof VivMdvReact;

@@ -172,7 +172,7 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
 }
 
 BaseChart.types["table_chart_react"] = {
-    name: "Table Chart (React)",
+    name: "Table",
     class: TableChartReact,
     allow_user_add: true,
     params: [
