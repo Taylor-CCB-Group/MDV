@@ -535,7 +535,7 @@ export function positionChart(dataSource: DataSource, config: Config) {
     //hack approx position of grid stack elements
 
     if (
-        chartManager.viewData.dataSources[dataSource.name].layout ===
+        chartManager.viewData.dataSources[dataSource.name]?.layout ===
             "gridstack" &&
         config.gssize
     ) {
