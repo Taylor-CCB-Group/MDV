@@ -22,18 +22,21 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useCallback, useMemo, useState } from "react";
-import { DEFAULT_GATE_COLOR } from "../gates/gateUtils";
+import { DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
 import GateNameDialog from "./GateNameDialog";
 import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
 import { PenBoxIcon } from "lucide-react";
 import { truncateGateLabel } from "../hooks/useGateLayers";
 import { hexToRgb, rgbToHex } from "@/utilities/Utilities";
 import type { Gate } from "../gates/types";
+import { observer } from "mobx-react-lite";
+import { useGateManager } from "../gates/useGateManager";
 
 export type ManageGateDialogType = {
     open: boolean;
     onClose: () => void;
-    gatesArray: Gate[];
+    xField?: string;
+    yField?: string;
     onDelete: (gateId: string) => Promise<void>;
     onEdit: (gateId: string) => void;
     onRenameGate: (gateId: string, newName: string) => Promise<void>;
@@ -42,9 +45,10 @@ export type ManageGateDialogType = {
     activeRegion?: string;
 };
 
-const ManageGateDialogContent = ({
+const ManageGateDialogContent = observer(({
     onClose,
-    gatesArray,
+    xField,
+    yField,
     onDelete,
     onEdit,
     onRenameGate,
@@ -52,18 +56,30 @@ const ManageGateDialogContent = ({
     onColorChange,
     activeRegion,
 }: ManageGateDialogType) => {
+    const gateManager = useGateManager();
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [renameGateId, setRenameGateId] = useState<string | null>(null);
     const [deleteGateId, setDeleteGateId] = useState<string | null>(null);
 
+    const relevantGates = useMemo(
+        () =>
+            getRelevantGates({
+                gates: gateManager.gatesArray,
+                xField,
+                yField,
+                region: activeRegion,
+            }),
+        [gateManager.gatesArray, xField, yField, activeRegion],
+    );
+
     const regionSpecificGates = useMemo(() => 
-        gatesArray.filter((gate) => gate.region === activeRegion), 
-    [gatesArray, activeRegion]);
+        relevantGates.filter((gate) => gate.region === activeRegion), 
+    [relevantGates, activeRegion]);
 
     const globalGates = useMemo(() => 
-        gatesArray.filter((gate) => gate.region === undefined), 
-    [gatesArray]);
+        relevantGates.filter((gate) => gate.region === undefined), 
+    [relevantGates]);
 
     const handleMenuOpen = useCallback((event: React.MouseEvent<HTMLButtonElement>, gateId: string) => {
         event.stopPropagation();
@@ -169,7 +185,7 @@ const ManageGateDialogContent = ({
 
     return (
         <>
-            {gatesArray.length === 0 ? (
+            {relevantGates.length === 0 ? (
                 <Typography color="textSecondary" sx={{ py: 2 }}>
                     No gates yet. Draw a selection on the chart and save it as a gate.
                 </Typography>
@@ -271,7 +287,7 @@ const ManageGateDialogContent = ({
                     onSaveGate={async (gateName) => {
                         await onRenameGate(renameGateId, gateName);
                     }}
-                    name={gatesArray.find((g) => g.id === renameGateId)?.name ?? ""}
+                    name={relevantGates.find((g) => g.id === renameGateId)?.name ?? ""}
                     isEditName
                 />
             )}
@@ -291,6 +307,6 @@ const ManageGateDialogContent = ({
             )}
         </>
     );
-};
+});
 
 export default ManageGateDialogContent;

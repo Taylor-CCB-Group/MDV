@@ -9,7 +9,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSpatialLayers } from "../spatial_context";
 import { observer } from "mobx-react-lite";
 import GateNameDialog from "./GateNameDialog";
-import { useGateManager } from "../gates/useGateManager";
 import {
     DrawPolygonMode,
     DrawPolygonByDraggingMode,
@@ -28,7 +27,8 @@ import { getEmptyFeatureCollection } from "../deck_state";
 import { TuneOutlined } from "@mui/icons-material";
 import { LassoIcon, SplineIcon } from "lucide-react";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
-import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
+import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
+import { useChart } from "../context";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -144,8 +144,9 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
 
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
+    const chart = useChart<DeckScatterConfigWithRegion>();
     const chartId = useChartID();
-    const config = useConfig<DeckScatterConfig & {region?: string}>();
+    const config = useConfig<DeckScatterConfigWithRegion>();
     const { 
         setSelectionMode, 
         selectionFeatureCollection,
@@ -154,11 +155,10 @@ export default observer(function SelectionOverlay() {
         selectedTool,
         setSelectedTool: setSelectedToolX
     } = selectionProps;
-    const gateManager = useGateManager();
     const [cx, cy] = useParamColumns();
     
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
-    const manageGateByChartRef = useRef<Map<string, ManageGateDialogWrapper>>(new Map());
+    const manageGateByChartRef = useRef<Map<string, ManageGateDialogWrapper<DeckScatterConfigWithRegion>>>(new Map());
     const theme = useTheme();
 
     const {
@@ -225,25 +225,6 @@ export default observer(function SelectionOverlay() {
         ));
     }, [selectedTool, setSelectedTool, toolsToShow]);
 
-    const relevantGates = useMemo(() => {
-        if (!cx || !cy) return [];
-        return gateManager.gatesArray.filter(
-            (gate) => {
-                if (gate.columns[0] === cx.field && gate.columns[1] === cy.field) {
-                    if (config?.region) {
-                        // For viv plot, we show gates which are both global 
-                        // and which has a region same as the plot's region
-                        return gate.region === undefined || config.region === gate.region;
-                    }
-                    // For deck scatterplot, we only show gates which are global (no region)
-                    return gate.region === undefined;
-                }
-                return false;
-            }
-        )
-    }
-    , [gateManager.gatesArray, cx, cy, config]);
-
     const onManageGatesClick = useCallback(() => {
         if (manageGateByChartRef.current.get(chartId)) {
             // a dialog already exists
@@ -252,7 +233,9 @@ export default observer(function SelectionOverlay() {
         
         // Create a new manage gates dialog for a chart
         const dialog = new ManageGateDialogWrapper({
-            gatesArray: relevantGates,
+            chart,
+            xField: cx?.field,
+            yField: cy?.field,
             onDelete: onDeleteGate,
             onColorChange,
             onRenameGate,
@@ -268,14 +251,16 @@ export default observer(function SelectionOverlay() {
         // create a new entry for the dialog for a chart
         manageGateByChartRef.current.set(chartId, dialog);
     }, [
-        relevantGates, 
+        cx?.field,
+        cy?.field,
         onDeleteGate, 
         onEditGate, 
         onColorChange, 
         onRenameGate, 
         onExportClick, 
+        chart,
         chartId,
-        config,
+        config?.region,
     ]);
 
     const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);

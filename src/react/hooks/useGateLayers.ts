@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGateManager } from "../gates/useGateManager";
 import { useChartID, useConfig, useParamColumns } from "../hooks";
 import type { LoadedDataColumn } from "@/charts/charts";
-import { computeCentroid, DEFAULT_GATE_COLOR } from "../gates/gateUtils";
-import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
+import { computeCentroid, DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
+import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
@@ -22,7 +22,7 @@ const useGateLayers = () => {
     const gateManager = useGateManager();
     const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
-    const config = useConfig<DeckScatterConfig & { region?: string }>();
+    const config = useConfig<DeckScatterConfigWithRegion>();
     const { selectionProps } = useSpatialLayers();
     const { onEditGate } = useGateActions();
     const { dimension } = config;
@@ -36,21 +36,16 @@ const useGateLayers = () => {
     const draggingIdRef = useRef<string | null>(null);
     const dragPosRef = useRef<[number, number] | null>(null);
 
-    const relevantGates = useMemo(() => {
-        if (!cx || !cy) return [];
-        return gateManager.gatesArray.filter((gate) => {
-            if (gate.columns[0] === cx.field && gate.columns[1] === cy.field) {
-                if (config?.region) {
-                    // For viv plot, we show gates which are both global 
-                    // and which has a region same as the plot's region
-                    return gate.region === undefined || config.region === gate.region;
-                }
-                // For deck scatterplot, we only show gates which are global (no region)
-                return gate.region === undefined;
-            }
-            return false;
-        });
-    }, [gateManager.gatesArray, cx, cy, config]);
+    const relevantGates = useMemo(
+        () =>
+            getRelevantGates({
+                gates: gateManager.gatesArray,
+                xField: cx?.field,
+                yField: cy?.field,
+                region: config?.region,
+            }),
+        [gateManager.gatesArray, cx?.field, cy?.field, config?.region],
+    );
 
     useEffect(() => {
         // Wait for columns to be loaded to update the gates column

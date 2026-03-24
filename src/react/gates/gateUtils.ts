@@ -102,3 +102,32 @@ export function computeCentroid(geometry: FeatureCollection): [number, number] {
 export function generateGateId(): string {
     return `gate-${uuid()}-${Date.now()}`;
 }
+
+type RelevantGatesArgs = {
+    gates: Gate[];
+    xField?: string;
+    yField?: string;
+    region?: string;
+};
+
+export function getRelevantGates({
+    gates,
+    xField,
+    yField,
+    region,
+}: RelevantGatesArgs): Gate[] {
+    if (!xField || !yField) return [];
+
+    return gates.filter((gate) => {
+        const sameAxes = gate.columns[0] === xField && gate.columns[1] === yField;
+        if (!sameAxes) return false;
+
+        if (region) {
+            // For viv plot, include both global gates and region-scoped gates for the active region.
+            return gate.region === undefined || gate.region === region;
+        }
+
+        // For deck scatterplot, include only global gates.
+        return gate.region === undefined;
+    });
+}

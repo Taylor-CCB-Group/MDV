@@ -2,29 +2,37 @@ import { BaseDialog } from "@/utilities/Dialog";
 import { createMdvPortal } from "@/react/react_utils";
 import type { ManageGateDialogType } from "./ManageGateDialogComponent";
 import ManageGateDialogContent from "./ManageGateDialogComponent";
+import { ChartProvider } from "../context";
+import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
 
-export type ManageGateDialogWrapperProps = Omit<ManageGateDialogType, "open">;
+export type ManageGateDialogWrapperProps<T extends BaseConfig> = Omit<ManageGateDialogType, "open"> & {
+    chart: BaseChart<T>;
+};
 
-class ManageGateDialogWrapper extends BaseDialog {
+class ManageGateDialogWrapper<T extends BaseConfig> extends BaseDialog {
     declare root: ReturnType<typeof createMdvPortal>;
     
-    constructor(props: ManageGateDialogWrapperProps) {
+    constructor(props: ManageGateDialogWrapperProps<T>) {
+        const { chart, ...dialogProps } = props;
         const config = {
             title: "Manage Gates",
             width: 500,
-            onclose: () => props.onClose(),
+            onclose: () => dialogProps.onClose(),
         };
         super(config, props);
 
         this.root = createMdvPortal(
-            <ManageGateDialogContent
-                {...props}
-                open={true}
-                onClose={() => {
-                    props.onClose();
-                    this.close();
-                }}
-            />,
+            <ChartProvider chart={chart}>
+                <ManageGateDialogContent
+                    {...dialogProps}
+                    open={true}
+                    onClose={() => {
+                        dialogProps.onClose();
+                        this.close();
+                    }}
+                />
+            </ChartProvider>,
             this.dialog,
             this,
         );

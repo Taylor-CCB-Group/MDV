@@ -23,6 +23,7 @@ const MainChart = observer(() => {
 });
 
 export type DeckScatterConfig = ScatterPlotConfig2D | ScatterPlotConfig3D;
+export type DeckScatterConfigWithRegion = DeckScatterConfig & { region?: string };
 const defaultViewState = {
     viewState: {
         target: [0, 0, 0],
