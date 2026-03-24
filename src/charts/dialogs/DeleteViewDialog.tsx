@@ -17,17 +17,10 @@ const DeleteViewDialogComponent = (props: {
         onDelete();
     };
 
-    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        onDelete();
-    };
-
     return (
         <Dialog
             open={props.open}
             onClose={props.onClose}
-            onKeyDown={handleKeyDown}
             fullWidth
             maxWidth="xs"
             PaperProps={{
