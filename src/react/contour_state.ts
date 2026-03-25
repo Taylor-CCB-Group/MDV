@@ -239,7 +239,7 @@ export function useFieldContour(props: FieldContourProps) {
                 if (!Number.isFinite(value) || value === 0) continue;
                 kept[w++] = idx;
             }
-            m.set(name, kept.subarray(0, w));
+            m.set(name, kept.slice(0, w));
         }
         return m;
     }, [denseData, fields]);
