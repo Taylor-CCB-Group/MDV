@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Box, Button, Chip, Divider, FormControl, FormControlLabel, Paper, type PaperProps, Radio, RadioGroup, Slider, Typography } from "@mui/material";
+import { Box, Button, Chip, Divider, FormControl, FormControlLabel, IconButton, InputAdornment, Paper, type PaperProps, Radio, RadioGroup, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -25,6 +25,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+import { Clear } from "@mui/icons-material";
 
 const SettingsSearchContext = createContext("");
 
@@ -567,27 +568,37 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     );
     if (settings.length === 0) return null;
     return (
-        <Accordion
-            type="single"
-            collapsible
+        <Paper
+            variant="outlined"
             className="w-full col-span-2"
-            value={isSearchActive ? props.label : (isOpen ? props.label : "")}
-            onValueChange={(value) => {
-                if (isSearchActive) return;
-                setIsOpen(value === props.label);
+            sx={{
+                paddingX: 2,
+                paddingBottom: 0,
+                overflow: "hidden",
             }}
-            //uncomment to expand by default
-            // defaultValue={props.label}
         >
-            <AccordionItem value={props.label}>
-                <AccordionTrigger>{props.label}</AccordionTrigger>
-                <AccordionContent>
-                    {settings.map(({ setting, id }) => (
-                        <AbstractComponent key={id} props={setting} />
-                    ))}
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+            <Accordion
+                type="single"
+                collapsible
+                className="w-full"
+                value={isSearchActive ? props.label : (isOpen ? props.label : "")}
+                onValueChange={(value) => {
+                    if (isSearchActive) return;
+                    setIsOpen(value === props.label);
+                }}
+                //uncomment to expand by default
+                // defaultValue={props.label}
+            >
+                <AccordionItem value={props.label}>
+                    <AccordionTrigger>{props.label}</AccordionTrigger>
+                    <AccordionContent>
+                        {settings.map(({ setting, id }) => (
+                            <AbstractComponent key={id} props={setting} />
+                        ))}
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        </Paper>
     );
 };
 
@@ -777,6 +788,17 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         sx={{ padding: 1, paddingRight: 2 }}
+                        slotProps={{
+                            input: {
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton onClick={() => setSearchTerm("")}>
+                                            <Clear />
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            },
+                        }}
                     />
                     {settings.length === 0 && (
                         <Typography variant="body2" color="text.secondary" sx={{ paddingLeft: 2, paddingBottom: 1 }}>
