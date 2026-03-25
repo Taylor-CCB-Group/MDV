@@ -1,6 +1,7 @@
 import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react from '@vitejs/plugin-react';
+import { babel } from '@rollup/plugin-babel';
 import glsl from 'vite-plugin-glsl';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -183,6 +184,17 @@ export default defineConfig(async (): Promise<UserConfig> => {
     },
     plugins: [
         glsl(),
+        babel({
+            babelHelpers: 'bundled',
+            extensions: ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'],
+            include: ['src/**/*'],
+            plugins: [
+                ['@babel/plugin-transform-typescript', { allowDeclareFields: true }],
+                '@babel/plugin-transform-class-static-block',
+                ['@babel/plugin-proposal-decorators', { version: '2023-05' }],
+                ['@babel/plugin-transform-class-properties', { loose: true }],
+            ],
+        }),
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
             babel: {
