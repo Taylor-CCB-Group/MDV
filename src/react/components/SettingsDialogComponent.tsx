@@ -561,7 +561,8 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
 const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     const searchTerm = useContext(SettingsSearchContext);
     const isSearchActive = searchTerm.trim().length > 0;
-    const [isOpen, setIsOpen] = useState(false);
+    // When the dialog first opens (and search is empty), expand "General" so the user sees settings immediately.
+    const [isOpen, setIsOpen] = useState(() => props.label === "General");
     // add uuid to each setting to avoid key collisions
     const settings = useMemo(
         () => props.current_value.map((setting) => ({ setting, id: uuid() })),
@@ -573,9 +574,17 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
             variant="outlined"
             className="w-full col-span-2"
             sx={{
+                backgroundColor: (theme) =>
+                    theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.03)"
+                        : "rgba(0,0,0,0.02)",
+                borderColor: (theme) => theme.palette.divider,
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderRadius: 1,
+                overflow: "hidden",
                 paddingX: 2,
                 paddingBottom: 0,
-                overflow: "hidden",
             }}
         >
             <Accordion
@@ -590,7 +599,7 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
                 //uncomment to expand by default
                 // defaultValue={props.label}
             >
-                <AccordionItem value={props.label}>
+                <AccordionItem value={props.label} className="border-b-0">
                     <AccordionTrigger>{props.label}</AccordionTrigger>
                     <AccordionContent>
                         {settings.map(({ setting, id }) => (
@@ -720,30 +729,34 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
         <ChartProvider chart={chart}>
             <SettingsSearchContext.Provider value={searchTerm}>
                 <div className="w-full max-h-[80vh]">
-                    <TextField
-                        fullWidth
-                        size="small"
-                        placeholder="Search settings by name"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        sx={{ padding: 1, paddingRight: 2 }}
-                        slotProps={{
-                            input: {
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton onClick={() => setSearchTerm("")}>
-                                            <Clear />
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            },
-                        }}
-                    />
+                    <Box sx={{ p: 1 }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            variant="outlined"
+                            placeholder="Search settings by name"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            sx={{ backgroundColor: "transparent" }}
+                            slotProps={{
+                                input: {
+                                    endAdornment: searchTerm.trim().length > 0 ? (
+                                        <InputAdornment position="end">
+                                            <IconButton onClick={() => setSearchTerm("")}>
+                                                <Clear />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ) : null,
+                                },
+                            }}
+                        />
+                    </Box>
                     {settings.length === 0 && (
-                        <Typography variant="body2" color="text.secondary" sx={{ paddingLeft: 2, paddingBottom: 1 }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
                             No settings match your search.
                         </Typography>
                     )}
+                    <Divider sx={{ marginY: 0.75, opacity: 0.6 }} />
                     {settings.map(({ setting, id }) => (
                         <AbstractComponent key={id} props={setting} />
                     ))}
