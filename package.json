@@ -175,6 +175,9 @@
     "vite": "$vite"
   },
   "optionalDependencies": {
+    "@typescript/native-preview-darwin-arm64": "7.0.0-dev.20260324.1",
+    "@typescript/native-preview-darwin-x64": "7.0.0-dev.20260324.1",
+    "@typescript/native-preview-linux-x64": "7.0.0-dev.20260324.1",
     "@rolldown/binding-darwin-arm64": "1.0.0-rc.11",
     "@rolldown/binding-darwin-x64": "1.0.0-rc.11",
     "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.11"
