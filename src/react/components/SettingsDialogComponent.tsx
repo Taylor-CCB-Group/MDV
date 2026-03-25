@@ -26,6 +26,7 @@ import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { Clear } from "@mui/icons-material";
+import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
 
 const SettingsSearchContext = createContext("");
 
@@ -625,32 +626,6 @@ export function collectDisposers(specs: AnyGuiSpec[]): Disposer[] {
     return disposers;
 }
 
-function filterSettingsByLabel(specs: AnyGuiSpec[], searchTerm: string): AnyGuiSpec[] {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return specs;
-
-    return specs.reduce<AnyGuiSpec[]>((acc, spec) => {
-        const labelMatches = spec.label.toLowerCase().includes(query);
-
-        if (spec.type !== "folder") {
-            if (labelMatches) acc.push(spec);
-            return acc;
-        }
-
-        const filteredChildren = filterSettingsByLabel(spec.current_value, query);
-        if (!labelMatches && filteredChildren.length === 0) {
-            return acc;
-        }
-
-        const filteredFolder: GuiSpec<"folder"> = {
-            ...spec,
-            current_value: filteredChildren,
-        };
-        acc.push(filteredFolder);
-        return acc;
-    }, []);
-}
-
 const Components: {
     [K in GuiSpecType]: React.FC<{ props: GuiSpec<K> }>;
 } = {
@@ -722,43 +697,7 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
     const rawSettings = useMemo(() => {
         return chart.getSettings();
     }, [chart]);
-
-    const filteredRawSettings = useMemo(() => {
-        return filterSettingsByLabel(rawSettings, searchTerm);
-    }, [rawSettings, searchTerm]);
-    
-    const settings = useMemo(() => {
-        // is the id just for a key in this component, or should the type passed to the component recognise it?
-        // for now, I don't think there's a benefit to including it in the type.
-        // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
-        const groupedSettings = filteredRawSettings.reduce<{
-            folderSettings: AnyGuiSpec[];
-            topLevelSettings: AnyGuiSpec[];
-        }>(
-            (acc, setting) => {
-                if (setting.type === "folder") {
-                    acc.folderSettings.push(setting);
-                } else {
-                    acc.topLevelSettings.push(setting);
-                }
-                return acc;
-            },
-            { folderSettings: [], topLevelSettings: [] },
-        );
-
-        const wrappedTopLevelSettings: AnyGuiSpec[] = groupedSettings.topLevelSettings.length > 0
-            ? [{
-                type: "folder",
-                label: "General",
-                current_value: groupedSettings.topLevelSettings,
-            }]
-            : [];
-
-        const settings = [...wrappedTopLevelSettings, ...groupedSettings.folderSettings].map((setting) => ({ setting, id: uuid() }));
-        const wrap = { settings };
-        makeAutoObservable(wrap);
-        return wrap.settings;
-    }, [filteredRawSettings]);
+    const settings = useFilteredGroupedSettings(rawSettings, searchTerm);
     
     // Collect and dispose all disposers when the component unmounts
     // Use the same rawSettings that are used for rendering
