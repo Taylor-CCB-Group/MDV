@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useMemo, useId, useCallback, useState, useRef, useEffect } from "react";
+import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -25,6 +25,8 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+
+const SettingsSearchContext = createContext("");
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -555,6 +557,9 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
 );
 
 const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
+    const searchTerm = useContext(SettingsSearchContext);
+    const isSearchActive = searchTerm.trim().length > 0;
+    const [isOpen, setIsOpen] = useState(false);
     // add uuid to each setting to avoid key collisions
     const settings = useMemo(
         () => props.current_value.map((setting) => ({ setting, id: uuid() })),
@@ -566,6 +571,11 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
             type="single"
             collapsible
             className="w-full col-span-2"
+            value={isSearchActive ? props.label : (isOpen ? props.label : "")}
+            onValueChange={(value) => {
+                if (isSearchActive) return;
+                setIsOpen(value === props.label);
+            }}
             //uncomment to expand by default
             // defaultValue={props.label}
         >
@@ -602,6 +612,32 @@ export function collectDisposers(specs: AnyGuiSpec[]): Disposer[] {
     
     specs.forEach(traverse);
     return disposers;
+}
+
+function filterSettingsByLabel(specs: AnyGuiSpec[], searchTerm: string): AnyGuiSpec[] {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return specs;
+
+    return specs.reduce<AnyGuiSpec[]>((acc, spec) => {
+        const labelMatches = spec.label.toLowerCase().includes(query);
+
+        if (spec.type !== "folder") {
+            if (labelMatches) acc.push(spec);
+            return acc;
+        }
+
+        const filteredChildren = filterSettingsByLabel(spec.current_value, query);
+        if (!labelMatches && filteredChildren.length === 0) {
+            return acc;
+        }
+
+        const filteredFolder: GuiSpec<"folder"> = {
+            ...spec,
+            current_value: filteredChildren,
+        };
+        acc.push(filteredFolder);
+        return acc;
+    }, []);
 }
 
 const Components: {
@@ -670,20 +706,48 @@ export const AbstractComponent = observer(
 );
 
 export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
+    const [searchTerm, setSearchTerm] = useState("");
     // Get the raw settings first so we can collect disposers from the same objects
     const rawSettings = useMemo(() => {
         return chart.getSettings();
     }, [chart]);
+
+    const filteredRawSettings = useMemo(() => {
+        return filterSettingsByLabel(rawSettings, searchTerm);
+    }, [rawSettings, searchTerm]);
     
     const settings = useMemo(() => {
         // is the id just for a key in this component, or should the type passed to the component recognise it?
         // for now, I don't think there's a benefit to including it in the type.
         // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
-        const settings = rawSettings.map((setting) => ({ setting, id: uuid() }));
+        const groupedSettings = filteredRawSettings.reduce<{
+            folderSettings: AnyGuiSpec[];
+            topLevelSettings: AnyGuiSpec[];
+        }>(
+            (acc, setting) => {
+                if (setting.type === "folder") {
+                    acc.folderSettings.push(setting);
+                } else {
+                    acc.topLevelSettings.push(setting);
+                }
+                return acc;
+            },
+            { folderSettings: [], topLevelSettings: [] },
+        );
+
+        const wrappedTopLevelSettings: AnyGuiSpec[] = groupedSettings.topLevelSettings.length > 0
+            ? [{
+                type: "folder",
+                label: "General",
+                current_value: groupedSettings.topLevelSettings,
+            }]
+            : [];
+
+        const settings = [...wrappedTopLevelSettings, ...groupedSettings.folderSettings].map((setting) => ({ setting, id: uuid() }));
         const wrap = { settings };
         makeAutoObservable(wrap);
         return wrap.settings;
-    }, [rawSettings]);
+    }, [filteredRawSettings]);
     
     // Collect and dispose all disposers when the component unmounts
     // Use the same rawSettings that are used for rendering
@@ -704,11 +768,26 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
     
     return (
         <ChartProvider chart={chart}>
-            <div className="w-full max-h-[80vh]">
-                {settings.map(({ setting, id }) => (
-                    <AbstractComponent key={id} props={setting} />
-                ))}
-            </div>
+            <SettingsSearchContext.Provider value={searchTerm}>
+                <div className="w-full max-h-[80vh]">
+                    <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search settings by name"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        sx={{ padding: 1, paddingRight: 2 }}
+                    />
+                    {settings.length === 0 && (
+                        <Typography variant="body2" color="text.secondary" sx={{ paddingLeft: 2, paddingBottom: 1 }}>
+                            No settings match your search.
+                        </Typography>
+                    )}
+                    {settings.map(({ setting, id }) => (
+                        <AbstractComponent key={id} props={setting} />
+                    ))}
+                </div>
+            </SettingsSearchContext.Provider>
         </ChartProvider>
     );
 });
