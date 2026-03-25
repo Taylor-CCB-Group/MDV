@@ -144,6 +144,8 @@ function createBaseContourLayerProps(params: {
         colorRange,
         radiusPixels,
         debounce: 1000,
+        // this makes a huge difference with large number of viewstate-linked charts
+        // should have a low in-flight value.
         weightsTextureSize: 256, // Intermediate value for balanced performance and quality
         pickable: false,
     };
@@ -211,7 +213,36 @@ export function useFieldContour(props: FieldContourProps) {
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
-    const data = useFilteredIndices();
+    const denseData = useFilteredIndices();
+    const dataMap = useMemo(() => {
+        const m = new Map<string, Uint32Array>();
+        if (!fields) return m;
+
+        // Experiment: for each field, pre-filter the shared index set down to
+        // indices that would contribute non-zero finite weight.
+        //
+        // This reduces HeatmapLayer's effective instance count because deck.gl
+        // will iterate over `data.length` when generating its weight map.
+        for (const { name, data: fieldData, minMax } of fields) {
+            const [min, max] = minMax;
+            const range = max - min;
+            if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(range) || range === 0) {
+                m.set(name, new Uint32Array());
+                continue;
+            }
+
+            const kept = new Uint32Array(denseData.length);
+            let w = 0;
+            for (let j = 0; j < denseData.length; j++) {
+                const idx = denseData[j];
+                const value = fieldData[idx];
+                if (!Number.isFinite(value) || value === 0) continue;
+                kept[w++] = idx;
+            }
+            m.set(name, kept.subarray(0, w));
+        }
+        return m;
+    }, [denseData, fields]);
     const { zoom } = useViewState();
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
     //won't be necessary when we implement heatmap differently
@@ -258,7 +289,7 @@ export function useFieldContour(props: FieldContourProps) {
             
             const baseProps = createBaseContourLayerProps({
                 id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
-                data, //todo filter sparse data
+                data: dataMap.get(name) ?? denseData, // Experimentally filtered to reduce zero/non-finite weights
                 cx,
                 cy,
                 radiusPixels,
@@ -278,8 +309,11 @@ export function useFieldContour(props: FieldContourProps) {
                     //things to consider: in some circumstances normalise range across all fields
                     const [min, max] = minMax;
                     const range = max - min;
-                    if (range === 0) return 0;
+                    if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(range) || range === 0) return 0;
+
                     const value = fieldData[i];
+                    // Defensive guard: filtering should already remove these, but keep it robust.
+                    if (!Number.isFinite(value) || value === 0) return 0;
                     if (value < min) return 0;
                     if (value > max) return 1;
                     const normalizedValue = (value - min) / range;
@@ -309,7 +343,8 @@ export function useFieldContour(props: FieldContourProps) {
         });
     }, [
         id,
-        data,
+        dataMap,
+        denseData,
         intensity,
         cx,
         cy,
