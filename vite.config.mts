@@ -1,7 +1,6 @@
 import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react from '@vitejs/plugin-react';
-import babel from '@rolldown/plugin-babel';
 import glsl from 'vite-plugin-glsl';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -160,41 +159,6 @@ export default defineConfig(async (): Promise<UserConfig> => {
     }
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
-    // @vitejs/plugin-react v6 ignores nested babel.plugins; use Rolldown Babel for decorators + TS class features.
-    // Rolldown's Babel plugin types omit Babel `overrides` `test`/`exclude` (valid at runtime).
-    const babelDecorators = await babel({
-        include: /\.(?:[jt]sx?|[cm][jt]s)(?:$|\?)/,
-        overrides: [
-            {
-                test: /\.tsx(?:$|\?)/,
-                plugins: [
-                    ['@babel/plugin-transform-typescript', { allowDeclareFields: true, isTSX: true }],
-                    '@babel/plugin-transform-class-static-block',
-                    ['@babel/plugin-proposal-decorators', { version: '2023-05' }],
-                    ['@babel/plugin-transform-class-properties', { loose: true }],
-                ],
-            },
-            {
-                test: /\.(?:ts|mts|cts)(?:$|\?)/,
-                exclude: /\.tsx(?:$|\?)/,
-                plugins: [
-                    ['@babel/plugin-transform-typescript', { allowDeclareFields: true, isTSX: false }],
-                    '@babel/plugin-transform-class-static-block',
-                    ['@babel/plugin-proposal-decorators', { version: '2023-05' }],
-                    ['@babel/plugin-transform-class-properties', { loose: true }],
-                ],
-            },
-            {
-                test: /\.jsx?(?:$|\?)/,
-                plugins: [
-                    '@babel/plugin-transform-class-static-block',
-                    ['@babel/plugin-proposal-decorators', { version: '2023-05' }],
-                    ['@babel/plugin-transform-class-properties', { loose: true }],
-                ],
-            },
-        ],
-    } as any);
-
     return {
     base: process.env.asset_base || "./",
     server: {
@@ -219,9 +183,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
     },
     plugins: [
         glsl(),
-        babelDecorators,
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
+            babel: {
+                plugins: [
+                    [
+                        "@babel/plugin-proposal-decorators",
+                        {
+                            version: "2023-05"
+                        }
+                    ]
+                ]
+            }
         })
     ],
     worker: {
