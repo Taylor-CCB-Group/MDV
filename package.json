@@ -136,7 +136,7 @@
     "@babel/preset-typescript": "^7.28.5",
     "@biomejs/biome": "1.9.4",
     "@playwright/test": "^1.57.0",
-    "@rolldown/plugin-babel": "^0.2.2",
+    "@rollup/plugin-babel": "^6.1.0",
     "@tanstack/react-query-devtools": "^5.80.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.1",
@@ -154,7 +154,7 @@
     "@types/react-dom": "^18.2.14",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@typescript/native-preview": "^7.0.0-dev.20260324.1",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react": "^5.0.2",
     "@welldone-software/why-did-you-render": "^8.0.3",
     "autoprefixer": "^10.4.19",
     "cross-env": "^7.0.3",
@@ -167,17 +167,8 @@
     "typedoc-plugin-missing-exports": "^4.0.0",
     "typedoc-plugin-rename-defaults": "^0.7.3",
     "typescript": "^6.0.2",
-    "vite": "^8.0.2",
+    "vite": "7.3.1",
     "vite-plugin-glsl": "^1.5.6",
     "vitest": "4.0.18"
-  },
-  "overrides": {
-    "vite": "$vite"
-  },
-  "optionalDependencies": {
-    "@esbuild/linux-x64": "^0.20.1",
-    "@rollup/rollup-linux-x64-gnu": "^4.12.1",
-    "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.11",
-    "lightningcss-linux-x64-gnu": "1.32.0"
   }
 }

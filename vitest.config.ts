@@ -1,7 +1,7 @@
 /**
  * Vitest is pinned to 4.0.18 in package.json: 4.1+ can load app `.ts` through paths that use
  * Node `stripTypeScriptTypes`, which breaks MobX decorators / `accessor` / parameter properties
- * (e.g. link_utils). See vitest#9873 / #9876. Vitest 4.0.18 lists Vite 6–7; root `package.json` overrides align `vite` with Vite 8.
+ * (e.g. link_utils).
  *
  * Merge `vite.config.mts` so test transforms match production (Babel decorators, glsl, aliases).
  */
