@@ -25,10 +25,6 @@ declare global {
             chartManager: ChartManager;
             chartTypes?: any;
             debugChart?: any;
-            validationErrors?: {
-                datasources: any[];
-                charts: any[];
-            };
         };
     }
 }
@@ -38,10 +34,6 @@ window.mdv = {
     // not sure what I'd use the class for - would generally import in a module
     ChartManager,
     chartTypes: BaseChart.types,
-    validationErrors: {
-        datasources: [],
-        charts: [],
-    },
 };
 
 document.addEventListener("DOMContentLoaded", async () => {

@@ -56,7 +56,7 @@ import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action } from "mobx";
+import { makeObservable, observable, action, makeAutoObservable } from "mobx";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -65,6 +65,7 @@ import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
+import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 
 
 //order of column data in an array buffer
@@ -121,6 +122,7 @@ function listenPreferredColorScheme(callback) {
 * 
 */
 export class ChartManager {
+    validationFindings = new ValidationFindingsStore();
     /**
      * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
      * @param {import("@/charts/charts").DataSource[]} dataSources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
@@ -189,6 +191,9 @@ export class ChartManager {
         /** @type {{[k: string]: DataSource | undefined}} */
         this.dsIndex = {};
         this.columnsLoading = {};
+        // Aggregated validation/schema findings for UI + reporting.
+        // Created before React mounts the menu bar so observers track it from first render.
+        this.validationFindings = new ValidationFindingsStore();
         for (const d of dataSources) {
             const ds = {
                 name: d.name,
