@@ -87,23 +87,28 @@ class DataModel {
 
     /**
      * @param {string} name
-     * @param {string} cloneCol
+     * @param {string} [cloneCol] optional
      */
     createColumn(name, cloneCol) {
         const col = {
             name: name,
             field: name,
             datatype: "text",
+            editable: true,
             values: [""],
         };
-        const buff = new SharedArrayBuffer(this.dataStore.size);
+        let data = new Array(this.dataStore.size).fill("");
         if (cloneCol) {
-            const arr = this.dataStore.getRawColumn(cloneCol);
-            const newArr = new Uint8Array(buff);
-            newArr.set(arr);
-            col.values = this.dataStore.getColumnValues(cloneCol).slice(0);
+            const sourceColumn = this.dataStore.columnIndex[cloneCol];
+            if (!sourceColumn) {
+                throw new Error(`Column ${cloneCol} not found`);
+            }
+            data = Array.from({ length: this.dataStore.size }, (_, index) => {
+                const value = sourceColumn.getValue(index);
+                return value == null ? "" : String(value);
+            });
         }
-        this.dataStore.addColumn(col, buff, true);
+        this.dataStore.addColumn(col, data, true);
     }
 
     removeColumn(col) {

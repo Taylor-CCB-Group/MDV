@@ -7,6 +7,13 @@ import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 const editorClassName = "TextEditorWithMaxLength";
+const createColumnMock = vi.fn();
+
+vi.mock("@/table/DataModel", () => ({
+    DataModel: vi.fn().mockImplementation(() => ({
+        createColumn: createColumnMock,
+    })),
+}));
 
 // Mock all the context hooks
 vi.mock("@/react/context", () => ({
@@ -77,13 +84,19 @@ describe("useSlickGridReact", () => {
             column_widths: {},
             order: {},
             sort: undefined as { columnId: string; ascending: boolean } | undefined,
+            param: ["age", "name", "id"],
         }) as any;
 
         mockDataStore = {
             dataHighlighted: vi.fn(),
+            dataChanged: vi.fn(),
+            columnIndex: {},
         };
 
-        mockChart = {};
+        mockChart = {
+            setAddColumnDialogOpener: vi.fn(),
+            setGridRef: vi.fn(),
+        };
     });
 
     describe("initialization", () => {
@@ -275,5 +288,60 @@ describe("useSlickGridReact", () => {
             expect(updatedAgeColumn?.width).toBe(250);
         });
     });
-});
 
+    describe("add column", () => {
+        test("should expose cloneable text columns", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            expect(result.current.cloneableColumns).toEqual([
+                { field: "age", name: "Age" },
+                { field: "id", name: "Id" },
+                { field: "name", name: "Name" },
+            ]);
+        });
+
+        test("should create a new editable column and insert it at the requested position", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    cloneColumn: "name",
+                    position: 2,
+                });
+            });
+
+            expect(createColumnMock).toHaveBeenCalledWith("annotation", "name");
+            expect(mockConfig.param).toEqual(["age", "annotation", "name", "id"]);
+            expect(mockConfig.order).toEqual({
+                age: 0,
+                annotation: 1,
+                name: 2,
+                id: 3,
+            });
+            expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["annotation"]);
+        });
+
+        test("should reject duplicate column names", () => {
+            mockDataStore.columnIndex = { age: { field: "age" } };
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "age",
+                    cloneColumn: null,
+                    position: 1,
+                });
+            });
+
+            expect(createColumnMock).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Add Column Error",
+                    message: "Column age already exists",
+                }),
+            );
+        });
+    });
+});

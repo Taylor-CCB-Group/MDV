@@ -47,9 +47,11 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
     return config;
 }
 
-class TableChartReact extends BaseReactChart<TableChartReactConfig> {
-    gridRef?: { current: SlickgridReactInstance | null };
+export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
+    private gridRef?: { current: SlickgridReactInstance | null };
+    private addColumnDialogOpener?: () => void;
     private downloadIconSpan: HTMLSpanElement | null = null;
+    private addColumnIconSpan: HTMLSpanElement | null = null;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
         // Adapt config before calling super constructor, which will make the config observable
@@ -63,6 +65,28 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                 this.downloadData();
             },
         }) as HTMLSpanElement;
+
+        const isEditMode = window.mdv?.chartManager?.config?.permission === "edit";
+
+        if (isEditMode) {
+            this.addColumnIconSpan = this.addMenuIcon("fas fa-plus", "Add Column", {
+                func: () => {
+                    this.openAddColumnDialog();
+                },
+            }) as HTMLSpanElement;
+        }
+    }
+
+    setGridRef(gridRef: { current: SlickgridReactInstance | null }) {
+        this.gridRef = gridRef;
+    }
+
+    setAddColumnDialogOpener(opener?: () => void) {
+        this.addColumnDialogOpener = opener;
+    }
+
+    openAddColumnDialog() {
+        this.addColumnDialogOpener?.();
     }
 
     private setDownloadIcon(downloading: boolean) {

@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SlickgridReact } from "slickgrid-react";
 import FindAndReplaceDialog from "./FindAndReplaceDialog";
 import useFindReplace from "../hooks/useFindReplace";
@@ -7,6 +7,7 @@ import useSlickGridReact from "../hooks/useSlickGridReact";
 import useEditCell from "../hooks/useEditCell";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./FeedbackAlertComponent";
+import AddTableColumnDialog from "./AddTableColumnDialog";
 
 /**
  * Main component for the react table chart
@@ -21,14 +22,6 @@ import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./Feed
 // todo: add integration tests using playwright to test the working of this component
 const TableChartReactComponent = observer(() => {
     const [alertDialogOpen, setAlertDialogOpen] = useState(false);
-    const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
-
-    const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
-        setFeedbackAlert(alert);
-        if (alert) {
-            setAlertDialogOpen(true);
-        }
-    }, []);
 
     const {
         chartId,
@@ -47,7 +40,22 @@ const TableChartReactComponent = observer(() => {
         handleGridCreated,
         isColumnEditable,
         onDialogClose,
+        feedbackAlert,
+        setFeedbackAlert,
+        isAddColumnDialogOpen,
+        cloneableColumns,
+        addColumnDefaultPosition,
+        closeAddColumnDialog,
+        handleAddColumn,
     } = useSlickGridReact();
+
+    const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
+        setFeedbackAlert(alert);
+    }, [setFeedbackAlert]);
+
+    useEffect(() => {
+        setAlertDialogOpen(Boolean(feedbackAlert));
+    }, [feedbackAlert]);
 
     const {
         matchCount,
@@ -86,7 +94,7 @@ const TableChartReactComponent = observer(() => {
     const onFeedbackDialogClose = useCallback(() => {
         setAlertDialogOpen(false);
         setFeedbackAlert(null);
-    }, []);
+    }, [setFeedbackAlert]);
 
     return (
         <div
@@ -120,6 +128,14 @@ const TableChartReactComponent = observer(() => {
                     isColumnEditable={isColumnEditable}
                 />
             </div>
+
+            <AddTableColumnDialog
+                open={isAddColumnDialogOpen}
+                cloneableColumns={cloneableColumns}
+                defaultPosition={addColumnDefaultPosition}
+                onClose={closeAddColumnDialog}
+                onSubmit={handleAddColumn}
+            />
 
             {feedbackAlert && (
                 <div data-testid="feedback-alert-dialog">

@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
+import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
 import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
 import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
-import { action } from "mobx";
+import { action, runInAction } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
 import { InputEditor } from "slickgrid-react";
+import { DataModel } from "@/table/DataModel";
+import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -56,7 +58,7 @@ const useSlickGridReact = () => {
     const config = useConfig<TableChartReactConfig>();
     const dataStore = useDataStore();
     const chartId = useChartID();
-    const chart = useChart<TableChartReactConfig>();
+    const chart = useChart<TableChartReactConfig, TableChartReact>();
     const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
     const sortedFilteredIndices = useSortedFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
@@ -65,6 +67,8 @@ const useSlickGridReact = () => {
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [searchColumn, setSearchColumn] = useState<string | null>(null);
+    const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
+    const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -78,6 +82,13 @@ const useSlickGridReact = () => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
     }, [sortedFilteredIndices, orderedParamColumns]);
+
+    useEffect(() => {
+        chart.setAddColumnDialogOpener(() => setIsAddColumnDialogOpen(true));
+        return () => {
+            chart.setAddColumnDialogOpener(undefined);
+        };
+    }, [chart]);
 
     // Extract initial widths from config once (non-observable)
     // This avoids rules-of-hooks issues and prevents columnDefs from reacting to config.column_widths changes
@@ -188,7 +199,7 @@ const useSlickGridReact = () => {
             gridRef.current = e.detail;
             
             // Store gridRef in chart instance for getConfig() access
-            (chart as any).gridRef = gridRef;
+            chart.setGridRef(gridRef);
 
             const grid = e.detail.slickGrid;
             if (grid && dataProvider) {
@@ -482,6 +493,90 @@ const useSlickGridReact = () => {
         setSearchColumn(null);
     }, []);
 
+    const closeAddColumnDialog = useCallback(() => {
+        setIsAddColumnDialogOpen(false);
+    }, []);
+
+    const cloneableColumns = useMemo(() => {
+        return orderedParamColumns
+            .map((column) => ({ field: column.field, name: column.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [orderedParamColumns]);
+
+    const addColumnDefaultPosition = useMemo(() => {
+        return config.include_index ? 2 : Math.min(2, orderedParamColumns.length + 1);
+    }, [config.include_index, orderedParamColumns.length]);
+
+    const handleAddColumn = useCallback((args: {
+        name: string;
+        cloneColumn: string | null;
+        position: number | null;
+    }) => {
+        const trimmedName = args.name.trim();
+
+        if (!trimmedName) {
+            setFeedbackAlert({
+                type: "warning",
+                title: "Add Column Warning",
+                message: "Column name is required.",
+            });
+            return;
+        }
+
+        if (dataStore.columnIndex[trimmedName]) {
+            setFeedbackAlert({
+                type: "error",
+                title: "Add Column Error",
+                message: `Column ${trimmedName} already exists`,
+            });
+            return;
+        }
+
+        try {
+            const dataModel = new DataModel(dataStore, { autoupdate: false });
+            dataModel.createColumn(trimmedName, args.cloneColumn ?? undefined);
+
+            const orderedFields = orderedParamColumnsRef.current.map((column) => column.field);
+            const displayedFields = config.include_index
+                ? ["__index__", ...orderedFields]
+                : [...orderedFields];
+            const parsedPosition = args.position ?? displayedFields.length + 1;
+            const insertionIndex = Math.min(
+                Math.max(parsedPosition - 1, 0),
+                displayedFields.length,
+            );
+
+            displayedFields.splice(insertionIndex, 0, trimmedName);
+            const nextFields = displayedFields.filter((field) => field !== "__index__");
+            const nextOrder = Object.fromEntries(
+                nextFields.map((field, index) => [field, index]),
+            );
+
+            runInAction(() => {
+                config.param = nextFields;
+                config.order = nextOrder;
+            });
+
+            dataStore.dataChanged([trimmedName]);
+            gridRef.current?.slickGrid?.invalidate();
+            setIsAddColumnDialogOpen(false);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to add editable column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Add Column Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    columnName: trimmedName,
+                    cloneColumn: args.cloneColumn,
+                    position: args.position,
+                },
+            });
+        }
+    }, [config, dataStore]);
+
     return {
         config,
         dataStore,
@@ -501,6 +596,13 @@ const useSlickGridReact = () => {
         handleGridCreated,
         isColumnEditable,
         onDialogClose,
+        feedbackAlert,
+        setFeedbackAlert,
+        isAddColumnDialogOpen,
+        cloneableColumns,
+        addColumnDefaultPosition,
+        closeAddColumnDialog,
+        handleAddColumn,
     };
 };
 
