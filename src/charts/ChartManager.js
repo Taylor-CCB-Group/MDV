@@ -63,6 +63,7 @@ import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWr
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
+import DGEDialogReact from "./dialogs/DGEDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 
@@ -1613,6 +1614,17 @@ export class ChartManager {
             new BaseDialog.experiment["AnnotationDialogReact"](ds.dataStore);
         });
 
+        if (dataStore.links) {
+            const hasRac = Object.values(dataStore.links).some(
+                (linkSet) => linkSet.rows_as_columns,
+            );
+            if (hasRac) {
+                this.addMenuIcon(ds.name, "fas fa-dna", "Run DGE Analysis", () => {
+                    new DGEDialogReact(dataStore);
+                });
+            }
+        }
+
         const idiv = createEl(
             "div",
             {
@@ -1952,7 +1964,7 @@ export class ChartManager {
             }
 
             for (const c of colInfo) {
-                ds.setColumnData(c.col, c.data);
+                ds.setColumnData(c.col, c.data, { recomputeStats: false });
             }
             func();
         });

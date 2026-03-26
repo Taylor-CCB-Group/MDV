@@ -518,7 +518,8 @@ class DataStore {
         this.columns.push(c);
         this.columnIndex[c.field] = c;
         if (data) {
-            this.setColumnData(column.field, data);
+            // Preserve pre-specified stats (e.g. minMax) when provided via metadata.
+            this.setColumnData(column.field, data, { recomputeStats: false });
         }
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
@@ -1196,13 +1197,16 @@ class DataStore {
      * format see [columns](../../docs/extradocs/datasource.md)
      * @param {string}  column - The field/id of the column.
      * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer
+     * @param {{recomputeStats?: boolean}?} opts - options for updating derived stats
      */
-    setColumnData(column, data) {
+    setColumnData(column, data, opts = null) {
         // if (Math.random() < 0.1) throw new Error("This is a test error");
         const c = this.columnIndex[column];
         if (!c) {
             throw `column ${column} is not present in data store`;
         }
+        const recomputeStats =
+            opts == null || opts.recomputeStats == null ? true : !!opts.recomputeStats;
         let buffer = null;
         if (Array.isArray(data)) {
             buffer = this._convertColumn(c, data);
@@ -1219,6 +1223,10 @@ class DataStore {
                 c.datatype === "int32"
                     ? new Int32Array(buffer)
                     : new Float32Array(buffer));
+            if (recomputeStats) {
+                c.minMax = null;
+                c.quantiles = null;
+            }
             if (!c.minMax) {
                 console.log(`Calculating min/max for ${c.name}`);
                 const computed = this._computeMinMaxFromData(c);

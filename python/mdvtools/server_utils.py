@@ -26,7 +26,8 @@ def add_safe_headers(resp):
     resp.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     # headers required if serving endpoints for another server e,g dev server
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    # Allow custom debug/request correlation headers used by the frontend.
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-MDV-Req-Id"
     #required for vite dev
     resp.headers["Cross-Origin-Resource-Policy"] ="cross-origin"
     return resp

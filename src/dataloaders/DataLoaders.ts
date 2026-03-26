@@ -17,6 +17,11 @@ import type { TypedArrayConstructor } from "@luma.gl/core";
 
 type Columns = DataColumn<DataType>[];
 
+let _mdvGetDataInFlight = 0;
+let _mdvGetDataSerialize: Promise<void> = Promise.resolve();
+
+// (debug-only helpers removed)
+
 /**
  * @memberof module:DataLoaders
  * @param data - an array buffer containing raw concatenated
@@ -126,18 +131,46 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
         dataSource: DataSourceName,
         size: number,
     ) => {
-        //get the data
-        const response = await fetch(url, {
-            method: "POST",
-            body: JSON.stringify({ columns: columns, data_source: dataSource }),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        });
-        //the data is any arraybuffer containing each individual
-        //column's raw data
-        let data: ArrayBufferLike = await response.arrayBuffer();
+        _mdvGetDataInFlight += 1;
+        const shouldSerialize = size >= 500_000;
+
+        let releaseSerialize: (() => void) | null = null;
+        if (shouldSerialize) {
+            const prev = _mdvGetDataSerialize;
+            _mdvGetDataSerialize = new Promise<void>((resolve) => {
+                releaseSerialize = resolve;
+            });
+            await prev;
+        }
+        const fetchUrl = url;
+
+        let response: Response;
+        try {
+            response = await fetch(fetchUrl, {
+                method: "POST",
+                body: JSON.stringify({ columns: columns, data_source: dataSource }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+        } catch (e: any) {
+            _mdvGetDataInFlight -= 1;
+            if (releaseSerialize) releaseSerialize();
+            throw e;
+        }
+
+        let data: ArrayBufferLike;
+        try {
+            data = await response.arrayBuffer();
+        } catch (e: any) {
+            _mdvGetDataInFlight -= 1;
+            if (releaseSerialize) releaseSerialize();
+            throw e;
+        }
+
         data = decompress ? await decompressData(new Uint8Array(data)) : data;
+        _mdvGetDataInFlight -= 1;
+        if (releaseSerialize) releaseSerialize();
         return processArrayBuffer(data, columns, size);
     };
 }
