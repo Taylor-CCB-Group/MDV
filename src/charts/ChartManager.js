@@ -1933,7 +1933,7 @@ export class ChartManager {
             }
 
             for (const c of colInfo) {
-                ds.setColumnData(c.col, c.data);
+                ds.setColumnData(c.col, c.data, { recomputeStats: false });
             }
             func();
         });
