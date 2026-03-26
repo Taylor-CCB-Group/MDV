@@ -20,6 +20,7 @@ import type { DGEIntegrationResult } from "../../datastore/dgeIntegration";
 import { getRandomString } from "../../utilities/Utilities";
 import { useChartManager } from "@/react/hooks";
 import type { DGEChartManager } from "../../datastore/dgeIntegration";
+import { DEFAULT_DGE_BATCH_SIZE } from "../../lib/constants";
 
 interface DGEDialogContentProps {
 	dataStore: DataStore;
@@ -113,6 +114,64 @@ function DGEDialogContent({ dataStore, onClose }: DGEDialogContentProps) {
 	}, []);
 
 	const handleRun = useCallback(async () => {
+		const w: any = window as any;
+		const getBrowserMemoryBudgetBytes = () => {
+			const jsHeapLimit = w?.performance?.memory?.jsHeapSizeLimit;
+			const deviceMemGB = w?.navigator?.deviceMemory;
+			const candidates: number[] = [];
+			if (typeof jsHeapLimit === "number" && Number.isFinite(jsHeapLimit) && jsHeapLimit > 0) {
+				candidates.push(jsHeapLimit * 0.6);
+			}
+			if (typeof deviceMemGB === "number" && Number.isFinite(deviceMemGB) && deviceMemGB > 0) {
+				candidates.push(deviceMemGB * 1024 * 1024 * 1024 * 0.25);
+			}
+			if (!candidates.length) return null;
+			return Math.min(...candidates);
+		};
+
+		const cellsCount = dataStore.size ?? 0;
+		const genesCount = selectedGenesDsName
+			? chartManager?.dsIndex?.[selectedGenesDsName]?.dataStore?.size ?? null
+			: null;
+		const budgetBytes = getBrowserMemoryBudgetBytes();
+		// Better estimate: DGE loads gene expression columns in batches.
+		// Each gene expression column is a Float32Array over all cells (~4 bytes per cell).
+		const batchSize = DEFAULT_DGE_BATCH_SIZE;
+		const bytesPerGeneColumn = cellsCount * 4;
+		const bytesPerBatch = bytesPerGeneColumn * batchSize;
+		const probeColumns = 50; // from runDGEOnDataStore MAX_PROBE
+		const bytesForProbe = bytesPerGeneColumn * Math.min(probeColumns, genesCount ?? probeColumns);
+		// Shared buffers always present:
+		const bytesForFilter = cellsCount; // Uint8 filterBuffer
+		const bytesForGroup = cellsCount; // Uint8 groupSAB
+		// DGE result columns written to genes DS (6 Float32 arrays sized by gene count).
+		const bytesForResults = (genesCount ?? 0) * 4 * 6;
+		// Peak-ish estimate: one batch of gene columns + existing buffers + results + some overhead factor.
+		const estimatedMinBytes = bytesPerBatch + bytesForProbe + bytesForFilter + bytesForGroup + bytesForResults;
+		const headroomFactor = 2.0;
+		const budgetUnknown = budgetBytes == null;
+		const shouldWarn =
+			// If we have a budget, compare estimate to it.
+			(!budgetUnknown && estimatedMinBytes * headroomFactor > (budgetBytes as number)) ||
+			// If we *don't* have a budget signal, only warn for clearly-large runs.
+			(budgetUnknown && (cellsCount >= 500_000 || (genesCount ?? 0) >= 50_000));
+
+		if (shouldWarn) {
+			const estimatedMB = estimatedMinBytes / (1024 * 1024);
+			const budgetMB = budgetBytes == null ? null : budgetBytes / (1024 * 1024);
+			const msg =
+				`This DGE run will process ${cellsCount.toLocaleString()} cells` +
+				(genesCount ? ` and ${genesCount.toLocaleString()} genes` : "") +
+				". This is likely to consume a lot of browser memory and may crash (OOM / Array buffer allocation failed)." +
+				`\n\nEstimate (very rough): ~${estimatedMB.toFixed(0)} MB minimum` +
+				(budgetMB == null ? "" : `; budget ~${budgetMB.toFixed(0)} MB`) +
+				".\n\nContinue?";
+
+			if (!window.confirm(msg)) {
+				return;
+			}
+		}
+
 		runAbortRef.current?.abort();
 		const abortController = new AbortController();
 		runAbortRef.current = abortController;

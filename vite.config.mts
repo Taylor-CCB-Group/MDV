@@ -101,7 +101,8 @@ function getRollupOptions(): RollupOptions {
 }
 
 // avoiding some repition by defining a proxyOptions object used for all proxied routes.
-const proxyOptions = { target: flaskURL, changeOrigin: true };
+// NOTE: Large chunked responses can be sensitive to proxy timeouts.
+const proxyOptions = { target: flaskURL, changeOrigin: true, timeout: 0, proxyTimeout: 0 };
 // ... and then this is a bit more concise than 
 const proxy = [
     '^/(get_|images|tracks|save|chat).*', // these routes are proxied to flask server in 'single project' mode
@@ -172,9 +173,9 @@ export default defineConfig(env => {
         strictPort: true,
         proxy,
     },
-    publicDir: process.env.exclude_dir?false:'examples', //used for netlify.toml??... the rest is noise.
+    publicDir: process.env.exclude_dir ? false : "examples", //used for netlify.toml??... the rest is noise.
     build: {
-        sourcemap: process.env.nomap?false:true,
+        sourcemap: !process.env.nomap,
         rollupOptions: { 
             ...getRollupOptions(),
             external: ['./python/**'],
