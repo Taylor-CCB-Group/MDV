@@ -6,33 +6,24 @@ import {
     Add as AddIcon,
     Remove as RemoveIcon,
     CloudUpload as CloudUploadIcon,
-    PestControl as PestControlIcon,
 } from "@mui/icons-material";
 import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
 import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
 import FileUploadDialogReact from "@/charts/dialogs/FileUploadDialogWrapper";
-import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
-import BaseChart from "@/charts/BaseChart";
 import { useProject } from "@/modules/ProjectContext";
-import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
-import { useState } from "react";
-import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
-import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import ChatButtons from "./ChatButtons";
-import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import CustomTooltip from "./CustomTooltip";
 import { LockIcon, LockOpenIcon } from "lucide-react";
+import { observer } from "mobx-react-lite";
+import { useChartManager } from "../hooks";
+import DebugButton from "./DebugButton";
 
-const MenuBarComponent = () => {
-    const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
-    const [open, setOpen] = useState(false);
-    const cm = window.mdv.chartManager;
-    const { viewManager, config, containerDiv } = cm;
-    const { root, mainApiRoute } = useProject();
-    const { buildInfo } = useBuildInfo();
+const MenuBarComponent = observer(() => {
+    const { viewManager, config } = useChartManager();
+    const { mainApiRoute } = useProject();
 
     const isEditable = config.permission === "edit";
     const ariaLabel = isEditable ? "editable" : "view only";
@@ -64,45 +55,6 @@ const MenuBarComponent = () => {
 
     const handleAddDataSourceClick = () => {
         new FileUploadDialogReact();
-    };
-
-    const handleDebugButtonClick = async () => {
-        setError(null);
-        setOpen(false);
-        try {
-            const datasources = await fetchJsonConfig(
-                `${root}/datasources.json`,
-                root,
-            );
-            const views = await fetchJsonConfig(`${root}/views.json`, root);
-            const state = await fetchJsonConfig(`${root}/state.json`, root);
-            const chartTypes = Object.entries(BaseChart.types).map(([k, v]) => {
-                const { class: omit, ...props } = v;
-                return [k, props];
-            });
-            const ve = window.mdv?.validationErrors;
-            const hasValidationErrors =
-                ve && ((ve.datasources?.length ?? 0) > 0 || (ve.charts?.length ?? 0) > 0);
-            new DebugChartReactWrapper({
-                chartTypes,
-                datasources,
-                views,
-                state,
-                buildInfo,
-                ...(hasValidationErrors && { validationErrors: ve }),
-            });
-        } catch (error) {
-            setError(error instanceof Error ? {
-                message: error.message,
-                stack: error?.stack,
-            } : {
-                message: "Error occurred while fetching JSON",
-                stack: `${error}`
-            });
-            setOpen(true);
-            console.error("Error occurred while fetching JSON: ", error);
-        }
-
     };
 
     return (
@@ -168,23 +120,13 @@ const MenuBarComponent = () => {
                         </CustomTooltip>
                         <ChatButtons />
                         <ToggleThemeWrapper />
-                        <IconWithTooltip tooltipText="Debug / Report issue" onClick={handleDebugButtonClick}>
-                            <PestControlIcon sx={{height: "1.5rem", width: "1.5rem"}} />
-                        </IconWithTooltip>
+                        <DebugButton />
                     </Box>
                 </Toolbar>
             </AppBar>
-            {error && (
-                <ReusableAlertDialog
-                    open={open}
-                    handleClose={() => setOpen(false)}
-                    component={<DebugErrorComponent error={error} />}
-                    isAlertErrorComponent
-                />
-            )}
         </>
     );
-};
+});
 
 const MenuBarWrapper = () => {
     return <MenuBarComponent />;
