@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useMemo, useId, useCallback, useState, useRef, useEffect } from "react";
+import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Box, Button, Chip, Divider, FormControl, FormControlLabel, Paper, type PaperProps, Radio, RadioGroup, Slider, Typography } from "@mui/material";
+import { Box, Button, Chip, Divider, FormControl, FormControlLabel, IconButton, InputAdornment, Paper, type PaperProps, Radio, RadioGroup, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -25,6 +25,10 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+import { Clear } from "@mui/icons-material";
+import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
+
+const SettingsSearchContext = createContext("");
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -555,6 +559,10 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
 );
 
 const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
+    const searchTerm = useContext(SettingsSearchContext);
+    const isSearchActive = searchTerm.trim().length > 0;
+    // When the dialog first opens (and search is empty), expand "General" so the user sees settings immediately.
+    const [isOpen, setIsOpen] = useState(() => props.label === "General");
     // add uuid to each setting to avoid key collisions
     const settings = useMemo(
         () => props.current_value.map((setting) => ({ setting, id: uuid() })),
@@ -562,22 +570,45 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     );
     if (settings.length === 0) return null;
     return (
-        <Accordion
-            type="single"
-            collapsible
+        <Paper
+            variant="outlined"
             className="w-full col-span-2"
-            //uncomment to expand by default
-            // defaultValue={props.label}
+            sx={{
+                backgroundColor: (theme) =>
+                    theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.03)"
+                        : "rgba(0,0,0,0.02)",
+                borderColor: (theme) => theme.palette.divider,
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderRadius: 1,
+                overflow: "hidden",
+                paddingX: 2,
+                paddingBottom: 0,
+            }}
         >
-            <AccordionItem value={props.label}>
-                <AccordionTrigger>{props.label}</AccordionTrigger>
-                <AccordionContent>
-                    {settings.map(({ setting, id }) => (
-                        <AbstractComponent key={id} props={setting} />
-                    ))}
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+            <Accordion
+                type="single"
+                collapsible
+                className="w-full"
+                value={isSearchActive ? props.label : (isOpen ? props.label : "")}
+                onValueChange={(value) => {
+                    if (isSearchActive) return;
+                    setIsOpen(value === props.label);
+                }}
+                //uncomment to expand by default
+                // defaultValue={props.label}
+            >
+                <AccordionItem value={props.label} className="border-b-0">
+                    <AccordionTrigger>{props.label}</AccordionTrigger>
+                    <AccordionContent>
+                        {settings.map(({ setting, id }) => (
+                            <AbstractComponent key={id} props={setting} />
+                        ))}
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        </Paper>
     );
 };
 
@@ -670,20 +701,12 @@ export const AbstractComponent = observer(
 );
 
 export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
+    const [searchTerm, setSearchTerm] = useState("");
     // Get the raw settings first so we can collect disposers from the same objects
     const rawSettings = useMemo(() => {
         return chart.getSettings();
     }, [chart]);
-    
-    const settings = useMemo(() => {
-        // is the id just for a key in this component, or should the type passed to the component recognise it?
-        // for now, I don't think there's a benefit to including it in the type.
-        // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
-        const settings = rawSettings.map((setting) => ({ setting, id: uuid() }));
-        const wrap = { settings };
-        makeAutoObservable(wrap);
-        return wrap.settings;
-    }, [rawSettings]);
+    const settings = useFilteredGroupedSettings(rawSettings, searchTerm);
     
     // Collect and dispose all disposers when the component unmounts
     // Use the same rawSettings that are used for rendering
@@ -704,11 +727,41 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
     
     return (
         <ChartProvider chart={chart}>
-            <div className="w-full max-h-[80vh]">
-                {settings.map(({ setting, id }) => (
-                    <AbstractComponent key={id} props={setting} />
-                ))}
-            </div>
+            <SettingsSearchContext.Provider value={searchTerm}>
+                <div className="w-full max-h-[80vh]">
+                    <Box sx={{ p: 1 }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            variant="outlined"
+                            placeholder="Search settings by name"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            sx={{ backgroundColor: "transparent" }}
+                            slotProps={{
+                                input: {
+                                    endAdornment: searchTerm.trim().length > 0 ? (
+                                        <InputAdornment position="end">
+                                            <IconButton onClick={() => setSearchTerm("")}>
+                                                <Clear />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ) : null,
+                                },
+                            }}
+                        />
+                    </Box>
+                    {settings.length === 0 && (
+                        <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
+                            No settings match your search.
+                        </Typography>
+                    )}
+                    <Divider sx={{ marginY: 0.75, opacity: 0.6 }} />
+                    {settings.map(({ setting, id }) => (
+                        <AbstractComponent key={id} props={setting} />
+                    ))}
+                </div>
+            </SettingsSearchContext.Provider>
         </ChartProvider>
     );
 });
