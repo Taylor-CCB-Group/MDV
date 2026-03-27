@@ -2,14 +2,14 @@ import type React from "react";
 import { useEffect } from "react";
 import { Box, Button, Paper, Typography } from "@mui/material";
 import mdvLogo from "./assets/mdv_logo.png";
+import { buildDashboardUrl } from "@/utils/mdvRouting";
 
 const Login: React.FC = () => {
     useEffect(() => {
         // Check if this is a callback from Auth0
         const params = new URLSearchParams(window.location.search);
         if (params.get('callback')) {
-            const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
-            window.location.href = `${base}/catalog_dev`;
+            window.location.href = buildDashboardUrl();
         }
     }, []);
 

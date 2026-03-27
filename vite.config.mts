@@ -17,7 +17,7 @@ const configDir = path.dirname(fileURLToPath(import.meta.url));
 
 
 const flaskURL = "http://127.0.0.1:5055";
-const port = 5170;
+const port = Number(process.env.PORT || process.env.VITE_PORT || 5170);
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 // maybe also the various build configurations at some point.
@@ -73,8 +73,7 @@ function getRollupOptions() {
         }
     } if (build === 'dev_pt') {
         // version of vite build used for netlify deploy preview & devserver, using default 'index.html' entrypoint
-        // (which as of writing refers to same static_index.ts as desktop_pt)
-        // nb, localhost:5170/catalog_dev.html works on devserver without needing to change this.
+        // which now picks dashboard vs project viewer at runtime.
         return {}
     } if (build === 'desktop') {
         return {
@@ -106,9 +105,7 @@ const proxyOptions = { target: flaskURL, changeOrigin: true };
 // ... and then this is a bit more concise than 
 const proxy = [
     '^/(get_|images|tracks|save|chat).*', // these routes are proxied to flask server in 'single project' mode
-    '^/project/.*/\?', //this works with ?dir=/project/id/foo...
-    //will fail if url has search params <-- ? (what will fail?)
-    //will cause problems if we have json files that don't want to be proxied
+    '^/project/[^/]+/.+', // proxy nested project routes, but keep /project/:id for the Vite app shell
     '^/.*\\.(json|b|gz)$',
     '/projects',
     '/create_project',
@@ -132,11 +129,6 @@ proxy['/socket.io'] = {
     // rewriteWsOrigin: true, // copilot says this is not needed in the current version of socket.io
     // ^^ not helping either way...
 }
-
-// not sure how we should make the root route work with vite devserver...
-// proxy['/'] = {
-//     target: "/catalog_dev.html"
-// };
 
 export default defineConfig(async (): Promise<UserConfig> => {
     // For local development, try to get Git info. This is guarded by a check for the .git directory

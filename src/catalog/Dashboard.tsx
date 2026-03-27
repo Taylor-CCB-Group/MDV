@@ -48,6 +48,7 @@ import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import HelpDialog from "./HelpDialog";
+import { buildProjectUrl } from "@/utils/mdvRouting";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
@@ -97,10 +98,7 @@ const Dashboard: React.FC = () => {
     const handleCreateProject = async () => {
         try {
             const newProject = await createProject();
-            const base = import.meta.env.DEV
-                ? "http://localhost:5170?dir=/"
-                : "";
-            window.location.href = `${base}project/${newProject?.id}`;
+            window.location.href = buildProjectUrl(newProject?.id ?? "");
         } catch (error) {
             console.error("Failed to create project:", error);
         }

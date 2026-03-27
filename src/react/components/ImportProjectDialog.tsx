@@ -26,6 +26,7 @@ import { createSocketIOUpload, type SocketIOUploadClient } from "../../charts/di
 import { ZipReader, BlobReader } from "@zip.js/zip.js";
 import { useApiRoot } from "@/catalog/hooks/useApiRoot";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import { buildApiUrl, buildProjectUrl } from "@/utils/mdvRouting";
 
 // Constants moved to module level to avoid recreation
 const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);
@@ -214,8 +215,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
             if (res.status === 200) {
                 if (res.data?.status === "success") {
                     await fetchProjects();
-                    const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
-                    window.location.href = `${base}project/${res.data.id}`;
+                    window.location.href = buildProjectUrl(res.data.id);
                 } else {
                     throw new Error("An error occurred. Please try again.");
                 }
@@ -250,11 +250,11 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
 
         try {
             // Use mdvApiRoot for socket path
-            const socketPath = `${mdvApiRoot}socket.io`;
+            const socketUrl = new URL(buildApiUrl("socket.io", mdvApiRoot), window.location.href);
             const client = createSocketIOUpload({
-                namespace: "/",
+                namespace: socketUrl.origin === window.location.origin ? "/" : socketUrl.origin,
                 file: file,
-                socketPath, // socket path for path variable: '/test/socket.io'
+                socketPath: socketUrl.pathname, // socket path for path variable: '/test/socket.io'
                 onProgress: (percent) => {
                     setProgress(percent);
                 },
@@ -266,8 +266,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                     setUploadClient(null);
                     if (result?.result?.project_id) {
                         await fetchProjects();
-                        const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
-                        window.location.href = `${base}project/${result.result.project_id}`;
+                        window.location.href = buildProjectUrl(result.result.project_id);
                     } else {
                         throw new Error("Upload succeeded but did not return a project ID.");
                     }

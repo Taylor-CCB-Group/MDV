@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/utils/mdvRouting";
 
 export interface User {
     name: string;
@@ -24,7 +25,7 @@ const useUser = () => {
             setIsLoading(true);
             try {
                 // Endpoint yet to be implemented
-                const response = await fetch("profile");
+                const response = await apiFetch("profile");
                 if (!response.ok) {
                     throw new Error("Failed to fetch user data");
                 }

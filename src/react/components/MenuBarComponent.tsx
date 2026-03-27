@@ -20,10 +20,11 @@ import { LockIcon, LockOpenIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import { useChartManager } from "../hooks";
 import DebugButton from "./DebugButton";
+import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
 
 const MenuBarComponent = observer(() => {
     const { viewManager, config } = useChartManager();
-    const { mainApiRoute } = useProject();
+    const { mainApiRoute, root } = useProject();
 
     const isEditable = config.permission === "edit";
     const ariaLabel = isEditable ? "editable" : "view only";
@@ -31,9 +32,9 @@ const MenuBarComponent = observer(() => {
     const handleHomeButtonClick = () => {
         // todo: uncomment when we fix state issues
         // viewManager.checkUnsavedState(() => {
-            window.location.href = import.meta.env.DEV
-                ? `${window.location.origin}/catalog_dev` //todo: sort out routing for dev
-                : mainApiRoute;
+            window.location.href = buildDashboardUrl(
+                mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute,
+            );
         // });
     };
 
