@@ -100,7 +100,12 @@ const Dashboard: React.FC = () => {
     const handleCreateProject = async () => {
         try {
             const newProject = await createProject();
-            window.location.href = buildProjectUrl(newProject?.id ?? "");
+            if (!newProject?.id) {
+                console.error("Project creation succeeded without a valid project id.", newProject);
+                return;
+            }
+
+            window.location.href = buildProjectUrl(newProject.id);
         } catch (error) {
             console.error("Failed to create project:", error);
         }

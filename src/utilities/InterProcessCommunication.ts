@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
 import type ChartManager from "../charts/ChartManager";
 import { DataModel } from "../table/DataModel";
-import { getProjectInfo } from "@/modules/ProjectContext";
+import { getProjectInfoBase } from "@/modules/ProjectContext";
 
 type VuplexCallback = (event: { data: MDVMessage }) => void;
 
@@ -82,7 +82,7 @@ export default async function connectIPC(cm: ChartManager) {
             }
         },
     );
-    const { projectName, mainApiRoute } = getProjectInfo();
+    const { projectName, mainApiRoute } = getProjectInfoBase();
     const projectNamespace = `/project/${projectName}`;
     const socketPath = `${mainApiRoute}socket.io`;
 
