@@ -20,6 +20,11 @@ function asUrl(value: string) {
     return new URL(value, window.location.href);
 }
 
+function buildAppShellUrl(search = "") {
+    const mountPath = getAppMountPath();
+    return `${mountPath}${search}`;
+}
+
 function isLocalHost(hostname = window.location.hostname) {
     return hostname === "localhost" || hostname === "127.0.0.1";
 }
@@ -42,6 +47,28 @@ export function isProjectDir(dir: string) {
 
 export function isProjectPath(pathname = window.location.pathname) {
     return /^\/project\/[^/]+\/?$/.test(pathname);
+}
+
+export function getAppMountPath(pathname = window.location.pathname) {
+    const normalizedPath = pathname || "/";
+
+    if (isProjectPath(normalizedPath)) {
+        const basePath = normalizedPath.replace(/\/project\/[^/]+\/?$/, "");
+        return ensureTrailingSlash(basePath || "/");
+    }
+
+    for (const suffix of ["/login_dev", "/login_dev.html", "/catalog_dev", "/catalog_dev.html", "/index.html"]) {
+        if (normalizedPath.endsWith(suffix)) {
+            const basePath = normalizedPath.slice(0, -suffix.length);
+            return ensureTrailingSlash(basePath || "/");
+        }
+    }
+
+    if (normalizedPath.endsWith("/")) {
+        return normalizedPath;
+    }
+
+    return ensureTrailingSlash(normalizedPath);
 }
 
 export function getApiRootFromDir(dir: string) {
@@ -83,7 +110,7 @@ export function buildApiUrl(path: string, apiRoot = getDashboardApiRoot()) {
     const normalizedPath = path.replace(/^\/+/, "");
 
     if (apiRoot === "/") {
-        return `/${normalizedPath}`;
+        return `${getAppMountPath()}${normalizedPath}`;
     }
 
     if (isAbsoluteUrl(apiRoot)) {
@@ -101,8 +128,8 @@ export function buildDashboardUrl(apiRoot = getDashboardApiRoot()) {
     if (!getDirParam() && isHostedPreviewHost() && apiRoot === getDefaultPreviewApiRoot()) {
         return "/";
     }
-    if (apiRoot === "/") return "/";
-    return `/?dir=${encodeURIComponent(ensureTrailingSlash(apiRoot))}`;
+    if (apiRoot === "/") return getAppMountPath();
+    return buildAppShellUrl(`?dir=${encodeURIComponent(ensureTrailingSlash(apiRoot))}`);
 }
 
 export function buildProjectUrl(projectId: string | number, apiRoot = getDashboardApiRoot()) {
@@ -110,10 +137,10 @@ export function buildProjectUrl(projectId: string | number, apiRoot = getDashboa
         return `/project/${projectId}`;
     }
     if (apiRoot === "/") {
-        return `/project/${projectId}`;
+        return `${getAppMountPath()}project/${projectId}`;
     }
 
-    return `/?dir=${encodeURIComponent(buildApiUrl(`project/${projectId}`, apiRoot))}`;
+    return buildAppShellUrl(`?dir=${encodeURIComponent(buildApiUrl(`project/${projectId}`, apiRoot))}`);
 }
 
 export function shouldShowLocalBackendNotice() {
