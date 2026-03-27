@@ -1,5 +1,5 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from "@mui/material";
-import { useEffect, useCallback, useState } from "react";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
+import { type FormEvent, useCallback, useState } from "react";
 
 const SaveAsViewDialogComponent = (props: {
     open: boolean;
@@ -17,8 +17,26 @@ const SaveAsViewDialogComponent = (props: {
         props.onClose();
     }, [viewManager, viewName, props]);
 
+    const isSaveDisabled = !viewName || checkInvalidName(viewName);
+
+    // Allow enter-to-submit behaviour
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (isSaveDisabled) return;
+        onSaveAs();
+    };
+
     return (
-        <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
+        <Dialog
+            open={props.open}
+            onClose={props.onClose}
+            fullWidth
+            maxWidth="xs"
+            PaperProps={{
+                component: "form",
+                onSubmit: handleSubmit,
+            }}
+        >
             <DialogTitle>Save View As...</DialogTitle>
             <DialogContent dividers>
                 {/* todo consider adding thumbnail here */}
@@ -34,7 +52,7 @@ const SaveAsViewDialogComponent = (props: {
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={onSaveAs} disabled={!viewName || checkInvalidName(viewName)}>
+                <Button type="submit" disabled={isSaveDisabled}>
                     Save As
                 </Button>
                 <Button

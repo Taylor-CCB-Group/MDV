@@ -136,7 +136,6 @@ export class ImageArray {
             if (!isUnique) {
                 //@ts-expect-error //not really a string array, but whatever
                 if (col.values === undefined) return col.data;
-                //@ts-expect-error complaining about iterator - surely data is known to be TypedArray & should be ok here?
                 return [...col.data].map((d) => col.values[d]); //slightly garbagey, never mind
             }
             const tc = new TextDecoder();

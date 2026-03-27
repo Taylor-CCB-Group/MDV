@@ -1,4 +1,5 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import type { FormEvent, KeyboardEvent } from "react";
 
 const DeleteViewDialogComponent = (props: {
     open: boolean;
@@ -10,14 +11,29 @@ const DeleteViewDialogComponent = (props: {
         viewManager.deleteView();
         props.onClose();
     };
+
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        onDelete();
+    };
+
     return (
-        <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
+        <Dialog
+            open={props.open}
+            onClose={props.onClose}
+            fullWidth
+            maxWidth="xs"
+            PaperProps={{
+                component: "form",
+                onSubmit: handleSubmit,
+            }}
+        >
             <DialogTitle>Delete View</DialogTitle>
             <DialogContent dividers>
                 <Typography>Do you want to delete the current view?</Typography>
             </DialogContent>
             <DialogActions>
-                <Button color="primary" onClick={onDelete}>
+                <Button color="primary" type="submit" autoFocus>
                     Yes
                 </Button>
                 <Button color="error" onClick={props.onClose}>
