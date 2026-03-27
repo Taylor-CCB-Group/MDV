@@ -2,7 +2,7 @@ import { getDefaultInitialViewState, ColorPaletteExtension, DetailView } from "@
 import { observer } from "mobx-react-lite";
 import { useMemo, useEffect, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
-import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
+import { useChartSize, useChartID, useConfig } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
 import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend } from "../contour_state";
@@ -12,15 +12,14 @@ import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewe
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
-import { GeoJsonLayer } from "@deck.gl/layers";
-import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
+import MDVivViewer from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
-import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useOuterContainer } from "../screen_state";
 import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
 import useGateLayers from "../hooks/useGateLayers";
 import { escapeHtml } from "@/utilities/Utilities";
+import useShapesLayer from "./ShapesLayer";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -34,37 +33,6 @@ export const VivScatter = () => {
             <Main hoveredField={hoveredField} setHoveredField={setHoveredField} />
         </SpatialAnnotationProvider>
     );
-};
-
-const useJsonLayer = (showJson: boolean) => {
-    const id = useChartID();
-    const { root } = useProject();
-    const { json } = useRegion(); // return type is 'any' and we assume 'json' will be a string - but want that to be different in future.
-    const layer_id = `json_${getVivId(`${id}detail-react`)}`;
-    const layer = useMemo(() => {
-        return json
-            ? new GeoJsonLayer({
-                  id: layer_id,
-                  data: `${root}/${json}`,
-                  opacity: 1,
-                  filled: true,
-                  getFillColor: (f) => [255, 255, 255, 150],
-                  getLineColor: (f) => [255, 255, 255, 150],
-                  getLineWidth: 2,
-                  lineWidthMinPixels: 1,
-                  getPointRadius: 10,
-                  pickable: true,
-                  autoHighlight: true,
-                  //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
-                  getText: (f) => f.properties.DN,
-                  getTextColor: [255, 255, 255, 255],
-                  getTextSize: 12,
-                  textBackground: true,
-                  visible: showJson,
-              })
-            : null;
-    }, [json, showJson, layer_id, root]);
-    return layer;
 };
 
 const Main = observer(
@@ -89,7 +57,7 @@ const Main = observer(
         const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
         const { showJson } = useConfig<VivRoiConfig>();
         // passing showJson from here to make use of this being `observer`
-        const jsonLayer = useJsonLayer(showJson);
+        const jsonLayer = useShapesLayer(showJson);
 
         const {
             gateLabelLayer,
