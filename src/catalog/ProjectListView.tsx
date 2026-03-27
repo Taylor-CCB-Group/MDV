@@ -32,6 +32,7 @@ import type { Project } from "./utils/projectUtils";
 import type { ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
 import usePermissions from "./PermissionsContext";
+import { buildProjectUrl } from "@/utils/mdvRouting";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {
@@ -64,8 +65,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
     }, []);
 
     const handleRowClick = useCallback((projectId: Project['id']) => {
-        const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
-        window.location.href = `${base}project/${projectId}`;
+        window.location.href = buildProjectUrl(projectId);
     }, []);
 
     const handleModalOpen = useCallback((modalSetter: React.Dispatch<React.SetStateAction<boolean>>) => {

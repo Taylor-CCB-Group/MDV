@@ -2,10 +2,10 @@ import { PATH } from './routes';
 
 export function getProjectUrl(projectId: string): string {
   if (PATH !== '/') {
-    // For /catalog_dev, use query param format at root
+    // When testing a non-root dashboard alias, use the smart root entrypoint for project mode.
     return `/?dir=/project/${projectId}`;
   } else {
-    // For root, use direct path
+    // For the default app route, use direct project paths.
     return `/project/${projectId}`;
   }
 }

@@ -6,6 +6,7 @@ import {
     useEffect,
     useState,
 } from "react";
+import { apiFetch } from "@/utils/mdvRouting";
 
 export interface ProjectOperationPermissions {
     createProject: boolean;
@@ -60,7 +61,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch("extension_config");
+            const response = await apiFetch("extension_config");
             if (!response.ok) {
                 // Fallback back to default permissions
                 console.warn(
