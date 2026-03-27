@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { getProjectInfoBase } from "@/modules/ProjectContext";
 
 describe("ProjectContext", () => {
+    let originalMdv: unknown;
+
     beforeEach(() => {
+        originalMdv = (window as any).mdv;
         window.history.replaceState({}, "", "/mdv/project/174");
         (window as any).mdv = {
             ChartManager: class {} as any,
@@ -11,6 +14,15 @@ describe("ProjectContext", () => {
             } as any,
             chartTypes: {},
         };
+    });
+
+    afterEach(() => {
+        if (originalMdv === undefined) {
+            delete (window as any).mdv;
+            return;
+        }
+
+        (window as any).mdv = originalMdv;
     });
 
     test("getProjectInfoBase derives project info without React hooks", () => {
