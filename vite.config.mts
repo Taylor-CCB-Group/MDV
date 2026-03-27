@@ -18,6 +18,7 @@ const configDir = path.dirname(fileURLToPath(import.meta.url));
 
 const flaskURL = "http://127.0.0.1:5055";
 const port = Number(process.env.PORT || process.env.VITE_PORT || 5170);
+const build = (process.env.build || "desktop_pt") as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 // maybe also the various build configurations at some point.
@@ -47,7 +48,6 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  * other methods are supposed to be for replacing other webpack configs.
  */
 function getRollupOptions() {
-    const build = process.env.build || "desktop_pt" as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
@@ -153,7 +153,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
     return {
-    base: process.env.asset_base || "./",
+    base: process.env.asset_base || (build === 'dev_pt' ? "/" : "./"),
     server: {
         headers: {
             "Cross-Origin-Embedder-Policy": "require-corp",
