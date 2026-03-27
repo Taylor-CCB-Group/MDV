@@ -39,7 +39,7 @@ export function useShapesLayer(showShapes: boolean) {
         const rowIndexById = new Map<string, number>();
 
         for (let rowIndex = 0; rowIndex < cellIds.length; rowIndex += 1) {
-            const cellId = cellIds[rowIndex];
+            const cellId = cellIdColumn.getValue(rowIndex);
             if (cellId == null) continue;
             const key = String(cellId);
             if (!rowIndexById.has(key)) rowIndexById.set(key, rowIndex);
@@ -51,7 +51,7 @@ export function useShapesLayer(showShapes: boolean) {
             }
         }
         for (const rowIndex of highlightedIndices) {
-            const cellId = cellIds[rowIndex];
+            const cellId = cellIdColumn.getValue(rowIndex);
             if (cellId != null) highlightedIds.add(String(cellId));
         }
 
