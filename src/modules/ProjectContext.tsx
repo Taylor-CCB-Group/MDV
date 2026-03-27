@@ -1,6 +1,6 @@
 import useBuildInfo, {type BuildInfo} from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
-import { buildApiUrl, getApiRootFromDir } from "@/utils/mdvRouting";
+import { buildApiUrl, getApiRootFromDir, getProjectDirFromLocation } from "@/utils/mdvRouting";
 import axios from "axios";
 import {
     type PropsWithChildren,
@@ -32,10 +32,8 @@ export type Project = {
  */
 export function getProjectInfo(): ProjectInfo {
     // Derive initial state from window.location and URL parameters
-    const { origin, pathname } = window.location;
-    const flaskURL = origin + pathname;
     const urlParams = new URLSearchParams(window.location.search);
-    const dir = urlParams.get("dir") || flaskURL;
+    const dir = getProjectDirFromLocation();
 
     // let's adjust how we reason about root for main API and project API
     // also consider 'static' - when we output state.json for that

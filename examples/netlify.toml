@@ -3,3 +3,13 @@
     [headers.values]
         Cross-Origin-Embedder-Policy = "require-corp"
         Cross-Origin-Opener-Policy = "same-origin"
+
+[[redirects]]
+    from = "/project/:projectId"
+    to = "/index.html"
+    status = 200
+
+[[redirects]]
+    from = "/login_dev"
+    to = "/login_dev.html"
+    status = 200

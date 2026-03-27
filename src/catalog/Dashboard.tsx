@@ -12,6 +12,7 @@ import Brightness7Icon from "@mui/icons-material/Brightness7";
 import HelpIcon from "@mui/icons-material/Help";
 import {
     AppBar,
+    Alert,
     Backdrop,
     Box,
     Button,
@@ -48,7 +49,7 @@ import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import HelpDialog from "./HelpDialog";
-import { buildProjectUrl } from "@/utils/mdvRouting";
+import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
@@ -81,6 +82,7 @@ const Dashboard: React.FC = () => {
     const [helpDialogOpen, setHelpDialogOpen] = useState(false);
     const [customLogoVisible, setCustomLogoVisible] = useState(true);
     const theme = useTheme();
+    const showLocalBackendNotice = shouldShowLocalBackendNotice();
 
     const isLoading = projectsLoading || permissionsLoading;
 
@@ -223,6 +225,12 @@ const Dashboard: React.FC = () => {
                 </AppBar>
 
                 <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+                    {showLocalBackendNotice && (
+                        <Alert severity="info" sx={{ mb: 3 }}>
+                            This preview build expects an MDV backend running on <code>http://localhost:5055</code> on your machine.
+                            Open this page after starting the local MDV container to browse projects and load <code>/project/:id</code> routes.
+                        </Alert>
+                    )}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         {permissions.createProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>

@@ -13,7 +13,7 @@ import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import type { DataSource } from "@/charts/charts";
 import { getProjectName } from "./ProjectContext";
-import { getApiRootFromDir } from "@/utils/mdvRouting";
+import { getApiRootFromDir, getProjectDirFromLocation } from "@/utils/mdvRouting";
 import { createMdvPortal } from "@/react/react_utils";
 import ProjectStateHandlerWrapper from "@/react/ProjectStateHandler";
 import type { Root } from "react-dom/client";
@@ -59,7 +59,7 @@ const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
 const isPopout = urlParams.get("popout") === "true";
 // if there is no dir parameter, use the flaskURL to proxy requests to the python server
-const dir = urlParams.get("dir") || (isPopout ? "" : flaskURL);
+const dir = isPopout ? "" : getProjectDirFromLocation();
 function getRoot(dir: string) {
     // const url = new URL(dir);
     // return url.origin + url.pathname;

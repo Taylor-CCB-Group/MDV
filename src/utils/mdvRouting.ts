@@ -20,6 +20,18 @@ function asUrl(value: string) {
     return new URL(value, window.location.href);
 }
 
+function isLocalHost(hostname = window.location.hostname) {
+    return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+export function isHostedPreviewHost(hostname = window.location.hostname) {
+    return hostname.endsWith(".netlify.app");
+}
+
+export function getDefaultPreviewApiRoot() {
+    return "http://localhost:5055";
+}
+
 export function getDirParam() {
     return new URLSearchParams(window.location.search).get("dir");
 }
@@ -47,8 +59,24 @@ export function getApiRootFromDir(dir: string) {
 
 export function getDashboardApiRoot() {
     const dir = getDirParam();
-    if (!dir) return "/";
+    if (!dir) {
+        if (isHostedPreviewHost() && !isLocalHost()) {
+            return getDefaultPreviewApiRoot();
+        }
+        return "/";
+    }
     return getApiRootFromDir(dir);
+}
+
+export function getProjectDirFromLocation() {
+    const dir = getDirParam();
+    if (dir) return dir;
+
+    if (isHostedPreviewHost() && isProjectPath() && !isLocalHost()) {
+        return `${getDefaultPreviewApiRoot()}${window.location.pathname}`;
+    }
+
+    return `${window.location.origin}${window.location.pathname}`;
 }
 
 export function buildApiUrl(path: string, apiRoot = getDashboardApiRoot()) {
@@ -70,16 +98,26 @@ export function apiFetch(input: string, init?: RequestInit) {
 }
 
 export function buildDashboardUrl(apiRoot = getDashboardApiRoot()) {
+    if (!getDirParam() && isHostedPreviewHost() && apiRoot === getDefaultPreviewApiRoot()) {
+        return "/";
+    }
     if (apiRoot === "/") return "/";
     return `/?dir=${encodeURIComponent(ensureTrailingSlash(apiRoot))}`;
 }
 
 export function buildProjectUrl(projectId: string | number, apiRoot = getDashboardApiRoot()) {
+    if (!getDirParam() && isHostedPreviewHost() && apiRoot === getDefaultPreviewApiRoot()) {
+        return `/project/${projectId}`;
+    }
     if (apiRoot === "/") {
         return `/project/${projectId}`;
     }
 
     return `/?dir=${encodeURIComponent(buildApiUrl(`project/${projectId}`, apiRoot))}`;
+}
+
+export function shouldShowLocalBackendNotice() {
+    return isHostedPreviewHost() && !getDirParam();
 }
 
 export function shouldRenderDashboard() {
