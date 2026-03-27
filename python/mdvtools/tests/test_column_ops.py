@@ -185,6 +185,90 @@ def test_drop_columns_cleanup_can_fix_already_missing_field(tmp_path):
     assert project.views["Overview Screen"]["initialCharts"]["cells"][0]["param"] == ["b"]
 
 
+def test_cleanup_detailed_remaining_refs_report(tmp_path):
+    project = _build_project(tmp_path)
+    # create a view with a chart still referencing a dropped field
+    project.views = {
+        "MNP cell signatures": {
+            "initialCharts": {
+                "cells": [
+                    {
+                        "type": "table_chart_react",
+                        "id": "NpEPWW",
+                        "title": "My table",
+                        # param gets cleaned; keep a dropped reference elsewhere to test reporting
+                        "param": ["b"],
+                        "color_by": "a",
+                    }
+                ]
+            }
+        }
+    }
+    # dry-run cleanup for a non-existent (already-missing) field should return details
+    report = project.drop_columns(
+        "cells",
+        ["a"],
+        strict=True,
+        hard=False,
+        cleanup=True,
+        backup=False,
+        dry_run=True,
+    )
+    detailed = report["cleanupReport"]["remainingRefsDetailed"]
+    assert detailed
+    item = detailed[0]
+    assert item["view"] == "MNP cell signatures"
+    assert item["datasource"] == "cells"
+    assert item["chartIndex"] == 0
+    assert item["chart"]["type"] == "table_chart_react"
+    assert item["chart"]["id"] == "NpEPWW"
+    assert item["chart"]["title"] == "My table"
+
+
+def test_dry_run_impact_report_includes_chart_and_non_chart_refs(tmp_path):
+    project = _build_project(tmp_path)
+    # chart impact
+    project.views = {
+        "Overview Screen": {
+            "initialCharts": {
+                "cells": [
+                    {
+                        "type": "table_chart_react",
+                        "id": "NpEPWW",
+                        "title": "My table",
+                        "param": ["a", "b"],
+                    }
+                ]
+            }
+        }
+    }
+    # non-chart refs: state + datasource nested
+    state = project.state
+    state["filters"] = {"cells": {"column": "a"}}
+    project.state = state
+    ds = project.get_datasource_metadata("cells")
+    ds["interactions"] = {"pivot_column": "a"}
+    project.set_datasource_metadata(ds)
+
+    report = project.drop_columns(
+        "cells",
+        ["a"],
+        cleanup=True,
+        dry_run=True,
+    )
+    impact = report["impactReport"]
+    assert impact
+    assert impact["charts"]
+    chart_item = impact["charts"][0]
+    assert chart_item["view"] == "Overview Screen"
+    assert chart_item["chart"]["type"] == "table_chart_react"
+    assert "a" in chart_item["wouldRemove"]
+    assert impact["stateRefs"]
+    assert any("filters" in p for p in impact["stateRefs"])
+    assert impact["datasourceRefs"]
+    assert any("interactions" in p for p in impact["datasourceRefs"])
+
+
 def test_restore_json_backup_latest(tmp_path):
     project = _build_project(tmp_path)
     project.views = {"main": {"initialCharts": {"cells": [{"type": "table_chart_react", "param": ["a"]}]}}}
@@ -215,3 +299,117 @@ def test_restore_json_backup_missing_raises(tmp_path):
     project = _build_project(tmp_path)
     with pytest.raises(FileNotFoundError):
         project.restore_json_backup()
+
+
+def test_list_columns_default_csv_output(tmp_path):
+    project = _build_project(tmp_path)
+    assert project.get_datasource_metadata("cells")
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "list-columns",
+            str(tmp_path),
+            "--datasource",
+            "cells",
+        ],
+    )
+    assert result.exit_code == 0
+    out = result.output.strip()
+    assert out == "a,b"
+
+
+def test_list_columns_not_used_filters_referenced_fields(tmp_path):
+    project = _build_project(tmp_path)
+    # mark "a" as used by chart, state and datasource nested refs
+    project.views = {
+        "Overview": {
+            "initialCharts": {
+                "cells": [{"type": "table_chart_react", "id": "C1", "param": ["a"]}]
+            }
+        }
+    }
+    st = project.state
+    st["filters"] = {"cells": {"column": "a"}}
+    project.state = st
+    ds = project.get_datasource_metadata("cells")
+    ds["interactions"] = {"pivot_column": "a"}
+    project.set_datasource_metadata(ds)
+    report = project.list_columns("cells", not_used=True)
+    assert report["fields"] == ["b"]
+    assert "a" in report["usedFields"]
+    assert "b" in report["unusedFields"]
+
+
+def test_list_columns_json_output_contains_usage_sections(tmp_path):
+    project = _build_project(tmp_path)
+    project.views = {
+        "Overview": {
+            "initialCharts": {
+                "cells": [{"type": "table_chart_react", "id": "C1", "param": ["a"]}]
+            }
+        }
+    }
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "list-columns",
+            str(tmp_path),
+            "--datasource",
+            "cells",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    import json
+    payload = json.loads(result.output)
+    assert "allFields" in payload
+    assert "usedFields" in payload
+    assert "unusedFields" in payload
+    assert "chartRefs" in payload
+    assert "stateRefs" in payload
+    assert "datasourceRefs" in payload
+
+
+def test_list_columns_used_only_cli_output(tmp_path):
+    project = _build_project(tmp_path)
+    project.views = {
+        "Overview": {
+            "initialCharts": {
+                "cells": [{"type": "table_chart_react", "id": "C1", "param": ["a"]}]
+            }
+        }
+    }
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "list-columns",
+            str(tmp_path),
+            "--datasource",
+            "cells",
+            "--used-only",
+        ],
+    )
+    assert result.exit_code == 0
+    assert result.output.strip() == "a"
+
+
+def test_list_columns_used_only_conflicts_with_not_used(tmp_path):
+    project = _build_project(tmp_path)
+    assert project.get_datasource_metadata("cells")
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "list-columns",
+            str(tmp_path),
+            "--datasource",
+            "cells",
+            "--used-only",
+            "--not-used",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "mutually exclusive" in result.output

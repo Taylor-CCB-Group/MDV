@@ -153,6 +153,64 @@ def _parse_rename_map(raw: str) -> dict[str, str]:
     return mapping
 
 
+def _print_impact_summary(report: dict) -> None:
+    impact = report.get("impactReport") or {}
+    charts = impact.get("charts") or []
+    state_refs = impact.get("stateRefs") or []
+    ds_refs = impact.get("datasourceRefs") or []
+
+    if not charts and not state_refs and not ds_refs:
+        click.echo("Impact summary: no affected references found.")
+        return
+
+    click.echo("Impact summary:")
+    if charts:
+        by_view: dict[str, int] = {}
+        by_type: dict[str, int] = {}
+        for item in charts:
+            view = item.get("view") or "<unknown>"
+            by_view[view] = by_view.get(view, 0) + 1
+            ctype = (item.get("chart") or {}).get("type") or "<unknown>"
+            by_type[ctype] = by_type.get(ctype, 0) + 1
+        click.echo(f"- charts affected: {len(charts)}")
+        click.echo(f"- views affected: {len(by_view)}")
+        top_views = sorted(by_view.items(), key=lambda x: (-x[1], x[0]))[:5]
+        click.echo(f"- top views: {', '.join([f'{k}({v})' for k,v in top_views])}")
+        top_types = sorted(by_type.items(), key=lambda x: (-x[1], x[0]))[:5]
+        click.echo(f"- top chart types: {', '.join([f'{k}({v})' for k,v in top_types])}")
+    if state_refs:
+        click.echo(f"- state refs affected: {len(state_refs)}")
+    if ds_refs:
+        click.echo(f"- datasource nested refs affected: {len(ds_refs)}")
+
+@cli.command("list-columns")
+@click.argument("folder")
+@click.option("--datasource", required=True, help="Datasource name to inspect.")
+@click.option("--not-used", "not_used", is_flag=True, help="Return only columns not referenced in project configs.")
+@click.option("--used-only", "used_only", is_flag=True, help="Return only columns referenced in project configs.")
+@click.option("--json", "as_json", is_flag=True, help="Print full JSON usage report.")
+@click.option("--one-per-line", is_flag=True, help="Print selected fields one per line.")
+def list_columns(folder, datasource, not_used, used_only, as_json, one_per_line):
+    """List columns in a datasource, optionally filtering to not-used fields."""
+    from .mdvproject import MDVProject
+
+    if not_used and used_only:
+        raise click.BadParameter("--not-used and --used-only are mutually exclusive.")
+    project = MDVProject(folder)
+    report = project.list_columns(datasource, not_used=not_used)
+    if used_only:
+        fields = report["usedFields"]
+    else:
+        fields = report["fields"]
+    if as_json:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        return
+    if one_per_line:
+        click.echo("\n".join(fields))
+        return
+    click.echo(",".join(fields))
+
+
 @cli.command("drop-columns")
 @click.argument("folder")
 @click.option("--datasource", required=False, help="Datasource name to update.")
@@ -161,6 +219,7 @@ def _parse_rename_map(raw: str) -> dict[str, str]:
 @click.option("--dry-run", is_flag=True, help="Preview changes without writing.")
 @click.option("--cleanup", is_flag=True, help="Rewrite project JSON to remove references to dropped fields.")
 @click.option("--backup", is_flag=True, help="Backup JSON files before rewriting.")
+@click.option("--impact-summary/--no-impact-summary", default=True, show_default=True, help="Print impact summary on dry-run.")
 @click.option("--restore-backup", "restore_backup", is_flag=True, help="Restore latest JSON backup and exit.")
 @click.option("--restore-backup-timestamp", default=None, help="Restore a specific JSON backup timestamp and exit.")
 @click.option("--continue-after-restore", is_flag=True, help="After restoring a backup, continue with the requested operation.")
@@ -169,7 +228,7 @@ def _parse_rename_map(raw: str) -> dict[str, str]:
     is_flag=True,
     help="Perform physical HDF5 dataset deletion in addition to metadata updates.",
 )
-def drop_columns(folder, datasource, fields, strict, dry_run, cleanup, backup, restore_backup, restore_backup_timestamp, continue_after_restore, hard):
+def drop_columns(folder, datasource, fields, strict, dry_run, cleanup, backup, impact_summary, restore_backup, restore_backup_timestamp, continue_after_restore, hard):
     """Drop multiple columns from a datasource."""
     from .mdvproject import MDVProject
 
@@ -193,16 +252,24 @@ def drop_columns(folder, datasource, fields, strict, dry_run, cleanup, backup, r
     parsed_fields = _parse_csv_values(fields)
     if not parsed_fields:
         raise click.BadParameter("At least one field must be provided.", param_hint="fields")
-    report = project.drop_columns(
-        datasource,
-        parsed_fields,
-        strict=strict,
-        hard=hard,
-        dry_run=dry_run,
-        cleanup=cleanup,
-        backup=backup,
-    )
-    click.echo(json.dumps(report, indent=2, sort_keys=True))
+    try:
+        report = project.drop_columns(
+            datasource,
+            parsed_fields,
+            strict=strict,
+            hard=hard,
+            dry_run=dry_run,
+            cleanup=cleanup,
+            backup=backup,
+        )
+        if dry_run and impact_summary:
+            _print_impact_summary(report)
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+    except ValueError as e:
+        details = getattr(e, "details", None)
+        if details:
+            click.echo(json.dumps(details, indent=2, sort_keys=True))
+        raise
 
 
 @cli.command("rename-columns")
@@ -223,6 +290,7 @@ def drop_columns(folder, datasource, fields, strict, dry_run, cleanup, backup, r
 @click.option("--dry-run", is_flag=True, help="Preview changes without writing.")
 @click.option("--cleanup", is_flag=True, help="Rewrite project JSON to apply field-id renames consistently.")
 @click.option("--backup", is_flag=True, help="Backup JSON files before rewriting.")
+@click.option("--impact-summary/--no-impact-summary", default=True, show_default=True, help="Print impact summary on dry-run.")
 @click.option("--restore-backup", "restore_backup", is_flag=True, help="Restore latest JSON backup and exit.")
 @click.option("--restore-backup-timestamp", default=None, help="Restore a specific JSON backup timestamp and exit.")
 @click.option("--continue-after-restore", is_flag=True, help="After restoring a backup, continue with the requested operation.")
@@ -231,7 +299,7 @@ def drop_columns(folder, datasource, fields, strict, dry_run, cleanup, backup, r
     is_flag=True,
     help="Required for operations that mutate HDF5 datasets.",
 )
-def rename_columns(folder, datasource, rename_map, field_id, strict, dry_run, cleanup, backup, restore_backup, restore_backup_timestamp, continue_after_restore, hard):
+def rename_columns(folder, datasource, rename_map, field_id, strict, dry_run, cleanup, backup, impact_summary, restore_backup, restore_backup_timestamp, continue_after_restore, hard):
     """Rename multiple columns on a datasource."""
     from .mdvproject import MDVProject
 
@@ -265,6 +333,8 @@ def rename_columns(folder, datasource, rename_map, field_id, strict, dry_run, cl
         cleanup=cleanup,
         backup=backup,
     )
+    if dry_run and impact_summary:
+        _print_impact_summary(report)
     click.echo(json.dumps(report, indent=2, sort_keys=True))
 
 @cli.command("convert-spatial")

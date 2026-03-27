@@ -398,7 +398,83 @@ class MDVProject:
             "renamed": renamed,
             "changed": {"views.json": [], "state.json": [], "datasources.json": []},
             "blocked": [],
+            "remainingRefsDetailed": [],
         }
+
+        def collect_view_chart_refs(views_obj: Any) -> list[dict[str, Any]]:
+            """Return remaining dropped-field refs with chart context."""
+            if not isinstance(views_obj, dict):
+                return []
+            detailed: list[dict[str, Any]] = []
+            for view_name, view_cfg in views_obj.items():
+                if not isinstance(view_cfg, dict):
+                    continue
+                init = view_cfg.get("initialCharts")
+                if not isinstance(init, dict):
+                    continue
+                charts = init.get(datasource)
+                if not isinstance(charts, list):
+                    continue
+                for idx, chart in enumerate(charts):
+                    if not isinstance(chart, dict):
+                        continue
+                    cfg = chart.get("config") if isinstance(chart.get("config"), dict) else chart
+                    ctype = cfg.get("type")
+                    cid = cfg.get("id")
+                    ctitle = cfg.get("title")
+                    fields_hit: set[str] = set()
+                    paths: list[str] = []
+
+                    param = cfg.get("param")
+                    if isinstance(param, list):
+                        for pi, item in enumerate(param):
+                            if isinstance(item, str) and item in dropped:
+                                fields_hit.add(item)
+                                paths.append(
+                                    f"views.{view_name}.initialCharts.{datasource}[{idx}].param[{pi}]"
+                                )
+                    # Common single-column keys used by the loader
+                    if isinstance(cfg.get("color_by"), str) and cfg["color_by"] in dropped:
+                        fields_hit.add(cfg["color_by"])
+                        paths.append(f"views.{view_name}.initialCharts.{datasource}[{idx}].color_by")
+                    tooltip = cfg.get("tooltip")
+                    if isinstance(tooltip, dict):
+                        col = tooltip.get("column")
+                        if isinstance(col, str) and col in dropped:
+                            fields_hit.add(col)
+                            paths.append(f"views.{view_name}.initialCharts.{datasource}[{idx}].tooltip.column")
+                        elif isinstance(col, list):
+                            for ti, item in enumerate(col):
+                                if isinstance(item, str) and item in dropped:
+                                    fields_hit.add(item)
+                                    paths.append(
+                                        f"views.{view_name}.initialCharts.{datasource}[{idx}].tooltip.column[{ti}]"
+                                    )
+                    bg = cfg.get("background_filter")
+                    if isinstance(bg, dict):
+                        col = bg.get("column")
+                        if isinstance(col, str) and col in dropped:
+                            fields_hit.add(col)
+                            paths.append(
+                                f"views.{view_name}.initialCharts.{datasource}[{idx}].background_filter.column"
+                            )
+
+                    if fields_hit:
+                        detailed.append(
+                            {
+                                "view": view_name,
+                                "datasource": datasource,
+                                "chartIndex": idx,
+                                "chart": {
+                                    "type": ctype,
+                                    "id": cid,
+                                    "title": ctitle,
+                                },
+                                "fields": sorted(fields_hit),
+                                "paths": paths,
+                            }
+                        )
+            return detailed
 
         def rewrite(obj: Any, path: str) -> Any:
             if isinstance(obj, dict):
@@ -440,25 +516,28 @@ class MDVProject:
         # views.json
         current_file = "views.json"
         new_views = rewrite(self.views, "views")
-        if strict and report["blocked"]:
+        if strict and report["blocked"] and not dry_run:
             raise ValueError("Cleanup blocked: " + "; ".join(report["blocked"]))
         # After rewrite, still block if any dropped strings remain in views.
+        report["remainingRefsDetailed"] = collect_view_chart_refs(new_views)
         remaining_view_hits = self._find_string_references(new_views, dropped, path="views")
-        if strict and remaining_view_hits:
-            raise ValueError(
+        if strict and remaining_view_hits and not dry_run:
+            err = ValueError(
                 "Cleanup incomplete; remaining references: "
                 + "; ".join(sorted(set(remaining_view_hits)))
             )
+            setattr(err, "details", {"remainingRefsDetailed": report["remainingRefsDetailed"]})
+            raise err
         if not dry_run:
             self.views = new_views
 
         # state.json
         current_file = "state.json"
         new_state = rewrite(self.state, "state")
-        if strict and report["blocked"]:
+        if strict and report["blocked"] and not dry_run:
             raise ValueError("Cleanup blocked: " + "; ".join(report["blocked"]))
         remaining_state_hits = self._find_string_references(new_state, dropped, path="state")
-        if strict and remaining_state_hits:
+        if strict and remaining_state_hits and not dry_run:
             raise ValueError(
                 "Cleanup incomplete; remaining references: "
                 + "; ".join(sorted(set(remaining_state_hits)))
@@ -477,7 +556,7 @@ class MDVProject:
             remaining_ds_hits.extend(
                 self._find_string_references(payload, dropped, path=f"datasources.{datasource}.{section}")
             )
-        if strict and remaining_ds_hits:
+        if strict and remaining_ds_hits and not dry_run:
             raise ValueError(
                 "Cleanup incomplete; remaining references: "
                 + "; ".join(sorted(set(remaining_ds_hits)))
@@ -486,6 +565,228 @@ class MDVProject:
             self.set_datasource_metadata(ds)
 
         return report
+
+    def _compute_impact_report(
+        self,
+        datasource: str,
+        *,
+        dropped: set[str],
+        renamed: dict[str, str] | None,
+    ) -> dict[str, Any]:
+        renamed = renamed or {}
+        impact: dict[str, Any] = {"charts": [], "stateRefs": [], "datasourceRefs": []}
+
+        views_obj = self.views
+        if isinstance(views_obj, dict):
+            for view_name, view_cfg in views_obj.items():
+                if not isinstance(view_cfg, dict):
+                    continue
+                init = view_cfg.get("initialCharts")
+                if not isinstance(init, dict):
+                    continue
+                charts = init.get(datasource)
+                if not isinstance(charts, list):
+                    continue
+                for idx, chart in enumerate(charts):
+                    if not isinstance(chart, dict):
+                        continue
+                    cfg = chart.get("config") if isinstance(chart.get("config"), dict) else chart
+                    ctype = cfg.get("type")
+                    cid = cfg.get("id")
+                    ctitle = cfg.get("title")
+                    would_remove: set[str] = set()
+                    would_rename: dict[str, str] = {}
+                    paths: list[str] = []
+
+                    def hit(field: str, path: str):
+                        if field in dropped:
+                            would_remove.add(field)
+                            paths.append(path)
+                        if field in renamed:
+                            would_rename[field] = renamed[field]
+                            paths.append(path)
+
+                    param = cfg.get("param")
+                    if isinstance(param, list):
+                        for pi, item in enumerate(param):
+                            if isinstance(item, str):
+                                hit(item, f"views.{view_name}.initialCharts.{datasource}[{idx}].param[{pi}]")
+                    if isinstance(cfg.get("color_by"), str):
+                        hit(cfg["color_by"], f"views.{view_name}.initialCharts.{datasource}[{idx}].color_by")
+                    tooltip = cfg.get("tooltip")
+                    if isinstance(tooltip, dict):
+                        col = tooltip.get("column")
+                        if isinstance(col, str):
+                            hit(col, f"views.{view_name}.initialCharts.{datasource}[{idx}].tooltip.column")
+                        elif isinstance(col, list):
+                            for ti, item in enumerate(col):
+                                if isinstance(item, str):
+                                    hit(item, f"views.{view_name}.initialCharts.{datasource}[{idx}].tooltip.column[{ti}]")
+                    bg = cfg.get("background_filter")
+                    if isinstance(bg, dict):
+                        col = bg.get("column")
+                        if isinstance(col, str):
+                            hit(col, f"views.{view_name}.initialCharts.{datasource}[{idx}].background_filter.column")
+
+                    if would_remove or would_rename:
+                        impact["charts"].append(
+                            {
+                                "view": view_name,
+                                "datasource": datasource,
+                                "chartIndex": idx,
+                                "chart": {"type": ctype, "id": cid, "title": ctitle},
+                                "wouldRemove": sorted(would_remove),
+                                "wouldRename": would_rename,
+                                "paths": paths,
+                            }
+                        )
+
+        # state refs (global)
+        state_hits: list[str] = []
+        if dropped:
+            state_hits.extend(self._find_string_references(self.state, dropped, path="state"))
+        if renamed:
+            state_hits.extend(self._find_string_references(self.state, set(renamed.keys()), path="state"))
+        impact["stateRefs"] = sorted(set(state_hits))
+
+        # datasources nested refs for this datasource only
+        try:
+            ds = self.get_datasource_metadata(datasource)
+            ds_sections = self._get_rewritable_datasource_sections(ds)
+            ds_hits: list[str] = []
+            for section, payload in ds_sections.items():
+                if dropped:
+                    ds_hits.extend(
+                        self._find_string_references(payload, dropped, path=f"datasources.{datasource}.{section}")
+                    )
+                if renamed:
+                    ds_hits.extend(
+                        self._find_string_references(
+                            payload, set(renamed.keys()), path=f"datasources.{datasource}.{section}"
+                        )
+                    )
+            impact["datasourceRefs"] = sorted(set(ds_hits))
+        except Exception:
+            impact["datasourceRefs"] = []
+
+        return impact
+
+    def _collect_datasource_column_usage(
+        self, datasource: str, known_fields: set[str]
+    ) -> dict[str, Any]:
+        usage: dict[str, Any] = {
+            "chartRefs": [],
+            "stateRefs": [],
+            "datasourceRefs": [],
+        }
+        # Chart refs scoped to this datasource's chart list in views.initialCharts
+        views_obj = self.views
+        if isinstance(views_obj, dict):
+            for view_name, view_cfg in views_obj.items():
+                if not isinstance(view_cfg, dict):
+                    continue
+                init = view_cfg.get("initialCharts")
+                if not isinstance(init, dict):
+                    continue
+                charts = init.get(datasource)
+                if not isinstance(charts, list):
+                    continue
+                for idx, chart in enumerate(charts):
+                    if not isinstance(chart, dict):
+                        continue
+                    cfg = chart.get("config") if isinstance(chart.get("config"), dict) else chart
+                    ctype = cfg.get("type")
+                    cid = cfg.get("id")
+                    ctitle = cfg.get("title")
+                    field_hits: set[str] = set()
+                    paths: list[str] = []
+
+                    def hit(field: str, path: str):
+                        if field in known_fields:
+                            field_hits.add(field)
+                            paths.append(path)
+
+                    param = cfg.get("param")
+                    if isinstance(param, list):
+                        for pi, item in enumerate(param):
+                            if isinstance(item, str):
+                                hit(item, f"views.{view_name}.initialCharts.{datasource}[{idx}].param[{pi}]")
+                    if isinstance(cfg.get("color_by"), str):
+                        hit(cfg["color_by"], f"views.{view_name}.initialCharts.{datasource}[{idx}].color_by")
+                    tooltip = cfg.get("tooltip")
+                    if isinstance(tooltip, dict):
+                        col = tooltip.get("column")
+                        if isinstance(col, str):
+                            hit(col, f"views.{view_name}.initialCharts.{datasource}[{idx}].tooltip.column")
+                        elif isinstance(col, list):
+                            for ti, item in enumerate(col):
+                                if isinstance(item, str):
+                                    hit(item, f"views.{view_name}.initialCharts.{datasource}[{idx}].tooltip.column[{ti}]")
+                    bg = cfg.get("background_filter")
+                    if isinstance(bg, dict):
+                        col = bg.get("column")
+                        if isinstance(col, str):
+                            hit(col, f"views.{view_name}.initialCharts.{datasource}[{idx}].background_filter.column")
+
+                    if field_hits:
+                        usage["chartRefs"].append(
+                            {
+                                "view": view_name,
+                                "datasource": datasource,
+                                "chartIndex": idx,
+                                "chart": {"type": ctype, "id": cid, "title": ctitle},
+                                "fields": sorted(field_hits),
+                                "paths": paths,
+                            }
+                        )
+
+        # state refs (global scan, filtered by known fields)
+        state_hits = self._find_string_references(self.state, known_fields, path="state")
+        for path in state_hits:
+            # best-effort extraction: read the value by path not implemented; keep field unknown
+            usage["stateRefs"].append({"path": path})
+
+        # datasource nested refs for target datasource only
+        ds = self.get_datasource_metadata(datasource)
+        for section, payload in self._get_rewritable_datasource_sections(ds).items():
+            hits = self._find_string_references(
+                payload, known_fields, path=f"datasources.{datasource}.{section}"
+            )
+            usage["datasourceRefs"].extend({"path": p} for p in hits)
+        return usage
+
+    def list_columns(self, datasource: str, not_used: bool = False) -> dict[str, Any]:
+        ds = self.get_datasource_metadata(datasource)
+        all_fields = [c["field"] for c in ds.get("columns", []) if isinstance(c.get("field"), str)]
+        known = set(all_fields)
+        usage = self._collect_datasource_column_usage(datasource, known)
+        used_fields: set[str] = set()
+        for item in usage["chartRefs"]:
+            for field in item.get("fields", []):
+                if field in known:
+                    used_fields.add(field)
+        # For state/datasource refs we only have paths from generic matcher.
+        # Derive field hits by scanning exact string occurrences per field.
+        for field in known:
+            if self._find_string_references(self.state, {field}, path="state"):
+                used_fields.add(field)
+                continue
+            for payload in self._get_rewritable_datasource_sections(ds).values():
+                if self._find_string_references(payload, {field}):
+                    used_fields.add(field)
+                    break
+        unused_fields = [f for f in all_fields if f not in used_fields]
+        selected = unused_fields if not_used else all_fields
+        return {
+            "datasource": datasource,
+            "allFields": all_fields,
+            "usedFields": [f for f in all_fields if f in used_fields],
+            "unusedFields": unused_fields,
+            "fields": selected,
+            "chartRefs": usage["chartRefs"],
+            "stateRefs": usage["stateRefs"],
+            "datasourceRefs": usage["datasourceRefs"],
+        }
 
     def add_images_to_datasource(
         self,
@@ -1010,6 +1311,7 @@ class MDVProject:
             "cleanup": cleanup,
             "backup": None,
             "cleanupReport": None,
+            "impactReport": None,
         }
         # If cleanup is requested, allow cleaning up references for columns that are already missing
         # from datasource metadata (common when a project is already in a partially-broken state).
@@ -1018,6 +1320,12 @@ class MDVProject:
 
         target_set = set(targets)
         cleanup_set = set(requested) if cleanup else target_set
+        if dry_run and cleanup_set:
+            report["impactReport"] = self._compute_impact_report(
+                datasource,
+                dropped=cleanup_set,
+                renamed=None,
+            )
         if cleanup and cleanup_set:
             if backup:
                 report["backup"] = self._backup_project_json_files(
@@ -1041,14 +1349,20 @@ class MDVProject:
             for hit in self._find_string_references(self.state, cleanup_set, path="state"):
                 report["failedRefs"].append(hit)
 
+        if dry_run:
+            return report
+
         if strict and report["failedRefs"]:
-            raise ValueError(
+            err = ValueError(
                 "Cannot drop columns while references still exist: "
                 + "; ".join(sorted(set(report["failedRefs"])))
             )
-
-        if dry_run:
-            return report
+            cleanup_details = None
+            if isinstance(report.get("cleanupReport"), dict):
+                cleanup_details = report["cleanupReport"].get("remainingRefsDetailed")
+            if cleanup_details:
+                setattr(err, "details", {"remainingRefsDetailed": cleanup_details})
+            raise err
 
         if hard:
             for field in targets:
@@ -1119,8 +1433,15 @@ class MDVProject:
             "cleanup": cleanup,
             "backup": None,
             "cleanupReport": None,
+            "impactReport": None,
         }
         if dry_run:
+            if cleanup:
+                report["impactReport"] = self._compute_impact_report(
+                    datasource,
+                    dropped=set(),
+                    renamed=effective_renames if rename_field else None,
+                )
             return report
 
         if cleanup and rename_field and effective_renames and backup:

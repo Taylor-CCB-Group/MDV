@@ -150,6 +150,44 @@ Use these commands to update datasource columns in an existing MDV project.
 
 `--datasource` expects a datasource `name` from `datasources.json` (for example `cells`).
 
+### List columns
+
+List all fields for a datasource (default: single comma-separated line):
+
+```bash
+poetry run python -m mdvtools.cli list-columns /path/to/project --datasource cells
+```
+
+List fields not used in views/state/datasource nested config (datasource-scoped analysis):
+
+```bash
+poetry run python -m mdvtools.cli list-columns /path/to/project --datasource cells --not-used
+```
+
+List fields currently used in views/state/datasource nested config:
+
+```bash
+poetry run python -m mdvtools.cli list-columns /path/to/project --datasource cells --used-only
+```
+
+Print one field per line:
+
+```bash
+poetry run python -m mdvtools.cli list-columns /path/to/project --datasource cells --not-used --one-per-line
+```
+
+Print full JSON usage report:
+
+```bash
+poetry run python -m mdvtools.cli list-columns /path/to/project --datasource cells --json
+```
+
+Pipe not-used fields directly into drop-columns:
+
+```bash
+poetry run python -m mdvtools.cli drop-columns /path/to/project --datasource cells --fields "$(poetry run python -m mdvtools.cli list-columns /path/to/project --datasource cells --not-used)" --cleanup --backup --dry-run
+```
+
 ### Drop columns
 
 Soft drop (default): remove column metadata from `datasources.json` only.
