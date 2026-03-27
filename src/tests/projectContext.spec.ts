@@ -29,7 +29,7 @@ describe("ProjectContext", () => {
         const info = getProjectInfoBase();
 
         expect(info.projectName).toBe("174");
-        expect(info.root).toBe("http://localhost:3000/mdv/project/174");
+        expect(info.root).toBe(`${window.location.origin}/mdv/project/174`);
         expect(info.mainApiRoute).toBe("/mdv/");
         expect(info.projectApiRoute).toBe("/mdv/project/174/");
     });
