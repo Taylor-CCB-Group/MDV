@@ -37,6 +37,10 @@ export function getDefaultPreviewApiRoot() {
     return "http://localhost:5055";
 }
 
+export function isDefaultPreviewApiRoot(apiRoot: string) {
+    return ensureTrailingSlash(apiRoot) === ensureTrailingSlash(getDefaultPreviewApiRoot());
+}
+
 export function getDirParam() {
     return new URLSearchParams(window.location.search).get("dir");
 }
@@ -46,7 +50,7 @@ export function isProjectDir(dir: string) {
 }
 
 export function isProjectPath(pathname = window.location.pathname) {
-    return /^\/project\/[^/]+\/?$/.test(pathname);
+    return /\/project\/[^/]+\/?$/.test(pathname);
 }
 
 export function getAppMountPath(pathname = window.location.pathname) {
@@ -136,7 +140,7 @@ export function apiFetch(input: string, init?: RequestInit) {
 }
 
 export function buildDashboardUrl(apiRoot = getDashboardApiRoot()) {
-    if (!getDirParam() && isHostedPreviewHost() && apiRoot === getDefaultPreviewApiRoot()) {
+    if (!getDirParam() && isHostedPreviewHost() && isDefaultPreviewApiRoot(apiRoot)) {
         return "/";
     }
     if (apiRoot === "/") return getAppMountPath();
@@ -144,7 +148,7 @@ export function buildDashboardUrl(apiRoot = getDashboardApiRoot()) {
 }
 
 export function buildProjectUrl(projectId: string | number, apiRoot = getDashboardApiRoot()) {
-    if (!getDirParam() && isHostedPreviewHost() && apiRoot === getDefaultPreviewApiRoot()) {
+    if (!getDirParam() && isHostedPreviewHost() && isDefaultPreviewApiRoot(apiRoot)) {
         return `/project/${projectId}`;
     }
     if (apiRoot === "/") {

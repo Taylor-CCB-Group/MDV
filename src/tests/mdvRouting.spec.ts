@@ -6,6 +6,8 @@ import {
     getAppMountPath,
     getApiRootFromDir,
     getDashboardApiRoot,
+    getProjectDirFromLocation,
+    isDefaultPreviewApiRoot,
     isProjectPath,
     shouldRenderDashboard,
 } from "@/utils/mdvRouting";
@@ -31,6 +33,19 @@ describe("mdvRouting", () => {
 
         expect(buildProjectUrl("174", "/")).toBe("/mdv/project/174");
         expect(buildApiUrl("projects", "/")).toBe("/mdv/projects");
+    });
+
+    test("handles mounted project pathname routes directly", () => {
+        setUrl("/mdvmount/project/174");
+
+        expect(getAppMountPath()).toBe("/mdvmount/");
+        expect(isProjectPath()).toBe(true);
+        expect(shouldRenderDashboard()).toBe(false);
+        expect(getProjectDirFromLocation()).toBe(
+            `${window.location.origin}/mdvmount/project/174`,
+        );
+        expect(buildApiUrl("projects", "/")).toBe("/mdvmount/projects");
+        expect(buildProjectUrl("174", "/")).toBe("/mdvmount/project/174");
     });
 
     test("keeps mounted shell path when building explicit dir urls", () => {
@@ -59,5 +74,11 @@ describe("mdvRouting", () => {
         setUrl("/");
         expect(isProjectPath()).toBe(false);
         expect(shouldRenderDashboard()).toBe(true);
+    });
+
+    test("treats preview api roots as equivalent with or without trailing slash", () => {
+        expect(isDefaultPreviewApiRoot("http://localhost:5055")).toBe(true);
+        expect(isDefaultPreviewApiRoot("http://localhost:5055/")).toBe(true);
+        expect(isDefaultPreviewApiRoot("http://localhost:5056/")).toBe(false);
     });
 });
