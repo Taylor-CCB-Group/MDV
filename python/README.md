@@ -144,6 +144,114 @@ with socketserver.TCPServer(("", 8000), CustomHandler) as httpd:
 
 ## Configuration
 
+## Column Operations CLI Examples
+
+Use these commands to update datasource columns in an existing MDV project.
+
+`--datasource` expects a datasource `name` from `datasources.json` (for example `cells`).
+
+### Drop columns
+
+Soft drop (default): remove column metadata from `datasources.json` only.
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --datasource cells --fields old_col1,old_col2
+```
+
+Soft drop with cleanup: also rewrite project JSON so charts don't reference removed fields (updates `views.json`, `state.json`, and relevant nested config under `datasources.json`).
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --datasource cells --fields old_col1,old_col2 --cleanup
+```
+
+Soft drop with cleanup + backup (recommended): snapshot JSON files under `json_backups/<timestamp>/` before rewriting.
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --datasource cells --fields old_col1,old_col2 --cleanup --backup
+```
+
+Preview without writing:
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --datasource cells --fields old_col1,old_col2 --dry-run
+```
+
+Restore latest JSON backup (no `--datasource` required; restores and exits):
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --restore-backup
+```
+
+Restore a specific JSON backup timestamp (restores and exits):
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --restore-backup-timestamp 2026-03-27T12-34-56Z
+```
+
+Hard drop: also delete the physical datasets from `datafile.h5`:
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --datasource cells --fields old_col1,old_col2 --hard
+```
+
+Allow best-effort behavior instead of failing on missing columns/references:
+
+```bash
+poetry run mdvtools drop-columns /path/to/project --datasource cells --fields old_col1,missing_col --no-strict
+```
+
+### Rename columns
+
+Rename display labels only (default, no HDF5 mutation):
+
+```bash
+poetry run mdvtools rename-columns /path/to/project --datasource cells --map old_col1:"My Label 1",old_col2:"My Label 2"
+```
+
+Preview rename:
+
+```bash
+poetry run mdvtools rename-columns /path/to/project --datasource cells --map old_col1:new_col1 --dry-run
+```
+
+Rename internal field ids (hard mode required):
+
+```bash
+poetry run mdvtools rename-columns /path/to/project --datasource cells --map old_col1:new_col1,old_col2:new_col2 --field-id --hard
+```
+
+Rename field ids with cleanup + backup (recommended for safety):
+
+```bash
+poetry run mdvtools rename-columns /path/to/project --datasource cells --map old_col1:new_col1 --field-id --hard --cleanup --backup
+```
+
+Restore latest JSON backup (no `--datasource` required; restores and exits):
+
+```bash
+poetry run mdvtools rename-columns /path/to/project --restore-backup
+```
+
+Restore a specific JSON backup timestamp (restores and exits):
+
+```bash
+poetry run mdvtools rename-columns /path/to/project --restore-backup-timestamp 2026-03-27T12-34-56Z
+```
+
+`--field-id` without `--hard` is rejected:
+
+```bash
+poetry run mdvtools rename-columns /path/to/project --datasource cells --map old_col1:new_col1 --field-id
+```
+
+### Notes
+
+- By default, operations are minimal-disruption and do not mutate `datafile.h5`.
+- `--hard` enables physical HDF5 changes and prints a warning banner.
+- `--dry-run` prints a JSON report of planned/validated changes.
+- `--backup` requires `--cleanup` and stores JSON snapshots under `json_backups/<timestamp>/`.
+- `--restore-backup` and `--restore-backup-timestamp` restore JSON only (`datasources.json`, `views.json`, `state.json`).
+
 ### User Configuration File
 
 MDV supports user-provided configuration for extensions via a JSON file specified through an environment variable:

@@ -268,6 +268,225 @@ class MDVProject:
             mds[index[0]] = ds
         self.datasources = mds
 
+    def _apply_string_replacements(self, obj: Any, replacements: dict[str, str]):
+        if isinstance(obj, dict):
+            return {key: self._apply_string_replacements(value, replacements) for key, value in obj.items()}
+        if isinstance(obj, list):
+            return [self._apply_string_replacements(item, replacements) for item in obj]
+        if isinstance(obj, str):
+            return replacements.get(obj, obj)
+        return obj
+
+    def _find_string_references(self, obj: Any, targets: set[str], path: str = "") -> list[str]:
+        hits: list[str] = []
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                child_path = f"{path}.{key}" if path else str(key)
+                hits.extend(self._find_string_references(value, targets, child_path))
+            return hits
+        if isinstance(obj, list):
+            for idx, item in enumerate(obj):
+                child_path = f"{path}[{idx}]"
+                hits.extend(self._find_string_references(item, targets, child_path))
+            return hits
+        if isinstance(obj, str) and obj in targets:
+            hits.append(path or "$")
+        return hits
+
+    def _get_rewritable_datasource_sections(self, ds: dict[str, Any]) -> dict[str, Any]:
+        rewritable_keys = [
+            "links",
+            "images",
+            "large_images",
+            "regions",
+            "interactions",
+            "offsets",
+            "genome_browser",
+            "tree_diagram",
+            "avivator",
+            "row_data_loader",
+            "binary_data_loader",
+            "deeptools",
+            "columnGroups",
+        ]
+        return {key: ds[key] for key in rewritable_keys if key in ds}
+
+    def _backup_project_json_files(self, *, files: list[str], dry_run: bool) -> dict[str, Any]:
+        report: dict[str, Any] = {"backupDir": None, "backedUp": []}
+        if dry_run:
+            return report
+        ts = time.strftime("%Y-%m-%dT%H-%M-%SZ", time.gmtime())
+        backup_dir = join(self.dir, "json_backups", ts)
+        os.makedirs(backup_dir, exist_ok=True)
+        report["backupDir"] = backup_dir
+        for f in files:
+            if exists(f):
+                dest = join(backup_dir, os.path.basename(f))
+                shutil.copy2(f, dest)
+                report["backedUp"].append(os.path.basename(f))
+        return report
+
+    def list_json_backups(self) -> list[str]:
+        backups_root = join(self.dir, "json_backups")
+        if not os.path.isdir(backups_root):
+            return []
+        dirs = [
+            name
+            for name in os.listdir(backups_root)
+            if os.path.isdir(join(backups_root, name))
+        ]
+        return sorted(dirs)
+
+    def restore_json_backup(self, *, timestamp: str | None = None, dry_run: bool = False) -> dict[str, Any]:
+        backups = self.list_json_backups()
+        if not backups:
+            raise FileNotFoundError("No json_backups found for this project.")
+        chosen = backups[-1] if timestamp is None else timestamp
+        if chosen not in backups:
+            raise FileNotFoundError(
+                f"Backup '{chosen}' not found. Available: {', '.join(backups[-10:])}"
+            )
+        backup_dir = join(self.dir, "json_backups", chosen)
+        wanted = {
+            "datasources.json": self.datasourcesfile,
+            "views.json": self.viewsfile,
+            "state.json": self.statefile,
+        }
+        report: dict[str, Any] = {
+            "restoredFrom": backup_dir,
+            "restoredFiles": [],
+            "missingInBackup": [],
+            "dry_run": dry_run,
+        }
+
+        def atomic_copy(src: str, dest: str):
+            parent = os.path.dirname(dest)
+            os.makedirs(parent, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(prefix=".restore_", dir=parent)
+            os.close(fd)
+            try:
+                shutil.copy2(src, tmp)
+                os.replace(tmp, dest)
+            finally:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+
+        with self.lock("write"):
+            for filename, dest in wanted.items():
+                src = join(backup_dir, filename)
+                if not exists(src):
+                    report["missingInBackup"].append(filename)
+                    continue
+                if not dry_run:
+                    atomic_copy(src, dest)
+                report["restoredFiles"].append(filename)
+        return report
+
+    def _cleanup_project_json_fields(
+        self,
+        datasource: str,
+        *,
+        dropped: set[str],
+        renamed: dict[str, str] | None,
+        strict: bool,
+        dry_run: bool,
+    ) -> dict[str, Any]:
+        renamed = renamed or {}
+        report: dict[str, Any] = {
+            "datasource": datasource,
+            "dropped": sorted(dropped),
+            "renamed": renamed,
+            "changed": {"views.json": [], "state.json": [], "datasources.json": []},
+            "blocked": [],
+        }
+
+        def rewrite(obj: Any, path: str) -> Any:
+            if isinstance(obj, dict):
+                out: dict[str, Any] = {}
+                for k, v in obj.items():
+                    child_path = f"{path}.{k}" if path else str(k)
+                    if k == "param" and isinstance(v, list):
+                        new_list: list[Any] = []
+                        removed_any = False
+                        changed_any = False
+                        for item in v:
+                            if isinstance(item, str) and item in dropped:
+                                removed_any = True
+                                continue
+                            if isinstance(item, str) and item in renamed:
+                                new_list.append(renamed[item])
+                                changed_any = True
+                            else:
+                                new_list.append(item)
+                        if removed_any or changed_any:
+                            report["changed"][current_file].append(child_path)
+                        if strict and isinstance(obj.get("type"), str) and len(v) > 0 and len(new_list) == 0:
+                            report["blocked"].append(
+                                f"{current_file}:{child_path} became empty for chart type '{obj.get('type')}'"
+                            )
+                        out[k] = new_list
+                        continue
+                    out[k] = rewrite(v, child_path)
+                return out
+            if isinstance(obj, list):
+                return [rewrite(item, f"{path}[{i}]") for i, item in enumerate(obj)]
+            if isinstance(obj, str):
+                if obj in renamed:
+                    report["changed"][current_file].append(path or "$")
+                    return renamed[obj]
+                return obj
+            return obj
+
+        # views.json
+        current_file = "views.json"
+        new_views = rewrite(self.views, "views")
+        if strict and report["blocked"]:
+            raise ValueError("Cleanup blocked: " + "; ".join(report["blocked"]))
+        # After rewrite, still block if any dropped strings remain in views.
+        remaining_view_hits = self._find_string_references(new_views, dropped, path="views")
+        if strict and remaining_view_hits:
+            raise ValueError(
+                "Cleanup incomplete; remaining references: "
+                + "; ".join(sorted(set(remaining_view_hits)))
+            )
+        if not dry_run:
+            self.views = new_views
+
+        # state.json
+        current_file = "state.json"
+        new_state = rewrite(self.state, "state")
+        if strict and report["blocked"]:
+            raise ValueError("Cleanup blocked: " + "; ".join(report["blocked"]))
+        remaining_state_hits = self._find_string_references(new_state, dropped, path="state")
+        if strict and remaining_state_hits:
+            raise ValueError(
+                "Cleanup incomplete; remaining references: "
+                + "; ".join(sorted(set(remaining_state_hits)))
+            )
+        if not dry_run:
+            self.state = new_state
+
+        # datasources.json nested sections for the affected datasource
+        current_file = "datasources.json"
+        ds = self.get_datasource_metadata(datasource)
+        sections = self._get_rewritable_datasource_sections(ds)
+        for section, payload in sections.items():
+            ds[section] = rewrite(payload, f"datasources.{datasource}.{section}")
+        remaining_ds_hits: list[str] = []
+        for section, payload in self._get_rewritable_datasource_sections(ds).items():
+            remaining_ds_hits.extend(
+                self._find_string_references(payload, dropped, path=f"datasources.{datasource}.{section}")
+            )
+        if strict and remaining_ds_hits:
+            raise ValueError(
+                "Cleanup incomplete; remaining references: "
+                + "; ".join(sorted(set(remaining_ds_hits)))
+            )
+        if not dry_run:
+            self.set_datasource_metadata(ds)
+
+        return report
+
     def add_images_to_datasource(
         self,
         ds: str,
@@ -758,6 +977,209 @@ class MDVProject:
             raise AttributeError(f"{datasource} is not a group")
         del gr[column]
         self.set_datasource_metadata(ds)
+
+    def drop_columns(
+        self,
+        datasource: str,
+        fields: list[str],
+        *,
+        strict: bool = True,
+        hard: bool = False,
+        dry_run: bool = False,
+        cleanup: bool = False,
+        backup: bool = False,
+    ) -> dict[str, Any]:
+        """Drop multiple columns from datasource metadata.
+
+        By default this is a soft operation (datasources.json + references only),
+        and does not mutate HDF5 unless hard=True.
+        """
+        ds = self.get_datasource_metadata(datasource)
+        existing_fields = {c["field"] for c in ds["columns"]}
+        requested = list(dict.fromkeys(fields))
+        missing = [field for field in requested if field not in existing_fields]
+        targets = [field for field in requested if field in existing_fields]
+        report: dict[str, Any] = {
+            "datasource": datasource,
+            "hard": hard,
+            "dry_run": dry_run,
+            "dropped": targets,
+            "missing": missing,
+            "strict": strict,
+            "failedRefs": [],
+            "cleanup": cleanup,
+            "backup": None,
+            "cleanupReport": None,
+        }
+        # If cleanup is requested, allow cleaning up references for columns that are already missing
+        # from datasource metadata (common when a project is already in a partially-broken state).
+        if strict and missing and not cleanup:
+            raise ValueError(f"Columns not found in datasource '{datasource}': {', '.join(missing)}")
+
+        target_set = set(targets)
+        cleanup_set = set(requested) if cleanup else target_set
+        if cleanup and cleanup_set:
+            if backup:
+                report["backup"] = self._backup_project_json_files(
+                    files=[self.datasourcesfile, self.viewsfile, self.statefile],
+                    dry_run=dry_run,
+                )
+            report["cleanupReport"] = self._cleanup_project_json_fields(
+                datasource,
+                dropped=cleanup_set,
+                renamed=None,
+                strict=strict,
+                dry_run=dry_run,
+            )
+        if cleanup_set:
+            ds_sections = self._get_rewritable_datasource_sections(ds)
+            for section, payload in ds_sections.items():
+                for hit in self._find_string_references(payload, cleanup_set, path=section):
+                    report["failedRefs"].append(f"datasources.{datasource}.{hit}")
+            for hit in self._find_string_references(self.views, cleanup_set, path="views"):
+                report["failedRefs"].append(hit)
+            for hit in self._find_string_references(self.state, cleanup_set, path="state"):
+                report["failedRefs"].append(hit)
+
+        if strict and report["failedRefs"]:
+            raise ValueError(
+                "Cannot drop columns while references still exist: "
+                + "; ".join(sorted(set(report["failedRefs"])))
+            )
+
+        if dry_run:
+            return report
+
+        if hard:
+            for field in targets:
+                self.remove_column(datasource, field)
+        else:
+            ds["columns"] = [col for col in ds["columns"] if col["field"] not in target_set]
+            self.set_datasource_metadata(ds)
+        return report
+
+    def rename_columns(
+        self,
+        datasource: str,
+        renames: dict[str, str],
+        *,
+        rename_field: bool = False,
+        strict: bool = True,
+        hard: bool = False,
+        dry_run: bool = False,
+        cleanup: bool = False,
+        backup: bool = False,
+    ) -> dict[str, Any]:
+        """Rename multiple columns in a datasource.
+
+        Default mode renames display names only (`column.name`) and keeps HDF5
+        datasets untouched. Renaming internal field ids requires hard=True.
+        """
+        if rename_field and not hard:
+            raise ValueError("Renaming field ids requires hard=True.")
+        if not renames:
+            return {
+                "datasource": datasource,
+                "hard": hard,
+                "dry_run": dry_run,
+                "renamed": {},
+                "missing": [],
+                "strict": strict,
+            }
+        ds = self.get_datasource_metadata(datasource)
+        existing_fields = {c["field"] for c in ds["columns"]}
+        requested_fields = list(renames.keys())
+        missing = [field for field in requested_fields if field not in existing_fields]
+        if strict and missing:
+            raise ValueError(f"Columns not found in datasource '{datasource}': {', '.join(missing)}")
+        effective_renames = {k: v for k, v in renames.items() if k in existing_fields}
+        for old_name, new_name in effective_renames.items():
+            if not isinstance(new_name, str) or not new_name.strip():
+                raise ValueError(f"Invalid target name for '{old_name}'.")
+        if rename_field:
+            target_fields = [new_name for new_name in effective_renames.values()]
+            if len(target_fields) != len(set(target_fields)):
+                raise ValueError("Duplicate field targets found in rename map.")
+            untouched_fields = existing_fields - set(effective_renames.keys())
+            collisions = sorted(set(target_fields) & untouched_fields)
+            if collisions:
+                raise ValueError(
+                    "Field rename would collide with existing columns: "
+                    + ", ".join(collisions)
+                )
+
+        report: dict[str, Any] = {
+            "datasource": datasource,
+            "hard": hard,
+            "dry_run": dry_run,
+            "rename_field": rename_field,
+            "renamed": effective_renames,
+            "missing": missing,
+            "strict": strict,
+            "cleanup": cleanup,
+            "backup": None,
+            "cleanupReport": None,
+        }
+        if dry_run:
+            return report
+
+        if cleanup and rename_field and effective_renames and backup:
+            report["backup"] = self._backup_project_json_files(
+                files=[self.datasourcesfile, self.viewsfile, self.statefile],
+                dry_run=dry_run,
+            )
+
+        if rename_field:
+            h5 = self._get_h5_handle()
+            try:
+                gr = h5[datasource]
+                if not isinstance(gr, h5py.Group):
+                    raise AttributeError(f"{datasource} is not a group")
+                for old_field, new_field in effective_renames.items():
+                    if old_field == new_field:
+                        continue
+                    if gr.get(new_field):
+                        raise ValueError(
+                            f"Cannot rename '{old_field}' to '{new_field}' because target exists in HDF5."
+                        )
+                    if not gr.get(old_field):
+                        raise ValueError(
+                            f"Cannot rename '{old_field}' because it does not exist in HDF5."
+                        )
+                    gr.copy(old_field, new_field)
+                    del gr[old_field]
+            finally:
+                h5.close()
+
+        for col in ds["columns"]:
+            old_field = col["field"]
+            if old_field not in effective_renames:
+                continue
+            target = effective_renames[old_field]
+            if rename_field:
+                col["field"] = target
+                if col.get("name") == old_field:
+                    col["name"] = target
+            else:
+                col["name"] = target
+
+        if rename_field:
+            ds_sections = self._get_rewritable_datasource_sections(ds)
+            for section, payload in ds_sections.items():
+                ds[section] = self._apply_string_replacements(payload, effective_renames)
+            self.views = self._apply_string_replacements(self.views, effective_renames)
+            self.state = self._apply_string_replacements(self.state, effective_renames)
+            if cleanup and effective_renames:
+                report["cleanupReport"] = self._cleanup_project_json_fields(
+                    datasource,
+                    dropped=set(),
+                    renamed=effective_renames,
+                    strict=strict,
+                    dry_run=dry_run,
+                )
+
+        self.set_datasource_metadata(ds)
+        return report
 
     def add_annotations(
         self,
