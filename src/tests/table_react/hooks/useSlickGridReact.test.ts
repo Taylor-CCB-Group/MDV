@@ -294,24 +294,27 @@ describe("useSlickGridReact", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             expect(result.current.cloneableColumns).toEqual([
-                { field: "age", name: "Age" },
-                { field: "id", name: "Id" },
-                { field: "name", name: "Name" },
+                { field: "age", name: "Age", datatype: "integer" },
+                { field: "id", name: "Id", datatype: "unique", stringLength: 2 },
+                { field: "name", name: "Name", datatype: "text" },
             ]);
         });
 
-        test("should create a new editable column and insert it at the requested position", () => {
+        test("should create a new empty typed column and insert it at the requested position", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             act(() => {
                 result.current.handleAddColumn({
                     name: "annotation",
-                    cloneColumn: "name",
+                    datatype: "double",
                     position: 2,
                 });
             });
 
-            expect(createColumnMock).toHaveBeenCalledWith("annotation", "name");
+            expect(createColumnMock).toHaveBeenCalledWith({
+                name: "annotation",
+                datatype: "double",
+            });
             expect(mockConfig.param).toEqual(["age", "annotation", "name", "id"]);
             expect(mockConfig.order).toEqual({
                 age: 0,
@@ -322,6 +325,25 @@ describe("useSlickGridReact", () => {
             expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["annotation"]);
         });
 
+        test("should pass clone metadata through to the model", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "copied_age",
+                    datatype: "text",
+                    cloneColumn: "age",
+                    position: 3,
+                });
+            });
+
+            expect(createColumnMock).toHaveBeenCalledWith({
+                name: "copied_age",
+                datatype: "text",
+                cloneColumn: "age",
+            });
+        });
+
         test("should reject duplicate column names", () => {
             mockDataStore.columnIndex = { age: { field: "age" } };
             const { result } = renderHook(() => useSlickGridReact());
@@ -329,7 +351,7 @@ describe("useSlickGridReact", () => {
             act(() => {
                 result.current.handleAddColumn({
                     name: "age",
-                    cloneColumn: null,
+                    datatype: "text",
                     position: 1,
                 });
             });

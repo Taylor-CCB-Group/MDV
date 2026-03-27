@@ -1,5 +1,33 @@
 import { getExportCsvStream } from "@/datastore/dataExportUtils";
 
+const DEFAULT_MULTITEXT_CAPACITY = 24;
+const DEFAULT_UNIQUE_STRING_LENGTH = 64;
+
+/**
+ * Helper to clone data type agnostically 
+ */
+function cloneTypedArrayBuffer(data) {
+    const buffer = new SharedArrayBuffer(data.byteLength);
+    const ctor = data.constructor;
+    const copy = new ctor(buffer);
+    copy.set(data, 0);
+    return buffer;
+}
+
+/**
+ * Helper to parse positive integer or use fallback
+ */
+function parsePositiveIntOrDefault(value, fallback, label) {
+    if (value == null || value === "") {
+        return fallback;
+    }
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(`${label} must be a positive integer`);
+    }
+    return parsed;
+}
+
 class DataModel {
     /**
      * * @typedef {import("@/datastore/DataStore").default} DataStore
@@ -86,27 +114,127 @@ class DataModel {
     }
 
     /**
-     * @param {string} name
-     * @param {string} [cloneCol] optional
+     * @param {string|Object} column - `string` when we clone a column 
+     * and `object`: `{name, datatype, stringLength, delimiter}` when we create a new empty column
+     * 
+     * @param {string} [cloneCol] - optional legacy clone source
      */
-    createColumn(name, cloneCol) {
-        const col = {
-            name: name,
-            field: name,
-            datatype: "text",
+    createColumn(column, cloneCol) {
+        const columnSpec =
+            typeof column === "string"
+                ? {
+                    name: column,
+                    cloneColumn: cloneCol,
+                    datatype: cloneCol ? undefined : "text",
+                }
+                : column;
+
+        if (!columnSpec?.name) {
+            throw new Error("Column name is required");
+        }
+
+        if (columnSpec.cloneColumn) {
+            this._createClonedColumn(columnSpec.name, columnSpec.cloneColumn);
+            return;
+        }
+
+        this._createEmptyColumn(columnSpec);
+    }
+
+    /**
+     * 
+     * @param {string} columnName - name of the new column
+     * @param {string} cloneColumnName - name of the column to be cloned from
+     * 
+     * Fetch the column spec of the actual column and assign them to the new column specs
+     * Create a deep copy of the data of the actual column to avoid mutations
+     * Add the new column to the datastore
+     */
+    _createClonedColumn(columnName, cloneColumnName) {
+        const clonedColumn = this.dataStore.columnIndex[cloneColumnName];
+        if (!clonedColumn?.data) {
+            throw new Error(`Column ${cloneColumnName} not found`);
+        }
+
+        const newColumn = {
+            name: columnName,
+            field: columnName,
+            datatype: clonedColumn.datatype,
             editable: true,
-            values: [""],
         };
-        let data = new Array(this.dataStore.size).fill("");
-        if (cloneCol) {
-            const sourceColumn = this.dataStore.columnIndex[cloneCol];
-            if (!sourceColumn) {
-                throw new Error(`Column ${cloneCol} not found`);
-            }
-            data = Array.from({ length: this.dataStore.size }, (_, index) => {
-                const value = sourceColumn.getValue(index);
-                return value == null ? "" : String(value);
-            });
+
+        // Assign the specs of the cloned column to new column
+        if (clonedColumn.values) {
+            newColumn.values = clonedColumn.values.slice();
+        }
+        if (clonedColumn.stringLength) {
+            newColumn.stringLength = clonedColumn.stringLength;
+        }
+        if (clonedColumn.delimiter) {
+            newColumn.delimiter = clonedColumn.delimiter;
+        }
+        if (clonedColumn.is_url) {
+            newColumn.is_url = clonedColumn.is_url;
+        }
+
+        this.dataStore.addColumn(
+            newColumn,
+            // clone the data of existing column to avoid mutations
+            cloneTypedArrayBuffer(clonedColumn.data),
+            true,
+        );
+    }
+
+    /**
+     * 
+     * @param {object} columnSpec - Column specs of new column to be created
+     * 
+     * Assign column specs based on the datatype and add the column to datastore
+     */
+    _createEmptyColumn(columnSpec) {
+        const datatype = columnSpec.datatype || "text";
+        const col = {
+            name: columnSpec.name,
+            field: columnSpec.name,
+            datatype,
+            editable: true,
+        };
+
+        let data;
+        // Prefill the column specs with default values based on the datatype
+        if (datatype === "text" || datatype === "text16") {
+            col.values = [""];
+            data = new Array(this.dataStore.size).fill("");
+        } else if (
+            datatype === "double" ||
+            datatype === "integer" ||
+            datatype === "int32"
+        ) {
+            //! int32 cannot truly represent NaN, so empty int32 cells currently coerce during storage and need a real missing-value strategy later.
+            data = new Array(this.dataStore.size).fill(Number.NaN);
+        } else if (datatype === "multitext") {
+            const stringLength = parsePositiveIntOrDefault(
+                columnSpec.stringLength,
+                DEFAULT_MULTITEXT_CAPACITY,
+                "multitext capacity",
+            );
+            col.values = [];
+            col.stringLength = stringLength;
+            col.delimiter = columnSpec.delimiter || ",";
+            const buffer = new SharedArrayBuffer(this.dataStore.size * stringLength * 2);
+            const arr = new Uint16Array(buffer);
+            arr.fill(65535);
+            data = buffer;
+        } else if (datatype === "unique") {
+            const stringLength = parsePositiveIntOrDefault(
+                columnSpec.stringLength,
+                DEFAULT_UNIQUE_STRING_LENGTH,
+                "unique stringLength",
+            );
+            col.stringLength = stringLength;
+            data = new SharedArrayBuffer(this.dataStore.size * stringLength);
+        } else {
+            throw new Error(`Unsupported datatype: ${datatype}`);
         }
         this.dataStore.addColumn(col, data, true);
     }

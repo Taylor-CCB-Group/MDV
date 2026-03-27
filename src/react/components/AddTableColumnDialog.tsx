@@ -1,5 +1,7 @@
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
+import type { DataType } from "@/charts/charts";
 import {
+    Autocomplete,
     Button,
     Checkbox,
     Dialog,
@@ -7,8 +9,6 @@ import {
     DialogContent,
     DialogTitle,
     FormControlLabel,
-    MenuItem,
-    Select,
     Stack,
     TextField,
     Typography,
@@ -18,19 +18,40 @@ import { useEffect, useState } from "react";
 type CloneableColumn = {
     field: string;
     name: string;
+    datatype: DataType;
+    stringLength?: number;
+    delimiter?: string;
 };
+
+export type AddColumnParams = {
+    name: string;
+    datatype: DataType;
+    cloneColumn?: string | null;
+    position?: number | null;
+    stringLength?: number | null;
+    delimiter?: string | null;
+};
+
+type AddColumnMode = "empty" | "clone";
 
 type AddTableColumnDialogProps = {
     open: boolean;
     cloneableColumns: CloneableColumn[];
     defaultPosition: number;
     onClose: () => void;
-    onSubmit: (args: {
-        name: string;
-        cloneColumn: string | null;
-        position: number | null;
-    }) => void;
+    onSubmit: (args: AddColumnParams) => void;
 };
+
+//! We currently don't support int32 datatype column creation
+//! int32 cannot truly represent NaN, so empty int32 cells currently coerce during storage and need a real missing-value strategy later.
+const DATATYPE_OPTIONS: DataType[] = [
+    "text",
+    "text16",
+    "integer",
+    "double",
+    "unique",
+    "multitext",
+];
 
 const AddTableColumnDialog = ({
     open,
@@ -40,26 +61,45 @@ const AddTableColumnDialog = ({
     onSubmit,
 }: AddTableColumnDialogProps) => {
     const [name, setName] = useState("");
-    const [copyExistingColumn, setCopyExistingColumn] = useState(false);
+    const [mode, setMode] = useState<AddColumnMode>("empty");
+    const [datatype, setDatatype] = useState<DataType>("text");
     const [cloneColumn, setCloneColumn] = useState("");
     const [position, setPosition] = useState(String(defaultPosition));
+    const [stringLength, setStringLength] = useState("");
+    const [delimiter, setDelimiter] = useState(",");
 
+    const selectedCloneColumn = cloneableColumns.find((column) => column.field === cloneColumn);
+    const selectedDatatype = mode === "clone" ? selectedCloneColumn?.datatype ?? "text" : datatype;
+
+    // Reset values when the dialog is opened to avoid stale values
     useEffect(() => {
         if (!open) {
             return;
         }
         setName("");
-        setCopyExistingColumn(false);
+        setMode("empty");
+        setDatatype("text");
         setCloneColumn(cloneableColumns[0]?.field ?? "");
         setPosition(String(defaultPosition));
+        setStringLength("");
+        setDelimiter(",");
     }, [open, cloneableColumns, defaultPosition]);
 
     const handleSubmit = () => {
         const parsedPosition = Number.parseInt(position, 10);
+        const parsedStringLength = Number.parseInt(stringLength, 10);
         onSubmit({
             name,
-            cloneColumn: copyExistingColumn && cloneColumn ? cloneColumn : null,
+            datatype: selectedDatatype,
+            cloneColumn: mode === "clone" && cloneColumn ? cloneColumn : null,
             position: Number.isNaN(parsedPosition) ? null : parsedPosition,
+            stringLength:
+                selectedDatatype === "unique" || selectedDatatype === "multitext"
+                    ? Number.isNaN(parsedStringLength)
+                        ? null
+                        : parsedStringLength
+                    : null,
+            delimiter: selectedDatatype === "multitext" ? delimiter : null,
         });
     };
 
@@ -88,34 +128,124 @@ const AddTableColumnDialog = ({
                     <FormControlLabel
                         control={
                             <Checkbox
-                                checked={copyExistingColumn}
-                                onChange={(event) => setCopyExistingColumn(event.target.checked)}
+                                checked={mode === "clone"}
+                                onChange={(event) => {
+                                    setMode(event.target.checked ? "clone" : "empty");
+                                }}
                                 disabled={cloneableColumns.length === 0}
                             />
                         }
-                        label="Copy Existing Column"
+                        label="Clone existing column"
                     />
 
-                    {copyExistingColumn && (
-                        <Select
-                            value={cloneColumn}
-                            onChange={(event) => setCloneColumn(String(event.target.value))}
-                            disabled={!copyExistingColumn || cloneableColumns.length === 0}
-                            fullWidth
-                            displayEmpty
-                        >
-                            {cloneableColumns.length === 0 ? (
-                                <MenuItem value="" disabled>
-                                    No text columns available
-                                </MenuItem>
-                            ) : (
-                                cloneableColumns.map((column) => (
-                                    <MenuItem key={column.field} value={column.field}>
-                                        {column.name}
-                                    </MenuItem>
-                                ))
+                    {mode === "clone" ? (
+                        <>
+                            <Autocomplete
+                                options={cloneableColumns}
+                                value={selectedCloneColumn}
+                                onChange={(_, value) => {
+                                    if (value) {
+                                        setCloneColumn(value.field);
+                                    }
+                                }}
+                                isOptionEqualToValue={(option, value) => option.field === value.field}
+                                disableClearable
+                                getOptionLabel={(option) =>
+                                    typeof option === "string"
+                                        ? option
+                                        : option.name
+                                }
+                                renderOption={(props, option) => (
+                                    <li {...props}>
+                                            <Typography variant="body1">{option.name}</Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="textDisabled"
+                                                sx={{
+                                                    ml: 1,
+                                                    fontStyle: "italic",
+                                                }}
+                                            >
+                                                ({option.datatype})
+                                            </Typography>
+                                    </li>
+                                )}
+                                disabled={cloneableColumns.length === 0}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Column to clone"
+                                        placeholder="Search columns"
+                                        fullWidth
+                                    />
+                                )}
+                            />
+
+                            <TextField
+                                label="Inherited Datatype"
+                                value={selectedDatatype}
+                                fullWidth
+                                disabled
+                                slotProps={{
+                                    input: {
+                                        readOnly: true,
+                                    }
+                                }}
+                            />
+                        </>
+                    ) : (
+                        <Autocomplete
+                            options={DATATYPE_OPTIONS}
+                            value={datatype}
+                            onChange={(_, value) => setDatatype((value ?? "text") as DataType)}
+                            getOptionLabel={(option) => option}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Datatype"
+                                    placeholder="Search datatype"
+                                    fullWidth
+                                />
                             )}
-                        </Select>
+                        />
+                    )}
+
+                    {selectedDatatype === "unique" && mode === "empty" && (
+                        <TextField
+                            label="Max Length"
+                            value={stringLength}
+                            onChange={(event) => setStringLength(event.target.value)}
+                            type="number"
+                            slotProps={{
+                                htmlInput: {
+                                    min: 1,
+                                }
+                            }}
+                            fullWidth
+                        />
+                    )}
+
+                    {selectedDatatype === "multitext" && mode === "empty" && (
+                        <>
+                            <TextField
+                                label="Capacity"
+                                value={stringLength}
+                                onChange={(event) => setStringLength(event.target.value)}
+                                type="number"
+                                slotProps={{
+                                    htmlInput: {
+                                        min: 1,
+                                    }
+                                }}
+                                fullWidth
+                            />
+                            <TextField
+                                label="Delimiter"
+                                value={delimiter}
+                                onChange={(event) => setDelimiter(event.target.value)}
+                                fullWidth
+                            />
+                        </>
                     )}
 
                     <TextField
@@ -123,12 +253,16 @@ const AddTableColumnDialog = ({
                         value={position}
                         onChange={(event) => setPosition(event.target.value)}
                         type="number"
-                        inputProps={{ min: 1 }}
+                        slotProps={{
+                            htmlInput: {
+                                min: 1,
+                            }
+                        }}
                         fullWidth
                     />
 
                     <Typography variant="body2" color="text.secondary">
-                        New columns are editable and can be used for annotations.
+                        New columns are editable. Empty columns use the selected datatype, and cloned columns inherit their source datatype.
                     </Typography>
                 </Stack>
             </DialogContent>

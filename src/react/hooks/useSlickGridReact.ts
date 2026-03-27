@@ -11,6 +11,7 @@ import useSortedFilteredIndices from "./useSortedFilteredIndices";
 import { InputEditor } from "slickgrid-react";
 import { DataModel } from "@/table/DataModel";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import type { AddColumnParams } from "../components/AddTableColumnDialog";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -497,9 +498,16 @@ const useSlickGridReact = () => {
         setIsAddColumnDialogOpen(false);
     }, []);
 
+    // Columns to be displayed for cloning
     const cloneableColumns = useMemo(() => {
         return orderedParamColumns
-            .map((column) => ({ field: column.field, name: column.name }))
+            .map((column) => ({
+                field: column.field,
+                name: column.name,
+                datatype: column.datatype,
+                stringLength: column.stringLength,
+                delimiter: column.delimiter,
+            }))
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [orderedParamColumns]);
 
@@ -507,12 +515,15 @@ const useSlickGridReact = () => {
         return config.include_index ? 2 : Math.min(2, orderedParamColumns.length + 1);
     }, [config.include_index, orderedParamColumns.length]);
 
-    const handleAddColumn = useCallback((args: {
-        name: string;
-        cloneColumn: string | null;
-        position: number | null;
-    }) => {
-        const trimmedName = args.name.trim();
+    const handleAddColumn = useCallback(({
+        name,
+        datatype,
+        cloneColumn,
+        position,
+        stringLength,
+        delimiter,
+    }: AddColumnParams) => {
+        const trimmedName = name.trim();
 
         if (!trimmedName) {
             setFeedbackAlert({
@@ -534,18 +545,27 @@ const useSlickGridReact = () => {
 
         try {
             const dataModel = new DataModel(dataStore, { autoupdate: false });
-            dataModel.createColumn(trimmedName, args.cloneColumn ?? undefined);
+            // Create a new column
+            dataModel.createColumn({
+                name: trimmedName,
+                datatype: datatype,
+                cloneColumn,
+                stringLength,
+                delimiter,
+            });
 
+            // Get the position of the column to be inserted
             const orderedFields = orderedParamColumnsRef.current.map((column) => column.field);
             const displayedFields = config.include_index
                 ? ["__index__", ...orderedFields]
                 : [...orderedFields];
-            const parsedPosition = args.position ?? displayedFields.length + 1;
+            const parsedPosition = position ?? displayedFields.length + 1;
             const insertionIndex = Math.min(
                 Math.max(parsedPosition - 1, 0),
                 displayedFields.length,
             );
 
+            // Insert the column in the position and update the order and param fields
             displayedFields.splice(insertionIndex, 0, trimmedName);
             const nextFields = displayedFields.filter((field) => field !== "__index__");
             const nextOrder = Object.fromEntries(
@@ -557,6 +577,7 @@ const useSlickGridReact = () => {
                 config.order = nextOrder;
             });
 
+            // Notify datastore and rerender the grid
             dataStore.dataChanged([trimmedName]);
             gridRef.current?.slickGrid?.invalidate();
             setIsAddColumnDialogOpen(false);
@@ -570,8 +591,8 @@ const useSlickGridReact = () => {
                 stack: error.stack,
                 metadata: {
                     columnName: trimmedName,
-                    cloneColumn: args.cloneColumn,
-                    position: args.position,
+                    cloneColumn,
+                    position,
                 },
             });
         }

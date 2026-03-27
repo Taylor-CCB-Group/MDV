@@ -1140,9 +1140,15 @@ export class ChartManager {
             };
             const numRows = dataStore.size;
             
-            // Add stringLength to metadata for unique columns (required by server)
-            if (cl.datatype === "unique" && cl.stringLength) {
+            // Add datatype-specific metadata required to reconstruct client-created columns on reload.
+            if (
+                (cl.datatype === "unique" || cl.datatype === "multitext") &&
+                cl.stringLength
+            ) {
                 md.stringLength = cl.stringLength;
+            }
+            if (cl.datatype === "multitext" && cl.delimiter) {
+                md.delimiter = cl.delimiter;
             }
             
             let arr;
@@ -1171,7 +1177,8 @@ export class ChartManager {
                     }
 
                     const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
-                    const decoded = textDecoder.decode(rowBytes);
+                    // TextDecoder cannot decode a SharedArrayBuffer-backed view in some browsers.
+                    const decoded = textDecoder.decode(Uint8Array.from(rowBytes));
                     // Remove null padding characters
                     arr[i] = decoded.replace(/\0+$/, "");
                 }
