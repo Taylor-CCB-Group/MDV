@@ -17,7 +17,8 @@ const configDir = path.dirname(fileURLToPath(import.meta.url));
 
 
 const flaskURL = "http://127.0.0.1:5055";
-const port = 5170;
+const port = Number(process.env.PORT || process.env.VITE_PORT || 5170);
+const build = (process.env.build || "desktop_pt") as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 // maybe also the various build configurations at some point.
@@ -47,7 +48,6 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  * other methods are supposed to be for replacing other webpack configs.
  */
 function getRollupOptions() {
-    const build = process.env.build || "desktop_pt" as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
@@ -73,8 +73,7 @@ function getRollupOptions() {
         }
     } if (build === 'dev_pt') {
         // version of vite build used for netlify deploy preview & devserver, using default 'index.html' entrypoint
-        // (which as of writing refers to same static_index.ts as desktop_pt)
-        // nb, localhost:5170/catalog_dev.html works on devserver without needing to change this.
+        // which now picks dashboard vs project viewer at runtime.
         return {}
     } if (build === 'desktop') {
         return {
@@ -106,9 +105,7 @@ const proxyOptions = { target: flaskURL, changeOrigin: true };
 // ... and then this is a bit more concise than 
 const proxy = [
     '^/(get_|images|tracks|save|chat).*', // these routes are proxied to flask server in 'single project' mode
-    '^/project/.*/\?', //this works with ?dir=/project/id/foo...
-    //will fail if url has search params <-- ? (what will fail?)
-    //will cause problems if we have json files that don't want to be proxied
+    '^/project/[^/]+/.+', // proxy nested project routes, but keep /project/:id for the Vite app shell
     '^/.*\\.(json|b|gz)$',
     '/projects',
     '/create_project',
@@ -133,11 +130,6 @@ proxy['/socket.io'] = {
     // ^^ not helping either way...
 }
 
-// not sure how we should make the root route work with vite devserver...
-// proxy['/'] = {
-//     target: "/catalog_dev.html"
-// };
-
 export default defineConfig(async (): Promise<UserConfig> => {
     // For local development, try to get Git info. This is guarded by a check for the .git directory
     // to prevent errors in environments where git is not available (like during Docker build, where
@@ -161,7 +153,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
     process.env.VITE_BUILD_DATE = new Date().toISOString();
 
     return {
-    base: process.env.asset_base || "./",
+    base: process.env.asset_base || (build === 'dev_pt' ? "/" : "./"),
     server: {
         headers: {
             "Cross-Origin-Embedder-Policy": "require-corp",

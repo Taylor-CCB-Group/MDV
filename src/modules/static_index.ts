@@ -13,6 +13,7 @@ import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import type { DataSource } from "@/charts/charts";
 import { getProjectName } from "./ProjectContext";
+import { getApiRootFromDir, getProjectDirFromLocation } from "@/utils/mdvRouting";
 import { createMdvPortal } from "@/react/react_utils";
 import ProjectStateHandlerWrapper from "@/react/ProjectStateHandler";
 import type { Root } from "react-dom/client";
@@ -36,7 +37,7 @@ window.mdv = {
     chartTypes: BaseChart.types,
 };
 
-document.addEventListener("DOMContentLoaded", async () => {
+async function startLoadData() {
     try {
         await loadData();
     } catch (e) {
@@ -45,7 +46,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.body.style.textAlign = "center";
         document.body.innerHTML = `<h1>Error loading data</h1><p>${e}</p>`;
     }
-});
+}
 
 /// --- this section is a bit of a mess, but it works for now ---
 //(copilot suggesting "this is a bit of a mess" is a bit rude, but in this case it's an understatement)
@@ -58,7 +59,7 @@ const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
 const isPopout = urlParams.get("popout") === "true";
 // if there is no dir parameter, use the flaskURL to proxy requests to the python server
-const dir = urlParams.get("dir") || (isPopout ? "" : flaskURL);
+const dir = isPopout ? "" : getProjectDirFromLocation();
 function getRoot(dir: string) {
     // const url = new URL(dir);
     // return url.origin + url.pathname;
@@ -77,13 +78,19 @@ let stateHandlerContainer: HTMLElement | null = null;
 let stateHandlerRoot: Root | null = null;
 
 // getting the project name by passing project id
-getProjectName(Number(project_id)).then((project_name) => {
+getProjectName(Number(project_id), getApiRootFromDir(root)).then((project_name) => {
     document.title = `MDV - ${project_name}`
 });
 /// --- end of messy section ---
 
 // set title of page to the data directory
 if (isPopout) document.title = "MDV popout";
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startLoadData, { once: true });
+} else {
+    void startLoadData();
+}
 
 async function loadData() {
     // setupDebug();

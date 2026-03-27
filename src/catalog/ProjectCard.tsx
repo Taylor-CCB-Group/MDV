@@ -32,6 +32,7 @@ import ProjectSettingsModal from "./ProjectSettingsModal";
 import type { Permissions, ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
 import usePermissions from "./PermissionsContext";
+import { buildProjectUrl } from "@/utils/mdvRouting";
 
 export interface ProjectCardProps {
     id: string;
@@ -80,10 +81,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const { permissions: operationPermissions, isPublicPage } = usePermissions();
     
     // todo - review how we do stuff like this
-    const base = import.meta.env.DEV
-        ? "http://localhost:5170?dir=/"
-        : "";
-    const href = `${base}project/${id}`;
+    const href = buildProjectUrl(id);
     
     const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
