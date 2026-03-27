@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { Feature, GeoJsonProperties, Geometry } from "geojson";
 import { useProject } from "@/modules/ProjectContext";
 import { useChartID, useFieldSpec, useFilteredIndices, useRegion } from "../hooks";
-import { useHighlightedIndices, useHighlightRows } from "../selectionHooks";
+import { getHighlightModifiers, useHighlightedIndices, useHighlightRowUpdater } from "../selectionHooks";
 import { getVivId } from "./avivatorish/MDVivViewer";
 
 type GeoJsonFeatureProperties = GeoJsonProperties & {
@@ -24,10 +24,12 @@ export function useShapesLayer(showShapes: boolean) {
     const id = useChartID();
     const { root } = useProject();
     const { json } = useRegion();
-    const cellIdColumn = useFieldSpec("EntityID"); //!!!!!! we need a better basis on which to associate id. cell_id has `_N` after merge...
+    //!!!!!! we need a better basis on which to associate id. cell_id has `_N` after merge...
+    //I have a project where EntityID gets the right result, but that isn't a general case.
+    const cellIdColumn = useFieldSpec("EntityID"); 
     const filteredIndices = useFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
-    const highlightRows = useHighlightRows();
+    const updateHighlightedRows = useHighlightRowUpdater();
     const layerId = `json_${getVivId(`${id}detail-react`)}`;
     const dataUrl = useMemo(() => (json ? `${root}/${json}` : null), [json, root]);
 
@@ -106,12 +108,12 @@ export function useShapesLayer(showShapes: boolean) {
                 getLineWidth: [geoJsonState?.highlightedIds],
                 getFilterValue: [geoJsonState?.visibleIds, geoJsonState?.highlightedIds],
             },
-            onClick: ({ object }) => {
+            onClick: ({ object }, event) => {
                 const featureId = getGeoJsonFeatureId(object as GeoJsonFeature | undefined);
                 if (featureId == null) return;
                 const rowIndex = geoJsonState?.rowIndexById.get(featureId);
                 if (rowIndex === undefined) return;
-                highlightRows([rowIndex]);
+                updateHighlightedRows(rowIndex, getHighlightModifiers(event));
             },
             //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
             getText: (feature) => feature.properties?.DN,
@@ -121,7 +123,7 @@ export function useShapesLayer(showShapes: boolean) {
             visible: showShapes,
         };
         return new GeoJsonLayer<GeoJsonFeature>(layerProps);
-    }, [dataUrl, geoJsonState, highlightRows, layerId, showShapes]);
+    }, [dataUrl, geoJsonState, layerId, showShapes, updateHighlightedRows]);
 }
 
 export default useShapesLayer;
