@@ -7,13 +7,6 @@ import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 const editorClassName = "TextEditorWithMaxLength";
-const createColumnMock = vi.fn();
-
-vi.mock("@/table/DataModel", () => ({
-    DataModel: vi.fn().mockImplementation(() => ({
-        createColumn: createColumnMock,
-    })),
-}));
 
 // Mock all the context hooks
 vi.mock("@/react/context", () => ({
@@ -90,6 +83,9 @@ describe("useSlickGridReact", () => {
         mockDataStore = {
             dataHighlighted: vi.fn(),
             dataChanged: vi.fn(),
+            addColumn: vi.fn(),
+            addListener: vi.fn(),
+            size: 3,
             columnIndex: {},
         };
 
@@ -311,10 +307,7 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            expect(createColumnMock).toHaveBeenCalledWith({
-                name: "annotation",
-                datatype: "double",
-            });
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
             expect(mockConfig.param).toEqual(["age", "annotation", "name", "id"]);
             expect(mockConfig.order).toEqual({
                 age: 0,
@@ -328,6 +321,16 @@ describe("useSlickGridReact", () => {
         test("should pass clone metadata through to the model", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
+            mockDataStore.columnIndex = {
+                age: {
+                    field: "age",
+                    name: "Age",
+                    datatype: "integer",
+                    data: new Float32Array([1, 2, 3]),
+                    getValue: (idx: number) => [1, 2, 3][idx],
+                },
+            };
+
             act(() => {
                 result.current.handleAddColumn({
                     name: "copied_age",
@@ -337,10 +340,13 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            expect(createColumnMock).toHaveBeenCalledWith({
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+            const [column] = mockDataStore.addColumn.mock.calls[0];
+            expect(column).toMatchObject({
                 name: "copied_age",
-                datatype: "text",
-                cloneColumn: "age",
+                field: "copied_age",
+                datatype: "integer",
+                editable: true,
             });
         });
 
@@ -356,7 +362,7 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            expect(createColumnMock).not.toHaveBeenCalled();
+            expect(mockDataStore.addColumn).not.toHaveBeenCalled();
             expect(result.current.feedbackAlert).toEqual(
                 expect.objectContaining({
                     type: "error",
