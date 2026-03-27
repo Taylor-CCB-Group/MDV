@@ -84,6 +84,17 @@ export function getApiRootFromDir(dir: string) {
     return trimTrailingSlash(`${url.origin}${apiPath}`) || url.origin;
 }
 
+export function normalizeApiRoot(apiRoot: string) {
+    if (!apiRoot || apiRoot === "/") return "/";
+
+    if (isAbsoluteUrl(apiRoot)) {
+        return ensureTrailingSlash(trimTrailingSlash(apiRoot));
+    }
+
+    const normalized = apiRoot.startsWith("/") ? apiRoot : `/${apiRoot}`;
+    return ensureTrailingSlash(trimTrailingSlash(normalized));
+}
+
 export function getDashboardApiRoot() {
     const dir = getDirParam();
     if (!dir) {

@@ -1,6 +1,6 @@
 import useBuildInfo, {type BuildInfo} from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
-import { buildApiUrl, getApiRootFromDir, getProjectDirFromLocation } from "@/utils/mdvRouting";
+import { buildApiUrl, getApiRootFromDir, getProjectDirFromLocation, normalizeApiRoot } from "@/utils/mdvRouting";
 import axios from "axios";
 import {
     type PropsWithChildren,
@@ -49,11 +49,12 @@ export function getProjectInfoBase(): ProjectInfoBase {
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
     const { chartManager } = window.mdv;
     //! might need to be a bit careful if we end up using this
-    const mainApiRoute =
-        chartManager.config.mdv_api_root || getApiRootFromDir(root);
+    const mainApiRoute = normalizeApiRoot(
+        chartManager.config.mdv_api_root || getApiRootFromDir(root),
+    );
     // const root = mainApiRoute; // todo establish that we have an actual consistent logic for this
     //! only applies when running with the associated project API routing...
-    const projectApiRoute = `${mainApiRoute}/project/${projectName}/`.replace('//', '/');
+    const projectApiRoute = buildApiUrl(`project/${projectName}`, mainApiRoute).replace(/\/$/, "") + "/";
     return {
         root,
         staticFolder,
