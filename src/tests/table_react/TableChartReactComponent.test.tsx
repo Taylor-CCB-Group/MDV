@@ -13,6 +13,22 @@ vi.mock("slickgrid-react", () => ({
     ),
 }));
 
+vi.mock("@/react/components/FindAndReplaceDialog", () => ({
+    default: () => <div data-testid="mock-find-replace-dialog" />,
+}));
+
+vi.mock("@/react/components/AddTableColumnDialog", () => ({
+    default: () => <div data-testid="mock-add-column-dialog" />,
+}));
+
+vi.mock("@/react/components/BulkEditColumnDialog", () => ({
+    default: () => <div data-testid="mock-bulk-edit-dialog" />,
+}));
+
+vi.mock("@/charts/dialogs/ReusableAlertDialog", () => ({
+    default: () => <div data-testid="mock-alert-dialog" />,
+}));
+
 // Mock the hooks
 let mockSlickGridReactReturn: any;
 let mockFindReplaceReturn: any;
@@ -56,6 +72,10 @@ describe("TableChartReactComponent", () => {
             addColumnDefaultPosition: 1,
             closeAddColumnDialog: vi.fn(),
             handleAddColumn: vi.fn(),
+            isBulkEditDialogOpen: false,
+            bulkEditColumn: null,
+            closeBulkEditDialog: vi.fn(),
+            handleBulkEdit: vi.fn(),
         };
 
         mockFindReplaceReturn = {

@@ -8,6 +8,7 @@ import useEditCell from "../hooks/useEditCell";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./FeedbackAlertComponent";
 import AddTableColumnDialog from "./AddTableColumnDialog";
+import BulkEditColumnDialog from "./BulkEditColumnDialog";
 
 /**
  * Main component for the react table chart
@@ -47,6 +48,10 @@ const TableChartReactComponent = observer(() => {
         addColumnDefaultPosition,
         closeAddColumnDialog,
         handleAddColumn,
+        isBulkEditDialogOpen,
+        bulkEditColumn,
+        closeBulkEditDialog,
+        handleBulkEdit,
     } = useSlickGridReact();
 
     const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
@@ -135,6 +140,13 @@ const TableChartReactComponent = observer(() => {
                 defaultPosition={addColumnDefaultPosition}
                 onClose={closeAddColumnDialog}
                 onSubmit={handleAddColumn}
+            />
+
+            <BulkEditColumnDialog
+                open={isBulkEditDialogOpen}
+                columnName={bulkEditColumn}
+                onClose={closeBulkEditDialog}
+                onSubmit={handleBulkEdit}
             />
 
             {feedbackAlert && (

@@ -122,3 +122,44 @@ describe("DataModel.createColumn", () => {
         expect(Array.from(new Uint8Array(data))).toEqual([65, 66, 0, 67, 68, 0]);
     });
 });
+
+describe("DataModel bulk edit helpers", () => {
+    test("fills only empty cells in a text column", () => {
+        const dataChanged = vi.fn();
+        const dataStore = {
+            size: 3,
+            columnIndex: {
+                label: {
+                    field: "label",
+                    name: "Label",
+                    datatype: "text",
+                    editable: true,
+                    values: ["", "A", "B"],
+                    data: new Uint8Array([0, 1, 0]),
+                },
+            },
+            dataChanged,
+        } as any;
+
+        const dataModel = new DataModel(dataStore, { autoupdate: false });
+        dataModel.fillColumn("label", "Filled", [0, 1, 2], true);
+
+        expect(Array.from(dataStore.columnIndex.label.data)).toEqual([3, 1, 3]);
+        expect(dataStore.columnIndex.label.values).toEqual(["", "A", "B", "Filled"]);
+        expect(dataChanged).toHaveBeenCalledWith(["label"]);
+    });
+
+    test("removes a column through the datastore", () => {
+        const removeColumn = vi.fn();
+        const dataStore = {
+            size: 1,
+            columnIndex: {},
+            removeColumn,
+        } as any;
+
+        const dataModel = new DataModel(dataStore, { autoupdate: false });
+        dataModel.removeColumn("label");
+
+        expect(removeColumn).toHaveBeenCalledWith("label", true, true);
+    });
+});

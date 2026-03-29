@@ -12,6 +12,7 @@ import { InputEditor } from "slickgrid-react";
 import { DataModel } from "@/table/DataModel";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
+import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -70,6 +71,8 @@ const useSlickGridReact = () => {
     const [searchColumn, setSearchColumn] = useState<string | null>(null);
     const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
     const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
+    const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
+    const [bulkEditColumn, setBulkEditColumn] = useState<string | null>(null);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -151,6 +154,15 @@ const useSlickGridReact = () => {
                                 title: isColumnEditable ? "Find & Replace" : "Find",
                                 iconCssClass: "mdi mdi-magnify",
                             },
+                            ...(isColumnEditable
+                                ? [
+                                    {
+                                        command: "bulk-edit",
+                                        title: "Bulk Edit",
+                                        iconCssClass: "mdi mdi-table-edit",
+                                    },
+                                ]
+                                : []),
                         ],
                     },
                 },
@@ -317,6 +329,9 @@ const useSlickGridReact = () => {
                 } else if (command === "find-replace") {
                     setSearchColumn(column.field);
                     setIsFindReplaceOpen(true);
+                } else if (command === "bulk-edit") {
+                    setBulkEditColumn(column.field);
+                    setIsBulkEditDialogOpen(true);
                 }
             },
         ));
@@ -498,6 +513,11 @@ const useSlickGridReact = () => {
         setIsAddColumnDialogOpen(false);
     }, []);
 
+    const closeBulkEditDialog = useCallback(() => {
+        setIsBulkEditDialogOpen(false);
+        setBulkEditColumn(null);
+    }, []);
+
     // Columns to be displayed for cloning
     const cloneableColumns = useMemo(() => {
         return orderedParamColumns
@@ -598,6 +618,43 @@ const useSlickGridReact = () => {
         }
     }, [config, dataStore]);
 
+    const handleBulkEdit = useCallback(({
+        action,
+        columnName,
+        value,
+    }: {
+        action: BulkEditAction;
+        columnName: string;
+        value: string;
+    }) => {
+        try {
+            const dataModel = new DataModel(dataStore, { autoupdate: false });
+            const rowIndices = Array.from(sortedFilteredIndicesRef.current);
+
+            if (action === "fill-all") {
+                dataModel.fillColumn(columnName, value, rowIndices, false);
+            } else {
+                dataModel.fillColumn(columnName, value, rowIndices, true);
+            }
+
+            gridRef.current?.slickGrid?.invalidate();
+            closeBulkEditDialog();
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to bulk edit column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Bulk Edit Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    action,
+                    columnName,
+                },
+            });
+        }
+    }, [closeBulkEditDialog, config, dataStore]);
+
     return {
         config,
         dataStore,
@@ -624,6 +681,10 @@ const useSlickGridReact = () => {
         addColumnDefaultPosition,
         closeAddColumnDialog,
         handleAddColumn,
+        isBulkEditDialogOpen,
+        bulkEditColumn,
+        closeBulkEditDialog,
+        handleBulkEdit,
     };
 };
 

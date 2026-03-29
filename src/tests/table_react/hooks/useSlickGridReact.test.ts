@@ -84,9 +84,13 @@ describe("useSlickGridReact", () => {
             dataHighlighted: vi.fn(),
             dataChanged: vi.fn(),
             addColumn: vi.fn(),
+            cleanColumnData: vi.fn(),
+            removeColumn: vi.fn(),
             addListener: vi.fn(),
             size: 3,
-            columnIndex: {},
+            columnIndex: Object.fromEntries(
+                mockOrderedParamColumns.map((column) => [column.field, column]),
+            ),
         };
 
         mockChart = {
@@ -127,7 +131,7 @@ describe("useSlickGridReact", () => {
             expect(result.current.columnDefs[2].field).toBe("name");
         });
 
-        test("should include find-replace menu item in header", () => {
+        test("should include bulk edit in editable column header menu", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
@@ -135,6 +139,24 @@ describe("useSlickGridReact", () => {
                 {
                     command: "find-replace",
                     title: "Find & Replace",
+                    iconCssClass: "mdi mdi-magnify",
+                },
+                {
+                    command: "bulk-edit",
+                    title: "Bulk Edit",
+                    iconCssClass: "mdi mdi-table-edit",
+                },
+            ]);
+        });
+
+        test("should not include bulk edit for non-editable column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const nameColumn = result.current.columnDefs.find((col) => col.field === "name");
+            expect(nameColumn?.header?.menu?.commandItems).toEqual([
+                {
+                    command: "find-replace",
+                    title: "Find",
                     iconCssClass: "mdi mdi-magnify",
                 },
             ]);
@@ -372,4 +394,41 @@ describe("useSlickGridReact", () => {
             );
         });
     });
+
+    describe("bulk edit", () => {
+        test("should fill all visible cells in an editable numeric column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleBulkEdit({
+                    action: "fill-all",
+                    columnName: "age",
+                    value: "42",
+                });
+            });
+
+            expect(Array.from(mockOrderedParamColumns[0].data as ArrayLike<number>)).toEqual([42, 42, 42]);
+            expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["age"]);
+        });
+
+        test("should fill only empty cells in a text column", () => {
+            mockOrderedParamColumns[1].editable = true;
+            mockOrderedParamColumns[1].values = ["", "Bob", "Charlie"];
+            mockOrderedParamColumns[1].data = new Uint8Array([0, 1, 0]);
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleBulkEdit({
+                    action: "fill-empty",
+                    columnName: "name",
+                    value: "Filled",
+                });
+            });
+
+            expect(mockOrderedParamColumns[1].values).toContain("Filled");
+            expect(Array.from(mockOrderedParamColumns[1].data as ArrayLike<number>)).toEqual([3, 1, 3]);
+            expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["name"]);
+        });
+    });
+
 });

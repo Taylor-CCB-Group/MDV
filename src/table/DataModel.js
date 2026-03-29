@@ -1,4 +1,8 @@
 import { getExportCsvStream } from "@/datastore/dataExportUtils";
+import {
+    getCellValueAsString,
+    setCellValueFromString,
+} from "@/react/utils/valueReplacementUtil";
 
 const DEFAULT_MULTITEXT_CAPACITY = 24;
 const DEFAULT_UNIQUE_STRING_LENGTH = 64;
@@ -241,6 +245,28 @@ class DataModel {
 
     removeColumn(col) {
         this.dataStore.removeColumn(col, true, true);
+    }
+
+    fillColumn(columnName, value, rowIndices, emptyOnly = false) {
+        const col = this.dataStore.columnIndex[columnName];
+        if (!col) {
+            throw new Error(`Column ${columnName} not found`);
+        }
+        if (!col.editable) {
+            throw new Error(`Column ${columnName} not editable`);
+        }
+
+        for (const rowIndex of rowIndices) {
+            if (emptyOnly) {
+                const currentValue = getCellValueAsString(col, rowIndex);
+                if (currentValue !== "") {
+                    continue;
+                }
+            }
+            setCellValueFromString(col, rowIndex, value);
+        }
+
+        this.dataStore.dataChanged([columnName]);
     }
 
     async getDataAsBlob(delimiter = "\t", newline = "\n") {
