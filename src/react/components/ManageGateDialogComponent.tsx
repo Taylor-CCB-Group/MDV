@@ -26,8 +26,7 @@ import { DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
 import GateNameDialog from "./GateNameDialog";
 import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
 import { PenBoxIcon } from "lucide-react";
-import { truncateGateLabel } from "../hooks/useGateLayers";
-import { hexToRgb, rgbToHex } from "@/utilities/Utilities";
+import { hexToRgb, rgbToHex, truncateWithEllipsis } from "@/utilities/Utilities";
 import type { Gate } from "../gates/types";
 import { observer } from "mobx-react-lite";
 import { useGateManager } from "../gates/useGateManager";
@@ -44,6 +43,8 @@ export type ManageGateDialogType = {
     onColorChange: (gateId: string, color: [number, number, number]) => Promise<void>;
     activeRegion?: string;
 };
+
+const GATE_NAME_MAX_LENGTH = 30;
 
 const ManageGateDialogContent = observer(({
     onClose,
@@ -80,6 +81,11 @@ const ManageGateDialogContent = observer(({
     const globalGates = useMemo(() => 
         relevantGates.filter((gate) => gate.region === undefined), 
     [relevantGates]);
+    
+    const activeRegionLabel = useMemo(
+        () => (activeRegion ? truncateWithEllipsis(activeRegion, GATE_NAME_MAX_LENGTH) : ""),
+        [activeRegion],
+    );
 
     const handleMenuOpen = useCallback((event: React.MouseEvent<HTMLButtonElement>, gateId: string) => {
         event.stopPropagation();
@@ -145,7 +151,7 @@ const ManageGateDialogContent = observer(({
                                 <TableCell>
                                     <Tooltip title={gate.name}>
                                         <Typography variant="subtitle1">
-                                            {truncateGateLabel(gate.name, 30)}
+                                            {truncateWithEllipsis(gate.name, GATE_NAME_MAX_LENGTH)}
                                         </Typography>
                                     </Tooltip>
                                 </TableCell>
@@ -197,9 +203,11 @@ const ManageGateDialogContent = observer(({
                                 expandIcon={<ExpandMoreIcon />}
                                 sx={{ minHeight: 56 }}
                             >
-                                <Typography variant="h6">
-                                    "{activeRegion}" gates
-                                </Typography>
+                                <Tooltip title={`"${activeRegion}" gates`}>
+                                    <Typography variant="h6">
+                                        "{activeRegionLabel}" gates
+                                    </Typography>
+                                </Tooltip>
                             </AccordionSummary>
                             <AccordionDetails sx={{ display: "block", pt: 0 }}>
                                 {renderGateTable(regionSpecificGates)}

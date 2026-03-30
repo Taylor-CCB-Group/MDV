@@ -8,15 +8,10 @@ import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
+import { truncateWithEllipsis } from "@/utilities/Utilities";
 
 const MAX_LABEL_LENGTH = 18;
-const ELLIPSIS = "...";
 
-export function truncateGateLabel(name: string, maxLen: number = MAX_LABEL_LENGTH) {
-    if (name.length <= maxLen) return name;
-    if (maxLen <= ELLIPSIS.length) return name.slice(0, maxLen);
-    return `${name.slice(0, maxLen - ELLIPSIS.length)}${ELLIPSIS}`;
-}
 const useGateLayers = () => {
     const chartId = useChartID();
     const gateManager = useGateManager();
@@ -75,7 +70,7 @@ const useGateLayers = () => {
             const z = is2d ? 0 : cz?.minMax ? (cz.minMax[0] + cz.minMax[1]) / 2 : 0;
             return {
                 position: [position[0], position[1], z] as [number, number, number],
-                text: truncateGateLabel(gate.name),
+                text: truncateWithEllipsis(gate.name, MAX_LABEL_LENGTH),
                 gateId: gate.id,
                 gateColor: gate.color ?? DEFAULT_GATE_COLOR,
             };
