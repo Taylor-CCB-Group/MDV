@@ -45,6 +45,10 @@ export function getDirParam() {
     return new URLSearchParams(window.location.search).get("dir");
 }
 
+export function hasExplicitDirParam() {
+    return new URLSearchParams(window.location.search).has("dir");
+}
+
 export function isProjectDir(dir: string) {
     return /\/project\/[^/]+\/?$/.test(asUrl(dir).pathname);
 }
@@ -140,18 +144,13 @@ export function apiFetch(input: string, init?: RequestInit) {
 }
 
 export function buildDashboardUrl(apiRoot = getDashboardApiRoot()) {
-    if (!getDirParam() && isHostedPreviewHost() && isDefaultPreviewApiRoot(apiRoot)) {
-        return "/";
-    }
+    if (!hasExplicitDirParam()) return getAppMountPath();
     if (apiRoot === "/") return getAppMountPath();
     return buildAppShellUrl(`?dir=${encodeURIComponent(ensureTrailingSlash(apiRoot))}`);
 }
 
 export function buildProjectUrl(projectId: string | number, apiRoot = getDashboardApiRoot()) {
-    if (!getDirParam() && isHostedPreviewHost() && isDefaultPreviewApiRoot(apiRoot)) {
-        return `/project/${projectId}`;
-    }
-    if (apiRoot === "/") {
+    if (!hasExplicitDirParam() || apiRoot === "/") {
         return `${getAppMountPath()}project/${projectId}`;
     }
 

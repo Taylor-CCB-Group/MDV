@@ -51,10 +51,15 @@ describe("mdvRouting", () => {
     test("keeps mounted shell path when building explicit dir urls", () => {
         setUrl("/mdv/");
 
+        expect(buildDashboardUrl("/prefix/")).toBe("/mdv/");
+        expect(buildProjectUrl("174", "/prefix/")).toBe("/mdv/project/174");
+    });
+
+    test("preserves explicit dir routing when user supplied dir", () => {
+        setUrl("/mdv/?dir=%2Fprefix%2F");
+
         expect(buildDashboardUrl("/prefix/")).toBe("/mdv/?dir=%2Fprefix%2F");
-        expect(buildProjectUrl("174", "/prefix/")).toBe(
-            "/mdv/?dir=%2Fprefix%2Fproject%2F174",
-        );
+        expect(buildProjectUrl("174", "/prefix/")).toBe("/mdv/?dir=%2Fprefix%2Fproject%2F174");
     });
 
     test("detects project routes from pathname and query-dir routes", () => {
