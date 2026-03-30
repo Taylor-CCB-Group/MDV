@@ -28,15 +28,9 @@ const MenuBarComponent = observer(() => {
 
     const isEditable = config.permission === "edit";
     const ariaLabel = isEditable ? "editable" : "view only";
-
-    const handleHomeButtonClick = () => {
-        // todo: uncomment when we fix state issues
-        // viewManager.checkUnsavedState(() => {
-            window.location.href = buildDashboardUrl(
-                mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute,
-            );
-        // });
-    };
+    const homeHref = buildDashboardUrl(
+        mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute,
+    );
 
     const handleSaveButtonClick = async () => {
         await viewManager.saveView();
@@ -63,7 +57,11 @@ const MenuBarComponent = observer(() => {
             <AppBar position="static" color="default" sx={{ boxShadow: "none" }}>
                 <Toolbar className="ciview-main-menu-bar" sx={{ padding: 2 }} disableGutters>
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
-                        <IconWithTooltip tooltipText="Back to Catalog" onClick={handleHomeButtonClick}>
+                        <IconWithTooltip
+                            tooltipText="Back to Catalog"
+                            href={homeHref}
+                            iconButtonProps={{ "aria-label": "Back to Catalog" }}
+                        >
                             <HomeIcon />
                         </IconWithTooltip>
                         {config.all_views && (
