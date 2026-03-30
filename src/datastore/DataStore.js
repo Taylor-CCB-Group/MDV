@@ -464,6 +464,10 @@ class DataStore {
             ...column, //may be useful to get any other properties we didn't explicitly copy before.
             getValue: (index) => {
                 const col = this.columnIndex[column.field];
+                // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
+                if (!col) {
+                    return;
+                }
                 if (!col.data) {
                     console.error(`Column ${column.field} has no data`);
                     return;
@@ -1885,6 +1889,10 @@ class DataStore {
 
     removeColumn(column, dirty = false, notify = false) {
         const c = this.columnIndex[column];
+        // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
+        if (!c) {
+            return;
+        }
         c.data = null;
         c.buffer = null;
         this.columns = this.columns.filter((c) => c.field !== column);

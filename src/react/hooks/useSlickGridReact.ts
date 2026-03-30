@@ -82,6 +82,11 @@ const useSlickGridReact = () => {
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
     const cleanupRef = useRef<(() => void) | null>(null); // Cleanup event handlers
 
+    // Single instance of data model used in many places
+    const dataModel = useMemo(() => 
+        new DataModel(dataStore, { autoupdate: false })
+    , [dataStore]);
+
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
@@ -160,6 +165,11 @@ const useSlickGridReact = () => {
                                         command: "bulk-edit",
                                         title: "Bulk Edit",
                                         iconCssClass: "mdi mdi-table-edit",
+                                    },
+                                    {
+                                        command: "remove-column",
+                                        title: "Remove Column",
+                                        iconCssClass: "mdi mdi-delete",
                                     },
                                 ]
                                 : []),
@@ -332,6 +342,9 @@ const useSlickGridReact = () => {
                 } else if (command === "bulk-edit") {
                     setBulkEditColumn(column.field);
                     setIsBulkEditDialogOpen(true);
+                } else if (command === "remove-column") {
+                    // const dataModel = new DataModel(dataStore, { autoupdate: false });
+                    dataModel.removeColumn(column.field);
                 }
             },
         ));
@@ -352,7 +365,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore]);
+    }, [config, chart, dataStore, dataModel]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
@@ -564,7 +577,7 @@ const useSlickGridReact = () => {
         }
 
         try {
-            const dataModel = new DataModel(dataStore, { autoupdate: false });
+            // const dataModel = new DataModel(dataStore, { autoupdate: false });
             // Create a new column
             dataModel.createColumn({
                 name: trimmedName,
@@ -616,7 +629,7 @@ const useSlickGridReact = () => {
                 },
             });
         }
-    }, [config, dataStore]);
+    }, [config, dataStore, dataModel]);
 
     const handleBulkEdit = useCallback(({
         action,
@@ -628,7 +641,7 @@ const useSlickGridReact = () => {
         value: string;
     }) => {
         try {
-            const dataModel = new DataModel(dataStore, { autoupdate: false });
+            // const dataModel = new DataModel(dataStore, { autoupdate: false });
             const rowIndices = Array.from(sortedFilteredIndicesRef.current);
 
             if (action === "fill-all") {
@@ -653,7 +666,7 @@ const useSlickGridReact = () => {
                 },
             });
         }
-    }, [closeBulkEditDialog, config, dataStore]);
+    }, [closeBulkEditDialog, dataModel]);
 
     return {
         config,

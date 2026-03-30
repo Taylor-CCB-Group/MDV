@@ -131,7 +131,7 @@ describe("useSlickGridReact", () => {
             expect(result.current.columnDefs[2].field).toBe("name");
         });
 
-        test("should include bulk edit in editable column header menu", () => {
+        test("should include remove column in editable column header menu", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
@@ -146,10 +146,15 @@ describe("useSlickGridReact", () => {
                     title: "Bulk Edit",
                     iconCssClass: "mdi mdi-table-edit",
                 },
+                {
+                    command: "remove-column",
+                    title: "Remove Column",
+                    iconCssClass: "mdi mdi-delete",
+                },
             ]);
         });
 
-        test("should not include bulk edit for non-editable column", () => {
+        test("should not include remove column for non-editable column", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const nameColumn = result.current.columnDefs.find((col) => col.field === "name");
@@ -235,6 +240,38 @@ describe("useSlickGridReact", () => {
 
             expect(mockGridInstance.slickGrid.setData).toHaveBeenCalled();
             expect(mockGridInstance.slickGrid.render).toHaveBeenCalled();
+        });
+
+        test("should remove an editable column from the header menu command", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const mockGridInstance = createSlickGridMock();
+            const mockEvent = new CustomEvent("gridCreated", {
+                detail: mockGridInstance,
+            }) as any;
+
+            act(() => {
+                result.current.handleGridCreated(mockEvent);
+            });
+
+            const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
+            const headerMenuCall = pubSub.subscribe.mock.calls.find(
+                ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
+            );
+
+            expect(headerMenuCall).toBeTruthy();
+
+            const headerMenuHandler = headerMenuCall?.[1];
+
+            act(() => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+            });
+
+            expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
+            expect(mockDataStore.removeColumn).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -338,6 +375,21 @@ describe("useSlickGridReact", () => {
                 id: 3,
             });
             expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["annotation"]);
+        });
+
+        test("should preserve existing column widths when adding a column", () => {
+            mockConfig.column_widths = { age: 150, name: 220 };
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    datatype: "text",
+                    position: 2,
+                });
+            });
+
+            expect(mockConfig.column_widths).toEqual({ age: 150, name: 220 });
         });
 
         test("should pass clone metadata through to the model", () => {
