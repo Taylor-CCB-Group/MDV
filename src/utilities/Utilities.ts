@@ -90,3 +90,12 @@ export function escapeHtml(s: string): string {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 }
+
+/**
+ * Truncate text to a max length and append ellipsis when needed.
+ */
+export function truncateWithEllipsis(value: string, maxLength = 30): string {
+    if (value.length <= maxLength) return value;
+    if (maxLength <= 3) return value.slice(0, maxLength);
+    return `${value.slice(0, maxLength - 3)}...`;
+}
