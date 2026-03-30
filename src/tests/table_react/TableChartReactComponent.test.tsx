@@ -13,6 +13,22 @@ vi.mock("slickgrid-react", () => ({
     ),
 }));
 
+vi.mock("@/react/components/FindAndReplaceDialog", () => ({
+    default: () => <div data-testid="mock-find-replace-dialog" />,
+}));
+
+vi.mock("@/react/components/AddTableColumnDialog", () => ({
+    default: () => <div data-testid="mock-add-column-dialog" />,
+}));
+
+vi.mock("@/react/components/BulkEditColumnDialog", () => ({
+    default: () => <div data-testid="mock-bulk-edit-dialog" />,
+}));
+
+vi.mock("@/charts/dialogs/ReusableAlertDialog", () => ({
+    default: () => <div data-testid="mock-alert-dialog" />,
+}));
+
 // Mock the hooks
 let mockSlickGridReactReturn: any;
 let mockFindReplaceReturn: any;
@@ -37,18 +53,29 @@ describe("TableChartReactComponent", () => {
             config: observable({}),
             dataStore: {},
             gridRef: { current: createSlickGridMock() },
-            isSelectingRef: { current: false },
+            selectionSourceRef: { current: null },
             isFindReplaceOpen: false,
             orderedParamColumns: [],
             searchColumn: null,
             orderedParamColumnsRef: { current: [] },
-            sortedIndices: new Uint32Array([]),
-            sortedIndicesRef: { current: new Uint32Array([]) },
+            sortedFilteredIndices: new Uint32Array([]),
+            sortedFilteredIndicesRef: { current: new Uint32Array([]) },
             options: {},
             columnDefs: [],
             handleGridCreated: vi.fn(),
             isColumnEditable: false,
             onDialogClose: vi.fn(),
+            feedbackAlert: null,
+            setFeedbackAlert: vi.fn(),
+            isAddColumnDialogOpen: false,
+            cloneableColumns: [],
+            addColumnDefaultPosition: 1,
+            closeAddColumnDialog: vi.fn(),
+            handleAddColumn: vi.fn(),
+            isBulkEditDialogOpen: false,
+            bulkEditColumn: null,
+            closeBulkEditDialog: vi.fn(),
+            handleBulkEdit: vi.fn(),
         };
 
         mockFindReplaceReturn = {

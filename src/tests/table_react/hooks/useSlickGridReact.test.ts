@@ -77,13 +77,26 @@ describe("useSlickGridReact", () => {
             column_widths: {},
             order: {},
             sort: undefined as { columnId: string; ascending: boolean } | undefined,
+            param: ["age", "name", "id"],
         }) as any;
 
         mockDataStore = {
             dataHighlighted: vi.fn(),
+            dataChanged: vi.fn(),
+            addColumn: vi.fn(),
+            cleanColumnData: vi.fn(),
+            removeColumn: vi.fn(),
+            addListener: vi.fn(),
+            size: 3,
+            columnIndex: Object.fromEntries(
+                mockOrderedParamColumns.map((column) => [column.field, column]),
+            ),
         };
 
-        mockChart = {};
+        mockChart = {
+            setAddColumnDialogOpener: vi.fn(),
+            setGridRef: vi.fn(),
+        };
     });
 
     describe("initialization", () => {
@@ -118,7 +131,7 @@ describe("useSlickGridReact", () => {
             expect(result.current.columnDefs[2].field).toBe("name");
         });
 
-        test("should include find-replace menu item in header", () => {
+        test("should include remove column in editable column header menu", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
@@ -126,6 +139,29 @@ describe("useSlickGridReact", () => {
                 {
                     command: "find-replace",
                     title: "Find & Replace",
+                    iconCssClass: "mdi mdi-magnify",
+                },
+                {
+                    command: "bulk-edit",
+                    title: "Bulk Edit",
+                    iconCssClass: "mdi mdi-table-edit",
+                },
+                {
+                    command: "remove-column",
+                    title: "Remove Column",
+                    iconCssClass: "mdi mdi-delete",
+                },
+            ]);
+        });
+
+        test("should not include remove column for non-editable column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const nameColumn = result.current.columnDefs.find((col) => col.field === "name");
+            expect(nameColumn?.header?.menu?.commandItems).toEqual([
+                {
+                    command: "find-replace",
+                    title: "Find",
                     iconCssClass: "mdi mdi-magnify",
                 },
             ]);
@@ -205,6 +241,38 @@ describe("useSlickGridReact", () => {
             expect(mockGridInstance.slickGrid.setData).toHaveBeenCalled();
             expect(mockGridInstance.slickGrid.render).toHaveBeenCalled();
         });
+
+        test("should remove an editable column from the header menu command", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const mockGridInstance = createSlickGridMock();
+            const mockEvent = new CustomEvent("gridCreated", {
+                detail: mockGridInstance,
+            }) as any;
+
+            act(() => {
+                result.current.handleGridCreated(mockEvent);
+            });
+
+            const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
+            const headerMenuCall = pubSub.subscribe.mock.calls.find(
+                ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
+            );
+
+            expect(headerMenuCall).toBeTruthy();
+
+            const headerMenuHandler = headerMenuCall?.[1];
+
+            act(() => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+            });
+
+            expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
+            expect(mockDataStore.removeColumn).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe("find and replace dialog", () => {
@@ -275,5 +343,144 @@ describe("useSlickGridReact", () => {
             expect(updatedAgeColumn?.width).toBe(250);
         });
     });
-});
 
+    describe("add column", () => {
+        test("should expose cloneable text columns", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            expect(result.current.cloneableColumns).toEqual([
+                { field: "age", name: "Age", datatype: "integer" },
+                { field: "id", name: "Id", datatype: "unique", stringLength: 2 },
+                { field: "name", name: "Name", datatype: "text" },
+            ]);
+        });
+
+        test("should create a new empty typed column and insert it at the requested position", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    datatype: "double",
+                    position: 2,
+                });
+            });
+
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+            expect(mockConfig.param).toEqual(["age", "annotation", "name", "id"]);
+            expect(mockConfig.order).toEqual({
+                age: 0,
+                annotation: 1,
+                name: 2,
+                id: 3,
+            });
+            expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["annotation"]);
+        });
+
+        test("should preserve existing column widths when adding a column", () => {
+            mockConfig.column_widths = { age: 150, name: 220 };
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    datatype: "text",
+                    position: 2,
+                });
+            });
+
+            expect(mockConfig.column_widths).toEqual({ age: 150, name: 220 });
+        });
+
+        test("should pass clone metadata through to the model", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            mockDataStore.columnIndex = {
+                age: {
+                    field: "age",
+                    name: "Age",
+                    datatype: "integer",
+                    data: new Float32Array([1, 2, 3]),
+                    getValue: (idx: number) => [1, 2, 3][idx],
+                },
+            };
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "copied_age",
+                    datatype: "text",
+                    cloneColumn: "age",
+                    position: 3,
+                });
+            });
+
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+            const [column] = mockDataStore.addColumn.mock.calls[0];
+            expect(column).toMatchObject({
+                name: "copied_age",
+                field: "copied_age",
+                datatype: "integer",
+                editable: true,
+            });
+        });
+
+        test("should reject duplicate column names", () => {
+            mockDataStore.columnIndex = { age: { field: "age" } };
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "age",
+                    datatype: "text",
+                    position: 1,
+                });
+            });
+
+            expect(mockDataStore.addColumn).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Add Column Error",
+                    message: "Column age already exists",
+                }),
+            );
+        });
+    });
+
+    describe("bulk edit", () => {
+        test("should fill all visible cells in an editable numeric column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleBulkEdit({
+                    action: "fill-all",
+                    columnName: "age",
+                    value: "42",
+                });
+            });
+
+            expect(Array.from(mockOrderedParamColumns[0].data as ArrayLike<number>)).toEqual([42, 42, 42]);
+            expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["age"]);
+        });
+
+        test("should fill only empty cells in a text column", () => {
+            mockOrderedParamColumns[1].editable = true;
+            mockOrderedParamColumns[1].values = ["", "Bob", "Charlie"];
+            mockOrderedParamColumns[1].data = new Uint8Array([0, 1, 0]);
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleBulkEdit({
+                    action: "fill-empty",
+                    columnName: "name",
+                    value: "Filled",
+                });
+            });
+
+            expect(mockOrderedParamColumns[1].values).toContain("Filled");
+            expect(Array.from(mockOrderedParamColumns[1].data as ArrayLike<number>)).toEqual([3, 1, 3]);
+            expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["name"]);
+        });
+    });
+
+});
