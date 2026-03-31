@@ -466,7 +466,7 @@ class DataStore {
                 const col = this.columnIndex[column.field];
                 // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
                 if (!col) {
-                    return;
+                    return "";
                 }
                 if (!col.data) {
                     console.error(`Column ${column.field} has no data`);
@@ -1889,8 +1889,23 @@ class DataStore {
 
     removeColumn(column, dirty = false, notify = false) {
         const c = this.columnIndex[column];
+        // Delete the column from entries of dirtyColumns
+        delete this.dirtyColumns.data_changed[column];
+        delete this.dirtyColumns.colors_changed[column];
         // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
         if (!c) {
+            // If column is marked dirty, then remove it from the dirtyColumns
+            if (dirty) {
+                if (this.dirtyColumns.added[column]) {
+                    delete this.dirtyColumns.added[column];
+                } else {
+                    this.dirtyColumns.removed[column] = true;
+                }
+            }
+            // Notify that column is removed if notify is true
+            if (notify) {
+                this._callListeners("column_removed", column);
+            }
             return;
         }
         c.data = null;
