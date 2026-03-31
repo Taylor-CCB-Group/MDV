@@ -86,6 +86,10 @@ const AddTableColumnDialog = ({
     }, [open, cloneableColumns, defaultPosition]);
 
     const handleSubmit = () => {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            return;
+        }
         const parsedPosition = Number.parseInt(position, 10);
         const parsedStringLength = Number.parseInt(stringLength, 10);
         onSubmit({

@@ -8,6 +8,7 @@ import type { SlickgridReactInstance } from "slickgrid-react";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
 import { createEl } from "@/utilities/ElementsTyped";
 import { DataModel } from "@/table/DataModel";
+import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -153,13 +154,22 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
 
     // Overriding the onColumnRemoved to update table config and avoid removing the whole table
     onColumnRemoved(column: string) {
-        if (!Array.isArray(this.config.param) || !this.config.param.includes(column)) {
+        if (!Array.isArray(this.config.param)) {
+            return false;
+        }
+        // `config.param` can contain either plain field names or query-backed FieldSpec objects
+        // flatten each spec to concrete field names so removals work for both
+        const containsRemovedColumn = (fieldSpec: FieldSpec) =>
+            flattenFields(fieldSpec).includes(column);
+        if (!this.config.param.some(containsRemovedColumn)) {
             return false;
         }
 
         action(() => {
             // Remove column from config.param, config.order
-            this.config.param = this.config.param.filter((field) => field !== column);
+            this.config.param = this.config.param.filter(
+                (fieldSpec) => !containsRemovedColumn(fieldSpec),
+            );
             const nextOrder = { ...(this.config.order ?? {}) };
             const removedOrder = nextOrder[column];
             delete nextOrder[column];

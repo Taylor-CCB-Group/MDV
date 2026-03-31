@@ -39,6 +39,7 @@ const TableChartReactComponent = observer(() => {
         options,
         columnDefs,
         handleGridCreated,
+        isEditMode,
         isColumnEditable,
         onDialogClose,
         feedbackAlert,
@@ -81,6 +82,7 @@ const TableChartReactComponent = observer(() => {
         gridRef,
         selectionSourceRef,
         handleFeedbackAlert,
+        isEditMode,
     );
 
     const { handleBeforeEditCell, handleCellChange } = useEditCell(
@@ -89,6 +91,7 @@ const TableChartReactComponent = observer(() => {
         dataStore,
         gridRef,
         handleFeedbackAlert,
+        isEditMode,
     );
 
     const onClose = useCallback(() => {
@@ -130,7 +133,7 @@ const TableChartReactComponent = observer(() => {
                     columnName={searchColumn}
                     disableFindPrev={disableFindPrev}
                     disableFindNext={disableFindNext}
-                    isColumnEditable={isColumnEditable}
+                    isColumnEditable={isColumnEditable && isEditMode}
                 />
             </div>
 

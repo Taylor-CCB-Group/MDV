@@ -28,6 +28,7 @@ const useFindReplace = (
     gridRef: React.MutableRefObject<SlickgridReactInstance | null>,
     selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>,
     setFeedbackAlert: (alert: FeedbackAlert) => void,
+    isEditMode: boolean,
 ) => {
     const [foundMatches, setFoundMatches] = useState<FoundMatch[]>([]);
     const [matchCount, setMatchCount] = useState<number | null>(null);
@@ -189,6 +190,9 @@ const useFindReplace = (
     const handleReplace = useCallback(
         (findValue: string, replaceValue: string) => {
             try {
+                if (!isEditMode) {
+                    throw new Error("Replace is only available in edit mode");
+                }
                 if (!searchColumn) {
                     console.log("No column selected for replace");
                     throw new Error("No column selected for replace");
@@ -260,12 +264,16 @@ const useFindReplace = (
             handleFind,
             gridRef,
             setFeedbackAlert,
+            isEditMode,
         ],
     );
 
     const handleReplaceAll = useCallback(
         (findValue: string, replaceValue: string) => {
             try {
+                if (!isEditMode) {
+                    throw new Error("Replace is only available in edit mode");
+                }
                 if (!searchColumn) {
                     console.log("No column selected for replace all");
                     throw new Error("No column selected for replace all");
@@ -366,7 +374,7 @@ const useFindReplace = (
                 });
             }
         },
-        [searchColumn, foundMatches, orderedParamColumns, dataStore, handleFind, gridRef, setFeedbackAlert],
+        [searchColumn, foundMatches, orderedParamColumns, dataStore, handleFind, gridRef, setFeedbackAlert, isEditMode],
     );
 
     const onReset = useCallback(() => {

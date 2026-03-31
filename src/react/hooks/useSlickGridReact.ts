@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
-import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
+import { useChartID, useChartManager, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
 import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
@@ -65,6 +65,9 @@ const useSlickGridReact = () => {
     const sortedFilteredIndices = useSortedFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
     const theme = useTheme();
+    const chartManager = useChartManager();
+    const permission = chartManager?.config?.permission;
+    const isEditMode = permission === "edit";
 
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
@@ -156,10 +159,10 @@ const useSlickGridReact = () => {
                         commandItems: [
                             {
                                 command: "find-replace",
-                                title: isColumnEditable ? "Find & Replace" : "Find",
+                                title: isColumnEditable && isEditMode ? "Find & Replace" : "Find",
                                 iconCssClass: "mdi mdi-magnify",
                             },
-                            ...(isColumnEditable
+                            ...(isColumnEditable && isEditMode
                                 ? [
                                     {
                                         command: "bulk-edit",
@@ -180,7 +183,7 @@ const useSlickGridReact = () => {
         }
 
         return cols;
-    }, [config.include_index, orderedParamColumns, initialWidths]);
+    }, [config.include_index, orderedParamColumns, initialWidths, isEditMode]);
 
     /**
      * A new data provider gets created whenever any of the dependencies change which
@@ -340,9 +343,15 @@ const useSlickGridReact = () => {
                     setSearchColumn(column.field);
                     setIsFindReplaceOpen(true);
                 } else if (command === "bulk-edit") {
+                    if (!isEditMode) {
+                        return;
+                    }
                     setBulkEditColumn(column.field);
                     setIsBulkEditDialogOpen(true);
                 } else if (command === "remove-column") {
+                    if (!isEditMode) {
+                        return;
+                    }
                     // const dataModel = new DataModel(dataStore, { autoupdate: false });
                     dataModel.removeColumn(column.field);
                 }
@@ -365,7 +374,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore, dataModel]);
+    }, [config, chart, dataStore, dataModel, isEditMode]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
@@ -502,7 +511,7 @@ const useSlickGridReact = () => {
                     // hack - seems somewhat closer to getting the right size here?
                     defaultRatioForStringType: 1.1,
                 },
-                editable: true,
+                editable: isEditMode,
                 enableCellNavigation: true,
                 enableExcelCopyBuffer: true,
                 multiSelect: true,
@@ -514,7 +523,7 @@ const useSlickGridReact = () => {
                     hideColumnHideCommand: true, // Disabled to avoid messing with the column order
                 },
             }) satisfies GridOption, // helps with autocomplete for options
-        [chartId, theme],
+        [chartId, theme, isEditMode],
     );
 
     const onDialogClose = useCallback(() => {
@@ -556,6 +565,9 @@ const useSlickGridReact = () => {
         stringLength,
         delimiter,
     }: AddColumnParams) => {
+        if (!isEditMode) {
+            return;
+        }
         const trimmedName = name.trim();
 
         if (!trimmedName) {
@@ -629,7 +641,7 @@ const useSlickGridReact = () => {
                 },
             });
         }
-    }, [config, dataStore, dataModel]);
+    }, [config, dataStore, dataModel, isEditMode]);
 
     const handleBulkEdit = useCallback(({
         action,
@@ -640,6 +652,9 @@ const useSlickGridReact = () => {
         columnName: string;
         value: string;
     }) => {
+        if (!isEditMode) {
+            return;
+        }
         try {
             // const dataModel = new DataModel(dataStore, { autoupdate: false });
             const rowIndices = Array.from(sortedFilteredIndicesRef.current);
@@ -666,7 +681,7 @@ const useSlickGridReact = () => {
                 },
             });
         }
-    }, [closeBulkEditDialog, dataModel]);
+    }, [closeBulkEditDialog, dataModel, isEditMode]);
 
     return {
         config,
@@ -685,6 +700,7 @@ const useSlickGridReact = () => {
         options,
         columnDefs,
         handleGridCreated,
+        isEditMode,
         isColumnEditable,
         onDialogClose,
         feedbackAlert,

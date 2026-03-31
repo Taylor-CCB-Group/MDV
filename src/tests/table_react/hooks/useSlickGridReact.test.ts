@@ -19,6 +19,7 @@ vi.mock("@/react/hooks", () => ({
     useChartID: () => "test-chart-id",
     useTheme: () => "dark",
     useOrderedParamColumns: () => mockOrderedParamColumns,
+    useChartManager: () => ({ config: { permission: "edit" } }),
 }));
 
 vi.mock("@/react/selectionHooks", () => ({
