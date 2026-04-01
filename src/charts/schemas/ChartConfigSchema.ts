@@ -270,6 +270,17 @@ export const DeckScatter3DConfigSchema = DeckScatterSharedConfigSchema.extend({
     viewState: OrbitViewStateSchema.optional().describe("Current deck.gl orbit view state"),
 }).describe("Configuration for the deck.gl 3D scatter plot");
 
+export const DeckSplatterConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("DeckSplatter").describe("Splatter plot chart type"),
+    category: FieldSpecSchema.optional().describe("Categorical column used for the row layout"),
+    densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as one density cell per field/category pairing"),
+    contour_fill: z.boolean().optional().describe("Whether each splatter cell should render a filled density field"),
+    contour_bandwidth: z.number().positive().optional().describe("KDE bandwidth for each splatter cell"),
+    contour_intensity: z.number().min(0).optional().describe("Opacity of the filled density field"),
+    contour_opacity: z.number().min(0).max(1).optional().describe("Opacity of contour lines around each density field"),
+    contour_fillThreshold: z.number().positive().optional().describe("Threshold used when filling density contours"),
+}).describe("Configuration for splatter plots showing density fields across a category-by-field grid");
+
 export const RowChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("row_chart").describe("Row chart type"),
     // Additional row chart specific properties
@@ -317,6 +328,7 @@ registerChartConfigSchema("DeckScatter", DeckScatterPlotConfigSchema, { version:
 registerChartConfigSchema("DeckContourScatter", DeckContourScatterConfigSchema, { version: "1" });
 registerChartConfigSchema("DeckDensity", DeckDensityConfigSchema, { version: "1" });
 registerChartConfigSchema("DeckScatter3D", DeckScatter3DConfigSchema, { version: "1" });
+registerChartConfigSchema("DeckSplatter", DeckSplatterConfigSchema, { version: "1" });
 registerChartConfigSchema("row_chart", RowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("stacked_row_chart", StackedRowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("row_summary_box", RowSummaryBoxConfigSchema, { version: "1" });
