@@ -211,11 +211,13 @@ class DataModel {
             data = new Array(this.dataStore.size).fill("");
         } else if (
             datatype === "double" ||
-            datatype === "integer" ||
-            datatype === "int32"
+            datatype === "integer"
         ) {
-            //! int32 cannot truly represent NaN, so empty int32 cells currently coerce during storage and need a real missing-value strategy later.
             data = new Array(this.dataStore.size).fill(Number.NaN);
+        } else if (datatype === "int32") {
+            //! int32 cannot truly represent NaN, so empty int32 cells currently coerce during storage and need a real missing-value strategy later.
+            // todo: add a missing value sentinal for int32
+            throw new Error("Creating empty int32 column is not supported currently")
         } else if (datatype === "multitext") {
             const stringLength = parsePositiveIntOrDefault(
                 columnSpec.stringLength,
