@@ -36,7 +36,7 @@ class ChatLogItem:
     conversation_id: Optional[str] = None
     view_name: Optional[str] = None
     error: Optional[bool] = None
-    
+    verification: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -49,6 +49,7 @@ class ChatLogItem:
             "conversation_id": self.conversation_id,
             "view_name": self.view_name,
             "error": self.error,
+            "verification": self.verification,
         }
 
     @classmethod
@@ -63,6 +64,7 @@ class ChatLogItem:
             conversation_id=data.get("conversation_id"),
             view_name=data.get("view_name"),
             error=data.get("error"),
+            verification=data.get("verification"),
         )
 
 class ChatLogger:
@@ -269,7 +271,18 @@ class LangchainLoggingHandler(BaseCallbackHandler):
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
         self.log(f"Chain ended, outputs: {outputs}")
 
-def log_chat_item(project, question, output, prompt_template, response, conversation_id, context: str | None, view_name: str | None, error: bool = False):
+def log_chat_item(
+    project,
+    question,
+    output,
+    prompt_template,
+    response,
+    conversation_id,
+    context: str | None,
+    view_name: str | None,
+    error: bool = False,
+    verification: str | None = None,
+):
     """
     Log a chat interaction to the chat log file.
     Args:
@@ -280,6 +293,7 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         conversation_id: ID to group messages from the same conversation
         context: Context of the response code generated which contains file names
         error: Whether this log is for an error
+        verification: Optional provenance text (same as the view TextBox), omitted on error
     """
     # Create a ChatLogger instance for this project
     chat_file = os.path.join(project.dir, "chat_log.json")
@@ -288,7 +302,7 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         context = "[]"
         view_name = None
         prompt_template = prompt_template or ""
-        
+        verification = None
 
     # Ensure context is always a non-optional string for ChatLogItem
     context_str: str = context if context is not None else "[]"
@@ -301,6 +315,7 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         conversation_id=conversation_id,
         view_name=view_name,
-        error=error
+        error=error,
+        verification=verification,
     )
     chat_logger.log_chat(chat_item)

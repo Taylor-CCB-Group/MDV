@@ -78,9 +78,10 @@ def create_column_markdown(cols: list[dict]) -> str:
     
     if categorical_cols:
         markdown += "\n### Categorical Columns\n"
-        markdown += "| Column Name | Data Type | Values (sample) |\n|---|---|---|\n"
+        markdown += "| Column Name | Field ID | Data Type | Values (sample) |\n|---|---|---|---|\n"
         for col in categorical_cols:
             col_name = escape_markdown(col.get('name', ''))
+            field_id = escape_markdown(str(col.get('field', col.get('name', ''))))
             datatype = col.get('datatype', '')
             values_str = ""
             if col.get('values'):
@@ -89,13 +90,14 @@ def create_column_markdown(cols: list[dict]) -> str:
                 values_str = ", ".join(escaped_values)
                 if len(col['values']) > 5:
                     values_str += ", ..."
-            markdown += f"| {col_name} | {datatype} | {values_str} |\n"
+            markdown += f"| {col_name} | `{field_id}` | {datatype} | {values_str} |\n"
 
     if numeric_cols:
         markdown += "\n### Numeric Columns\n"
-        markdown += "| Column Name | Data Type | Min / Max | Quantiles (0.05) |\n|---|---|---|---|\n"
+        markdown += "| Column Name | Field ID | Data Type | Min / Max | Quantiles (0.05) |\n|---|---|---|---|---|\n"
         for col in numeric_cols:
             col_name = escape_markdown(col.get('name', ''))
+            field_id = escape_markdown(str(col.get('field', col.get('name', ''))))
             datatype = col.get('datatype', '')
             min_max = col.get('minMax')
             min_max_str = f"{min_max[0]} / {min_max[1]}" if min_max and len(min_max) == 2 else ""
@@ -104,15 +106,16 @@ def create_column_markdown(cols: list[dict]) -> str:
             q05 = quantiles.get('0.05')
             quantiles_str = f"[{q05[0]}, {q05[1]}]" if q05 else ""
 
-            markdown += f"| {col_name} | {datatype} | {min_max_str} | {quantiles_str} |\n"
+            markdown += f"| {col_name} | `{field_id}` | {datatype} | {min_max_str} | {quantiles_str} |\n"
 
     if other_cols:
         markdown += "\n### Other Columns\n"
-        markdown += "| Column Name | Data Type |\n|---|---|\n"
+        markdown += "| Column Name | Field ID | Data Type |\n|---|---|---|\n"
         for col in other_cols:
             col_name = escape_markdown(col.get('name', ''))
+            field_id = escape_markdown(str(col.get('field', col.get('name', ''))))
             datatype = col.get('datatype', 'N/A')
-            markdown += f"| {col_name} | {datatype} |\n"
+            markdown += f"| {col_name} | `{field_id}` | {datatype} |\n"
     
     if not (numeric_cols or categorical_cols or other_cols):
         markdown = "No columns found."

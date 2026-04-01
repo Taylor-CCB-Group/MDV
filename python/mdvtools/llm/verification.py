@@ -1,0 +1,268 @@
+"""
+Build a verification summary for Chat MDV from project metadata and generated code,
+and merge it into the view as a TextBox chart.
+"""
+from __future__ import annotations
+
+import ast
+import json
+import re
+from typing import TYPE_CHECKING, Any, Optional
+
+from mdvtools.charts.text_box_plot import TextBox
+
+if TYPE_CHECKING:
+    from mdvtools.mdvproject import MDVProject
+
+# Gene expression columns use this wrapper in generated code (see templates / RAG examples)
+_GS_WRAPPER_RE = re.compile(r"gs\|([^|(]+)\(gs\)\|\s*(\d+)")
+# Chart classes commonly instantiated in chat-generated scripts
+_CHART_CLASS_RE = re.compile(
+    r"\b(DotPlot|ScatterPlot|HeatmapPlot|HistogramPlot|BoxPlot|ViolinPlot|"
+    r"DensityScatterPlot|ScatterPlot3D|RowChart|StackedRowChart|PieChart|RingChart|"
+    r"AbundanceBoxPlot|MultiLinePlot|TablePlot|WordcloudPlot|SankeyPlot|"
+    r"SelectionDialogPlot|RowSummaryBox|TextBox)\s*\("
+)
+
+
+def parse_datasource_name(code: str) -> Optional[str]:
+    """Extract datasource_name = \"...\" from generated code."""
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                if (
+                    len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id == "datasource_name"
+                    and isinstance(node.value, ast.Constant)
+                    and isinstance(node.value.value, str)
+                ):
+                    return node.value.value
+    except SyntaxError:
+        pass
+    return None
+
+
+def _project_datasource_names(project: Any) -> list[str]:
+    return [ds["name"] for ds in project.datasources]
+
+
+def _has_genes_table(project: Any) -> bool:
+    for name in _project_datasource_names(project):
+        if name == "genes" or "gene" in name.lower():
+            return True
+    return False
+
+
+def _ensembl_style(token: str) -> bool:
+    t = token.strip()
+    if re.match(r"^ENS[A-Z]*G\d+", t):
+        return True
+    if re.match(r"^ENSMUSG\d+", t):
+        return True
+    if t.startswith("ENS") and len(t) > 6:
+        return True
+    return False
+
+
+def _extract_chart_types(code: str) -> list[str]:
+    seen: set[str] = set()
+    order: list[str] = []
+    for m in _CHART_CLASS_RE.finditer(code):
+        name = m.group(1)
+        if name not in seen and name != "TextBox":
+            seen.add(name)
+            order.append(name)
+    return order
+
+
+def _filter_hints(code: str) -> list[str]:
+    """Heuristic: lines suggesting row subsetting in generated code."""
+    hints: list[str] = []
+    lowered = code.lower()
+    if ".loc[" in code or ".iloc[" in code:
+        hints.append("Uses pandas .loc / .iloc indexing (possible row subset).")
+    if ".query(" in lowered:
+        hints.append("Uses DataFrame.query(...) (possible row subset).")
+    if re.search(r"adata\s*\[\s*[^,\]]+\s*,", code):
+        hints.append("Uses AnnData subset indexing on adata[...].")
+    if "boolean" in lowered and "[" in code and "adata" in lowered:
+        pass
+    return hints
+
+
+def build_verification_summary(project: Any, final_code: str) -> str:
+    """
+    Plain-text (markdown-friendly) summary of what the user can verify from code and project data.
+    """
+    lines: list[str] = []
+    lines.append("## What you can verify")
+    lines.append("")
+
+    ds_names = _project_datasource_names(project)
+    lines.append(f"- **Datasources in project:** {', '.join(ds_names) if ds_names else '(none)'}")
+
+    ds_from_code = parse_datasource_name(final_code)
+    if ds_from_code:
+        lines.append(f"- **Primary datasource used in generated code:** `{ds_from_code}`")
+
+    gs_matches = list(_GS_WRAPPER_RE.finditer(final_code))
+    gene_tokens = [m.group(1).strip() for m in gs_matches]
+
+    if gs_matches:
+        lines.append("")
+        lines.append("### Gene expression parameters")
+        for tok in gene_tokens:
+            kind = "Ensembl-style ID (heuristic)" if _ensembl_style(tok) else "gene label as in `genes` / `var` `name` column (heuristic: not ENS* )"
+            lines.append(f"- `{tok}` — {kind}")
+    else:
+        lines.append("")
+        lines.append(
+            "- **Gene expression:** not used in this view (no `gs|…(gs)|…` parameters in generated code)."
+        )
+        if _has_genes_table(project) and not gene_tokens:
+            lines.append(
+                "- **Note:** this project includes a genes table; this view does not plot gene expression columns."
+            )
+
+    lines.append("")
+    lines.append("### Columns / parameters (from code)")
+    if gene_tokens:
+        lines.append(f"- Gene expression column(s): {', '.join(f'`{t}`' for t in gene_tokens)}")
+    # crude param extraction: strings in params=[...] — skip if too noisy
+    param_lists = re.findall(r"params\s*=\s*\[([^\]]+)\]", final_code, re.DOTALL)
+    cell_like: set[str] = set()
+    for block in param_lists[:8]:
+        for m in re.finditer(r'"([^"]+)"', block):
+            s = m.group(1)
+            if not s.startswith("gs|") and "|" not in s:
+                cell_like.add(s)
+    if cell_like:
+        sample = sorted(cell_like)[:40]
+        extra = f" (+{len(cell_like) - len(sample)} more)" if len(cell_like) > 40 else ""
+        lines.append(f"- Other chart parameters (strings): {', '.join(f'`{c}`' for c in sample)}{extra}")
+    elif not gene_tokens:
+        lines.append("- (No `params=[...]` string list parsed; inspect the code block for column names.)")
+
+    lines.append("")
+    lines.append("### Filters / subsets")
+    fh = _filter_hints(final_code)
+    if fh:
+        for h in fh:
+            lines.append(f"- {h}")
+    else:
+        lines.append(
+            "- No obvious row-level subsetting detected in generated code; interactive filters may still apply in the UI (e.g. Selection dialog)."
+        )
+
+    lines.append("")
+    lines.append("### Chart types (from code)")
+    ctypes = _extract_chart_types(final_code)
+    if ctypes:
+        lines.append(f"- {', '.join(ctypes)}")
+    else:
+        lines.append("- (Could not infer chart class names from code.)")
+
+    lines.append("")
+    lines.append("### Cell count")
+    cell_ds = ds_from_code if ds_from_code and ds_from_code in ds_names else None
+    if cell_ds is None:
+        for candidate in ("cells", "obs", "cell"):
+            for n in ds_names:
+                if candidate in n.lower():
+                    cell_ds = n
+                    break
+            if cell_ds:
+                break
+    if cell_ds is None and ds_names:
+        cell_ds = ds_names[0]
+
+    if cell_ds:
+        try:
+            md = project.get_datasource_metadata(cell_ds)
+            n = md.get("size", "?")
+            lines.append(f"- **Rows in datasource `{cell_ds}` (from project metadata):** {n}")
+        except Exception:
+            lines.append(f"- Could not read size for datasource `{cell_ds}`.")
+    else:
+        lines.append("- Could not determine a cell-level datasource for row count.")
+
+    lines.append("")
+    lines.append("_Summary is generated from executed project metadata and static analysis of the generated script; it may not reflect interactive UI-only filters._")
+
+    return "\n".join(lines)
+
+
+def _convert_plot_to_json(plot: Any) -> dict[str, Any]:
+    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
+
+
+def _chart_bottom_y(chart: dict[str, Any]) -> float:
+    pos = chart.get("position") or [0, 0]
+    size = chart.get("size") or [0, 0]
+    if not isinstance(pos, (list, tuple)) or len(pos) < 2:
+        return 0.0
+    if not isinstance(size, (list, tuple)) or len(size) < 2:
+        return float(pos[1])
+    return float(pos[1]) + float(size[1])
+
+
+def _is_verification_textbox(chart: dict[str, Any]) -> bool:
+    if chart.get("type") != "text_box_chart":
+        return False
+    title = (chart.get("title") or "").strip().lower()
+    return title in ("what you can verify", "verification")
+
+
+def append_verification_textbox(
+    project: Any,
+    view_name: str,
+    verification_text: str,
+    primary_datasource: Optional[str] = None,
+) -> bool:
+    """
+    Append a TextBox with verification text to the given view's primary datasource chart list.
+    Returns True if the view was updated.
+    """
+    view = project.get_view(view_name)
+    if not view or "initialCharts" not in view:
+        return False
+
+    initial = view["initialCharts"]
+    if not isinstance(initial, dict) or not initial:
+        return False
+
+    ds_keys = list(initial.keys())
+    primary_ds = primary_datasource if primary_datasource in initial else ds_keys[0]
+    charts = initial.get(primary_ds)
+    if not isinstance(charts, list):
+        return False
+
+    # Remove prior verification TextBox to avoid duplicates on re-run
+    charts = [c for c in charts if isinstance(c, dict) and not _is_verification_textbox(c)]
+
+    max_bottom = 0.0
+    for c in charts:
+        if isinstance(c, dict):
+            max_bottom = max(max_bottom, _chart_bottom_y(c))
+
+    margin = 24.0
+    box_width = 880.0
+    box_height = min(320.0, max(160.0, 24.0 * verification_text.count("\n") + 80.0))
+    y_pos = max_bottom + margin if max_bottom > 0 else 10.0
+
+    tb = TextBox(
+        title="What you can verify",
+        param=[],
+        size=[int(box_width), int(box_height)],
+        position=[10, int(y_pos)],
+    )
+    tb.set_text(verification_text)
+    chart_json = _convert_plot_to_json(tb)
+
+    charts.append(chart_json)
+    initial[primary_ds] = charts
+    view["initialCharts"] = initial
+    project.set_view(view_name, view)
+    return True

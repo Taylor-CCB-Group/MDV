@@ -34,6 +34,8 @@ from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
+from .column_field_resolve import normalize_view_chart_params
+from .verification import append_verification_textbox, build_verification_summary, parse_datasource_name
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
@@ -366,7 +368,13 @@ class ProjectChat(ProjectChatProtocol):
             ok, strdout, stderr = execute_code(
                 'import mdvtools\nprint("mdvtools import ok")'
             )
-            return {"code": f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}", "view_name": None, "error": False, "message": "Success"}
+            return {
+                "code": f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}",
+                "view_name": None,
+                "error": False,
+                "message": "Success",
+                "verification": None,
+            }
         
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
             socket_api.update_chat_progress(
@@ -486,7 +494,31 @@ class ProjectChat(ProjectChatProtocol):
                 if view_name is None:
                     raise Exception("Parsing view name failed")
                 log(f"view_name: {view_name}")
-                
+
+            with time_block("b15c: Normalize chart params (name to field id)"):
+                try:
+                    view_obj = self.project.get_view(view_name)
+                    if view_obj:
+                        normalized = normalize_view_chart_params(
+                            view_obj, self.project
+                        )
+                        self.project.set_view(view_name, normalized)
+                except Exception as norm_ex:
+                    log(f"normalize chart params: {norm_ex}")
+
+            verification_text = ""
+            with time_block("b15b: Verification summary and TextBox"):
+                try:
+                    verification_text = build_verification_summary(self.project, final_code)
+                    append_verification_textbox(
+                        self.project,
+                        view_name,
+                        verification_text,
+                        primary_datasource=parse_datasource_name(final_code),
+                    )
+                except Exception as ver_ex:
+                    log(f"verification TextBox: {ver_ex}")
+
             with time_block("b16: Log chat item"):
                  # Extract the explanation section from the LLM's response (removing code blocks)
                 explanation = extract_explanation_from_response(output_qa["result"])
@@ -515,21 +547,28 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 # Log successful code execution
                 log_chat_item(
-                    project=self.project, 
-                    question=question, 
-                    output=output_qa, 
-                    prompt_template=prompt_RAG, 
-                    response=final_code_updated, 
-                    conversation_id=conversation_id, 
-                    context=context, 
-                    view_name=view_name
+                    project=self.project,
+                    question=question,
+                    output=output_qa,
+                    prompt_template=prompt_RAG,
+                    response=final_code_updated,
+                    conversation_id=conversation_id,
+                    context=context,
+                    view_name=view_name,
+                    verification=verification_text or None,
                 )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
                     "Finished processing query", id, 100, 0
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return {"code": final_code_updated, "view_name": view_name, "error": False, "message": "Success"}
+                return {
+                    "code": final_code_updated,
+                    "view_name": view_name,
+                    "error": False,
+                    "message": "Success",
+                    "verification": verification_text or None,
+                }
         except Exception as e:
             # Log general error
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
@@ -538,4 +577,10 @@ class ProjectChat(ProjectChatProtocol):
                 f"Error: {error_message}", id, 100, 0
             )
             handle_error(e)
-            return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {error_message}"}
+            return {
+                "code": None,
+                "view_name": None,
+                "error": True,
+                "message": f"ERROR: {error_message}",
+                "verification": None,
+            }

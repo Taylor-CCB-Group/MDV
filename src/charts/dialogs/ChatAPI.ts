@@ -11,6 +11,8 @@ const completedChatResponseSchema = z.object({
      * This should be a string that identifies newly created views.
      */
     view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
+    /** Provenance summary (also embedded as a TextBox in the created view). */
+    verification: z.string().optional().nullable(),
     // timestamp: z.string(),
     error: z.boolean().optional(),
 });
@@ -49,6 +51,7 @@ const chatLogItemSchema = z.object({
     timestamp: z.string().optional(),
     view_name: z.string().optional().nullable(),
     error: z.boolean().optional(),
+    verification: z.string().optional().nullable(),
 });
 // this is possible - may consider it at some point.
 // .transform((data) => ({
@@ -64,6 +67,8 @@ type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 export type ChatMessage = {
     text: string;
     view?: string;
+    /** Same text as the "What you can verify" TextBox in the view; not shown as a separate chat widget. */
+    verification?: string | null;
     sender: 'user' | 'bot' | 'system';
     id: string;
     conversationId: string;
@@ -184,6 +189,7 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
         sender: 'bot',
         text: log.response,
         view: viewName,
+        verification: log?.verification,
         error: log?.error,
     };
     
@@ -413,6 +419,7 @@ const useChat = () => {
                     id: generateId(),
                     conversationId,
                     view: response?.view,
+                    verification: response?.verification ?? undefined,
                 }])
             }
         } catch (error: any) {

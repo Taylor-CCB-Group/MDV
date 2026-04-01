@@ -147,15 +147,16 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Only add datasources when explicitly creating a new project from raw data (not the default).
 
     4. Plot Construction:
-        - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected fields.
-            - The fields and chart type are given by """+final_answer+"""
+        - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected **field ids** (see Parameter Handling).
+            - The suggested columns and chart type are given by """+final_answer+"""
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
         - Set the view using `project.set_view(view_name, view_object)`
 
     5. Parameter Handling:
-        - The string """+final_answer+""" specifies the field names to use in the `params` list and the chart type to use.
-        - For parameters from cell-level data (from data_frame_obs or existing 'cells' datasource), use them as-is.
-        - For gene expression (if a 'genes' datasource or data_frame_var is available), use this syntax to refer to a gene:
+        - The string """+final_answer+""" guides which columns and chart types to use.
+        - **Critical:** For cell-level (obs) columns, each string in `params` must be the datasource **Field ID** exactly as shown in the Project Data Context tables (the **Field ID** column), NOT the display "Column Name" alone. MDV matches charts to data by internal `field` keys; display names may differ from field ids.
+        - If you copy from `data_frame_obs.columns`, prefer the MDV field id for that column from the context table when they differ.
+        - For gene expression (if a 'genes' datasource or data_frame_var is available), use this syntax to refer to a gene (not a plain obs field id):
             ```python
             param = "GENE_NAME"
             param_index = data_frame_var['name'].tolist().index(param)
@@ -174,9 +175,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
 
     9. Your Task:
         - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+final_answer+"""
-        - Use the fields in the """+final_answer+""" as params appropriately:
-            - Wrap only gene names as shown.
-            - Use others directly. Fields are case sensitive.
+        - Use **field ids** from the Project Data Context (Field ID column) in `params` as appropriate:
+            - Wrap only gene names using the `gs|...` form as shown in section 5.
+            - For all non-gene columns, use the exact **Field ID** string. Field ids are case sensitive.
         - Use formatted f-strings for all dynamic strings.
         - Generate a valid Python script that creates and visualizes the appropriate chart using the MDVProject framework.
         - Update these variables with these values:
