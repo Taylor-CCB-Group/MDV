@@ -5,7 +5,6 @@ import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
-import { fa } from "zod/v4/locales";
 
 describe("useFindReplace", () => {
     let orderedParamColumns: LoadedDataColumn<DataType>[];

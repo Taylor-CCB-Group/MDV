@@ -93,7 +93,7 @@ const AddTableColumnDialog = ({
         const parsedPosition = Number.parseInt(position, 10);
         const parsedStringLength = Number.parseInt(stringLength, 10);
         onSubmit({
-            name,
+            name: trimmedName,
             datatype: selectedDatatype,
             cloneColumn: mode === "clone" && cloneColumn ? cloneColumn : null,
             position: Number.isNaN(parsedPosition) ? null : parsedPosition,
