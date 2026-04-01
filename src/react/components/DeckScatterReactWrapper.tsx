@@ -35,6 +35,12 @@ const defaultViewState = {
     },
 };
 
+function shouldMigrateLegacyContourParameter(originalConfig: DeckScatterConfig) {
+    if (originalConfig.dimension === "3d") return false;
+    if (!deckContourScatterTypes.has(originalConfig.type)) return false;
+    return "category1" in originalConfig || "category2" in originalConfig;
+}
+
 function adaptConfig(originalConfig: DeckScatterConfig) {
     if (originalConfig.type === "wgl_3d_scatter_plot") {
         //! charts loaded from other configs may not have a dimension set
@@ -49,8 +55,13 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
     const defaults = originalConfig.dimension !== "3d" ? { axis: scatterAxisDefaults } : {};
     const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
-    const legacyContourParameter = config.param[2];
-    if (!config.contourParameter && legacyContourParameter && !Array.isArray(legacyContourParameter)) {
+    const legacyContourParameter = originalConfig.param?.[2];
+    if (
+        !config.contourParameter &&
+        shouldMigrateLegacyContourParameter(originalConfig) &&
+        legacyContourParameter &&
+        !Array.isArray(legacyContourParameter)
+    ) {
         config.contourParameter = legacyContourParameter;
     }
     return config;
