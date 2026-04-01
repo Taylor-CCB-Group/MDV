@@ -19,7 +19,7 @@ vi.mock("@/react/hooks", () => ({
     useChartID: () => "test-chart-id",
     useTheme: () => "dark",
     useOrderedParamColumns: () => mockOrderedParamColumns,
-    useChartManager: () => ({ config: { permission: "edit" } }),
+    useChartManager: () => ({ config: { permission: mockPermission } }),
 }));
 
 vi.mock("@/react/selectionHooks", () => ({
@@ -36,6 +36,7 @@ let mockChart: any;
 let mockOrderedParamColumns: LoadedDataColumn<DataType>[];
 let mockSortedIndices: Uint32Array;
 let mockHighlightedIndices: number[];
+let mockPermission: "edit" | "view";
 
 describe("useSlickGridReact", () => {
     beforeEach(() => {
@@ -71,6 +72,7 @@ describe("useSlickGridReact", () => {
 
         mockSortedIndices = new Uint32Array([0, 1, 2]);
         mockHighlightedIndices = [];
+        mockPermission = "edit";
 
         // Setup mock config with observable properties
         mockConfig = observable({
@@ -273,6 +275,40 @@ describe("useSlickGridReact", () => {
 
             expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
             expect(mockDataStore.removeColumn).toHaveBeenCalledTimes(1);
+        });
+
+        test("should respect updated permissions in existing header menu handlers", () => {
+            const { result, rerender } = renderHook(() => useSlickGridReact());
+
+            const mockGridInstance = createSlickGridMock();
+            const mockEvent = new CustomEvent("gridCreated", {
+                detail: mockGridInstance,
+            }) as any;
+
+            act(() => {
+                result.current.handleGridCreated(mockEvent);
+            });
+
+            const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
+            const headerMenuCall = pubSub.subscribe.mock.calls.find(
+                ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
+            );
+
+            expect(headerMenuCall).toBeTruthy();
+
+            const headerMenuHandler = headerMenuCall?.[1];
+
+            mockPermission = "view";
+            rerender();
+
+            act(() => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+            });
+
+            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
         });
     });
 

@@ -85,6 +85,7 @@ const useSlickGridReact = () => {
     const gridRef = useRef<SlickgridReactInstance | null>(null);
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
     const cleanupRef = useRef<(() => void) | null>(null); // Cleanup event handlers
+    const isEditModeRef = useRef(isEditMode);
 
     // Single instance of data model used in many places
     const dataModel = useMemo(() => 
@@ -95,6 +96,10 @@ const useSlickGridReact = () => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
     }, [sortedFilteredIndices, orderedParamColumns]);
+
+    useEffect(() => {
+        isEditModeRef.current = isEditMode;
+    }, [isEditMode]);
 
     useEffect(() => {
         chart.setAddColumnDialogOpener(() => setIsAddColumnDialogOpen(true));
@@ -344,13 +349,13 @@ const useSlickGridReact = () => {
                     setSearchColumn(column.field);
                     setIsFindReplaceOpen(true);
                 } else if (command === "bulk-edit") {
-                    if (!isEditMode) {
+                    if (!isEditModeRef.current) {
                         return;
                     }
                     setBulkEditColumn(column.field);
                     setIsBulkEditDialogOpen(true);
                 } else if (command === "remove-column") {
-                    if (!isEditMode) {
+                    if (!isEditModeRef.current) {
                         return;
                     }
                     // const dataModel = new DataModel(dataStore, { autoupdate: false });
@@ -375,7 +380,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore, dataModel, isEditMode]);
+    }, [config, chart, dataStore, dataModel]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
