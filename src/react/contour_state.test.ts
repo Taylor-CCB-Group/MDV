@@ -315,9 +315,11 @@ describe('getContourVisualSettings', () => {
         };
 
         const [bandwidthSetting] = getContourVisualSettings(config);
+        if (bandwidthSetting.type !== 'slider') {
+            throw new Error('expected first contour setting to be a slider');
+        }
         const initialBandwidth = config.contour_bandwidth;
 
-        expect(bandwidthSetting.type).toBe('slider');
         expect(bandwidthSetting.min).toBeLessThan(bandwidthSetting.current_value);
         expect(bandwidthSetting.max).toBeGreaterThan(bandwidthSetting.current_value);
 

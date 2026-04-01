@@ -4,23 +4,23 @@ import { g } from "@/lib/utils";
 import { getDensitySettings } from "../contour_state";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 
-type SharedScatterSettingsOptions = {
-    chart?: BaseChart<ScatterPlotConfig>;
+type SharedScatterSettingsOptions<C extends ScatterPlotConfig> = {
+    chart?: BaseChart<C>;
     includeDensitySettings?: boolean;
     includePointShape?: boolean;
     includeTooltip?: boolean;
     includeZoomOnFilter?: boolean;
 };
 
-export function getSharedScatterSettings(
-    config: ScatterPlotConfig,
+export function getSharedScatterSettings<C extends ScatterPlotConfig>(
+    config: C,
     {
         chart,
         includeDensitySettings = false,
         includePointShape = false,
         includeTooltip = true,
         includeZoomOnFilter = true,
-    }: SharedScatterSettingsOptions = {},
+    }: SharedScatterSettingsOptions<C> = {},
 ) {
     const settings = [];
 
