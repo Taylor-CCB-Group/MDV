@@ -104,7 +104,6 @@ def _prepare_x_umap_and_leiden(
     scanpy_object, _ = _coerce_x_to_csc_without_nonfinite(scanpy_object)
     sc.pp.neighbors(scanpy_object, use_rep="X")
     sc.tl.umap(scanpy_object)
-
     if umap_key != "X_umap":
         scanpy_object.obsm[umap_key] = scanpy_object.obsm["X_umap"].copy()
         del scanpy_object.obsm["X_umap"]

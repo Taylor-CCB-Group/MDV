@@ -234,6 +234,9 @@ class TestConversionWithEdgeCases:
         """Test optional X-based UMAP/Leiden computation during conversion."""
         factory = MockAnnDataFactory(random_seed=42)
         adata = factory.create_minimal(50, 20)
+        adata.X = np.asarray(adata.X, dtype=np.float32)
+        adata.X[0, 0] = np.nan
+        adata.X[1, 1] = np.inf
 
         assert "X_umap" not in adata.obsm
         assert "leiden" not in adata.obs.columns
@@ -247,6 +250,9 @@ class TestConversionWithEdgeCases:
                     compute_x_umap=True,
                     leiden_resolution=0.5,
                 )
+
+            assert sp.isspmatrix_csc(adata.X)
+            assert np.isfinite(adata.X.data).all()
 
             cells_metadata = mdv.get_datasource_metadata("cells")
             columns = {col["field"]: col for col in cells_metadata["columns"]}
