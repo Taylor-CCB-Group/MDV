@@ -58,12 +58,12 @@ Data is requested from the backend in batches (default: **2000 genes per batch**
 *   **Memory**: Each gene for 60k cells takes ~240KB. A batch of 2000 genes takes ~480MB.
 *   **Dataset Size**: While Tier 1 works well for up to 500k cells, datasets of **10M+ cells** require either sub-sampling or server-side execution (Tier 2) due to browser memory and transfer limits.
 
-## 5. Backend Integration: HTTP Streaming
+    ## 5. Backend Integration: HTTP Streaming
 
-To prevent the backend from crashing when requesting thousands of columns at once, we implemented **HTTP Streaming** (Chunked Transfer Encoding) in the Flask server:
+    To prevent the backend from crashing when requesting thousands of columns at once, we implemented **HTTP Streaming** (Chunked Transfer Encoding) in the Flask server:
 
-*   **`yield_byte_data`**: The Python backend streams individual gene columns from HDF5 as they are read, instead of buffering the entire multi-gigabyte response in RAM.
-*   **No Content-Length**: This removes the risk of `ERR_CONTENT_LENGTH_MISMATCH` errors caused by large binary payloads.
+    *   **`yield_byte_data`**: The Python backend streams individual gene columns from HDF5 as they are read, instead of buffering the entire multi-gigabyte response in RAM.
+    *   **No Content-Length**: This removes the risk of `ERR_CONTENT_LENGTH_MISMATCH` errors caused by large binary payloads.
 
 ## 6. Configuration & Troubleshooting
 
