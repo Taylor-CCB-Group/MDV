@@ -21,6 +21,8 @@ if __name__ == "__main__":
     parser.add_argument("input_h5ad", help="Input h5ad file")
     parser.add_argument("output_folder", help="Output folder for MDV project")
     parser.add_argument("--delete-existing", action="store_false", default=True, help="Delete existing project data")
+    parser.add_argument("--compute-x-umap", action="store_true", help="Compute neighbors, UMAP, and Leiden clusters directly from adata.X before export")
+    parser.add_argument("--leiden-resolution", type=float, default=1.0, help="Leiden resolution used with --compute-x-umap")
     # parser.add_argument("--add-layers", default=False, help="Add additional matrix layers (expensive)")
     
     args = parser.parse_args()
@@ -44,7 +46,9 @@ if __name__ == "__main__":
         adata, 
         chunk_data=True,
         add_layer_data=False,
-        delete_existing=args.delete_existing
+        delete_existing=args.delete_existing,
+        compute_x_umap=args.compute_x_umap,
+        leiden_resolution=args.leiden_resolution,
     )
     elapsed = time.time() - start_time
     minutes = int(elapsed // 60)

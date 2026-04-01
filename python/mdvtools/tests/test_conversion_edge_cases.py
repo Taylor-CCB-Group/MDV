@@ -230,6 +230,36 @@ class TestConversionWithEdgeCases:
             
             assert isinstance(mdv, MDVProject)
 
+    def test_conversion_can_compute_x_umap_and_leiden_as_text(self):
+        """Test optional X-based UMAP/Leiden computation during conversion."""
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(50, 20)
+
+        assert "X_umap" not in adata.obsm
+        assert "leiden" not in adata.obs.columns
+
+        with temp_mdv_project() as test_dir:
+            with suppress_anndata_warnings():
+                mdv = convert_scanpy_to_mdv(
+                    test_dir,
+                    adata,
+                    delete_existing=True,
+                    compute_x_umap=True,
+                    leiden_resolution=0.5,
+                )
+
+            cells_metadata = mdv.get_datasource_metadata("cells")
+            columns = {col["field"]: col for col in cells_metadata["columns"]}
+
+            assert "X_umap_1" in columns
+            assert "X_umap_2" in columns
+            assert "leiden" in columns
+            assert columns["leiden"]["datatype"] in ["text", "text16"]
+
+            leiden_values = mdv.get_column("cells", "leiden")
+            assert len(leiden_values) == adata.n_obs
+            assert all(isinstance(value, str) for value in leiden_values)
+
 
 class TestConversionErrorHandling:
     """Test class for error handling during conversion."""

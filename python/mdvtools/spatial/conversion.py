@@ -32,6 +32,11 @@ class SpatialDataConversionArgs:
     density: bool = False
     point_transform: str = "auto"
     verbose: bool = False
+    obs_datasource_name: str = "cells"
+    var_datasource_name: str = "genes"
+    link_name_column: str | None = None
+    compute_x_umap: bool = False
+    leiden_resolution: float = 1.0
 
 
 REGION_FIELD = "spatial_region"
@@ -165,6 +170,11 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Link spatial data**: {conversion_args.link}\n"
         markdown += f"- **Batch mode**: {conversion_args.batch}\n"
         markdown += f"- **SpatialData source**: `{conversion_args.spatialdata_path}`\n"
+        markdown += f"- **Obs datasource name**: `{conversion_args.obs_datasource_name}`\n"
+        markdown += f"- **Var datasource name**: `{conversion_args.var_datasource_name}`\n"
+        markdown += f"- **rows_as_columns name column**: `{conversion_args.link_name_column}`\n"
+        markdown += f"- **Compute X UMAP/Leiden**: {conversion_args.compute_x_umap}\n"
+        markdown += f"- **Leiden resolution**: {conversion_args.leiden_resolution}\n"
         markdown += "\n"
     
     markdown += "## SpatialData objects:\n\n"
@@ -218,7 +228,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     _emit(f"README.md written to {os.path.join(mdv.dir, 'README.md')}", verbose_only=True)
     textbox = TextBox(title="SpatialData conversion information", param=[], size=[792, 472], position=[10, 10])
     textbox.set_text(markdown)
-    mdv.set_view("Data summary", {"initialCharts": {"cells": [textbox.plot_data]}})
+    mdv.set_view("Data summary", {"initialCharts": {conversion_args.obs_datasource_name if conversion_args is not None else "cells": [textbox.plot_data]}})
 
 def _shape_to_geojson(shape: "GeoDataFrame", transform_to_image: "BaseTransformation") -> str:
     """
@@ -1041,8 +1051,13 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             args.output_folder,
             merged_adata,
             delete_existing=not args.preserve_existing,
+            obs_datasource_name=args.obs_datasource_name,
+            var_datasource_name=args.var_datasource_name,
+            link_name_column=args.link_name_column,
             gene_columns=gene_columns,
-    )
+            compute_x_umap=args.compute_x_umap,
+            leiden_resolution=args.leiden_resolution,
+        )
     if args.link:
         if single_source_input:
             os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
@@ -1144,6 +1159,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("--density", action="store_true", help="Include density fields for gene expression in the default spatial view")
     parser.add_argument("--serve", action="store_true", help="Serve the generated project after conversion")
+    parser.add_argument("--obs-datasource-name", default="cells", help="Datasource name for observations")
+    parser.add_argument("--var-datasource-name", default="genes", help="Datasource name for variables")
+    parser.add_argument("--link-name-column", default=None, help="Variable datasource column used as the rows_as_columns name_column")
+    parser.add_argument("--compute-x-umap", action="store_true", help="Compute neighbors, UMAP, and Leiden clusters from merged adata.X before export")
+    parser.add_argument("--leiden-resolution", type=float, default=1.0, help="Leiden resolution used with --compute-x-umap")
     parser.add_argument("--verbose", action="store_true", help="Show detailed per-dataset conversion output, transform decisions, and merged summaries")
     parser.add_argument(
         "--point-transform",
