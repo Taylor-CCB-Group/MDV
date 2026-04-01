@@ -353,6 +353,7 @@ const contourBandwidthSlider = {
 };
 
 function bandwidthToSliderValue(bandwidth: number) {
+    if (!Number.isFinite(bandwidth)) return Math.log10(contourBandwidthSlider.minBandwidth);
     const safeBandwidth = Math.min(
         contourBandwidthSlider.maxBandwidth,
         Math.max(contourBandwidthSlider.minBandwidth, bandwidth),
@@ -361,6 +362,7 @@ function bandwidthToSliderValue(bandwidth: number) {
 }
 
 function sliderValueToBandwidth(value: number) {
+    if (!Number.isFinite(value)) return contourBandwidthSlider.minBandwidth;
     const minValue = Math.log10(contourBandwidthSlider.minBandwidth);
     const maxValue = Math.log10(contourBandwidthSlider.maxBandwidth);
     const safeValue = Math.min(maxValue, Math.max(minValue, value));
