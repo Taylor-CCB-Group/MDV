@@ -1,7 +1,12 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { CategoricalDataType } from '@/charts/charts';
-import { useCategoryContour, getDensitySettings, type DualContourLegacyConfig } from './contour_state';
+import {
+    useCategoryContour,
+    getDensitySettings,
+    getContourVisualSettings,
+    type DualContourLegacyConfig,
+} from './contour_state';
 import type { CategoryContourProps } from './contour_state';
 import type BaseChart from '@/charts/BaseChart';
 import type { BaseConfig } from '@/charts/BaseChart';
@@ -296,5 +301,37 @@ describe('getDensitySettings disposer management', () => {
         if (disposer) {
             disposer();
         }
+    });
+});
+
+describe('getContourVisualSettings', () => {
+    test('maps KDE bandwidth through the slider spec without coupling to UI copy', () => {
+        const config = {
+            contour_fill: false,
+            contour_fillThreshold: 2,
+            contour_bandwidth: 0.1,
+            contour_intensity: 1,
+            contour_opacity: 0.5,
+        };
+
+        const [bandwidthSetting] = getContourVisualSettings(config);
+        const initialBandwidth = config.contour_bandwidth;
+
+        expect(bandwidthSetting.type).toBe('slider');
+        expect(bandwidthSetting.min).toBeLessThan(bandwidthSetting.current_value);
+        expect(bandwidthSetting.max).toBeGreaterThan(bandwidthSetting.current_value);
+
+        bandwidthSetting.func?.(bandwidthSetting.current_value);
+        expect(config.contour_bandwidth).toBeCloseTo(initialBandwidth);
+
+        if (bandwidthSetting.min === undefined || bandwidthSetting.max === undefined) {
+            throw new Error('bandwidth slider should define min/max');
+        }
+
+        bandwidthSetting.func?.(bandwidthSetting.min);
+        expect(config.contour_bandwidth).toBeLessThan(initialBandwidth);
+
+        bandwidthSetting.func?.(bandwidthSetting.max);
+        expect(config.contour_bandwidth).toBeGreaterThan(initialBandwidth);
     });
 });

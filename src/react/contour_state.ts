@@ -346,6 +346,27 @@ export type DualContourLegacyConfig = {
     };
 } & ContourVisualConfig;
 
+const contourBandwidthSlider = {
+    minBandwidth: 0.01,
+    maxBandwidth: 250,
+    step: 0.01,
+};
+
+function bandwidthToSliderValue(bandwidth: number) {
+    const safeBandwidth = Math.min(
+        contourBandwidthSlider.maxBandwidth,
+        Math.max(contourBandwidthSlider.minBandwidth, bandwidth),
+    );
+    return Math.log10(safeBandwidth);
+}
+
+function sliderValueToBandwidth(value: number) {
+    const minValue = Math.log10(contourBandwidthSlider.minBandwidth);
+    const maxValue = Math.log10(contourBandwidthSlider.maxBandwidth);
+    const safeValue = Math.min(maxValue, Math.max(minValue, value));
+    return 10 ** safeValue;
+}
+
 export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
     const { dataStore } = chart;
     // make it so that if we change the parameter, we get the new values in the dropdowns
@@ -467,18 +488,21 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
  * @returns - array of visual settings
  */
 export function getContourVisualSettings(c: ContourVisualConfig) {
+    const minValue = Math.log10(contourBandwidthSlider.minBandwidth);
+    const maxValue = Math.log10(contourBandwidthSlider.maxBandwidth);
     return [
         g({
             type: "slider",
-            max: 50,
-            min: 1,
+            max: maxValue,
+            min: minValue,
+            step: contourBandwidthSlider.step,
 
             // doc: this.__doc__, //why?
-            current_value: c.contour_bandwidth,
+            current_value: bandwidthToSliderValue(c.contour_bandwidth),
             label: "KDE Bandwidth",
             continuous: true,
             func(x) {
-                c.contour_bandwidth = x;
+                c.contour_bandwidth = sliderValueToBandwidth(x);
             },
         }),
         g({
@@ -537,10 +561,10 @@ export function useLegacyDualContour(hoveredFieldId?: FieldName | null): Contour
     const commonProps = {
         parameter: config.contourParameter,
         fill: config.contour_fill,
-        bandwidth: config.contour_bandwidth || 10,
-        intensity: config.contour_intensity || 0.1,
-        opacity: config.contour_opacity || 0.2,
-        fillThreshold: config.contour_fillThreshold || 2,
+        bandwidth: config.contour_bandwidth ?? 0.1,
+        intensity: config.contour_intensity ?? 0.1,
+        opacity: config.contour_opacity ?? 0.2,
+        fillThreshold: config.contour_fillThreshold ?? 2,
     };
     const fields = useFieldSpecs(config.densityFields);
     const fieldContours = useFieldContour({

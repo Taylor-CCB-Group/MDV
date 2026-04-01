@@ -172,7 +172,7 @@ BaseChart.types["DeckScatter"] = {
     ],
 };
 BaseChart.types["DeckDensity"] = {
-    name: "Scatter Plot + Contours",
+    name: "Scatter Plot + Density",
     class: DeckScatterReact,
     allow_user_add: false,
     params: [
