@@ -9,7 +9,7 @@ import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
 import { useChartSize, useConfig, useFieldSpec, useFieldSpecs, useFilteredIndices, useParamColumns } from "../hooks";
 import { getDensityVisualisationFolder } from "../contour_state";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { TriangleLayerContours } from "@/webgl/HeatmapContourExtension";
 import { getFieldColor } from "../fieldColorManager";
 import {
@@ -37,6 +37,7 @@ const SplatterPlot = observer(function SplatterPlot() {
             field.datatype === "double" || field.datatype === "integer" || field.datatype === "int32",
     );
     const hasConfiguredDensityFields = Array.isArray(config.densityFields) && config.densityFields.length > 0;
+    const [hoveredCell, setHoveredCell] = useState<{ rowIndex: number; columnIndex: number } | null>(null);
 
     const visibleCategories = useMemo(
         () => getVisibleSplatterCategories(categoryColumn, filteredRows),
@@ -162,6 +163,11 @@ const SplatterPlot = observer(function SplatterPlot() {
             matchesSplatterView(layer.id, viewport.id),
         [],
     );
+    const hoveredRowIndex = hoveredCell?.rowIndex ?? null;
+    const hoveredColumnIndex = hoveredCell?.columnIndex ?? null;
+    const hoveredCategory = hoveredRowIndex === null ? null : visibleCategories[hoveredRowIndex];
+    const hoveredField = hoveredColumnIndex === null ? null : densityFields[hoveredColumnIndex];
+    const gridLineColor = "rgba(148, 163, 184, 0.16)";
 
     if (!config.category) {
         return <div className="flex h-full items-center justify-center text-sm">Choose a category column to build the splatter plot.</div>;
@@ -196,8 +202,27 @@ const SplatterPlot = observer(function SplatterPlot() {
                         key={`row-label-${category.categoryIndex}`}
                         className="flex items-center justify-end pr-3 text-right text-xs"
                         title={category.label}
+                        style={{
+                            zIndex: hoveredCategory?.categoryIndex === category.categoryIndex ? 1 : 0,
+                        }}
                     >
-                        <span className="max-w-full truncate">{category.label === "" ? "none" : category.label}</span>
+                        <span
+                            className="max-w-full truncate rounded-sm px-1 py-0.5"
+                            style={{
+                                backgroundColor:
+                                    hoveredCategory?.categoryIndex === category.categoryIndex
+                                        ? "rgba(15, 23, 42, 0.78)"
+                                        : "transparent",
+                                color:
+                                    hoveredCategory?.categoryIndex === category.categoryIndex ? "white" : undefined,
+                                maxWidth:
+                                    hoveredCategory?.categoryIndex === category.categoryIndex ? "none" : undefined,
+                                overflow:
+                                    hoveredCategory?.categoryIndex === category.categoryIndex ? "visible" : undefined,
+                            }}
+                        >
+                            {category.label === "" ? "none" : category.label}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -213,13 +238,23 @@ const SplatterPlot = observer(function SplatterPlot() {
                 {densityFields.map((field) => {
                     const color = getFieldColor(field.field);
                     return (
-                        <div key={`column-label-${field.field}`} className="relative overflow-visible">
+                        <div
+                            key={`column-label-${field.field}`}
+                            className="relative overflow-visible"
+                            style={{
+                                zIndex: hoveredField?.field === field.field ? 1 : 0,
+                            }}
+                        >
                             <div
                                 className="absolute bottom-2 left-2 whitespace-nowrap text-xs"
                                 style={{
                                     color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
                                     transform: "rotate(-35deg)",
                                     transformOrigin: "left bottom",
+                                    backgroundColor:
+                                        hoveredField?.field === field.field ? "rgba(15, 23, 42, 0.78)" : "transparent",
+                                    borderRadius: "2px",
+                                    padding: hoveredField?.field === field.field ? "2px 4px" : undefined,
                                 }}
                                 title={field.name}
                             >
@@ -248,23 +283,92 @@ const SplatterPlot = observer(function SplatterPlot() {
                     useDevicePixels={true}
                 />
                 <div
-                    className="absolute inset-0 grid pointer-events-none"
+                    className="absolute inset-0 pointer-events-none"
+                >
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            border: `1px solid ${gridLineColor}`,
+                        }}
+                    />
+                    {Array.from({ length: Math.max(densityFields.length - 1, 0) }, (_, index) => (
+                        <div
+                            key={`vline-${densityFields[index + 1]?.field ?? index}`}
+                            className="absolute top-0 bottom-0"
+                            style={{
+                                left: `${(index + 1) * layout.cellWidth}px`,
+                                width: "1px",
+                                backgroundColor: gridLineColor,
+                            }}
+                        />
+                    ))}
+                    {Array.from({ length: Math.max(visibleCategories.length - 1, 0) }, (_, index) => (
+                        <div
+                            key={`hline-${visibleCategories[index + 1]?.categoryIndex ?? index}`}
+                            className="absolute left-0 right-0"
+                            style={{
+                                top: `${(index + 1) * layout.cellHeight}px`,
+                                height: "1px",
+                                backgroundColor: gridLineColor,
+                            }}
+                        />
+                    ))}
+                </div>
+                <div
+                    className="absolute inset-0 grid"
                     style={{
                         gridTemplateColumns: `repeat(${densityFields.length}, minmax(0, 1fr))`,
                         gridTemplateRows: `repeat(${visibleCategories.length}, minmax(0, 1fr))`,
                     }}
                 >
-                    {visibleCategories.flatMap((category) =>
-                        densityFields.map((field) => (
+                    {visibleCategories.flatMap((category, rowIndex) =>
+                        densityFields.map((field, columnIndex) => (
                             <div
                                 key={`grid-${category.categoryIndex}-${field.field}`}
+                                onMouseEnter={() => {
+                                    setHoveredCell({ rowIndex, columnIndex });
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredCell((current) =>
+                                        current?.rowIndex === rowIndex && current?.columnIndex === columnIndex
+                                            ? null
+                                            : current,
+                                    );
+                                }}
+                                title={`${category.label === "" ? "none" : category.label} / ${field.name === "" ? "none" : field.name}`}
                                 style={{
-                                    border: "1px solid rgba(148, 163, 184, 0.35)",
+                                    backgroundColor:
+                                        hoveredRowIndex === rowIndex && hoveredColumnIndex === columnIndex
+                                            ? "rgba(255, 255, 255, 0.04)"
+                                            : "transparent",
+                                    boxShadow:
+                                        hoveredRowIndex === rowIndex && hoveredColumnIndex === columnIndex
+                                            ? "inset 0 0 0 1px rgba(255, 255, 255, 0.22)"
+                                            : "none",
                                 }}
                             />
                         )),
                     )}
                 </div>
+                {hoveredCategory && hoveredField ? (
+                    <div
+                        className="absolute left-3 top-3 pointer-events-none rounded-md px-3 py-2 text-xs"
+                        style={{
+                            backgroundColor: "rgba(15, 23, 42, 0.82)",
+                            color: "white",
+                            maxWidth: `min(${Math.max(layout.labelWidth - 24, 180)}px, calc(100% - 24px))`,
+                            boxShadow: "0 4px 16px rgba(15, 23, 42, 0.18)",
+                        }}
+                    >
+                        <div className="break-words">
+                            <strong>{categoryColumn.name}:</strong>{" "}
+                            {hoveredCategory.label === "" ? "none" : hoveredCategory.label}
+                        </div>
+                        <div className="break-words">
+                            {hoveredField.name === "" ? "none" : hoveredField.name}
+                        </div>
+                    </div>
+                ) : null}
             </div>
         </div>
     );
