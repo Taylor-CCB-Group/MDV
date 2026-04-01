@@ -64,9 +64,10 @@ const AddTableColumnDialog = ({
     const [mode, setMode] = useState<AddColumnMode>("empty");
     const [datatype, setDatatype] = useState<DataType>("text");
     const [cloneColumn, setCloneColumn] = useState("");
-    const [position, setPosition] = useState(String(defaultPosition));
-    const [stringLength, setStringLength] = useState("");
-    const [delimiter, setDelimiter] = useState(",");
+	const [position, setPosition] = useState(String(defaultPosition));
+	const [stringLength, setStringLength] = useState("");
+	const [delimiter, setDelimiter] = useState(",");
+    const [nameError, setNameError] = useState<string | null>(null);
 
     const selectedCloneColumn = cloneableColumns.find((column) => column.field === cloneColumn);
     const selectedDatatype = mode === "clone" ? selectedCloneColumn?.datatype ?? "text" : datatype;
@@ -79,17 +80,19 @@ const AddTableColumnDialog = ({
         setName("");
         setMode("empty");
         setDatatype("text");
-        setCloneColumn(cloneableColumns[0]?.field ?? "");
-        setPosition(String(defaultPosition));
-        setStringLength("");
-        setDelimiter(",");
-    }, [open, cloneableColumns, defaultPosition]);
+	        setCloneColumn(cloneableColumns[0]?.field ?? "");
+	        setPosition(String(defaultPosition));
+	        setStringLength("");
+	        setDelimiter(",");
+            setNameError(null);
+	    }, [open, cloneableColumns, defaultPosition]);
 
-    const handleSubmit = () => {
-        const trimmedName = name.trim();
-        if (!trimmedName) {
-            return;
-        }
+	    const handleSubmit = () => {
+	        const trimmedName = name.trim();
+	        if (!trimmedName) {
+                setNameError("Column name is required");
+	            return;
+	        }
         const parsedPosition = Number.parseInt(position, 10);
         const parsedStringLength = Number.parseInt(stringLength, 10);
         onSubmit({
@@ -115,19 +118,24 @@ const AddTableColumnDialog = ({
             </DialogTitle>
             <DialogContent dividers>
                 <Stack spacing={2} sx={{ pt: 0.5 }}>
-                    <TextField
-                        autoFocus
-                        label="Column Name"
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                                event.preventDefault();
-                                handleSubmit();
-                            }
-                        }}
-                        fullWidth
-                    />
+	                    <TextField
+	                        autoFocus
+	                        label="Column Name"
+	                        value={name}
+	                        onChange={(event) => {
+                                setName(event.target.value);
+                                setNameError(null);
+                            }}
+	                        onKeyDown={(event) => {
+	                            if (event.key === "Enter") {
+	                                event.preventDefault();
+	                                handleSubmit();
+	                            }
+	                        }}
+                            error={!!nameError}
+                            helperText={nameError}
+	                        fullWidth
+	                    />
 
                     <FormControlLabel
                         control={
@@ -198,13 +206,13 @@ const AddTableColumnDialog = ({
                             />
                         </>
                     ) : (
-                        <Autocomplete
-                            options={DATATYPE_OPTIONS}
-                            value={datatype}
-                            onChange={(_, value) => setDatatype((value ?? "text") as DataType)}
-                            getOptionLabel={(option) => option}
-                            renderInput={(params) => (
-                                <TextField
+	                        <Autocomplete
+	                            options={DATATYPE_OPTIONS}
+	                            value={datatype}
+	                            onChange={(_, value) => setDatatype(value ?? "text")}
+	                            getOptionLabel={(option) => option}
+	                            renderInput={(params) => (
+	                                <TextField
                                     {...params}
                                     label="Datatype"
                                     placeholder="Search datatype"
