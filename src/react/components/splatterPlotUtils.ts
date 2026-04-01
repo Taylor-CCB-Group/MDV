@@ -33,6 +33,10 @@ export type SplatterLayout = {
     cellHeight: number;
 };
 
+export function matchesSplatterView(layerId: string, viewId: string) {
+    return layerId === viewId || layerId.startsWith(`${viewId}-`);
+}
+
 export function adaptSplatterConfig(originalConfig: SplatterPlotConfig): SplatterPlotConfig {
     const config = {
         ...splatterDefaults,

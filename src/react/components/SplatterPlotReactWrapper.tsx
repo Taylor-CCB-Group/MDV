@@ -9,7 +9,7 @@ import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
 import { useChartSize, useConfig, useFieldSpec, useFieldSpecs, useFilteredIndices, useParamColumns } from "../hooks";
 import { getContourVisualSettings } from "../contour_state";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { TriangleLayerContours } from "@/webgl/HeatmapContourExtension";
 import { getFieldColor } from "../fieldColorManager";
 import {
@@ -17,6 +17,7 @@ import {
     getSharedSplatterViewState,
     getSplatterLayout,
     getVisibleSplatterCategories,
+    matchesSplatterView,
     type SplatterPlotConfig,
 } from "./splatterPlotUtils";
 
@@ -156,6 +157,11 @@ const SplatterPlot = observer(function SplatterPlot() {
             cy.data,
         ],
     );
+    const layerFilter = useCallback(
+        ({ layer, viewport }: { layer: { id: string }; viewport: { id: string } }) =>
+            matchesSplatterView(layer.id, viewport.id),
+        [],
+    );
 
     if (!config.category) {
         return <div className="flex h-full items-center justify-center text-sm">Choose a category column to build the splatter plot.</div>;
@@ -234,6 +240,7 @@ const SplatterPlot = observer(function SplatterPlot() {
             >
                 <DeckGL
                     controller={false}
+                    layerFilter={layerFilter}
                     layers={layers}
                     views={views}
                     viewState={viewState as any}

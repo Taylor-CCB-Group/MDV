@@ -4,6 +4,7 @@ import {
     getSharedSplatterViewState,
     getSplatterLayout,
     getVisibleSplatterCategories,
+    matchesSplatterView,
     type SplatterPlotConfig,
 } from "./splatterPlotUtils";
 
@@ -66,5 +67,11 @@ describe("SplatterPlotReactWrapper helpers", () => {
         expect(viewState.target).toEqual([10, 5, 0]);
         expect(viewState.zoom).toBeGreaterThan(1);
         expect(viewState.minZoom).toBe(-50);
+    });
+
+    test("matchesSplatterView scopes composite heatmap sublayers to the right viewport", () => {
+        expect(matchesSplatterView("splatter-2-gene_a", "splatter-2-gene_a")).toBe(true);
+        expect(matchesSplatterView("splatter-2-gene_a-weights", "splatter-2-gene_a")).toBe(true);
+        expect(matchesSplatterView("splatter-2-gene_a-weights", "splatter-1-gene_a")).toBe(false);
     });
 });
