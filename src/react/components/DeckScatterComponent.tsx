@@ -4,11 +4,11 @@ import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
 import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
-import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
+import type { DataColumn, FieldName, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
@@ -18,6 +18,8 @@ import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import useGateLayers from "../hooks/useGateLayers";
 import { escapeHtml } from "@/utilities/Utilities";
+import FieldContourLegend from "./FieldContourLegend";
+import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -123,13 +125,18 @@ function useZoomOnFilter(data: Uint32Array) {
  *   - enhanced version with more info (in general for all charts, or at least new ones)
  * - axis configuration (including via direct manipulation)
  */
-const DeckScatter = observer(function DeckScatterComponent() {
+const DeckScatter = observer(function DeckScatterComponent({
+    setHoveredField,
+}: {
+    setHoveredField: (fieldId: FieldName | null) => void;
+}) {
     const id = useId();
     const [width, height] = useChartSize();
     const [cx, cy, ...density] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
+    const contourConfig = useConfig<DualContourLegacyConfig>();
     const { opacity, viewState, on_filter, dimension } = config;
     const is2d = dimension === "2d";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
@@ -178,6 +185,10 @@ const DeckScatter = observer(function DeckScatterComponent() {
         gateDisplayLayer,
         controllerOptions,
     } = useGateLayers();
+
+    const legendFields = useFieldContourLegend(contourConfig.densityFields);
+    const showLegend = contourConfig.field_legend.display;
+    const legendPosition = { x: 10, y: 10 };
 
     // this should move in to scatter_state, common with viv...
     const greyScatterplotLayer = useMemo(
@@ -355,18 +366,26 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     />
                 </div>
             </AxisComponent>
+            {showLegend && (
+                <FieldContourLegend
+                    fields={legendFields}
+                    position={legendPosition}
+                    onFieldHover={setHoveredField}
+                />
+            )}
         </>
     );
 });
 
 export default () => {
     const chart = useChart();
+    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
     // in order for SelectionOverlay to work, we need to review how our implementation works
     // vs useScatterplotLayer in spatial_context.tsx
     return (
-        <SpatialAnnotationProvider chart={chart}>
+        <SpatialAnnotationProvider chart={chart} hoveredFieldId={hoveredField} setHoveredFieldId={setHoveredField}>
             <SelectionOverlay />
-            <DeckScatter />
+            <DeckScatter setHoveredField={setHoveredField} />
         </SpatialAnnotationProvider>
     );
 };

@@ -22,10 +22,9 @@ import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
 import { g, toArray } from "@/lib/utils";
-import { getDensitySettings } from "../contour_state";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
-import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 import { allNumeric } from "@/lib/columnTypeHelpers";
+import { getSharedScatterSettings } from "./sharedScatterSettings";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -222,61 +221,10 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.background_filter.category = v;
                 },
             }),
-            getTooltipSettings(c),
-            g({
-                type: "dropdown",
-                label: "Shape",
-                current_value: c.point_shape,
-                values: [["circle", "square", "gaussian"]], //ugh
-                func: (x) => {
-                    //@ts-ignore we have a very restricted type for point_shape - could think about supporting that
-                    c.point_shape = x;
-                },
-            }),
-            g({
-                type: "radiobuttons",
-                label: "course radius",
-                current_value: `${c.course_radius || 1}`,
-                choices: [
-                    [0.1, 0.1],
-                    [1, 1],
-                    [10, 10],
-                    [100, 100],
-                ].map(a => [`${a[0]}`, `${a[1]}]`]),
-                func: (x) => {
-                    //@ts-check !todo - maybe we should allow radiobuttons to use different datatypes
-                    c.course_radius = Number.parseFloat(x);
-                },
-            }),
-            g({
-                type: "slider",
-                label: "radius",
-                current_value: c.radius || 5,
-                min: 0,
-                max: 20,
-                continuous: true,
-                func: (x) => {
-                    c.radius = x;
-                },
-            }),
-            g({
-                type: "slider",
-                label: "opacity",
-                current_value: Math.sqrt(c.opacity || scatterDefaults.opacity),
-                min: 0,
-                max: 1,
-                continuous: true,
-                func: (x) => {
-                    c.opacity = x * x;
-                },
-            }),
-            g({
-                type: "check",
-                label: "zoom on filter",
-                current_value: c.zoom_on_filter || false,
-                func: (x) => {
-                    c.zoom_on_filter = x;
-                },
+            ...getSharedScatterSettings(c, {
+                chart: this,
+                includeDensitySettings: true,
+                includePointShape: true,
             }),
             g({
                 type: "check",
@@ -286,9 +234,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.showJson = x;
                 },
             }),
-            // side-note; what if "folders" could just be keyed objects?
-            // also, it might be nice to remember which folders were open...
-            getDensitySettings(c, this),
             g({
                 type: "folder",
                 label: "Category Filters",
