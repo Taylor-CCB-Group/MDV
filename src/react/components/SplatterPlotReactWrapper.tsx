@@ -8,7 +8,7 @@ import type { CategoricalDataType, LoadedDataColumn, NumberDataType } from "../.
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
 import { useChartSize, useConfig, useFieldSpec, useFieldSpecs, useFilteredIndices, useParamColumns } from "../hooks";
-import { getContourVisualSettings } from "../contour_state";
+import { getDensityVisualisationFolder } from "../contour_state";
 import { useCallback, useMemo } from "react";
 import { TriangleLayerContours } from "@/webgl/HeatmapContourExtension";
 import { getFieldColor } from "../fieldColorManager";
@@ -285,10 +285,8 @@ class DeckSplatterReact extends BaseReactChart<SplatterPlotConfig> {
     getSettings() {
         const c = this.config;
         return super.getSettings().concat([
-            g({
-                type: "folder",
-                label: "Splatter Plot",
-                current_value: [
+            getDensityVisualisationFolder(c, {
+                categorySelectionControls: [
                     g({
                         type: "column",
                         label: "Categories on y-axis",
@@ -300,14 +298,13 @@ class DeckSplatterReact extends BaseReactChart<SplatterPlotConfig> {
                     }),
                     g({
                         type: "multicolumn",
-                        label: "Density fields",
+                        label: "Density Fields",
                         current_value: c.densityFields || [],
                         columnType: "number",
                         func: (x) => {
                             c.densityFields = x;
                         },
                     }),
-                    ...getContourVisualSettings(c),
                 ],
             }),
         ]);
