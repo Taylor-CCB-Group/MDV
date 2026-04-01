@@ -257,8 +257,18 @@ class DataModel {
         if (!col.editable) {
             throw new Error(`Column ${columnName} not editable`);
         }
+        const rowCount =
+            this.dataStore.rowCount ?? this.dataStore.data?.length ?? this.dataStore.size ?? 0;
 
         for (const rowIndex of rowIndices) {
+            if (
+                !Number.isFinite(rowIndex) ||
+                !Number.isInteger(rowIndex) ||
+                rowIndex < 0 ||
+                rowIndex >= rowCount
+            ) {
+                throw new Error(`Invalid row index ${rowIndex} for column ${columnName}`);
+            }
             if (emptyOnly) {
                 const currentValue = getCellValueAsString(col, rowIndex);
                 if (currentValue !== "") {

@@ -162,4 +162,29 @@ describe("DataModel bulk edit helpers", () => {
 
         expect(removeColumn).toHaveBeenCalledWith("label", true, true);
     });
+
+    test("throws for invalid row indices during bulk fill", () => {
+        const dataChanged = vi.fn();
+        const dataStore = {
+            size: 3,
+            columnIndex: {
+                label: {
+                    field: "label",
+                    name: "Label",
+                    datatype: "text",
+                    editable: true,
+                    values: [""],
+                    data: new Uint8Array([0, 0, 0]),
+                },
+            },
+            dataChanged,
+        } as any;
+
+        const dataModel = new DataModel(dataStore, { autoupdate: false });
+
+        expect(() => dataModel.fillColumn("label", "Filled", [0, 3], false)).toThrow(
+            "Invalid row index 3 for column label",
+        );
+        expect(dataChanged).not.toHaveBeenCalled();
+    });
 });
