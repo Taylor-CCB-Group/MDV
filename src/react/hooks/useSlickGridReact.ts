@@ -13,6 +13,7 @@ import { DataModel } from "@/table/DataModel";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
+import { flattenFields } from "@/lib/columnTypeHelpers";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -610,15 +611,23 @@ const useSlickGridReact = () => {
                 displayedFields.length,
             );
 
-            // Insert the column in the position and update the order and param fields
-            displayedFields.splice(insertionIndex, 0, trimmedName);
-            const nextFields = displayedFields.filter((field) => field !== "__index__");
+            // Map the display-layer index to config.param index, skip the "__index__" slot
+            const paramInsertionIndex = config.include_index
+                ? Math.max(0, insertionIndex - 1)
+                : insertionIndex;
+
+            // Splice into a copy of config.param to preserve any FieldSpec/ColumnQuery objects
+            const nextParam = [...(config.param ?? [])];
+            nextParam.splice(paramInsertionIndex, 0, trimmedName);
+
+            // Flatten the params so ordering retains the query objects
+            const nextRenderedFields = nextParam.flatMap((entry) => flattenFields(entry));
             const nextOrder = Object.fromEntries(
-                nextFields.map((field, index) => [field, index]),
+                nextRenderedFields.map((field, index) => [field, index]),
             );
 
             runInAction(() => {
-                config.param = nextFields;
+                config.param = nextParam;
                 config.order = nextOrder;
             });
 
