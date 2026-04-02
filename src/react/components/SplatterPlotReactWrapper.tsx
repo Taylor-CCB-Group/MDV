@@ -523,8 +523,6 @@ BaseChart.types["DeckSplatter"] = {
     name: "Splatter Plot",
     class: DeckSplatterReact,
     allow_user_add: true,
-    required: (ds) =>
-        ds.getColumnList("number").length >= 3 && ds.getColumnList(["text", "text16"]).length >= 1,
     params: [
         {
             type: "number",
