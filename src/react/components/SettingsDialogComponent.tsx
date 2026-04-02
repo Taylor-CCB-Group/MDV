@@ -563,12 +563,12 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     const isSearchActive = searchTerm.trim().length > 0;
     // When the dialog first opens (and search is empty), expand "General" so the user sees settings immediately.
     const [isOpen, setIsOpen] = useState(() => props.label === "General");
-    // Derive stable keys so nested items are not remounted on each render.
     const settings = useMemo(
         () =>
-            props.current_value.map((setting, index) => ({
+            props.current_value.map((setting) => ({
                 setting,
-                id: `${props.label}:${setting.type}:${setting.label}:${index}`,
+                id: (setting as AnyGuiSpec & { _stableId?: string })._stableId ||
+                    `${props.label}:${setting.type}:${setting.label}`,
             })),
         [props.current_value, props.label],
     );
@@ -746,7 +746,11 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
                                 input: {
                                     endAdornment: searchTerm.trim().length > 0 ? (
                                         <InputAdornment position="end">
-                                            <IconButton aria-label="clear search" onClick={() => setSearchTerm("")}>
+                                            <IconButton
+                                                aria-label="clear search"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => setSearchTerm("")}
+                                            >
                                                 <Clear />
                                             </IconButton>
                                         </InputAdornment>
@@ -757,7 +761,9 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
                     </Box>
                     {settings.length === 0 && (
                         <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
-                            No settings match your search.
+                            {searchTerm.trim().length > 0
+                                ? "No settings match your search."
+                                : "No settings available."}
                         </Typography>
                     )}
                     <Divider sx={{ marginY: 0.75, opacity: 0.6 }} />

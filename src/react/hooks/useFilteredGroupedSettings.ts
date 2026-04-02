@@ -2,11 +2,24 @@ import { useMemo } from "react";
 import { makeAutoObservable } from "mobx";
 import type { AnyGuiSpec, GuiSpec } from "../../charts/charts";
 
-function filterSettingsByLabel(specs: AnyGuiSpec[], searchTerm: string): AnyGuiSpec[] {
+type StableGuiSpec = AnyGuiSpec & { _stableId?: string };
+
+function stampStableIds(specs: StableGuiSpec[], parentPath = "") {
+    specs.forEach((spec, index) => {
+        if (!spec._stableId) {
+            spec._stableId = `${parentPath}${spec.type}:${spec.label}:${index}`;
+        }
+        if (spec.type === "folder" && Array.isArray(spec.current_value)) {
+            stampStableIds(spec.current_value as StableGuiSpec[], `${spec._stableId}/`);
+        }
+    });
+}
+
+function filterSettingsByLabel(specs: StableGuiSpec[], searchTerm: string): StableGuiSpec[] {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return specs;
 
-    return specs.reduce<AnyGuiSpec[]>((acc, spec) => {
+    return specs.reduce<StableGuiSpec[]>((acc, spec) => {
         const labelMatches = spec.label.toLowerCase().includes(query);
 
         if (spec.type !== "folder") {
@@ -16,13 +29,13 @@ function filterSettingsByLabel(specs: AnyGuiSpec[], searchTerm: string): AnyGuiS
         }
 
         // Folder setting: recurse into children so nested matches are preserved.
-        const filteredChildren = filterSettingsByLabel(spec.current_value, query);
+        const filteredChildren = filterSettingsByLabel(spec.current_value as StableGuiSpec[], query);
         if (!labelMatches && filteredChildren.length === 0) {
             // Neither this folder nor any descendant matches.
             return acc;
         }
 
-        const filteredFolder: GuiSpec<"folder"> = {
+        const filteredFolder: GuiSpec<"folder"> & { _stableId?: string } = {
             ...spec,
             // If the folder label itself matches, keep all children so folder-name searches
             // show the full folder instead of an empty one.
@@ -58,7 +71,7 @@ export function useFilteredGroupedSettings(rawSettings: AnyGuiSpec[], searchTerm
         );
 
         // Keep UI tidy by collecting top level settings under a single "General" folder.
-        const wrappedTopLevelSettings: AnyGuiSpec[] =
+        const wrappedTopLevelSettings: StableGuiSpec[] =
             groupedSettings.topLevelSettings.length > 0
                 ? [
                     {
@@ -69,7 +82,9 @@ export function useFilteredGroupedSettings(rawSettings: AnyGuiSpec[], searchTerm
                 ]
                 : [];
 
-        return [...wrappedTopLevelSettings, ...groupedSettings.folderSettings];
+        const settings = [...wrappedTopLevelSettings, ...groupedSettings.folderSettings] as StableGuiSpec[];
+        stampStableIds(settings);
+        return settings;
     }, [rawSettings]);
 
     const filteredSettings = useMemo(() => {
@@ -79,10 +94,10 @@ export function useFilteredGroupedSettings(rawSettings: AnyGuiSpec[], searchTerm
 
     return useMemo(() => {
         const settings = filteredSettings.map(
-            (setting, index) => ({
+            (setting) => ({
                 setting,
-                // Stable id rather than uuid() so that uuid is not called for every render
-                id: `${setting.type}:${setting.label}:${index}`,
+                // Stable across filtering/search transitions.
+                id: setting._stableId || `${setting.type}:${setting.label}`,
             }),
         );
 
