@@ -1,6 +1,20 @@
 import { useEffect, useState, useCallback, useId } from "react";
 import { useChart, useDataStore } from "./context";
 
+export type HighlightModifiers = {
+    add?: boolean;
+    remove?: boolean;
+    toggle?: boolean;
+};
+
+export type ModifierEventLike = {
+    shiftKey?: boolean;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    srcEvent?: unknown;
+    sourceEvent?: unknown;
+} | null | undefined;
+
 /**
  * Hook to get the index of the highlighted data point.
  * Delegates to useHighlightedIndices() and returns the first index.
@@ -55,4 +69,48 @@ export function useHighlightRows() {
         // dataHighlighted expects an array of numbers
         dataStore.dataHighlighted(rowIndexes, chart);
     }, [chart, dataStore]);
+}
+
+export function getHighlightModifiers(event?: ModifierEventLike): HighlightModifiers {
+    const raw = event ?? {};
+    const nested =
+        typeof raw === "object" && raw !== null
+            ? ((raw.srcEvent ?? raw.sourceEvent) as ModifierEventLike)
+            : undefined;
+    const resolved = nested ?? raw;
+    return {
+        add: !!resolved?.shiftKey,
+        toggle: !!(resolved?.ctrlKey || resolved?.metaKey),
+    };
+}
+
+export function useHighlightRowUpdater() {
+    const highlightedIndices = useHighlightedIndices();
+    const highlightRows = useHighlightRows();
+
+    return useCallback(
+        (rowIndex: number, modifiers?: HighlightModifiers) => {
+            if (rowIndex < 0) return;
+            const { add = false, remove = false, toggle = false } = modifiers ?? {};
+            if (toggle) {
+                const nextHighlights = new Set(highlightedIndices);
+                if (nextHighlights.has(rowIndex)) nextHighlights.delete(rowIndex);
+                else nextHighlights.add(rowIndex);
+                highlightRows(Array.from(nextHighlights));
+                return;
+            }
+            if (remove) {
+                if (!highlightedIndices.includes(rowIndex)) return;
+                highlightRows(highlightedIndices.filter((index) => index !== rowIndex));
+                return;
+            }
+            if (add) {
+                if (highlightedIndices.includes(rowIndex)) return;
+                highlightRows([...highlightedIndices, rowIndex]);
+                return;
+            }
+            highlightRows([rowIndex]);
+        },
+        [highlightRows, highlightedIndices],
+    );
 }

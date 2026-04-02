@@ -20,7 +20,7 @@ import { ScatterSquareExtension, ScatterDensityExension } from "../webgl/Scatter
 import type { LayerExtension } from "@deck.gl/core";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
-import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
+import { getHighlightModifiers, useHighlightedIndices, useHighlightRowUpdater, useHighlightRows } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName, DataColumn, FieldName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
@@ -338,37 +338,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     const lastSpaceHighlightedRowRef = useRef(-1);
     const highlightedIndices = useHighlightedIndices();
     const highlightRows = useHighlightRows();
-    const getModifierState = useCallback(
-        (
-            event?: {
-                shiftKey?: boolean;
-                ctrlKey?: boolean;
-                metaKey?: boolean;
-                srcEvent?: unknown;
-                sourceEvent?: unknown;
-            } | null,
-        ) => {
-            const raw = event ?? {};
-            const nested =
-                typeof raw === "object" && raw !== null
-                    ? ((raw.srcEvent ?? raw.sourceEvent) as
-                          | {
-                                shiftKey?: boolean;
-                                ctrlKey?: boolean;
-                                metaKey?: boolean;
-                                srcEvent?: unknown;
-                                sourceEvent?: unknown;
-                            }
-                          | undefined)
-                    : undefined;
-            const resolved = nested ?? raw;
-            return {
-                add: !!resolved.shiftKey,
-                toggle: !!(resolved.ctrlKey || resolved.metaKey),
-            };
-        },
-        [],
-    );
+    const updateHighlightedRows = useHighlightRowUpdater();
     const highlightLineWidth = useMemo(() => (0.2 * radiusScale) / scale, [radiusScale, scale]);
     const highlightedData = useMemo(() => {
         if (highlightedIndices.length === 0 || data.length === 0) return [];
@@ -376,38 +346,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         return highlightedIndices.filter((rowIndex) => visibleRows.has(rowIndex));
     }, [data, highlightedIndices]);
     const contourLayers = useLegacyDualContour(hoveredFieldId);
-    const updateHighlightedRows = useCallback(
-        (
-            rowIndex: number,
-            modifiers?: {
-                add?: boolean;
-                remove?: boolean;
-                toggle?: boolean;
-            },
-        ) => {
-            if (rowIndex < 0) return;
-            const { add = false, remove = false, toggle = false } = modifiers ?? {};
-            if (toggle) {
-                const nextHighlights = new Set(highlightedIndices);
-                if (nextHighlights.has(rowIndex)) nextHighlights.delete(rowIndex);
-                else nextHighlights.add(rowIndex);
-                highlightRows(Array.from(nextHighlights));
-                return;
-            }
-            if (remove) {
-                if (!highlightedIndices.includes(rowIndex)) return;
-                highlightRows(highlightedIndices.filter((index) => index !== rowIndex));
-                return;
-            }
-            if (add) {
-                if (highlightedIndices.includes(rowIndex)) return;
-                highlightRows([...highlightedIndices, rowIndex]);
-                return;
-            }
-            highlightRows([rowIndex]);
-        },
-        [highlightRows, highlightedIndices],
-    );
     const paintHoveredRow = useCallback(() => {
         const hoverInfo = hoverInfoRef.current;
         if (!hoverInfo || hoverInfo.index === -1) return;
@@ -541,7 +479,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             // highlightedObjectIndex, // has some undesirable effects, but could be useful when better controlled
             onClick: ({ index }, event) => {
                 if (index < 0) return;
-                updateHighlightedRows(data[index], getModifierState(event));
+                updateHighlightedRows(data[index], getHighlightModifiers(event));
             },
             transitions: {
                 // this leads to weird behaviour when filter changes, looks ok when changing colorBy
@@ -574,7 +512,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         shouldFilterMissing,
         colorColumn,
         fallbackOnZero,
-        getModifierState,
         updateHighlightedRows,
         paintHoveredRow,
     ]);
