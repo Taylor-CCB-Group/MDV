@@ -524,6 +524,9 @@ class DataStore {
         if (data) {
             this.setColumnData(column.field, data);
         }
+        // Delete column from dirtyColumns.removed if it exists (this could happen when a column is removed and the state is not saved)
+        // This avoids the new column from getting deleted
+        delete this.dirtyColumns.removed[c.field];
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
         }
