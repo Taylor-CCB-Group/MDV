@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
-import { action, autorun, makeAutoObservable } from "mobx";
+import { action, autorun, makeAutoObservable, runInAction } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
     Accordion,
@@ -518,7 +518,9 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                           })()
                         : [];
 
-                dropdownSpec.values = [availableValues];
+                runInAction(() => {
+                    dropdownSpec.values = [availableValues];
+                });
 
                 if (multiple) {
                     const currentSelection = Array.isArray(rawSelection) ? rawSelection : [];
@@ -526,14 +528,20 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                     if (!isArray(dropdownSpec.current_value)) {
                         throw new Error("expected multidropdown spec for multi category selection");
                     }
-                    if (!areStringArraysEqual(dropdownSpec.current_value, nextValue)) {
-                        dropdownSpec.current_value = nextValue;
-                    }
-                    if (!isArray(props.current_value) || !areStringArraysEqual(props.current_value, nextValue)) {
-                        props.current_value = nextValue;
-                    }
+                    const currentDropdownValue = dropdownSpec.current_value;
+                    const currentPropsValue = props.current_value;
+                    runInAction(() => {
+                        if (!areStringArraysEqual(currentDropdownValue, nextValue)) {
+                            dropdownSpec.current_value = nextValue;
+                        }
+                        if (!isArray(currentPropsValue) || !areStringArraysEqual(currentPropsValue, nextValue)) {
+                            props.current_value = nextValue;
+                        }
+                    });
                     if (!areStringArraysEqual(currentSelection, nextValue)) {
-                        props.func?.(nextValue);
+                        queueMicrotask(() => {
+                            props.func?.(nextValue);
+                        });
                     }
                     return;
                 }
@@ -543,14 +551,18 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                 if (isArray(dropdownSpec.current_value)) {
                     throw new Error("expected dropdown spec for single category selection");
                 }
-                if (dropdownSpec.current_value !== nextValue) {
-                    dropdownSpec.current_value = nextValue;
-                }
-                if (isArray(props.current_value) || props.current_value !== nextValue) {
-                    props.current_value = nextValue;
-                }
+                runInAction(() => {
+                    if (dropdownSpec.current_value !== nextValue) {
+                        dropdownSpec.current_value = nextValue;
+                    }
+                    if (isArray(props.current_value) || props.current_value !== nextValue) {
+                        props.current_value = nextValue;
+                    }
+                });
                 if (currentSelection !== nextValue) {
-                    props.func?.(nextValue);
+                    queueMicrotask(() => {
+                        props.func?.(nextValue);
+                    });
                 }
             },
         );
