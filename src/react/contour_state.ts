@@ -6,7 +6,7 @@ import type {
     LoadedDataColumn,
     FieldName,
 } from "@/charts/charts";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     useCategoryFilterIndices,
     useConfig,
@@ -19,6 +19,7 @@ import { useDataStore } from "./context";
 // import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
 import { g, isArray } from "@/lib/utils";
+import { reaction, toJS } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getFieldColor } from "./fieldColorManager";
@@ -80,6 +81,10 @@ function useColorRange(
     category: string | string[] | undefined,
 ) {
     const ds = useDataStore();
+    const categorySnapshot = Array.isArray(category) ? [...category] : category;
+    const categoryKey = Array.isArray(categorySnapshot)
+        ? categorySnapshot.join("\u0000")
+        : categorySnapshot ?? "";
     const columnColors = useMemo(
         () =>
             contourParameter ? ds.getColumnColors(contourParameter.field, {
@@ -96,21 +101,22 @@ function useColorRange(
      */
     const categoryValueIndex = useMemo(() => {
         // if (!category) return contourParameter.values.map((_, i) => i); //NO: -1 is a clue to use general 'viridis' color range atm.
-        if (!contourParameter || !category) return -1;
+        if (!contourParameter || !categorySnapshot) return -1;
         //we could do something different here... would need more clever color handling on the receiving end
-        if (Array.isArray(category)) return category.length > 1 ? -1 : contourParameter.values.indexOf(category[0]);
-        return contourParameter.values.indexOf(category);
-    }, [contourParameter, category]);
+        if (Array.isArray(categorySnapshot))
+            return categorySnapshot.length > 1 ? -1 : contourParameter.values.indexOf(categorySnapshot[0]);
+        return contourParameter.values.indexOf(categorySnapshot);
+    }, [contourParameter, categoryKey]);
     const colorRange = useMemo(() => {
         if (categoryValueIndex === -1) return viridis;
         const color = columnColors[categoryValueIndex];
         // return [[...color, 255], [...color, 255]];
-        console.log("color", color, category);
+        console.log("color", color, categorySnapshot);
         // return [color];
         // workaround for https://github.com/visgl/deck.gl/issues/9219
         // always use same length array so it doesn't delete the texture
         return new Array(viridis.length).fill(color);
-    }, [categoryValueIndex, columnColors, category]);
+    }, [categoryValueIndex, columnColors, categoryKey]);
     return colorRange;
 }
 
@@ -421,6 +427,42 @@ function toCategorySelection(value: string | string[] | undefined) {
     return typeof value === "string" ? [value] : [];
 }
 
+function areStringArraysEqual(a: string[], b: string[]) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function useContourCategorySelections(config: DualContourLegacyConfig) {
+    const [categories, setCategories] = useState(() => ({
+        category1: toCategorySelection(config.category1),
+        category2: toCategorySelection(config.category2),
+    }));
+
+    useEffect(() => {
+        return reaction(
+            () => [toJS(config.category1), toJS(config.category2)] as const,
+            ([rawCategory1, rawCategory2]) => {
+                const nextCategory1 = toCategorySelection(rawCategory1);
+                const nextCategory2 = toCategorySelection(rawCategory2);
+                setCategories((previous) => {
+                    if (
+                        areStringArraysEqual(previous.category1, nextCategory1) &&
+                        areStringArraysEqual(previous.category2, nextCategory2)
+                    ) {
+                        return previous;
+                    }
+                    return {
+                        category1: nextCategory1,
+                        category2: nextCategory2,
+                    };
+                });
+            },
+            { fireImmediately: true },
+        );
+    }, [config]);
+
+    return categories;
+}
+
 export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
     return getDensityVisualisationFolder(c, {
         categorySelectionControls: [
@@ -452,7 +494,7 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
                 getCurrentValue: () => toCategorySelection(c.category1),
                 func(x) {
                     // if (x === "None") x = null;
-                    c.category1 = x;
+                    c.category1 = isArray(x) ? [...x] : x;
                 },
             }),
             g({
@@ -463,7 +505,7 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
                 getCurrentValue: () => toCategorySelection(c.category2),
                 func(x) {
                     // if (x === "None") x = null;
-                    c.category2 = x;
+                    c.category2 = isArray(x) ? [...x] : x;
                 },
             }),
             g({
@@ -565,6 +607,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
  */
 export function useLegacyDualContour(hoveredFieldId?: FieldName | null): ContourLayerProps[] {
     const config = useConfig<DualContourLegacyConfig>();
+    const { category1, category2 } = useContourCategorySelections(config);
     // todo: this is currently short-circuiting for non-viv deck scatter...
     // breaking rule of hooks etc, should be fixed
     const commonProps = {
@@ -585,12 +628,12 @@ export function useLegacyDualContour(hoveredFieldId?: FieldName | null): Contour
     const contour1 = useCategoryContour({
         ...commonProps,
         id: "contour1",
-        category: config.category1,
+        category: category1,
     });
     const contour2 = useCategoryContour({
         ...commonProps,
         id: "contour2",
-        category: config.category2,
+        category: category2,
     });
     const stableArray = useMemo(
         () => [contour1, contour2, ...fieldContours].filter(v => v !== undefined),

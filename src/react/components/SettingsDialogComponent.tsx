@@ -476,6 +476,10 @@ function normalizeCategorySelectionValue(
     return typeof value === "string" ? value : "";
 }
 
+function cloneCategorySelectionValue(value: string | string[]) {
+    return isArray(value) ? [...value] : value;
+}
+
 const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
     const dataStore = useDataStore();
     const multiple = isMultiCategorySelection(props);
@@ -488,9 +492,10 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                     current_value: normalizeCategorySelectionValue(props.current_value, multiple),
                     values: [[] as string[]],
                     func: action((value: string | string[]) => {
-                        dropdownSpec.current_value = value;
-                        props.current_value = value as never;
-                        props.func?.(value as never);
+                        const nextValue = cloneCategorySelectionValue(value);
+                        dropdownSpec.current_value = nextValue;
+                        props.current_value = nextValue as never;
+                        props.func?.(nextValue as never);
                     }),
                 }),
             ) as DropdownSpec,
