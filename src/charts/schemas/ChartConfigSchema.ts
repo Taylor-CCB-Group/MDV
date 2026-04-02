@@ -98,17 +98,33 @@ const FieldLegendConfigSchema = z.object({
     display: z.boolean().describe("Whether to display the density field legend"),
 }).describe("Configuration for density field legend visibility");
 
-const ContourScatterConfigSchema = z.object({
+const ContourVisualConfigSchema = z.object({
     contour_fill: z.boolean().optional().describe("Whether to render filled contour areas"),
     contour_fillThreshold: z.number().optional().describe("Threshold controlling how much of the contour is filled"),
     contour_bandwidth: z.number().positive().optional().describe("Kernel density bandwidth used for contour generation"),
     contour_intensity: z.number().min(0).max(1).optional().describe("Opacity/intensity applied to contour fills"),
     contour_opacity: z.number().min(0).max(1).optional().describe("Opacity applied to contour lines"),
+}).describe("Visual contour configuration shared by density-style charts");
+
+const DensityFieldsConfigSchema = z.object({
+    densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+}).describe("Density field selection shared by contour-based charts");
+
+const LegacyContourCategorySelectionConfigSchema = z.object({
     contourParameter: FieldSpecSchema.optional().describe("Categorical field used to choose contour categories"),
     category1: CategorySelectionSchema.optional().describe("First contour category selection"),
     category2: CategorySelectionSchema.optional().describe("Second contour category selection"),
-    densityFields: FieldSpecsSchema.optional().describe("Numeric fields to render as contour overlays"),
+}).describe("Legacy contour category selection shared by deck scatter density charts");
+
+const DensityFieldLegendConfigSchema = z.object({
     field_legend: FieldLegendConfigSchema.optional().describe("Legend settings for density field overlays"),
+}).describe("Legend configuration for density field overlays");
+
+const ContourScatterConfigSchema = z.object({
+    ...ContourVisualConfigSchema.shape,
+    ...LegacyContourCategorySelectionConfigSchema.shape,
+    ...DensityFieldsConfigSchema.shape,
+    ...DensityFieldLegendConfigSchema.shape,
 }).describe("Contour-specific configuration shared by deck scatter charts and spatial viewers");
 
 const ScatterAxisSchema = z.object({
@@ -270,6 +286,13 @@ export const DeckScatter3DConfigSchema = DeckScatterSharedConfigSchema.extend({
     viewState: OrbitViewStateSchema.optional().describe("Current deck.gl orbit view state"),
 }).describe("Configuration for the deck.gl 3D scatter plot");
 
+export const DeckSplatterConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("DeckSplatter").describe("Splatter plot chart type"),
+    category: FieldSpecSchema.optional().describe("Categorical column used for the row layout"),
+    ...DensityFieldsConfigSchema.shape,
+    ...ContourVisualConfigSchema.shape,
+}).describe("Configuration for splatter plots showing density fields across a category-by-field grid");
+
 export const RowChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("row_chart").describe("Row chart type"),
     // Additional row chart specific properties
@@ -317,6 +340,7 @@ registerChartConfigSchema("DeckScatter", DeckScatterPlotConfigSchema, { version:
 registerChartConfigSchema("DeckContourScatter", DeckContourScatterConfigSchema, { version: "1" });
 registerChartConfigSchema("DeckDensity", DeckDensityConfigSchema, { version: "1" });
 registerChartConfigSchema("DeckScatter3D", DeckScatter3DConfigSchema, { version: "1" });
+registerChartConfigSchema("DeckSplatter", DeckSplatterConfigSchema, { version: "1" });
 registerChartConfigSchema("row_chart", RowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("stacked_row_chart", StackedRowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("row_summary_box", RowSummaryBoxConfigSchema, { version: "1" });

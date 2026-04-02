@@ -1,3 +1,4 @@
+import type { FC } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
@@ -19,8 +20,6 @@ function Fallback() {
         </>
     );
 }
-
-export type TComponent<T extends BaseConfig> = () => JSX.Element;
 
 /**
  * Base class for charts that use React.
@@ -46,12 +45,12 @@ export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> 
     useMobx = true;
     root?: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
-    ComponentFn: TComponent<T>;
+    ComponentFn: FC;
     protected constructor(
         dataStore: DataStore,
         div: string | HTMLDivElement,
         config: T,
-        ReactComponentFunction: TComponent<T> = Fallback,
+        ReactComponentFunction: FC = Fallback,
     ) {
         super(dataStore, div, config);
         //! for review - can we bypass this in react charts after a bit more evolution of the state management?

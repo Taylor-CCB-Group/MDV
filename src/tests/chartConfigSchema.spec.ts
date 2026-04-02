@@ -83,4 +83,29 @@ describe("chart config schema registration", () => {
             contour_fill: true,
         });
     });
+
+    test("validates DeckSplatter against the shared contour and density field config sections", () => {
+        const config = {
+            id: "deck-splatter-1",
+            title: "Splatter",
+            type: "DeckSplatter",
+            param: ["x", "y"],
+            size: [500, 400],
+            category: "cell_type",
+            densityFields: ["marker_a", "marker_b"],
+            contour_fill: true,
+            contour_bandwidth: 1.5,
+            contour_intensity: 0.75,
+            contour_opacity: 0.4,
+            contour_fillThreshold: 2,
+        };
+
+        expect(getChartConfigSchema("DeckSplatter")).toBeDefined();
+        expect(safeValidateChartConfig(config)).toMatchObject({
+            type: "DeckSplatter",
+            category: "cell_type",
+            densityFields: ["marker_a", "marker_b"],
+            contour_bandwidth: 1.5,
+        });
+    });
 });

@@ -1,4 +1,11 @@
-import type { CategoricalDataType, DataColumn, LoadedDataColumn, FieldName } from "@/charts/charts";
+import type {
+    AnyGuiSpec,
+    CategoricalDataType,
+    DataColumn,
+    Disposer,
+    LoadedDataColumn,
+    FieldName,
+} from "@/charts/charts";
 import { useMemo } from "react";
 import {
     useCategoryFilterIndices,
@@ -346,6 +353,48 @@ export type DualContourLegacyConfig = {
     };
 } & ContourVisualConfig;
 
+type DensityVisualisationFolderOptions = {
+    categorySelectionControls: AnyGuiSpec[];
+    legendControls?: AnyGuiSpec[];
+    disposers?: Disposer[];
+};
+
+export function getDensityVisualisationFolder(
+    config: ContourVisualConfig,
+    { categorySelectionControls, legendControls = [], disposers = [] }: DensityVisualisationFolderOptions,
+) {
+    const currentValue: AnyGuiSpec[] = [
+        g({
+            type: "folder",
+            label: "Category selection",
+            current_value: categorySelectionControls,
+        }),
+        ...getContourVisualSettings(config),
+    ];
+
+    if (legendControls.length > 0) {
+        currentValue.push(
+            g({
+                type: "folder",
+                label: "Legend",
+                current_value: legendControls,
+            }),
+        );
+    }
+
+    const folderSpec = g({
+        type: "folder",
+        label: "Density Visualisation",
+        current_value: currentValue,
+    });
+
+    if (disposers.length > 0) {
+        folderSpec._disposers = disposers;
+    }
+
+    return folderSpec;
+}
+
 const contourBandwidthSlider = {
     minBandwidth: 0.01,
     maxBandwidth: 250,
@@ -400,87 +449,71 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
     // If we have a "category_selection" widget and it properly observed `c.contourParameter`,
     // we wouldn't need this autorun here.
     // this is related to existing selection dialog widget - both should be able to understand multitext better.
-    const folderSpec = g({
-        type: "folder",
-        label: "Density Visualisation",
-        current_value: [
+    return getDensityVisualisationFolder(c, {
+        categorySelectionControls: [
+            //maybe 2-spaces format is better...
             g({
-                type: "folder",
-                label: "Category selection",
-                current_value: [
-                    //maybe 2-spaces format is better...
-                    g({
-                        type: "column", //todo, make this "column" and fix odd behaviour with showing the value...
-                        //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
-                        //^^ maybe get Furquan to work on this.
-                        label: "Contour parameter",
-                        current_value: c.contourParameter || "",
-                        columnType: "text",
-                        func: (x) => {
-                            if (x === c.contourParameter) return;
-                            if (!isArray(c.param)) throw "expected param array";
-                            c.contourParameter = x;
-                            //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
-                            //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
-                            //nb - when we switch back to a contourParameter that had categories associated, the GUI state is changing
-                            // back to the old setting (but not updating the state).
-                            // Shouldn't this line mean that it forgets the old categories?
-                            c.category1 = c.category2 = [];
-                        },
-                    }),
-                    g({
-                        type: "multidropdown",
-                        label: "Contour Category 1",
-                        current_value: toArray(c.category1 || "None"),
-                        values: catsValues,
-                        func(x) {
-                            // if (x === "None") x = null;
-                            c.category1 = x;
-                        },
-                    }),
-                    g({
-                        type: "multidropdown",
-                        label: "Contour Category 2",
-                        current_value: toArray(c.category2 || "None"),
-                        values: catsValues,
-                        func(x) {
-                            // if (x === "None") x = null;
-                            c.category2 = x;
-                        },
-                    }),
-                    g({
-                        type: "multicolumn",
-                        label: "Density Fields",
-                        //@ts-expect-error - pending optional columns
-                        current_value: c.densityFields,
-                        columnType: "double",
-                        func: (x) => {
-                            c.densityFields = x;
-                        },
-                    })
-                ],
+                type: "column", //todo, make this "column" and fix odd behaviour with showing the value...
+                //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
+                //^^ maybe get Furquan to work on this.
+                label: "Contour parameter",
+                current_value: c.contourParameter || "",
+                columnType: "text",
+                func: (x) => {
+                    if (x === c.contourParameter) return;
+                    if (!isArray(c.param)) throw "expected param array";
+                    c.contourParameter = x;
+                    //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
+                    //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
+                    //nb - when we switch back to a contourParameter that had categories associated, the GUI state is changing
+                    // back to the old setting (but not updating the state).
+                    // Shouldn't this line mean that it forgets the old categories?
+                    c.category1 = c.category2 = [];
+                },
             }),
-            ...getContourVisualSettings(c),
             g({
-                type: "folder",
-                label: "Legend",
-                current_value: [
-                    g({
-                        type: "check",
-                        label: "Show Field Legend",
-                        current_value: c.field_legend.display,
-                        func: (x) => {
-                            c.field_legend.display = x;
-                        },
-                    }),
-                ],
+                type: "multidropdown",
+                label: "Contour Category 1",
+                current_value: toArray(c.category1 || "None"),
+                values: catsValues,
+                func(x) {
+                    // if (x === "None") x = null;
+                    c.category1 = x;
+                },
+            }),
+            g({
+                type: "multidropdown",
+                label: "Contour Category 2",
+                current_value: toArray(c.category2 || "None"),
+                values: catsValues,
+                func(x) {
+                    // if (x === "None") x = null;
+                    c.category2 = x;
+                },
+            }),
+            g({
+                type: "multicolumn",
+                label: "Density Fields",
+                //@ts-expect-error - pending optional columns
+                current_value: c.densityFields,
+                columnType: "double",
+                func: (x) => {
+                    c.densityFields = x;
+                },
             }),
         ],
+        legendControls: [
+            g({
+                type: "check",
+                label: "Show Field Legend",
+                current_value: c.field_legend.display,
+                func: (x) => {
+                    c.field_legend.display = x;
+                },
+            }),
+        ],
+        disposers: [disposer],
     });
-    
-    // Attach the disposer to the spec so it gets cleaned up when the settings dialog closes
-    folderSpec._disposers = [disposer];
-    return folderSpec;
 }
 
 /**
