@@ -1,0 +1,3 @@
+- use tsgo for type-checking
+- avoid as casts where possible
+- prefer follow-up PRs for wider type-system cleanups
