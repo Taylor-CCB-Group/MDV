@@ -460,15 +460,16 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
     // then we could use zustand without bothering with faff of multiple store contexts
     // the only consequence of allowing multiple dialogs to be open would be that they'd share state
     // but that could actually be bad in that they are all associated with a particular dataStore
-    const initialConfig: ChartConfig = {
-        title: "",
-        legend: "",
-        type: "",
-        param: [],
-        extra: {},
-        _updated: new Date(),
-    };
-    const config = useMemo(() => observable.object(initialConfig), []);
+    const [config] = useState(() =>
+        observable.object({
+            title: "",
+            legend: "",
+            type: "",
+            param: [],
+            extra: {},
+            _updated: new Date(),
+        } satisfies ChartConfig),
+    );
     const [open, setOpen] = useState(true);
     useEffect(() => {
         if (!props.modal) return;
