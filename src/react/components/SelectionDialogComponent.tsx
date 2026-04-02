@@ -53,6 +53,10 @@ import {
     getNumericColumnData,
     getSharedNumericColumnData,
 } from "@/lib/columnTypeHelpers";
+import {
+    getMultitextItemValues,
+    inferMultitextEmptyItem,
+} from "@/lib/multitext";
 import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
 import { useDebounce } from "use-debounce";
 
@@ -86,17 +90,24 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
     return filter;
 }
 
-const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
+const TextComponent = observer(({
+    column,
+    options,
+}: Props<CategoricalDataType> & { options?: string[] }) => {
     const [open, setOpen] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
     const conf = useConfig<SelectionDialogConfig>();
-    const { values } = column;
+    const values = options ?? column.values;
     const filter = useFilterConfig(column);
     const value = filter?.category || [];
     const setValue = useCallback((newValue: string[]) => {
-        const newFilter = filter || { category: [] };
+        const newFilter =
+            filter ||
+            (column.datatype === "multitext"
+                ? { category: [], operand: "or" as const }
+                : { category: [] });
         action(() => {
             newFilter.category = newValue;
             conf.filters[column.field] = newFilter;
@@ -300,17 +311,12 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
 });
 
 const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
-    // todo: think about what to do with null config for filter
-    console.log("multitext selection dialog has missing features for 'operand' and other logic");
-    // !!! - uncommenting this stuff makes the entire chart disappear when the filter is removed
-    // const config = useFilterConfig(column);
-    // const operand = config.operand || "or";
+    const options = getMultitextItemValues(column, {
+        emptyItem: inferMultitextEmptyItem(column),
+    }).sort((left, right) => left.localeCompare(right));
     return (
-        <>
-            {/* operand: {operand} */}
-            <TextComponent column={column} />
-        </>
-    )
+        <TextComponent column={column} options={options} />
+    );
 });
 
 const UniqueComponent = observer(({ column }: Props<"unique">) => {

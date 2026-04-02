@@ -3,6 +3,7 @@ import { createEl, makeSortable } from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
 import { getRandomString } from "../utilities/Utilities";
 import MultiSelectDropdown from "../utilities/MultiSelect";
+import { getMultitextItemValues, inferMultitextEmptyItem } from "@/lib/multitext";
 
 class SelectionDialog extends BaseChart {
     constructor(dataStore, div, config) {
@@ -315,7 +316,12 @@ class SelectionDialog extends BaseChart {
             });
         }
         const dd = createEl("div", {}, div);
-        const options = col.values
+        const availableValues = ismulti
+            ? getMultitextItemValues(col, {
+                  emptyItem: inferMultitextEmptyItem(col),
+              })
+            : col.values;
+        const options = availableValues
             .slice(0)
             .sort((a, b) => a.localeCompare(b))
             .map((x) => {

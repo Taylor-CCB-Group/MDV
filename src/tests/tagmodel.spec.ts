@@ -1,118 +1,160 @@
-import { expect, test, vi, beforeEach } from 'vitest';
-import TagModel from '../table/TagModel';
-import DataStore from '../datastore/DataStore';
-import { DataModel } from '../table/DataModel';
-import { loadColumn } from '@/dataloaders/DataLoaderUtil';
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import TagModel from "@/table/TagModel";
+import { DataModel } from "@/table/DataModel";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock('../datastore/DataStore');
-vi.mock('../table/DataModel');
-vi.mock('@/dataloaders/DataLoaderUtil');
+vi.mock("@/table/DataModel", () => ({
+    DataModel: vi.fn(),
+}));
+vi.mock("@/dataloaders/DataLoaderUtil", () => ({
+    loadColumn: vi.fn(),
+}));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-test('TagModel can be instantiated and creates a __tags column if needed', async () => {
-  const mockColumnIndex: Record<string, any> = {};
-  const mockDataStoreInstance = {
-    size: 10,
-    name: 'test-store',
-    columnIndex: mockColumnIndex,
-    filterArray: new Uint8Array(10),
-    filterSize: 10,
-    addListener: vi.fn(),
-    addColumn: vi.fn((spec, data) => {
-      mockColumnIndex[spec.name] = {
-        ...spec,
-        data: new Uint16Array(data),
-        // TagModel expects the column to be loaded.
-        // In a real scenario, this would be handled by `loadColumn`.
-        // For the mock, we can assume it's loaded.
-        // Let's also mock the necessary properties to pass `isColumnLoaded`.
-        values: spec.values,
-        buffer: data,
-        datatype: 'multitext',
-      };
-    }),
-    dataChanged: vi.fn(),
-  };
-  (DataStore as any).mockImplementation(() => mockDataStoreInstance);
+function createMockDataModel(selection: number[]) {
+    return {
+        updateModel: vi.fn(),
+        addListener: vi.fn(),
+        data: new Int32Array(selection),
+        dataStore: undefined,
+    } as any;
+}
 
-  const mockDataModelInstance = {
-    updateModel: vi.fn(),
-    addListener: vi.fn(),
-    data: new Int32Array(10),
-  };
-  (DataModel as any).mockImplementation(function mockDataModel() {
-    return mockDataModelInstance;
-  });
+function createMockDataStore(columnIndex: Record<string, any>, size: number) {
+    return {
+        size,
+        name: "test-store",
+        columnIndex,
+        filterArray: new Uint8Array(size),
+        filterSize: size,
+        addListener: vi.fn(),
+        addColumn: vi.fn((spec, data) => {
+            columnIndex[spec.field] = {
+                ...spec,
+                data: new Uint16Array(data),
+                buffer: data,
+            };
+        }),
+        dataChanged: vi.fn(),
+    };
+}
 
-  const tagModel = await TagModel.create(mockDataStoreInstance as unknown as DataStore);
+describe("TagModel", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-  expect(tagModel).toBeInstanceOf(TagModel);
-  expect(DataModel).toHaveBeenCalledTimes(1);
-  expect(mockDataModelInstance.updateModel).toHaveBeenCalledTimes(1);
-  expect(mockDataModelInstance.addListener).toHaveBeenCalledWith(
-    'tag',
-    expect.any(Function),
-  );
-  expect(mockDataStoreInstance.addColumn).toHaveBeenCalledTimes(1);
-  const addColumnCall = mockDataStoreInstance.addColumn.mock.calls[0][0];
-  expect(addColumnCall.name).toBe('__tags');
-  expect(addColumnCall.datatype).toBe('multitext');
-});
+    test("creates an empty __tags column with delimiter metadata and empty sentinels", async () => {
+        const columnIndex: Record<string, any> = {};
+        const dataStore = createMockDataStore(columnIndex, 4);
+        const dataModel = createMockDataModel([0, 1, 2, 3]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
 
-test('getTags should handle undefined values in the column', async () => {
-  // this test is added to simulate the situation that we had at runtime...
-  // although I'm not sure that it really gets at the root of the problem.
-  const mockColumnWithUndefined = {
-    name: '__tags',
-    datatype: 'multitext' as const,
-    values: ['a', 'b', undefined] as any,
-    delimiter: ';',
-    data: new Uint16Array([0, 1, 2]),
-    buffer: new SharedArrayBuffer(6),
-  };
+        const tagModel = await TagModel.create(dataStore as never);
 
-  const mockColumnIndex = {
-    __tags: mockColumnWithUndefined,
-  };
+        expect(tagModel).toBeInstanceOf(TagModel);
+        expect(dataStore.addColumn).toHaveBeenCalledTimes(1);
+        expect(dataStore.addColumn).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: "__tags",
+                field: "__tags",
+                datatype: "multitext",
+                delimiter: ";",
+                stringLength: 1,
+            }),
+            expect.any(SharedArrayBuffer),
+        );
+        expect(Array.from(columnIndex.__tags.data)).toEqual([
+            65535, 65535, 65535, 65535,
+        ]);
+    });
 
-  const mockDataStoreInstance = {
-    size: 3,
-    name: 'test-store',
-    columnIndex: mockColumnIndex,
-    filterArray: new Uint8Array(3),
-    filterSize: 3,
-    addListener: vi.fn(),
-    addColumn: vi.fn(),
-    dataChanged: vi.fn(),
-  };
+    test("getTags ignores undefined legacy values", async () => {
+        const mockColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a", "b", undefined] as unknown as string[],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0, 1, 2]),
+            buffer: new SharedArrayBuffer(6),
+        };
+        const dataStore = createMockDataStore({ __tags: mockColumn }, 3);
+        const dataModel = createMockDataModel([0, 1, 2]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(mockColumn as never);
 
-  (DataStore as any).mockImplementation(() => mockDataStoreInstance);
-  (loadColumn as any).mockResolvedValue(mockColumnWithUndefined);
+        const tagModel = await TagModel.create(dataStore as never);
 
-  const mockDataModelInstance = {
-    updateModel: vi.fn(),
-    addListener: vi.fn(),
-    data: new Int32Array(3),
-  };
-  (DataModel as any).mockImplementation(function mockDataModel() {
-    return mockDataModelInstance;
-  });
+        expect(tagModel.getTags()).toEqual(new Set(["a", "b"]));
+    });
 
-  const tagModel = await TagModel.create(mockDataStoreInstance as any);
+    test("reads packed gates-style multitext columns as item-level tags", async () => {
+        const gateColumn = {
+            name: "__gates__",
+            field: "__gates__",
+            datatype: "multitext" as const,
+            values: ["N/A", "a", "b"],
+            delimiter: ",",
+            stringLength: 3,
+            data: new Uint16Array([
+                0, 65535, 65535,
+                2, 65535, 65535,
+                1, 2, 65535,
+            ]),
+            buffer: new SharedArrayBuffer(18),
+        };
+        const dataStore = createMockDataStore({ __gates__: gateColumn }, 3);
+        const dataModel = createMockDataModel([0, 1, 2]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(gateColumn as never);
 
-  // Allow for the promise in the constructor to resolve
-  await new Promise(process.nextTick);
+        const tagModel = await TagModel.create(dataStore as never, "__gates__");
 
-  expect(tagModel.isReady).toBe(true);
+        expect(tagModel.getTags()).toEqual(new Set(["a", "b"]));
+        expect(tagModel.getTagsInSelection()).toEqual(new Set(["a", "b"]));
+    });
 
-  // With the old implementation of splitTags, this would throw.
-  // With the new implementation, it should work fine.
-  let tags: Set<string> = new Set();
-  expect(() => {
-    tags = tagModel.getTags();
-  }).not.toThrow();
+    test("setTag updates packed multitext rows without keeping the gates placeholder", async () => {
+        const gateColumn = {
+            name: "__gates__",
+            field: "__gates__",
+            datatype: "multitext" as const,
+            values: ["N/A", "a", "b"],
+            delimiter: ",",
+            stringLength: 3,
+            data: new Uint16Array([
+                0, 65535, 65535,
+                2, 65535, 65535,
+                1, 2, 65535,
+            ]),
+            buffer: new SharedArrayBuffer(18),
+        };
+        const dataStore = createMockDataStore({ __gates__: gateColumn }, 3);
+        const dataModel = createMockDataModel([0, 1]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(gateColumn as never);
 
-  expect(tags).toEqual(new Set(['a', 'b']));
+        const tagModel = await TagModel.create(dataStore as never, "__gates__");
+        tagModel.setTag("a", true);
+
+        expect(Array.from(gateColumn.data)).toEqual([
+            1, 65535, 65535,
+            1, 2, 65535,
+            1, 2, 65535,
+        ]);
+        expect(dataStore.dataChanged).toHaveBeenCalledWith(["__gates__"]);
+    });
 });

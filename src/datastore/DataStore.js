@@ -14,6 +14,11 @@ import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import { isDatatypeNumeric } from "@/lib/utils";
+import {
+    getMultitextCapacity,
+    getMultitextDelimiter,
+    getMultitextJoinDelimiter,
+} from "@/lib/multitext";
 import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
 import { logValidationError } from "@/lib/validationLogging";
 
@@ -486,10 +491,13 @@ class DataStore {
                 }
                 //multitext displayed as comma delimited values
                 else if (col.datatype === "multitext") {
-                    const delim = ", ";
+                    const delim = getMultitextJoinDelimiter(
+                        getMultitextDelimiter(col),
+                    );
+                    const capacity = getMultitextCapacity(col);
                     const d = col.data.slice(
-                        index * col.stringLength,
-                        index * col.stringLength + col.stringLength,
+                        index * capacity,
+                        index * capacity + capacity,
                     );
                     v = Array.from(d.filter((x) => x !== 65535))
                         .map((x) => col.values[x])
@@ -1380,14 +1388,14 @@ class DataStore {
             return buff;
         }
         if (col.datatype === "multitext") {
-            const delim = col.delimiter || ",";
+            const delim = getMultitextDelimiter(col);
             const vals = new Set();
             let max = 0;
             //first parse - get all possible values and max number
             //of values in a single field
             for (let i = 0; i < len; i++) {
                 const v = arr[i];
-                const vs = v.split(",");
+                const vs = v.split(delim);
                 max = Math.max(max, vs.length);
                 vs.forEach((x) => vals.add(x.trim()));
             }
@@ -1411,7 +1419,7 @@ class DataStore {
                 if (v === "") {
                     continue;
                 }
-                const vs = v.split(",");
+                const vs = v.split(delim);
                 vs.sort();
                 for (let n = 0; n < vs.length; n++) {
                     data[b + n] = map[vs[n].trim()];

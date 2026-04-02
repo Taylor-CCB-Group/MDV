@@ -1,4 +1,121 @@
 import Dimension from "./Dimension.js";
+import {
+    MULTITEXT_EMPTY_INDEX,
+    getMultitextCapacity,
+    getMultitextValueItems,
+} from "@/lib/multitext";
+
+function rowHasAnyMultitextItem(data, start, capacity, valueItemsByIndex, selectedItems) {
+    for (let offset = 0; offset < capacity; offset++) {
+        const valueIndex = data[start + offset];
+        if (valueIndex === MULTITEXT_EMPTY_INDEX) {
+            break;
+        }
+        const items = valueItemsByIndex[valueIndex] || [];
+        for (const item of items) {
+            if (selectedItems.has(item)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function rowHasAllMultitextItems(data, start, capacity, valueItemsByIndex, selectedItems) {
+    const remaining = selectedItems.slice();
+    for (let offset = 0; offset < capacity; offset++) {
+        const valueIndex = data[start + offset];
+        if (valueIndex === MULTITEXT_EMPTY_INDEX) {
+            break;
+        }
+        const items = valueItemsByIndex[valueIndex] || [];
+        for (const item of items) {
+            const index = remaining.indexOf(item);
+            if (index !== -1) {
+                remaining.splice(index, 1);
+                if (remaining.length === 0) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function createMultitextCategoryPredicate(column, category) {
+    const data = column.data;
+    const capacity = getMultitextCapacity(column);
+    const valueItemsByIndex = column.values.map((_, index) =>
+        getMultitextValueItems(column, index),
+    );
+
+    if (typeof category === "string") {
+        const exactIndex = column.values.indexOf(category);
+        if (exactIndex !== -1) {
+            return (rowIndex) => {
+                const start = rowIndex * capacity;
+                for (let offset = 0; offset < capacity; offset++) {
+                    if (data[start + offset] === exactIndex) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+        }
+
+        const selectedItems = new Set([category]);
+        return (rowIndex) =>
+            rowHasAnyMultitextItem(
+                data,
+                rowIndex * capacity,
+                capacity,
+                valueItemsByIndex,
+                selectedItems,
+            );
+    }
+
+    const selectedItems = category.filter(
+        (item) => typeof item === "string" && item.length > 0,
+    );
+
+    if (selectedItems.length === 0) {
+        return () => false;
+    }
+
+    if (category.operand !== "and") {
+        const selectedItemSet = new Set(selectedItems);
+        return (rowIndex) =>
+            rowHasAnyMultitextItem(
+                data,
+                rowIndex * capacity,
+                capacity,
+                valueItemsByIndex,
+                selectedItemSet,
+            );
+    }
+
+    if (new Set(selectedItems).size === 1) {
+        const selectedItemSet = new Set([selectedItems[0]]);
+        return (rowIndex) =>
+            rowHasAnyMultitextItem(
+                data,
+                rowIndex * capacity,
+                capacity,
+                valueItemsByIndex,
+                selectedItemSet,
+            );
+    }
+
+    return (rowIndex) =>
+        rowHasAllMultitextItems(
+            data,
+            rowIndex * capacity,
+            capacity,
+            valueItemsByIndex,
+            selectedItems,
+        );
+}
+
 class CategoryDimension extends Dimension {
     constructor(parent) {
         super(parent);
@@ -13,21 +130,13 @@ class CategoryDimension extends Dimension {
         const data = col.data;
         const vals = col.values;
 
+        if (col.datatype === "multitext") {
+            const predicate = createMultitextCategoryPredicate(col, category);
+            return this.filterPredicate({ predicate });
+        }
+
         if (typeof category === "string") {
             const ind = vals.indexOf(category);
-
-            if (col.datatype === "multitext") {
-                const int = col.stringLength;
-                const predicate = (i) => {
-                    const st = i * int;
-                    for (let n = st; n < st + int; n++) {
-                        if (data[n] === ind) return true;
-                    }
-                    return false;
-                };
-                return this.filterPredicate({ predicate });
-            }
-
             const predicate = (i) => data[i] === ind;
             return this.filterPredicate({ predicate });
         }
@@ -35,51 +144,6 @@ class CategoryDimension extends Dimension {
         const cats = new Set();
         for (const cat of category) {
             cats.add(vals.indexOf(cat));
-        }
-        if (col.datatype === "multitext") {
-            const int = col.stringLength;
-            const ao = category.operand === "and";
-            const catsArr = category.map((c) => vals.indexOf(c));
-            const singleCat = cats.size === 1;
-
-            const predicate = (i) => {
-                const st = i * int;
-                //nb, this is based on the premise that we want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
-                //in any case, we need to remove found categories for a given row as we go,
-                //otherwise we end up with a false positive if the same category is used twice
-                const catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
-                for (let n = st; n < st + int; n++) {
-                    if (data[n] === 65535) {
-                        //... if this row only has one item, we can't possibly have two of the same item,
-                        //but I think we still want to match if we're looking for a single category...
-                        //e.g. if we have 'Count Periostin' and we click the 'Periostin / Periostin' element of an interaction matrix.
-                        //In that case, `catsToFind` will have fewer items than `catsArr`
-                        //(testing with cellpairs where I want but should be right for arbitrary multitext??)
-                        if (
-                            ao &&
-                            singleCat &&
-                            catsToFind.length < catsArr.length
-                        ) {
-                            return true;
-                        }
-                    }
-                    if (ao) {
-                        const index = catsToFind.indexOf(data[n]);
-                        if (index !== -1) {
-                            catsToFind.splice(index, 1);
-                            if (catsToFind.length === 0) {
-                                return true;
-                            }
-                        }
-                    } else {
-                        if (catsToFind.has(data[n])) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            };
-            return this.filterPredicate({ predicate });
         }
 
         const catsArr = Array.from(cats);
@@ -114,139 +178,52 @@ class CategoryDimension extends Dimension {
         const cats = new Set();
         const len = this.parent.size;
 
+        if (col.datatype === "multitext") {
+            return this.filterPredicate({
+                predicate: createMultitextCategoryPredicate(col, category),
+            });
+        }
+
         if (typeof category === "string") {
             const ind = vals.indexOf(category);
 
-            if (col.datatype === "multitext") {
-                const int = col.stringLength;
-                for (let i = 0; i < len; i++) {
-                    const st = i * int;
-                    let has = false;
-                    for (let n = st; n < st + int; n++) {
-                        if (data[n] === ind) {
-                            has = true;
-                            break;
+            for (let i = 0; i < len; i++) {
+                if (data[i] === ind) {
+                    if (localFilter[i] === 1) {
+                        if (--filter[i] === 0) {
+                            parent.filterSize++;
                         }
                     }
-
-                    if (has) {
-                        if (localFilter[i] === 1) {
-                            if (--filter[i] === 0) {
-                                parent.filterSize++;
-                            }
+                    localFilter[i] = 0;
+                } else {
+                    if (localFilter[i] === 0) {
+                        if (++filter[i] === 1) {
+                            parent.filterSize--;
                         }
-                        localFilter[i] = 0;
-                    } else {
-                        if (localFilter[i] === 0) {
-                            if (++filter[i] === 1) {
-                                parent.filterSize--;
-                            }
-                        }
-                        localFilter[i] = 1;
                     }
-                }
-            } else {
-                for (let i = 0; i < len; i++) {
-                    if (data[i] === ind) {
-                        if (localFilter[i] === 1) {
-                            if (--filter[i] === 0) {
-                                parent.filterSize++;
-                            }
-                        }
-                        localFilter[i] = 0;
-                    } else {
-                        if (localFilter[i] === 0) {
-                            if (++filter[i] === 1) {
-                                parent.filterSize--;
-                            }
-                        }
-                        localFilter[i] = 1;
-                    }
+                    localFilter[i] = 1;
                 }
             }
         } else {
             for (const cat of category) {
                 cats.add(vals.indexOf(cat));
             }
-            if (col.datatype === "multitext") {
-                const int = col.stringLength;
-                const ao = category.operand === "and";
-                const catsArr = category.map((c) => vals.indexOf(c));
-                const singleCat = cats.size === 1;
-                for (let i = 0; i < len; i++) {
-                    const st = i * int;
-                    let has = false;
-                    //nb, we actually want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
-                    //in any case, we need to remove found categories for a given row as we go,
-                    //otherwise we end up with a false positive if the same category is used twice
 
-                    const catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
-
-                    for (let n = st; n < st + int; n++) {
-                        if (data[n] === 65535) {
-                            //... if this row only has one item, we can't possibly have two of the same item,
-                            //but I think we still want to match if we're looking for a single category...
-                            //e.g. if we have 'Count Periostin' and we click the 'Periostin / Periostin' element of an interaction matrix.
-                            //In that case, `catsToFind` will have fewer items than `catsArr`
-                            //(testing with cellpairs where I want but should be right for arbitrary multitext??)
-                            if (
-                                ao &&
-                                singleCat &&
-                                catsToFind.length < catsArr.length
-                            )
-                                has = true;
-                            break;
-                        }
-                        if (ao) {
-                            const index = catsToFind.indexOf(data[n]);
-                            if (index !== -1) {
-                                catsToFind.splice(index, 1);
-                                if (catsToFind.length === 0) {
-                                    has = true;
-                                    break;
-                                }
-                            }
-                        } else {
-                            if (catsToFind.has(data[n])) {
-                                has = true;
-                                break;
-                            }
+            for (let i = 0; i < len; i++) {
+                if (cats.has(data[i])) {
+                    if (localFilter[i] === 1) {
+                        if (--filter[i] === 0) {
+                            parent.filterSize++;
                         }
                     }
-                    if (has) {
-                        if (localFilter[i] === 1) {
-                            if (--filter[i] === 0) {
-                                parent.filterSize++;
-                            }
+                    localFilter[i] = 0;
+                } else {
+                    if (localFilter[i] === 0) {
+                        if (++filter[i] === 1) {
+                            parent.filterSize--;
                         }
-                        localFilter[i] = 0;
-                    } else {
-                        if (localFilter[i] === 0) {
-                            if (++filter[i] === 1) {
-                                parent.filterSize--;
-                            }
-                        }
-                        localFilter[i] = 1;
                     }
-                }
-            } //end multitext
-            else {
-                for (let i = 0; i < len; i++) {
-                    if (cats.has(data[i])) {
-                        if (localFilter[i] === 1) {
-                            if (--filter[i] === 0) {
-                                parent.filterSize++;
-                            }
-                        }
-                        localFilter[i] = 0;
-                    } else {
-                        if (localFilter[i] === 0) {
-                            if (++filter[i] === 1) {
-                                parent.filterSize--;
-                            }
-                        }
-                        localFilter[i] = 1;
-                    }
+                    localFilter[i] = 1;
                 }
             }
         }

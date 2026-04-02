@@ -20,6 +20,7 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
+import { getMultitextItemValues, inferMultitextEmptyItem } from "@/lib/multitext";
 import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
@@ -515,6 +516,12 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                     typeof sourceColumn === "string"
                         ? (() => {
                               try {
+                                  const source = dataStore.columnIndex[sourceColumn];
+                                  if (source?.datatype === "multitext") {
+                                      return getMultitextItemValues(source, {
+                                          emptyItem: inferMultitextEmptyItem(source),
+                                      }).slice();
+                                  }
                                   return dataStore.getColumnValues(sourceColumn).slice();
                               } catch (error) {
                                   console.error(

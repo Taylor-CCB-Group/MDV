@@ -4,13 +4,20 @@ import TagModel from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createMdvPortal } from "@/react/react_utils";
 import { observer } from "mobx-react-lite";
-import TextField from "@mui/material/TextField";
-import Autocomplete from "@mui/material/Autocomplete";
-import Checkbox from "@mui/material/Checkbox";
-import Chip from "@mui/material/Chip";
+import {
+    Autocomplete,
+    Box,
+    Button,
+    Checkbox,
+    Chip,
+    Divider,
+    Paper,
+    Stack,
+    TextField,
+    Typography,
+} from "@mui/material";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -20,139 +27,244 @@ function TagView({
     columnName,
 }: { dataStore: DataStore; columnName: string }) {
     const [tagModel, setTagModel] = useState<TagModel | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [tagList, setTagList] = useState<Set<string>>(new Set());
+    const [tagsInSelection, setTagsInSelection] = useState<Set<string>>(new Set());
+    const [draftTag, setDraftTag] = useState("");
 
     useEffect(() => {
-        let isMounted = true;
-        TagModel.create(dataStore, columnName).then(model => {
-            if (isMounted) {
-                setTagModel(model);
-            }
-        });
-        return () => {
-            isMounted = false;
+        let cancelled = false;
+
+        const syncFromModel = (model: TagModel) => {
+            setTagList(model.getTags());
+            setTagsInSelection(model.getTagsInSelection());
         };
-    }, [dataStore, columnName]);
+
+        setTagModel(null);
+        setLoadError(null);
+        TagModel.create(dataStore, columnName)
+            .then((model) => {
+                if (cancelled) {
+                    return;
+                }
+                setTagModel(model);
+                syncFromModel(model);
+            })
+            .catch((error) => {
+                if (cancelled) {
+                    return;
+                }
+                const message =
+                    error instanceof Error ? error.message : String(error);
+                setLoadError(message);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [columnName, dataStore]);
 
     useEffect(() => {
-        if (!tagModel) return;
-        const listener = tagModel.addListener(() => {
-            console.log("tagModel changed");
+        if (!tagModel) {
+            return;
+        }
+
+        const syncFromModel = () => {
             setTagList(tagModel.getTags());
             setTagsInSelection(tagModel.getTagsInSelection());
-            console.log("tagList", tagModel.getTags());
-            console.log("tagsInSelection", tagModel.getTagsInSelection());
-        });
+        };
+
+        const listener = tagModel.addListener(syncFromModel);
+        syncFromModel();
         return () => {
-            // probably not relevant now - expect old tagModel to be garbage collected.
-            // any remaining references to it are a bug.
-            // ^^^ also the design is likely to change and there probably are bugs ATM ^^^
             tagModel.removeListener(listener);
         };
     }, [tagModel]);
 
-    const [tagList, setTagList] = useState(
-        tagModel?.isReady ? tagModel.getTags() : new Set<string>(),
+    const availableTags = useMemo(
+        () =>
+            Array.from(tagList).sort((left, right) => left.localeCompare(right)),
+        [tagList],
     );
-    const [tagsInSelection, setTagsInSelection] = useState(
-        tagModel?.isReady ? tagModel.getTagsInSelection() : new Set<string>(),
+    const selectedTags = useMemo(
+        () =>
+            Array.from(tagsInSelection).sort((left, right) =>
+                left.localeCompare(right),
+            ),
+        [tagsInSelection],
     );
 
-    if (!tagModel) {
-        return <div>Loading tags...</div>;
+    if (loadError) {
+        return (
+            <Typography color="error" variant="body2">
+                Could not load annotation column: {loadError}
+            </Typography>
+        );
     }
 
+    if (!tagModel) {
+        return <Typography variant="body2">Loading annotations...</Typography>;
+    }
+
+    const addTag = (rawTag: string) => {
+        const nextTag = rawTag.trim();
+        if (!nextTag) {
+            return;
+        }
+        tagModel.setTag(nextTag, true);
+        setDraftTag("");
+    };
+
     return (
-        <>
-            <h3>
-                Annotations (on {tagModel.dataModel.getLength()} selected rows):
-            </h3>
-            <Autocomplete
-                freeSolo
-                multiple
-                options={[...tagList]} //strings vs objects? strings work more easily with freeSolo
-                value={[...tagsInSelection]}
-                onChange={(_, value) => {
-                    // we only handle items that have been either removed or added here
-                    // - items that were previously only present in part of the selection
-                    // but have been toggled to 'on' will be handled elsewhere (onClick in renderOption components)
-                    const addedTags = value.filter(
-                        (v) => !tagsInSelection.has(v),
-                    );
-                    for (const t of addedTags) {
-                        console.log("main Autocomplete onChange adding", t);
-                        tagModel.setTag(t, true);
-                    }
-                    const removedTags = [...tagsInSelection].filter(
-                        (v) => !value.includes(v),
-                    );
-                    for (const t of removedTags) {
-                        console.log("main Autocomplete onChange removing", t);
-                        tagModel.setTag(t, false);
-                    }
-                }}
-                renderInput={(props) => {
-                    const { key, ...p } = props as typeof props & {
-                        key: string;
-                    }; //questionable mui types?
-                    return (
-                        <TextField
-                            key={key}
-                            {...p}
-                            label={`add tags to '${columnName}'...`}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    const { target } = e;
-                                    if (target instanceof HTMLInputElement) {
-                                        tagModel.setTag(target.value, true);
+        <Stack spacing={2.5} sx={{ mt: 2 }}>
+            <Box>
+                <Typography variant="h6">
+                    Annotating {tagModel.dataModel.getLength()} selected rows
+                </Typography>
+                <Typography color="text.secondary" variant="body2">
+                    Column: {columnName}
+                </Typography>
+            </Box>
+
+            <Stack direction="row" spacing={1}>
+                <Autocomplete
+                    freeSolo
+                    fullWidth
+                    options={availableTags}
+                    inputValue={draftTag}
+                    onInputChange={(_, value) => {
+                        setDraftTag(value);
+                    }}
+                    onChange={(_, value) => {
+                        if (typeof value === "string") {
+                            addTag(value);
+                        }
+                    }}
+                    renderInput={(params) => {
+                        const { key, ...fieldProps } = params as typeof params & {
+                            key: string;
+                        };
+                        return (
+                            <TextField
+                                key={key}
+                                {...fieldProps}
+                                label="Add annotation item"
+                                placeholder="Type a value and press Enter"
+                                onKeyDown={(event) => {
+                                    if (event.key !== "Enter") {
+                                        return;
                                     }
-                                }
-                            }}
-                        />
-                    );
-                }}
-                // getOptionLabel={o => typeof o === "string" ? o : o.tag}
-                // getOptionLabel={o => o}
-                renderOption={(props, option, { selected }) => {
-                    const indeterminate =
-                        !tagModel.entireSelectionHasTag(option) &&
-                        tagsInSelection.has(option);
-                    return (
-                        <li
-                            {...props}
-                            onClick={() => {
-                                if (indeterminate) tagModel.setTag(option, true);
-                                else tagModel.setTag(option, !selected);
-                            }}
-                        >
-                            <Checkbox
-                                icon={icon}
-                                checkedIcon={checkedIcon}
-                                style={{ marginRight: 8 }}
-                                // checked={option.inSelection === 'entire'}
-                                // indeterminate={option.inSelection === 'partial'}
-                                checked={tagModel.entireSelectionHasTag(option)}
-                                indeterminate={indeterminate}
+                                    event.preventDefault();
+                                    addTag(draftTag);
+                                }}
                             />
-                            {option}
-                        </li>
-                    );
-                }}
-                renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                        <Chip
-                            {...getTagProps({ index })}
-                            key={option}
-                            label={option}
-                            // className={
-                            //     tagModel.entireSelectionHasTag(option)
-                            //         ? ""
-                            //         : "indeterminate"
-                            // }
-                        />
-                    ))
-                }
-            />
-        </>
+                        );
+                    }}
+                />
+                <Button
+                    onClick={() => addTag(draftTag)}
+                    sx={{ minWidth: 96 }}
+                    variant="contained"
+                >
+                    Add
+                </Button>
+            </Stack>
+
+            <Box>
+                <Typography gutterBottom variant="subtitle2">
+                    Present on selected rows
+                </Typography>
+                {selectedTags.length === 0 ? (
+                    <Typography color="text.secondary" variant="body2">
+                        No annotation items are present on the current selection.
+                    </Typography>
+                ) : (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                        {selectedTags.map((tag) => {
+                            const entireSelection = tagModel.entireSelectionHasTag(tag);
+                            return (
+                                <Chip
+                                    color={entireSelection ? "primary" : "default"}
+                                    key={tag}
+                                    label={tag}
+                                    onDelete={() => tagModel.setTag(tag, false)}
+                                    variant={entireSelection ? "filled" : "outlined"}
+                                />
+                            );
+                        })}
+                    </Box>
+                )}
+            </Box>
+
+            <Divider />
+
+            <Box>
+                <Typography gutterBottom variant="subtitle2">
+                    Available items
+                </Typography>
+                {availableTags.length === 0 ? (
+                    <Typography color="text.secondary" variant="body2">
+                        Add the first annotation item for this column above.
+                    </Typography>
+                ) : (
+                    <Paper
+                        sx={{
+                            maxHeight: 240,
+                            overflowY: "auto",
+                            border: "1px solid",
+                            borderColor: "divider",
+                        }}
+                        variant="outlined"
+                    >
+                        {availableTags.map((tag) => {
+                            const entireSelection = tagModel.entireSelectionHasTag(tag);
+                            const inSelection = tagsInSelection.has(tag);
+                            const indeterminate = inSelection && !entireSelection;
+                            return (
+                                <Box
+                                    key={tag}
+                                    onClick={() =>
+                                        tagModel.setTag(tag, indeterminate ? true : !entireSelection)
+                                    }
+                                    sx={{
+                                        alignItems: "center",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        gap: 1,
+                                        px: 1.5,
+                                        py: 1,
+                                        "&:hover": {
+                                            backgroundColor: "action.hover",
+                                        },
+                                    }}
+                                >
+                                    <Checkbox
+                                        checked={entireSelection}
+                                        checkedIcon={checkedIcon}
+                                        icon={icon}
+                                        indeterminate={indeterminate}
+                                        onChange={() => undefined}
+                                        sx={{ p: 0.5 }}
+                                    />
+                                    <Box sx={{ minWidth: 0 }}>
+                                        <Typography noWrap variant="body2">
+                                            {tag}
+                                        </Typography>
+                                        <Typography color="text.secondary" variant="caption">
+                                            {entireSelection
+                                                ? "Present on all selected rows"
+                                                : inSelection
+                                                  ? "Present on some selected rows"
+                                                  : "Not present on the current selection"}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            );
+                        })}
+                    </Paper>
+                )}
+            </Box>
+        </Stack>
     );
 }
 
@@ -161,115 +273,134 @@ const AnnotationDialogComponent = observer(
         const columns = useMemo(
             () =>
                 dataStore.columns
-                    .filter((c) => c.datatype === "multitext")
-                    .map((c) => c.name),
+                    .filter((column) => column.datatype === "multitext")
+                    .map((column) => column.field || column.name)
+                    .sort((left, right) => left.localeCompare(right)),
             [dataStore],
         );
-        const [selectedColumn, setSelectedColumn] = useState<string>();
-        type NameValid = "ok" | "empty" | "clash";
-        const [isValidName, setIsValidName] = useState<NameValid>("empty");
-        const validateInput = (value: string) => {
-            if (value.trim() === "") {
-                setIsValidName("empty");
-                return false;
+        const [selectedColumn, setSelectedColumn] = useState(
+            () => dataStore.columnIndex.__tags ? "__tags" : columns[0] || "",
+        );
+        const [columnInput, setColumnInput] = useState(selectedColumn);
+
+        const getNameState = (rawValue: string) => {
+            const nextValue = rawValue.trim();
+            if (!nextValue) {
+                return "empty" as const;
             }
-            const existingCol = dataStore.columnIndex[value];
-            if (existingCol && existingCol.datatype !== "multitext") {
-                setIsValidName("clash");
-                return false;
-            }
-            setIsValidName("ok");
-            return true;
+            const existingColumn = dataStore.columnIndex[nextValue];
+            return existingColumn && existingColumn.datatype !== "multitext"
+                ? ("clash" as const)
+                : ("ok" as const);
         };
+
+        const nameState = getNameState(columnInput);
+
+        const applyColumnChoice = (rawValue: string) => {
+            const nextValue = rawValue.trim();
+            if (getNameState(nextValue) !== "ok") {
+                return;
+            }
+            setSelectedColumn(nextValue);
+            setColumnInput(nextValue);
+        };
+
         return (
-            <>
-                <Autocomplete
-                    freeSolo
-                    options={columns}
-                    onChange={(_, value) => {
-                        if (!value) return;
-                        if (validateInput(value)) setSelectedColumn(value);
-                    }}
-                    onInputChange={({ currentTarget }) => {
-                        if (currentTarget instanceof HTMLInputElement) {
-                            const { value } = currentTarget;
-                            validateInput(value);
-                        }
-                    }}
-                    renderInput={(params) => {
-                        const { key, ...p } = params as typeof params & {
-                            key: string;
-                        };
-                        return (
-                            <TextField
-                                key={key}
-                                {...p}
-                                color={isValidName ? undefined : "warning"}
-                                label="Annotation column"
-                                placeholder="Annotation column name"
-                            />
-                        );
-                    }}
-                    renderOption={(props, text) => {
-                        const { key, ...p } = props as typeof props & {
-                            key: string;
-                        };
-                        return (
-                            <li key={key} {...p}>
-                                {text}
-                            </li>
-                        );
-                    }}
-                />
-                {isValidName === "clash" && (
-                    <p>Incompatible column with that name already exists...</p>
-                )}
-                {selectedColumn && (
-                    <TagView
-                        dataStore={dataStore}
-                        columnName={selectedColumn}
+            <Stack spacing={2}>
+                <Box>
+                    <Typography variant="h6">Annotation Column</Typography>
+                    <Typography color="text.secondary" variant="body2">
+                        Pick an existing multitext column or create a new one for item-level annotations.
+                    </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1}>
+                    <Autocomplete
+                        freeSolo
+                        fullWidth
+                        inputValue={columnInput}
+                        onChange={(_, value) => {
+                            if (typeof value === "string") {
+                                setColumnInput(value);
+                                applyColumnChoice(value);
+                            }
+                        }}
+                        onInputChange={(_, value) => {
+                            setColumnInput(value);
+                        }}
+                        options={columns}
+                        renderInput={(params) => {
+                            const { key, ...fieldProps } = params as typeof params & {
+                                key: string;
+                            };
+                            return (
+                                <TextField
+                                    key={key}
+                                    {...fieldProps}
+                                    error={nameState === "clash"}
+                                    helperText={
+                                        nameState === "clash"
+                                            ? "A non-multitext column already uses that name."
+                                            : "Names become new multitext annotation columns when needed."
+                                    }
+                                    label="Column name"
+                                    onKeyDown={(event) => {
+                                        if (event.key !== "Enter") {
+                                            return;
+                                        }
+                                        event.preventDefault();
+                                        applyColumnChoice(columnInput);
+                                    }}
+                                />
+                            );
+                        }}
                     />
+                    <Button
+                        disabled={nameState !== "ok"}
+                        onClick={() => applyColumnChoice(columnInput)}
+                        sx={{ minWidth: 112 }}
+                        variant="contained"
+                    >
+                        Use Column
+                    </Button>
+                </Stack>
+
+                {selectedColumn ? (
+                    <TagView dataStore={dataStore} columnName={selectedColumn} />
+                ) : (
+                    <Typography color="text.secondary" variant="body2">
+                        Select or create a multitext column to start annotating the current selection.
+                    </Typography>
                 )}
-                {!selectedColumn && (
-                    <h2>
-                        Select or add a column above to use for annotations.
-                    </h2>
-                )}
-            </>
+            </Stack>
         );
     },
 );
 
 class AnnotationDialogReact extends BaseDialog {
-    // tagModel: TagModel; //prefer to keep this state in react... but we do need to know what the dataStore is.
-    // tagColumn: DataColumn<'text'>;
-    // dataModel: DataModel;
-    // tagListElement: HTMLDivElement;
-    // tagInput: any;
     root: ReturnType<typeof createMdvPortal>;
+
     constructor(dataStore: DataStore) {
         super(
             {
                 title: `Annotate '${dataStore.name}'`,
-                width: 400,
-                height: 300,
+                width: 520,
+                height: 520,
             },
             null,
         );
-        // this.outer.classList.add('annotationDialog');
-        // this.tagModel = new TagModel(dataStore);
-        // this.tagModel = tagModel;
         this.root = createMdvPortal(
             <AnnotationDialogComponent dataStore={dataStore} />,
             this.dialog,
             this,
         );
     }
+
     close(): void {
         super.close();
         this.root.unmount();
     }
 }
-// https://github.com/Taylor-CCB-Group/MDV/discussions/44
+
 BaseDialog.experiment["AnnotationDialogReact"] = AnnotationDialogReact;
 export default "AnnotationDialogReact loaded";
