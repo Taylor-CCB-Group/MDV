@@ -7,6 +7,7 @@
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+import type { Gate } from "@/react/gates/types";
 
 /**
  * A cleanup function that can be called to dispose of resources.
@@ -176,6 +177,7 @@ export type DataSource = {
     images?: Record<string, any>;
     regions?: Record<string, any>;
     links?: DataSourceLinks;
+    gates?: Gate[];
     size: number;
     columns: DataColumn<DataType>[];
 };// | ExperimentalZarrStore; ? something something spatialdata.js ...

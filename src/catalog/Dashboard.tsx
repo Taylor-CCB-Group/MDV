@@ -12,6 +12,7 @@ import Brightness7Icon from "@mui/icons-material/Brightness7";
 import HelpIcon from "@mui/icons-material/Help";
 import {
     AppBar,
+    Alert,
     Backdrop,
     Box,
     Button,
@@ -48,6 +49,7 @@ import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import HelpDialog from "./HelpDialog";
+import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
@@ -80,6 +82,7 @@ const Dashboard: React.FC = () => {
     const [helpDialogOpen, setHelpDialogOpen] = useState(false);
     const [customLogoVisible, setCustomLogoVisible] = useState(true);
     const theme = useTheme();
+    const showLocalBackendNotice = shouldShowLocalBackendNotice();
 
     const isLoading = projectsLoading || permissionsLoading;
 
@@ -97,10 +100,12 @@ const Dashboard: React.FC = () => {
     const handleCreateProject = async () => {
         try {
             const newProject = await createProject();
-            const base = import.meta.env.DEV
-                ? "http://localhost:5170?dir=/"
-                : "";
-            window.location.href = `${base}project/${newProject?.id}`;
+            if (!newProject?.id) {
+                console.error("Project creation succeeded without a valid project id.", newProject);
+                return;
+            }
+
+            window.location.href = buildProjectUrl(newProject.id);
         } catch (error) {
             console.error("Failed to create project:", error);
         }
@@ -225,6 +230,14 @@ const Dashboard: React.FC = () => {
                 </AppBar>
 
                 <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+                    {showLocalBackendNotice && (
+                        <Alert severity="info" sx={{ mb: 3 }}>
+                            This preview build needs to talk to an MDV app running locally on <code>http://localhost:5055</code>.
+                            If your browser asks whether this site can communicate with local apps or devices, allow it for this preview:
+                            the Netlify page is only the frontend, and project lists plus <code>/project/:id</code> data are loaded from your local MDV container.
+                            No local data is sent to a remote server.
+                        </Alert>
+                    )}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         {permissions.createProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
@@ -327,7 +340,7 @@ const Dashboard: React.FC = () => {
                                         onClick={onRescanClick}
                                     >
                                         <RefreshCwIcon />
-                                        <Typography 
+                                        <Typography
                                             sx={{
                                                 marginLeft: 1
                                             }}
@@ -370,7 +383,7 @@ const Dashboard: React.FC = () => {
                                     >
                                         {/* Hide last modified on public page */}
                                         Sort by:{" "}
-                                        {!isPublicPage ? 
+                                        {!isPublicPage ?
                                             sortBy === "lastModified"
                                                 ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
                                                 : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
@@ -407,7 +420,7 @@ const Dashboard: React.FC = () => {
                             open={Boolean(anchorEl)}
                             onClose={() => setAnchorEl(null)}
                         >
-                            {!isPublicPage && 
+                            {!isPublicPage &&
                                 (<MenuItem
                                     onClick={() => handleSort("lastModified")}
                                     sx={{

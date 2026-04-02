@@ -84,6 +84,72 @@ export const TooltipConfigSchema = z.object({
     })
 }).describe("Configuration for chart tooltip behavior and content");
 
+const CategorySelectionSchema = z.union([
+    z.string(),
+    z.array(z.string()),
+]).describe("One or more selected categorical values");
+
+const CategoryFilterSchema = z.object({
+    column: z.string().describe("Categorical column used for filtering"),
+    category: CategorySelectionSchema.describe("Selected categorical values"),
+}).describe("A categorical filter applied to a scatter plot");
+
+const FieldLegendConfigSchema = z.object({
+    display: z.boolean().describe("Whether to display the density field legend"),
+}).describe("Configuration for density field legend visibility");
+
+const ContourScatterConfigSchema = z.object({
+    contour_fill: z.boolean().optional().describe("Whether to render filled contour areas"),
+    contour_fillThreshold: z.number().optional().describe("Threshold controlling how much of the contour is filled"),
+    contour_bandwidth: z.number().positive().optional().describe("Kernel density bandwidth used for contour generation"),
+    contour_intensity: z.number().min(0).max(1).optional().describe("Opacity/intensity applied to contour fills"),
+    contour_opacity: z.number().min(0).max(1).optional().describe("Opacity applied to contour lines"),
+    contourParameter: FieldSpecSchema.optional().describe("Categorical field used to choose contour categories"),
+    category1: CategorySelectionSchema.optional().describe("First contour category selection"),
+    category2: CategorySelectionSchema.optional().describe("Second contour category selection"),
+    densityFields: FieldSpecsSchema.optional().describe("Numeric fields to render as contour overlays"),
+    field_legend: FieldLegendConfigSchema.optional().describe("Legend settings for density field overlays"),
+}).describe("Contour-specific configuration shared by deck scatter charts and spatial viewers");
+
+const ScatterAxisSchema = z.object({
+    size: z.number().describe("Reserved size for this axis in pixels"),
+    tickfont: z.number().describe("Axis tick font size"),
+    rotate_labels: z.boolean().describe("Whether to rotate axis tick labels"),
+}).describe("Configuration for a single scatter plot axis");
+
+const ScatterAxis2DSchema = z.object({
+    x: ScatterAxisSchema.describe("X axis settings"),
+    y: ScatterAxisSchema.describe("Y axis settings"),
+}).describe("Configuration for 2D scatter plot axes");
+
+const OrthographicViewStateSchema = z.object({
+    target: z.tuple([z.number(), z.number(), z.number()]).describe("Orthographic view target in world coordinates"),
+    zoom: z.number().describe("Current zoom level"),
+    minZoom: z.number().optional().describe("Minimum allowed zoom"),
+    maxZoom: z.number().optional().describe("Maximum allowed zoom"),
+}).passthrough().describe("Serializable orthographic deck.gl view state");
+
+const OrbitViewStateSchema = OrthographicViewStateSchema.extend({
+    rotationOrbit: z.number().optional().describe("Orbit rotation in degrees"),
+    rotationX: z.number().optional().describe("X-axis rotation in degrees"),
+}).passthrough().describe("Serializable orbit deck.gl view state");
+
+const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
+    ...ChartColorConfigSchema.shape,
+    ...TooltipConfigSchema.shape,
+    ...ContourScatterConfigSchema.shape,
+    course_radius: z.number().positive().optional().describe("Coarse multiplier applied to the scatter point radius"),
+    radius: z.number().positive().optional().describe("Scatter point radius"),
+    opacity: z.number().min(0).max(1).optional().describe("Scatter point opacity"),
+    category_filters: z.array(CategoryFilterSchema).optional().describe("Categorical filters applied before rendering"),
+    on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
+    zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
+    point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
+    selectionFeatureCollection: z.unknown().optional().describe("Serialized selection overlay geometry"),
+    region: z.string().optional().describe("Associated region identifier when rendering spatial scatter plots"),
+    hideMissing: z.boolean().optional().describe("Whether to hide points with missing numeric color values"),
+}).describe("Shared configuration for deck.gl scatter charts");
+
 // Chart-specific configuration schemas
 export const ScatterPlotConfigSchema = BaseConfigSchema.extend({
     ...ChartColorConfigSchema.shape,
@@ -177,6 +243,33 @@ export const DensityScatterConfigSchema = BaseConfigSchema.extend({
     // Additional density scatter specific properties
 }).describe("Configuration for density scatter plots showing point density with color intensity");
 
+export const DeckScatterPlotConfigSchema = DeckScatterSharedConfigSchema.extend({
+    type: z.literal("DeckScatter").describe("Deck.gl 2D scatter plot chart type"),
+    dimension: z.literal("2d").optional().describe("Deck scatter plots default to 2D"),
+    axis: ScatterAxis2DSchema.optional().describe("Axis configuration for the 2D scatter view"),
+    viewState: OrthographicViewStateSchema.optional().describe("Current deck.gl orthographic view state"),
+}).describe("Configuration for the deck.gl 2D scatter plot");
+
+export const DeckContourScatterConfigSchema = DeckScatterSharedConfigSchema.extend({
+    type: z.literal("DeckContourScatter").describe("Deck.gl contour-enabled scatter plot chart type"),
+    dimension: z.literal("2d").optional().describe("Contour scatter plots render in 2D"),
+    axis: ScatterAxis2DSchema.optional().describe("Axis configuration for the contour scatter view"),
+    viewState: OrthographicViewStateSchema.optional().describe("Current deck.gl orthographic view state"),
+}).describe("Configuration for the deck.gl scatter plot with contour overlays");
+
+export const DeckDensityConfigSchema = DeckScatterSharedConfigSchema.extend({
+    type: z.literal("DeckDensity").describe("Legacy alias for the deck.gl contour scatter chart type"),
+    dimension: z.literal("2d").optional().describe("Contour scatter plots render in 2D"),
+    axis: ScatterAxis2DSchema.optional().describe("Axis configuration for the contour scatter view"),
+    viewState: OrthographicViewStateSchema.optional().describe("Current deck.gl orthographic view state"),
+}).describe("Configuration for legacy deck.gl density scatter charts");
+
+export const DeckScatter3DConfigSchema = DeckScatterSharedConfigSchema.extend({
+    type: z.literal("DeckScatter3D").describe("Deck.gl 3D scatter plot chart type"),
+    dimension: z.literal("3d").optional().describe("3D deck scatter plots render in orbit view"),
+    viewState: OrbitViewStateSchema.optional().describe("Current deck.gl orbit view state"),
+}).describe("Configuration for the deck.gl 3D scatter plot");
+
 export const RowChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("row_chart").describe("Row chart type"),
     // Additional row chart specific properties
@@ -220,6 +313,10 @@ registerChartConfigSchema("multi_line_chart", MultiLineChartConfigSchema, { vers
 registerChartConfigSchema("multi_box_plot", MultiBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("abundance_box_plot", AbundanceBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("density_scatter", DensityScatterConfigSchema, { version: "1" });
+registerChartConfigSchema("DeckScatter", DeckScatterPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("DeckContourScatter", DeckContourScatterConfigSchema, { version: "1" });
+registerChartConfigSchema("DeckDensity", DeckDensityConfigSchema, { version: "1" });
+registerChartConfigSchema("DeckScatter3D", DeckScatter3DConfigSchema, { version: "1" });
 registerChartConfigSchema("row_chart", RowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("stacked_row_chart", StackedRowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("row_summary_box", RowSummaryBoxConfigSchema, { version: "1" });

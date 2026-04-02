@@ -1,6 +1,7 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import useFindReplace from "@/react/hooks/useFindReplace";
+import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
@@ -13,7 +14,7 @@ describe("useFindReplace", () => {
     let config: { include_index?: boolean };
     let gridRef: React.MutableRefObject<any>;
     let selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>;
-    let setFeedbackAlert: ReturnType<typeof vi.fn>;
+    let setFeedbackAlert: (alert: FeedbackAlert) => void;
     let mockGridInstance: ReturnType<typeof createSlickGridMock>;
 
     beforeEach(() => {
@@ -56,7 +57,7 @@ describe("useFindReplace", () => {
         } as any;
 
         selectionSourceRef = { current: null };
-        setFeedbackAlert = vi.fn();
+        setFeedbackAlert = vi.fn() as (alert: FeedbackAlert) => void;
     });
 
     describe("handleFind", () => {

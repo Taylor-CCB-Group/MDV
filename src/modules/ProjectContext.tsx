@@ -1,21 +1,24 @@
 import useBuildInfo, {type BuildInfo} from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
+import { buildApiUrl, getApiRootFromDir, getProjectDirFromLocation, normalizeApiRoot } from "@/utils/mdvRouting";
 import axios from "axios";
 import {
     type PropsWithChildren,
     createContext,
     useContext,
-    useState,
 } from "react";
 
-export type ProjectInfo = {
+export type ProjectInfoBase = {
     root: string;
     staticFolder: boolean;
     chartManager: ChartManager;
     projectName: string;
-    buildInfo: BuildInfo;
     projectApiRoute: string;
     mainApiRoute: string;
+};
+
+export type ProjectInfo = ProjectInfoBase & {
+    buildInfo: BuildInfo;
 };
 
 export type Project = {
@@ -29,12 +32,10 @@ export type Project = {
  * 
  * This can be used to derive the initial state of the project, or called by non-React code to get similar information.
  */
-export function getProjectInfo(): ProjectInfo {
+export function getProjectInfoBase(): ProjectInfoBase {
     // Derive initial state from window.location and URL parameters
-    const { origin, pathname } = window.location;
-    const flaskURL = origin + pathname;
     const urlParams = new URLSearchParams(window.location.search);
-    const dir = urlParams.get("dir") || flaskURL;
+    const dir = getProjectDirFromLocation();
 
     // let's adjust how we reason about root for main API and project API
     // also consider 'static' - when we output state.json for that
@@ -48,25 +49,33 @@ export function getProjectInfo(): ProjectInfo {
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
     const { chartManager } = window.mdv;
     //! might need to be a bit careful if we end up using this
-    const mainApiRoute = chartManager.config.mdv_api_root || "/";
+    const mainApiRoute = normalizeApiRoot(
+        chartManager.config.mdv_api_root || getApiRootFromDir(root),
+    );
     // const root = mainApiRoute; // todo establish that we have an actual consistent logic for this
     //! only applies when running with the associated project API routing...
-    const projectApiRoute = `${mainApiRoute}/project/${projectName}/`.replace('//', '/');
-    const { buildInfo } = useBuildInfo();
+    const projectApiRoute = buildApiUrl(`project/${projectName}`, mainApiRoute).replace(/\/$/, "") + "/";
     return {
         root,
         staticFolder,
         projectName,
         chartManager,
-        buildInfo,
         mainApiRoute,
         projectApiRoute,
     };   
 }
 
-export async function getProjectName(projectId: number) {
+export function useProjectInfo(): ProjectInfo {
+    const { buildInfo } = useBuildInfo();
+    return {
+        ...getProjectInfoBase(),
+        buildInfo,
+    };
+}
+
+export async function getProjectName(projectId: number, apiRoot?: string) {
     try {
-        const res = await axios.get("../projects");
+        const res = await axios.get(buildApiUrl("projects", apiRoot));
         const projectData: Project[] = res.data;
     
         const projectName = projectData?.find((project) => project.id === projectId)?.name || "unnamed_project";
@@ -80,9 +89,7 @@ export async function getProjectName(projectId: number) {
 const ProjectContext = createContext<ProjectInfo>(null as any);
 
 export const ProjectProvider = ({ children }: PropsWithChildren) => {
-    // we might get away with just a hook for `useProject = () => useMemo(getProjectInfo, [])`... 
-    // but maybe in future we'll make this more complex
-    const [projectConfig, setProjectConfig] = useState<ProjectInfo>(getProjectInfo());
+    const projectConfig = useProjectInfo();
 
     return (
         <ProjectContext.Provider value={{ ...projectConfig }}>

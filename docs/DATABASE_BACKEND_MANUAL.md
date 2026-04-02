@@ -674,7 +674,7 @@ Location: `python/mdvtools/dbutils/config.json`
 - `MDV_USER_CONFIG_PATH`: Path to user-provided config file for extensions
 
 **API Configuration**:
-- `MDV_API_ROOT`: API root path prefix
+- `MDV_API_ROOT`: API root path prefix. Use this when the app is mounted below `/` (for example `/mdv/`). The backend exposes the same value via `GET /api_root`, and frontend routes and redirects are expected to preserve this prefix.
 
 ### Docker Secrets
 
@@ -699,6 +699,8 @@ Renders the main index page.
 
 #### `GET /api_root`
 Returns the MDV API root path.
+
+This is the canonical way for the frontend to discover the current mount prefix for same-origin deployments.
 
 **Response**:
 ```json
@@ -1297,4 +1299,3 @@ genomes
 
 **Last Updated**: 2024
 **Version**: 1.0
-

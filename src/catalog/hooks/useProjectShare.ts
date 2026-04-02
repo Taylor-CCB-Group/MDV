@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/utils/mdvRouting";
 
 export type UserPermission = "View" | "Edit" | "Owner";
 
@@ -33,7 +34,7 @@ const useProjectShare = (projectId: string) => {
         setErrorMsg("");
         setIsLoading(true);
         try {
-            const res = await fetch(`projects/${projectId}/share`, {
+            const res = await apiFetch(`projects/${projectId}/share`, {
                 headers: {
                     Accept: "application/json",
                 },
@@ -70,7 +71,7 @@ const useProjectShare = (projectId: string) => {
         setErrorMsg("");
         setIsLoading(true);
         try {
-            const res = await fetch(`projects/${projectId}/share`, {
+            const res = await apiFetch(`projects/${projectId}/share`, {
                 method: "POST",
                 body: JSON.stringify({ user_id: userId, permission: permission.toLowerCase() }),
                 headers: {
@@ -109,7 +110,7 @@ const useProjectShare = (projectId: string) => {
         setErrorMsg("");
         setIsLoading(true);
         try {
-            const res = await fetch(`projects/${projectId}/share/${userId}/edit`, {
+            const res = await apiFetch(`projects/${projectId}/share/${userId}/edit`, {
                 method: "POST",
                 body: JSON.stringify({ permission }),
                 headers: {
@@ -148,7 +149,7 @@ const useProjectShare = (projectId: string) => {
         setErrorMsg("");
         setIsLoading(true);
         try {
-            const res = await fetch(`projects/${projectId}/share/${userId}/delete`, {
+            const res = await apiFetch(`projects/${projectId}/share/${userId}/delete`, {
                 method: "POST",
                 headers: {
                     Accept: "application/json",

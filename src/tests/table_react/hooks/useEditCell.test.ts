@@ -1,6 +1,7 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import useEditCell from "@/react/hooks/useEditCell";
+import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs } from "slickgrid-react";
@@ -11,7 +12,7 @@ describe("useEditCell", () => {
     let sortedIndices: Uint32Array;
     let dataStore: DataStore;
     let gridRef: React.MutableRefObject<any>;
-    let setFeedbackAlert: ReturnType<typeof vi.fn>;
+    let setFeedbackAlert: (alert: FeedbackAlert) => void;
     let mockGridInstance: ReturnType<typeof createSlickGridMock>;
     let orderedParamColumnsRef: React.MutableRefObject<LoadedDataColumn<DataType>[]>;
     let sortedIndicesRef: React.MutableRefObject<Uint32Array>;
@@ -54,7 +55,7 @@ describe("useEditCell", () => {
 
         orderedParamColumnsRef = { current: orderedParamColumns };
         sortedIndicesRef = { current: sortedIndices };
-        setFeedbackAlert = vi.fn();
+        setFeedbackAlert = vi.fn() as (alert: FeedbackAlert) => void;
     });
 
     test("should handle null grid reference gracefully", () => {
