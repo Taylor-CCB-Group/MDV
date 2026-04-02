@@ -77,6 +77,8 @@ class BaseChart<T extends BaseConfig> {
     fullscreenIcon: HTMLSpanElement;
     _fullscreenChangeHandler: () => void;
     _escapeKeyHandler: (e: KeyboardEvent) => void;
+    /** Set to the fullscreen element when Escape is pressed while a dialog is open. */
+    _escapeDialogFullscreenElement: Element | null = null;
     // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
     activeQueries: ColumnQueryMapper<T>;
     /**
@@ -239,18 +241,23 @@ class BaseChart<T extends BaseConfig> {
         );
 
         let oldSize = config.size;
-        // Prevent the browser from exiting fullscreen when a MUI dialog is open inside the
-        // fullscreen element. Per the Fullscreen API spec, calling e.preventDefault() on the
-        // keydown event for Escape tells the browser not to exit fullscreen, while the event
-        // still propagates normally so MUI can close the dialog.
+        // When Escape is pressed while a MUI dialog is open inside the fullscreen element,
+        // modern browsers (Chrome, Firefox) will ALWAYS exit fullscreen — e.preventDefault()
+        // is silently ignored for Escape in fullscreen mode (security feature). Instead we
+        // store the fullscreen element and immediately re-request it in the fullscreenchange
+        // handler so that only the dialog is dismissed, not the fullscreen session.
         this._escapeKeyHandler = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && this.__doc__.fullscreenElement?.querySelector('[role="dialog"]')) {
-                e.preventDefault();
+            if (e.key === "Escape" && this.__doc__.fullscreenElement) {
+                if (this.__doc__.fullscreenElement.querySelector('[role="dialog"]')) {
+                    this._escapeDialogFullscreenElement = this.__doc__.fullscreenElement;
+                }
             }
         };
         this._fullscreenChangeHandler = action(() => {
             //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
             if (this.__doc__.fullscreenElement) {
+                // Clear any pending re-enter flag since we're now (back) in fullscreen
+                this._escapeDialogFullscreenElement = null;
                 if (this.div === this.__doc__.fullscreenElement) {               
                     this.observable.container = this.div;
                     const rect = window.screen;
@@ -278,32 +285,23 @@ class BaseChart<T extends BaseConfig> {
                 }
                 this.isFullscreen = true;
             } else {
-                this.observable.container = this.__doc__.body;
-             
-                // Reset the size of chart
-                this.setSize(...oldSize);
-                const cm = window.mdv.chartManager;
-                // we could make GridstackManager also change the setSize method?
-                // then we'd avoid any gridstack code in here
-                // but this is probably easier to understand anyway.
-                if (cm.viewData.dataSources[this.dataStore.name]?.layout === "gridstack") {
-                    cm.gridStack.manageChart(this, this.dataSource, false, true);
+                const reenterTarget = this._escapeDialogFullscreenElement;
+                this._escapeDialogFullscreenElement = null;
+                if (reenterTarget) {
+                    // Escape was pressed while a MUI dialog was open. The browser exited fullscreen
+                    // (we cannot prevent this), but MUI already closed the dialog via the same
+                    // keydown event. Re-enter fullscreen for the same element so the user only
+                    // loses the dialog, not the fullscreen session.
+                    reenterTarget.requestFullscreen().catch(action((err: unknown) => {
+                        console.warn("Could not re-enter fullscreen after dialog close:", err);
+                        // Fall through to normal exit handling
+                        this._processFullscreenExit(oldSize);
+                    }));
+                    // Return early - if requestFullscreen succeeds the fullscreenchange handler
+                    // will fire again and clear the entry branch above.
+                    return;
                 }
-                for (const d of this.dialogs) {
-                    d.setParent(null);
-                }
-
-                // Updating the icon
-                if (this.fullscreenIcon) {
-                    const iconEl = this.fullscreenIcon.querySelector("i");
-                    if (iconEl) {
-                        iconEl.classList.remove("fa-compress");
-                        iconEl.classList.add("fa-expand");
-                    }
-                    this.fullscreenIcon.setAttribute("aria-label", "Full Screen");
-                }
-                this.__doc__.removeEventListener("keydown", this._escapeKeyHandler, true);
-                this.isFullscreen = false;
+                this._processFullscreenExit(oldSize);
             }
         });
         // Listen on the document so we catch fullscreen changes on ancestor elements
@@ -342,6 +340,28 @@ class BaseChart<T extends BaseConfig> {
         this.observable = makeAutoObservable({
             container: this.__doc__.body,
         });
+    }
+    /** Shared logic for handling the transition out of fullscreen (icon reset, size restore, etc.) */
+    _processFullscreenExit(oldSize: [number, number]) {
+        this.observable.container = this.__doc__.body;
+        this.setSize(...oldSize);
+        const cm = window.mdv.chartManager;
+        if (cm.viewData.dataSources[this.dataStore.name]?.layout === "gridstack") {
+            cm.gridStack.manageChart(this, this.dataSource, false, true);
+        }
+        for (const d of this.dialogs) {
+            d.setParent(null);
+        }
+        if (this.fullscreenIcon) {
+            const iconEl = this.fullscreenIcon.querySelector("i");
+            if (iconEl) {
+                iconEl.classList.remove("fa-compress");
+                iconEl.classList.add("fa-expand");
+            }
+            this.fullscreenIcon.setAttribute("aria-label", "Full Screen");
+        }
+        this.__doc__.removeEventListener("keydown", this._escapeKeyHandler, true);
+        this.isFullscreen = false;
     }
     _deferredInits: Promise<void>[] = [];
     /**
