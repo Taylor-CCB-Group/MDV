@@ -76,6 +76,7 @@ class BaseChart<T extends BaseConfig> {
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
     _fullscreenChangeHandler: () => void;
+    _escapeKeyHandler: (e: KeyboardEvent) => void;
     // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
     activeQueries: ColumnQueryMapper<T>;
     /**
@@ -238,6 +239,15 @@ class BaseChart<T extends BaseConfig> {
         );
 
         let oldSize = config.size;
+        // Prevent the browser from exiting fullscreen when a MUI dialog is open inside the
+        // fullscreen element. Per the Fullscreen API spec, calling e.preventDefault() on the
+        // keydown event for Escape tells the browser not to exit fullscreen, while the event
+        // still propagates normally so MUI can close the dialog.
+        this._escapeKeyHandler = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && this.__doc__.fullscreenElement?.querySelector('[role="dialog"]')) {
+                e.preventDefault();
+            }
+        };
         this._fullscreenChangeHandler = action(() => {
             //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
             if (this.__doc__.fullscreenElement) {
@@ -259,10 +269,12 @@ class BaseChart<T extends BaseConfig> {
                         }
                         this.fullscreenIcon.setAttribute("aria-label", "Exit Full Screen");
                     }
+                    this.__doc__.addEventListener("keydown", this._escapeKeyHandler, true);
                 } else if (this.__doc__.fullscreenElement.contains(this.div)) {
                     // An ancestor element (e.g. datasource panel) is fullscreen -
                     // update the container so MUI modals render inside the fullscreen element
                     this.observable.container = this.__doc__.fullscreenElement as HTMLElement;
+                    this.__doc__.addEventListener("keydown", this._escapeKeyHandler, true);
                 }
                 this.isFullscreen = true;
             } else {
@@ -290,6 +302,7 @@ class BaseChart<T extends BaseConfig> {
                     }
                     this.fullscreenIcon.setAttribute("aria-label", "Full Screen");
                 }
+                this.__doc__.removeEventListener("keydown", this._escapeKeyHandler, true);
                 this.isFullscreen = false;
             }
         });
@@ -705,6 +718,9 @@ class BaseChart<T extends BaseConfig> {
         this.menuTooltips = [];
         if (this._fullscreenChangeHandler) {
             this.__doc__.removeEventListener("fullscreenchange", this._fullscreenChangeHandler);
+        }
+        if (this._escapeKeyHandler) {
+            this.__doc__.removeEventListener("keydown", this._escapeKeyHandler, true);
         }
         // dynamic props?
     }
