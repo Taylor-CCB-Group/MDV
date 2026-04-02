@@ -13,10 +13,9 @@ import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Ico
 import Grid from "@mui/material/Grid2";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
 import { action, observable, reaction, toJS } from "mobx";
-import z from "zod/v4";
-import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
+import type { ExtraControl, FieldName, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
-import { columnMatchesType, isMultiColumn } from "@/lib/columnTypeHelpers";
+import { columnMatchesType, flattenFields, isMultiColumn, type FieldSpec, type FieldSpecs } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
 import { g, isArray } from "@/lib/utils.js";
 import { serialiseConfig } from "../chartConfigUtils.js";
@@ -28,34 +27,76 @@ import { Close as CloseIcon } from "@mui/icons-material";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 
-// how do I match this with the type in link_utils?
-//! using zod here is an extra layer of complexity and it's not at all clear that this is the place for it
-// we're not validating data coming in, we're just using it to define the shape of the data 
-// - the whole schema-isation is really a separate concern that I very much want to have - but in the right place/time
-// we don't want a schema for the live version of the object, only for the serialised version
-// const RowsAsColsQuerySchema = z.object({});
+// This is local draft state for the add-chart dialog rather than a serialised chart config.
+// Keeping the slot shape explicit here lets us distinguish single and multi params before
+// flattening back to the legacy `config.param` array that charts still expect.
 
-const ParamzSchema = z.optional(z.array(z.union([z.string(), z.array(z.string())])));
-type Paramz = z.infer<typeof ParamzSchema>;
+type AddChartParamSlot = FieldSpec | FieldSpecs;
+type AddChartParamSlots = Array<AddChartParamSlot | undefined>;
 
-const ChartConfigSchema = z.object({
-    title: z.string(),
-    legend: z.string(),
-    param: ParamzSchema,
-    type: z.string(),
+type ChartConfig = {
+    title: string;
+    legend: string;
+    param: AddChartParamSlots;
+    type: string;
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
-    extra: z.record(z.string(), z.unknown()),
-    _updated: z.date(),
-});
-type ChartConfig = z.infer<typeof ChartConfigSchema>;
+    extra: Record<string, unknown>;
+    _updated: Date;
+};
 
+function getSingleParamSlot(slot: AddChartParamSlot | undefined): FieldSpec | undefined {
+    if (slot === undefined) return undefined;
+    return isArray(slot) ? slot[0] : slot;
+}
 
-function flattenParams(param: Paramz) {
-    if (!param) return []; //would quite like it to remain undefined
-    //! todo change the type so that it can also include column-query... probably not defined by zod
-    const result = param?.flatMap(p => isArray(p) ? [...p] : p);
-    return result;
+function getMultiParamSlot(slot: AddChartParamSlot | undefined): FieldSpecs | undefined {
+    if (slot === undefined) return undefined;
+    return isArray(slot) ? slot : [slot];
+}
+
+function normaliseParamSlot(slot: AddChartParamSlot | undefined, multiple: boolean): AddChartParamSlot | undefined {
+    return multiple ? getMultiParamSlot(slot) : getSingleParamSlot(slot);
+}
+
+function flattenParams(param: AddChartParamSlots): FieldName[] {
+    return param.flatMap((slot) => {
+        if (slot === undefined) return [];
+        return flattenFields(slot);
+    });
+}
+
+function slotMatchesParamType(
+    slot: AddChartParamSlot | undefined,
+    type: Param | Param[],
+    dataStore: DataStore,
+): boolean {
+    const normalisedSlot = normaliseParamSlot(slot, isMultiColumn(type));
+    if (normalisedSlot === undefined) return false;
+
+    const fieldNames = flattenFields(normalisedSlot);
+    if (fieldNames.length === 0) {
+        return isArray(normalisedSlot);
+    }
+
+    return fieldNames.every((fieldName) => {
+        const column = dataStore.columnIndex[fieldName];
+        return column ? columnMatchesType(column, type) : false;
+    });
+}
+
+function getDefaultParamSlot(type: Param | Param[], dataStore: DataStore): AddChartParamSlot | undefined {
+    const matchingColumn = dataStore.columns.find((column) => columnMatchesType(column, type));
+    if (!matchingColumn) {
+        return isMultiColumn(type) ? [] : undefined;
+    }
+
+    return isMultiColumn(type) ? [matchingColumn.field] : matchingColumn.field;
+}
+
+function formatParamSlotForLog(slot: AddChartParamSlot | undefined): string {
+    if (slot === undefined) return "undefined";
+    return JSON.stringify(slot);
 }
 
 const ChartPreview = observer(({config}: {config: ChartConfig}) => {
@@ -69,8 +110,11 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     // todo rearrange so that the same code is used for adding actual chart
     const scratchProps = useMemo(() => {
         const scratchConfig = toJS(config);
-        scratchConfig.param = flattenParams(scratchConfig.param);
         const { extra, _updated, ...props } = scratchConfig;
+        const previewProps = {
+            ...props,
+            param: flattenParams(scratchConfig.param),
+        };
         // flatten the config into props
         chartType?.extra_controls?.(dataStore).forEach(control => {
             if (control.defaultVal && !extra[control.name]) {
@@ -81,24 +125,24 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
         });
         for (const [k, v] of Object.entries(extra)) {
             //@ts-ignore
-            props[k] = v;
+            previewProps[k] = v;
         }
         // find the key in BaseChart.types that corresponds to this chart type
         // I don't much like this, but it seems to vaguely work for now
         for (const [k, v] of Object.entries(BaseChart.types)) {
             if (v.name === config.type) {
-                props.type = k;
+                previewProps.type = k;
                 break;
             }
         }
         if (chartType?.init) {
             try {
-                chartType.init(props, dataStore, extra);
+                chartType.init(previewProps, dataStore, extra);
             } catch (e) {
                 return e;
             }
         }
-        return props;
+        return previewProps;
     }, [config, dataStore, chartType]);
     const { _updated, ...configWithoutUpdated } = toJS(config);
     return (
@@ -117,6 +161,43 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
         </div>
     );
 });
+
+const ParamSelection = observer(
+    ({ config, index, param }: { config: ChartConfig, index: number, param: { type: Param | Param[]; name: string } }) => {
+        const currentSlot = config.param[index];
+
+        return (
+            <>
+                <Typography fontSize="small">
+                    {param.name}:
+                </Typography>
+                {isMultiColumn(param.type) ? (
+                    <ColumnSelectionComponent
+                        placeholder={param.name}
+                        multiple={true}
+                        setSelectedColumn={action((column: FieldSpecs) => {
+                            config.param[index] = column;
+                            config._updated = new Date();
+                        })}
+                        type={param.type}
+                        current_value={getMultiParamSlot(currentSlot)}
+                    />
+                ) : (
+                    <ColumnSelectionComponent
+                        placeholder={param.name}
+                        multiple={false}
+                        setSelectedColumn={action((column: FieldSpec) => {
+                            config.param[index] = column;
+                            config._updated = new Date();
+                        })}
+                        type={param.type}
+                        current_value={getSingleParamSlot(currentSlot)}
+                    />
+                )}
+            </>
+        );
+    },
+);
 
 /** given an (observable) ExtraControl, return an (observable) GuiSpec
  * adapted so we can use SettingsDialogComponent widgets
@@ -196,9 +277,6 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     }, [dataStore]);
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
-    const paramColumns = useMemo(
-        () => config.param ? flattenParams(config.param)?.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
-    [config.param, dataStore]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
     const setChartTypeName = useCallback(action((chartTypeName: string) => {
         config.type = chartTypeName;
@@ -207,31 +285,35 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
         // set default values for params, use previous values if possible
         if (chartType.params) {
             // we could have some metadata on the column like `{intendedFor: "X axis"}` etc
-            const previousParams = toJS(config.param) || []; // warning: mobx gives us a proxy & normal indexing doesn't work
-            config.param = new Array(chartType.params.length);
+            const previousParams = toJS(config.param);
+            config.param = Array.from({ length: chartType.params.length }, () => undefined);
             for (const [i, p] of chartType.params.entries()) {
-                const previousColumn = paramColumns[i];
-                if (previousColumn && previousParams[i] && columnMatchesType(previousColumn, p.type)) {
-                    console.log(`[${config.type}, ${p.name}] using previous selection: '${previousParams[i]}'`);
-                    config.param[i] = previousParams[i];
+                const previousParam = previousParams[i];
+                if (slotMatchesParamType(previousParam, p.type, dataStore)) {
+                    const normalisedSlot = normaliseParamSlot(previousParam, isMultiColumn(p.type));
+                    console.log(
+                        `[${config.type}, ${p.name}] using previous selection: ${formatParamSlotForLog(normalisedSlot)}`,
+                    );
+                    config.param[i] = normalisedSlot;
                 } else {
                     // we could try to be a bit clever about finding a suitable column, like "x"...
-                    const c = dataStore.columns.find(c => columnMatchesType(c, p.type));
-                    if (!c) {
+                    const defaultSlot = getDefaultParamSlot(p.type, dataStore);
+                    if (defaultSlot === undefined) {
                         // we should let the user know - highlight the dropdown or something
                         console.warn(`[${config.type}, ${p.name}] No column found for type '${p.type}'`);
                         continue;
                     }
-                    console.log(`[${config.type}, ${p.name}] using first available ${p.type}: '${c.name}'`);
-                    // todo: figure out why this setting the value in the dropdown (it does apply to the config preview)
-                    config.param[i] = c.name;
+                    console.log(
+                        `[${config.type}, ${p.name}] using default selection: ${formatParamSlotForLog(defaultSlot)}`,
+                    );
+                    config.param[i] = defaultSlot;
                 }
             }
         } else {
             config.param = [];
         }
         config._updated = new Date();
-    }), [config.type, config, chartTypes, paramColumns, dataStore]);
+    }), [config, chartTypes, dataStore]);
     const chartType = chartTypes.find(t => t.name === config.type);
     const extraControls = useMemo(() => {
         return chartType?.extra_controls?.(dataStore).map((control, i) => (
@@ -241,7 +323,12 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
 
 
     const addChart = useCallback(() => {
-        const { extra, _updated, ...props } = config;
+        const draftConfig = toJS(config);
+        const { extra, _updated, ...props } = draftConfig;
+        const chartProps = {
+            ...props,
+            param: flattenParams(draftConfig.param),
+        };
         // flatten the config into props
         chartType?.extra_controls?.(dataStore).forEach(control => {
             if (control.defaultVal && !extra[control.name]) {
@@ -250,26 +337,25 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // if (!control.defaultVal)
             }
         });
-        props.param = flattenParams(props.param);
         for (const [k, v] of Object.entries(extra)) {
             //@ts-ignore
-            props[k] = v;
+            chartProps[k] = v;
         }
         // find the key in BaseChart.types that corresponds to this chart type
         // I don't much like this, but it seems to vaguely work for now
         for (const [k, v] of Object.entries(BaseChart.types)) {
             if (v.name === config.type) {
-                props.type = k;
+                chartProps.type = k;
                 break;
             }
         }
         if (chartType?.init) {
-            chartType.init(props, dataStore, extra);
+            chartType.init(chartProps, dataStore, extra);
         }
 
         // this is where we'd call the chart manager to add the chart
         if (!window.mdv.chartManager) throw new Error("chartManager not found");
-        const finalConfig = serialiseConfig(props);
+        const finalConfig = serialiseConfig(chartProps);
         window.mdv.chartManager.addChart(dataStore.name, finalConfig, true);
         // and then close the dialog...
         onDone();
@@ -317,34 +403,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     >
                         {chartType?.params && <Typography variant="h6">Columns</Typography>}
                         {chartType?.params?.map((p, i) => (
-                            <>
-                                <Typography key={`label_${p.name}`} fontSize="small">
-                                    {p.name}:
-                                </Typography>
-                                <ColumnSelectionComponent key={p.name} placeholder={p.name}
-                                multiple={isMultiColumn(p.type)}
-                                // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
-                                // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
-                                //@ts-expect-error setSelectedColumn(c: never)???
-                                setSelectedColumn={action((column) => {
-                                    // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
-                                    // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
-                                    if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
-                                    
-                                    // the type of config.param is string[] - but this could be a multi-column or virtual column query...
-                                    // we need to decide at which point to apply these transformations.
-                                    // - to deal with string[] we should be able to specify multiple={false} which could change the return type
-                                    //... could we set up a reaction to update the config when the column changes?
-
-                                    // if (typeof column !== "string") throw new Error("Expected string column name");
-                                    config.param[i] = column; //issue now is that because ref is stable, we don't re-flatten the param
-                                    // grumble grumble
-                                    config._updated = new Date();
-                                })}
-                                type={p.type}
-                                current_value={config.param?.[i]}
-                                />
-                            </>
+                            <ParamSelection key={p.name} config={config} index={i} param={p} />
                         ))}
                         {extraControls && <h2>Extra Controls</h2>}
                         {extraControls}
@@ -401,15 +460,16 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
     // then we could use zustand without bothering with faff of multiple store contexts
     // the only consequence of allowing multiple dialogs to be open would be that they'd share state
     // but that could actually be bad in that they are all associated with a particular dataStore
-    const config = useMemo(() => observable.object((ChartConfigSchema.parse({
+    const [config] = useState(() =>
+        observable.object({
             title: "",
             legend: "",
             type: "",
-            param: [] as Param[],
+            param: [],
             extra: {},
             _updated: new Date(),
-        })
-    )), []);
+        } satisfies ChartConfig),
+    );
     const [open, setOpen] = useState(true);
     useEffect(() => {
         if (!props.modal) return;
