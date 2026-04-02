@@ -18,8 +18,7 @@ import {
 import { useDataStore } from "./context";
 // import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
-import { g, isArray, toArray } from "@/lib/utils";
-import { observable, autorun } from "mobx";
+import { g, isArray } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -418,37 +417,13 @@ function sliderValueToBandwidth(value: number) {
     return 10 ** safeValue;
 }
 
+function toCategorySelection(value: string | string[] | undefined) {
+    if (isArray(value)) return value.filter((item): item is string => typeof item === "string");
+    return typeof value === "string" ? [value] : [];
+}
+
 export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
-    const { dataStore } = chart;
-    // make it so that if we change the parameter, we get the new values in the dropdowns
-    // empty array will be replaced with the new values
-    const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
-    
-    // Create autorun that will be disposed when the settings dialog closes
-    // The disposer is stored in the _disposers array on the returned GuiSpec
-    // so it gets cleaned up properly when the dialog closes
-    const disposer = autorun(() => {
-        if (typeof c.contourParameter !== "string") {
-            // as of now, categorical parameter like this is expected to be a string here
-            // we would like to be operating on a version of state that just had a column object
-            // complete with values, regardless of provenance, and not need to refer to dataStore
-            console.error("unexpected type for contourParameter");
-            return;
-        }
-        // getColumnValues() may throw or return undefined, especially with linked data...
-        // actually, there is another issue when we don't really have a categorical column...
-        try {
-            const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
-            const cats = ocats.map((x) => ({ t: x }));
-            catsValues[0] = cats;
-        } catch (e) {
-            console.error(`error updating contour values with '${c.contourParameter}' (${e})`);
-        }
-    });
-    
-    // If we have a "category_selection" widget and it properly observed `c.contourParameter`,
-    // we wouldn't need this autorun here.
-    // this is related to existing selection dialog widget - both should be able to understand multitext better.
+    void chart;
     return getDensityVisualisationFolder(c, {
         categorySelectionControls: [
             //maybe 2-spaces format is better...
@@ -472,20 +447,22 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                 },
             }),
             g({
-                type: "multidropdown",
+                type: "category_selection",
                 label: "Contour Category 1",
-                current_value: toArray(c.category1 || "None"),
-                values: catsValues,
+                current_value: toCategorySelection(c.category1),
+                sourceColumn: () => c.contourParameter,
+                getCurrentValue: () => toCategorySelection(c.category1),
                 func(x) {
                     // if (x === "None") x = null;
                     c.category1 = x;
                 },
             }),
             g({
-                type: "multidropdown",
+                type: "category_selection",
                 label: "Contour Category 2",
-                current_value: toArray(c.category2 || "None"),
-                values: catsValues,
+                current_value: toCategorySelection(c.category2),
+                sourceColumn: () => c.contourParameter,
+                getCurrentValue: () => toCategorySelection(c.category2),
                 func(x) {
                     // if (x === "None") x = null;
                     c.category2 = x;
@@ -512,7 +489,6 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                 },
             }),
         ],
-        disposers: [disposer],
     });
 }
 

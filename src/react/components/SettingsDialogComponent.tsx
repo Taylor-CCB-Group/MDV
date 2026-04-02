@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
-import { action, makeAutoObservable } from "mobx";
+import { action, autorun, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
     Accordion,
@@ -19,7 +19,7 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { isArray, notEmpty } from "@/lib/utils";
+import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
@@ -27,6 +27,7 @@ import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { Clear } from "@mui/icons-material";
 import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
+import { useDataStore } from "../context";
 
 const SettingsSearchContext = createContext("");
 
@@ -162,6 +163,7 @@ const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 // nb this is not the same as `GuiSpec<"dropdown" | "multidropdown">`
 export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
+export type CategorySelectionSpec = GuiSpec<"category_selection">;
 // type DropdownSpec = GuiSpec<"dropdown" | "multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
@@ -451,6 +453,68 @@ export const DropdownAutocompleteComponent = observer(({
         </>
     );
 });
+
+function areStringArraysEqual(a: string[], b: string[]) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
+    const dataStore = useDataStore();
+    const [dropdownSpec] = useState(() =>
+        makeAutoObservable(
+            g({
+                type: "multidropdown",
+                label: props.label,
+                current_value: props.current_value,
+                values: [[] as string[]],
+                func: action((value: string[]) => {
+                    dropdownSpec.current_value = value;
+                    props.current_value = value;
+                    props.func?.(value);
+                }),
+            }),
+        ),
+    );
+
+    useEffect(() => {
+        return autorun(
+            () => {
+                const sourceColumn = props.sourceColumn?.();
+                const rawSelection = props.getCurrentValue?.() ?? props.current_value;
+                const availableValues =
+                    typeof sourceColumn === "string"
+                        ? (() => {
+                              try {
+                                  return dataStore.getColumnValues(sourceColumn).slice();
+                              } catch (error) {
+                                  console.error(
+                                      `error updating category selection values with '${sourceColumn}' (${error})`,
+                                  );
+                                  return [];
+                              }
+                          })()
+                        : [];
+
+                dropdownSpec.values = [availableValues];
+
+                const nextValue = rawSelection.filter((value) => availableValues.includes(value));
+                if (!areStringArraysEqual(dropdownSpec.current_value, nextValue)) {
+                    dropdownSpec.current_value = nextValue;
+                }
+                if (!areStringArraysEqual(props.current_value, nextValue)) {
+                    props.current_value = nextValue;
+                }
+                if (!areStringArraysEqual(rawSelection, nextValue)) {
+                    props.func?.(nextValue);
+                }
+            },
+        );
+    }, [dataStore, dropdownSpec, props]);
+
+    return (
+        <DropdownAutocompleteComponent props={dropdownSpec} />
+    );
+});
 // removed unused DropdownComponent...
 
 const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
@@ -647,6 +711,7 @@ const Components: {
     slider: observer(SliderComponent),
     spinner: observer(SpinnerComponent),
     dropdown: DropdownAutocompleteComponent,
+    category_selection: CategorySelectionSettingGui,
     // consider having component specifically for column/category selection <<<<
     // the column selection can make use of column groups
     // category selection can have some logic for multitext / tags
