@@ -1,6 +1,25 @@
 import { useEffect, useState, useCallback, useId } from "react";
 import { useChart, useDataStore } from "./context";
 
+type CategoryRows = {
+    rows: ArrayLike<number>;
+};
+
+export function getHighlightedRowsFromCategoryIndices(
+    categoryIndices: number[],
+    categories: CategoryRows[],
+) {
+    const highlightedRows = new Set<number>();
+    for (const categoryIndex of categoryIndices) {
+        const categoryRows = categories[categoryIndex]?.rows;
+        if (!categoryRows) continue;
+        for (const row of Array.from(categoryRows)) {
+            highlightedRows.add(row);
+        }
+    }
+    return Array.from(highlightedRows);
+}
+
 /**
  * Hook to get the index of the highlighted data point.
  * Delegates to useHighlightedIndices() and returns the first index.
@@ -55,4 +74,18 @@ export function useHighlightRows() {
         // dataHighlighted expects an array of numbers
         dataStore.dataHighlighted(rowIndexes, chart);
     }, [chart, dataStore]);
+}
+
+/**
+ * Hook that highlights rows by selected category indices.
+ * This is useful when the interaction model is category-based but the shared
+ * application highlight state is still expressed in row indices.
+ */
+export function useHighlightCategoryRows(categories: CategoryRows[]) {
+    const highlightRows = useHighlightRows();
+
+    return useCallback((categoryIndices: number[]) => {
+        const rows = getHighlightedRowsFromCategoryIndices(categoryIndices, categories);
+        highlightRows(rows);
+    }, [categories, highlightRows]);
 }
