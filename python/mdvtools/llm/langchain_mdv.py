@@ -509,7 +509,9 @@ class ProjectChat(ProjectChatProtocol):
             verification_text = ""
             with time_block("b15b: Verification summary and TextBox"):
                 try:
-                    verification_text = build_verification_summary(self.project, final_code)
+                    verification_text = build_verification_summary(
+                        self.project, final_code, view_name
+                    )
                     append_verification_textbox(
                         self.project,
                         view_name,
