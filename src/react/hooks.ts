@@ -422,14 +422,18 @@ export function useCategoryFilterIndices(
     //but at the moment that will end up being (often much) slower
     //because it always passes through all rows, which this doesn't.
     const data = useFilteredIndices();
+    const categorySnapshot = isArray(category) ? [...category] : category;
+    const categoryKey = isArray(categorySnapshot)
+        ? categorySnapshot.join("\u0000")
+        : categorySnapshot ?? "";
     //todo handle multitext / tags properly.
     const categoryValueIndex = useMemo(() => {
-        if (!contourParameter || !category) return -1;
-        if (isArray(category)) {
-            return category.map((c) => contourParameter.values?.indexOf(c));
+        if (!contourParameter || !categorySnapshot) return -1;
+        if (isArray(categorySnapshot)) {
+            return categorySnapshot.map((c) => contourParameter.values?.indexOf(c));
         }
-        return contourParameter.values.indexOf(category);
-    }, [contourParameter, category]);
+        return contourParameter.values.indexOf(categorySnapshot);
+    }, [contourParameter, categoryKey]);
     const filteredIndices = useMemo(() => {
         if (!contourParameter) return [];
         const pData = contourParameter.data;

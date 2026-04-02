@@ -6,7 +6,7 @@ import type {
     LoadedDataColumn,
     FieldName,
 } from "@/charts/charts";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     useCategoryFilterIndices,
     useConfig,
@@ -18,10 +18,9 @@ import {
 import { useDataStore } from "./context";
 // import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
-import { g, isArray, toArray } from "@/lib/utils";
-import { observable, autorun } from "mobx";
+import { g, isArray } from "@/lib/utils";
+import { reaction, toJS } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
-import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getFieldColor } from "./fieldColorManager";
 import type { FieldLegendItem } from "./components/FieldContourLegend";
@@ -82,6 +81,10 @@ function useColorRange(
     category: string | string[] | undefined,
 ) {
     const ds = useDataStore();
+    const categorySnapshot = Array.isArray(category) ? [...category] : category;
+    const categoryKey = Array.isArray(categorySnapshot)
+        ? categorySnapshot.join("\u0000")
+        : categorySnapshot ?? "";
     const columnColors = useMemo(
         () =>
             contourParameter ? ds.getColumnColors(contourParameter.field, {
@@ -98,21 +101,22 @@ function useColorRange(
      */
     const categoryValueIndex = useMemo(() => {
         // if (!category) return contourParameter.values.map((_, i) => i); //NO: -1 is a clue to use general 'viridis' color range atm.
-        if (!contourParameter || !category) return -1;
+        if (!contourParameter || !categorySnapshot) return -1;
         //we could do something different here... would need more clever color handling on the receiving end
-        if (Array.isArray(category)) return category.length > 1 ? -1 : contourParameter.values.indexOf(category[0]);
-        return contourParameter.values.indexOf(category);
-    }, [contourParameter, category]);
+        if (Array.isArray(categorySnapshot))
+            return categorySnapshot.length > 1 ? -1 : contourParameter.values.indexOf(categorySnapshot[0]);
+        return contourParameter.values.indexOf(categorySnapshot);
+    }, [contourParameter, categoryKey]);
     const colorRange = useMemo(() => {
         if (categoryValueIndex === -1) return viridis;
         const color = columnColors[categoryValueIndex];
         // return [[...color, 255], [...color, 255]];
-        console.log("color", color, category);
+        console.log("color", color, categorySnapshot);
         // return [color];
         // workaround for https://github.com/visgl/deck.gl/issues/9219
         // always use same length array so it doesn't delete the texture
         return new Array(viridis.length).fill(color);
-    }, [categoryValueIndex, columnColors, category]);
+    }, [categoryValueIndex, columnColors, categoryKey]);
     return colorRange;
 }
 
@@ -418,37 +422,48 @@ function sliderValueToBandwidth(value: number) {
     return 10 ** safeValue;
 }
 
-export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
-    const { dataStore } = chart;
-    // make it so that if we change the parameter, we get the new values in the dropdowns
-    // empty array will be replaced with the new values
-    const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
-    
-    // Create autorun that will be disposed when the settings dialog closes
-    // The disposer is stored in the _disposers array on the returned GuiSpec
-    // so it gets cleaned up properly when the dialog closes
-    const disposer = autorun(() => {
-        if (typeof c.contourParameter !== "string") {
-            // as of now, categorical parameter like this is expected to be a string here
-            // we would like to be operating on a version of state that just had a column object
-            // complete with values, regardless of provenance, and not need to refer to dataStore
-            console.error("unexpected type for contourParameter");
-            return;
-        }
-        // getColumnValues() may throw or return undefined, especially with linked data...
-        // actually, there is another issue when we don't really have a categorical column...
-        try {
-            const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
-            const cats = ocats.map((x) => ({ t: x }));
-            catsValues[0] = cats;
-        } catch (e) {
-            console.error(`error updating contour values with '${c.contourParameter}' (${e})`);
-        }
-    });
-    
-    // If we have a "category_selection" widget and it properly observed `c.contourParameter`,
-    // we wouldn't need this autorun here.
-    // this is related to existing selection dialog widget - both should be able to understand multitext better.
+function toCategorySelection(value: string | string[] | undefined) {
+    if (isArray(value)) return value.filter((item): item is string => typeof item === "string");
+    return typeof value === "string" ? [value] : [];
+}
+
+function areStringArraysEqual(a: string[], b: string[]) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function useContourCategorySelections(config: DualContourLegacyConfig) {
+    const [categories, setCategories] = useState(() => ({
+        category1: toCategorySelection(config.category1),
+        category2: toCategorySelection(config.category2),
+    }));
+
+    useEffect(() => {
+        return reaction(
+            () => [toJS(config.category1), toJS(config.category2)] as const,
+            ([rawCategory1, rawCategory2]) => {
+                const nextCategory1 = toCategorySelection(rawCategory1);
+                const nextCategory2 = toCategorySelection(rawCategory2);
+                setCategories((previous) => {
+                    if (
+                        areStringArraysEqual(previous.category1, nextCategory1) &&
+                        areStringArraysEqual(previous.category2, nextCategory2)
+                    ) {
+                        return previous;
+                    }
+                    return {
+                        category1: nextCategory1,
+                        category2: nextCategory2,
+                    };
+                });
+            },
+            { fireImmediately: true },
+        );
+    }, [config]);
+
+    return categories;
+}
+
+export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
     return getDensityVisualisationFolder(c, {
         categorySelectionControls: [
             //maybe 2-spaces format is better...
@@ -472,23 +487,25 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                 },
             }),
             g({
-                type: "multidropdown",
+                type: "category_selection",
                 label: "Contour Category 1",
-                current_value: toArray(c.category1 || "None"),
-                values: catsValues,
+                current_value: toCategorySelection(c.category1),
+                sourceColumn: () => c.contourParameter,
+                getCurrentValue: () => toCategorySelection(c.category1),
                 func(x) {
                     // if (x === "None") x = null;
-                    c.category1 = x;
+                    c.category1 = isArray(x) ? [...x] : x;
                 },
             }),
             g({
-                type: "multidropdown",
+                type: "category_selection",
                 label: "Contour Category 2",
-                current_value: toArray(c.category2 || "None"),
-                values: catsValues,
+                current_value: toCategorySelection(c.category2),
+                sourceColumn: () => c.contourParameter,
+                getCurrentValue: () => toCategorySelection(c.category2),
                 func(x) {
                     // if (x === "None") x = null;
-                    c.category2 = x;
+                    c.category2 = isArray(x) ? [...x] : x;
                 },
             }),
             g({
@@ -512,7 +529,6 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, char
                 },
             }),
         ],
-        disposers: [disposer],
     });
 }
 
@@ -591,6 +607,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
  */
 export function useLegacyDualContour(hoveredFieldId?: FieldName | null): ContourLayerProps[] {
     const config = useConfig<DualContourLegacyConfig>();
+    const { category1, category2 } = useContourCategorySelections(config);
     // todo: this is currently short-circuiting for non-viv deck scatter...
     // breaking rule of hooks etc, should be fixed
     const commonProps = {
@@ -611,12 +628,12 @@ export function useLegacyDualContour(hoveredFieldId?: FieldName | null): Contour
     const contour1 = useCategoryContour({
         ...commonProps,
         id: "contour1",
-        category: config.category1,
+        category: category1,
     });
     const contour2 = useCategoryContour({
         ...commonProps,
         id: "contour2",
-        category: config.category2,
+        category: category2,
     });
     const stableArray = useMemo(
         () => [contour1, contour2, ...fieldContours].filter(v => v !== undefined),

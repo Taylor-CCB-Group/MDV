@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
-import { action, makeAutoObservable } from "mobx";
+import { action, autorun, makeAutoObservable, runInAction } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
     Accordion,
@@ -19,7 +19,7 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { isArray, notEmpty } from "@/lib/utils";
+import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
@@ -27,6 +27,7 @@ import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { Clear } from "@mui/icons-material";
 import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
+import { useDataStore } from "../context";
 
 const SettingsSearchContext = createContext("");
 
@@ -162,6 +163,9 @@ const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 // nb this is not the same as `GuiSpec<"dropdown" | "multidropdown">`
 export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
+export type CategorySelectionSpec =
+    | GuiSpec<"category_selection">
+    | GuiSpec<"single_category_selection">;
 // type DropdownSpec = GuiSpec<"dropdown" | "multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
@@ -451,6 +455,128 @@ export const DropdownAutocompleteComponent = observer(({
         </>
     );
 });
+
+function areStringArraysEqual(a: string[], b: string[]) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function isMultiCategorySelection(
+    props: CategorySelectionSpec,
+): props is GuiSpec<"category_selection"> {
+    return props.type === "category_selection";
+}
+
+function normalizeCategorySelectionValue(
+    value: string | string[] | undefined,
+    multiple: boolean,
+) {
+    if (multiple) {
+        return isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    }
+    return typeof value === "string" ? value : "";
+}
+
+function cloneCategorySelectionValue(value: string | string[]) {
+    return isArray(value) ? [...value] : value;
+}
+
+const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
+    const dataStore = useDataStore();
+    const multiple = isMultiCategorySelection(props);
+    const [dropdownSpec] = useState<DropdownSpec>(
+        () =>
+            makeAutoObservable(
+                g({
+                    type: multiple ? "multidropdown" : "dropdown",
+                    label: props.label,
+                    current_value: normalizeCategorySelectionValue(props.current_value, multiple),
+                    values: [[] as string[]],
+                    func: action((value: string | string[]) => {
+                        const nextValue = cloneCategorySelectionValue(value);
+                        dropdownSpec.current_value = nextValue;
+                        props.current_value = nextValue as never;
+                        props.func?.(nextValue as never);
+                    }),
+                }),
+            ) as DropdownSpec,
+    );
+
+    useEffect(() => {
+        return autorun(
+            () => {
+                const sourceColumn = props.sourceColumn?.();
+                const rawSelection = normalizeCategorySelectionValue(
+                    props.getCurrentValue?.() ?? props.current_value,
+                    multiple,
+                );
+                const availableValues =
+                    typeof sourceColumn === "string"
+                        ? (() => {
+                              try {
+                                  return dataStore.getColumnValues(sourceColumn).slice();
+                              } catch (error) {
+                                  console.error(
+                                      `error updating category selection values with '${sourceColumn}' (${error})`,
+                                  );
+                                  return [];
+                              }
+                          })()
+                        : [];
+
+                runInAction(() => {
+                    dropdownSpec.values = [availableValues];
+                });
+
+                if (multiple) {
+                    const currentSelection = Array.isArray(rawSelection) ? rawSelection : [];
+                    const nextValue = currentSelection.filter((value) => availableValues.includes(value));
+                    if (!isArray(dropdownSpec.current_value)) {
+                        throw new Error("expected multidropdown spec for multi category selection");
+                    }
+                    const currentDropdownValue = dropdownSpec.current_value;
+                    const currentPropsValue = props.current_value;
+                    runInAction(() => {
+                        if (!areStringArraysEqual(currentDropdownValue, nextValue)) {
+                            dropdownSpec.current_value = nextValue;
+                        }
+                        if (!isArray(currentPropsValue) || !areStringArraysEqual(currentPropsValue, nextValue)) {
+                            props.current_value = nextValue;
+                        }
+                    });
+                    if (!areStringArraysEqual(currentSelection, nextValue)) {
+                        queueMicrotask(() => {
+                            props.func?.(nextValue);
+                        });
+                    }
+                    return;
+                }
+
+                const currentSelection = typeof rawSelection === "string" ? rawSelection : "";
+                const nextValue = availableValues.includes(currentSelection) ? currentSelection : "";
+                if (isArray(dropdownSpec.current_value)) {
+                    throw new Error("expected dropdown spec for single category selection");
+                }
+                runInAction(() => {
+                    if (dropdownSpec.current_value !== nextValue) {
+                        dropdownSpec.current_value = nextValue;
+                    }
+                    if (isArray(props.current_value) || props.current_value !== nextValue) {
+                        props.current_value = nextValue;
+                    }
+                });
+                if (currentSelection !== nextValue) {
+                    queueMicrotask(() => {
+                        props.func?.(nextValue);
+                    });
+                }
+            },
+        );
+    }, [dataStore, dropdownSpec, multiple, props]);
+
+    return (
+        <DropdownAutocompleteComponent props={dropdownSpec} />
+    );
+});
 // removed unused DropdownComponent...
 
 const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
@@ -647,6 +773,8 @@ const Components: {
     slider: observer(SliderComponent),
     spinner: observer(SpinnerComponent),
     dropdown: DropdownAutocompleteComponent,
+    category_selection: CategorySelectionSettingGui,
+    single_category_selection: CategorySelectionSettingGui,
     // consider having component specifically for column/category selection <<<<
     // the column selection can make use of column groups
     // category selection can have some logic for multitext / tags

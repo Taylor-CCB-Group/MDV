@@ -8,7 +8,6 @@ import {
     type DualContourLegacyConfig,
 } from './contour_state';
 import type { CategoryContourProps } from './contour_state';
-import type BaseChart from '@/charts/BaseChart';
 import type { BaseConfig } from '@/charts/BaseChart';
 import { scatterDefaults } from './scatter_state';
 
@@ -220,16 +219,8 @@ describe('useCategoryContour', () => {
     });
 });
 
-describe('getDensitySettings disposer management', () => {
-    test('getDensitySettings attaches disposer to returned spec', () => {
-        const mockDataStore = {
-            getColumnValues: vi.fn(() => ['cat1', 'cat2', 'cat3']),
-        };
-        
-        const mockChart = {
-            dataStore: mockDataStore,
-        } as unknown as BaseChart<BaseConfig>;
-        
+describe('getDensitySettings category selection wiring', () => {
+    test('builds category selection controls that read from live config state', () => {
         const mockConfig: DualContourLegacyConfig & BaseConfig = {
             ...scatterDefaults,
             id: 'test-chart',
@@ -239,37 +230,30 @@ describe('getDensitySettings disposer management', () => {
             type: 'scatter',
             param: ['x', 'y', 'test-field'],
             contourParameter: 'test-field',
-            category1: [],
-            category2: [],
+            category1: ['cat1'],
+            category2: ['cat2'],
         };
-        
-        const spec = getDensitySettings(mockConfig, mockChart);
-        
-        // Check that _disposers array exists and has one disposer
-        expect(spec._disposers).toBeDefined();
-        expect(Array.isArray(spec._disposers)).toBe(true);
-        expect(spec._disposers).toHaveLength(1);
-        
-        // Check that the disposer is a function (IReactionDisposer)
-        const disposer = spec._disposers?.[0];
-        expect(disposer).toBeDefined();
-        expect(typeof disposer).toBe('function');
-        
-        // Verify the disposer can be called (cleanup)
-        if (disposer) {
-            expect(() => disposer()).not.toThrow();
+
+        const spec = getDensitySettings(mockConfig);
+
+        expect(spec._disposers).toBeUndefined();
+        expect(spec.type).toBe('folder');
+        const categoryFolder = spec.current_value[0];
+        if (categoryFolder.type !== 'folder') {
+            throw new Error('expected category selection folder');
         }
+        const [, category1, category2] = categoryFolder.current_value;
+        if (category1.type !== 'category_selection' || category2.type !== 'category_selection') {
+            throw new Error('expected dedicated category selection specs');
+        }
+
+        expect(category1.getCurrentValue?.()).toEqual(['cat1']);
+        expect(category2.getCurrentValue?.()).toEqual(['cat2']);
+        expect(category1.sourceColumn?.()).toBe('test-field');
+        expect(category2.sourceColumn?.()).toBe('test-field');
     });
-    
-    test('getDensitySettings disposer updates values when contourParameter changes', () => {
-        const mockDataStore = {
-            getColumnValues: vi.fn(() => ['cat1', 'cat2']),
-        };
-        
-        const mockChart = {
-            dataStore: mockDataStore,
-        } as unknown as BaseChart<BaseConfig>;
-        
+
+    test('category selection getters follow source column and category changes', () => {
         const mockConfig: DualContourLegacyConfig & BaseConfig = {
             ...scatterDefaults,
             id: 'test-chart',
@@ -279,28 +263,28 @@ describe('getDensitySettings disposer management', () => {
             type: 'scatter',
             param: ['x', 'y', 'test-field'],
             contourParameter: 'test-field',
-            category1: [],
-            category2: [],
+            category1: ['cat1'],
+            category2: ['cat2'],
         };
-        
-        const spec = getDensitySettings(mockConfig, mockChart);
-        
-        // The autorun should have been set up and called getColumnValues
-        expect(mockDataStore.getColumnValues).toHaveBeenCalledWith('test-field');
-        
-        // Change the contourParameter
-        mockConfig.contourParameter = 'new-field';
-        mockDataStore.getColumnValues.mockReturnValue(['new1', 'new2']);
-        
-        // Trigger the autorun by accessing the observable
-        // (In a real scenario, changing the config would trigger mobx reactivity)
-        // For this test, we're just verifying the disposer is attached
-        
-        // Clean up
-        const disposer = spec._disposers?.[0];
-        if (disposer) {
-            disposer();
+
+        const spec = getDensitySettings(mockConfig);
+        const categoryFolder = spec.current_value[0];
+        if (categoryFolder.type !== 'folder') {
+            throw new Error('expected category selection folder');
         }
+        const [, category1, category2] = categoryFolder.current_value;
+        if (category1.type !== 'category_selection' || category2.type !== 'category_selection') {
+            throw new Error('expected dedicated category selection specs');
+        }
+
+        mockConfig.contourParameter = 'new-field';
+        mockConfig.category1 = ['new1'];
+        mockConfig.category2 = [];
+
+        expect(category1.sourceColumn?.()).toBe('new-field');
+        expect(category2.sourceColumn?.()).toBe('new-field');
+        expect(category1.getCurrentValue?.()).toEqual(['new1']);
+        expect(category2.getCurrentValue?.()).toEqual([]);
     });
 });
 
