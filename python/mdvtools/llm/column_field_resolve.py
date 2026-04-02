@@ -9,12 +9,14 @@ from __future__ import annotations
 import copy
 import logging
 from typing import TYPE_CHECKING, Any
+import re
 
 if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
 
 logger = logging.getLogger(__name__)
 
+_WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)")
 
 def build_name_to_field_map(columns: list[dict]) -> dict[str, str]:
     """
@@ -60,7 +62,7 @@ def resolve_param_string(
     """Map a single param string to canonical field id when needed."""
     if not isinstance(s, str):
         return s
-    if s.startswith("gs|"):
+    if _WRAPPER_RE.match(s):
         return s
     if s in field_set:
         return s

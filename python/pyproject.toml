@@ -127,6 +127,8 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
+    "-m",
+    "not performance",
     "-v",
     "--tb=short",
     "--strict-markers"

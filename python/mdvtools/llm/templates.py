@@ -1,29 +1,30 @@
 from mdvtools.mdvproject import MDVProject
 from typing import Any
 from mdvtools.markdown_utils import create_project_markdown, create_column_markdown
+from mdvtools.llm.datasource_roles import infer_datasource_roles
 prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
 2. Use only the two DataFrames provided:
-   - df1: cells (data_frame_obs)
-   - df2: genes (data_frame_var)
+   - df1: observation/metadata table (e.g. cells)
+   - df2: linked feature table for wrapper-based expression (e.g. rna/protein), containing a feature name column (typically 'name')
 3. Column selection logic:
-   - For non-gene queries: select columns from df1 only. Inspect df1, using df1.columns
-   - For gene-related queries (e.g., expression of a gene, comparison of genes, highest expressing genes):
-       a. Use ONLY gene names from df2["name"] — do NOT use gene IDs or any other columns (e.g., df2["gene_ids"]).
-       b. If a specific gene is mentioned by the user, check if it exists in df2["name"].
+   - For non-expression queries: select columns from df1 only. Inspect df1, using df1.columns
+   - For expression-related queries (e.g., expression of a gene/protein, comparison of features, highest expressing features):
+       a. Use ONLY feature names from df2["name"] — do NOT use other columns unless explicitly instructed.
+       b. If a specific feature is mentioned by the user, check if it exists in df2["name"].
            - If it does not exist, assume the user provided a gene name and that df2["name"] may contain gene IDs instead.
                 - Attempt to match the user-provided gene name to the corresponding gene ID using any available mapping logic (e.g., a lookup function or mapping dictionary).
                 - If a corresponding gene ID is found in df2["name"], return that value.
            - If it exists, return it.
            - If no match is found, ignore the requested gene and instead select one or more gene names from df2["name"].
-       c. If no gene is mentioned, select one or more gene names from df2["name"].
+       c. If no feature is mentioned, select one or more feature names from df2["name"].
        d. Only use values from df2["name"] — do NOT use any other columns from df2.
 4. Always return the list of required columns as a quoted comma-separated string, like:
    - "col1", "col2"
-   - Or for gene-related: "col", "gene_name"   (make sure "col" is from df1) 
-5. For gene-related queries:
-   - Return both df1 columns and the selected gene name (from df2["name"]).
+   - Or for expression-related: "col", "feature_name"   (make sure "col" is from df1) 
+5. For expression-related queries:
+   - Return both df1 columns and the selected feature name (from df2["name"]).
    - Only return the name as a string (e.g., "gene_name")—do not wrap it.
 6. NEVER create new DataFrames or modify existing ones.
 7. Ensure that the selected columns match the visualization requirements:  
@@ -114,6 +115,15 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         context_md = f"## **{datasource_name}:** ({ds_meta['size']} rows)\n\n" + create_column_markdown(ds_meta["columns"])
     except Exception:
         context_md = create_project_markdown(project)
+    roles = infer_datasource_roles(project)
+    expr_lines = ""
+    if roles.expressions:
+        expr_lines = "\n".join(
+            f"- `{e.datasource_name}` (name_column=`{e.name_column}`, default_subgroup=`{e.subgroup_key}`)"
+            for e in roles.expressions
+        )
+    else:
+        expr_lines = "- (none detected)"
     prompt_RAG = (
     """
     Project Data Context:
@@ -138,9 +148,10 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - OTHERWISE (no scanpy or no .h5ad):
             - DO NOT use scanpy.
             - Use the existing MDV datasources already registered in the project:
-                data_frame_obs = project.get_datasource_as_dataframe('cells') if available
-                data_frame_var = project.get_datasource_as_dataframe('genes') if available
-            - If a 'genes' datasource is not available, omit gene-specific logic and charts that require gene wrapping.
+                - Observation/metadata datasource (df1): `"""+roles.obs_datasource+"""`
+                - Wrapper-capable expression datasources (feature tables): 
+"""+expr_lines+"""
+            - Use `project.get_datasource_as_dataframe(<datasource_name>)` to load these tables.
 
     3. Datasource Registration:
         - When modifying an existing project, DO NOT call project.add_datasource(...).
@@ -156,16 +167,23 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - The string """+final_answer+""" guides which columns and chart types to use.
         - **Critical:** For cell-level (obs) columns, each string in `params` must be the datasource **Field ID** exactly as shown in the Project Data Context tables (the **Field ID** column), NOT the display "Column Name" alone. MDV matches charts to data by internal `field` keys; display names may differ from field ids.
         - If you copy from `data_frame_obs.columns`, prefer the MDV field id for that column from the context table when they differ.
-        - For gene expression (if a 'genes' datasource or data_frame_var is available), use this syntax to refer to a gene (not a plain obs field id):
+        - For wrapper-based expression (rows-as-columns), DO NOT treat features as plain obs columns.
+          Use the FieldName wrapper format:
+            `"<subgroup>|<feature>(<subgroup>)|<index>"`
+          where:
+            - `<feature>` comes from the feature table's `name_column` (often `name`)
+            - `<index>` is the row index of that feature in the feature table (0-based)
+            - `<subgroup>` is a subgroup key from the rows-as-columns link (often something like `*_expr`)
+        - Example (wrapper expression):
             ```python
-            param = "GENE_NAME"
-            param_index = data_frame_var['name'].tolist().index(param)
-            f"gs|{{{{param}}}}(gs)|{{{{param_index}}}}"
+            feature = "GENE_OR_PROTEIN_NAME"
+            feature_index = data_frame_var[name_column].tolist().index(feature)
+            wrapper = f"<subgroup>|<feature>(<subgroup>)|<index>"
             ```
 
     6. Gene-Related Queries:
-        - Only perform gene wrapping if you have a usable gene names table (data_frame_var or 'genes' datasource with a 'name' column).
-        - If not available, proceed without gene wrapping and prefer non-gene charts.
+        - Only perform wrapper expression if you have a usable feature table for the modality (e.g. `rna`, `protein`) with its `name_column` and at least one subgroup key.
+        - If none are available, proceed without wrapper expression and prefer non-expression charts.
 
     7. Queries requiring subsetting of the dataset:
         If to answer the question requires a subset of the data or filtering the data, make sure to:
@@ -176,7 +194,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     9. Your Task:
         - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+final_answer+"""
         - Use **field ids** from the Project Data Context (Field ID column) in `params` as appropriate:
-            - Wrap only gene names using the `gs|...` form as shown in section 5.
+            - Wrap only expression feature names using the `<subgroup>|<feature>(<subgroup>)|<index>` form as shown in section 5.
             - For all non-gene columns, use the exact **Field ID** string. Field ids are case sensitive.
         - Use formatted f-strings for all dynamic strings.
         - Generate a valid Python script that creates and visualizes the appropriate chart using the MDVProject framework.

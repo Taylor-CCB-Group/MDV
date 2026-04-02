@@ -36,6 +36,7 @@ from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
 from .column_field_resolve import normalize_view_chart_params
 from .verification import append_verification_textbox, build_verification_summary, parse_datasource_name
+from .datasource_roles import infer_datasource_roles
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
@@ -189,11 +190,18 @@ class ProjectChat(ProjectChatProtocol):
         try:
             # raise ValueError("test error")
             self.df = None
-            # Prepare dataframes for the agent
-            if len(self.project.datasources) >= 2:
-                self.df_list = [self.project.get_datasource_as_dataframe(ds['name']) for ds in self.project.datasources[:2]]
+            # Prepare dataframes for the agent.
+            # ChatMDV historically assumed df1=cells and df2=genes. Many projects instead use
+            # wrapper-capable expression datasources (e.g. rna/protein) linked via rows-as-columns.
+            roles = infer_datasource_roles(self.project)
+            self.roles = roles
+            df1 = self.project.get_datasource_as_dataframe(roles.obs_datasource)
+            primary_expr = roles.preferred_expression()
+            if primary_expr is not None:
+                df2 = self.project.get_datasource_as_dataframe(primary_expr.datasource_name)
+                self.df_list = [df1, df2]
             else:
-                self.df_list = [self.project.get_datasource_as_dataframe(self.project.datasources[0]['name'])]
+                self.df_list = [df1]
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
@@ -270,8 +278,29 @@ class ProjectChat(ProjectChatProtocol):
         contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
 
         # Step 3: Define the Agent Prompt
+        role_hint = ""
+        try:
+            roles = getattr(self, "roles", None)
+            if roles is not None:
+                exprs = roles.expressions or []
+                if exprs:
+                    expr_lines = "\n".join(
+                        f"- df2 maps to expression datasource '{exprs[0].datasource_name}' "
+                        f"(feature names in column '{exprs[0].name_column}', default subgroup '{exprs[0].subgroup_key}')"
+                    )
+                else:
+                    expr_lines = "- No rows-as-columns expression datasource detected for this project."
+                role_hint = (
+                    "\n\nDatasource roles:\n"
+                    f"- df1 maps to obs datasource '{roles.obs_datasource}'\n"
+                    f"{expr_lines}\n"
+                )
+        except Exception:
+            role_hint = ""
+
         prompt_data_template = f"""You have access to the following Pandas DataFrames: 
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
+        {role_hint}
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
         Use these to correct the column names mentioned by the user.
         You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.

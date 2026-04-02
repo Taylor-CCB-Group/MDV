@@ -52,7 +52,7 @@ def test_resolve_param_string_name_to_field():
 def test_resolve_param_string_gs_passthrough():
     fs = set()
     nm = {}
-    g = "gs|TP53(gs)|12"
+    g = "rna_expr|TP53(rna_expr)|12"
     assert resolve_param_string(g, fs, nm) == g
 
 

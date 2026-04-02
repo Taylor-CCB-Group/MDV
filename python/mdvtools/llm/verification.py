@@ -14,8 +14,10 @@ from mdvtools.charts.text_box_plot import TextBox
 if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
 
-# Gene expression columns use this wrapper in generated code (see templates / RAG examples)
-_GS_WRAPPER_RE = re.compile(r"gs\|([^|(]+)\(gs\)\|\s*(\d+)")
+# Wrapper-based expression columns use this FieldName format:
+#   "<subgroup>|<feature>(<subgroup>)|<index>"
+# where subgroup is a rows-as-columns subgroup key.
+_WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)")
 # Chart classes commonly instantiated in chat-generated scripts
 _CHART_CLASS_RE = re.compile(
     r"\b(DotPlot|ScatterPlot|HeatmapPlot|HistogramPlot|BoxPlot|ViolinPlot|"
@@ -109,18 +111,17 @@ def _format_param_value(project: Any, datasource_name: str, token: Any) -> str:
 
     - Plain tokens are treated as datasource `field` ids, resolved through
       `project.get_column_metadata(datasource_name, field)`.
-    - `gs|...` tokens are gene wrappers from generated code; show gene label.
+    - Wrapper tokens in the form `<subgroup>|<feature>(<subgroup>)|<index>` are linked-expression features.
     """
     if not isinstance(token, str):
         return str(token)
 
     s = token.strip()
-    if s.startswith("gs|"):
-        m = _GS_WRAPPER_RE.match(s)
-        if m:
-            gene = m.group(1).strip()
-            return f"Gene expression: `{gene}`"
-        return f"Gene expression: `{s}`"
+    m = _WRAPPER_RE.match(s)
+    if m:
+        subgroup = m.group(1).strip()
+        feature = m.group(2).strip()
+        return f"Expression feature: `{feature}` (subgroup `{subgroup}`)"
 
     try:
         col = project.get_column_metadata(datasource_name, s)
@@ -262,12 +263,12 @@ def build_verification_summary(
         lines.append("")
         lines.append(charts_md.rstrip())
 
-    gs_matches = list(_GS_WRAPPER_RE.finditer(final_code))
-    gene_tokens = [m.group(1).strip() for m in gs_matches]
+    w_matches = list(_WRAPPER_RE.finditer(final_code))
+    gene_tokens = [m.group(2).strip() for m in w_matches]
 
-    if gs_matches:
+    if w_matches:
         lines.append("")
-        lines.append("### Gene expression parameters")
+        lines.append("### Wrapper expression parameters")
         for tok in gene_tokens:
             kind = (
                 "Ensembl-style ID (heuristic)"
@@ -278,7 +279,7 @@ def build_verification_summary(
     else:
         lines.append("")
         lines.append(
-            "- **Gene expression:** not used in this view (no `gs|…(gs)|…` parameters in generated code)."
+            "- **Wrapper expression:** not used in this view (no `<subgroup>|…(<subgroup>)|…` parameters detected)."
         )
         if _has_genes_table(project) and not gene_tokens:
             lines.append(

@@ -162,14 +162,14 @@ def test_format_charts_gene_wrapper_renders_gene_label():
                 {
                     "title": "G1",
                     "type": "wgl_scatter_plot",
-                    "param": ["gs|TP53(gs)|12", "y_field"],
+                    "param": ["rna_expr|TP53(rna_expr)|12", "y_field"],
                 }
             ]
         }
     }
     proj = FakeProject(view=view, column_names={"y_field": "Y"})
     md, _ = format_charts_from_saved_view(proj, proj.get_view("v1"))
-    assert "- X: Gene expression: `TP53`" in md
+    assert "- X: Expression feature: `TP53` (subgroup `rna_expr`)" in md
     assert "- Y: `y_field` (Y)" in md
 
 
