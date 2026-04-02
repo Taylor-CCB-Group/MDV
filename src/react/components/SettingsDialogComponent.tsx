@@ -563,10 +563,14 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     const isSearchActive = searchTerm.trim().length > 0;
     // When the dialog first opens (and search is empty), expand "General" so the user sees settings immediately.
     const [isOpen, setIsOpen] = useState(() => props.label === "General");
-    // add uuid to each setting to avoid key collisions
+    // Derive stable keys so nested items are not remounted on each render.
     const settings = useMemo(
-        () => props.current_value.map((setting) => ({ setting, id: uuid() })),
-        [props.current_value],
+        () =>
+            props.current_value.map((setting, index) => ({
+                setting,
+                id: `${props.label}:${setting.type}:${setting.label}:${index}`,
+            })),
+        [props.current_value, props.label],
     );
     if (settings.length === 0) return null;
     return (
@@ -734,7 +738,7 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
                             fullWidth
                             size="small"
                             variant="outlined"
-                            placeholder="Search settings by name"
+                            label="Search Settings by Folder or Name"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             sx={{ backgroundColor: "transparent" }}
@@ -742,7 +746,7 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
                                 input: {
                                     endAdornment: searchTerm.trim().length > 0 ? (
                                         <InputAdornment position="end">
-                                            <IconButton onClick={() => setSearchTerm("")}>
+                                            <IconButton aria-label="clear search" onClick={() => setSearchTerm("")}>
                                                 <Clear />
                                             </IconButton>
                                         </InputAdornment>
