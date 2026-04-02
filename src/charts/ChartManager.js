@@ -1118,8 +1118,14 @@ export class ChartManager {
             removed: [],
             colors_changed: [],
         };
+        // Although, removed columns are deleted from the dirtyColumns in DataStore
+        // If a stale entry is still present, some checks are added to skip them
         for (const c in dc.added) {
             const td = getMd(c);
+            // Skip stale entries
+            if (!td) {
+                continue;
+            }
             rv.columns.push(td);
             rv.added.push(c);
         }
@@ -1130,14 +1136,23 @@ export class ChartManager {
         for (const c in dc.data_changed) {
             if (!rv.columns[c]) {
                 const td = getMd(c);
+                // Skip stale entries
+                if (!td) {
+                    continue;
+                }
                 rv.columns.push(td);
             }
         }
 
         for (const cc in dc.colors_changed) {
+            const column = dataStore.columnIndex[cc];
+            // Skip if the removed column is still present
+            if (!column) {
+                continue;
+            }
             rv.colors_changed.push({
                 column: cc,
-                colors: dataStore.columnIndex[cc].colors,
+                colors: column.colors,
             });
         }
 
@@ -1145,6 +1160,10 @@ export class ChartManager {
 
         function getMd(c) {
             const cl = dataStore.columnIndex[c];
+            // Skip stale entries if present
+            if (!cl) {
+                return null;
+            }
             const md = {
                 values: cl.values,
                 datatype: cl.datatype,
@@ -1155,9 +1174,15 @@ export class ChartManager {
             };
             const numRows = dataStore.size;
             
-            // Add stringLength to metadata for unique and multitext columns if stringLength property exists
-            if ((cl.datatype === "unique" || cl.datatype === "multitext") && cl.stringLength) {
+            // Add datatype-specific metadata required to reconstruct client-created columns on reload.
+            if (
+                (cl.datatype === "unique" || cl.datatype === "multitext") &&
+                cl.stringLength
+            ) {
                 md.stringLength = cl.stringLength;
+            }
+            if (cl.datatype === "multitext" && cl.delimiter) {
+                md.delimiter = cl.delimiter;
             }
             
             let arr;
@@ -1186,7 +1211,8 @@ export class ChartManager {
                     }
 
                     const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
-                    const decoded = textDecoder.decode(rowBytes);
+                    // TextDecoder cannot decode a SharedArrayBuffer-backed view in some browsers.
+                    const decoded = textDecoder.decode(Uint8Array.from(rowBytes));
                     // Remove null padding characters
                     arr[i] = decoded.replace(/\0+$/, "");
                 }

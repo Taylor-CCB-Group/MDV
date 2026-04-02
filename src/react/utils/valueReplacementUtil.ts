@@ -56,7 +56,7 @@ const getOrAddValueIndex = (replaceValue: string, values: string[], maxValues: n
  * @returns Cell value of the column in the table
  * @throws Error if column data is invalid or missing
  */
-const getCurrentCellValue = (column: LoadedDataColumn<DataType>, dataIndex: number): string => {
+export const getCellValueAsString = (column: LoadedDataColumn<DataType>, dataIndex: number): string => {
     if (!column.data) {
         throw new Error(`No data found in column: ${column.field}`);
     }
@@ -271,7 +271,7 @@ export const replaceMatches = (
 
     let currentValue: string;
     try {
-        currentValue = getCurrentCellValue(column, dataIndex);
+        currentValue = getCellValueAsString(column, dataIndex);
     } catch (error) {
         console.error(`Failed to get current cell value in column "${searchColumn}": ${error instanceof Error ? error.message : String(error)}`);
         throw new Error(

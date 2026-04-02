@@ -464,6 +464,10 @@ class DataStore {
             ...column, //may be useful to get any other properties we didn't explicitly copy before.
             getValue: (index) => {
                 const col = this.columnIndex[column.field];
+                // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
+                if (!col) {
+                    return "";
+                }
                 if (!col.data) {
                     console.error(`Column ${column.field} has no data`);
                     return;
@@ -520,6 +524,9 @@ class DataStore {
         if (data) {
             this.setColumnData(column.field, data);
         }
+        // Delete column from dirtyColumns.removed if it exists (this could happen when a column is removed and the state is not saved)
+        // This avoids the new column from getting deleted
+        delete this.dirtyColumns.removed[c.field];
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
         }
@@ -1885,6 +1892,25 @@ class DataStore {
 
     removeColumn(column, dirty = false, notify = false) {
         const c = this.columnIndex[column];
+        // Delete the column from entries of dirtyColumns
+        delete this.dirtyColumns.data_changed[column];
+        delete this.dirtyColumns.colors_changed[column];
+        // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
+        if (!c) {
+            // If column is marked dirty, then remove it from the dirtyColumns
+            if (dirty) {
+                if (this.dirtyColumns.added[column]) {
+                    delete this.dirtyColumns.added[column];
+                } else {
+                    this.dirtyColumns.removed[column] = true;
+                }
+            }
+            // Notify that column is removed if notify is true
+            if (notify) {
+                this._callListeners("column_removed", column);
+            }
+            return;
+        }
         c.data = null;
         c.buffer = null;
         this.columns = this.columns.filter((c) => c.field !== column);
