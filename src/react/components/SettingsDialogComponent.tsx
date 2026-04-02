@@ -163,7 +163,9 @@ const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 // nb this is not the same as `GuiSpec<"dropdown" | "multidropdown">`
 export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
-export type CategorySelectionSpec = GuiSpec<"category_selection">;
+export type CategorySelectionSpec =
+    | GuiSpec<"category_selection">
+    | GuiSpec<"single_category_selection">;
 // type DropdownSpec = GuiSpec<"dropdown" | "multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
@@ -458,29 +460,50 @@ function areStringArraysEqual(a: string[], b: string[]) {
     return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
+function isMultiCategorySelection(
+    props: CategorySelectionSpec,
+): props is GuiSpec<"category_selection"> {
+    return props.type === "category_selection";
+}
+
+function normalizeCategorySelectionValue(
+    value: string | string[] | undefined,
+    multiple: boolean,
+) {
+    if (multiple) {
+        return isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    }
+    return typeof value === "string" ? value : "";
+}
+
 const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
     const dataStore = useDataStore();
-    const [dropdownSpec] = useState(() =>
-        makeAutoObservable(
-            g({
-                type: "multidropdown",
-                label: props.label,
-                current_value: props.current_value,
-                values: [[] as string[]],
-                func: action((value: string[]) => {
-                    dropdownSpec.current_value = value;
-                    props.current_value = value;
-                    props.func?.(value);
+    const multiple = isMultiCategorySelection(props);
+    const [dropdownSpec] = useState<DropdownSpec>(
+        () =>
+            makeAutoObservable(
+                g({
+                    type: multiple ? "multidropdown" : "dropdown",
+                    label: props.label,
+                    current_value: normalizeCategorySelectionValue(props.current_value, multiple),
+                    values: [[] as string[]],
+                    func: action((value: string | string[]) => {
+                        dropdownSpec.current_value = value;
+                        props.current_value = value as never;
+                        props.func?.(value as never);
+                    }),
                 }),
-            }),
-        ),
+            ) as DropdownSpec,
     );
 
     useEffect(() => {
         return autorun(
             () => {
                 const sourceColumn = props.sourceColumn?.();
-                const rawSelection = props.getCurrentValue?.() ?? props.current_value;
+                const rawSelection = normalizeCategorySelectionValue(
+                    props.getCurrentValue?.() ?? props.current_value,
+                    multiple,
+                );
                 const availableValues =
                     typeof sourceColumn === "string"
                         ? (() => {
@@ -497,19 +520,41 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
 
                 dropdownSpec.values = [availableValues];
 
-                const nextValue = rawSelection.filter((value) => availableValues.includes(value));
-                if (!areStringArraysEqual(dropdownSpec.current_value, nextValue)) {
+                if (multiple) {
+                    const currentSelection = Array.isArray(rawSelection) ? rawSelection : [];
+                    const nextValue = currentSelection.filter((value) => availableValues.includes(value));
+                    if (!isArray(dropdownSpec.current_value)) {
+                        throw new Error("expected multidropdown spec for multi category selection");
+                    }
+                    if (!areStringArraysEqual(dropdownSpec.current_value, nextValue)) {
+                        dropdownSpec.current_value = nextValue;
+                    }
+                    if (!isArray(props.current_value) || !areStringArraysEqual(props.current_value, nextValue)) {
+                        props.current_value = nextValue;
+                    }
+                    if (!areStringArraysEqual(currentSelection, nextValue)) {
+                        props.func?.(nextValue);
+                    }
+                    return;
+                }
+
+                const currentSelection = typeof rawSelection === "string" ? rawSelection : "";
+                const nextValue = availableValues.includes(currentSelection) ? currentSelection : "";
+                if (isArray(dropdownSpec.current_value)) {
+                    throw new Error("expected dropdown spec for single category selection");
+                }
+                if (dropdownSpec.current_value !== nextValue) {
                     dropdownSpec.current_value = nextValue;
                 }
-                if (!areStringArraysEqual(props.current_value, nextValue)) {
+                if (isArray(props.current_value) || props.current_value !== nextValue) {
                     props.current_value = nextValue;
                 }
-                if (!areStringArraysEqual(rawSelection, nextValue)) {
+                if (currentSelection !== nextValue) {
                     props.func?.(nextValue);
                 }
             },
         );
-    }, [dataStore, dropdownSpec, props]);
+    }, [dataStore, dropdownSpec, multiple, props]);
 
     return (
         <DropdownAutocompleteComponent props={dropdownSpec} />
@@ -712,6 +757,7 @@ const Components: {
     spinner: observer(SpinnerComponent),
     dropdown: DropdownAutocompleteComponent,
     category_selection: CategorySelectionSettingGui,
+    single_category_selection: CategorySelectionSettingGui,
     // consider having component specifically for column/category selection <<<<
     // the column selection can make use of column groups
     // category selection can have some logic for multitext / tags
