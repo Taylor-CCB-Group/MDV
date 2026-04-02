@@ -96,7 +96,7 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
     }
 
     if (includeDensitySettings && chart) {
-        settings.push(getDensitySettings(config, chart));
+        settings.push(getDensitySettings(config));
     }
 
     return settings;

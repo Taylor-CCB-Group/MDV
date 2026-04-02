@@ -20,7 +20,6 @@ import { useDataStore } from "./context";
 import { useViewState } from "./deck_state";
 import { g, isArray } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
-import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getFieldColor } from "./fieldColorManager";
 import type { FieldLegendItem } from "./components/FieldContourLegend";
@@ -422,8 +421,7 @@ function toCategorySelection(value: string | string[] | undefined) {
     return typeof value === "string" ? [value] : [];
 }
 
-export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
-    void chart;
+export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
     return getDensityVisualisationFolder(c, {
         categorySelectionControls: [
             //maybe 2-spaces format is better...

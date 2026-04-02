@@ -8,7 +8,6 @@ import {
     type DualContourLegacyConfig,
 } from './contour_state';
 import type { CategoryContourProps } from './contour_state';
-import type BaseChart from '@/charts/BaseChart';
 import type { BaseConfig } from '@/charts/BaseChart';
 import { scatterDefaults } from './scatter_state';
 
@@ -221,12 +220,6 @@ describe('useCategoryContour', () => {
 });
 
 describe('getDensitySettings category selection wiring', () => {
-    const mockChart = {
-        dataStore: {
-            getColumnValues: vi.fn(),
-        },
-    } as unknown as BaseChart<BaseConfig>;
-
     test('builds category selection controls that read from live config state', () => {
         const mockConfig: DualContourLegacyConfig & BaseConfig = {
             ...scatterDefaults,
@@ -241,7 +234,7 @@ describe('getDensitySettings category selection wiring', () => {
             category2: ['cat2'],
         };
 
-        const spec = getDensitySettings(mockConfig, mockChart);
+        const spec = getDensitySettings(mockConfig);
 
         expect(spec._disposers).toBeUndefined();
         expect(spec.type).toBe('folder');
@@ -274,7 +267,7 @@ describe('getDensitySettings category selection wiring', () => {
             category2: ['cat2'],
         };
 
-        const spec = getDensitySettings(mockConfig, mockChart);
+        const spec = getDensitySettings(mockConfig);
         const categoryFolder = spec.current_value[0];
         if (categoryFolder.type !== 'folder') {
             throw new Error('expected category selection folder');
