@@ -473,7 +473,7 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
                 //^^ maybe get Furquan to work on this.
                 label: "Contour parameter",
                 current_value: c.contourParameter || "",
-                columnType: "text",
+                columnType: ["text", "text16", "multitext"],
                 func: (x) => {
                     if (x === c.contourParameter) return;
                     if (!isArray(c.param)) throw "expected param array";

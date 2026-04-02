@@ -242,11 +242,15 @@ describe('getDensitySettings category selection wiring', () => {
         if (categoryFolder.type !== 'folder') {
             throw new Error('expected category selection folder');
         }
-        const [, category1, category2] = categoryFolder.current_value;
+        const [contourParameter, category1, category2] = categoryFolder.current_value;
+        if (contourParameter.type !== 'column') {
+            throw new Error('expected contour parameter column selector');
+        }
         if (category1.type !== 'category_selection' || category2.type !== 'category_selection') {
             throw new Error('expected dedicated category selection specs');
         }
 
+        expect(contourParameter.columnType).toEqual(['text', 'text16', 'multitext']);
         expect(category1.getCurrentValue?.()).toEqual(['cat1']);
         expect(category2.getCurrentValue?.()).toEqual(['cat2']);
         expect(category1.sourceColumn?.()).toBe('test-field');
