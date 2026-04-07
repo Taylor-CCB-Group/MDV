@@ -77,18 +77,13 @@ function getOrAddValueIndex(value: string, column: TagColumn) {
     return index;
 }
 
-function clearRow(column: TagColumn, rowIndex: number) {
-    const capacity = getMultitextCapacity(column);
-    const baseIndex = rowIndex * capacity;
-    for (let offset = 0; offset < capacity; offset += 1) {
-        column.data[baseIndex + offset] = MULTITEXT_EMPTY_INDEX;
-    }
-}
+type RowWritePlan =
+    | { kind: "packed"; itemsToWrite: string[] }
+    | { kind: "legacy"; encodedValue: string };
 
-function writeRowItems(column: TagColumn, rowIndex: number, items: string[]) {
+function computeRowWritePlan(column: TagColumn, items: string[]): RowWritePlan {
     const normalizedItems = normalizeMultitextItems(items);
     const capacity = getMultitextCapacity(column);
-    const baseIndex = rowIndex * capacity;
 
     if (isPackedMultitextColumn(column)) {
         const emptyItem = getEmptyItem(column);
@@ -103,11 +98,7 @@ function writeRowItems(column: TagColumn, rowIndex: number, items: string[]) {
             );
         }
 
-        clearRow(column, rowIndex);
-        itemsToWrite.forEach((item, offset) => {
-            column.data[baseIndex + offset] = getOrAddValueIndex(item, column);
-        });
-        return;
+        return { kind: "packed", itemsToWrite };
     }
 
     const encodedValue =
@@ -115,9 +106,118 @@ function writeRowItems(column: TagColumn, rowIndex: number, items: string[]) {
             ? ""
             : joinMultitextItems(normalizedItems, getMultitextDelimiter(column));
 
+    return { kind: "legacy", encodedValue };
+}
+
+function valueStringsFromRowWritePlan(plan: RowWritePlan): string[] {
+    if (plan.kind === "packed") {
+        return plan.itemsToWrite;
+    }
+    return plan.encodedValue === "" ? [] : [plan.encodedValue];
+}
+
+/**
+ * Ensures the column dictionary can accept every distinct new string in one shot.
+ * Call before mutating row buffers or column.values so failures cannot leave partial writes.
+ */
+function assertCanAddNewMultitextValues(
+    column: TagColumn,
+    valueStrings: readonly string[],
+): void {
+    const distinctNew = new Set<string>();
+    for (const v of valueStrings) {
+        if (column.values.indexOf(v) === -1) {
+            distinctNew.add(v);
+        }
+    }
+    if (column.values.length + distinctNew.size > MAX_MULTITEXT_VALUES) {
+        throw new Error(
+            `multitext column '${column.name}' exceeded ${MAX_MULTITEXT_VALUES} values`,
+        );
+    }
+}
+
+function collectPreflightValueStringsForUpdate(
+    tagToChange: string,
+    column: TagColumn,
+    rowIndices: Iterable<number>,
+    tagValue: boolean,
+    rowState?: Map<number, string[]>,
+): string[] {
+    const tags = splitMultitextItems(
+        tagToChange,
+        getMultitextDelimiter(column),
+    );
+
+    if (tags.length > 1) {
+        const acc: string[] = [];
+        const sim = rowState ?? new Map<number, string[]>();
+        for (const tag of tags) {
+            acc.push(
+                ...collectPreflightValueStringsForUpdate(
+                    tag,
+                    column,
+                    rowIndices,
+                    tagValue,
+                    sim,
+                ),
+            );
+        }
+        return acc;
+    }
+
+    const tag = tags[0]?.trim() || tagToChange.trim();
+    if (!tag || tag === getEmptyItem(column)) {
+        return [];
+    }
+
+    const pending: string[] = [];
+    const sim = rowState ?? new Map<number, string[]>();
+    for (const rowIndex of rowIndices) {
+        const currentItems =
+            sim.get(rowIndex) ?? getSemanticRowItems(column, rowIndex);
+        const hasTag = currentItems.includes(tag);
+        if (tagValue ? hasTag : !hasTag) {
+            continue;
+        }
+
+        const nextItems = tagValue
+            ? [...currentItems, tag]
+            : currentItems.filter((item) => item !== tag);
+        sim.set(rowIndex, nextItems);
+        pending.push(
+            ...valueStringsFromRowWritePlan(
+                computeRowWritePlan(column, nextItems),
+            ),
+        );
+    }
+    return pending;
+}
+
+function clearRow(column: TagColumn, rowIndex: number) {
+    const capacity = getMultitextCapacity(column);
+    const baseIndex = rowIndex * capacity;
+    for (let offset = 0; offset < capacity; offset += 1) {
+        column.data[baseIndex + offset] = MULTITEXT_EMPTY_INDEX;
+    }
+}
+
+function writeRowItems(column: TagColumn, rowIndex: number, items: string[]) {
+    const plan = computeRowWritePlan(column, items);
+    assertCanAddNewMultitextValues(column, valueStringsFromRowWritePlan(plan));
+
+    const capacity = getMultitextCapacity(column);
+    const baseIndex = rowIndex * capacity;
+
     clearRow(column, rowIndex);
-    if (encodedValue !== "") {
-        column.data[baseIndex] = getOrAddValueIndex(encodedValue, column);
+    if (plan.kind === "packed") {
+        plan.itemsToWrite.forEach((item, offset) => {
+            column.data[baseIndex + offset] = getOrAddValueIndex(item, column);
+        });
+        return;
+    }
+    if (plan.encodedValue !== "") {
+        column.data[baseIndex] = getOrAddValueIndex(plan.encodedValue, column);
     }
 }
 
@@ -132,6 +232,16 @@ function updateSelectedRows(
     const tags = splitMultitextItems(
         tagToChange,
         getMultitextDelimiter(column),
+    );
+
+    assertCanAddNewMultitextValues(
+        column,
+        collectPreflightValueStringsForUpdate(
+            tagToChange,
+            column,
+            rowIndices,
+            tagValue,
+        ),
     );
 
     if (tags.length > 1) {
