@@ -38,6 +38,13 @@ function getSemanticColumnItems(column: TagColumn) {
     });
 }
 
+function getQueryTags(column: TagColumn, tag: string) {
+    return splitMultitextItems(tag, getMultitextDelimiter(column))
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .filter((item) => item !== getEmptyItem(column));
+}
+
 function getOrAddValueIndex(value: string, column: TagColumn) {
     let index = column.values.indexOf(value);
     if (index !== -1) {
@@ -163,7 +170,7 @@ export default class TagModel {
     readonly dataModel: DataModel;
     isReady = false;
     private listeners: (() => void)[] = [];
-    private selectionScope: TagSelectionScope;
+    private readonly selectionScope: TagSelectionScope;
     private readonly listenerId: string;
 
     private constructor(
@@ -174,18 +181,6 @@ export default class TagModel {
         this.dataStore = dataStore;
         this.selectionScope = selectionScope;
         this.listenerId = `tag-model-${columnName}-${Math.random().toString(36).slice(2)}`;
-        this.dataModel = new DataModel(dataStore, { autoupdate: true });
-        this.dataModel.updateModel();
-        this.dataModel.addListener("tag", () => {
-            if (this.selectionScope === "filtered") {
-                this.callListeners();
-            }
-        });
-        this.dataStore.addListener(this.listenerId, (type) => {
-            if (type === "data_highlighted" && this.selectionScope === "highlighted") {
-                this.callListeners();
-            }
-        });
 
         const column = dataStore.columnIndex[columnName];
         if (!column) {
@@ -207,8 +202,24 @@ export default class TagModel {
             this.tagColumn = dataStore.columnIndex[columnName] as TagColumn;
             this.isReady = true;
         } else {
+            if (isColumnOfType(column, COL_TYPE) && column.editable === false) {
+                throw new Error(`column '${columnName}' is not editable`);
+            }
             this.tagColumn = column as TagColumn;
         }
+
+        this.dataModel = new DataModel(dataStore, { autoupdate: true });
+        this.dataModel.updateModel();
+        this.dataModel.addListener("tag", () => {
+            if (this.selectionScope === "filtered") {
+                this.callListeners();
+            }
+        });
+        this.dataStore.addListener(this.listenerId, (type) => {
+            if (type === "data_highlighted" && this.selectionScope === "highlighted") {
+                this.callListeners();
+            }
+        });
     }
 
     static async create(
@@ -228,6 +239,9 @@ export default class TagModel {
             if (!isColumnLoaded(column)) {
                 throw new Error("expected column to be loaded");
             }
+            if (column.editable === false) {
+                throw new Error(`column '${columnName}' is not editable`);
+            }
             model.tagColumn = column;
             model.isReady = true;
             model.callListeners();
@@ -241,18 +255,6 @@ export default class TagModel {
             return this.dataStore.getHighlightedData()?.slice() || [];
         }
         return this.dataModel.data;
-    }
-
-    getSelectionScope() {
-        return this.selectionScope;
-    }
-
-    setSelectionScope(scope: TagSelectionScope) {
-        if (scope === this.selectionScope) {
-            return;
-        }
-        this.selectionScope = scope;
-        this.callListeners();
     }
 
     getSelectionLength() {
@@ -273,6 +275,11 @@ export default class TagModel {
         if (index !== -1) {
             this.listeners.splice(index, 1);
         }
+    }
+
+    dispose() {
+        this.dataStore.removeListener(this.listenerId);
+        this.listeners = [];
     }
 
     setTag(tag: string, tagValue = true) {
@@ -316,5 +323,17 @@ export default class TagModel {
             );
         }
         return tags;
+    }
+
+    getMatchingRowIndices(tag: string) {
+        const queryTags = getQueryTags(this.tagColumn, tag);
+        if (queryTags.length === 0) {
+            return [];
+        }
+
+        return Array.from(this.getSelectedRowIndices()).filter((rowIndex) => {
+            const rowItems = getSemanticRowItems(this.tagColumn, rowIndex);
+            return queryTags.every((queryTag) => rowItems.includes(queryTag));
+        });
     }
 }

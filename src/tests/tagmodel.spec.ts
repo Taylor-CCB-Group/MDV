@@ -242,4 +242,60 @@ describe("TagModel", () => {
         expect(listener).toHaveBeenCalled();
         expect(tagModel.getTagsInSelection()).toEqual(new Set(["a"]));
     });
+
+    test("matches multitext rows by individual tag item within the active scope", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a", "b", "a; b", "c"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0, 2, 1, 3]),
+            buffer: new SharedArrayBuffer(8),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 4);
+        const dataModel = createMockDataModel([0, 1, 2, 3]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const filteredTagModel = await TagModel.create(dataStore as never, "__tags");
+        const highlightedTagModel = await TagModel.create(
+            dataStore as never,
+            "__tags",
+            "highlighted",
+        );
+        dataStore.highightedData = [1, 3];
+
+        expect(filteredTagModel.getMatchingRowIndices("b")).toEqual([1, 2]);
+        expect(highlightedTagModel.getMatchingRowIndices("b")).toEqual([1]);
+    });
+
+    test("rejects read-only multitext columns", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            editable: false,
+            values: ["a"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0]),
+            buffer: new SharedArrayBuffer(2),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 1);
+        const dataModel = createMockDataModel([0]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        await expect(TagModel.create(dataStore as never)).rejects.toThrow(
+            "column '__tags' is not editable",
+        );
+    });
 });

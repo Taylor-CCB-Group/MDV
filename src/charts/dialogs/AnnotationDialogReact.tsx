@@ -1,9 +1,15 @@
-import { type PropsWithChildren, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent, type PropsWithChildren } from "react";
 import type DataStore from "../../datastore/DataStore.js";
 import TagModel, { type TagSelectionScope } from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createMdvPortal } from "@/react/react_utils";
 import { observer } from "mobx-react-lite";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
     Autocomplete,
     Box,
@@ -11,55 +17,141 @@ import {
     Checkbox,
     Chip,
     Divider,
-    FormControl,
-    FormControlLabel,
     Paper,
-    Radio,
-    RadioGroup,
     Stack,
     TextField,
     Typography,
 } from "@mui/material";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import TabHeader from "@/react/components/TabHeader";
+import { getNextHighlightedRows } from "@/react/selectionHooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
+const SCOPE_TABS = ["Filtered", "Highlighted"] as const;
 
-function TagView({
-    dataStore,
-    columnName,
-    selectionScope,
-}: {
-    dataStore: DataStore;
-    columnName: string;
-    selectionScope: TagSelectionScope;
-}) {
+type ScopeTab = (typeof SCOPE_TABS)[number];
+type AnnotationColumnChoiceState = "empty" | "ok" | "clash" | "readonly";
+type TagModelSnapshot = {
+    tagList: Set<string>;
+    tagsInSelection: Set<string>;
+    selectionCount: number;
+};
+
+function isEditableAnnotationColumn(column: { datatype?: string; editable?: boolean } | undefined) {
+    return column?.datatype === "multitext" && column.editable !== false;
+}
+
+export function getEditableAnnotationColumnNames(
+    columns: Array<{ datatype?: string; editable?: boolean; field?: string; name?: string }>,
+) {
+    return columns
+        .filter(isEditableAnnotationColumn)
+        .map((column) => column.field || column.name || "")
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right));
+}
+
+export function getAnnotationColumnChoiceState(
+    dataStore: DataStore,
+    rawValue: string,
+): AnnotationColumnChoiceState {
+    const nextValue = rawValue.trim();
+    if (!nextValue) {
+        return "empty";
+    }
+
+    const existingColumn = dataStore.columnIndex[nextValue];
+    if (!existingColumn) {
+        return "ok";
+    }
+
+    if (existingColumn.datatype !== "multitext") {
+        return "clash";
+    }
+
+    return existingColumn.editable === false ? "readonly" : "ok";
+}
+
+function getDefaultAnnotationColumn(dataStore: DataStore) {
+    const editableColumnNames = getEditableAnnotationColumnNames(dataStore.columns);
+    if (editableColumnNames.includes("__tags")) {
+        return "__tags";
+    }
+    return editableColumnNames[0] || "";
+}
+
+function getSelectionScope(tab: ScopeTab): TagSelectionScope {
+    return tab === "Highlighted" ? "highlighted" : "filtered";
+}
+
+function getChoiceStateHelperText(choiceState: AnnotationColumnChoiceState) {
+    if (choiceState === "clash") {
+        return "A non-multitext column already uses that name.";
+    }
+    if (choiceState === "readonly") {
+        return "That multitext column is read-only and can't be edited here.";
+    }
+    if (choiceState === "empty") {
+        return "Enter a column name to select or create an editable annotation column.";
+    }
+    return "Names become new editable multitext annotation columns when needed.";
+}
+
+function getTagModelSnapshot(model: TagModel): TagModelSnapshot {
+    return {
+        tagList: model.getTags(),
+        tagsInSelection: model.getTagsInSelection(),
+        selectionCount: model.getSelectionLength(),
+    };
+}
+
+function useTagModelState(
+    dataStore: DataStore,
+    columnName: string,
+    selectionScope: TagSelectionScope,
+) {
     const [tagModel, setTagModel] = useState<TagModel | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [tagList, setTagList] = useState<Set<string>>(new Set());
-    const [tagsInSelection, setTagsInSelection] = useState<Set<string>>(new Set());
-    const [draftTag, setDraftTag] = useState("");
-    const [selectionCount, setSelectionCount] = useState(0);
+    const [snapshot, setSnapshot] = useState<TagModelSnapshot>({
+        tagList: new Set(),
+        tagsInSelection: new Set(),
+        selectionCount: 0,
+    });
 
     useEffect(() => {
         let cancelled = false;
-
-        const syncFromModel = (model: TagModel) => {
-            setTagList(model.getTags());
-            setTagsInSelection(model.getTagsInSelection());
-            setSelectionCount(model.getSelectionLength());
-        };
+        let activeModel: TagModel | null = null;
+        let listener: (() => void) | null = null;
 
         setTagModel(null);
         setLoadError(null);
+        setSnapshot({
+            tagList: new Set(),
+            tagsInSelection: new Set(),
+            selectionCount: 0,
+        });
+
+        if (!columnName) {
+            return;
+        }
+
         TagModel.create(dataStore, columnName, selectionScope)
             .then((model) => {
                 if (cancelled) {
+                    model.dispose();
                     return;
                 }
+
+                activeModel = model;
+                listener = () => {
+                    setSnapshot(getTagModelSnapshot(model));
+                };
+
+                model.addListener(listener);
                 setTagModel(model);
-                syncFromModel(model);
+                setSnapshot(getTagModelSnapshot(model));
             })
             .catch((error) => {
                 if (cancelled) {
@@ -72,27 +164,203 @@ function TagView({
 
         return () => {
             cancelled = true;
+            if (activeModel && listener) {
+                activeModel.removeListener(listener);
+            }
+            activeModel?.dispose();
         };
     }, [columnName, dataStore, selectionScope]);
 
+    return {
+        tagModel,
+        loadError,
+        tagList: snapshot.tagList,
+        tagsInSelection: snapshot.tagsInSelection,
+        selectionCount: snapshot.selectionCount,
+    };
+}
+
+function SetupSection({
+    dataStore,
+    columnInput,
+    onColumnInputChange,
+    onApplyColumnChoice,
+    selectedColumn,
+}: {
+    dataStore: DataStore;
+    columnInput: string;
+    onColumnInputChange: (value: string) => void;
+    onApplyColumnChoice: (value: string) => void;
+    selectedColumn: string;
+}) {
+    const [isOpen, setIsOpen] = useState(() => !selectedColumn);
+    const editableColumnNames = getEditableAnnotationColumnNames(dataStore.columns);
+    const editableColumnNamesKey = editableColumnNames.join("\0");
+    const choiceState = getAnnotationColumnChoiceState(dataStore, columnInput);
+
     useEffect(() => {
-        if (!tagModel) {
-            return;
+        if (!selectedColumn) {
+            setIsOpen(true);
         }
+    }, [selectedColumn]);
 
-        const syncFromModel = () => {
-            tagModel.setSelectionScope(selectionScope);
-            setTagList(tagModel.getTags());
-            setTagsInSelection(tagModel.getTagsInSelection());
-            setSelectionCount(tagModel.getSelectionLength());
-        };
+    return (
+        <Paper
+            className="w-full"
+            variant="outlined"
+            sx={{
+                width: "100%",
+                backgroundColor: (theme) =>
+                    theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.03)"
+                        : "rgba(0,0,0,0.02)",
+                borderColor: (theme) => theme.palette.divider,
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderRadius: 1,
+                overflow: "hidden",
+                paddingX: 2,
+                paddingBottom: 0,
+            }}
+        >
+            <Accordion
+                type="single"
+                collapsible
+                className="w-full"
+                value={isOpen ? "annotation-setup" : ""}
+                onValueChange={(value) => {
+                    setIsOpen(value === "annotation-setup");
+                }}
+            >
+                <AccordionItem value="annotation-setup" className="border-b-0">
+                    <AccordionTrigger className="w-full py-3 hover:no-underline">
+                        <Box sx={{ textAlign: "left" }}>
+                            <Typography variant="h6">Annotation Setup</Typography>
+                            <Typography color="text.secondary" variant="body2">
+                                Choose or create an editable multitext column for tag
+                                annotations.
+                            </Typography>
+                        </Box>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-5 pt-2">
+                        <Stack spacing={2}>
+                            <Stack direction={{ sm: "row", xs: "column" }} spacing={1}>
+                                <Autocomplete
+                                    freeSolo
+                                    fullWidth
+                                    size="small"
+                                    options={editableColumnNames}
+                                    inputValue={columnInput}
+                                    onChange={(_, value) => {
+                                        if (typeof value === "string") {
+                                            onColumnInputChange(value);
+                                            if (
+                                                getAnnotationColumnChoiceState(dataStore, value) ===
+                                                "ok"
+                                            ) {
+                                                onApplyColumnChoice(value);
+                                                setIsOpen(false);
+                                            }
+                                        }
+                                    }}
+                                    onInputChange={(_, value) => {
+                                        onColumnInputChange(value);
+                                    }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            error={choiceState === "clash" || choiceState === "readonly"}
+                                            helperText={getChoiceStateHelperText(choiceState)}
+                                            label="Column name"
+                                            onKeyDown={(event) => {
+                                                if (event.key !== "Enter") {
+                                                    return;
+                                                }
+                                                event.preventDefault();
+                                                if (choiceState === "ok") {
+                                                    onApplyColumnChoice(columnInput);
+                                                    setIsOpen(false);
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                />
+                                <Button
+                                    disabled={choiceState !== "ok"}
+                                    onClick={() => {
+                                        onApplyColumnChoice(columnInput);
+                                        setIsOpen(false);
+                                    }}
+                                    sx={{ minWidth: 112 }}
+                                    variant="contained"
+                                >
+                                    Use Column
+                                </Button>
+                            </Stack>
 
-        const listener = tagModel.addListener(syncFromModel);
-        syncFromModel();
-        return () => {
-            tagModel.removeListener(listener);
-        };
-    }, [selectionScope, tagModel]);
+                            <Typography color="text.secondary" variant="body2">
+                                Editable annotation columns:{" "}
+                                {editableColumnNamesKey
+                                    ? editableColumnNames.join(", ")
+                                    : "none yet"}
+                            </Typography>
+                        </Stack>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        </Paper>
+    );
+}
+
+function WorkspaceCard({
+    title,
+    description,
+    children,
+}: PropsWithChildren<{ title: string; description?: string }>) {
+    return (
+        <Paper
+            className="w-full"
+            variant="outlined"
+            sx={{
+                width: "100%",
+                borderColor: "divider",
+                overflow: "hidden",
+            }}
+        >
+            <Box sx={{ px: 2.5, pt: 2.5, pb: 2 }}>
+                <Typography variant="h6">{title}</Typography>
+                {description ? (
+                    <Typography color="text.secondary" variant="body2">
+                        {description}
+                    </Typography>
+                ) : null}
+            </Box>
+            <Divider />
+            {children}
+        </Paper>
+    );
+}
+
+function TagEditorPanel({
+    dataStore,
+    columnName,
+    selectionScope,
+    tagModel,
+    loadError,
+    selectionCount,
+    tagList,
+    tagsInSelection,
+}: {
+    dataStore: DataStore;
+    columnName: string;
+    selectionScope: TagSelectionScope;
+    tagModel: TagModel | null;
+    loadError: string | null;
+    selectionCount: number;
+    tagList: Set<string>;
+    tagsInSelection: Set<string>;
+}) {
+    const [draftTag, setDraftTag] = useState("");
 
     const availableTags = useMemo(
         () =>
@@ -107,6 +375,10 @@ function TagView({
         [tagsInSelection],
     );
 
+    useEffect(() => {
+        setDraftTag("");
+    }, [columnName, selectionScope]);
+
     if (loadError) {
         return (
             <Typography color="error" variant="body2">
@@ -119,6 +391,9 @@ function TagView({
         return <Typography variant="body2">Loading annotations...</Typography>;
     }
 
+    const selectionLabel =
+        selectionScope === "highlighted" ? "highlighted" : "filtered";
+
     const addTag = (rawTag: string) => {
         const nextTag = rawTag.trim();
         if (!nextTag) {
@@ -128,26 +403,32 @@ function TagView({
         setDraftTag("");
     };
 
+    const highlightMatchingRows = (
+        tag: string,
+        event: MouseEvent<HTMLButtonElement>,
+    ) => {
+        event.stopPropagation();
+        const matchingRows = tagModel.getMatchingRowIndices(tag);
+        const currentHighlights = dataStore.getHighlightedData()?.slice() || [];
+        dataStore.dataHighlighted(
+            getNextHighlightedRows(matchingRows, currentHighlights, event),
+            tagModel,
+        );
+    };
+
     return (
-        <Paper
-            sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                p: 2,
-            }}
-            variant="outlined"
-        >
-            <Stack spacing={2.5}>
-                <Box>
-                <Typography variant="h6">
-                    Annotating {selectionCount} {selectionScope} row{selectionCount === 1 ? "" : "s"}
+        <Stack spacing={2.5}>
+            <Box>
+                <Typography variant="subtitle1">
+                    Annotating {selectionCount} {selectionLabel} row
+                    {selectionCount === 1 ? "" : "s"}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
                     Column: {columnName}
                 </Typography>
-                </Box>
+            </Box>
 
-                <Stack direction="row" spacing={1}>
+            <Stack direction={{ sm: "row", xs: "column" }} spacing={1}>
                 <Autocomplete
                     freeSolo
                     fullWidth
@@ -162,26 +443,20 @@ function TagView({
                             addTag(value);
                         }
                     }}
-                    renderInput={(params) => {
-                        const { key, ...fieldProps } = params as typeof params & {
-                            key: string;
-                        };
-                        return (
-                            <TextField
-                                key={key}
-                                {...fieldProps}
-                                label="Add annotation item"
-                                placeholder="Type a value and press Enter"
-                                onKeyDown={(event) => {
-                                    if (event.key !== "Enter") {
-                                        return;
-                                    }
-                                    event.preventDefault();
-                                    addTag(draftTag);
-                                }}
-                            />
-                        );
-                    }}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label="Add annotation item"
+                            placeholder="Type a value and press Enter"
+                            onKeyDown={(event) => {
+                                if (event.key !== "Enter") {
+                                    return;
+                                }
+                                event.preventDefault();
+                                addTag(draftTag);
+                            }}
+                        />
+                    )}
                 />
                 <Button
                     onClick={() => addTag(draftTag)}
@@ -190,9 +465,9 @@ function TagView({
                 >
                     Add
                 </Button>
-                </Stack>
+            </Stack>
 
-                <Box>
+            <Box>
                 <Typography gutterBottom variant="subtitle2">
                     Present on selected rows
                 </Typography>
@@ -216,13 +491,18 @@ function TagView({
                         })}
                     </Box>
                 )}
-                </Box>
+            </Box>
 
-                <Divider />
+            <Divider />
 
-                <Box>
+            <Box>
                 <Typography gutterBottom variant="subtitle2">
                     Available items
+                </Typography>
+                <Typography color="text.secondary" sx={{ mb: 1.5 }} variant="body2">
+                    Click a row to add or remove a tag on the current scope. Use
+                    Highlight to replace the current highlight set, hold Shift to add,
+                    or Ctrl/Cmd to toggle matching rows.
                 </Typography>
                 {availableTags.length === 0 ? (
                     <Typography color="text.secondary" variant="body2">
@@ -231,7 +511,7 @@ function TagView({
                 ) : (
                     <Paper
                         sx={{
-                            maxHeight: 240,
+                            maxHeight: 260,
                             overflowY: "auto",
                             border: "1px solid",
                             borderColor: "divider",
@@ -246,7 +526,10 @@ function TagView({
                                 <Box
                                     key={tag}
                                     onClick={() =>
-                                        tagModel.setTag(tag, indeterminate ? true : !entireSelection)
+                                        tagModel.setTag(
+                                            tag,
+                                            indeterminate ? true : !entireSelection,
+                                        )
                                     }
                                     sx={{
                                         alignItems: "center",
@@ -266,9 +549,9 @@ function TagView({
                                         icon={icon}
                                         indeterminate={indeterminate}
                                         onChange={() => undefined}
-                                        sx={{ p: 0.5 }}
+                                        sx={{ p: 0.5, pointerEvents: "none" }}
                                     />
-                                    <Box sx={{ minWidth: 0 }}>
+                                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                                         <Typography noWrap variant="body2">
                                             {tag}
                                         </Typography>
@@ -280,80 +563,114 @@ function TagView({
                                                   : "Not present on the current selection"}
                                         </Typography>
                                     </Box>
+                                    <Button
+                                        onClick={(event) => highlightMatchingRows(tag, event)}
+                                        size="small"
+                                        variant="text"
+                                    >
+                                        Highlight
+                                    </Button>
                                 </Box>
                             );
                         })}
                     </Paper>
                 )}
-                </Box>
-            </Stack>
-        </Paper>
+            </Box>
+        </Stack>
     );
 }
 
-function SectionCard({
-    title,
-    description,
-    children,
-}: PropsWithChildren<{
-    title: string;
-    description: string;
-}>) {
-    return (
-        <Paper
-            sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                p: 2,
-            }}
-            variant="outlined"
-        >
-            <Stack spacing={2}>
-                <Box>
-                    <Typography variant="h6">{title}</Typography>
+function AnnotationWorkspace({
+    dataStore,
+    selectedColumn,
+}: {
+    dataStore: DataStore;
+    selectedColumn: string;
+}) {
+    const [activeTab, setActiveTab] = useState<ScopeTab>("Filtered");
+    const filteredState = useTagModelState(dataStore, selectedColumn, "filtered");
+    const highlightedState = useTagModelState(
+        dataStore,
+        selectedColumn,
+        "highlighted",
+    );
+
+    if (!selectedColumn) {
+        return (
+            <WorkspaceCard
+                title="Apply Annotations"
+                description="Choose or create an editable multitext column above to start annotating rows."
+            >
+                <Box sx={{ px: 2.5, py: 2.5 }}>
                     <Typography color="text.secondary" variant="body2">
-                        {description}
+                        No annotation column is active yet.
                     </Typography>
                 </Box>
-                {children}
-            </Stack>
-        </Paper>
+            </WorkspaceCard>
+        );
+    }
+
+    const selectionScope = getSelectionScope(activeTab);
+    const activeState =
+        selectionScope === "highlighted" ? highlightedState : filteredState;
+
+    return (
+        <WorkspaceCard title="Apply Annotations">
+            <Box sx={{ px: 2.5, pt: 1 }}>
+                <TabHeader
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    tabs={[...SCOPE_TABS]}
+                />
+            </Box>
+            <Box sx={{ px: 2.5, py: 2.5 }}>
+                <TagEditorPanel
+                    columnName={selectedColumn}
+                    dataStore={dataStore}
+                    loadError={activeState.loadError}
+                    selectionCount={activeState.selectionCount}
+                    selectionScope={selectionScope}
+                    tagList={activeState.tagList}
+                    tagModel={activeState.tagModel}
+                    tagsInSelection={activeState.tagsInSelection}
+                />
+            </Box>
+        </WorkspaceCard>
     );
 }
 
-const AnnotationDialogComponent = observer(
+export const AnnotationDialogComponent = observer(
     ({ dataStore }: { dataStore: DataStore }) => {
-        const columns = useMemo(
-            () =>
-                dataStore.columns
-                    .filter((column) => column.datatype === "multitext")
-                    .map((column) => column.field || column.name)
-                    .sort((left, right) => left.localeCompare(right)),
-            [dataStore],
-        );
-        const [selectedColumn, setSelectedColumn] = useState(
-            () => dataStore.columnIndex.__tags ? "__tags" : columns[0] || "",
+        const [selectedColumn, setSelectedColumn] = useState(() =>
+            getDefaultAnnotationColumn(dataStore),
         );
         const [columnInput, setColumnInput] = useState(selectedColumn);
-        const [selectionScope, setSelectionScope] =
-            useState<TagSelectionScope>("filtered");
 
-        const getNameState = (rawValue: string) => {
-            const nextValue = rawValue.trim();
-            if (!nextValue) {
-                return "empty" as const;
+        const editableColumnNames = getEditableAnnotationColumnNames(dataStore.columns);
+        const editableColumnNamesKey = editableColumnNames.join("\0");
+
+        useEffect(() => {
+            if (
+                selectedColumn &&
+                getAnnotationColumnChoiceState(dataStore, selectedColumn) === "ok"
+            ) {
+                return;
             }
-            const existingColumn = dataStore.columnIndex[nextValue];
-            return existingColumn && existingColumn.datatype !== "multitext"
-                ? ("clash" as const)
-                : ("ok" as const);
-        };
 
-        const nameState = getNameState(columnInput);
+            const fallbackColumn = getDefaultAnnotationColumn(dataStore);
+            if (fallbackColumn !== selectedColumn) {
+                setSelectedColumn(fallbackColumn);
+            }
+            if (!columnInput.trim() || columnInput === selectedColumn) {
+                setColumnInput(fallbackColumn);
+            }
+        }, [columnInput, dataStore, editableColumnNamesKey, selectedColumn]);
 
         const applyColumnChoice = (rawValue: string) => {
             const nextValue = rawValue.trim();
-            if (getNameState(nextValue) !== "ok") {
+            if (
+                getAnnotationColumnChoiceState(dataStore, nextValue) !== "ok"
+            ) {
                 return;
             }
             setSelectedColumn(nextValue);
@@ -362,107 +679,17 @@ const AnnotationDialogComponent = observer(
 
         return (
             <Stack spacing={2}>
-                <SectionCard
-                    title="Annotation Setup"
-                    description="Choose the multitext column to edit, then pick whether tag actions should apply to filtered rows or the current highlight set."
-                >
-                    <Stack spacing={2}>
-                        <Stack direction="row" spacing={1}>
-                            <Autocomplete
-                                freeSolo
-                                fullWidth
-                                size="small"
-                                inputValue={columnInput}
-                                onChange={(_, value) => {
-                                    if (typeof value === "string") {
-                                        setColumnInput(value);
-                                        applyColumnChoice(value);
-                                    }
-                                }}
-                                onInputChange={(_, value) => {
-                                    setColumnInput(value);
-                                }}
-                                options={columns}
-                                renderInput={(params) => {
-                                    const { key, ...fieldProps } = params as typeof params & {
-                                        key: string;
-                                    };
-                                    return (
-                                        <TextField
-                                            key={key}
-                                            {...fieldProps}
-                                            error={nameState === "clash"}
-                                            helperText={
-                                                nameState === "clash"
-                                                    ? "A non-multitext column already uses that name."
-                                                    : "Names become new multitext annotation columns when needed."
-                                            }
-                                            label="Column name"
-                                            onKeyDown={(event) => {
-                                                if (event.key !== "Enter") {
-                                                    return;
-                                                }
-                                                event.preventDefault();
-                                                applyColumnChoice(columnInput);
-                                            }}
-                                        />
-                                    );
-                                }}
-                            />
-                            <Button
-                                disabled={nameState !== "ok"}
-                                onClick={() => applyColumnChoice(columnInput)}
-                                sx={{ minWidth: 112 }}
-                                variant="contained"
-                            >
-                                Use Column
-                            </Button>
-                        </Stack>
-
-                        <FormControl>
-                            <Typography gutterBottom variant="subtitle2">
-                                Apply actions to
-                            </Typography>
-                            <RadioGroup
-                                row
-                                onChange={(_, value) => {
-                                    if (value === "filtered" || value === "highlighted") {
-                                        setSelectionScope(value);
-                                    }
-                                }}
-                                value={selectionScope}
-                            >
-                                <FormControlLabel
-                                    control={<Radio size="small" />}
-                                    label="Filtered rows"
-                                    value="filtered"
-                                />
-                                <FormControlLabel
-                                    control={<Radio size="small" />}
-                                    label="Highlighted rows"
-                                    value="highlighted"
-                                />
-                            </RadioGroup>
-                        </FormControl>
-                    </Stack>
-                </SectionCard>
-
-                {selectedColumn ? (
-                    <TagView
-                        columnName={selectedColumn}
-                        dataStore={dataStore}
-                        selectionScope={selectionScope}
-                    />
-                ) : (
-                    <SectionCard
-                        title="Apply Annotations"
-                        description="Select or create a multitext column above to start annotating rows."
-                    >
-                        <Typography color="text.secondary" variant="body2">
-                            No annotation column is active yet.
-                        </Typography>
-                    </SectionCard>
-                )}
+                <SetupSection
+                    columnInput={columnInput}
+                    dataStore={dataStore}
+                    onApplyColumnChoice={applyColumnChoice}
+                    onColumnInputChange={setColumnInput}
+                    selectedColumn={selectedColumn}
+                />
+                <AnnotationWorkspace
+                    dataStore={dataStore}
+                    selectedColumn={selectedColumn}
+                />
             </Stack>
         );
     },
@@ -475,8 +702,8 @@ class AnnotationDialogReact extends BaseDialog {
         super(
             {
                 title: `Annotate '${dataStore.name}'`,
-                width: 520,
-                height: 520,
+                width: 560,
+                height: 740,
             },
             null,
         );
