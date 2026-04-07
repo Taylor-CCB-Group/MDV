@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { CategoricalDataType } from '@/charts/charts';
+import { autorun, makeAutoObservable, runInAction } from 'mobx';
 import {
     useCategoryContour,
     getDensitySettings,
@@ -146,6 +147,44 @@ describe('useCategoryContour', () => {
         expect(typeof result.current?.getPosition).toBe('function');
     });
 
+    test('recomputes contour colors when the active category column gains a new value in place', () => {
+        const mockContourParameter = {
+            field: 'test-field',
+            values: ['cat1'],
+            data: new Uint8Array([0]),
+            datatype: 'multitext' as CategoricalDataType,
+        };
+
+        (useFieldSpec as any).mockReturnValue(mockContourParameter);
+        (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([0]));
+        (useDataStore as any).mockReturnValue({
+            getColumnColors: vi.fn(() =>
+                mockContourParameter.values.length === 1
+                    ? [[255, 0, 0]]
+                    : [[255, 0, 0], [0, 255, 0]],
+            ),
+        });
+
+        const { result, rerender } = renderHook(
+            ({ category }) =>
+                useCategoryContour({
+                    ...baseProps,
+                    parameter: 'test-field',
+                    category,
+                }),
+            {
+                initialProps: { category: 'cat1' as string | string[] | undefined },
+            },
+        );
+
+        expect(result.current?.colorRange[0]).toEqual([255, 0, 0]);
+
+        mockContourParameter.values.push('cat2');
+        rerender({ category: 'cat2' });
+
+        expect(result.current?.colorRange[0]).toEqual([0, 255, 0]);
+    });
+
     test('handles empty data array when contourParameter is falsy but category is provided', () => {
         (useFieldSpec as any).mockReturnValue(undefined);
         (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([]));
@@ -220,6 +259,36 @@ describe('useCategoryContour', () => {
 });
 
 describe('getDensitySettings category selection wiring', () => {
+    test('scatter defaults seed density settings keys so later edits stay observable', () => {
+        const config = makeAutoObservable({
+            ...scatterDefaults,
+            id: 'test-chart',
+            size: [800, 600] as [number, number],
+            title: 'Test Chart',
+            legend: '',
+            type: 'scatter',
+            param: ['x', 'y'] as string[],
+        });
+        const observed: Array<{ contourParameter: typeof config.contourParameter; category1: string[] }> = [];
+        const dispose = autorun(() => {
+            observed.push({
+                contourParameter: config.contourParameter,
+                category1: Array.isArray(config.category1) ? [...config.category1] : [],
+            });
+        });
+
+        runInAction(() => {
+            config.contourParameter = 'test-field';
+            config.category1 = ['tag-a'];
+        });
+        dispose();
+
+        expect(observed).toEqual([
+            { contourParameter: undefined, category1: [] },
+            { contourParameter: 'test-field', category1: ['tag-a'] },
+        ]);
+    });
+
     test('builds category selection controls that read from live config state', () => {
         const mockConfig: DualContourLegacyConfig & BaseConfig = {
             ...scatterDefaults,

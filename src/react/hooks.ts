@@ -286,6 +286,14 @@ export function useRegion() {
     return region;
 }
 
+/**
+ * Exposes datastore filtered-row invalidations as a simple React state dependency.
+ *
+ * `DataStore#getFilteredIndices()` caches a promise on the store, and many hooks need
+ * a React-visible signal when that cache is invalidated by filtering or data edits.
+ * The returned counter increments on the datastore events that can change the set of
+ * rows available to downstream filtered-index consumers.
+ */
 function useFilteredIndicesRefreshVersion() {
     const dataStore = useDataStore();
     const listenerId = useId();
