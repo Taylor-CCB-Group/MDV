@@ -295,6 +295,7 @@ export default class TagModel {
 
     dispose() {
         this.dataStore.removeListener(this.listenerId);
+        this.dataModel.dispose();
         this.listeners = [];
     }
 
