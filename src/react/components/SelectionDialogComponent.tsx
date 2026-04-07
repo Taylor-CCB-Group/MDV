@@ -53,12 +53,9 @@ import {
     getNumericColumnData,
     getSharedNumericColumnData,
 } from "@/lib/columnTypeHelpers";
-import {
-    getMultitextItemValues,
-    inferMultitextEmptyItem,
-} from "@/lib/multitext";
 import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
 import { useDebounce } from "use-debounce";
+import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 
 
 
@@ -92,14 +89,13 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
 
 const TextComponent = observer(({
     column,
-    options,
-}: Props<CategoricalDataType> & { options?: string[] }) => {
+}: Props<CategoricalDataType>) => {
     const [open, setOpen] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
     const conf = useConfig<SelectionDialogConfig>();
-    const values = options ?? column.values;
+    const values = useLiveCategorySelectionValues(column.field);
     const filter = useFilterConfig(column);
     const value = filter?.category || [];
     const setValue = useCallback((newValue: string[]) => {
@@ -311,12 +307,7 @@ const TextComponent = observer(({
 });
 
 const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
-    const options = getMultitextItemValues(column, {
-        emptyItem: inferMultitextEmptyItem(column),
-    }).sort((left, right) => left.localeCompare(right));
-    return (
-        <TextComponent column={column} options={options} />
-    );
+    return <TextComponent column={column} />;
 });
 
 const UniqueComponent = observer(({ column }: Props<"unique">) => {
