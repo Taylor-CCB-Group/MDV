@@ -19,7 +19,11 @@ function createMockDataModel(selection: number[]) {
     } as any;
 }
 
-function createMockDataStore(columnIndex: Record<string, any>, size: number) {
+function createMockDataStore(
+    columnIndex: Record<string, any>,
+    size: number,
+    options?: { isFiltered?: () => boolean },
+) {
     const listeners: Record<string, (type: string, data?: any) => void> = {};
     const store = {
         size,
@@ -28,6 +32,7 @@ function createMockDataStore(columnIndex: Record<string, any>, size: number) {
         filterArray: new Uint8Array(size),
         filterSize: size,
         highightedData: [] as number[],
+        ...(options?.isFiltered ? { isFiltered: options.isFiltered } : {}),
         addListener: vi.fn((id, listener) => {
             listeners[id] = listener;
         }),
@@ -305,6 +310,121 @@ describe("TagModel", () => {
 
         expect(filteredTagModel.getMatchingRowIndices("b")).toEqual([1, 2]);
         expect(highlightedTagModel.getMatchingRowIndices("b")).toEqual([1]);
+    });
+
+    test("getAnnotationViewState mirrors tags, selection tags, and length", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a", "b"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0, 1]),
+            buffer: new SharedArrayBuffer(4),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 2);
+        const dataModel = createMockDataModel([0]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const tagModel = await TagModel.create(dataStore as never, "__tags");
+        const view = tagModel.getAnnotationViewState();
+
+        expect(view.selectionCount).toBe(1);
+        expect(view.tagList).toEqual(new Set(["a", "b"]));
+        expect(view.tagsInSelection).toEqual(new Set(["a"]));
+    });
+
+    test("getAnnotationWarningFlags: no rows shows no-selection only", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([65535, 65535]),
+            buffer: new SharedArrayBuffer(4),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 2);
+        const dataModel = createMockDataModel([]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const tagModel = await TagModel.create(dataStore as never, "__tags");
+        const flags = tagModel.getAnnotationWarningFlags();
+
+        expect(flags.showNoSelectionWarning).toBe(true);
+        expect(flags.showFilteredScopeCoversWholeTableWarning).toBe(false);
+    });
+
+    test("getAnnotationWarningFlags: filtered scope with no active filter warns whole table", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0]),
+            buffer: new SharedArrayBuffer(2),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 1, {
+            isFiltered: () => false,
+        });
+        const dataModel = createMockDataModel([0]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const tagModel = await TagModel.create(dataStore as never, "__tags");
+        const flags = tagModel.getAnnotationWarningFlags();
+
+        expect(flags.showNoSelectionWarning).toBe(false);
+        expect(flags.showFilteredScopeCoversWholeTableWarning).toBe(true);
+    });
+
+    test("getAnnotationWarningFlags: highlighted scope never warns whole table", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0]),
+            buffer: new SharedArrayBuffer(2),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 1, {
+            isFiltered: () => false,
+        });
+        const dataModel = createMockDataModel([0]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const tagModel = await TagModel.create(
+            dataStore as never,
+            "__tags",
+            "highlighted",
+        );
+        dataStore.highightedData = [0];
+
+        const flags = tagModel.getAnnotationWarningFlags();
+
+        expect(flags.showNoSelectionWarning).toBe(false);
+        expect(flags.showFilteredScopeCoversWholeTableWarning).toBe(false);
     });
 
     test("rejects read-only multitext columns", async () => {

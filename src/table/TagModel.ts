@@ -22,6 +22,17 @@ const MAX_MULTITEXT_VALUES = 65535;
 export type TagColumn = LoadedDataColumn<"multitext">;
 export type TagSelectionScope = "filtered" | "highlighted";
 
+export type TagAnnotationViewState = {
+    tagList: Set<string>;
+    tagsInSelection: Set<string>;
+    selectionCount: number;
+};
+
+export type TagAnnotationWarningFlags = {
+    showNoSelectionWarning: boolean;
+    showFilteredScopeCoversWholeTableWarning: boolean;
+};
+
 type DataChangedEvent = {
     columns?: string[];
 };
@@ -275,6 +286,40 @@ export default class TagModel {
 
     getSelectionLength() {
         return this.getSelectedRowIndices().length;
+    }
+
+    getAnnotationViewState(): TagAnnotationViewState {
+        return {
+            tagList: this.getTags(),
+            tagsInSelection: this.getTagsInSelection(),
+            selectionCount: this.getSelectionLength(),
+        };
+    }
+
+    /**
+     * Warning flags for annotation UI: empty selection vs filtered scope covering the full table
+     * (no narrowing filter, or selection length equals datastore row count).
+     */
+    getAnnotationWarningFlags(): TagAnnotationWarningFlags {
+        const selectionCount = this.getSelectionLength();
+        return {
+            showNoSelectionWarning: selectionCount === 0,
+            showFilteredScopeCoversWholeTableWarning:
+                selectionCount > 0 && this.isFilteredScopeAnnotatingEntireTable(),
+        };
+    }
+
+    private isFilteredScopeAnnotatingEntireTable(): boolean {
+        if (this.selectionScope !== "filtered") {
+            return false;
+        }
+
+        if (typeof this.dataStore.isFiltered === "function") {
+            return !this.dataStore.isFiltered();
+        }
+
+        const totalRows = this.dataStore.size ?? this.getSelectionLength();
+        return this.getSelectionLength() === totalRows;
     }
 
     private callListeners() {

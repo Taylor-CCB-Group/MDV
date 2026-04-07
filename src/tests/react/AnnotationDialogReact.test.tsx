@@ -13,11 +13,39 @@ vi.mock("@/table/TagModel", () => ({
     },
 }));
 
-function createMockTagModel(selectionCount: number) {
+function createMockTagModel(
+    dataStore: { isFiltered?: () => boolean; size?: number },
+    selectionScope: "filtered" | "highlighted",
+    selectionCount: number,
+) {
+    const getAnnotationViewState = () => ({
+        tagList: new Set(["a", "b"]),
+        tagsInSelection: new Set(["a"]),
+        selectionCount,
+    });
+    const getAnnotationWarningFlags = () => {
+        const showNoSelectionWarning = selectionCount === 0;
+        let showFilteredScopeCoversWholeTableWarning = false;
+        if (selectionScope === "filtered" && selectionCount > 0) {
+            if (typeof dataStore.isFiltered === "function") {
+                showFilteredScopeCoversWholeTableWarning = !dataStore.isFiltered();
+            } else {
+                const totalRows = dataStore.size ?? selectionCount;
+                showFilteredScopeCoversWholeTableWarning =
+                    selectionCount === totalRows;
+            }
+        }
+        return {
+            showFilteredScopeCoversWholeTableWarning,
+            showNoSelectionWarning,
+        };
+    };
     return {
         addListener: vi.fn(),
         dispose: vi.fn(),
         entireSelectionHasTag: (tag: string) => tag === "a",
+        getAnnotationViewState,
+        getAnnotationWarningFlags,
         getMatchingRowIndices: vi.fn(() => [0, 2]),
         getSelectionLength: vi.fn(() => selectionCount),
         getTags: vi.fn(() => new Set(["a", "b"])),
@@ -64,6 +92,7 @@ function createMockDataStore() {
         getHighlightedData: vi.fn(() => []),
         isFiltered: vi.fn(() => false),
         name: "test-store",
+        size: 100,
     };
 }
 
@@ -71,8 +100,12 @@ describe("AnnotationDialogReact", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(TagModel.create).mockImplementation(
-            async (_dataStore, _columnName, selectionScope) =>
-                createMockTagModel(selectionScope === "highlighted" ? 1 : 2) as never,
+            async (dataStore, _columnName, selectionScope = "filtered") =>
+                createMockTagModel(
+                    dataStore as { isFiltered?: () => boolean; size?: number },
+                    selectionScope,
+                    selectionScope === "highlighted" ? 1 : 2,
+                ) as never,
         );
     });
 
@@ -164,8 +197,12 @@ describe("AnnotationDialogReact", () => {
         const dataStore = createMockDataStore();
         dataStore.getHighlightedData = vi.fn(() => [0] as never);
         vi.mocked(TagModel.create).mockImplementation(
-            async (_dataStore, _columnName, selectionScope) =>
-                createMockTagModel(selectionScope === "highlighted" ? 0 : 2) as never,
+            async (dataStore, _columnName, selectionScope = "filtered") =>
+                createMockTagModel(
+                    dataStore as { isFiltered?: () => boolean; size?: number },
+                    selectionScope,
+                    selectionScope === "highlighted" ? 0 : 2,
+                ) as never,
         );
 
         render(<AnnotationDialogComponent dataStore={dataStore as never} />);
@@ -181,7 +218,7 @@ describe("AnnotationDialogReact", () => {
 
     test("shows tag mutation errors and keeps the draft value when add fails", async () => {
         const dataStore = createMockDataStore();
-        const tagModel = createMockTagModel(2);
+        const tagModel = createMockTagModel(dataStore, "filtered", 2);
         tagModel.setTag.mockImplementation(() => {
             throw new Error("Tag update failed");
         });
@@ -203,7 +240,7 @@ describe("AnnotationDialogReact", () => {
 
     test("shows tag mutation errors when toggling an available tag row fails", async () => {
         const dataStore = createMockDataStore();
-        const tagModel = createMockTagModel(2);
+        const tagModel = createMockTagModel(dataStore, "filtered", 2);
         tagModel.setTag.mockImplementation(() => {
             throw new Error("Row toggle failed");
         });

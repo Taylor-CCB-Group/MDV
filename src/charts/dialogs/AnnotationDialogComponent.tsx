@@ -38,29 +38,6 @@ const SCOPE_TABS = ["Filtered", "Highlighted"] as const;
 
 type ScopeTab = (typeof SCOPE_TABS)[number];
 type AnnotationColumnChoiceState = "empty" | "ok" | "clash" | "readonly";
-type TagModelSnapshot = {
-    tagList: Set<string>;
-    tagsInSelection: Set<string>;
-    selectionCount: number;
-};
-
-function isAllRowsFilteredSelection(
-    dataStore: DataStore,
-    selectionScope: TagSelectionScope,
-    selectionCount: number,
-) {
-    if (selectionScope !== "filtered") {
-        return false;
-    }
-
-    if (typeof dataStore.isFiltered === "function") {
-        return !dataStore.isFiltered();
-    }
-
-    const totalRows = dataStore.size ?? selectionCount;
-    return selectionCount === totalRows;
-}
-
 function isEditableAnnotationColumn(
     column: { datatype?: string; editable?: boolean } | undefined,
 ) {
@@ -123,14 +100,6 @@ function getChoiceStateHelperText(choiceState: AnnotationColumnChoiceState) {
     return "Names become new editable multitext annotation columns when needed.";
 }
 
-function getTagModelSnapshot(model: TagModel): TagModelSnapshot {
-    return {
-        tagList: model.getTags(),
-        tagsInSelection: model.getTagsInSelection(),
-        selectionCount: model.getSelectionLength(),
-    };
-}
-
 function useTagModelState(
     dataStore: DataStore,
     columnName: string,
@@ -138,11 +107,7 @@ function useTagModelState(
 ) {
     const [tagModel, setTagModel] = useState<TagModel | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [snapshot, setSnapshot] = useState<TagModelSnapshot>({
-        tagList: new Set(),
-        tagsInSelection: new Set(),
-        selectionCount: 0,
-    });
+    const [, setRevision] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -151,11 +116,6 @@ function useTagModelState(
 
         setTagModel(null);
         setLoadError(null);
-        setSnapshot({
-            tagList: new Set(),
-            tagsInSelection: new Set(),
-            selectionCount: 0,
-        });
 
         if (!columnName) {
             return;
@@ -170,12 +130,12 @@ function useTagModelState(
 
                 activeModel = model;
                 listener = () => {
-                    setSnapshot(getTagModelSnapshot(model));
+                    setRevision((n) => n + 1);
                 };
 
                 model.addListener(listener);
                 setTagModel(model);
-                setSnapshot(getTagModelSnapshot(model));
+                setRevision((n) => n + 1);
             })
             .catch((error) => {
                 if (cancelled) {
@@ -198,9 +158,6 @@ function useTagModelState(
     return {
         tagModel,
         loadError,
-        tagList: snapshot.tagList,
-        tagsInSelection: snapshot.tagsInSelection,
-        selectionCount: snapshot.selectionCount,
     };
 }
 
@@ -371,21 +328,30 @@ function TagEditorPanel({
     selectionScope,
     tagModel,
     loadError,
-    selectionCount,
-    tagList,
-    tagsInSelection,
 }: {
     dataStore: DataStore;
     columnName: string;
     selectionScope: TagSelectionScope;
     tagModel: TagModel | null;
     loadError: string | null;
-    selectionCount: number;
-    tagList: Set<string>;
-    tagsInSelection: Set<string>;
 }) {
     const [draftTag, setDraftTag] = useState("");
     const [tagError, setTagError] = useState<string | null>(null);
+
+    const { tagList, tagsInSelection, selectionCount } = tagModel
+        ? tagModel.getAnnotationViewState()
+        : {
+              tagList: new Set<string>(),
+              tagsInSelection: new Set<string>(),
+              selectionCount: 0,
+          };
+    const { showFilteredScopeCoversWholeTableWarning, showNoSelectionWarning } =
+        tagModel
+            ? tagModel.getAnnotationWarningFlags()
+            : {
+                  showFilteredScopeCoversWholeTableWarning: false,
+                  showNoSelectionWarning: true,
+              };
 
     const availableTags = useMemo(
         () =>
@@ -419,10 +385,8 @@ function TagEditorPanel({
 
     const selectionLabel =
         selectionScope === "highlighted" ? "highlighted" : "filtered";
-    const showFilteredWarning =
-        selectionCount > 0
-        && isAllRowsFilteredSelection(dataStore, selectionScope, selectionCount);
-    const showNoRowsWarning = selectionCount === 0;
+    const showFilteredWarning = showFilteredScopeCoversWholeTableWarning;
+    const showNoRowsWarning = showNoSelectionWarning;
     const noRowsLabel =
         selectionScope === "highlighted"
             ? "No highlighted rows match right now."
@@ -745,11 +709,8 @@ function AnnotationWorkspace({
                     columnName={selectedColumn}
                     dataStore={dataStore}
                     loadError={activeState.loadError}
-                    selectionCount={activeState.selectionCount}
                     selectionScope={selectionScope}
-                    tagList={activeState.tagList}
                     tagModel={activeState.tagModel}
-                    tagsInSelection={activeState.tagsInSelection}
                 />
             </Box>
         </WorkspaceCard>
