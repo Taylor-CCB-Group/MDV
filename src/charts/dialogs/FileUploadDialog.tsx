@@ -95,7 +95,7 @@ export const FileInputLabel = ({
     <label
         htmlFor={htmlFor}
         {...props}
-        className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500"
+        className="mt-2 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500"
     >
         {children}
     </label>
@@ -435,6 +435,14 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
     },
 };
 
+const IS_PRODUCTION = import.meta.env.PROD;
+const ALLOWED_FILE_TYPES = IS_PRODUCTION
+    ? {
+          CSV: FILE_TYPES.CSV,
+          TSV: FILE_TYPES.TSV,
+      }
+    : FILE_TYPES;
+
 interface H5Metadata {
     uns: Record<string, any>;
     obs: Record<string, any>;
@@ -445,14 +453,14 @@ interface H5Metadata {
 const getFileTypeFromExtension = (fileName: string): FileTypeConfig | null => {
     const extension = `.${fileName.split(".").pop()?.toLowerCase()}`;
     return (
-        Object.values(FILE_TYPES).find((config) =>
+        Object.values(ALLOWED_FILE_TYPES).find((config) =>
             config.extensions.includes(extension),
         ) || null
     );
 };
 
 const generateDropzoneAccept = () => {
-    return Object.values(FILE_TYPES).reduce(
+    return Object.values(ALLOWED_FILE_TYPES).reduce(
         (acc, config) => {
             config.mimeTypes.forEach((mimeType) => {
                 acc[mimeType] = config.extensions;
@@ -763,7 +771,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 accept: generateDropzoneAccept(),
                 multiple: false,
                 maxSize: Math.max(
-                    ...Object.values(FILE_TYPES).map(
+                    ...Object.values(ALLOWED_FILE_TYPES).map(
                         (config) => config.maxSize || 0,
                     ),
                 ),
@@ -788,6 +796,17 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
         const rejectionMessageStyle =
             fileRejections.length > 0 ? "text-red-500" : "";
+
+        const supportedFileTypes = useMemo(() => {
+            return Array.from(
+                new Set(
+                    Object.values(ALLOWED_FILE_TYPES).flatMap(
+                        (config) =>
+                            config.extensions
+                    ),
+                ),
+            );
+        }, []);
 
         const getTextWidth = (
             canvas: HTMLCanvasElement,
@@ -1552,7 +1571,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                             aria-label={"dropzoneLabel"}
                         >
                             <input {...getInputProps()} />
-                            <div className="flex flex-col items-center justify-center space-y-0">
+                            <div className="flex flex-col items-center justify-center">
                                 <CloudUploadIcon
                                     className="text-gray-400"
                                     style={{ fontSize: "5rem" }}
@@ -1578,6 +1597,21 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                 >
                                     {"Choose File"}
                                 </FileInputLabel>
+                                <div className="mt-6 w-full max-w-md rounded-md bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
+                                    <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                        Supported file types
+                                    </p>
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                    {supportedFileTypes.map((extension) => (
+                                        <span
+                                            key={extension}
+                                            className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                                        >
+                                            {extension}
+                                        </span>
+                                    ))}
+                                    </div>
+                                </div>
                             </div>
                         </DropzoneContainer>
                     </>
