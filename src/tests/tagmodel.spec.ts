@@ -20,13 +20,20 @@ function createMockDataModel(selection: number[]) {
 }
 
 function createMockDataStore(columnIndex: Record<string, any>, size: number) {
-    return {
+    const listeners: Record<string, (type: string, data?: any) => void> = {};
+    const store = {
         size,
         name: "test-store",
         columnIndex,
         filterArray: new Uint8Array(size),
         filterSize: size,
-        addListener: vi.fn(),
+        highightedData: [] as number[],
+        addListener: vi.fn((id, listener) => {
+            listeners[id] = listener;
+        }),
+        removeListener: vi.fn((id) => {
+            delete listeners[id];
+        }),
         addColumn: vi.fn((spec, data) => {
             columnIndex[spec.field] = {
                 ...spec,
@@ -34,8 +41,13 @@ function createMockDataStore(columnIndex: Record<string, any>, size: number) {
                 buffer: data,
             };
         }),
+        getHighlightedData: vi.fn(() => store.highightedData),
+        emit(type: string, data?: any) {
+            Object.values(listeners).forEach((listener) => listener(type, data));
+        },
         dataChanged: vi.fn(),
     };
+    return store;
 }
 
 describe("TagModel", () => {
@@ -156,5 +168,78 @@ describe("TagModel", () => {
             1, 2, 65535,
         ]);
         expect(dataStore.dataChanged).toHaveBeenCalledWith(["__gates__"]);
+    });
+
+    test("can operate on highlighted rows instead of the filtered model selection", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a", "b"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0, 1, 65535]),
+            buffer: new SharedArrayBuffer(6),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 3);
+        dataStore.highightedData = [1, 2];
+        const dataModel = createMockDataModel([0, 1, 2]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const tagModel = await TagModel.create(
+            dataStore as never,
+            "__tags",
+            "highlighted",
+        );
+
+        expect(tagModel.getSelectionLength()).toBe(2);
+        expect(tagModel.getTagsInSelection()).toEqual(new Set(["b"]));
+
+        tagModel.setTag("a", true);
+
+        expect(tagColumn.values).toEqual(["a", "b", "a; b"]);
+        expect(Array.from(tagColumn.data)).toEqual([0, 2, 0]);
+        expect(dataStore.dataChanged).toHaveBeenCalledWith(["__tags"]);
+    });
+
+    test("updates highlighted-scope selection when highlighted rows change", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a", "b"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0, 1, 65535]),
+            buffer: new SharedArrayBuffer(6),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 3);
+        dataStore.highightedData = [1];
+        const dataModel = createMockDataModel([0, 1, 2]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const tagModel = await TagModel.create(
+            dataStore as never,
+            "__tags",
+            "highlighted",
+        );
+        const listener = vi.fn();
+        tagModel.addListener(listener);
+
+        expect(tagModel.getTagsInSelection()).toEqual(new Set(["b"]));
+
+        dataStore.highightedData = [0, 2];
+        dataStore.emit("data_highlighted", { indexes: [0, 2] });
+
+        expect(listener).toHaveBeenCalled();
+        expect(tagModel.getTagsInSelection()).toEqual(new Set(["a"]));
     });
 });

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { type PropsWithChildren, useEffect, useMemo, useState } from "react";
 import type DataStore from "../../datastore/DataStore.js";
-import TagModel from "../../table/TagModel";
+import TagModel, { type TagSelectionScope } from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createMdvPortal } from "@/react/react_utils";
 import { observer } from "mobx-react-lite";
@@ -11,7 +11,11 @@ import {
     Checkbox,
     Chip,
     Divider,
+    FormControl,
+    FormControlLabel,
     Paper,
+    Radio,
+    RadioGroup,
     Stack,
     TextField,
     Typography,
@@ -25,12 +29,18 @@ const checkedIcon = <CheckBoxIcon fontSize="small" />;
 function TagView({
     dataStore,
     columnName,
-}: { dataStore: DataStore; columnName: string }) {
+    selectionScope,
+}: {
+    dataStore: DataStore;
+    columnName: string;
+    selectionScope: TagSelectionScope;
+}) {
     const [tagModel, setTagModel] = useState<TagModel | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [tagList, setTagList] = useState<Set<string>>(new Set());
     const [tagsInSelection, setTagsInSelection] = useState<Set<string>>(new Set());
     const [draftTag, setDraftTag] = useState("");
+    const [selectionCount, setSelectionCount] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -38,11 +48,12 @@ function TagView({
         const syncFromModel = (model: TagModel) => {
             setTagList(model.getTags());
             setTagsInSelection(model.getTagsInSelection());
+            setSelectionCount(model.getSelectionLength());
         };
 
         setTagModel(null);
         setLoadError(null);
-        TagModel.create(dataStore, columnName)
+        TagModel.create(dataStore, columnName, selectionScope)
             .then((model) => {
                 if (cancelled) {
                     return;
@@ -62,7 +73,7 @@ function TagView({
         return () => {
             cancelled = true;
         };
-    }, [columnName, dataStore]);
+    }, [columnName, dataStore, selectionScope]);
 
     useEffect(() => {
         if (!tagModel) {
@@ -70,8 +81,10 @@ function TagView({
         }
 
         const syncFromModel = () => {
+            tagModel.setSelectionScope(selectionScope);
             setTagList(tagModel.getTags());
             setTagsInSelection(tagModel.getTagsInSelection());
+            setSelectionCount(tagModel.getSelectionLength());
         };
 
         const listener = tagModel.addListener(syncFromModel);
@@ -79,7 +92,7 @@ function TagView({
         return () => {
             tagModel.removeListener(listener);
         };
-    }, [tagModel]);
+    }, [selectionScope, tagModel]);
 
     const availableTags = useMemo(
         () =>
@@ -116,20 +129,29 @@ function TagView({
     };
 
     return (
-        <Stack spacing={2.5} sx={{ mt: 2 }}>
-            <Box>
+        <Paper
+            sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                p: 2,
+            }}
+            variant="outlined"
+        >
+            <Stack spacing={2.5}>
+                <Box>
                 <Typography variant="h6">
-                    Annotating {tagModel.dataModel.getLength()} selected rows
+                    Annotating {selectionCount} {selectionScope} row{selectionCount === 1 ? "" : "s"}
                 </Typography>
                 <Typography color="text.secondary" variant="body2">
                     Column: {columnName}
                 </Typography>
-            </Box>
+                </Box>
 
-            <Stack direction="row" spacing={1}>
+                <Stack direction="row" spacing={1}>
                 <Autocomplete
                     freeSolo
                     fullWidth
+                    size="small"
                     options={availableTags}
                     inputValue={draftTag}
                     onInputChange={(_, value) => {
@@ -168,9 +190,9 @@ function TagView({
                 >
                     Add
                 </Button>
-            </Stack>
+                </Stack>
 
-            <Box>
+                <Box>
                 <Typography gutterBottom variant="subtitle2">
                     Present on selected rows
                 </Typography>
@@ -194,11 +216,11 @@ function TagView({
                         })}
                     </Box>
                 )}
-            </Box>
+                </Box>
 
-            <Divider />
+                <Divider />
 
-            <Box>
+                <Box>
                 <Typography gutterBottom variant="subtitle2">
                     Available items
                 </Typography>
@@ -263,8 +285,39 @@ function TagView({
                         })}
                     </Paper>
                 )}
-            </Box>
-        </Stack>
+                </Box>
+            </Stack>
+        </Paper>
+    );
+}
+
+function SectionCard({
+    title,
+    description,
+    children,
+}: PropsWithChildren<{
+    title: string;
+    description: string;
+}>) {
+    return (
+        <Paper
+            sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                p: 2,
+            }}
+            variant="outlined"
+        >
+            <Stack spacing={2}>
+                <Box>
+                    <Typography variant="h6">{title}</Typography>
+                    <Typography color="text.secondary" variant="body2">
+                        {description}
+                    </Typography>
+                </Box>
+                {children}
+            </Stack>
+        </Paper>
     );
 }
 
@@ -282,6 +335,8 @@ const AnnotationDialogComponent = observer(
             () => dataStore.columnIndex.__tags ? "__tags" : columns[0] || "",
         );
         const [columnInput, setColumnInput] = useState(selectedColumn);
+        const [selectionScope, setSelectionScope] =
+            useState<TagSelectionScope>("filtered");
 
         const getNameState = (rawValue: string) => {
             const nextValue = rawValue.trim();
@@ -307,70 +362,106 @@ const AnnotationDialogComponent = observer(
 
         return (
             <Stack spacing={2}>
-                <Box>
-                    <Typography variant="h6">Annotation Column</Typography>
-                    <Typography color="text.secondary" variant="body2">
-                        Pick an existing multitext column or create a new one for item-level annotations.
-                    </Typography>
-                </Box>
-
-                <Stack direction="row" spacing={1}>
-                    <Autocomplete
-                        freeSolo
-                        fullWidth
-                        inputValue={columnInput}
-                        onChange={(_, value) => {
-                            if (typeof value === "string") {
-                                setColumnInput(value);
-                                applyColumnChoice(value);
-                            }
-                        }}
-                        onInputChange={(_, value) => {
-                            setColumnInput(value);
-                        }}
-                        options={columns}
-                        renderInput={(params) => {
-                            const { key, ...fieldProps } = params as typeof params & {
-                                key: string;
-                            };
-                            return (
-                                <TextField
-                                    key={key}
-                                    {...fieldProps}
-                                    error={nameState === "clash"}
-                                    helperText={
-                                        nameState === "clash"
-                                            ? "A non-multitext column already uses that name."
-                                            : "Names become new multitext annotation columns when needed."
+                <SectionCard
+                    title="Annotation Setup"
+                    description="Choose the multitext column to edit, then pick whether tag actions should apply to filtered rows or the current highlight set."
+                >
+                    <Stack spacing={2}>
+                        <Stack direction="row" spacing={1}>
+                            <Autocomplete
+                                freeSolo
+                                fullWidth
+                                size="small"
+                                inputValue={columnInput}
+                                onChange={(_, value) => {
+                                    if (typeof value === "string") {
+                                        setColumnInput(value);
+                                        applyColumnChoice(value);
                                     }
-                                    label="Column name"
-                                    onKeyDown={(event) => {
-                                        if (event.key !== "Enter") {
-                                            return;
-                                        }
-                                        event.preventDefault();
-                                        applyColumnChoice(columnInput);
-                                    }}
+                                }}
+                                onInputChange={(_, value) => {
+                                    setColumnInput(value);
+                                }}
+                                options={columns}
+                                renderInput={(params) => {
+                                    const { key, ...fieldProps } = params as typeof params & {
+                                        key: string;
+                                    };
+                                    return (
+                                        <TextField
+                                            key={key}
+                                            {...fieldProps}
+                                            error={nameState === "clash"}
+                                            helperText={
+                                                nameState === "clash"
+                                                    ? "A non-multitext column already uses that name."
+                                                    : "Names become new multitext annotation columns when needed."
+                                            }
+                                            label="Column name"
+                                            onKeyDown={(event) => {
+                                                if (event.key !== "Enter") {
+                                                    return;
+                                                }
+                                                event.preventDefault();
+                                                applyColumnChoice(columnInput);
+                                            }}
+                                        />
+                                    );
+                                }}
+                            />
+                            <Button
+                                disabled={nameState !== "ok"}
+                                onClick={() => applyColumnChoice(columnInput)}
+                                sx={{ minWidth: 112 }}
+                                variant="contained"
+                            >
+                                Use Column
+                            </Button>
+                        </Stack>
+
+                        <FormControl>
+                            <Typography gutterBottom variant="subtitle2">
+                                Apply actions to
+                            </Typography>
+                            <RadioGroup
+                                row
+                                onChange={(_, value) => {
+                                    if (value === "filtered" || value === "highlighted") {
+                                        setSelectionScope(value);
+                                    }
+                                }}
+                                value={selectionScope}
+                            >
+                                <FormControlLabel
+                                    control={<Radio size="small" />}
+                                    label="Filtered rows"
+                                    value="filtered"
                                 />
-                            );
-                        }}
-                    />
-                    <Button
-                        disabled={nameState !== "ok"}
-                        onClick={() => applyColumnChoice(columnInput)}
-                        sx={{ minWidth: 112 }}
-                        variant="contained"
-                    >
-                        Use Column
-                    </Button>
-                </Stack>
+                                <FormControlLabel
+                                    control={<Radio size="small" />}
+                                    label="Highlighted rows"
+                                    value="highlighted"
+                                />
+                            </RadioGroup>
+                        </FormControl>
+                    </Stack>
+                </SectionCard>
 
                 {selectedColumn ? (
-                    <TagView dataStore={dataStore} columnName={selectedColumn} />
+                    <TagView
+                        columnName={selectedColumn}
+                        dataStore={dataStore}
+                        selectionScope={selectionScope}
+                    />
                 ) : (
-                    <Typography color="text.secondary" variant="body2">
-                        Select or create a multitext column to start annotating the current selection.
-                    </Typography>
+                    <SectionCard
+                        title="Apply Annotations"
+                        description="Select or create a multitext column above to start annotating rows."
+                    >
+                        <Typography color="text.secondary" variant="body2">
+                            No annotation column is active yet.
+                        </Typography>
+                    </SectionCard>
                 )}
             </Stack>
         );

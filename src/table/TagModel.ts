@@ -20,6 +20,7 @@ const COL_TYPE = "multitext" as const;
 const MAX_MULTITEXT_VALUES = 65535;
 
 export type TagColumn = LoadedDataColumn<"multitext">;
+export type TagSelectionScope = "filtered" | "highlighted";
 
 function getEmptyItem(column: TagColumn) {
     return inferMultitextEmptyItem(column);
@@ -101,7 +102,8 @@ function writeRowItems(column: TagColumn, rowIndex: number, items: string[]) {
 function updateSelectedRows(
     tagToChange: string,
     column: TagColumn,
-    dataModel: DataModel,
+    rowIndices: Iterable<number>,
+    dataStore: DataStore,
     notify = true,
     tagValue = true,
 ): boolean {
@@ -113,12 +115,12 @@ function updateSelectedRows(
     if (tags.length > 1) {
         const changed = tags
             .map((tag) =>
-                updateSelectedRows(tag, column, dataModel, false, tagValue),
+                updateSelectedRows(tag, column, rowIndices, dataStore, false, tagValue),
             )
             .some(Boolean);
 
         if (notify && changed) {
-            dataModel.dataStore.dataChanged([column.name]);
+            dataStore.dataChanged([column.name]);
         }
         return changed;
     }
@@ -129,7 +131,7 @@ function updateSelectedRows(
     }
 
     let changed = false;
-    for (const rowIndex of dataModel.data) {
+    for (const rowIndex of rowIndices) {
         const currentItems = getSemanticRowItems(column, rowIndex);
         const hasTag = currentItems.includes(tag);
         if (tagValue ? hasTag : !hasTag) {
@@ -144,7 +146,7 @@ function updateSelectedRows(
     }
 
     if (notify && changed) {
-        dataModel.dataStore.dataChanged([column.name]);
+        dataStore.dataChanged([column.name]);
     }
     return changed;
 }
@@ -161,13 +163,28 @@ export default class TagModel {
     readonly dataModel: DataModel;
     isReady = false;
     private listeners: (() => void)[] = [];
+    private selectionScope: TagSelectionScope;
+    private readonly listenerId: string;
 
-    private constructor(dataStore: DataStore, columnName = "__tags") {
+    private constructor(
+        dataStore: DataStore,
+        columnName = "__tags",
+        selectionScope: TagSelectionScope = "filtered",
+    ) {
         this.dataStore = dataStore;
+        this.selectionScope = selectionScope;
+        this.listenerId = `tag-model-${columnName}-${Math.random().toString(36).slice(2)}`;
         this.dataModel = new DataModel(dataStore, { autoupdate: true });
         this.dataModel.updateModel();
         this.dataModel.addListener("tag", () => {
-            this.callListeners();
+            if (this.selectionScope === "filtered") {
+                this.callListeners();
+            }
+        });
+        this.dataStore.addListener(this.listenerId, (type) => {
+            if (type === "data_highlighted" && this.selectionScope === "highlighted") {
+                this.callListeners();
+            }
         });
 
         const column = dataStore.columnIndex[columnName];
@@ -197,8 +214,9 @@ export default class TagModel {
     static async create(
         dataStore: DataStore,
         columnName = "__tags",
+        selectionScope: TagSelectionScope = "filtered",
     ): Promise<TagModel> {
-        const model = new TagModel(dataStore, columnName);
+        const model = new TagModel(dataStore, columnName, selectionScope);
 
         if (!model.isReady) {
             const column = await loadColumn(dataStore.name, columnName);
@@ -218,6 +236,29 @@ export default class TagModel {
         return model;
     }
 
+    private getSelectedRowIndices() {
+        if (this.selectionScope === "highlighted") {
+            return this.dataStore.getHighlightedData()?.slice() || [];
+        }
+        return this.dataModel.data;
+    }
+
+    getSelectionScope() {
+        return this.selectionScope;
+    }
+
+    setSelectionScope(scope: TagSelectionScope) {
+        if (scope === this.selectionScope) {
+            return;
+        }
+        this.selectionScope = scope;
+        this.callListeners();
+    }
+
+    getSelectionLength() {
+        return this.getSelectedRowIndices().length;
+    }
+
     private callListeners() {
         this.listeners.forEach((callback) => callback());
     }
@@ -235,7 +276,14 @@ export default class TagModel {
     }
 
     setTag(tag: string, tagValue = true) {
-        updateSelectedRows(tag, this.tagColumn, this.dataModel, true, tagValue);
+        updateSelectedRows(
+            tag,
+            this.tagColumn,
+            this.getSelectedRowIndices(),
+            this.dataStore,
+            true,
+            tagValue,
+        );
         this.dataModel.updateModel();
         this.callListeners();
     }
@@ -255,14 +303,14 @@ export default class TagModel {
             return false;
         }
 
-        return !this.dataModel.data.some(
+        return !Array.from(this.getSelectedRowIndices()).some(
             (rowIndex) => !getSemanticRowItems(this.tagColumn, rowIndex).includes(needle),
         );
     }
 
     getTagsInSelection(): Set<string> {
         const tags = new Set<string>();
-        for (const rowIndex of this.dataModel.data) {
+        for (const rowIndex of this.getSelectedRowIndices()) {
             getSemanticRowItems(this.tagColumn, rowIndex).forEach((tag) =>
                 tags.add(tag),
             );
