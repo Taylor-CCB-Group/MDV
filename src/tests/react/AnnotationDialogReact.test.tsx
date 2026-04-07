@@ -62,6 +62,7 @@ function createMockDataStore() {
         columns,
         dataHighlighted: vi.fn(),
         getHighlightedData: vi.fn(() => []),
+        isFiltered: vi.fn(() => false),
         name: "test-store",
     };
 }
@@ -129,6 +130,53 @@ describe("AnnotationDialogReact", () => {
             "editable_tags",
             "highlighted",
         );
+    });
+
+    test("defaults to highlighted scope when highlighted rows exist and warns only when filtered would hit all rows", async () => {
+        const dataStore = createMockDataStore();
+        dataStore.getHighlightedData = vi.fn(() => [0] as never);
+
+        render(<AnnotationDialogComponent dataStore={dataStore as never} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Annotating 1 highlighted row")).toBeTruthy();
+        });
+
+        fireEvent.click(screen.getByRole("tab", { name: "Filtered" }));
+
+        expect(screen.getByText("Filtered mode will apply to every row right now.")).toBeTruthy();
+        expect(
+            screen.getByText(
+                "Use Highlighted for targeted edits when you only mean to tag a subset.",
+            ),
+        ).toBeTruthy();
+
+        dataStore.isFiltered = vi.fn(() => true);
+        fireEvent.click(screen.getByRole("tab", { name: "Highlighted" }));
+        fireEvent.click(screen.getByRole("tab", { name: "Filtered" }));
+
+        expect(
+            screen.queryByText("Filtered mode will apply to every row right now."),
+        ).toBeNull();
+    });
+
+    test("shows a warning when the active scope has no matching rows", async () => {
+        const dataStore = createMockDataStore();
+        dataStore.getHighlightedData = vi.fn(() => [0] as never);
+        vi.mocked(TagModel.create).mockImplementation(
+            async (_dataStore, _columnName, selectionScope) =>
+                createMockTagModel(selectionScope === "highlighted" ? 0 : 2) as never,
+        );
+
+        render(<AnnotationDialogComponent dataStore={dataStore as never} />);
+
+        await waitFor(() => {
+            expect(screen.getByText("No highlighted rows match right now.")).toBeTruthy();
+        });
+
+        expect(
+            screen.getByText("Highlight some rows before applying tags in this scope."),
+        ).toBeTruthy();
     });
 
     test("shows tag mutation errors and keeps the draft value when add fails", async () => {

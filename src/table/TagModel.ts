@@ -22,6 +22,10 @@ const MAX_MULTITEXT_VALUES = 65535;
 export type TagColumn = LoadedDataColumn<"multitext">;
 export type TagSelectionScope = "filtered" | "highlighted";
 
+type DataChangedEvent = {
+    columns?: string[];
+};
+
 function getEmptyItem(column: TagColumn) {
     return inferMultitextEmptyItem(column);
 }
@@ -215,8 +219,20 @@ export default class TagModel {
                 this.callListeners();
             }
         });
-        this.dataStore.addListener(this.listenerId, (type) => {
+        this.dataStore.addListener(this.listenerId, (type, data?: DataChangedEvent) => {
             if (type === "data_highlighted" && this.selectionScope === "highlighted") {
+                this.callListeners();
+                return;
+            }
+
+            if (
+                type === "data_changed"
+                && Array.isArray(data?.columns)
+                && data.columns.includes(this.tagColumn.name)
+            ) {
+                if (this.selectionScope === "filtered") {
+                    this.dataModel.updateModel();
+                }
                 this.callListeners();
             }
         });

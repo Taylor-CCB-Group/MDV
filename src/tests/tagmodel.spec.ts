@@ -243,6 +243,39 @@ describe("TagModel", () => {
         expect(tagModel.getTagsInSelection()).toEqual(new Set(["a"]));
     });
 
+    test("refreshes when the tag column changes in place", async () => {
+        const tagColumn = {
+            name: "__tags",
+            field: "__tags",
+            datatype: "multitext" as const,
+            values: ["a"],
+            delimiter: ";",
+            stringLength: 1,
+            data: new Uint16Array([0, 65535]),
+            buffer: new SharedArrayBuffer(4),
+        };
+        const dataStore = createMockDataStore({ __tags: tagColumn }, 2);
+        const dataModel = createMockDataModel([0, 1]);
+        dataModel.dataStore = dataStore;
+        vi.mocked(DataModel).mockImplementation(function MockDataModel() {
+            return dataModel as never;
+        });
+        vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
+
+        const tagModel = await TagModel.create(dataStore as never, "__tags");
+        const listener = vi.fn();
+        tagModel.addListener(listener);
+
+        tagColumn.values.push("a; b", "b");
+        tagColumn.data[1] = 1;
+        dataStore.emit("data_changed", { columns: ["__tags"] });
+
+        expect(dataModel.updateModel).toHaveBeenCalled();
+        expect(listener).toHaveBeenCalled();
+        expect(tagModel.getTags()).toEqual(new Set(["a", "b"]));
+        expect(tagModel.getTagsInSelection()).toEqual(new Set(["a", "b"]));
+    });
+
     test("matches multitext rows by individual tag item within the active scope", async () => {
         const tagColumn = {
             name: "__tags",
