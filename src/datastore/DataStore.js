@@ -1502,11 +1502,8 @@ class DataStore {
             const max = ov.max == null ? c.minMax[1] : ov.max;
             const bins = config.bins || 100;
             const interval_size = (max - min) / bins;
-            // not ideal way of getting theme - also, won't update dynamically.
-            const dark = window.mdv?.chartManager.theme === "dark";
-            const white = config.asArray ? [255, 255, 255] : "#ffffff";
-            const black = config.asArray ? [0, 0, 0] : "#000000";
-            const fallbackColor = ov.hideMissing ? undefined : (dark ? black : white);
+            const gray = config.asArray ? [128, 128, 128] : "#808080";
+            const fallbackColor = ov.hideMissing ? undefined : gray;
             //the actual function - bins the value and returns the color for that bin
             function getColor(v) {
                 if (isFallback(v)) return fallbackColor;
