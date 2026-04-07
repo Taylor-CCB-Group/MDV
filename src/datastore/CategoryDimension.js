@@ -51,6 +51,7 @@ function createMultitextCategoryPredicate(column, category) {
 
     if (typeof category === "string") {
         const exactIndex = column.values.indexOf(category);
+        const selectedItems = new Set([category]);
         if (exactIndex !== -1) {
             return (rowIndex) => {
                 const start = rowIndex * capacity;
@@ -59,11 +60,16 @@ function createMultitextCategoryPredicate(column, category) {
                         return true;
                     }
                 }
-                return false;
+                return rowHasAnyMultitextItem(
+                    data,
+                    start,
+                    capacity,
+                    valueItemsByIndex,
+                    selectedItems,
+                );
             };
         }
 
-        const selectedItems = new Set([category]);
         return (rowIndex) =>
             rowHasAnyMultitextItem(
                 data,
