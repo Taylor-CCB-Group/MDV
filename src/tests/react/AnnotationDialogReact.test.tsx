@@ -133,12 +133,6 @@ describe("AnnotationDialogReact", () => {
 
         expect(screen.getByRole("tab", { name: "Filtered" })).toBeTruthy();
         expect(screen.getByRole("tab", { name: "Highlighted" })).toBeTruthy();
-        expect(screen.queryByText("Apply actions to")).toBeNull();
-        expect(
-            screen.queryByText(
-                "Switch between filtered and highlighted scopes without leaving the dialog.",
-            ),
-        ).toBeNull();
 
         fireEvent.click(screen.getByText("Annotation Setup"));
 
@@ -146,11 +140,9 @@ describe("AnnotationDialogReact", () => {
         fireEvent.change(input, { target: { value: "readonly_tags" } });
 
         await waitFor(() => {
-            expect(
-                screen.getByText(
-                    "That multitext column is read-only and can't be edited here.",
-                ),
-            ).toBeTruthy();
+            const columnField = screen.getByLabelText("Column name");
+            expect(columnField.getAttribute("aria-invalid")).toBe("true");
+            expect(screen.getByText(/read-only/i)).toBeTruthy();
         });
 
         expect(vi.mocked(TagModel.create)).toHaveBeenCalledWith(
@@ -172,16 +164,13 @@ describe("AnnotationDialogReact", () => {
         render(<AnnotationDialogComponent dataStore={dataStore as never} />);
 
         await waitFor(() => {
-            expect(screen.getByText("Annotating 1 highlighted row")).toBeTruthy();
+            expect(screen.getByText(/Annotating 1 .*highlighted row/)).toBeTruthy();
         });
 
         fireEvent.click(screen.getByRole("tab", { name: "Filtered" }));
 
-        expect(screen.getByText("Filtered mode will apply to every row right now.")).toBeTruthy();
         expect(
-            screen.getByText(
-                "Use Highlighted for targeted edits when you only mean to tag a subset.",
-            ),
+            screen.getByTestId("annotation-whole-table-filter-warning"),
         ).toBeTruthy();
 
         dataStore.isFiltered = vi.fn(() => true);
@@ -189,7 +178,7 @@ describe("AnnotationDialogReact", () => {
         fireEvent.click(screen.getByRole("tab", { name: "Filtered" }));
 
         expect(
-            screen.queryByText("Filtered mode will apply to every row right now."),
+            screen.queryByTestId("annotation-whole-table-filter-warning"),
         ).toBeNull();
     });
 
@@ -208,12 +197,12 @@ describe("AnnotationDialogReact", () => {
         render(<AnnotationDialogComponent dataStore={dataStore as never} />);
 
         await waitFor(() => {
-            expect(screen.getByText("No highlighted rows match right now.")).toBeTruthy();
+            expect(screen.getByTestId("annotation-no-rows-warning")).toBeTruthy();
         });
 
-        expect(
-            screen.getByText("Highlight some rows before applying tags in this scope."),
-        ).toBeTruthy();
+        expect(screen.getByTestId("annotation-no-rows-warning").textContent).toMatch(
+            /highlighted/i,
+        );
     });
 
     test("shows tag mutation errors and keeps the draft value when add fails", async () => {

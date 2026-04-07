@@ -446,6 +446,7 @@ function TagEditorPanel({
 
             {showNoRowsWarning ? (
                 <Paper
+                    data-testid="annotation-no-rows-warning"
                     sx={{
                         alignItems: "flex-start",
                         backgroundColor: (theme) =>
@@ -474,6 +475,7 @@ function TagEditorPanel({
 
             {showFilteredWarning ? (
                 <Paper
+                    data-testid="annotation-whole-table-filter-warning"
                     sx={{
                         alignItems: "flex-start",
                         backgroundColor: (theme) =>
@@ -496,7 +498,7 @@ function TagEditorPanel({
                             Filtered mode will apply to every row right now.
                         </Typography>
                         <Typography color="text.secondary" variant="caption">
-                            Use Highlighted for targeted edits when you only mean to tag a subset.
+                            Apply selection filters to limit scope, or highlight rows of interest and use 'Highlighted' above.
                         </Typography>
                     </Box>
                 </Paper>
