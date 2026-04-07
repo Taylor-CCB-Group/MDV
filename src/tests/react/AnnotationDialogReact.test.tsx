@@ -130,4 +130,45 @@ describe("AnnotationDialogReact", () => {
             "highlighted",
         );
     });
+
+    test("shows tag mutation errors and keeps the draft value when add fails", async () => {
+        const dataStore = createMockDataStore();
+        const tagModel = createMockTagModel(2);
+        tagModel.setTag.mockImplementation(() => {
+            throw new Error("Tag update failed");
+        });
+        vi.mocked(TagModel.create).mockResolvedValue(tagModel as never);
+
+        render(<AnnotationDialogComponent dataStore={dataStore as never} />);
+
+        const input = await screen.findByLabelText("Add annotation item");
+        fireEvent.change(input, { target: { value: "new-tag" } });
+        fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+        await waitFor(() => {
+            expect(screen.getByText("Tag update failed")).toBeTruthy();
+        });
+
+        expect(tagModel.setTag).toHaveBeenCalledWith("new-tag", true);
+        expect(screen.getByDisplayValue("new-tag")).toBeTruthy();
+    });
+
+    test("shows tag mutation errors when toggling an available tag row fails", async () => {
+        const dataStore = createMockDataStore();
+        const tagModel = createMockTagModel(2);
+        tagModel.setTag.mockImplementation(() => {
+            throw new Error("Row toggle failed");
+        });
+        vi.mocked(TagModel.create).mockResolvedValue(tagModel as never);
+
+        render(<AnnotationDialogComponent dataStore={dataStore as never} />);
+
+        fireEvent.click(await screen.findByText("b"));
+
+        await waitFor(() => {
+            expect(screen.getByText("Row toggle failed")).toBeTruthy();
+        });
+
+        expect(tagModel.setTag).toHaveBeenCalledWith("b", true);
+    });
 });

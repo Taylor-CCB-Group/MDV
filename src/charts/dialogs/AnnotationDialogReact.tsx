@@ -361,6 +361,7 @@ function TagEditorPanel({
     tagsInSelection: Set<string>;
 }) {
     const [draftTag, setDraftTag] = useState("");
+    const [tagError, setTagError] = useState<string | null>(null);
 
     const availableTags = useMemo(
         () =>
@@ -377,6 +378,7 @@ function TagEditorPanel({
 
     useEffect(() => {
         setDraftTag("");
+        setTagError(null);
     }, [columnName, selectionScope]);
 
     if (loadError) {
@@ -399,8 +401,22 @@ function TagEditorPanel({
         if (!nextTag) {
             return;
         }
-        tagModel.setTag(nextTag, true);
-        setDraftTag("");
+        try {
+            tagModel.setTag(nextTag, true);
+            setTagError(null);
+            setDraftTag("");
+        } catch (error) {
+            setTagError(error instanceof Error ? error.message : String(error));
+        }
+    };
+
+    const updateTag = (tag: string, tagValue: boolean) => {
+        try {
+            tagModel.setTag(tag, tagValue);
+            setTagError(null);
+        } catch (error) {
+            setTagError(error instanceof Error ? error.message : String(error));
+        }
     };
 
     const highlightMatchingRows = (
@@ -437,6 +453,9 @@ function TagEditorPanel({
                     inputValue={draftTag}
                     onInputChange={(_, value) => {
                         setDraftTag(value);
+                        if (tagError) {
+                            setTagError(null);
+                        }
                     }}
                     onChange={(_, value) => {
                         if (typeof value === "string") {
@@ -446,6 +465,8 @@ function TagEditorPanel({
                     renderInput={(params) => (
                         <TextField
                             {...params}
+                            error={Boolean(tagError)}
+                            helperText={tagError || " "}
                             label="Add annotation item"
                             placeholder="Type a value and press Enter"
                             onKeyDown={(event) => {
@@ -484,7 +505,7 @@ function TagEditorPanel({
                                     color={entireSelection ? "primary" : "default"}
                                     key={tag}
                                     label={tag}
-                                    onDelete={() => tagModel.setTag(tag, false)}
+                                    onDelete={() => updateTag(tag, false)}
                                     variant={entireSelection ? "filled" : "outlined"}
                                 />
                             );
@@ -526,7 +547,7 @@ function TagEditorPanel({
                                 <Box
                                     key={tag}
                                     onClick={() =>
-                                        tagModel.setTag(
+                                        updateTag(
                                             tag,
                                             indeterminate ? true : !entireSelection,
                                         )
