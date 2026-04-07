@@ -419,11 +419,9 @@ function TagEditorPanel({
 
     const selectionLabel =
         selectionScope === "highlighted" ? "highlighted" : "filtered";
-    const showFilteredWarning = isAllRowsFilteredSelection(
-        dataStore,
-        selectionScope,
-        selectionCount,
-    );
+    const showFilteredWarning =
+        selectionCount > 0
+        && isAllRowsFilteredSelection(dataStore, selectionScope, selectionCount);
     const showNoRowsWarning = selectionCount === 0;
     const noRowsLabel =
         selectionScope === "highlighted"
