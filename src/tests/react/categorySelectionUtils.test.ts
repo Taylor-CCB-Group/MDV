@@ -1,6 +1,7 @@
 import {
     getAvailableCategorySelectionValues,
     getCategorySelectionDropdownKey,
+    shouldRefreshCategorySelectionValues,
 } from "@/react/components/categorySelectionUtils";
 import { describe, expect, test, vi } from "vitest";
 
@@ -28,5 +29,41 @@ describe("categorySelectionUtils", () => {
         expect(getCategorySelectionDropdownKey("col_a", ["x", "y"])).not.toBe(
             getCategorySelectionDropdownKey("col_b", ["x", "y"]),
         );
+    });
+
+    test("refreshes when the active source column changes data", () => {
+        expect(
+            shouldRefreshCategorySelectionValues(
+                "data_changed",
+                { columns: ["__tags"] },
+                "__tags",
+            ),
+        ).toBe(true);
+
+        expect(
+            shouldRefreshCategorySelectionValues(
+                "data_changed",
+                { columns: ["other"] },
+                "__tags",
+            ),
+        ).toBe(false);
+    });
+
+    test("refreshes when rows are added or the active source column is removed", () => {
+        expect(
+            shouldRefreshCategorySelectionValues(
+                "data_added",
+                10,
+                "__tags",
+            ),
+        ).toBe(true);
+
+        expect(
+            shouldRefreshCategorySelectionValues(
+                "column_removed",
+                "__tags",
+                "__tags",
+            ),
+        ).toBe(true);
     });
 });

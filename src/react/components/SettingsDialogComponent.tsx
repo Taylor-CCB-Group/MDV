@@ -33,6 +33,7 @@ import { useDataStore } from "../context";
 import {
     getAvailableCategorySelectionValues,
     getCategorySelectionDropdownKey,
+    shouldRefreshCategorySelectionValues,
 } from "./categorySelectionUtils";
 
 const SettingsSearchContext = createContext("");
@@ -489,7 +490,9 @@ function cloneCategorySelectionValue(value: string | string[]) {
 const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
     const dataStore = useDataStore();
     const multiple = isMultiCategorySelection(props);
+    const listenerId = useId();
     const [dropdownKey, setDropdownKey] = useState("");
+    const [refreshVersion, setRefreshVersion] = useState(0);
     const [dropdownSpec] = useState<DropdownSpec>(
         () =>
             makeAutoObservable(
@@ -507,6 +510,29 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                 }),
             ) as DropdownSpec,
     );
+
+    useEffect(() => {
+        const key = `CategorySelectionSettingGui-${listenerId}`;
+        const listener = (
+            eventType: string,
+            eventData: { columns?: string[] } | string | number | undefined,
+        ) => {
+            const sourceColumn = props.sourceColumn?.();
+            if (
+                !shouldRefreshCategorySelectionValues(
+                    eventType,
+                    eventData,
+                    typeof sourceColumn === "string" ? sourceColumn : undefined,
+                )
+            ) {
+                return;
+            }
+            setRefreshVersion((version) => version + 1);
+        };
+
+        dataStore.addListener(key, listener);
+        return () => dataStore.removeListener(key);
+    }, [dataStore, listenerId, props]);
 
     useEffect(() => {
         return autorun(
@@ -576,7 +602,7 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                 }
             },
         );
-    }, [dataStore, dropdownSpec, multiple, props]);
+    }, [dataStore, dropdownSpec, multiple, props, refreshVersion]);
 
     return (
         <DropdownAutocompleteComponent key={dropdownKey} props={dropdownSpec} />
