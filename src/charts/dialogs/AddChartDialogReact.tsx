@@ -13,7 +13,7 @@ import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Ico
 import Grid from "@mui/material/Grid2";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
 import { action, observable, reaction, toJS } from "mobx";
-import type { ExtraControl, FieldName, GuiSpec, GuiValueTypes } from "../charts.js";
+import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType, flattenFields, isMultiColumn, type FieldSpec, type FieldSpecs } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
@@ -27,9 +27,7 @@ import { Close as CloseIcon } from "@mui/icons-material";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 
-// This is local draft state for the add-chart dialog rather than a serialised chart config.
-// Keeping the slot shape explicit here lets us distinguish single and multi params before
-// flattening back to the legacy `config.param` array that charts still expect.
+// Draft chart config: param slots are FieldSpec / FieldSpecs until we emit a flat `param` for ChartManager.
 
 type AddChartParamSlot = FieldSpec | FieldSpecs;
 type AddChartParamSlots = Array<AddChartParamSlot | undefined>;
@@ -39,8 +37,6 @@ type ChartConfig = {
     legend: string;
     param: AddChartParamSlots;
     type: string;
-    // in the original AddChartDialog, extra props are on the root object, not nested
-    // so when we pass this to ChartManager, we'll need to flatten it
     extra: Record<string, unknown>;
     _updated: Date;
 };
@@ -59,11 +55,32 @@ function normaliseParamSlot(slot: AddChartParamSlot | undefined, multiple: boole
     return multiple ? getMultiParamSlot(slot) : getSingleParamSlot(slot);
 }
 
-function flattenParams(param: AddChartParamSlots): FieldName[] {
-    return param.flatMap((slot) => {
-        if (slot === undefined) return [];
-        return flattenFields(slot);
-    });
+function buildChartPropsFromDialogState(
+    draft: ChartConfig,
+    liveSlots: AddChartParamSlots,
+    dataStore: DataStore,
+    chartType: (typeof BaseChart.types)[string] | undefined,
+): { chartProps: Record<string, unknown>; extra: Record<string, unknown> } {
+    const { extra, _updated, ...props } = draft;
+    const mergedExtra = { ...extra };
+    for (const c of chartType?.extra_controls?.(dataStore) ?? []) {
+        if (!(c.name in mergedExtra) && c.defaultVal !== undefined) mergedExtra[c.name] = c.defaultVal;
+    }
+    const flatParam =
+        chartType?.params?.length ?
+            chartType.params.flatMap((p, i) => {
+                const slot = liveSlots[i];
+                if (slot === undefined) return [];
+                const n = normaliseParamSlot(slot, isMultiColumn(p.type));
+                if (n === undefined) return [];
+                return isArray(n) ? n : [n];
+            })
+        :   [];
+    const chartProps: Record<string, unknown> = { ...props, param: flatParam };
+    Object.assign(chartProps, mergedExtra);
+    const typeKey = Object.entries(BaseChart.types).find(([, t]) => t.name === draft.type)?.[0];
+    if (typeKey !== undefined) chartProps.type = typeKey;
+    return { chartProps, extra: mergedExtra };
 }
 
 function slotMatchesParamType(
@@ -94,56 +111,24 @@ function getDefaultParamSlot(type: Param | Param[], dataStore: DataStore): AddCh
     return isMultiColumn(type) ? [matchingColumn.field] : matchingColumn.field;
 }
 
-function formatParamSlotForLog(slot: AddChartParamSlot | undefined): string {
-    if (slot === undefined) return "undefined";
-    return JSON.stringify(slot);
-}
-
 const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     const dataStore = useDataStore();
-    const chartType = useMemo(() => {
-        return Object.values(BaseChart.types).find(t => t.name === config.type);
-    }, [config.type]);
-    // this could be an actual chart preview, but for now, the config is useful
-    // will probably keep it as an option to show the JSON, but default to a chart preview
-    // this should always have the result of any extra controls & init applied - which may be an error
-    // todo rearrange so that the same code is used for adding actual chart
+    const chartType = useMemo(
+        () => Object.values(BaseChart.types).find((t) => t.name === config.type),
+        [config.type],
+    );
     const scratchProps = useMemo(() => {
-        const scratchConfig = toJS(config);
-        const { extra, _updated, ...props } = scratchConfig;
-        const previewProps = {
-            ...props,
-            param: flattenParams(scratchConfig.param),
-        };
-        // flatten the config into props
-        chartType?.extra_controls?.(dataStore).forEach(control => {
-            if (control.defaultVal && !extra[control.name]) {
-                extra[control.name] = control.defaultVal;
-            } else {
-                // if (!control.defaultVal)
-            }
-        });
-        for (const [k, v] of Object.entries(extra)) {
-            //@ts-ignore
-            previewProps[k] = v;
-        }
-        // find the key in BaseChart.types that corresponds to this chart type
-        // I don't much like this, but it seems to vaguely work for now
-        for (const [k, v] of Object.entries(BaseChart.types)) {
-            if (v.name === config.type) {
-                previewProps.type = k;
-                break;
-            }
-        }
+        const draft = toJS(config);
+        const { chartProps, extra } = buildChartPropsFromDialogState(draft, config.param, dataStore, chartType);
         if (chartType?.init) {
             try {
-                chartType.init(previewProps, dataStore, extra);
+                chartType.init(chartProps, dataStore, extra);
             } catch (e) {
                 return e;
             }
         }
-        return previewProps;
-    }, [config, dataStore, chartType]);
+        return chartProps;
+    }, [config, config._updated, dataStore, chartType]);
     const { _updated, ...configWithoutUpdated } = toJS(config);
     return (
         <div className="grid grid-cols-2 px-3 py-5">
@@ -282,7 +267,8 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
         config.type = chartTypeName;
         const chartType = chartTypes.find(t => t.name === config.type);
         if (!chartType) throw new Error(`Chart type ${config.type} not found`);
-        // set default values for params, use previous values if possible
+        const slotStr = (s: AddChartParamSlot | undefined) =>
+            s === undefined ? "undefined" : JSON.stringify(s);
         if (chartType.params) {
             // we could have some metadata on the column like `{intendedFor: "X axis"}` etc
             const previousParams = toJS(config.param);
@@ -291,9 +277,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 const previousParam = previousParams[i];
                 if (slotMatchesParamType(previousParam, p.type, dataStore)) {
                     const normalisedSlot = normaliseParamSlot(previousParam, isMultiColumn(p.type));
-                    console.log(
-                        `[${config.type}, ${p.name}] using previous selection: ${formatParamSlotForLog(normalisedSlot)}`,
-                    );
+                    console.log(`[${config.type}, ${p.name}] using previous selection: ${slotStr(normalisedSlot)}`);
                     config.param[i] = normalisedSlot;
                 } else {
                     // we could try to be a bit clever about finding a suitable column, like "x"...
@@ -303,9 +287,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                         console.warn(`[${config.type}, ${p.name}] No column found for type '${p.type}'`);
                         continue;
                     }
-                    console.log(
-                        `[${config.type}, ${p.name}] using default selection: ${formatParamSlotForLog(defaultSlot)}`,
-                    );
+                    console.log(`[${config.type}, ${p.name}] using default selection: ${slotStr(defaultSlot)}`);
                     config.param[i] = defaultSlot;
                 }
             }
@@ -323,41 +305,16 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
 
 
     const addChart = useCallback(() => {
-        const draftConfig = toJS(config);
-        const { extra, _updated, ...props } = draftConfig;
-        const chartProps = {
-            ...props,
-            param: flattenParams(draftConfig.param),
-        };
-        // flatten the config into props
-        chartType?.extra_controls?.(dataStore).forEach(control => {
-            if (control.defaultVal && !extra[control.name]) {
-                extra[control.name] = control.defaultVal;
-            } else {
-                // if (!control.defaultVal)
-            }
-        });
-        for (const [k, v] of Object.entries(extra)) {
-            //@ts-ignore
-            chartProps[k] = v;
-        }
-        // find the key in BaseChart.types that corresponds to this chart type
-        // I don't much like this, but it seems to vaguely work for now
-        for (const [k, v] of Object.entries(BaseChart.types)) {
-            if (v.name === config.type) {
-                chartProps.type = k;
-                break;
-            }
-        }
-        if (chartType?.init) {
+        if (!chartType) throw new Error("No chart type selected");
+        const draft = toJS(config);
+        const { chartProps, extra } = buildChartPropsFromDialogState(draft, config.param, dataStore, chartType);
+        if (chartType.init) {
             chartType.init(chartProps, dataStore, extra);
         }
 
-        // this is where we'd call the chart manager to add the chart
         if (!window.mdv.chartManager) throw new Error("chartManager not found");
         const finalConfig = serialiseConfig(chartProps);
         window.mdv.chartManager.addChart(dataStore.name, finalConfig, true);
-        // and then close the dialog...
         onDone();
     }, [config, dataStore, onDone, chartType]);
     return (
