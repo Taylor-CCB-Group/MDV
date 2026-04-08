@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from 'vitest';
 import { g } from '@/lib/utils';
 import type { AnyGuiSpec, Disposer } from '@/charts/charts';
-import { collectDisposers, getFolderOpenStateForSearchChange } from './SettingsDialogComponent';
+import { collectDisposers, createInitialFolderOpenState, getFolderOpenStateForSearchChange } from './SettingsDialogComponent';
 
 // We need to export collectDisposers for testing
 // Since it's not exported, we'll test it indirectly through the component
@@ -179,51 +179,74 @@ describe('Settings Dialog Disposer Management', () => {
 });
 
 describe('Settings dialog folder search state', () => {
-    test('opens a folder when search becomes active', () => {
-        expect(getFolderOpenStateForSearchChange({
-            currentSearchTerm: 'den',
-            previousSearchTerm: '',
-            isOpen: false,
-            isOpenBeforeSearch: false,
+    test('opens a folder when it mounts during an active search', () => {
+        expect(createInitialFolderOpenState({
+            defaultOpen: false,
+            searchTerm: 'den',
         })).toEqual({
             isOpen: true,
             isOpenBeforeSearch: false,
+            appliedSearchTerm: 'den',
+        });
+    });
+
+    test('opens a folder when search becomes active', () => {
+        expect(getFolderOpenStateForSearchChange({
+            currentSearchTerm: 'den',
+            folderState: {
+                isOpen: false,
+                isOpenBeforeSearch: false,
+                appliedSearchTerm: '',
+            },
+        })).toEqual({
+            isOpen: true,
+            isOpenBeforeSearch: false,
+            appliedSearchTerm: 'den',
         });
     });
 
     test('keeps user-collapsed folder closed while search term is unchanged', () => {
         expect(getFolderOpenStateForSearchChange({
             currentSearchTerm: 'den',
-            previousSearchTerm: 'den',
-            isOpen: false,
-            isOpenBeforeSearch: true,
+            folderState: {
+                isOpen: false,
+                isOpenBeforeSearch: true,
+                appliedSearchTerm: 'den',
+            },
         })).toEqual({
             isOpen: false,
             isOpenBeforeSearch: true,
+            appliedSearchTerm: 'den',
         });
     });
 
     test('reopens a folder when the active search term changes', () => {
         expect(getFolderOpenStateForSearchChange({
             currentSearchTerm: 'dens',
-            previousSearchTerm: 'den',
-            isOpen: false,
-            isOpenBeforeSearch: true,
+            folderState: {
+                isOpen: false,
+                isOpenBeforeSearch: true,
+                appliedSearchTerm: 'den',
+            },
         })).toEqual({
             isOpen: true,
             isOpenBeforeSearch: true,
+            appliedSearchTerm: 'dens',
         });
     });
 
     test('restores the pre-search open state when search is cleared', () => {
         expect(getFolderOpenStateForSearchChange({
             currentSearchTerm: '',
-            previousSearchTerm: 'den',
-            isOpen: true,
-            isOpenBeforeSearch: false,
+            folderState: {
+                isOpen: true,
+                isOpenBeforeSearch: false,
+                appliedSearchTerm: 'den',
+            },
         })).toEqual({
             isOpen: false,
             isOpenBeforeSearch: false,
+            appliedSearchTerm: '',
         });
     });
 });

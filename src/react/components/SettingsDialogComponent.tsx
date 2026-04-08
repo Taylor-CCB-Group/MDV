@@ -684,44 +684,85 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
     </>
 );
 
-export function getFolderOpenStateForSearchChange({
-    currentSearchTerm,
-    previousSearchTerm,
-    isOpen,
-    isOpenBeforeSearch,
-}: {
-    currentSearchTerm: string;
-    previousSearchTerm: string;
+type FolderOpenState = {
     isOpen: boolean;
     isOpenBeforeSearch: boolean;
-}) {
+    appliedSearchTerm: string;
+};
+
+export function createInitialFolderOpenState({
+    defaultOpen,
+    searchTerm,
+}: {
+    defaultOpen: boolean;
+    searchTerm: string;
+}): FolderOpenState {
+    const currentQuery = searchTerm.trim();
+    if (currentQuery.length > 0) {
+        return {
+            isOpen: true,
+            isOpenBeforeSearch: defaultOpen,
+            appliedSearchTerm: currentQuery,
+        };
+    }
+
+    return {
+        isOpen: defaultOpen,
+        isOpenBeforeSearch: defaultOpen,
+        appliedSearchTerm: "",
+    };
+}
+
+export function getFolderOpenStateForSearchChange({
+    currentSearchTerm,
+    folderState,
+}: {
+    currentSearchTerm: string;
+    folderState: FolderOpenState;
+}): FolderOpenState {
     const currentQuery = currentSearchTerm.trim();
-    const previousQuery = previousSearchTerm.trim();
+    const previousQuery = folderState.appliedSearchTerm;
 
     if (currentQuery.length === 0) {
         if (previousQuery.length === 0) {
-            return { isOpen, isOpenBeforeSearch };
+            return folderState;
         }
-        return { isOpen: isOpenBeforeSearch, isOpenBeforeSearch };
+        return {
+            ...folderState,
+            isOpen: folderState.isOpenBeforeSearch,
+            appliedSearchTerm: "",
+        };
     }
 
     if (previousQuery.length === 0) {
-        return { isOpen: true, isOpenBeforeSearch: isOpen };
+        return {
+            isOpen: true,
+            isOpenBeforeSearch: folderState.isOpen,
+            appliedSearchTerm: currentQuery,
+        };
     }
 
     if (currentQuery !== previousQuery) {
-        return { isOpen: true, isOpenBeforeSearch };
+        return {
+            ...folderState,
+            isOpen: true,
+            appliedSearchTerm: currentQuery,
+        };
     }
 
-    return { isOpen, isOpenBeforeSearch };
+    return folderState;
 }
 
 const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     const searchTerm = useContext(SettingsSearchContext);
     // When the dialog first opens (and search is empty), expand "General" so the user sees settings immediately.
-    const [isOpen, setIsOpen] = useState(() => props.label === "General");
-    const previousSearchTermRef = useRef(searchTerm);
-    const isOpenBeforeSearchRef = useRef(isOpen);
+    const defaultOpen = props.label === "General";
+    const [folderState, setFolderState] = useState(() =>
+        createInitialFolderOpenState({
+            defaultOpen,
+            searchTerm,
+        }),
+    );
     const settings = useMemo(
         () =>
             props.current_value.map((setting) => ({
@@ -733,20 +774,23 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     );
 
     useEffect(() => {
-        const nextState = getFolderOpenStateForSearchChange({
-            currentSearchTerm: searchTerm,
-            previousSearchTerm: previousSearchTermRef.current,
-            isOpen,
-            isOpenBeforeSearch: isOpenBeforeSearchRef.current,
+        setFolderState((previousState) => {
+            const nextState = getFolderOpenStateForSearchChange({
+                currentSearchTerm: searchTerm,
+                folderState: previousState,
+            });
+
+            if (
+                nextState.isOpen === previousState.isOpen
+                && nextState.isOpenBeforeSearch === previousState.isOpenBeforeSearch
+                && nextState.appliedSearchTerm === previousState.appliedSearchTerm
+            ) {
+                return previousState;
+            }
+
+            return nextState;
         });
-
-        previousSearchTermRef.current = searchTerm;
-        isOpenBeforeSearchRef.current = nextState.isOpenBeforeSearch;
-
-        if (nextState.isOpen !== isOpen) {
-            setIsOpen(nextState.isOpen);
-        }
-    }, [isOpen, searchTerm]);
+    }, [searchTerm]);
 
     if (settings.length === 0) return null;
     return (
@@ -771,9 +815,12 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
                 type="single"
                 collapsible
                 className="w-full"
-                value={isOpen ? props.label : ""}
+                value={folderState.isOpen ? props.label : ""}
                 onValueChange={(value) => {
-                    setIsOpen(value === props.label);
+                    setFolderState((previousState) => ({
+                        ...previousState,
+                        isOpen: value === props.label,
+                    }));
                 }}
                 //uncomment to expand by default
                 // defaultValue={props.label}
