@@ -1038,17 +1038,20 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 console.log('Namespace:', `/project/${projectId}`);
                 console.log('Socket Path:', socketPath);
                 
+                const isTabularForSocket =
+                    fileConfig.type === "csv" || fileConfig.type === "tsv";
+
                 // Create SocketIO upload client
                 const uploadClient = createSocketIOUpload({
                     namespace: `/project/${projectId}`,
                     socketPath: socketPath, // socket path for path variable: '/test/socket.io'
                     file: file,
                     fileName: file.name,
-                    // CSV-specific options
-                    datasourceName: fileConfig.type === 'csv' ? datasourceName : undefined,
-                    replace: fileConfig.type === 'csv' ? true : undefined,
-                    view: fileConfig.type === 'csv' ? 'default' : undefined,
-                    suppliedOnly: fileConfig.type === 'csv' ? false : undefined,
+                    // Tabular datasource options (CSV / TSV / .txt treated as TSV in UI)
+                    datasourceName: isTabularForSocket ? datasourceName : undefined,
+                    replace: isTabularForSocket ? true : undefined,
+                    view: isTabularForSocket ? "default" : undefined,
+                    suppliedOnly: isTabularForSocket ? false : undefined,
                     onProgress: (progressPercent: number, uploaded: number, total: number) => {
                         setProgress(progressPercent);
                     },
@@ -1082,6 +1085,23 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         }
 
                         const viewName = result?.result?.created_view ?? result?.result?.view;
+                        const tabularSuccess =
+                            !isTabularForSocket ||
+                            (result?.result?.success === true &&
+                                Array.isArray(result?.result?.metadata?.columns) &&
+                                result.result.metadata.columns.length > 0);
+
+                        if (!tabularSuccess) {
+                            dispatch({
+                                type: "SET_ERROR",
+                                payload: {
+                                    message:
+                                        "Upload failed: file format is invalid or could not be parsed. Please verify delimiter and header row.",
+                                    status: 400,
+                                },
+                            });
+                            return;
+                        }
                         if (viewName) {
                             dispatch({ type: "SET_REDIRECTING_TO_VIEW", payload: viewName });
                             const projectPath = root.startsWith("http") ? new URL(root).pathname : root;
@@ -1611,6 +1631,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                         </span>
                                     ))}
                                     </div>
+                                    <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                                        Use a header row and ensure delimiter matches file type.
+                                    </p>
                                 </div>
                             </div>
                         </DropzoneContainer>
