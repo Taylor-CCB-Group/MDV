@@ -7,6 +7,8 @@ import {
 const DEFAULT_MULTITEXT_CAPACITY = 24;
 const DEFAULT_UNIQUE_STRING_LENGTH = 64;
 
+let nextDataModelFilterListenerSeq = 0;
+
 /**
  * Helper to clone data type agnostically 
  */
@@ -50,12 +52,25 @@ class DataModel {
         }
         this.size = len;
         this.listeners = {};
+        /** @type {string | null} */
+        this._dataStoreFilterListenerId = null;
         if (config.autoupdate == null || config.autoupdate === true) {
-            dataStore.addListener("sss", (type) => {
+            this._dataStoreFilterListenerId = `data-model-filter-${++nextDataModelFilterListenerSeq}`;
+            dataStore.addListener(this._dataStoreFilterListenerId, (type) => {
                 if (type === "filtered") {
                     this.updateModel();
                 }
             });
+        }
+    }
+
+    /**
+     * Removes the DataStore "filtered" autoupdate listener. Safe to call more than once.
+     */
+    dispose() {
+        if (this._dataStoreFilterListenerId) {
+            this.dataStore.removeListener(this._dataStoreFilterListenerId);
+            this._dataStoreFilterListenerId = null;
         }
     }
 

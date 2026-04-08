@@ -85,33 +85,33 @@ function useColorRange(
     const categoryKey = Array.isArray(categorySnapshot)
         ? categorySnapshot.join("\u0000")
         : categorySnapshot ?? "";
-    const columnColors = useMemo(
-        () =>
-            contourParameter ? ds.getColumnColors(contourParameter.field, {
-                asArray: true,
-                useValue: true,
-            }) : viridis,
-        [ds, contourParameter],
-    );
+    // Category columns can mutate in place, for example when annotation values are added
+    // to an existing multitext column. Derive colors from the latest column contents on
+    // every render rather than memoizing against the stable column object identity.
+    const columnColors =
+        contourParameter
+            ? ds.getColumnColors(contourParameter.field, {
+                  asArray: true,
+                  useValue: true,
+              })
+            : viridis;
     /**
      * if the category refers to a specific value,
      * return its index in `category.values` (and associated `columnColors`).
      * otherwise return `-1` indicating that we should use the default color range
      * (currently hardcoded to `viridis`)
      */
-    const categoryValueIndex = useMemo(() => {
+    const categoryValueIndex = (() => {
         // if (!category) return contourParameter.values.map((_, i) => i); //NO: -1 is a clue to use general 'viridis' color range atm.
         if (!contourParameter || !categorySnapshot) return -1;
         //we could do something different here... would need more clever color handling on the receiving end
         if (Array.isArray(categorySnapshot))
             return categorySnapshot.length > 1 ? -1 : contourParameter.values.indexOf(categorySnapshot[0]);
         return contourParameter.values.indexOf(categorySnapshot);
-    }, [contourParameter, categoryKey]);
+    })();
     const colorRange = useMemo(() => {
         if (categoryValueIndex === -1) return viridis;
         const color = columnColors[categoryValueIndex];
-        // return [[...color, 255], [...color, 255]];
-        console.log("color", color, categorySnapshot);
         // return [color];
         // workaround for https://github.com/visgl/deck.gl/issues/9219
         // always use same length array so it doesn't delete the texture
@@ -473,7 +473,7 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
                 //^^ maybe get Furquan to work on this.
                 label: "Contour parameter",
                 current_value: c.contourParameter || "",
-                columnType: "text",
+                columnType: ["text", "text16", "multitext"],
                 func: (x) => {
                     if (x === c.contourParameter) return;
                     if (!isArray(c.param)) throw "expected param array";

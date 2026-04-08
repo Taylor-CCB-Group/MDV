@@ -30,6 +30,10 @@ import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/const
 import { Clear } from "@mui/icons-material";
 import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
 import { useDataStore } from "../context";
+import {
+    getCategorySelectionDropdownKey,
+} from "./categorySelectionUtils";
+import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 
 const SettingsSearchContext = createContext("");
 
@@ -483,8 +487,8 @@ function cloneCategorySelectionValue(value: string | string[]) {
 }
 
 const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
-    const dataStore = useDataStore();
     const multiple = isMultiCategorySelection(props);
+    const [dropdownKey, setDropdownKey] = useState("");
     const [dropdownSpec] = useState<DropdownSpec>(
         () =>
             makeAutoObservable(
@@ -502,6 +506,10 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                 }),
             ) as DropdownSpec,
     );
+    const liveSourceColumn = props.sourceColumn?.();
+    const availableValues = useLiveCategorySelectionValues(
+        typeof liveSourceColumn === "string" ? liveSourceColumn : undefined,
+    );
 
     useEffect(() => {
         return autorun(
@@ -511,19 +519,13 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                     props.getCurrentValue?.() ?? props.current_value,
                     multiple,
                 );
-                const availableValues =
-                    typeof sourceColumn === "string"
-                        ? (() => {
-                              try {
-                                  return dataStore.getColumnValues(sourceColumn).slice();
-                              } catch (error) {
-                                  console.error(
-                                      `error updating category selection values with '${sourceColumn}' (${error})`,
-                                  );
-                                  return [];
-                              }
-                          })()
-                        : [];
+                setDropdownKey((previousKey) => {
+                    const nextKey = getCategorySelectionDropdownKey(
+                        typeof sourceColumn === "string" ? sourceColumn : undefined,
+                        availableValues,
+                    );
+                    return previousKey === nextKey ? previousKey : nextKey;
+                });
 
                 runInAction(() => {
                     dropdownSpec.values = [availableValues];
@@ -573,10 +575,10 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                 }
             },
         );
-    }, [dataStore, dropdownSpec, multiple, props]);
+    }, [availableValues, dropdownSpec, multiple, props]);
 
     return (
-        <DropdownAutocompleteComponent props={dropdownSpec} />
+        <DropdownAutocompleteComponent key={dropdownKey} props={dropdownSpec} />
     );
 });
 // removed unused DropdownComponent...

@@ -5,6 +5,65 @@ type CategoryRows = {
     rows: ArrayLike<number>;
 };
 
+export type HighlightModifierInput = {
+    shiftKey?: boolean;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+};
+
+export type HighlightModifierState = {
+    add: boolean;
+    toggle: boolean;
+};
+
+function getUniqueRows(rowIndexes: ArrayLike<number>) {
+    return Array.from(new Set(Array.from(rowIndexes)));
+}
+
+/**
+ * Normalizes keyboard modifiers into the shared highlight semantics used by row-selection UIs.
+ * Ctrl/Cmd toggle wins over Shift-add when both are pressed.
+ */
+export function getHighlightModifierState(
+    modifiers?: HighlightModifierInput,
+): HighlightModifierState {
+    const toggle = !!(modifiers?.ctrlKey || modifiers?.metaKey);
+    return {
+        add: !toggle && !!modifiers?.shiftKey,
+        toggle,
+    };
+}
+
+export function getNextHighlightedRows(
+    rowIndexes: ArrayLike<number>,
+    currentHighlightedRows: ArrayLike<number>,
+    modifiers?: HighlightModifierInput,
+) {
+    const targetRows = getUniqueRows(rowIndexes);
+    const { add, toggle } = getHighlightModifierState(modifiers);
+
+    if (toggle) {
+        const currentRows = getUniqueRows(currentHighlightedRows);
+        const currentRowSet = new Set(currentRows);
+        const shouldRemoveGroup = targetRows.every((rowIndex) =>
+            currentRowSet.has(rowIndex),
+        );
+
+        if (shouldRemoveGroup) {
+            const targetRowSet = new Set(targetRows);
+            return currentRows.filter((rowIndex) => !targetRowSet.has(rowIndex));
+        }
+
+        return getUniqueRows([...currentRows, ...targetRows]);
+    }
+
+    if (add) {
+        return getUniqueRows([...Array.from(currentHighlightedRows), ...targetRows]);
+    }
+
+    return targetRows;
+}
+
 export function getHighlightedRowsFromCategoryIndices(
     categoryIndices: number[],
     categories: CategoryRows[],
@@ -74,6 +133,23 @@ export function useHighlightRows() {
         // dataHighlighted expects an array of numbers
         dataStore.dataHighlighted(rowIndexes, chart);
     }, [chart, dataStore]);
+}
+
+/**
+ * Hook that highlights rows while respecting the shared replace/add/toggle keyboard modifiers.
+ */
+export function useHighlightRowsWithModifiers() {
+    const highlightRows = useHighlightRows();
+    const highlightedIndices = useHighlightedIndices();
+
+    return useCallback(
+        (rowIndexes: ArrayLike<number>, modifiers?: HighlightModifierInput) => {
+            highlightRows(
+                getNextHighlightedRows(rowIndexes, highlightedIndices, modifiers),
+            );
+        },
+        [highlightRows, highlightedIndices],
+    );
 }
 
 /**

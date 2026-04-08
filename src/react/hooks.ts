@@ -1,5 +1,5 @@
 import type React from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
@@ -13,6 +13,8 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
+import { getCategoryFilterIndices } from "./categoryFilterUtils";
+import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
 
 /** Region constraint for `filterPoly` — restricts the polygon filter to rows in a specific region. */
 export type FilterPolyRegionOpts = { regionField: string; regionValue: string };
@@ -285,6 +287,35 @@ export function useRegion() {
 }
 
 /**
+ * Exposes datastore filtered-row invalidations as a simple React state dependency.
+ *
+ * `DataStore#getFilteredIndices()` caches a promise on the store, and many hooks need
+ * a React-visible signal when that cache is invalidated by filtering or data edits.
+ * The returned counter increments on the datastore events that can change the set of
+ * rows available to downstream filtered-index consumers.
+ */
+function useFilteredIndicesRefreshVersion() {
+    const dataStore = useDataStore();
+    const listenerId = useId();
+    const [refreshVersion, setRefreshVersion] = useState(0);
+
+    useEffect(() => {
+        const key = `filtered-indices-${listenerId}`;
+        const listener = (type: string) => {
+            if (!shouldRefreshFilteredIndices(type)) {
+                return;
+            }
+            setRefreshVersion((version) => version + 1);
+        };
+
+        dataStore.addListener(key, listener);
+        return () => dataStore.removeListener(key);
+    }, [dataStore, listenerId]);
+
+    return refreshVersion;
+}
+
+/**
  * Get a {Uint32Array} of the currently filtered indices.
  * When the selection changes, this will asynchronously update.
  * All users of the same data store (on a per-chart basis) share a reference to the same array.
@@ -301,6 +332,7 @@ export function useFilteredIndices() {
     useEffect(() => {
         // return
         let cancelled = false;
+        simpleFilteredIndices; // referenced so local filters refresh when the base filtered rows change
         if (!filterColumn) return;
         const indexPromise = dataStore.getFilteredIndices();
         //todo maybe make more use of deck.gl category filters once we update to new version
@@ -370,6 +402,7 @@ export function useFilteredIndices() {
         // using _filteredIndicesPromise as a dependency is working reasonably well,
         // but possibly needs a bit more thought.
     }, [
+        simpleFilteredIndices,
         dataStore._filteredIndicesPromise,
         filterColumn,
         config.background_filter,
@@ -395,11 +428,12 @@ export function useFilteredIndices() {
  */
 export function useSimplerFilteredIndices() {
     const ds = useDataStore();
+    const refreshVersion = useFilteredIndicesRefreshVersion();
     const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(0));
     useEffect(() => {
         ds._filteredIndicesPromise; //referencing this so it's a dependency
         ds.getFilteredIndices().then(i => setFilteredIndices(i));
-    }, [ds._filteredIndicesPromise, ds.getFilteredIndices]);
+    }, [refreshVersion, ds._filteredIndicesPromise, ds.getFilteredIndices]);
     return filteredIndices;
 }
 
@@ -426,27 +460,13 @@ export function useCategoryFilterIndices(
     const categoryKey = isArray(categorySnapshot)
         ? categorySnapshot.join("\u0000")
         : categorySnapshot ?? "";
-    //todo handle multitext / tags properly.
-    const categoryValueIndex = useMemo(() => {
-        if (!contourParameter || !categorySnapshot) return -1;
-        if (isArray(categorySnapshot)) {
-            return categorySnapshot.map((c) => contourParameter.values?.indexOf(c));
-        }
-        return contourParameter.values.indexOf(categorySnapshot);
-    }, [contourParameter, categoryKey]);
     const filteredIndices = useMemo(() => {
-        if (!contourParameter) return [];
-        const pData = contourParameter.data;
-        if (categoryValueIndex === -1 || !pData) return [];
-        if (isArray(categoryValueIndex)) {
-            return data.filter((i) =>
-                categoryValueIndex.includes(pData[i]),
-            );
-        }
-        return data.filter(
-            (i) => pData[i] === categoryValueIndex,
+        return getCategoryFilterIndices(
+            data,
+            contourParameter,
+            categorySnapshot,
         );
-    }, [data, categoryValueIndex, contourParameter]);
+    }, [data, contourParameter, categoryKey]);
     return filteredIndices;
 }
 
