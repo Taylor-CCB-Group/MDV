@@ -23,6 +23,7 @@ import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type { SettingsDialogState as PersistedSettingsDialogState } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
@@ -692,6 +693,7 @@ type FolderOpenState = {
 };
 
 type FolderStateById = Record<string, FolderOpenState>;
+type SettingsDialogState = PersistedSettingsDialogState;
 
 type SettingsFolderStateContextValue = {
     folderStates: FolderStateById;
@@ -699,6 +701,13 @@ type SettingsFolderStateContextValue = {
 };
 
 const SettingsFolderStateContext = createContext<SettingsFolderStateContextValue | null>(null);
+
+function getInitialSettingsDialogState<T extends BaseConfig>(chart: BaseChart<T>): SettingsDialogState {
+    return chart.settingsDialogState || {
+        searchTerm: "",
+        folderStates: {},
+    };
+}
 
 export function createInitialFolderOpenState({
     defaultOpen,
@@ -995,8 +1004,35 @@ export const AbstractComponent = observer(
 );
 
 export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [folderStates, setFolderStates] = useState<FolderStateById>({});
+    const [dialogState, setDialogState] = useState<SettingsDialogState>(() =>
+        getInitialSettingsDialogState(chart),
+    );
+    const { searchTerm, folderStates } = dialogState;
+    const setSearchTerm = useCallback((value: string) => {
+        setDialogState((previousState) => {
+            if (previousState.searchTerm === value) {
+                return previousState;
+            }
+            return {
+                ...previousState,
+                searchTerm: value,
+            };
+        });
+    }, []);
+    const setFolderStates = useCallback<Dispatch<SetStateAction<FolderStateById>>>((value) => {
+        setDialogState((previousState) => {
+            const nextFolderStates = typeof value === "function"
+                ? value(previousState.folderStates)
+                : value;
+            if (nextFolderStates === previousState.folderStates) {
+                return previousState;
+            }
+            return {
+                ...previousState,
+                folderStates: nextFolderStates,
+            };
+        });
+    }, []);
     // Get the raw settings first so we can collect disposers from the same objects
     const rawSettings = useMemo(() => {
         return chart.getSettings();
@@ -1019,6 +1055,10 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
             });
         };
     }, [rawSettings]);
+
+    useEffect(() => {
+        chart.settingsDialogState = dialogState;
+    }, [chart, dialogState]);
     
     return (
         <ChartProvider chart={chart}>
