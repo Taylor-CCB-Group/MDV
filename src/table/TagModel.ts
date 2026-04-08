@@ -477,6 +477,9 @@ export default class TagModel {
     }
 
     entireSelectionHasTag(tag: string): boolean {
+        if (this.dataModel.getLength() === 0) {
+            return false;
+        }
         const tags = splitMultitextItems(tag, getMultitextDelimiter(this.tagColumn));
         if (tags.length > 1) {
             return tags.every((item) => this.entireSelectionHasTag(item));
