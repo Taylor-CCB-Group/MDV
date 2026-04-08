@@ -20,7 +20,6 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { getMultitextItemValues, inferMultitextEmptyItem } from "@/lib/multitext";
 import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
@@ -31,6 +30,10 @@ import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/const
 import { Clear } from "@mui/icons-material";
 import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
 import { useDataStore } from "../context";
+import {
+    getAvailableCategorySelectionValues,
+    getCategorySelectionDropdownKey,
+} from "./categorySelectionUtils";
 
 const SettingsSearchContext = createContext("");
 
@@ -486,6 +489,7 @@ function cloneCategorySelectionValue(value: string | string[]) {
 const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
     const dataStore = useDataStore();
     const multiple = isMultiCategorySelection(props);
+    const [dropdownKey, setDropdownKey] = useState("");
     const [dropdownSpec] = useState<DropdownSpec>(
         () =>
             makeAutoObservable(
@@ -512,25 +516,17 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
                     props.getCurrentValue?.() ?? props.current_value,
                     multiple,
                 );
-                const availableValues =
-                    typeof sourceColumn === "string"
-                        ? (() => {
-                              try {
-                                  const source = dataStore.columnIndex[sourceColumn];
-                                  if (source?.datatype === "multitext") {
-                                      return getMultitextItemValues(source, {
-                                          emptyItem: inferMultitextEmptyItem(source),
-                                      }).slice();
-                                  }
-                                  return dataStore.getColumnValues(sourceColumn).slice();
-                              } catch (error) {
-                                  console.error(
-                                      `error updating category selection values with '${sourceColumn}' (${error})`,
-                                  );
-                                  return [];
-                              }
-                          })()
-                        : [];
+                const availableValues = getAvailableCategorySelectionValues(
+                    dataStore,
+                    typeof sourceColumn === "string" ? sourceColumn : undefined,
+                );
+                setDropdownKey((previousKey) => {
+                    const nextKey = getCategorySelectionDropdownKey(
+                        typeof sourceColumn === "string" ? sourceColumn : undefined,
+                        availableValues,
+                    );
+                    return previousKey === nextKey ? previousKey : nextKey;
+                });
 
                 runInAction(() => {
                     dropdownSpec.values = [availableValues];
@@ -583,7 +579,7 @@ const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelect
     }, [dataStore, dropdownSpec, multiple, props]);
 
     return (
-        <DropdownAutocompleteComponent props={dropdownSpec} />
+        <DropdownAutocompleteComponent key={dropdownKey} props={dropdownSpec} />
     );
 });
 // removed unused DropdownComponent...

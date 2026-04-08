@@ -177,7 +177,6 @@ describe('Settings Dialog Disposer Management', () => {
         });
     });
 });
-
 describe('Settings dialog folder search state', () => {
     test('opens a folder when it mounts during an active search', () => {
         expect(createInitialFolderOpenState({
