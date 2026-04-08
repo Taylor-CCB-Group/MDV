@@ -1,3 +1,4 @@
 - use `npx tsgo` for type-checking
 - avoid `as` casts where possible
 - prefer follow-up PRs for wider type-system cleanups
+- when composing commit messages, avoid words like "enhance" and favour conciseness and clarity
