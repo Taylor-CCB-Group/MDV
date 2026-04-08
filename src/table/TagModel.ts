@@ -367,6 +367,7 @@ export default class TagModel {
         const model = new TagModel(dataStore, columnName, selectionScope);
 
         if (!model.isReady) {
+        try {
             const column = await loadColumn(dataStore.name, columnName);
             if (!isColumnOfType(column, COL_TYPE)) {
                 throw new Error(
@@ -382,6 +383,10 @@ export default class TagModel {
             model.tagColumn = column;
             model.isReady = true;
             model.callListeners();
+        } catch (error) {
+            model.dispose();
+            throw error;
+            }
         }
 
         return model;
