@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from 'vitest';
 import { g } from '@/lib/utils';
 import type { AnyGuiSpec, Disposer } from '@/charts/charts';
-import { collectDisposers, createInitialFolderOpenState, getFolderOpenStateForSearchChange } from './SettingsDialogComponent';
+import { collectDisposers, createInitialFolderOpenState, getFolderOpenStateForSearchChange, resolveFolderOpenState } from './SettingsDialogComponent';
 
 // We need to export collectDisposers for testing
 // Since it's not exported, we'll test it indirectly through the component
@@ -216,6 +216,22 @@ describe('Settings dialog folder search state', () => {
         })).toEqual({
             isOpen: false,
             isOpenBeforeSearch: true,
+            appliedSearchTerm: 'den',
+        });
+    });
+
+    test('preserves a remembered child collapse state when remounted under the same search', () => {
+        expect(resolveFolderOpenState({
+            defaultOpen: false,
+            searchTerm: 'den',
+            folderState: {
+                isOpen: false,
+                isOpenBeforeSearch: false,
+                appliedSearchTerm: 'den',
+            },
+        })).toEqual({
+            isOpen: false,
+            isOpenBeforeSearch: false,
             appliedSearchTerm: 'den',
         });
     });

@@ -1,5 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
 import { action, autorun, makeAutoObservable, runInAction } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -690,6 +691,15 @@ type FolderOpenState = {
     appliedSearchTerm: string;
 };
 
+type FolderStateById = Record<string, FolderOpenState>;
+
+type SettingsFolderStateContextValue = {
+    folderStates: FolderStateById;
+    setFolderStates: Dispatch<SetStateAction<FolderStateById>>;
+};
+
+const SettingsFolderStateContext = createContext<SettingsFolderStateContextValue | null>(null);
+
 export function createInitialFolderOpenState({
     defaultOpen,
     searchTerm,
@@ -711,6 +721,28 @@ export function createInitialFolderOpenState({
         isOpenBeforeSearch: defaultOpen,
         appliedSearchTerm: "",
     };
+}
+
+export function resolveFolderOpenState({
+    defaultOpen,
+    searchTerm,
+    folderState,
+}: {
+    defaultOpen: boolean;
+    searchTerm: string;
+    folderState?: FolderOpenState;
+}): FolderOpenState {
+    if (!folderState) {
+        return createInitialFolderOpenState({
+            defaultOpen,
+            searchTerm,
+        });
+    }
+
+    return getFolderOpenStateForSearchChange({
+        currentSearchTerm: searchTerm,
+        folderState,
+    });
 }
 
 export function getFolderOpenStateForSearchChange({
@@ -755,14 +787,21 @@ export function getFolderOpenStateForSearchChange({
 
 const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     const searchTerm = useContext(SettingsSearchContext);
+    const folderStateContext = useContext(SettingsFolderStateContext);
+    if (!folderStateContext) {
+        throw new Error("FolderComponent must be used within SettingsFolderStateContext");
+    }
+
     // When the dialog first opens (and search is empty), expand "General" so the user sees settings immediately.
     const defaultOpen = props.label === "General";
-    const [folderState, setFolderState] = useState(() =>
-        createInitialFolderOpenState({
-            defaultOpen,
-            searchTerm,
-        }),
-    );
+    const { folderStates, setFolderStates } = folderStateContext;
+    const folderId = (props as GuiSpec<"folder"> & { _stableId?: string })._stableId
+        || `${props.type}:${props.label}`;
+    const folderState = resolveFolderOpenState({
+        defaultOpen,
+        searchTerm,
+        folderState: folderStates[folderId],
+    });
     const settings = useMemo(
         () =>
             props.current_value.map((setting) => ({
@@ -774,23 +813,29 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
     );
 
     useEffect(() => {
-        setFolderState((previousState) => {
-            const nextState = getFolderOpenStateForSearchChange({
-                currentSearchTerm: searchTerm,
-                folderState: previousState,
+        setFolderStates((previousStates) => {
+            const nextState = resolveFolderOpenState({
+                defaultOpen,
+                searchTerm,
+                folderState: previousStates[folderId],
             });
+            const previousState = previousStates[folderId];
 
             if (
-                nextState.isOpen === previousState.isOpen
+                previousState
+                && nextState.isOpen === previousState.isOpen
                 && nextState.isOpenBeforeSearch === previousState.isOpenBeforeSearch
                 && nextState.appliedSearchTerm === previousState.appliedSearchTerm
             ) {
-                return previousState;
+                return previousStates;
             }
 
-            return nextState;
+            return {
+                ...previousStates,
+                [folderId]: nextState,
+            };
         });
-    }, [searchTerm]);
+    }, [defaultOpen, folderId, searchTerm, setFolderStates]);
 
     if (settings.length === 0) return null;
     return (
@@ -817,10 +862,31 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
                 className="w-full"
                 value={folderState.isOpen ? props.label : ""}
                 onValueChange={(value) => {
-                    setFolderState((previousState) => ({
-                        ...previousState,
-                        isOpen: value === props.label,
-                    }));
+                    setFolderStates((previousStates) => {
+                        const previousState = resolveFolderOpenState({
+                            defaultOpen,
+                            searchTerm,
+                            folderState: previousStates[folderId],
+                        });
+                        const nextState = {
+                            ...previousState,
+                            isOpen: value === props.label,
+                        };
+
+                        if (
+                            previousStates[folderId]
+                            && nextState.isOpen === previousState.isOpen
+                            && nextState.isOpenBeforeSearch === previousState.isOpenBeforeSearch
+                            && nextState.appliedSearchTerm === previousState.appliedSearchTerm
+                        ) {
+                            return previousStates;
+                        }
+
+                        return {
+                            ...previousStates,
+                            [folderId]: nextState,
+                        };
+                    });
                 }}
                 //uncomment to expand by default
                 // defaultValue={props.label}
@@ -930,6 +996,7 @@ export const AbstractComponent = observer(
 
 export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
     const [searchTerm, setSearchTerm] = useState("");
+    const [folderStates, setFolderStates] = useState<FolderStateById>({});
     // Get the raw settings first so we can collect disposers from the same objects
     const rawSettings = useMemo(() => {
         return chart.getSettings();
@@ -956,45 +1023,47 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
     return (
         <ChartProvider chart={chart}>
             <SettingsSearchContext.Provider value={searchTerm}>
-                <div className="w-full max-h-[80vh]">
-                    <Box sx={{ p: 1 }}>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            variant="outlined"
-                            label="Search Settings by Folder or Name"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            sx={{ backgroundColor: "transparent" }}
-                            slotProps={{
-                                input: {
-                                    endAdornment: searchTerm.trim().length > 0 ? (
-                                        <InputAdornment position="end">
-                                            <IconButton
-                                                aria-label="clear search"
-                                                onMouseDown={(e) => e.preventDefault()}
-                                                onClick={() => setSearchTerm("")}
-                                            >
-                                                <Clear />
-                                            </IconButton>
-                                        </InputAdornment>
-                                    ) : null,
-                                },
-                            }}
-                        />
-                    </Box>
-                    {settings.length === 0 && (
-                        <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
-                            {searchTerm.trim().length > 0
-                                ? "No settings match your search."
-                                : "No settings available."}
-                        </Typography>
-                    )}
-                    <Divider sx={{ marginY: 0.75, opacity: 0.6 }} />
-                    {settings.map(({ setting, id }) => (
-                        <AbstractComponent key={id} props={setting} />
-                    ))}
-                </div>
+                <SettingsFolderStateContext.Provider value={{ folderStates, setFolderStates }}>
+                    <div className="w-full max-h-[80vh]">
+                        <Box sx={{ p: 1 }}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                variant="outlined"
+                                label="Search Settings by Folder or Name"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                sx={{ backgroundColor: "transparent" }}
+                                slotProps={{
+                                    input: {
+                                        endAdornment: searchTerm.trim().length > 0 ? (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label="clear search"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => setSearchTerm("")}
+                                                >
+                                                    <Clear />
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ) : null,
+                                    },
+                                }}
+                            />
+                        </Box>
+                        {settings.length === 0 && (
+                            <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
+                                {searchTerm.trim().length > 0
+                                    ? "No settings match your search."
+                                    : "No settings available."}
+                            </Typography>
+                        )}
+                        <Divider sx={{ marginY: 0.75, opacity: 0.6 }} />
+                        {settings.map(({ setting, id }) => (
+                            <AbstractComponent key={id} props={setting} />
+                        ))}
+                    </div>
+                </SettingsFolderStateContext.Provider>
             </SettingsSearchContext.Provider>
         </ChartProvider>
     );
