@@ -40,7 +40,7 @@ type ButtonProps = {
 
 export const Container = ({ children }: PropsWithChildren) => {
     return (
-        <div className="flex flex-col content-center items-center h-max dark:bg-black-800 dark:text-white">
+        <div className="flex flex-col content-center items-center h-max dark:text-white">
             {children}
         </div>
     );
@@ -48,7 +48,7 @@ export const Container = ({ children }: PropsWithChildren) => {
 
 export const StatusContainer = ({ children }: PropsWithChildren) => {
     return (
-        <div className="flex flex-col justify-center items-center w-full h-150 dark:bg-#333">
+        <div className="flex flex-col justify-center items-center w-full h-[150px] dark:bg-[`#333`]">
             {children}
         </div>
     );
