@@ -37,6 +37,11 @@ ColumnName = str  # NewType("ColumnName", str)
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
 datatype_mappings = {
+    "int8": "integer",
+    "int16": "integer",
+    "uint8": "integer",
+    "uint16": "integer",
+    "uint32": "integer",
     "int64": "integer",
     "float64": "double",
     "float32": "double",
