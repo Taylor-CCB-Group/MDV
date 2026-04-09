@@ -40,18 +40,22 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
             endpoint: "add_datasource",
         },
     },
-    TIFF: {
-        type: "tiff",
-        extensions: [".tiff", ".tif"],
-        mimeTypes: ["image/tiff"],
-        maxSize: 10000 * 1024 * 1024,
-        processingConfig: {
-            defaultWidth: 1032,
-            defaultHeight: 580,
-            requiresMetadata: true,
-            endpoint: "add_or_update_image_datasource",
-        },
-    },
+    // TIFF upload is intentionally disabled for now.
+    // Reason: Socket.IO backend path does not fully process TIFF uploads yet,
+    // and current frontend TIFF metadata flow is incomplete.
+    // Re-enable only after both HTTP and Socket.IO TIFF paths are validated end-to-end.
+    // TIFF: {
+    //     type: "tiff",
+    //     extensions: [".tiff", ".tif"],
+    //     mimeTypes: ["image/tiff"],
+    //     maxSize: 10000 * 1024 * 1024,
+    //     processingConfig: {
+    //         defaultWidth: 1032,
+    //         defaultHeight: 580,
+    //         requiresMetadata: true,
+    //         endpoint: "add_or_update_image_datasource",
+    //     },
+    // },
     H5: {
         type: "h5",
         extensions: [".h5", ".h5ad"],
