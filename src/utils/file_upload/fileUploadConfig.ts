@@ -31,7 +31,7 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
     TSV: {
         type: "tsv",
         extensions: [".tsv", ".tab", ".txt"],
-        mimeTypes: ["text/tab-separated-values"],
+        mimeTypes: ["text/tab-separated-values", "text/plain"],
         maxSize: 10000 * 1024 * 1024,
         processingConfig: {
             defaultWidth: 800,
