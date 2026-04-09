@@ -1,20 +1,8 @@
 import click
-import scanpy as sc
-import mudata as mu
 import shutil
 import zipfile
 import os
 from os.path import exists, join, basename
-from .conversions import (
-    convert_scanpy_to_mdv,
-    convert_mudata_to_mdv,
-    convert_vcf_to_mdv,
-    merge_projects,
-)
-from .spatial.conversion import (
-    convert_spatialdata_to_mdv,
-    SpatialDataConversionArgs,
-)
 
 def zip_and_remove(folder):
     """Zip a directory and delete the original."""
@@ -54,6 +42,9 @@ def cli():
 @click.option('--chatmdv', is_flag=True, help='Include the original Scanpy .h5ad file in the zipped project.')
 def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column, zip_output, chatmdv):
     """Convert Scanpy AnnData object to MDV format."""
+    import scanpy as sc
+    from .conversions import convert_scanpy_to_mdv
+
     adata = sc.read_h5ad(scanpy_object)
     convert_scanpy_to_mdv(folder, adata, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column)
 
@@ -74,6 +65,9 @@ def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, chun
 @click.option('--zip', 'zip_output', is_flag=True, help='Zip the output folder and delete the original.')
 def convert_mudata(folder, mudata_object, max_dims, delete_existing, chunk_data, zip_output):
     """Convert MuData object to MDV format."""
+    import mudata as mu
+    from .conversions import convert_mudata_to_mdv
+
     mdata = mu.read(mudata_object)
     convert_mudata_to_mdv(folder, mdata, max_dims, delete_existing, chunk_data)
     if zip_output:
@@ -85,6 +79,8 @@ def convert_mudata(folder, mudata_object, max_dims, delete_existing, chunk_data,
 @click.option('--zip', 'zip_output', is_flag=True, help='Zip the output folder and delete the original.')
 def convert_vcf(folder, vcf_filename, zip_output):
     """Convert VCF file to MDV format."""
+    from .conversions import convert_vcf_to_mdv
+
     convert_vcf_to_mdv(folder, vcf_filename)
     if zip_output:
         zip_and_remove(folder)
@@ -120,19 +116,25 @@ def serve(folder, port):
 )
 def merge_project(base_project, extra_project, prefix, view_prefix):
     """Merge an existing MDV project into another project."""
+    from .conversions import merge_projects
+
     merge_projects(base_project, extra_project, prefix=prefix, view_prefix=view_prefix)
     click.echo(f"Merged '{extra_project}' into '{base_project}'.")
 
 @cli.command("convert-spatial")
 @click.argument('output_folder')
 @click.argument('spatialdata_path')
-@click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data.')
-@click.option('--link', is_flag=True, help='Symlink to the original SpatialData objects.')
-@click.option('--output_geojson', is_flag=True, help='Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes).')
-@click.option('--serve', is_flag=True, help='Serve the project after conversion.')
-def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, serve):
+@click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data in the output folder instead of recreating it.')
+@click.option('--link', is_flag=True, help='Symlink the original SpatialData inputs into the project instead of copying them.')
+@click.option('--output_geojson/--no-output_geojson', 'output_geojson', default=True, help='Write transformed GeoJSON region files into the project images directory.')
+@click.option('--density', is_flag=True, help='Include density fields for gene expression in the default spatial view.')
+@click.option('--serve', is_flag=True, help='Serve the generated project after conversion.')
+@click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
+def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, density, serve, verbose):
     """Convert SpatialData objects to MDV format."""
     import tempfile
+    from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
+
     with tempfile.TemporaryDirectory() as temp_folder:
         args = SpatialDataConversionArgs(
             spatialdata_path=spatialdata_path,
@@ -141,7 +143,9 @@ def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, ou
             temp_folder=temp_folder,
             link=link,
             output_geojson=output_geojson,
+            density=density,
             serve=serve,
+            verbose=verbose,
         )
         convert_spatialdata_to_mdv(args)
 

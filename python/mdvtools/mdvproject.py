@@ -2436,7 +2436,7 @@ def add_column_to_group(
         for i in range(0, length):
             b = i * maxv
             try:
-                v = data[i]  # may raise KeyError if data is None at this index
+                v = data.iloc[i] if hasattr(data, "iloc") else data[i]
                 if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
@@ -2469,6 +2469,10 @@ def add_column_to_group(
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
+        if na.size == 0:
+            col["minMax"] = [0.0, 0.0]
+            col["quantiles"] = {}
+            return
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}

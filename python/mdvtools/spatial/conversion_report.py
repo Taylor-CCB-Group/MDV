@@ -74,27 +74,38 @@ def _parse_args() -> argparse.Namespace:
         "--point-transform",
         choices=POINT_TRANSFORM_CHOICES,
         default="auto",
-        help="Point transform mode passed through to the conversion entrypoint.",
+        help="Choose how table coordinates are transformed into image coordinates.",
     )
     parser.add_argument(
         "--output-geojson",
-        action="store_true",
-        help="Pass --output_geojson to the conversion entrypoint.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Write transformed GeoJSON region files into the generated project.",
     )
     parser.add_argument(
         "--preserve-existing",
         action="store_true",
-        help="Pass --preserve-existing to the conversion entrypoint.",
+        help="Preserve existing project data in the output folder instead of recreating it.",
     )
     parser.add_argument(
         "--no-link",
         action="store_true",
-        help="Copy data into outputs instead of using --link.",
+        help="Copy the SpatialData inputs into outputs instead of linking them.",
     )
     parser.add_argument(
         "--keep-failures",
         action="store_true",
         help="Keep the per-dataset input/output temp directories for failed runs.",
+    )
+    parser.add_argument(
+        "--density",
+        action="store_true",
+        help="Include density fields for gene expression in the default spatial view.",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show detailed per-dataset conversion output, transform decisions, and merged summaries.",
     )
     return parser.parse_args()
 
@@ -139,8 +150,14 @@ def _command_for_dataset(
         command.append("--link")
     if args.output_geojson:
         command.append("--output_geojson")
+    else:
+        command.append("--no-output_geojson")
     if args.preserve_existing:
         command.append("--preserve-existing")
+    if args.density:
+        command.append("--density")
+    if args.verbose:
+        command.append("--verbose")
     return command
 
 
