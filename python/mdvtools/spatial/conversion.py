@@ -687,6 +687,14 @@ def _ensure_unique_var_names(adata: "AnnData", table_name: str, sdata_name: str)
     )
     adata.var_names_make_unique()
 
+
+def _concat_spatial_tables(adata_objects: list["AnnData"]) -> "AnnData":
+    from anndata import concat as ad_concat
+
+    # Tables from different technologies often have disjoint gene sets, so an
+    # inner join can collapse the merged object down to zero genes.
+    return ad_concat(adata_objects, index_unique="_", join="outer", fill_value=0)
+
 def _set_default_image_view(mdv: "MDVProject", args: SpatialDataConversionArgs):
     """
     Uses a template view for the default view of the spatial data.
@@ -744,7 +752,6 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             - The written SpatialData objects contain the modified tables
     """
     # imports can be slow, so doing them here rather than at the top of the file
-    from anndata import concat as ad_concat
     from mdvtools.conversions import convert_scanpy_to_mdv
     from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.build_info import get_build_info
@@ -818,7 +825,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     if len(spatial_tables) == 0:
         print("WARNING: No spatial tables found. Skipping spatial-specific metadata and view setup.")
         # Still merge and convert, but skip spatial operations
-        merged_adata = ad_concat(adata_objects, index_unique="_")
+        merged_adata = _concat_spatial_tables(adata_objects)
         mdv = convert_scanpy_to_mdv(
             args.output_folder, merged_adata, delete_existing=not args.preserve_existing
         )
@@ -830,7 +837,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
 
     ## todo - try to make sure we have sparse CSC matrices if possible.
-    merged_adata = ad_concat(adata_objects, index_unique="_")
+    merged_adata = _concat_spatial_tables(adata_objects)
     mdv = convert_scanpy_to_mdv(
         args.output_folder, merged_adata, delete_existing=not args.preserve_existing
     )
