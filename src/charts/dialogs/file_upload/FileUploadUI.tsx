@@ -1,4 +1,5 @@
 import {
+    type ChangeEventHandler,
     type PropsWithChildren,
     forwardRef,
 } from "react";
@@ -133,10 +134,14 @@ export const Button = ({
     );
 };
 
-//@ts-ignore CBA
-export const ProgressBar = ({ value, max }) => (
+type ProgressBarProps = {
+    value: number;
+    max: number | string;
+};
+
+export const ProgressBar = ({ value, max }: ProgressBarProps) => (
     <progress
-        className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded"
+        className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white border border-gray-300 rounded"
         value={value}
         max={max}
     />
@@ -183,7 +188,7 @@ export const DynamicText = ({
     <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
         <p
             //consider using `cn()` from lib/utils
-            className={`text-center m-0 font-bold text-sm sm:text-lg md:text-m ${className}`}
+            className={`text-center m-0 font-bold text-sm sm:text-lg md:text-base ${className}`}
         >
             {text}
         </p>
@@ -194,11 +199,20 @@ export const ErrorHeading = ({ children }: PropsWithChildren) => (
     <h4 className="mt-0 text-lg font-bold">{children}</h4>
 );
 
-//@ts-ignore CBA
-export const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
-    <div className="flex-left items-center space-x-2 pr-4">
+type DatasourceNameInputProps = {
+    value: string;
+    onChange: ChangeEventHandler<HTMLInputElement>;
+    isDisabled: boolean;
+};
+
+export const DatasourceNameInput = ({
+    value,
+    onChange,
+    isDisabled,
+}: DatasourceNameInputProps) => (
+    <div className="flex flex-left items-center space-x-2 pr-4">
         <label className="text-lg text-gray-700 dark:text-white my-1" htmlFor="datasourceName">
-            <strong>Datasouce Name:</strong>
+            <strong>Datasource Name:</strong>
         </label>
         <input
             id="datasourceName"
