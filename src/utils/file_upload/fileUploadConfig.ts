@@ -93,14 +93,14 @@ export function getFileTypeFromExtension(fileName: string): FileTypeConfig | nul
 }
 
 export function generateDropzoneAccept(): Record<string, string[]> {
-    return Object.values(ALLOWED_FILE_TYPES).reduce(
+    return Object.values(ALLOWED_FILE_TYPES).reduce<Record<string, string[]>>(
         (acc, config) => {
             config.mimeTypes.forEach((mimeType) => {
                 acc[mimeType] = config.extensions;
             });
             return acc;
         },
-        {} as Record<string, string[]>,
+        {},
     );
 }
 

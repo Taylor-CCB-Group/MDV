@@ -8,25 +8,25 @@ const colorStyles = {
         bgColor: "bg-blue-600",
         hoverColor: "hover:bg-blue-700",
         darkBgColor: "dark:bg-blue-800",
-        darkHoverColor: "dark:bg-blue-900",
+        darkHoverColor: "dark:hover:bg-blue-900",
     },
     red: {
         bgColor: "bg-red-600",
         hoverColor: "hover:bg-red-700",
         darkBgColor: "dark:bg-red-800",
-        darkHoverColor: "dark:bg-red-900",
+        darkHoverColor: "dark:hover:bg-red-900",
     },
     green: {
         bgColor: "bg-green-600",
         hoverColor: "hover:bg-green-700",
         darkBgColor: "dark:bg-green-800",
-        darkHoverColor: "dark:bg-green-900",
+        darkHoverColor: "dark:hover:bg-green-900",
     },
     gray: {
         bgColor: "bg-gray-600",
         hoverColor: "hover:bg-gray-700",
         darkBgColor: "dark:bg-gray-800",
-        darkHoverColor: "dark:bg-gray-900",
+        darkHoverColor: "dark:hover:bg-gray-900",
     },
 };
 
@@ -87,12 +87,13 @@ export const DropzoneContainer = forwardRef(
 export const FileInputLabel = ({
     children,
     htmlFor,
-    ...props
-}: PropsWithChildren & { className: string; htmlFor: string }) => (
+    className,
+    ...rest
+}: PropsWithChildren & { className?: string; htmlFor: string }) => (
     <label
         htmlFor={htmlFor}
-        {...props}
-        className="mt-2 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500"
+        {...rest}
+        className={`mt-2 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500 ${className ?? ""}`}
     >
         {children}
     </label>

@@ -282,6 +282,13 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         //         onResize(totalWidth, 745);
                         //     }
                         // };
+                        const totalWidth = calculateTotalWidth(
+                            columnNames,
+                            columnTypes,
+                            secondRowValues,
+                        );
+                        onResize(totalWidth, 745);
+
                         dispatch({
                             type: "SET_VALIDATION_RESULT",
                             payload: EMPTY_VALIDATION_RESULT,
@@ -355,7 +362,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         return;
                 }
             },
-            [onResize, resetLocalState, setErrorStage],
+            [
+                columnNames,
+                columnTypes,
+                onResize,
+                resetLocalState,
+                secondRowValues,
+                setErrorStage,
+            ],
         );
 
         const handleDatasourceNameChange = useCallback((event: any) => {
