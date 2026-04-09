@@ -791,11 +791,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             }
         };
 
-        const displayUploadDialog = useCallback(() => {
+        const displayNewUploadDialog = useCallback(() => {
+            if (state.socketioClient) {
+                state.socketioClient.cancel();
+            }
             dispatch({ type: "RESET_DIALOG" });
             resetLocalState();
             onResize(450, 320);
-        }, [onResize, resetLocalState]);
+        }, [onResize, resetLocalState, state.socketioClient]);
 
         const handleCombineError = (error: {
             message: string;
@@ -880,7 +883,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 ) : currentError ? (
                     <UploadErrorView
                         error={currentError}
-                        onUploadAnother={displayUploadDialog}
+                        onUploadAnother={displayNewUploadDialog}
                         onCancel={handleClose}
                     />
                 ) : state.stage.kind === "conflict" ? (
