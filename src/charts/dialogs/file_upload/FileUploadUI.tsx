@@ -48,7 +48,7 @@ export const Container = ({ children }: PropsWithChildren) => {
 
 export const StatusContainer = ({ children }: PropsWithChildren) => {
     return (
-        <div className="flex flex-col justify-center items-center w-full h-[150px] dark:bg-[`#333`]">
+        <div className="flex flex-col justify-center items-center w-full h-[150px]">
             {children}
         </div>
     );
