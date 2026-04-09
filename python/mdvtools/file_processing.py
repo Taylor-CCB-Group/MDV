@@ -54,6 +54,10 @@ def _get_delimiter_from_extension(original_filename: str) -> str:
     return ","
 
 
+def _delimiter_label(delimiter: str) -> str:
+    return "tab-separated" if delimiter == "\t" else "comma-separated"
+
+
 def _read_rows_without_blanks(filepath: str, delimiter: str, max_rows: int | None = None) -> list[list[str]]:
     """Read file rows, skipping blank lines and optionally stopping after a small sample."""
     rows: list[list[str]] = []
@@ -66,6 +70,53 @@ def _read_rows_without_blanks(filepath: str, delimiter: str, max_rows: int | Non
             if max_rows is not None and len(rows) >= max_rows:
                 break
     return rows
+
+
+def _rows_have_consistent_width(rows: list[list[str]]) -> bool:
+    if not rows:
+        return False
+
+    expected_width = len(rows[0])
+    return all(len(row) == expected_width for row in rows)
+
+
+def _detect_obvious_delimiter_mismatch(
+    filepath: str,
+    original_filename: str,
+    rows: list[list[str]],
+    delimiter: str,
+) -> None:
+    """
+    Reject files that collapse to one column under the extension-based delimiter
+    when the alternate common delimiter clearly parses them as multi-column data.
+    """
+    if not rows or len(rows[0]) != 1:
+        return
+
+    alternate_delimiter = "," if delimiter == "\t" else "\t"
+    try:
+        alternate_rows = _read_rows_without_blanks(
+            filepath,
+            alternate_delimiter,
+            max_rows=TABULAR_VALIDATION_SAMPLE_ROWS,
+        )
+    except Exception:
+        return
+
+    if not alternate_rows:
+        return
+
+    alternate_header = alternate_rows[0]
+    if len(alternate_header) <= 1 or not _rows_have_consistent_width(alternate_rows):
+        return
+
+    expected = _delimiter_label(delimiter)
+    detected = _delimiter_label(alternate_delimiter)
+    raise ValidationError(
+        f"'{original_filename}' looks {detected}, not {expected}. "
+        "Please export the file with the expected delimiter and try again.",
+        status_code=400,
+    )
 
 
 def _validate_tabular_structure(filepath: str, original_filename: str, delimiter: str):
@@ -85,11 +136,13 @@ def _validate_tabular_structure(filepath: str, original_filename: str, delimiter
     header = rows[0]
     non_empty_header_cells = [cell.strip() for cell in header if cell.strip()]
     if not non_empty_header_cells:
-        expected = "tab-separated" if delimiter == "\t" else "comma-separated"
+        expected = _delimiter_label(delimiter)
         raise ValidationError(
             f"'{original_filename}' is not a valid {expected} file with a header row.",
             status_code=400,
         )
+
+    _detect_obvious_delimiter_mismatch(filepath, original_filename, rows, delimiter)
 
     if len(set(cell.lower() for cell in non_empty_header_cells)) != len(non_empty_header_cells):
         raise ValidationError(

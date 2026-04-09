@@ -57,3 +57,25 @@ def test_validate_tabular_structure_rejects_inconsistent_rows(tmp_path: Path):
 
     with pytest.raises(ValidationError, match="inconsistent columns"):
         _validate_tabular_structure(str(path), "bad.tsv", "\t")
+
+
+def test_validate_tabular_structure_rejects_csv_content_named_txt(tmp_path: Path):
+    path = write_tabular_file(
+        tmp_path,
+        "wrong_delimiter.txt",
+        "id,name,age\n1,Alice,34\n2,Bob,29\n",
+    )
+
+    with pytest.raises(ValidationError, match="looks comma-separated, not tab-separated"):
+        _validate_tabular_structure(str(path), "wrong_delimiter.txt", "\t")
+
+
+def test_validate_tabular_structure_rejects_tsv_content_named_csv(tmp_path: Path):
+    path = write_tabular_file(
+        tmp_path,
+        "wrong_delimiter.csv",
+        "id\tname\tage\n1\tAlice\t34\n2\tBob\t29\n",
+    )
+
+    with pytest.raises(ValidationError, match="looks tab-separated, not comma-separated"):
+        _validate_tabular_structure(str(path), "wrong_delimiter.csv", ",")
