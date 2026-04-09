@@ -48,6 +48,15 @@ export type ColorConfig = {
 export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
 export type ColorOptions = any;
 export type ContextMenuItem = { text: string, icon: string, func: () => void };
+export type SettingsDialogFolderState = {
+    isOpen: boolean;
+    isOpenBeforeSearch: boolean;
+    appliedSearchTerm: string;
+};
+export type SettingsDialogState = {
+    searchTerm: string;
+    folderStates: Record<string, SettingsDialogFolderState>;
+};
 /**
  * A JSON string representing a chart configuration.
  * 
@@ -67,6 +76,7 @@ class BaseChart<T extends BaseConfig> {
     resetButton: HTMLButtonElement | HTMLSpanElement;
     contextMenu: ContextMenu;
     dialogs: BaseDialog[] = [];
+    settingsDialogState?: SettingsDialogState;
     legendIcon: HTMLElement;
     observable: { container: HTMLElement };
     width = 0;

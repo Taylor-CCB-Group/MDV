@@ -22,7 +22,7 @@ import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
-import type { ColumnName, DataColumn, FieldName } from "@/charts/charts";
+import type { ColumnName, DataColumn, DataType, FieldName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -107,11 +107,15 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     category_filters: [],
     zoom_on_filter: false,
     point_shape: "circle",
+    contourParameter: undefined,
+    category1: [],
+    category2: [],
     contour_fill: false,
     contour_bandwidth: 0.1,
     contour_intensity: 1,
     contour_opacity: 0.5,
     contour_fillThreshold: 2,
+    densityFields: [],
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
     // todo omit this so we can have better HMR...
@@ -290,7 +294,7 @@ export function useScatterRadius() {
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
 
-function useShouldFilterNaN() {
+export function useShouldFilterNaN() {
     const chart = useChart();
     const colorBySpec = chart.config.color_by;
     const colorByField: FieldSpec | undefined = colorBySpec
@@ -309,6 +313,19 @@ function useShouldFilterNaN() {
     // inside the filter (zeros as well as NaN/Inf), but does not by itself trigger filtering.
     const shouldFilter = hideMissing && isNumericColor;
     return { shouldFilter, colorColumn, fallbackOnZero };
+}
+
+export function getMissingColorFilterValue(
+    index: number,
+    colorColumn: DataColumn<DataType> | undefined,
+    shouldFilterMissing: boolean,
+    fallbackOnZero: boolean,
+): 0 | 1 {
+    if (!shouldFilterMissing || !colorColumn?.data) return 1;
+    const value = colorColumn.data[index];
+    if (!Number.isFinite(value)) return 0;
+    if (fallbackOnZero && value === 0) return 0;
+    return 1;
 }
 
 /**
@@ -511,15 +528,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                 // future work https://deck.gl/docs/developer-guide/performance#use-binary-data
                 //currently useFieldSpec is typed as DataColumn|undefined,
                 //if not undefined is guaranteed to be loaded but we may change how we manage lazy-loading.
-                getFilterValue:
-                    shouldFilterMissing && colorColumn?.data
-                        ? (i: number) => {
-                              const v = colorColumn.data[i];
-                              if (!Number.isFinite(v)) return 0;
-                              if (fallbackOnZero && v === 0) return 0;
-                              return 1;
-                          }
-                        : (_: number) => 1,
+                getFilterValue: (i: number) =>
+                    getMissingColorFilterValue(i, colorColumn, shouldFilterMissing, fallbackOnZero),
                 filterRange: [0.5, 1],
             } as any),
             updateTriggers: {

@@ -1,6 +1,63 @@
 import { DataModel } from "@/table/DataModel";
 import { describe, expect, test, vi } from "vitest";
 
+describe("DataModel autoupdate filter listener", () => {
+    test("two models on the same store each receive filtered updates", () => {
+        const filterArray = new Uint8Array(3);
+        filterArray.fill(0);
+        const listeners: Record<string, (type: string) => void> = {};
+        const dataStore = {
+            size: 3,
+            filterSize: 3,
+            filterArray,
+            addListener(id: string, fn: (type: string) => void) {
+                listeners[id] = fn;
+            },
+            removeListener(id: string) {
+                delete listeners[id];
+            },
+        } as any;
+
+        const first = new DataModel(dataStore);
+        const second = new DataModel(dataStore);
+        first.updateModel();
+        second.updateModel();
+        expect(Array.from(first.data)).toEqual([0, 1, 2]);
+        expect(Array.from(second.data)).toEqual([0, 1, 2]);
+
+        filterArray.set([0, 0, 1]);
+        dataStore.filterSize = 2;
+        for (const fn of Object.values(listeners)) {
+            fn("filtered");
+        }
+        expect(Array.from(first.data)).toEqual([0, 1]);
+        expect(Array.from(second.data)).toEqual([0, 1]);
+    });
+
+    test("dispose removes the DataStore listener", () => {
+        const filterArray = new Uint8Array(1);
+        const listeners: Record<string, (type: string) => void> = {};
+        const dataStore = {
+            size: 1,
+            filterSize: 1,
+            filterArray,
+            addListener(id: string, fn: (type: string) => void) {
+                listeners[id] = fn;
+            },
+            removeListener(id: string) {
+                delete listeners[id];
+            },
+        } as any;
+
+        const model = new DataModel(dataStore);
+        expect(Object.keys(listeners).length).toBe(1);
+        model.dispose();
+        expect(Object.keys(listeners).length).toBe(0);
+        model.dispose();
+        expect(Object.keys(listeners).length).toBe(0);
+    });
+});
+
 describe("DataModel.createColumn", () => {
     test("creates an empty double column using NaN values", () => {
         const addColumn = vi.fn();

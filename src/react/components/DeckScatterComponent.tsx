@@ -12,7 +12,7 @@ import type { DataColumn, FieldName, LoadedDataColumn, NumberDataType } from "@/
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
-import { useScatterRadius } from "../scatter_state";
+import { getMissingColorFilterValue, useScatterRadius, useShouldFilterNaN } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
@@ -179,6 +179,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
 
     const filterValue = useFilterArray();
+    const { shouldFilter: shouldFilterMissing, colorColumn, fallbackOnZero } = useShouldFilterNaN();
 
     const {
         gateLabelLayer,
@@ -222,17 +223,33 @@ const DeckScatter = observer(function DeckScatterComponent({
                         // type: "spring",
                     },
                 },
-                getFilterValue: (_: any, { index }: { index: number }) => filterValue[index] || 0, //how do we just pass the buffer?
+                getFilterValue: (_: unknown, { index }: { index: number }) => {
+                    if (!filterValue[index]) return 0;
+                    return getMissingColorFilterValue(index, colorColumn, shouldFilterMissing, fallbackOnZero);
+                },
                 filterRange: [0.5, 1],
                 updateTriggers: {
                     //! using `data` as a trigger as `filterValue` was behind by one frame or something
-                    getFilterValue: data,
+                    getFilterValue: [data, filterValue, colorColumn, shouldFilterMissing, fallbackOnZero],
                     getPosition: [cx.data, cy.data, cz?.data],
                 },
                 extensions: [new DataFilterExtension()],
                 visible: greyOnFilter,
             }),
-        [cx, cy, cz, opacity, radiusScale, id, filterValue, data, greyOnFilter],
+        [
+            cx,
+            cy,
+            cz,
+            opacity,
+            radiusScale,
+            id,
+            filterValue,
+            data,
+            greyOnFilter,
+            colorColumn,
+            shouldFilterMissing,
+            fallbackOnZero,
+        ],
     );
 
     const axisLinesLayer = useMemo(() => {
