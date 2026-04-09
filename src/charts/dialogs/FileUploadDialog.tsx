@@ -1631,9 +1631,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                         </span>
                                     ))}
                                     </div>
-                                    <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-                                        Use a header row and ensure delimiter matches file type.
-                                    </p>
                                 </div>
                             </div>
                         </DropzoneContainer>
