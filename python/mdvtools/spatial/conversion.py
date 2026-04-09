@@ -675,6 +675,18 @@ def _try_read_zarr(path: str):# -> sd.SpatialData | None:
         print(f"Warning: Failed to read SpatialData object from {path}: '{e}'")
         return None
 
+
+def _ensure_unique_var_names(adata: "AnnData", table_name: str, sdata_name: str) -> None:
+    if adata.var_names.is_unique:
+        return
+
+    duplicate_count = int(adata.var_names.duplicated().sum())
+    print(
+        f"WARNING: Table '{table_name}' in '{sdata_name}' has "
+        f"{duplicate_count} duplicate var_names. Making them unique before concatenation."
+    )
+    adata.var_names_make_unique()
+
 def _set_default_image_view(mdv: "MDVProject", args: SpatialDataConversionArgs):
     """
     Uses a template view for the default view of the spatial data.
@@ -787,6 +799,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         # - NOT written to original files (when args.link is True, files are symlinked)
         for table_name, adata in sdata.tables.items():
             _resolve_regions_for_table(sdata, table_name, sdata_name, args)
+            _ensure_unique_var_names(adata, table_name, sdata_name)
             adata.obs["spatialdata_path"] = sdata_name
             adata.obs["table_name"] = table_name
             adata_objects.append(adata)
