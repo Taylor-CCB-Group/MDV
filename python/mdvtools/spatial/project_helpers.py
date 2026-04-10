@@ -31,8 +31,10 @@ def set_default_spatial_image_view(
     template_path: str,
     density: bool,
     emit,
+    obs_datasource_name: str = "cells",
+    var_datasource_name: str = "genes",
 ) -> None:
-    for region_name, region_data in mdv.get_datasource_metadata("cells")["regions"]["all_regions"].items():
+    for region_name, region_data in mdv.get_datasource_metadata(obs_datasource_name)["regions"]["all_regions"].items():
         if "viv_image" in region_data:
             break
     else:
@@ -40,13 +42,24 @@ def set_default_spatial_image_view(
 
     emit(f"Using region '{region_name}' for default view", verbose_only=True)
     with open(template_path, "r") as f:
-        view_str = f.read().replace("<SPATIAL_REGION_NAME>", region_name)
-        density_block = """
-        {
-            "linkedDsName": "genes", "maxItems": 15, "type": "RowsAsColsQuery"
-        }
-        """
-        view_str = view_str.replace('"<DENSITY_FIELDS>"', density_block if density else "")
+        view_str = f.read()
+        view_str = view_str.replace('"<SPATIAL_REGION_NAME>"', json.dumps(region_name))
+        view_str = view_str.replace('"cells"', '"__OBS_DS__"')
+        view_str = view_str.replace('"genes"', '"__VAR_DS__"')
+        density_block = (
+            json.dumps(
+                {
+                    "linkedDsName": var_datasource_name,
+                    "maxItems": 15,
+                    "type": "RowsAsColsQuery",
+                }
+            )
+            if density
+            else ""
+        )
+        view_str = view_str.replace('"<DENSITY_FIELDS>"', density_block)
+        view_str = view_str.replace('"__OBS_DS__"', json.dumps(obs_datasource_name))
+        view_str = view_str.replace('"__VAR_DS__"', json.dumps(var_datasource_name))
         mdv.set_view("default", json.loads(view_str), True)
 
 
@@ -54,6 +67,8 @@ def create_empty_spatial_mdv_project(
     output_folder: str,
     delete_existing: bool,
     region_field: str,
+    obs_datasource_name: str = "cells",
+    var_datasource_name: str = "genes",
 ) -> "MDVProject":
     import pandas
     from mdvtools.mdvproject import MDVProject
@@ -68,7 +83,7 @@ def create_empty_spatial_mdv_project(
         }
     )
     mdv.add_datasource(
-        "cells",
+        obs_datasource_name,
         cells_df,
         columns=[
             {"name": "x", "field": "x", "datatype": "double"},
@@ -85,7 +100,7 @@ def create_empty_spatial_mdv_project(
         }
     )
     mdv.add_datasource(
-        "genes",
+        var_datasource_name,
         genes_df,
         columns=[
             {"name": "name", "field": "name", "datatype": "text"},

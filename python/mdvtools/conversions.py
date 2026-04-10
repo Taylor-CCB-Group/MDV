@@ -1,4 +1,5 @@
 from scanpy import AnnData
+import scanpy as sc
 import scipy
 import pandas as pd
 from os.path import join, split, exists
@@ -21,16 +22,116 @@ from .mdvproject import MDVProject,create_bed_gz_file
 logger = logging.getLogger(__name__)
 
 
+def _coerce_x_to_csc_without_nonfinite(
+    scanpy_object: AnnData,
+) -> tuple[AnnData, bool]:
+    """
+    Ensure ``adata.X`` is CSC and contains no explicit non-finite entries.
+
+    Non-finite values are converted to 0 and removed from the sparse structure
+    so they become implicit missing values.
+    """
+    matrix = scanpy_object.X
+    if scipy.sparse.issparse(matrix):
+        sparse_matrix = scipy.sparse.csc_matrix(matrix, copy=True)
+        if sparse_matrix.data.size == 0:
+            scanpy_object.X = sparse_matrix
+            return scanpy_object, False
+        finite_mask = np.isfinite(sparse_matrix.data)
+        if finite_mask.all():
+            scanpy_object.X = sparse_matrix
+            return scanpy_object, False
+        non_finite = int((~finite_mask).sum())
+        sparse_matrix.data = np.nan_to_num(
+            sparse_matrix.data,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        )
+        sparse_matrix.eliminate_zeros()
+        scanpy_object.X = sparse_matrix
+        logger.warning(
+            "Replacing %s non-finite values in adata.X and converting to CSC for UMAP/Leiden computation",
+            non_finite,
+        )
+        return scanpy_object, True
+
+    dense_matrix = np.asarray(matrix)
+    finite_mask = np.isfinite(dense_matrix)
+    non_finite = int((~finite_mask).sum())
+    sanitized = np.nan_to_num(
+        dense_matrix,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
+        copy=True,
+    )
+    csc_matrix = scipy.sparse.csc_matrix(sanitized)
+    csc_matrix.eliminate_zeros()
+    scanpy_object.X = csc_matrix
+    if finite_mask.all():
+        return scanpy_object, False
+    logger.warning(
+        "Replacing %s non-finite values in adata.X and converting dense X to CSC for UMAP/Leiden computation",
+        non_finite,
+    )
+    return scanpy_object, True
+
+
+def _prepare_x_umap_and_leiden(
+    scanpy_object: AnnData,
+    compute_x_umap: bool,
+    leiden_resolution: float,
+    leiden_column: str,
+    umap_key: str = "X_umap",
+) -> AnnData:
+    """
+    Optionally compute a neighbor graph, UMAP embedding, and Leiden clusters from ``adata.X``.
+
+    The Leiden labels are coerced to pandas categorical strings so they are exported as text.
+    """
+    if not compute_x_umap:
+        if leiden_column in scanpy_object.obs.columns:
+            scanpy_object.obs[leiden_column] = pd.Categorical(
+                scanpy_object.obs[leiden_column].astype(str)
+            )
+        return scanpy_object
+
+    if hasattr(scanpy_object, "isbacked") and scanpy_object.isbacked:
+        logger.info("Loading backed AnnData into memory for X-based UMAP/Leiden computation")
+        scanpy_object = scanpy_object.to_memory()
+
+    scanpy_object, _ = _coerce_x_to_csc_without_nonfinite(scanpy_object)
+    sc.pp.neighbors(scanpy_object, use_rep="X")
+    sc.tl.umap(scanpy_object)
+    if umap_key != "X_umap":
+        scanpy_object.obsm[umap_key] = scanpy_object.obsm["X_umap"].copy()
+        del scanpy_object.obsm["X_umap"]
+
+    sc.tl.leiden(scanpy_object, resolution=leiden_resolution, key_added=leiden_column)
+    scanpy_object.obs[leiden_column] = pd.Categorical(
+        scanpy_object.obs[leiden_column].astype(str)
+    )
+    return scanpy_object
+
+
 def convert_scanpy_to_mdv(
     folder: str, 
     scanpy_object: AnnData, 
     max_dims: int = 3, 
     delete_existing: bool = False, 
     label: str = "",
+    obs_datasource_name: str = "cells",
+    var_datasource_name: str = "genes",
     chunk_data: bool = False,
     add_layer_data = True,
     gene_identifier_column = None,
+    link_name_column: str | None = None,
+    rows_as_columns_name_column: str | None = None,
     gene_columns: List[dict[str, Any]] | None = None,
+    compute_x_umap: bool = False,
+    leiden_resolution: float = 1.0,
+    leiden_column: str = "leiden",
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -48,6 +149,10 @@ def convert_scanpy_to_mdv(
             If False, merges with existing data. Defaults to False.
         label (str, optional): Prefix to add to datasource names and metadata columns
             when merging with existing data. Defaults to "".
+        obs_datasource_name (str, optional): Base name for the observation datasource.
+            Defaults to "cells".
+        var_datasource_name (str, optional): Base name for the variable datasource.
+            Defaults to "genes".
         chunk_data (bool, optional): For dense matrices, transposing and flattening
             will be performed in chunks. Saves memory but takes longer. Default is False.
         add_layer_data (bool, optional): If True (default) then the layer data (log values etc.)
@@ -55,7 +160,17 @@ def convert_scanpy_to_mdv(
         gene_identifier_column: (str, optional) This is the gene column that the user will use to
             identify the gene. If not specified (default) than a column 'name' will be added that is
             created from the index (which is usaully the unique gene name)
+        link_name_column (str, optional): Column in the variable datasource whose
+            values should be used as the dynamic column names for the ``rows_as_columns`` link.
+            Defaults to ``gene_identifier_column``.
+        rows_as_columns_name_column (str, optional): Deprecated alias for ``link_name_column``.
         gene_columns: (list[dict], optional) Column metadata overrides for the genes datasource.
+        compute_x_umap (bool, optional): If True, compute neighbors, UMAP and Leiden clusters
+            directly from ``adata.X`` before export. Defaults to False.
+        leiden_resolution (float, optional): Resolution passed to Leiden when
+            ``compute_x_umap`` is True. Defaults to 1.0.
+        leiden_column (str, optional): Observation column name used for Leiden labels.
+            The exported column is always coerced to text/categorical. Defaults to "leiden".
     Returns:
         MDVProject: The configured MDV project object with the converted data
 
@@ -91,6 +206,21 @@ def convert_scanpy_to_mdv(
     # Validate input AnnData
     if scanpy_object.n_obs == 0 or scanpy_object.n_vars == 0:
         raise ValueError("Cannot convert empty AnnData object (0 cells or 0 genes)")
+    if rows_as_columns_name_column is not None and link_name_column is not None:
+        raise ValueError(
+            "Specify only one of 'link_name_column' or 'rows_as_columns_name_column'"
+        )
+    if rows_as_columns_name_column is not None:
+        link_name_column = rows_as_columns_name_column
+    obs_ds_name = f"{label}{obs_datasource_name}"
+    var_ds_name = f"{label}{var_datasource_name}"
+
+    scanpy_object = _prepare_x_umap_and_leiden(
+        scanpy_object,
+        compute_x_umap=compute_x_umap,
+        leiden_resolution=leiden_resolution,
+        leiden_column=leiden_column,
+    )
     
     mdv = MDVProject(folder, delete_existing=delete_existing)
 
@@ -114,7 +244,20 @@ def convert_scanpy_to_mdv(
         "name":"cell_id",
         "datatype":"unique"
     }]
-    mdv.add_datasource(f"{label}cells", cell_table,columns)
+    leiden_like_columns = sorted(
+        {
+            column_name
+            for column_name in cell_table.columns
+            if column_name == leiden_column or column_name.endswith("__leiden")
+        }
+    )
+    for column_name in leiden_like_columns:
+        columns.append({
+            "name": column_name,
+            "field": column_name,
+            "datatype": "text",
+        })
+    mdv.add_datasource(obs_ds_name, cell_table,columns)
 
     # create datasource 'genes'
     gene_table = scanpy_object.var
@@ -127,15 +270,21 @@ def convert_scanpy_to_mdv(
     if not gene_identifier_column:
         gene_identifier_column= f"{label}name"
         gene_table[gene_identifier_column] = gene_table.index
+    if link_name_column and link_name_column not in gene_table.columns:
+        raise ValueError(
+            f"link_name_column '{link_name_column}' not found in variable metadata"
+        )
+    if not link_name_column:
+        link_name_column = gene_identifier_column
     gene_table = _add_dims(gene_table, scanpy_object.varm, max_dims)
 
     #originally column had to be unique - but now is just text
     #need to coerce gene name column to unique
     #columns=[{"name":"name","datatype":"text16"}]
-    mdv.add_datasource(f"{label}genes", gene_table, columns=gene_columns)
+    mdv.add_datasource(var_ds_name, gene_table, columns=gene_columns)
 
     # link the two datasets
-    mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", gene_identifier_column, "Gene Expr")
+    mdv.add_rows_as_columns_link(obs_ds_name, var_ds_name, link_name_column, "Gene Expr")
 
     #get the matrix in the correct format
     print("Getting Matrix")
@@ -147,7 +296,7 @@ def convert_scanpy_to_mdv(
         # add the gene expression
         print("Adding gene expression")
         mdv.add_rows_as_columns_subgroup(
-            f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",
+            obs_ds_name, var_ds_name, "gs", matrix, name="gene_scores", label="Gene Scores",
             # sparse=sparse, #this should be inferred from the matrix
             chunk_data=chunk_data
         )
@@ -158,12 +307,12 @@ def convert_scanpy_to_mdv(
             matrix,sparse = get_matrix(matrix)
             print(f"Adding layer {layer}")
             mdv.add_rows_as_columns_subgroup(
-                f"{label}cells", f"{label}genes", layer, matrix, chunk_data=chunk_data
+                obs_ds_name, var_ds_name, layer, matrix, chunk_data=chunk_data
             )
 
     if delete_existing:
         # If we're deleting existing, create new default view
-        mdv.set_view("default", {"initialCharts": {"cells": [], "genes": []}}, True)
+        mdv.set_view("default", {"initialCharts": {obs_ds_name: [], var_ds_name: []}}, True)
         mdv.set_editable(True)
     else:
         # If we're not deleting existing, update existing views with new datasources
@@ -176,16 +325,16 @@ def convert_scanpy_to_mdv(
                 new_view_data["initialCharts"] = {}
             
             # Add new datasources to initialCharts
-            new_view_data["initialCharts"][f"{label}cells"] = []
-            new_view_data["initialCharts"][f"{label}genes"] = []
+            new_view_data["initialCharts"][obs_ds_name] = []
+            new_view_data["initialCharts"][var_ds_name] = []
             
             # Initialize dataSources if they don't exist
             if "dataSources" not in new_view_data:
                 new_view_data["dataSources"] = {}
             
             # Add new datasources with panel widths
-            new_view_data["dataSources"][f"{label}cells"] = {"panelWidth": 50}
-            new_view_data["dataSources"][f"{label}genes"] = {"panelWidth": 50}
+            new_view_data["dataSources"][obs_ds_name] = {"panelWidth": 50}
+            new_view_data["dataSources"][var_ds_name] = {"panelWidth": 50}
             
             new_views[view_name] = new_view_data
         

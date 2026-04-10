@@ -35,18 +35,37 @@ def cli():
 @click.option('--max_dims', default=3, help='Maximum number of dimensions to include from dimensionality reductions.')
 @click.option('--delete_existing', is_flag=True, help='Delete existing project data.')
 @click.option('--label', default='', help='Prefix to add to datasource names and metadata columns.')
+@click.option('--obs-datasource-name', default='cells', show_default=True, help='Datasource name for observations.')
+@click.option('--var-datasource-name', default='genes', show_default=True, help='Datasource name for variables.')
 @click.option('--chunk_data', is_flag=True, help='Transpose and flatten in chunks to save memory.')
 @click.option('--add_layer_data', is_flag=True, default=True, help='Add layer data (log values etc.).')
 @click.option('--gene_identifier_column', default=None, help='Gene column for identification.')
+@click.option('--link-name-column', default=None, help='Variable datasource column used as the rows_as_columns name_column.')
+@click.option('--compute-x-umap', 'compute_x_umap', is_flag=True, help='Compute neighbors, UMAP, and Leiden clusters directly from adata.X before export.')
+@click.option('--leiden-resolution', default=1.0, type=float, show_default=True, help='Leiden resolution used with --compute-x-umap.')
 @click.option('--zip', 'zip_output', is_flag=True, help='Zip the output folder and delete the original.')
 @click.option('--chatmdv', is_flag=True, help='Include the original Scanpy .h5ad file in the zipped project.')
-def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column, zip_output, chatmdv):
+def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, obs_datasource_name, var_datasource_name, chunk_data, add_layer_data, gene_identifier_column, link_name_column, compute_x_umap, leiden_resolution, zip_output, chatmdv):
     """Convert Scanpy AnnData object to MDV format."""
     import scanpy as sc
     from .conversions import convert_scanpy_to_mdv
 
     adata = sc.read_h5ad(scanpy_object)
-    convert_scanpy_to_mdv(folder, adata, max_dims, delete_existing, label, chunk_data, add_layer_data, gene_identifier_column)
+    convert_scanpy_to_mdv(
+        folder,
+        adata,
+        max_dims,
+        delete_existing,
+        label,
+        obs_datasource_name,
+        var_datasource_name,
+        chunk_data,
+        add_layer_data,
+        gene_identifier_column,
+        link_name_column=link_name_column,
+        compute_x_umap=compute_x_umap,
+        leiden_resolution=leiden_resolution,
+    )
 
     if chatmdv:
         dest_path = os.path.join(folder, basename(scanpy_object))
@@ -130,8 +149,18 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
 @click.option('--output_geojson/--no-output_geojson', 'output_geojson', default=True, help='Write transformed GeoJSON region files into the project images directory.')
 @click.option('--density', is_flag=True, help='Include density fields for gene expression in the default spatial view.')
 @click.option('--serve', is_flag=True, help='Serve the generated project after conversion.')
+@click.option('--obs-datasource-name', default='cells', show_default=True, help='Datasource name for observations.')
+@click.option('--var-datasource-name', default='genes', show_default=True, help='Datasource name for variables.')
+@click.option('--link-name-column', default=None, help='Variable datasource column used as the rows_as_columns name_column.')
+@click.option(
+    '--compute-x-umap',
+    'compute_x_umap',
+    is_flag=True,
+    help='Compute neighbors, UMAP, and Leiden clusters separately for each source table from that table\'s adata.X before merge. These per-table helper embeddings are not globally comparable.',
+)
+@click.option('--leiden-resolution', default=1.0, type=float, show_default=True, help='Leiden resolution used with --compute-x-umap.')
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
-def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, verbose):
+def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, verbose):
     """Convert one SpatialData store to MDV format, or use --batch for a directory of stores."""
     import tempfile
     from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
@@ -148,6 +177,11 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
             density=density,
             serve=serve,
             verbose=verbose,
+            obs_datasource_name=obs_datasource_name,
+            var_datasource_name=var_datasource_name,
+            link_name_column=link_name_column,
+            compute_x_umap=compute_x_umap,
+            leiden_resolution=leiden_resolution,
         )
         convert_spatialdata_to_mdv(args)
 
