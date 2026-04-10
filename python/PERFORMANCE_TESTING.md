@@ -82,8 +82,14 @@ make test
 # Performance tests (slow, resource-intensive)
 make test-performance
 
-# All tests
-poetry run pytest mdvtools/
+# Backend tests
+make test-backend
+
+# Auth tests
+make test-auth
+
+# All core tests
+poetry run pytest mdvtools/tests
 ```
 
 ### Test Markers
@@ -93,7 +99,7 @@ poetry run pytest mdvtools/
 poetry run pytest -m performance
 
 # Run everything except performance tests
-poetry run pytest -m "not performance"
+poetry run pytest mdvtools/tests -m "not performance"
 
 # Run slow tests
 poetry run pytest -m slow
