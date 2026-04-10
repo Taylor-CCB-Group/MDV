@@ -1,5 +1,9 @@
 import argparse
+import contextlib
+import io
+import logging
 import os
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 import numpy as np
@@ -20,15 +24,110 @@ class SpatialDataConversionArgs:
     spatialdata_path: str
     output_folder: str
     temp_folder: str
+    batch: bool = False
     preserve_existing: bool = False
-    output_geojson: bool = False
+    output_geojson: bool = True
     serve: bool = False
     link: bool = False
     density: bool = False
     point_transform: str = "auto"
+    verbose: bool = False
 
 
 REGION_FIELD = "spatial_region"
+_VERBOSE_OUTPUT = True
+
+
+def _set_verbose_output(verbose: bool) -> None:
+    global _VERBOSE_OUTPUT
+    _VERBOSE_OUTPUT = verbose
+
+
+def _emit(message: str, *, verbose_only: bool = False) -> None:
+    if verbose_only and not _VERBOSE_OUTPUT:
+        return
+    print(message)
+
+
+def _progress(message: str) -> None:
+    print(message, flush=True)
+
+
+def _call_with_optional_stdout_suppressed(func, *args, **kwargs):
+    if _VERBOSE_OUTPUT:
+        return func(*args, **kwargs)
+
+    original_levels: dict[str, int] = {}
+    quiet_loggers = {
+        "mdvtools.mdvproject": logging.WARNING,
+        "mdvtools.conversions": logging.WARNING,
+        "ome_zarr.reader": logging.ERROR,
+    }
+
+    for logger_name, quiet_level in quiet_loggers.items():
+        logger = logging.getLogger(logger_name)
+        original_levels[logger_name] = logger.level
+        logger.setLevel(quiet_level)
+
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            return func(*args, **kwargs)
+    finally:
+        for logger_name, original_level in original_levels.items():
+            logging.getLogger(logger_name).setLevel(original_level)
+
+
+def _discover_spatialdata_paths(spatialdata_path: str, batch: bool = False) -> list[str]:
+    source_path = os.path.abspath(spatialdata_path)
+
+    if not os.path.exists(source_path):
+        raise FileNotFoundError(f"SpatialData source does not exist: '{spatialdata_path}'")
+
+    try:
+        root_sdata = _try_read_zarr(source_path, emit_warning=False, raise_on_error=True)
+    except Exception as error:
+        try:
+            from zarr.errors import GroupNotFoundError
+        except Exception:
+            GroupNotFoundError = None  # type: ignore
+
+        if not os.path.isdir(source_path) or (
+            GroupNotFoundError is not None and not isinstance(error, GroupNotFoundError)
+        ):
+            raise ValueError(
+                f"Failed to read SpatialData source '{spatialdata_path}' at '{source_path}': {error}"
+            ) from error
+        root_sdata = None
+
+    if root_sdata is not None:
+        return [source_path]
+
+    if not os.path.isdir(source_path):
+        raise ValueError(
+            f"SpatialData source '{spatialdata_path}' is neither a readable SpatialData store nor a directory of stores."
+        )
+
+    if not batch:
+        raise ValueError(
+            f"SpatialData source '{spatialdata_path}' is a directory. Pass --batch to convert all child SpatialData stores."
+        )
+
+    sdata_paths = [
+        os.path.join(source_path, child)
+        for child in os.listdir(source_path)
+        if not child.startswith(".")
+    ]
+    sdata_paths = sorted(sdata_paths)
+    if len(sdata_paths) == 0:
+        raise ValueError(f"No SpatialData objects found in the folder '{spatialdata_path}'")
+    return sdata_paths
+
+
+def _is_single_spatialdata_source(spatialdata_path: str, sdata_paths: list[str]) -> bool:
+    source_path = os.path.abspath(spatialdata_path)
+    return len(sdata_paths) == 1 and os.path.abspath(sdata_paths[0]) == source_path
+
+
 @dataclass
 class ImageEntry:
     """
@@ -64,14 +163,25 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Preserve existing**: {conversion_args.preserve_existing}\n"
         markdown += f"- **Output GeoJSON**: {conversion_args.output_geojson}\n"
         markdown += f"- **Link spatial data**: {conversion_args.link}\n"
-        markdown += f"- **SpatialData path**: `{conversion_args.spatialdata_path}`\n"
+        markdown += f"- **Batch mode**: {conversion_args.batch}\n"
+        markdown += f"- **SpatialData source**: `{conversion_args.spatialdata_path}`\n"
         markdown += "\n"
     
     markdown += "## SpatialData objects:\n\n"
     spatial_dir = os.path.join(mdv.dir, "spatial")
-    
-    for sdata_name in os.listdir(spatial_dir):
-        sdata_path = os.path.join(spatial_dir, sdata_name)
+
+    if _try_read_zarr(spatial_dir, emit_warning=False) is not None:
+        sdata_candidates = [(os.path.basename(os.path.normpath(spatial_dir)), spatial_dir)]
+    else:
+        sdata_candidates = [
+            (sdata_name, os.path.join(spatial_dir, sdata_name))
+            for sdata_name in os.listdir(spatial_dir)
+            if not sdata_name.startswith(".")
+        ]
+
+    for sdata_name, sdata_path in sdata_candidates:
+        if sdata_name.startswith("."):
+            continue
         if not os.path.exists(sdata_path):
             continue
         sdata = _try_read_zarr(sdata_path)
@@ -105,7 +215,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     #     markdown += f"\n{create_anndata_markdown(adata)}"
     with open(os.path.join(mdv.dir, "README.md"), "w") as f:
         f.write(markdown)
-    print(f"README.md written to {os.path.join(mdv.dir, 'README.md')}")
+    _emit(f"README.md written to {os.path.join(mdv.dir, 'README.md')}", verbose_only=True)
     textbox = TextBox(title="SpatialData conversion information", param=[], size=[792, 472], position=[10, 10])
     textbox.set_text(markdown)
     mdv.set_view("Data summary", {"initialCharts": {"cells": [textbox.plot_data]}})
@@ -137,7 +247,7 @@ def _get_transformation_between_coordinate_systems_safe(
     Safely get transformation between coordinate systems, handling multiple equal paths.
     
     When multiple equal-length shortest paths are found, this function automatically
-    selects the first path and logs a warning, rather than raising an error.
+    selects the first path and logs an informational message, rather than raising an error.
     
     Args:
         sdata: SpatialData object
@@ -163,10 +273,11 @@ def _get_transformation_between_coordinate_systems_safe(
             # Re-raise if it's a different error
             raise
         
-        # Log warning about auto-selecting path
-        print(
-            f"WARNING: Multiple equal transformation paths found. "
-            f"Automatically selecting the first path. Error details: {error_msg}"
+        # This is benign for current behavior: we only need one shortest path.
+        _emit(
+            "INFO: Multiple equal transformation paths found. "
+            f"Automatically selecting the first shortest path. Details: {error_msg}",
+            verbose_only=True,
         )
         
         # Manually build graph and select first shortest path
@@ -232,8 +343,11 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
     from spatialdata.transformations import Identity
     if "spatial" not in adata.obsm:
         # todo: proper support for non-spatial tables, add tests.
-        print("WARNING: No spatial coordinates found in obsm['spatial']")
-        print("We should be able to handle this case, but it is not supported or tested yet, results may be undesired.")
+        _emit("WARNING: No spatial coordinates found in obsm['spatial']")
+        _emit(
+            "WARNING: This table is being treated as non-spatial for now; "
+            "results may be incomplete.",
+        )
         return adata
     # todo: support non-2d cases...
     axes = ("x", "y")
@@ -241,7 +355,7 @@ def _transform_table_coordinates(adata: "AnnData", region_to_image: dict[str, Im
     coords_homogeneous = np.column_stack([adata.obsm["spatial"], np.ones(adata.obsm["spatial"].shape[0], dtype=float)])
     _r, region_element, _instance_key = get_table_keys(adata)
 
-    transformed_coords = np.full_like(adata.obsm["spatial"], fill_value=np.nan)
+    transformed_coords = np.full(adata.obsm["spatial"].shape, fill_value=np.nan, dtype=float)
     region_ids = np.empty(adata.n_obs, dtype=object)
 
     for r, entry in region_to_image.items():
@@ -493,7 +607,10 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
     adata.uns.setdefault("mdv", {})
     # Early return for non-spatial tables
     if "spatial" not in adata.obsm:
-        print(f"INFO: Skipping region resolution for non-spatial table '{table_name}' in '{sdata_name}'")
+        _emit(
+            f"INFO: Skipping region resolution for non-spatial table '{table_name}' in '{sdata_name}'",
+            verbose_only=True,
+        )
         # Mark as non-spatial for downstream handling
         adata.uns["mdv"]["is_spatial"] = False
         return adata
@@ -590,7 +707,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
 
         if not img_entries:
             # raise ValueError(f"No images found for region '{r}' in '{sdata_name}'")
-            print(f"WARNING: No images found for region '{r}' in '{sdata_name}'")
+            _emit(f"WARNING: No images found for region '{r}' in '{sdata_name}'")
             continue
         
         for j, entry in enumerate(img_entries):
@@ -605,10 +722,11 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             transform_provenance[region_id] = best_transform_metadata
             # Log the transform decision
             xenium_note = " (Xenium detected)" if best_transform_metadata.get("xenium_detected", False) else ""
-            print(
+            _emit(
                 f"INFO: Table '{table_name}' region '{r}' using point_transform mode '{best_transform_metadata['mode']}'"
                 f"{xenium_note}: {best_transform_metadata['source_element']} -> {best_transform_metadata['target_element']} "
-                f"({best_transform_metadata['transform_type']})"
+                f"({best_transform_metadata['transform_type']})",
+                verbose_only=True,
             )
         all_regions[region_id] = {
             "spatial": {
@@ -634,7 +752,10 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             from geopandas import GeoDataFrame
             # xenium hack... we want cell_boundaries, not cell_circles which is the annotated element...
             if "cell_boundaries" in sdata.shapes:
-                print(f"Xenium hack... using cell_boundaries for geojson output for region '{r}' in '{sdata_name}'")
+                _emit(
+                    f"INFO: Using cell_boundaries for geojson output for region '{r}' in '{sdata_name}'",
+                    verbose_only=True,
+                )
                 annotated = sdata["cell_boundaries"]
             
             if isinstance(annotated, GeoDataFrame):
@@ -646,9 +767,12 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
                 all_regions[region_id]["json"] = f"images/{name}"
                 with open(path, "w") as f:
                     f.write(geojson)
-                    print(f"Wrote geojson for region '{region_id}' to {path}")
+                    _emit(f"Wrote geojson for region '{region_id}' to {path}", verbose_only=True)
             else:
-                print(f"WARNING: No geojson output for region '{r}' in '{sdata_name}' because it is not a GeoDataFrame")
+                _emit(
+                    f"INFO: No geojson output for region '{r}' in '{sdata_name}' because it is not a GeoDataFrame",
+                    verbose_only=True,
+                )
         
         region_to_image[r] = best_img
 
@@ -664,42 +788,120 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
 
 
 
-def _try_read_zarr(path: str):# -> sd.SpatialData | None:
+def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[str, dict]:
+    all_regions: dict[str, dict] = {}
+
+    for cs in sdata.coordinate_systems:
+        img_candidates = [img for img in sdata.images.items() if cs in _get_transform_keys(img[1])]
+        img_candidates.sort(key=lambda img: (0 if "morphology_focus" in str(img[0]) else 1, img[0]))
+        if not img_candidates:
+            continue
+
+        img_path, _img_obj = img_candidates[0]
+        region_id = f"{sdata_name}_{cs}"
+        all_regions[region_id] = {
+            "spatial": {
+                "coordinate_system": cs,
+                "file": sdata_name,
+            },
+            "viv_image": {
+                "file": f"{sdata_name}/images/{img_path}",
+            },
+            "roi": {
+                "min_x": 0,
+                "min_y": 0,
+                "max_x": 1000,
+                "max_y": 1000,
+            },
+            "images": {},
+        }
+
+    return all_regions
+
+
+def _try_read_zarr(
+    path: str,
+    emit_warning: bool = True,
+    raise_on_error: bool = False,
+):# -> sd.SpatialData | None:
     """
     Attempts to read arbitrary path string as a SpatialData object, falling back to None if it fails.
     """
     try:
         import spatialdata as sd
-        return sd.read_zarr(path)
+        ome_logger = logging.getLogger("ome_zarr.reader")
+        original_level = ome_logger.level
+        if not _VERBOSE_OUTPUT:
+            ome_logger.setLevel(logging.ERROR)
+
+        try:
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Variable names are not unique.*",
+                    category=UserWarning,
+                )
+                return sd.read_zarr(path)
+        finally:
+            if not _VERBOSE_OUTPUT:
+                ome_logger.setLevel(original_level)
     except Exception as e:
-        print(f"Warning: Failed to read SpatialData object from {path}: '{e}'")
+        if raise_on_error:
+            raise
+        if emit_warning:
+            _emit(f"WARNING: Failed to read SpatialData object from {path}: '{e}'")
         return None
 
-def _set_default_image_view(mdv: "MDVProject", args: SpatialDataConversionArgs):
-    """
-    Uses a template view for the default view of the spatial data.
-    In future it would be good to make this user-configurable.
-    """
-    import json
-    import os
 
-    # find a region with a viv_image and use key from that...
-    for region_name, region_data in mdv.get_datasource_metadata("cells")["regions"]["all_regions"].items():
-        if "viv_image" in region_data:
-            break
-    else:
-        raise ValueError("No region with a viv_image found")
+def _ensure_unique_var_names(adata: "AnnData", table_name: str, sdata_name: str) -> None:
+    if adata.var_names.is_unique:
+        return
 
-    print(f"Using region '{region_name}' for default view")
-    with open(os.path.join(os.path.dirname(__file__), "spatial_view_template.json"), "r") as f:
-        view_str = f.read().replace("<SPATIAL_REGION_NAME>", region_name)
-        density = """
+    duplicate_count = int(adata.var_names.duplicated().sum())
+    _emit(
+        f"INFO: Table '{table_name}' in '{sdata_name}' has "
+        f"{duplicate_count} duplicate var_names. Making them unique before concatenation.",
+        verbose_only=True,
+    )
+    adata.var_names_make_unique()
+
+
+def _concat_spatial_tables(adata_objects: list["AnnData"]) -> "AnnData":
+    from anndata import concat as ad_concat
+
+    # Tables from different technologies often have disjoint gene sets, so an
+    # inner join can collapse the merged object down to zero genes.
+    has_raw_flags = [adata.raw is not None for adata in adata_objects]
+    if any(has_raw_flags) and not all(has_raw_flags):
+        _emit(
+            "INFO: Some input tables have .raw while others do not; merged .raw is omitted.",
+            verbose_only=True,
+        )
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"Only some AnnData objects have `.raw` attribute, not concatenating `.raw` attributes\.",
+            category=UserWarning,
+        )
+        return ad_concat(adata_objects, index_unique="_", join="outer", fill_value=0)
+
+
+def _build_gene_source_column(
+    merged_adata: "AnnData",
+    gene_sources: dict[str, set[str]],
+) -> list[dict[str, str]]:
+    merged_adata.var["object_source"] = [
+        "|".join(sorted(gene_sources.get(str(gene_name), set())))
+        for gene_name in merged_adata.var_names
+    ]
+    return [
         {
-            "linkedDsName": "genes", "maxItems": 15, "type": "RowsAsColsQuery"
+            "name": "object_source",
+            "datatype": "multitext",
+            "delimiter": "|",
         }
-        """
-        view_str = view_str.replace('"<DENSITY_FIELDS>"', density if args.density else "")
-        mdv.set_view("default", json.loads(view_str), True)
+    ]
 
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
@@ -732,41 +934,44 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             - The written SpatialData objects contain the modified tables
     """
     # imports can be slow, so doing them here rather than at the top of the file
-    from anndata import concat as ad_concat
     from mdvtools.conversions import convert_scanpy_to_mdv
     from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.build_info import get_build_info
     from mdvtools.spatial.mermaid import sdata_to_mermaid
+    from mdvtools.spatial.project_helpers import (
+        build_spatial_regions_metadata,
+        create_empty_spatial_mdv_project,
+        set_default_spatial_image_view,
+    )
+
+    _set_verbose_output(args.verbose)
     
     # Print version banner if build info is available
     build_info = get_build_info()
     if build_info["source"] != "unknown" and build_info["git_commit_hash"]:
         commit_short = build_info["git_commit_hash"][:8]
         date_str = build_info["git_commit_date"] or build_info["build_date"] or "unknown"
-        print(f"MDV conversion (commit: {commit_short}, date: {date_str})")
+        _progress(f"MDV conversion (commit: {commit_short}, date: {date_str})")
     
+    sdata_paths = _discover_spatialdata_paths(args.spatialdata_path, batch=args.batch)
+    single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
 
-    # we could do a nicer glob thing here, but I don't want to test that right now.
-    sdata_paths = [
-        os.path.join(args.spatialdata_path, f)
-        for f in os.listdir(args.spatialdata_path)
-    ]
-    # sdata_paths = [f for f in sdata_paths if f.endswith(".zarr")]
-    sdata_paths = sorted(sdata_paths)
-    if len(sdata_paths) == 0:
-        # we haven't actually yet determined whether any of the paths are really sdata...
-        # this happens when the folder is totally empty.
-        raise ValueError(f"No SpatialData objects found in the folder '{args.spatialdata_path}'")
+    _progress(
+        f"Converting {len(sdata_paths)} SpatialData entr{'y' if len(sdata_paths) == 1 else 'ies'} "
+        f"from '{args.spatialdata_path}' to '{args.output_folder}'"
+    )
     
     sdata_objects: dict[str, SpatialData] = {}
     adata_objects: list[AnnData] = []
     all_regions: dict[str, dict] = {}
+    gene_sources: dict[str, set[str]] = {}
     names: set[str] = set()
     
     # Process each SpatialData object sequentially
     # Removed ProcessPoolExecutor to avoid pickling issues with lazy zarr arrays in SpatialData objects
-    for sdata_path in sdata_paths:
+    for index, sdata_path in enumerate(sdata_paths, start=1):
         sdata_name = os.path.basename(sdata_path)
+        _progress(f"[{index}/{len(sdata_paths)}] Processing {sdata_name}")
         sdata = _try_read_zarr(sdata_path)
         if sdata is None:
             continue
@@ -777,8 +982,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             )
         names.add(sdata_name)
         
-        print(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n")
-        print(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n")
+        _emit(f"## SpatialData object representation:\n\n```\n{sdata}\n```\n", verbose_only=True)
+        _emit(f"## Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n", verbose_only=True)
         
         # Process tables and modify them in-place
         # These modifications will be:
@@ -787,8 +992,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         # - NOT written to original files (when args.link is True, files are symlinked)
         for table_name, adata in sdata.tables.items():
             _resolve_regions_for_table(sdata, table_name, sdata_name, args)
+            _ensure_unique_var_names(adata, table_name, sdata_name)
             adata.obs["spatialdata_path"] = sdata_name
             adata.obs["table_name"] = table_name
+            for gene_name in adata.var_names:
+                gene_sources.setdefault(str(gene_name), set()).add(sdata_name)
             adata_objects.append(adata)
             if "regions" in adata.uns.get("mdv", {}):
                 all_regions.update(adata.uns["mdv"]["regions"])
@@ -797,40 +1005,70 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         sdata_objects[sdata_name] = sdata
 
     if len(adata_objects) == 0:
-        raise ValueError("No tables found in any SpatialData objects - this is not yet supported.")
-    
-    # Check if we have at least one spatial table - maybe this is unnecessary noise?
-    spatial_tables = [ad for ad in adata_objects if ad.uns.get("mdv", {}).get("is_spatial", False)]
-
-    if len(spatial_tables) == 0:
-        print("WARNING: No spatial tables found. Skipping spatial-specific metadata and view setup.")
-        # Still merge and convert, but skip spatial operations
-        merged_adata = ad_concat(adata_objects, index_unique="_")
-        mdv = convert_scanpy_to_mdv(
-            args.output_folder, merged_adata, delete_existing=not args.preserve_existing
+        for sdata_name, sdata in sdata_objects.items():
+            all_regions.update(_resolve_image_only_regions(sdata, sdata_name))
+        if not all_regions:
+            raise ValueError("No tables or image-backed regions found in any SpatialData objects.")
+        _emit("INFO: No tables found. Creating an image-only project with empty datasources.")
+        _progress("Writing MDV project")
+        mdv = _call_with_optional_stdout_suppressed(
+            create_empty_spatial_mdv_project,
+            args.output_folder,
+            delete_existing=not args.preserve_existing,
+            region_field=REGION_FIELD,
         )
-        # ... write sdata objects but skip region metadata and _set_default_image_view
-        return mdv
+        merged_adata = None
+        has_spatial_tables = False
+    else:
+        # Check if we have at least one spatial table - maybe this is unnecessary noise?
+        spatial_tables = [ad for ad in adata_objects if ad.uns.get("mdv", {}).get("is_spatial", False)]
 
-    # Proceed with normal spatial workflow if we have spatial tables
-    if not all_regions:
-        raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
+        has_spatial_tables = len(spatial_tables) != 0
 
-    ## todo - try to make sure we have sparse CSC matrices if possible.
-    merged_adata = ad_concat(adata_objects, index_unique="_")
-    mdv = convert_scanpy_to_mdv(
-        args.output_folder, merged_adata, delete_existing=not args.preserve_existing
+        if not has_spatial_tables:
+            _emit(
+                "INFO: No spatial tables found. Creating a merged project without spatial metadata or a default image view."
+            )
+        elif not all_regions:
+            raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
+
+        _progress(f"Merging {len(adata_objects)} table(s) with outer gene union")
+        merged_adata = _concat_spatial_tables(adata_objects)
+        gene_columns = _build_gene_source_column(merged_adata, gene_sources)
+        _progress("Writing MDV project")
+        mdv = _call_with_optional_stdout_suppressed(
+            convert_scanpy_to_mdv,
+            args.output_folder,
+            merged_adata,
+            delete_existing=not args.preserve_existing,
+            gene_columns=gene_columns,
     )
     if args.link:
-        print(f"Linking spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
-        print("NOTE: Original SpatialData files are not modified. Table modifications exist only in the merged MDV project.")
+        if single_source_input:
+            os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
+            link_target = os.path.join(mdv.dir, "spatial", os.path.basename(sdata_paths[0]))
+        else:
+            link_target = os.path.join(mdv.dir, "spatial")
+        if os.path.lexists(link_target):
+            raise FileExistsError(
+                f"Cannot create symlink at '{link_target}' because the path already exists."
+            )
+        _progress(f"Linking spatial inputs into '{link_target}'")
+        _emit(
+            "NOTE: Original SpatialData files are not modified. Table modifications exist only in the merged MDV project.",
+            verbose_only=True,
+        )
         os.symlink(
-            os.path.abspath(args.spatialdata_path), 
-            os.path.join(mdv.dir, "spatial"), target_is_directory=True
+            os.path.abspath(args.spatialdata_path if not single_source_input else sdata_paths[0]),
+            link_target,
+            target_is_directory=True,
         )
     else:
-        print(f"Copying spatialdata object path '{args.spatialdata_path}' to '{mdv.dir}/spatial'")
-        print("NOTE: SpatialData objects are written with modified tables (added obs columns and uns metadata).")
+        _progress(f"Copying spatial inputs into '{mdv.dir}/spatial'")
+        _emit(
+            "NOTE: SpatialData objects are written with modified tables (added obs columns and uns metadata).",
+            verbose_only=True,
+        )
         os.makedirs(
             f"{mdv.dir}/spatial", exist_ok=True
         )  # pretty sure sdata.write will do this anyway
@@ -845,7 +1083,9 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         import shutil
         dest_dir = os.path.join(mdv.dir, "images")
         os.makedirs(dest_dir, exist_ok=True)
-        for f in os.listdir(args.temp_folder):
+        geojson_files = [f for f in os.listdir(args.temp_folder) if f.endswith(".geo.json")]
+        _progress(f"Writing {len(geojson_files)} GeoJSON file{'s' if len(geojson_files) != 1 else ''}")
+        for f in geojson_files:
             shutil.move(os.path.join(args.temp_folder, f), os.path.join(dest_dir, f))
 
     mdv.set_editable()
@@ -862,46 +1102,49 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     # }
     # mdv.add_viv_images("cells", viv_data, link_images=False)
 
-    # instead, we will set the region metadata directly.
-    cells_md = mdv.get_datasource_metadata("cells")
-    cells_md["regions"] = {
-        # non-2d cases are one thing... but mixtures are another.
-        # this metadata format won't work for that, we expect to move more towards spatialdata.js.
-        "position_fields": ["x", "y"],
-        "region_field": REGION_FIELD,
-        "default_color": "x",  # todo: figure out a better way to determine this.
-        "scale_unit": "µm",
-        # scale will be baked during conversion from spatialdata to mdv.
-        # in future we will use spatialdata.js to handle transforms at runtime.
-        "scale": 1.0,
-        "avivator": {
-            "default_channels": [],
-            "base_url": "spatial/",
-        },
-        "all_regions": all_regions,
-    }
-    mdv.set_datasource_metadata(cells_md)
-    _set_default_image_view(mdv, args)
-    print(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n")
-    print(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---")
+    if all_regions:
+        # instead, we will set the region metadata directly.
+        cells_md = mdv.get_datasource_metadata("cells")
+        cells_md["regions"] = build_spatial_regions_metadata(all_regions, REGION_FIELD)
+        mdv.set_datasource_metadata(cells_md)
+        set_default_spatial_image_view(
+            mdv,
+            os.path.join(os.path.dirname(__file__), "spatial_view_template.json"),
+            args.density,
+            _emit,
+        )
+    if merged_adata is not None:
+        _emit(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n", verbose_only=True)
+    _emit(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---", verbose_only=True)
     add_readme_to_project(mdv, merged_adata, args)
     if args.serve:
-        print(f"Serving project at {args.output_folder}")
+        _progress(f"Serving project at {args.output_folder}")
         serve_project(mdv)
     else:
-        print(f"Project saved to {args.output_folder}")
+        _progress(f"Project saved to {args.output_folder}")
 
     return mdv
 if __name__ == "__main__":
     # take an array of spatialdata objects from a folder and convert them to mdv.
     parser = argparse.ArgumentParser(description="Convert SpatialData to MDV format")
-    parser.add_argument("spatialdata_path", type=str, help="Path to SpatialData data")
+    parser.add_argument(
+        "spatialdata_path",
+        type=str,
+        help="Path to a SpatialData store, or with --batch a directory containing multiple SpatialData stores",
+    )
     parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
-    parser.add_argument("--link", action="store_true", help="Symlink to the original SpatialData objects")
-    parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data")
-    parser.add_argument("--output_geojson", action="store_true", help="Output geojson for each region (this feature to be deprecated in favour of spatialdata.js layers with shapes)")
-    parser.add_argument("--density", action="store_true", help="Include density fields for gene expression in default view")
-    parser.add_argument("--serve", action="store_true", help="Serve the project after conversion")
+    parser.add_argument("--batch", action="store_true", help="Convert all child SpatialData stores in the given directory")
+    parser.add_argument("--link", action="store_true", help="Symlink the original SpatialData inputs into the project instead of copying them")
+    parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data in the output folder instead of recreating it")
+    parser.add_argument(
+        "--output_geojson",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Write transformed GeoJSON region files into the project images directory",
+    )
+    parser.add_argument("--density", action="store_true", help="Include density fields for gene expression in the default spatial view")
+    parser.add_argument("--serve", action="store_true", help="Serve the generated project after conversion")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed per-dataset conversion output, transform decisions, and merged summaries")
     parser.add_argument(
         "--point-transform",
         type=str,
@@ -917,10 +1160,6 @@ if __name__ == "__main__":
         )
     )
     args = parser.parse_args()
-    print(f"Converting SpatialData from '{args.spatialdata_path}' to {args.output_folder}")
-    print(f"Preserving existing project data: {args.preserve_existing}")
-    print(f"Serving the project after conversion: {args.serve}")
-    print(f"Converting {len(os.listdir(args.spatialdata_path))} potential SpatialData objects")
     import tempfile
     with tempfile.TemporaryDirectory() as temp_folder:
         args.temp_folder = temp_folder

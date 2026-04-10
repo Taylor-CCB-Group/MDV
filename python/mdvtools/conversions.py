@@ -29,7 +29,8 @@ def convert_scanpy_to_mdv(
     label: str = "",
     chunk_data: bool = False,
     add_layer_data = True,
-    gene_identifier_column = None
+    gene_identifier_column = None,
+    gene_columns: List[dict[str, Any]] | None = None,
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -54,6 +55,7 @@ def convert_scanpy_to_mdv(
         gene_identifier_column: (str, optional) This is the gene column that the user will use to
             identify the gene. If not specified (default) than a column 'name' will be added that is
             created from the index (which is usaully the unique gene name)
+        gene_columns: (list[dict], optional) Column metadata overrides for the genes datasource.
     Returns:
         MDVProject: The configured MDV project object with the converted data
 
@@ -130,7 +132,7 @@ def convert_scanpy_to_mdv(
     #originally column had to be unique - but now is just text
     #need to coerce gene name column to unique
     #columns=[{"name":"name","datatype":"text16"}]
-    mdv.add_datasource(f"{label}genes", gene_table)
+    mdv.add_datasource(f"{label}genes", gene_table, columns=gene_columns)
 
     # link the two datasets
     mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", gene_identifier_column, "Gene Expr")
