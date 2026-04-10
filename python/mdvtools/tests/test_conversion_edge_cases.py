@@ -9,12 +9,14 @@ edge cases, ensuring that adata.X is properly handled and validated.
 import os
 import tempfile
 import shutil
+from typing import cast
 import pytest
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
 from contextlib import contextmanager
+from pandas import DataFrame
 
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
@@ -347,13 +349,14 @@ class TestConversionWithEdgeCases:
         assert "table_a__leiden" in merged.obs.columns
         assert "table_b__leiden" in merged.obs.columns
 
-        table_a_rows = merged.obs["table_name"] == "table_a"
-        table_b_rows = merged.obs["table_name"] == "table_b"
+        merged_obs = cast(DataFrame, merged.obs)
+        table_a_rows = merged_obs["table_name"] == "table_a"
+        table_b_rows = merged_obs["table_name"] == "table_b"
 
-        assert merged.obs.loc[table_a_rows, "table_a__leiden"].notna().all()
-        assert merged.obs.loc[table_b_rows, "table_b__leiden"].notna().all()
-        assert merged.obs.loc[table_a_rows, "table_b__leiden"].isna().all()
-        assert merged.obs.loc[table_b_rows, "table_a__leiden"].isna().all()
+        assert merged_obs.loc[table_a_rows, "table_a__leiden"].notna().all()
+        assert merged_obs.loc[table_b_rows, "table_b__leiden"].notna().all()
+        assert merged_obs.loc[table_a_rows, "table_b__leiden"].isna().all()
+        assert merged_obs.loc[table_b_rows, "table_a__leiden"].isna().all()
 
         with temp_mdv_project() as test_dir:
             with suppress_anndata_warnings():

@@ -42,15 +42,24 @@ def set_default_spatial_image_view(
 
     emit(f"Using region '{region_name}' for default view", verbose_only=True)
     with open(template_path, "r") as f:
-        view_str = f.read().replace("<SPATIAL_REGION_NAME>", region_name)
-        view_str = view_str.replace('"cells"', f'"{obs_datasource_name}"')
-        view_str = view_str.replace('"genes"', f'"{var_datasource_name}"')
-        density_block = """
-        {
-            "linkedDsName": "%s", "maxItems": 15, "type": "RowsAsColsQuery"
-        }
-        """ % var_datasource_name
-        view_str = view_str.replace('"<DENSITY_FIELDS>"', density_block if density else "")
+        view_str = f.read()
+        view_str = view_str.replace('"<SPATIAL_REGION_NAME>"', json.dumps(region_name))
+        view_str = view_str.replace('"cells"', '"__OBS_DS__"')
+        view_str = view_str.replace('"genes"', '"__VAR_DS__"')
+        density_block = (
+            json.dumps(
+                {
+                    "linkedDsName": var_datasource_name,
+                    "maxItems": 15,
+                    "type": "RowsAsColsQuery",
+                }
+            )
+            if density
+            else ""
+        )
+        view_str = view_str.replace('"<DENSITY_FIELDS>"', density_block)
+        view_str = view_str.replace('"__OBS_DS__"', json.dumps(obs_datasource_name))
+        view_str = view_str.replace('"__VAR_DS__"', json.dumps(var_datasource_name))
         mdv.set_view("default", json.loads(view_str), True)
 
 
