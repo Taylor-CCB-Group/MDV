@@ -1026,13 +1026,17 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             merged_adata,
             delete_existing=not args.preserve_existing,
             gene_columns=gene_columns,
-        )
+    )
     if args.link:
-        os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
         if single_source_input:
+            os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
             link_target = os.path.join(mdv.dir, "spatial", os.path.basename(sdata_paths[0]))
         else:
             link_target = os.path.join(mdv.dir, "spatial")
+        if os.path.lexists(link_target):
+            raise FileExistsError(
+                f"Cannot create symlink at '{link_target}' because the path already exists."
+            )
         _progress(f"Linking spatial inputs into '{link_target}'")
         _emit(
             "NOTE: Original SpatialData files are not modified. Table modifications exist only in the merged MDV project.",
