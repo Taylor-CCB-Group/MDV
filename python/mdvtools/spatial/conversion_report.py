@@ -110,12 +110,19 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _discover_datasets(datasets_root: Path, selected_names: set[str]) -> list[Path]:
+def _discover_datasets(
+    datasets_root: Path,
+    selected_names: set[str],
+    report_dir: Path | None = None,
+) -> list[Path]:
     datasets = []
+    resolved_report_dir = report_dir.resolve() if report_dir is not None else None
     for child in sorted(datasets_root.iterdir()):
         if child.name.startswith("."):
             continue
         if selected_names and child.name not in selected_names:
+            continue
+        if resolved_report_dir is not None and child.resolve() == resolved_report_dir:
             continue
         if child.is_dir():
             datasets.append(child)
@@ -426,7 +433,7 @@ def main() -> int:
         raise NotADirectoryError(f"Datasets root is not a directory: {datasets_root}")
 
     logs_dir, failures_dir, cache_dir = _ensure_dirs(report_dir)
-    datasets = _discover_datasets(datasets_root, selected_names)
+    datasets = _discover_datasets(datasets_root, selected_names, report_dir)
     if not datasets:
         raise ValueError(f"No datasets found under {datasets_root}")
 

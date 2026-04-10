@@ -125,13 +125,13 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
 @click.argument('output_folder')
 @click.argument('spatialdata_path')
 @click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data in the output folder instead of recreating it.')
-@click.option('--link', is_flag=True, help='Symlink the original SpatialData inputs into the project instead of copying them.')
+@click.option('--link', is_flag=True, help='Symlink the original SpatialData source into the project instead of copying it.')
 @click.option('--output_geojson/--no-output_geojson', 'output_geojson', default=True, help='Write transformed GeoJSON region files into the project images directory.')
 @click.option('--density', is_flag=True, help='Include density fields for gene expression in the default spatial view.')
 @click.option('--serve', is_flag=True, help='Serve the generated project after conversion.')
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
 def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, density, serve, verbose):
-    """Convert SpatialData objects to MDV format."""
+    """Convert one SpatialData store, or a directory of SpatialData stores, to MDV format."""
     import tempfile
     from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
 

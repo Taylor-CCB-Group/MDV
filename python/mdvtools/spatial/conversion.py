@@ -76,6 +76,31 @@ def _call_with_optional_stdout_suppressed(func, *args, **kwargs):
             logging.getLogger(logger_name).setLevel(original_level)
 
 
+def _discover_spatialdata_paths(spatialdata_path: str) -> list[str]:
+    source_path = os.path.abspath(spatialdata_path)
+
+    if not os.path.exists(source_path):
+        raise FileNotFoundError(f"SpatialData source does not exist: '{spatialdata_path}'")
+
+    if _try_read_zarr(source_path, emit_warning=False) is not None:
+        return [source_path]
+
+    if not os.path.isdir(source_path):
+        raise ValueError(
+            f"SpatialData source '{spatialdata_path}' is neither a readable SpatialData store nor a directory of stores."
+        )
+
+    sdata_paths = [
+        os.path.join(source_path, child)
+        for child in os.listdir(source_path)
+        if not child.startswith(".")
+    ]
+    sdata_paths = sorted(sdata_paths)
+    if len(sdata_paths) == 0:
+        raise ValueError(f"No SpatialData objects found in the folder '{spatialdata_path}'")
+    return sdata_paths
+
+
 @dataclass
 class ImageEntry:
     """
@@ -111,16 +136,24 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Preserve existing**: {conversion_args.preserve_existing}\n"
         markdown += f"- **Output GeoJSON**: {conversion_args.output_geojson}\n"
         markdown += f"- **Link spatial data**: {conversion_args.link}\n"
-        markdown += f"- **SpatialData path**: `{conversion_args.spatialdata_path}`\n"
+        markdown += f"- **SpatialData source**: `{conversion_args.spatialdata_path}`\n"
         markdown += "\n"
     
     markdown += "## SpatialData objects:\n\n"
     spatial_dir = os.path.join(mdv.dir, "spatial")
-    
-    for sdata_name in os.listdir(spatial_dir):
+
+    if _try_read_zarr(spatial_dir, emit_warning=False) is not None:
+        sdata_candidates = [(os.path.basename(os.path.normpath(spatial_dir)), spatial_dir)]
+    else:
+        sdata_candidates = [
+            (sdata_name, os.path.join(spatial_dir, sdata_name))
+            for sdata_name in os.listdir(spatial_dir)
+            if not sdata_name.startswith(".")
+        ]
+
+    for sdata_name, sdata_path in sdata_candidates:
         if sdata_name.startswith("."):
             continue
-        sdata_path = os.path.join(spatial_dir, sdata_name)
         if not os.path.exists(sdata_path):
             continue
         sdata = _try_read_zarr(sdata_path)
@@ -727,7 +760,7 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
 
 
 
-def _try_read_zarr(path: str):# -> sd.SpatialData | None:
+def _try_read_zarr(path: str, emit_warning: bool = True):# -> sd.SpatialData | None:
     """
     Attempts to read arbitrary path string as a SpatialData object, falling back to None if it fails.
     """
@@ -750,7 +783,8 @@ def _try_read_zarr(path: str):# -> sd.SpatialData | None:
             if not _VERBOSE_OUTPUT:
                 ome_logger.setLevel(original_level)
     except Exception as e:
-        _emit(f"WARNING: Failed to read SpatialData object from {path}: '{e}'")
+        if emit_warning:
+            _emit(f"WARNING: Failed to read SpatialData object from {path}: '{e}'")
         return None
 
 
@@ -875,17 +909,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         date_str = build_info["git_commit_date"] or build_info["build_date"] or "unknown"
         _progress(f"MDV conversion (commit: {commit_short}, date: {date_str})")
     
-
-    sdata_paths = [
-        os.path.join(args.spatialdata_path, f)
-        for f in os.listdir(args.spatialdata_path)
-        if not f.startswith(".")
-    ]
-    sdata_paths = sorted(sdata_paths)
-    if len(sdata_paths) == 0:
-        # we haven't actually yet determined whether any of the paths are really sdata...
-        # this happens when the folder is totally empty.
-        raise ValueError(f"No SpatialData objects found in the folder '{args.spatialdata_path}'")
+    sdata_paths = _discover_spatialdata_paths(args.spatialdata_path)
 
     _progress(
         f"Converting {len(sdata_paths)} SpatialData entr{'y' if len(sdata_paths) == 1 else 'ies'} "
@@ -1058,7 +1082,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
 if __name__ == "__main__":
     # take an array of spatialdata objects from a folder and convert them to mdv.
     parser = argparse.ArgumentParser(description="Convert SpatialData to MDV format")
-    parser.add_argument("spatialdata_path", type=str, help="Folder containing SpatialData objects")
+    parser.add_argument(
+        "spatialdata_path",
+        type=str,
+        help="Path to a SpatialData store or to a directory containing multiple SpatialData stores",
+    )
     parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
     parser.add_argument("--link", action="store_true", help="Symlink the original SpatialData inputs into the project instead of copying them")
     parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data in the output folder instead of recreating it")
