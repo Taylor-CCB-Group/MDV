@@ -1057,7 +1057,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         os.makedirs(dest_dir, exist_ok=True)
         geojson_files = [f for f in os.listdir(args.temp_folder) if f.endswith(".geo.json")]
         _progress(f"Writing {len(geojson_files)} GeoJSON file{'s' if len(geojson_files) != 1 else ''}")
-        for f in os.listdir(args.temp_folder):
+        for f in geojson_files:
             shutil.move(os.path.join(args.temp_folder, f), os.path.join(dest_dir, f))
 
     mdv.set_editable()
