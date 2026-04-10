@@ -919,23 +919,34 @@ def _allocate_table_prefix(table_name: str, used_prefixes: set[str]) -> str:
     return prefix
 
 
-def _compute_table_prefixed_x_umap_and_leiden(
+def _compute_table_x_umap_and_leiden(
     adata: "AnnData",
-    table_prefix: str,
     leiden_resolution: float,
-) -> tuple[str, str]:
+) -> str:
     from mdvtools.conversions import _prepare_x_umap_and_leiden
 
-    umap_key = f"{table_prefix}__X_umap"
-    leiden_column = f"{table_prefix}__leiden"
     _prepare_x_umap_and_leiden(
         adata,
         compute_x_umap=True,
         leiden_resolution=leiden_resolution,
-        leiden_column=leiden_column,
-        umap_key=umap_key,
+        leiden_column="leiden",
+        umap_key="X_umap",
     )
-    return umap_key, leiden_column
+    return "leiden"
+
+
+def _prefix_table_leiden_categories(
+    adata: "AnnData",
+    table_prefix: str,
+    leiden_column: str = "leiden",
+) -> None:
+    import pandas as pd
+
+    if leiden_column not in adata.obs.columns:
+        return
+    adata.obs[leiden_column] = pd.Categorical(
+        [f"{table_prefix}__{value}" for value in adata.obs[leiden_column].astype(str)]
+    )
 
 
 def _build_gene_source_column(
@@ -1018,7 +1029,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     gene_sources: dict[str, set[str]] = {}
     names: set[str] = set()
     used_table_prefixes: set[str] = set()
-    table_leiden_columns: list[str] = []
+    table_leiden_labels: list[tuple[AnnData, str]] = []
     
     # Process each SpatialData object sequentially
     # Removed ProcessPoolExecutor to avoid pickling issues with lazy zarr arrays in SpatialData objects
@@ -1050,14 +1061,13 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 table_prefix = _allocate_table_prefix(table_name, used_prefixes=used_table_prefixes)
                 _progress(
                     f"Computing per-table X UMAP/Leiden for '{table_name}' "
-                    f"as '{table_prefix}__X_umap_*' and '{table_prefix}__leiden'"
+                    "into shared X_umap/leiden columns"
                 )
-                _, leiden_column = _compute_table_prefixed_x_umap_and_leiden(
+                leiden_column = _compute_table_x_umap_and_leiden(
                     adata,
-                    table_prefix=table_prefix,
                     leiden_resolution=args.leiden_resolution,
                 )
-                table_leiden_columns.append(leiden_column)
+                table_leiden_labels.append((adata, table_prefix))
             adata.obs["spatialdata_path"] = sdata_name
             adata.obs["table_name"] = table_name
             for gene_name in adata.var_names:
@@ -1099,6 +1109,10 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         elif not all_regions:
             raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
 
+        if args.compute_x_umap and len(adata_objects) > 1:
+            for adata, table_prefix in table_leiden_labels:
+                _prefix_table_leiden_categories(adata, table_prefix)
+
         _progress(f"Merging {len(adata_objects)} table(s) with outer gene union")
         merged_adata = _concat_spatial_tables(adata_objects)
         gene_columns = _build_gene_source_column(merged_adata, gene_sources)
@@ -1115,12 +1129,6 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             compute_x_umap=False,
             leiden_resolution=args.leiden_resolution,
         )
-        if table_leiden_columns:
-            obs_metadata = mdv.get_datasource_metadata(args.obs_datasource_name)
-            for column in obs_metadata["columns"]:
-                if column.get("field") in table_leiden_columns:
-                    column["datatype"] = "text"
-            mdv.set_datasource_metadata(obs_metadata)
     if args.link:
         if single_source_input:
             os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)

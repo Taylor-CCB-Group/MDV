@@ -21,8 +21,9 @@ from pandas import DataFrame
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
 from mdvtools.spatial.conversion import (
-    _compute_table_prefixed_x_umap_and_leiden,
+    _compute_table_x_umap_and_leiden,
     _concat_spatial_tables,
+    _prefix_table_leiden_categories,
 )
 from .mock_anndata import (
     MockAnnDataFactory,
@@ -296,22 +297,20 @@ class TestConversionWithEdgeCases:
             link_metadata = obs_metadata["links"]["features"]["rows_as_columns"]
             assert link_metadata["name_column"] == "display_name"
 
-    def test_spatial_single_table_x_umap_is_prefixed_and_text(self):
-        """Spatial helper should compute per-table prefixed UMAP/Leiden columns."""
+    def test_spatial_single_table_x_umap_uses_plain_columns(self):
+        """Single-table spatial helper should keep plain X_umap/leiden column names."""
         factory = MockAnnDataFactory(random_seed=42)
         adata = factory.create_minimal(40, 16)
 
-        _compute_table_prefixed_x_umap_and_leiden(
+        _compute_table_x_umap_and_leiden(
             adata,
-            table_prefix="sample_table",
             leiden_resolution=0.6,
         )
 
-        assert "sample_table__X_umap" in adata.obsm
-        assert "sample_table__leiden" in adata.obs.columns
-        assert "leiden" not in adata.obs.columns
-        assert isinstance(adata.obs["sample_table__leiden"].dtype, pd.CategoricalDtype)
-        assert all(isinstance(value, str) for value in adata.obs["sample_table__leiden"].astype(str))
+        assert "X_umap" in adata.obsm
+        assert "leiden" in adata.obs.columns
+        assert isinstance(adata.obs["leiden"].dtype, pd.CategoricalDtype)
+        assert all(isinstance(value, str) for value in adata.obs["leiden"].astype(str))
 
         with temp_mdv_project() as test_dir:
             with suppress_anndata_warnings():
@@ -319,44 +318,40 @@ class TestConversionWithEdgeCases:
 
             cells_metadata = mdv.get_datasource_metadata("cells")
             columns = {col["field"]: col for col in cells_metadata["columns"]}
-            assert "sample_table__X_umap_1" in columns
-            assert "sample_table__X_umap_2" in columns
-            assert "sample_table__leiden" in columns
-            assert columns["sample_table__leiden"]["datatype"] in ["text", "text16"]
+            assert "X_umap_1" in columns
+            assert "X_umap_2" in columns
+            assert "leiden" in columns
+            assert columns["leiden"]["datatype"] in ["text", "text16"]
 
-    def test_spatial_multi_table_x_umap_stays_per_table_after_merge(self):
-        """Merged spatial tables should keep separate per-table UMAP/Leiden columns."""
+    def test_spatial_multi_table_x_umap_shares_columns_and_prefixes_leiden_values(self):
+        """Merged spatial tables should share X_umap/leiden columns while prefixing Leiden labels."""
         factory = MockAnnDataFactory(random_seed=42)
         adata_a = factory.create_minimal(24, 12)
         adata_b = factory.create_minimal(18, 9)
 
-        _compute_table_prefixed_x_umap_and_leiden(
+        _compute_table_x_umap_and_leiden(
             adata_a,
-            table_prefix="table_a",
             leiden_resolution=0.5,
         )
-        _compute_table_prefixed_x_umap_and_leiden(
+        _compute_table_x_umap_and_leiden(
             adata_b,
-            table_prefix="table_b",
             leiden_resolution=0.5,
         )
+        _prefix_table_leiden_categories(adata_a, "table_a")
+        _prefix_table_leiden_categories(adata_b, "table_b")
         adata_a.obs["table_name"] = "table_a"
         adata_b.obs["table_name"] = "table_b"
 
         merged = _concat_spatial_tables([adata_a, adata_b])
 
-        assert "leiden" not in merged.obs.columns
-        assert "table_a__leiden" in merged.obs.columns
-        assert "table_b__leiden" in merged.obs.columns
+        assert "leiden" in merged.obs.columns
 
         merged_obs = cast(DataFrame, merged.obs)
         table_a_rows = merged_obs["table_name"] == "table_a"
         table_b_rows = merged_obs["table_name"] == "table_b"
 
-        assert merged_obs.loc[table_a_rows, "table_a__leiden"].notna().all()
-        assert merged_obs.loc[table_b_rows, "table_b__leiden"].notna().all()
-        assert merged_obs.loc[table_a_rows, "table_b__leiden"].isna().all()
-        assert merged_obs.loc[table_b_rows, "table_a__leiden"].isna().all()
+        assert merged_obs.loc[table_a_rows, "leiden"].str.startswith("table_a__").all()
+        assert merged_obs.loc[table_b_rows, "leiden"].str.startswith("table_b__").all()
 
         with temp_mdv_project() as test_dir:
             with suppress_anndata_warnings():
@@ -364,12 +359,9 @@ class TestConversionWithEdgeCases:
 
             cells_metadata = mdv.get_datasource_metadata("cells")
             columns = {col["field"]: col for col in cells_metadata["columns"]}
-            assert "table_a__X_umap_1" in columns
-            assert "table_a__X_umap_2" in columns
-            assert "table_b__X_umap_1" in columns
-            assert "table_b__X_umap_2" in columns
-            assert columns["table_a__leiden"]["datatype"] in ["text", "text16"]
-            assert columns["table_b__leiden"]["datatype"] in ["text", "text16"]
+            assert "X_umap_1" in columns
+            assert "X_umap_2" in columns
+            assert columns["leiden"]["datatype"] in ["text", "text16"]
 
 
 class TestConversionErrorHandling:
