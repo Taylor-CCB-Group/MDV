@@ -82,7 +82,14 @@ def _discover_spatialdata_paths(spatialdata_path: str) -> list[str]:
     if not os.path.exists(source_path):
         raise FileNotFoundError(f"SpatialData source does not exist: '{spatialdata_path}'")
 
-    if _try_read_zarr(source_path, emit_warning=False) is not None:
+    try:
+        root_sdata = _try_read_zarr(source_path, emit_warning=False, raise_on_error=True)
+    except Exception as error:
+        raise ValueError(
+            f"Failed to read SpatialData source '{spatialdata_path}' at '{source_path}': {error}"
+        ) from error
+
+    if root_sdata is not None:
         return [source_path]
 
     if not os.path.isdir(source_path):
@@ -765,7 +772,11 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
 
 
 
-def _try_read_zarr(path: str, emit_warning: bool = True):# -> sd.SpatialData | None:
+def _try_read_zarr(
+    path: str,
+    emit_warning: bool = True,
+    raise_on_error: bool = False,
+):# -> sd.SpatialData | None:
     """
     Attempts to read arbitrary path string as a SpatialData object, falling back to None if it fails.
     """
@@ -788,6 +799,8 @@ def _try_read_zarr(path: str, emit_warning: bool = True):# -> sd.SpatialData | N
             if not _VERBOSE_OUTPUT:
                 ome_logger.setLevel(original_level)
     except Exception as e:
+        if raise_on_error:
+            raise
         if emit_warning:
             _emit(f"WARNING: Failed to read SpatialData object from {path}: '{e}'")
         return None
