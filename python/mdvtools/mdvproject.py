@@ -2466,7 +2466,10 @@ def add_column_to_group(
         )  # this is slooooow?
         if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
             try:
-                numeric = pandas.to_numeric(clean, errors="coerce")
+                numeric = numpy.asarray(
+                    pandas.to_numeric(clean, errors="coerce"),
+                    dtype=numpy.float64,
+                )
                 finite_numeric = numeric[numpy.isfinite(numeric)]
                 out_of_range = finite_numeric[finite_numeric > 16_777_216]
                 if len(out_of_range) != 0:
@@ -2648,12 +2651,14 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
             if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
                 try:
                     numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
-                    out_of_range = numeric.filter(pl.col(numeric.name) > 16_777_216)
-                    if out_of_range.len() != 0:
+                    arr = numeric.to_numpy()
+                    finite = arr[np.isfinite(arr)]
+                    out_of_range = finite[finite > 16_777_216]
+                    if len(out_of_range) != 0:
                         col_info.setdefault("storage_warnings", []).append(
                             "uint32 -> float32 (integer): "
-                            f"{out_of_range.len()} value(s) exceed exact-integer range "
-                            f"(max={numeric.max():.0f}); precision loss possible."
+                            f"{len(out_of_range)} value(s) exceed exact-integer range "
+                            f"(max={float(finite.max()):.0f}); precision loss possible."
                         )
                 except Exception:
                     pass
