@@ -24,6 +24,7 @@ class SpatialDataConversionArgs:
     spatialdata_path: str
     output_folder: str
     temp_folder: str
+    batch: bool = False
     preserve_existing: bool = False
     output_geojson: bool = True
     serve: bool = False
@@ -76,7 +77,7 @@ def _call_with_optional_stdout_suppressed(func, *args, **kwargs):
             logging.getLogger(logger_name).setLevel(original_level)
 
 
-def _discover_spatialdata_paths(spatialdata_path: str) -> list[str]:
+def _discover_spatialdata_paths(spatialdata_path: str, batch: bool = False) -> list[str]:
     source_path = os.path.abspath(spatialdata_path)
 
     if not os.path.exists(source_path):
@@ -85,9 +86,18 @@ def _discover_spatialdata_paths(spatialdata_path: str) -> list[str]:
     try:
         root_sdata = _try_read_zarr(source_path, emit_warning=False, raise_on_error=True)
     except Exception as error:
-        raise ValueError(
-            f"Failed to read SpatialData source '{spatialdata_path}' at '{source_path}': {error}"
-        ) from error
+        try:
+            from zarr.errors import GroupNotFoundError
+        except Exception:
+            GroupNotFoundError = None  # type: ignore
+
+        if not os.path.isdir(source_path) or (
+            GroupNotFoundError is not None and not isinstance(error, GroupNotFoundError)
+        ):
+            raise ValueError(
+                f"Failed to read SpatialData source '{spatialdata_path}' at '{source_path}': {error}"
+            ) from error
+        root_sdata = None
 
     if root_sdata is not None:
         return [source_path]
@@ -95,6 +105,11 @@ def _discover_spatialdata_paths(spatialdata_path: str) -> list[str]:
     if not os.path.isdir(source_path):
         raise ValueError(
             f"SpatialData source '{spatialdata_path}' is neither a readable SpatialData store nor a directory of stores."
+        )
+
+    if not batch:
+        raise ValueError(
+            f"SpatialData source '{spatialdata_path}' is a directory. Pass --batch to convert all child SpatialData stores."
         )
 
     sdata_paths = [
@@ -148,6 +163,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Preserve existing**: {conversion_args.preserve_existing}\n"
         markdown += f"- **Output GeoJSON**: {conversion_args.output_geojson}\n"
         markdown += f"- **Link spatial data**: {conversion_args.link}\n"
+        markdown += f"- **Batch mode**: {conversion_args.batch}\n"
         markdown += f"- **SpatialData source**: `{conversion_args.spatialdata_path}`\n"
         markdown += "\n"
     
@@ -937,7 +953,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         date_str = build_info["git_commit_date"] or build_info["build_date"] or "unknown"
         _progress(f"MDV conversion (commit: {commit_short}, date: {date_str})")
     
-    sdata_paths = _discover_spatialdata_paths(args.spatialdata_path)
+    sdata_paths = _discover_spatialdata_paths(args.spatialdata_path, batch=args.batch)
     single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
 
     _progress(
@@ -1114,9 +1130,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "spatialdata_path",
         type=str,
-        help="Path to a SpatialData store or to a directory containing multiple SpatialData stores",
+        help="Path to a SpatialData store, or with --batch a directory containing multiple SpatialData stores",
     )
     parser.add_argument("output_folder", type=str, help="Output folder for MDV project")
+    parser.add_argument("--batch", action="store_true", help="Convert all child SpatialData stores in the given directory")
     parser.add_argument("--link", action="store_true", help="Symlink the original SpatialData inputs into the project instead of copying them")
     parser.add_argument("--preserve-existing", action="store_true", help="Preserve existing project data in the output folder instead of recreating it")
     parser.add_argument(

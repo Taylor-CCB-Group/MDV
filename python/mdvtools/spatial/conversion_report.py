@@ -150,6 +150,7 @@ def _command_for_dataset(
         "mdvtools.spatial.conversion",
         str(input_dir),
         str(output_dir),
+        "--batch",
         "--point-transform",
         args.point_transform,
     ]

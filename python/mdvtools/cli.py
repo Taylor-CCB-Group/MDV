@@ -124,14 +124,15 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
 @cli.command("convert-spatial")
 @click.argument('output_folder')
 @click.argument('spatialdata_path')
+@click.option('--batch', is_flag=True, help='Convert all child SpatialData stores in the given directory.')
 @click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data in the output folder instead of recreating it.')
 @click.option('--link', is_flag=True, help='Symlink the original SpatialData source into the project instead of copying it.')
 @click.option('--output_geojson/--no-output_geojson', 'output_geojson', default=True, help='Write transformed GeoJSON region files into the project images directory.')
 @click.option('--density', is_flag=True, help='Include density fields for gene expression in the default spatial view.')
 @click.option('--serve', is_flag=True, help='Serve the generated project after conversion.')
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
-def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, output_geojson, density, serve, verbose):
-    """Convert one SpatialData store, or a directory of SpatialData stores, to MDV format."""
+def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, verbose):
+    """Convert one SpatialData store to MDV format, or use --batch for a directory of stores."""
     import tempfile
     from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
 
@@ -139,6 +140,7 @@ def convert_spatial(spatialdata_path, output_folder, preserve_existing, link, ou
         args = SpatialDataConversionArgs(
             spatialdata_path=spatialdata_path,
             output_folder=output_folder,
+            batch=batch,
             preserve_existing=preserve_existing,
             temp_folder=temp_folder,
             link=link,
