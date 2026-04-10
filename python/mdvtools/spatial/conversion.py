@@ -101,6 +101,11 @@ def _discover_spatialdata_paths(spatialdata_path: str) -> list[str]:
     return sdata_paths
 
 
+def _is_single_spatialdata_source(spatialdata_path: str, sdata_paths: list[str]) -> bool:
+    source_path = os.path.abspath(spatialdata_path)
+    return len(sdata_paths) == 1 and os.path.abspath(sdata_paths[0]) == source_path
+
+
 @dataclass
 class ImageEntry:
     """
@@ -910,6 +915,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         _progress(f"MDV conversion (commit: {commit_short}, date: {date_str})")
     
     sdata_paths = _discover_spatialdata_paths(args.spatialdata_path)
+    single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
 
     _progress(
         f"Converting {len(sdata_paths)} SpatialData entr{'y' if len(sdata_paths) == 1 else 'ies'} "
@@ -1001,14 +1007,20 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         gene_columns=gene_columns,
     )
     if args.link:
-        _progress(f"Linking spatial inputs into '{mdv.dir}/spatial'")
+        os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
+        if single_source_input:
+            link_target = os.path.join(mdv.dir, "spatial", os.path.basename(sdata_paths[0]))
+        else:
+            link_target = os.path.join(mdv.dir, "spatial")
+        _progress(f"Linking spatial inputs into '{link_target}'")
         _emit(
             "NOTE: Original SpatialData files are not modified. Table modifications exist only in the merged MDV project.",
             verbose_only=True,
         )
         os.symlink(
-            os.path.abspath(args.spatialdata_path), 
-            os.path.join(mdv.dir, "spatial"), target_is_directory=True
+            os.path.abspath(args.spatialdata_path if not single_source_input else sdata_paths[0]),
+            link_target,
+            target_is_directory=True,
         )
     else:
         _progress(f"Copying spatial inputs into '{mdv.dir}/spatial'")
