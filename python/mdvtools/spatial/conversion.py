@@ -772,6 +772,37 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
 
 
 
+def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[str, dict]:
+    all_regions: dict[str, dict] = {}
+
+    for cs in sdata.coordinate_systems:
+        img_candidates = [img for img in sdata.images.items() if cs in _get_transform_keys(img[1])]
+        img_candidates.sort(key=lambda img: (0 if "morphology_focus" in str(img[0]) else 1, img[0]))
+        if not img_candidates:
+            continue
+
+        img_path, _img_obj = img_candidates[0]
+        region_id = f"{sdata_name}_{cs}"
+        all_regions[region_id] = {
+            "spatial": {
+                "coordinate_system": cs,
+                "file": sdata_name,
+            },
+            "viv_image": {
+                "file": f"{sdata_name}/images/{img_path}",
+            },
+            "roi": {
+                "min_x": 0,
+                "min_y": 0,
+                "max_x": 1000,
+                "max_y": 1000,
+            },
+            "images": {},
+        }
+
+    return all_regions
+
+
 def _try_read_zarr(
     path: str,
     emit_warning: bool = True,
@@ -856,32 +887,6 @@ def _build_gene_source_column(
         }
     ]
 
-def _set_default_image_view(mdv: "MDVProject", args: SpatialDataConversionArgs):
-    """
-    Uses a template view for the default view of the spatial data.
-    In future it would be good to make this user-configurable.
-    """
-    import json
-    import os
-
-    # find a region with a viv_image and use key from that...
-    for region_name, region_data in mdv.get_datasource_metadata("cells")["regions"]["all_regions"].items():
-        if "viv_image" in region_data:
-            break
-    else:
-        raise ValueError("No region with a viv_image found")
-
-    _emit(f"Using region '{region_name}' for default view", verbose_only=True)
-    with open(os.path.join(os.path.dirname(__file__), "spatial_view_template.json"), "r") as f:
-        view_str = f.read().replace("<SPATIAL_REGION_NAME>", region_name)
-        density = """
-        {
-            "linkedDsName": "genes", "maxItems": 15, "type": "RowsAsColsQuery"
-        }
-        """
-        view_str = view_str.replace('"<DENSITY_FIELDS>"', density if args.density else "")
-        mdv.set_view("default", json.loads(view_str), True)
-
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
     Convert all SpatialData objects in a folder to MDV format.
@@ -917,6 +922,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.build_info import get_build_info
     from mdvtools.spatial.mermaid import sdata_to_mermaid
+    from mdvtools.spatial.project_helpers import (
+        build_spatial_regions_metadata,
+        create_empty_spatial_mdv_project,
+        set_default_spatial_image_view,
+    )
 
     _set_verbose_output(args.verbose)
     
@@ -979,16 +989,33 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         sdata_objects[sdata_name] = sdata
 
     if len(adata_objects) == 0:
-        raise ValueError("No tables found in any SpatialData objects - this is not yet supported.")
-    
-    # Check if we have at least one spatial table - maybe this is unnecessary noise?
-    spatial_tables = [ad for ad in adata_objects if ad.uns.get("mdv", {}).get("is_spatial", False)]
-
-    if len(spatial_tables) == 0:
-        _emit(
-            "INFO: No spatial tables found. Creating a merged project without spatial metadata or a default image view."
+        for sdata_name, sdata in sdata_objects.items():
+            all_regions.update(_resolve_image_only_regions(sdata, sdata_name))
+        if not all_regions:
+            raise ValueError("No tables or image-backed regions found in any SpatialData objects.")
+        _emit("INFO: No tables found. Creating an image-only project with empty datasources.")
+        _progress("Writing MDV project")
+        mdv = _call_with_optional_stdout_suppressed(
+            create_empty_spatial_mdv_project,
+            args.output_folder,
+            delete_existing=not args.preserve_existing,
+            region_field=REGION_FIELD,
         )
-        # Still merge and convert, but skip spatial operations
+        merged_adata = None
+        has_spatial_tables = False
+    else:
+        # Check if we have at least one spatial table - maybe this is unnecessary noise?
+        spatial_tables = [ad for ad in adata_objects if ad.uns.get("mdv", {}).get("is_spatial", False)]
+
+        has_spatial_tables = len(spatial_tables) != 0
+
+        if not has_spatial_tables:
+            _emit(
+                "INFO: No spatial tables found. Creating a merged project without spatial metadata or a default image view."
+            )
+        elif not all_regions:
+            raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
+
         _progress(f"Merging {len(adata_objects)} table(s) with outer gene union")
         merged_adata = _concat_spatial_tables(adata_objects)
         gene_columns = _build_gene_source_column(merged_adata, gene_sources)
@@ -1000,25 +1027,6 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             delete_existing=not args.preserve_existing,
             gene_columns=gene_columns,
         )
-        # ... write sdata objects but skip region metadata and _set_default_image_view
-        return mdv
-
-    # Proceed with normal spatial workflow if we have spatial tables
-    if not all_regions:
-        raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
-
-    ## todo - try to make sure we have sparse CSC matrices if possible.
-    _progress(f"Merging {len(adata_objects)} table(s) with outer gene union")
-    merged_adata = _concat_spatial_tables(adata_objects)
-    gene_columns = _build_gene_source_column(merged_adata, gene_sources)
-    _progress("Writing MDV project")
-    mdv = _call_with_optional_stdout_suppressed(
-        convert_scanpy_to_mdv,
-        args.output_folder,
-        merged_adata,
-        delete_existing=not args.preserve_existing,
-        gene_columns=gene_columns,
-    )
     if args.link:
         os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
         if single_source_input:
@@ -1074,27 +1082,19 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     # }
     # mdv.add_viv_images("cells", viv_data, link_images=False)
 
-    # instead, we will set the region metadata directly.
-    cells_md = mdv.get_datasource_metadata("cells")
-    cells_md["regions"] = {
-        # non-2d cases are one thing... but mixtures are another.
-        # this metadata format won't work for that, we expect to move more towards spatialdata.js.
-        "position_fields": ["x", "y"],
-        "region_field": REGION_FIELD,
-        "default_color": "x",  # todo: figure out a better way to determine this.
-        "scale_unit": "µm",
-        # scale will be baked during conversion from spatialdata to mdv.
-        # in future we will use spatialdata.js to handle transforms at runtime.
-        "scale": 1.0,
-        "avivator": {
-            "default_channels": [],
-            "base_url": "spatial/",
-        },
-        "all_regions": all_regions,
-    }
-    mdv.set_datasource_metadata(cells_md)
-    _set_default_image_view(mdv, args)
-    _emit(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n", verbose_only=True)
+    if all_regions:
+        # instead, we will set the region metadata directly.
+        cells_md = mdv.get_datasource_metadata("cells")
+        cells_md["regions"] = build_spatial_regions_metadata(all_regions, REGION_FIELD)
+        mdv.set_datasource_metadata(cells_md)
+        set_default_spatial_image_view(
+            mdv,
+            os.path.join(os.path.dirname(__file__), "spatial_view_template.json"),
+            args.density,
+            _emit,
+        )
+    if merged_adata is not None:
+        _emit(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n", verbose_only=True)
     _emit(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---", verbose_only=True)
     add_readme_to_project(mdv, merged_adata, args)
     if args.serve:
