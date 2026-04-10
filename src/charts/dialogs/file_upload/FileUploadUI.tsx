@@ -210,7 +210,7 @@ export const DatasourceNameInput = ({
     onChange,
     isDisabled,
 }: DatasourceNameInputProps) => (
-    <div className="flex flex-left items-center space-x-2 pr-4">
+    <div className="flex items-center justify-start space-x-2 pr-4">
         <label className="text-lg text-gray-700 dark:text-white my-1" htmlFor="datasourceName">
             <strong>Datasource Name:</strong>
         </label>
