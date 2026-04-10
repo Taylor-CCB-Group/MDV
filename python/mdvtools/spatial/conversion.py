@@ -3,6 +3,7 @@ import contextlib
 import io
 import logging
 import os
+import re
 import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
@@ -176,6 +177,11 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Compute X UMAP/Leiden**: {conversion_args.compute_x_umap}\n"
         markdown += f"- **Leiden resolution**: {conversion_args.leiden_resolution}\n"
         markdown += "\n"
+        if conversion_args.compute_x_umap:
+            markdown += (
+                "Per-table X-based UMAP/Leiden annotations were computed before table merging. "
+                "These helper embeddings are not globally comparable across tables.\n\n"
+            )
     
     markdown += "## SpatialData objects:\n\n"
     spatial_dir = os.path.join(mdv.dir, "spatial")
@@ -228,7 +234,8 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     _emit(f"README.md written to {os.path.join(mdv.dir, 'README.md')}", verbose_only=True)
     textbox = TextBox(title="SpatialData conversion information", param=[], size=[792, 472], position=[10, 10])
     textbox.set_text(markdown)
-    mdv.set_view("Data summary", {"initialCharts": {conversion_args.obs_datasource_name if conversion_args is not None else "cells": [textbox.plot_data]}})
+    obs_ds_name = conversion_args.obs_datasource_name if conversion_args is not None else "cells"
+    mdv.set_view("Data summary", {"initialCharts": {obs_ds_name: [textbox.plot_data]}})
 
 def _shape_to_geojson(shape: "GeoDataFrame", transform_to_image: "BaseTransformation") -> str:
     """
@@ -862,7 +869,6 @@ def _try_read_zarr(
             _emit(f"WARNING: Failed to read SpatialData object from {path}: '{e}'")
         return None
 
-
 def _ensure_unique_var_names(adata: "AnnData", table_name: str, sdata_name: str) -> None:
     if adata.var_names.is_unique:
         return
@@ -895,6 +901,41 @@ def _concat_spatial_tables(adata_objects: list["AnnData"]) -> "AnnData":
             category=UserWarning,
         )
         return ad_concat(adata_objects, index_unique="_", join="outer", fill_value=0)
+
+
+def _sanitize_table_prefix(table_name: str) -> str:
+    sanitized = re.sub(r"[^0-9A-Za-z]+", "_", table_name).strip("_")
+    return sanitized or "table"
+
+
+def _allocate_table_prefix(table_name: str, used_prefixes: set[str]) -> str:
+    base_prefix = _sanitize_table_prefix(table_name)
+    prefix = base_prefix
+    suffix = 2
+    while prefix in used_prefixes:
+        prefix = f"{base_prefix}_{suffix}"
+        suffix += 1
+    used_prefixes.add(prefix)
+    return prefix
+
+
+def _compute_table_prefixed_x_umap_and_leiden(
+    adata: "AnnData",
+    table_prefix: str,
+    leiden_resolution: float,
+) -> tuple[str, str]:
+    from mdvtools.conversions import _prepare_x_umap_and_leiden
+
+    umap_key = f"{table_prefix}__X_umap"
+    leiden_column = f"{table_prefix}__leiden"
+    _prepare_x_umap_and_leiden(
+        adata,
+        compute_x_umap=True,
+        leiden_resolution=leiden_resolution,
+        leiden_column=leiden_column,
+        umap_key=umap_key,
+    )
+    return umap_key, leiden_column
 
 
 def _build_gene_source_column(
@@ -976,6 +1017,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     all_regions: dict[str, dict] = {}
     gene_sources: dict[str, set[str]] = {}
     names: set[str] = set()
+    used_table_prefixes: set[str] = set()
+    table_leiden_columns: list[str] = []
     
     # Process each SpatialData object sequentially
     # Removed ProcessPoolExecutor to avoid pickling issues with lazy zarr arrays in SpatialData objects
@@ -1003,6 +1046,18 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         for table_name, adata in sdata.tables.items():
             _resolve_regions_for_table(sdata, table_name, sdata_name, args)
             _ensure_unique_var_names(adata, table_name, sdata_name)
+            if args.compute_x_umap:
+                table_prefix = _allocate_table_prefix(table_name, used_prefixes=used_table_prefixes)
+                _progress(
+                    f"Computing per-table X UMAP/Leiden for '{table_name}' "
+                    f"as '{table_prefix}__X_umap_*' and '{table_prefix}__leiden'"
+                )
+                _, leiden_column = _compute_table_prefixed_x_umap_and_leiden(
+                    adata,
+                    table_prefix=table_prefix,
+                    leiden_resolution=args.leiden_resolution,
+                )
+                table_leiden_columns.append(leiden_column)
             adata.obs["spatialdata_path"] = sdata_name
             adata.obs["table_name"] = table_name
             for gene_name in adata.var_names:
@@ -1026,6 +1081,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             args.output_folder,
             delete_existing=not args.preserve_existing,
             region_field=REGION_FIELD,
+            obs_datasource_name=args.obs_datasource_name,
+            var_datasource_name=args.var_datasource_name,
         )
         merged_adata = None
         has_spatial_tables = False
@@ -1055,9 +1112,15 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             var_datasource_name=args.var_datasource_name,
             link_name_column=args.link_name_column,
             gene_columns=gene_columns,
-            compute_x_umap=args.compute_x_umap,
+            compute_x_umap=False,
             leiden_resolution=args.leiden_resolution,
         )
+        if table_leiden_columns:
+            obs_metadata = mdv.get_datasource_metadata(args.obs_datasource_name)
+            for column in obs_metadata["columns"]:
+                if column.get("field") in table_leiden_columns:
+                    column["datatype"] = "text"
+            mdv.set_datasource_metadata(obs_metadata)
     if args.link:
         if single_source_input:
             os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
@@ -1119,14 +1182,16 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
 
     if all_regions:
         # instead, we will set the region metadata directly.
-        cells_md = mdv.get_datasource_metadata("cells")
-        cells_md["regions"] = build_spatial_regions_metadata(all_regions, REGION_FIELD)
-        mdv.set_datasource_metadata(cells_md)
+        obs_md = mdv.get_datasource_metadata(args.obs_datasource_name)
+        obs_md["regions"] = build_spatial_regions_metadata(all_regions, REGION_FIELD)
+        mdv.set_datasource_metadata(obs_md)
         set_default_spatial_image_view(
             mdv,
             os.path.join(os.path.dirname(__file__), "spatial_view_template.json"),
             args.density,
             _emit,
+            obs_datasource_name=args.obs_datasource_name,
+            var_datasource_name=args.var_datasource_name,
         )
     if merged_adata is not None:
         _emit(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n", verbose_only=True)
@@ -1162,7 +1227,15 @@ if __name__ == "__main__":
     parser.add_argument("--obs-datasource-name", default="cells", help="Datasource name for observations")
     parser.add_argument("--var-datasource-name", default="genes", help="Datasource name for variables")
     parser.add_argument("--link-name-column", default=None, help="Variable datasource column used as the rows_as_columns name_column")
-    parser.add_argument("--compute-x-umap", action="store_true", help="Compute neighbors, UMAP, and Leiden clusters from merged adata.X before export")
+    parser.add_argument(
+        "--compute-x-umap",
+        action="store_true",
+        help=(
+            "Compute neighbors, UMAP, and Leiden clusters separately for each source table "
+            "from that table's adata.X before merge. These per-table helper embeddings are "
+            "not globally comparable across tables."
+        ),
+    )
     parser.add_argument("--leiden-resolution", type=float, default=1.0, help="Leiden resolution used with --compute-x-umap")
     parser.add_argument("--verbose", action="store_true", help="Show detailed per-dataset conversion output, transform decisions, and merged summaries")
     parser.add_argument(

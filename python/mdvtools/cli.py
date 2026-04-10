@@ -152,7 +152,12 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
 @click.option('--obs-datasource-name', default='cells', show_default=True, help='Datasource name for observations.')
 @click.option('--var-datasource-name', default='genes', show_default=True, help='Datasource name for variables.')
 @click.option('--link-name-column', default=None, help='Variable datasource column used as the rows_as_columns name_column.')
-@click.option('--compute-x-umap', 'compute_x_umap', is_flag=True, help='Compute neighbors, UMAP, and Leiden clusters from merged adata.X before export.')
+@click.option(
+    '--compute-x-umap',
+    'compute_x_umap',
+    is_flag=True,
+    help='Compute neighbors, UMAP, and Leiden clusters separately for each source table from that table\'s adata.X before merge. These per-table helper embeddings are not globally comparable.',
+)
 @click.option('--leiden-resolution', default=1.0, type=float, show_default=True, help='Leiden resolution used with --compute-x-umap.')
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
 def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, verbose):

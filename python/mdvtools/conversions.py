@@ -244,10 +244,17 @@ def convert_scanpy_to_mdv(
         "name":"cell_id",
         "datatype":"unique"
     }]
-    if leiden_column in cell_table.columns:
+    leiden_like_columns = sorted(
+        {
+            column_name
+            for column_name in cell_table.columns
+            if column_name == leiden_column or column_name.endswith("__leiden")
+        }
+    )
+    for column_name in leiden_like_columns:
         columns.append({
-            "name": leiden_column,
-            "field": leiden_column,
+            "name": column_name,
+            "field": column_name,
             "datatype": "text",
         })
     mdv.add_datasource(obs_ds_name, cell_table,columns)
