@@ -1615,7 +1615,7 @@ export class ChartManager {
                         new ColorPaletteWrapper(this, ds);
                     } catch (error) {
                         console.error("error making ColorPalette", error);
-                        this.createInfoAlert("Error making color chooser", {
+                        this.createInfoAlert("Error making Color Palette", {
                             type: "warning",
                             duration: 2000,
                         });

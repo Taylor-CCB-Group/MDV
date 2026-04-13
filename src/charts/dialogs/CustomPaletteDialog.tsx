@@ -26,6 +26,20 @@ interface CustomPaletteDialogProps {
     onSchemeInputChange: (value: string) => void;
 }
 
+function buildPreviewColors(colors: string[]) {
+    const colorCounts = new Map<string, number>();
+
+    return colors.slice(0, 20).map((color) => {
+        const duplicateCount = colorCounts.get(color) ?? 0;
+        colorCounts.set(color, duplicateCount + 1);
+
+        return {
+            color,
+            key: duplicateCount === 0 ? color : `${color}-${duplicateCount}`,
+        };
+    });
+}
+
 function CustomPaletteDialog({
     open,
     schemeInput,
@@ -36,6 +50,8 @@ function CustomPaletteDialog({
     onLoadCurrentPalette,
     onSchemeInputChange,
 }: CustomPaletteDialogProps) {
+    const previewColors = buildPreviewColors(parsedScheme.colors);
+
     return (
         <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose}>
             <DialogTitle>
@@ -72,8 +88,8 @@ function CustomPaletteDialog({
                             }}
                         >
                             <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
-                                {parsedScheme.colors.slice(0, 20).map((color) => (
-                                    <Tooltip key={color} title={color}>
+                                {previewColors.map(({ color, key }) => (
+                                    <Tooltip key={key} title={color}>
                                         <Box
                                             sx={{
                                                 backgroundColor: color,

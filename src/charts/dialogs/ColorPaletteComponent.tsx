@@ -13,6 +13,7 @@ import {
     Typography,
 } from "@mui/material";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import type DataStore from "../../datastore/DataStore.js";
 import CustomPaletteDialog from "./CustomPaletteDialog";
 
 interface ColumnOption {
@@ -26,12 +27,7 @@ interface ColorEntry {
     label: string;
 }
 
-interface DataSourceLike {
-    getColumnColors: (column: string) => string[];
-    getColumnList: (datatype: string) => ColumnOption[];
-    getColumnValues: (column: string) => Array<string | number | null | undefined>;
-    name: string;
-}
+type DataSourceLike = Pick<DataStore, "getColumnColors" | "getColumnList" | "getColumnValues" | "name">;
 
 interface ColorPaletteComponentProps {
     dataSource: DataSourceLike;
@@ -88,7 +84,10 @@ function buildEntries(dataSource: DataSourceLike, column: string): ColorEntry[] 
 
     return values
         .map((value, index) => ({
-            color: normalizeHexColor(colors[index] ?? "") ?? "#808080",
+            color:
+                typeof colors[index] === "string"
+                    ? normalizeHexColor(colors[index]) ?? "#808080"
+                    : "#808080",
             index,
             label: String(value ?? ""),
         }))

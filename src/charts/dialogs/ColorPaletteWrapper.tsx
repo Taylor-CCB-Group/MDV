@@ -1,66 +1,23 @@
 import { createMdvPortal } from "@/react/react_utils";
+import type { ChartManager } from "../ChartManager.js";
+import type DataStore from "../../datastore/DataStore.js";
 import { createEl } from "../../utilities/ElementsTyped";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import ColorPaletteComponent from "./ColorPaletteComponent";
 
-interface ColumnColorSyncLink {
-    col: string;
-    link_to: string;
-}
-
-interface SyncColumnColorsConfig {
-    columns: ColumnColorSyncLink[];
-    dataSource: string;
-}
-
-interface LinkColumnsConfig {
-    columns: string[];
-    dataSource: string;
-}
-
-interface ColorDataSource {
-    dataChanged: (columns: string[], shouldUpdateFilters?: boolean, shouldCalcExtents?: boolean) => void;
-    getColumnColors: (column: string) => string[];
-    getColumnList: (datatype: string) => Array<{ field: string; name: string }>;
-    getColumnValues: (column: string) => Array<string | number | null | undefined>;
-    linkColumns: LinkColumnsConfig[];
-    name: string;
-    setColumnColors: (column: string, colors: string[]) => void;
-    syncColumnColors: SyncColumnColorsConfig[];
-}
-
-interface ChartManagerDataSourceItem {
-    dataStore: ColorDataSource;
-}
-
-interface ChartManagerLike {
-    _sync_colors: (
-        columns: ColumnColorSyncLink[],
-        sourceDataSource: ColorDataSource,
-        targetDataSource: ColorDataSource,
-    ) => void;
-    dataSources: ChartManagerDataSourceItem[];
-    getDataSource: (name: string) => ColorDataSource;
-}
-
-interface DialogSource {
-    dataStore: {
-        name: string;
-    };
-    name: string;
-}
-
-interface ColorPaletteInitContent {
-    cm: ChartManagerLike;
-    ds: DialogSource;
-}
+type ColorPaletteChartManager = Pick<ChartManager, "_sync_colors" | "dataSources" | "getDataSource">;
+type ChartManagerDataSource = ChartManager["dataSources"][number];
+type ColorPaletteContent = { cm: ColorPaletteChartManager; ds: ChartManagerDataSource };
+type SyncColumnColorLink = { col: string; link_to: string };
+type SyncColumnColorMapping = { columns: SyncColumnColorLink[]; dataSource: string };
+type LinkedColumnsMapping = { columns: string[]; dataSource: string };
 
 class ColorPaletteWrapper extends BaseDialog {
     declare root: ReturnType<typeof createMdvPortal>;
-    declare cm: ChartManagerLike;
-    declare ds: DialogSource;
+    declare cm: ColorPaletteChartManager;
+    declare ds: ChartManagerDataSource;
 
-    constructor(cm: ChartManagerLike, ds: DialogSource) {
+    constructor(cm: ColorPaletteChartManager, ds: ChartManagerDataSource) {
         super(
             {
                 width: 500,
@@ -71,7 +28,7 @@ class ColorPaletteWrapper extends BaseDialog {
         );
     }
 
-    init(content: ColorPaletteInitContent) {
+    init(content: ColorPaletteContent) {
         this.cm = content.cm;
         this.ds = content.ds;
 
@@ -109,26 +66,29 @@ class ColorPaletteWrapper extends BaseDialog {
     }
 
     applyColors(column: string, colors: string[]) {
-        const dataSource = this.cm.getDataSource(this.ds.dataStore.name);
+        const dataSource: DataStore = this.cm.getDataSource(this.ds.dataStore.name);
         dataSource.setColumnColors(column, colors);
-        dataSource.dataChanged([column], false, false);
+        dataSource.dataChanged([column], false);
 
         for (const dataSourceItem of this.cm.dataSources) {
-            const linkedStore = dataSourceItem.dataStore;
-            const syncedColumnColors = linkedStore.syncColumnColors.find((item) => item.dataSource === dataSource.name);
+            const linkedStore: DataStore = dataSourceItem.dataStore;
+            const syncedColumns = linkedStore.syncColumnColors
+                .filter((item: SyncColumnColorMapping) => item.dataSource === dataSource.name)
+                .flatMap((item: SyncColumnColorMapping) =>
+                    item.columns.filter((linkedColumn: SyncColumnColorLink) => linkedColumn.link_to === column),
+                );
 
-            if (syncedColumnColors) {
-                const linkedColumn = syncedColumnColors.columns.find((item) => item.link_to === column);
-                if (linkedColumn) {
-                    this.cm._sync_colors([linkedColumn], dataSource, linkedStore);
-                    linkedStore.dataChanged([linkedColumn.col], false, false);
-                }
+            if (syncedColumns.length > 0) {
+                this.cm._sync_colors(syncedColumns, dataSource, linkedStore);
+                linkedStore.dataChanged(syncedColumns.map((linkedColumn) => linkedColumn.col), false);
             }
 
-            const linkedColumns = linkedStore.linkColumns.find((item) => item.dataSource === dataSource.name);
-            if (linkedColumns?.columns.includes(column)) {
+            const hasLinkedColumn = linkedStore.linkColumns.some(
+                (item: LinkedColumnsMapping) => item.dataSource === dataSource.name && item.columns.includes(column),
+            );
+            if (hasLinkedColumn) {
                 linkedStore.setColumnColors(column, colors);
-                linkedStore.dataChanged([column], false, false);
+                linkedStore.dataChanged([column], false);
             }
         }
     }
@@ -140,4 +100,3 @@ class ColorPaletteWrapper extends BaseDialog {
 }
 
 export default ColorPaletteWrapper;
-export type { ChartManagerLike, ColorDataSource, DialogSource };

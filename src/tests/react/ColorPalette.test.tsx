@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import DataStore from "@/datastore/DataStore";
 
 const { baseCloseMock, createMdvPortalMock } = vi.hoisted(() => ({
     baseCloseMock: vi.fn(),
@@ -64,7 +65,7 @@ function createDataSource(
         }>;
     }> = {},
 ) {
-    return {
+    const dataStore: DataStore = Object.assign(Object.create(DataStore.prototype), {
         dataChanged: vi.fn(),
         getColumnColors: vi.fn(() => ["#111111", "#222222"]),
         getColumnList: vi.fn(() => [{ field: "cell_type", name: "Cell type" }]),
@@ -73,20 +74,33 @@ function createDataSource(
         name,
         setColumnColors: vi.fn(),
         syncColumnColors: overrides.syncColumnColors ?? [],
+    });
+    return dataStore;
+}
+
+function createChartManagerDataSource(dataStore: ReturnType<typeof createDataSource>) {
+    return {
+        charts: [],
+        columns: [],
+        contentDiv: document.createElement("div"),
+        dataStore,
+        menuBar: document.createElement("div"),
+        name: dataStore.name,
+        size: 0,
     };
 }
 
 describe("ColorPalette wrapper", () => {
     test("mounts the React component with the selected datasource", () => {
         const mainDataSource = createDataSource("main-ds");
+        const mainSource = createChartManagerDataSource(mainDataSource);
         const chartManager = {
             _sync_colors: vi.fn(),
-            dataSources: [{ dataStore: mainDataSource }],
+            dataSources: [mainSource],
             getDataSource: vi.fn(() => mainDataSource),
         };
-        const ds = { dataStore: { name: "main-ds" }, name: "My Dataset" };
 
-        const dialog = new ColorPalette(chartManager, ds);
+        const dialog = new ColorPalette(chartManager, mainSource);
 
         expect(chartManager.getDataSource).toHaveBeenCalledWith("main-ds");
         expect(createMdvPortalMock).toHaveBeenCalledTimes(1);
@@ -104,6 +118,10 @@ describe("ColorPalette wrapper", () => {
                     dataSource: "main-ds",
                     columns: [{ col: "linked_cell_type", link_to: "cell_type" }],
                 },
+                {
+                    dataSource: "main-ds",
+                    columns: [{ col: "secondary_cell_type", link_to: "cell_type" }],
+                },
             ],
         });
         const linkedTarget = createDataSource("linked-target", {
@@ -112,29 +130,39 @@ describe("ColorPalette wrapper", () => {
                     dataSource: "main-ds",
                     columns: ["cell_type"],
                 },
+                {
+                    dataSource: "main-ds",
+                    columns: ["cell_type", "other_column"],
+                },
             ],
         });
+        const mainSource = createChartManagerDataSource(mainDataSource);
+        const syncedSource = createChartManagerDataSource(syncedTarget);
+        const linkedSource = createChartManagerDataSource(linkedTarget);
 
         const chartManager = {
             _sync_colors: vi.fn(),
-            dataSources: [{ dataStore: mainDataSource }, { dataStore: syncedTarget }, { dataStore: linkedTarget }],
+            dataSources: [mainSource, syncedSource, linkedSource],
             getDataSource: vi.fn(() => mainDataSource),
         };
-        const ds = { dataStore: { name: "main-ds" }, name: "My Dataset" };
 
-        const dialog = new ColorPalette(chartManager, ds);
+        const dialog = new ColorPalette(chartManager, mainSource);
         dialog.applyColors("cell_type", ["#AA0000", "#00AA00"]);
 
         expect(mainDataSource.setColumnColors).toHaveBeenCalledWith("cell_type", ["#AA0000", "#00AA00"]);
-        expect(mainDataSource.dataChanged).toHaveBeenCalledWith(["cell_type"], false, false);
+        expect(mainDataSource.dataChanged).toHaveBeenCalledWith(["cell_type"], false);
         expect(chartManager._sync_colors).toHaveBeenCalledWith(
-            [{ col: "linked_cell_type", link_to: "cell_type" }],
+            [
+                { col: "linked_cell_type", link_to: "cell_type" },
+                { col: "secondary_cell_type", link_to: "cell_type" },
+            ],
             mainDataSource,
             syncedTarget,
         );
-        expect(syncedTarget.dataChanged).toHaveBeenCalledWith(["linked_cell_type"], false, false);
+        expect(syncedTarget.dataChanged).toHaveBeenCalledWith(["linked_cell_type", "secondary_cell_type"], false);
         expect(linkedTarget.setColumnColors).toHaveBeenCalledWith("cell_type", ["#AA0000", "#00AA00"]);
-        expect(linkedTarget.dataChanged).toHaveBeenCalledWith(["cell_type"], false, false);
+        expect(linkedTarget.dataChanged).toHaveBeenCalledWith(["cell_type"], false);
+        expect(linkedTarget.setColumnColors).toHaveBeenCalledTimes(1);
     });
 
     test("close unmounts the React root and closes the base dialog", () => {
@@ -142,14 +170,14 @@ describe("ColorPalette wrapper", () => {
         createMdvPortalMock.mockReturnValueOnce({ unmount });
 
         const mainDataSource = createDataSource("main-ds");
+        const mainSource = createChartManagerDataSource(mainDataSource);
         const chartManager = {
             _sync_colors: vi.fn(),
-            dataSources: [{ dataStore: mainDataSource }],
+            dataSources: [mainSource],
             getDataSource: vi.fn(() => mainDataSource),
         };
-        const ds = { dataStore: { name: "main-ds" }, name: "My Dataset" };
 
-        const dialog = new ColorPalette(chartManager, ds);
+        const dialog = new ColorPalette(chartManager, mainSource);
         dialog.close();
 
         expect(unmount).toHaveBeenCalledTimes(1);
