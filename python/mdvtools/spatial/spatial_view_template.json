@@ -107,7 +107,7 @@
         "param": [
           "name"
         ],
-        "type": "table_chart",
+        "type": "table_chart_react",
         "id": "lFuDYZ",
         "size": [
           375,

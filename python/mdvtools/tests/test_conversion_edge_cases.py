@@ -9,15 +9,22 @@ edge cases, ensuring that adata.X is properly handled and validated.
 import os
 import tempfile
 import shutil
+from typing import cast
 import pytest
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
 from contextlib import contextmanager
+from pandas import DataFrame
 
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
+from mdvtools.spatial.conversion import (
+    _compute_table_x_umap_and_leiden,
+    _concat_spatial_tables,
+    _prefix_table_leiden_categories,
+)
 from .mock_anndata import (
     MockAnnDataFactory,
     create_edge_case_anndata,
@@ -229,6 +236,132 @@ class TestConversionWithEdgeCases:
                 mdv = convert_scanpy_to_mdv(test_dir, adata, delete_existing=True)
             
             assert isinstance(mdv, MDVProject)
+
+    def test_conversion_can_compute_x_umap_and_leiden_as_text(self):
+        """Test optional X-based UMAP/Leiden computation during conversion."""
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(50, 20)
+        adata.X = np.asarray(adata.X, dtype=np.float32)
+        adata.X[0, 0] = np.nan
+        adata.X[1, 1] = np.inf
+
+        assert "X_umap" not in adata.obsm
+        assert "leiden" not in adata.obs.columns
+
+        with temp_mdv_project() as test_dir:
+            with suppress_anndata_warnings():
+                mdv = convert_scanpy_to_mdv(
+                    test_dir,
+                    adata,
+                    delete_existing=True,
+                    compute_x_umap=True,
+                    leiden_resolution=0.5,
+                )
+
+            assert sp.isspmatrix_csc(adata.X)
+            assert np.isfinite(adata.X.data).all()
+
+            cells_metadata = mdv.get_datasource_metadata("cells")
+            columns = {col["field"]: col for col in cells_metadata["columns"]}
+
+            assert "X_umap_1" in columns
+            assert "X_umap_2" in columns
+            assert "leiden" in columns
+            assert columns["leiden"]["datatype"] in ["text", "text16"]
+
+            leiden_values = mdv.get_column("cells", "leiden")
+            assert len(leiden_values) == adata.n_obs
+            assert all(isinstance(value, str) for value in leiden_values)
+
+    def test_conversion_can_override_link_name_column_and_datasource_names(self):
+        """Test explicit selection of the rows_as_columns link column and datasource names."""
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(20, 10)
+        adata.var["display_name"] = [f"Gene {i}" for i in range(adata.n_vars)]
+
+        with temp_mdv_project() as test_dir:
+            with suppress_anndata_warnings():
+                mdv = convert_scanpy_to_mdv(
+                    test_dir,
+                    adata,
+                    delete_existing=True,
+                    obs_datasource_name="observations",
+                    var_datasource_name="features",
+                    link_name_column="display_name",
+                )
+
+            assert "observations" in mdv.get_datasource_names()
+            assert "features" in mdv.get_datasource_names()
+
+            obs_metadata = mdv.get_datasource_metadata("observations")
+            link_metadata = obs_metadata["links"]["features"]["rows_as_columns"]
+            assert link_metadata["name_column"] == "display_name"
+
+    def test_spatial_single_table_x_umap_uses_plain_columns(self):
+        """Single-table spatial helper should keep plain X_umap/leiden column names."""
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(40, 16)
+
+        _compute_table_x_umap_and_leiden(
+            adata,
+            leiden_resolution=0.6,
+        )
+
+        assert "X_umap" in adata.obsm
+        assert "leiden" in adata.obs.columns
+        assert isinstance(adata.obs["leiden"].dtype, pd.CategoricalDtype)
+        assert all(isinstance(value, str) for value in adata.obs["leiden"].astype(str))
+
+        with temp_mdv_project() as test_dir:
+            with suppress_anndata_warnings():
+                mdv = convert_scanpy_to_mdv(test_dir, adata, delete_existing=True)
+
+            cells_metadata = mdv.get_datasource_metadata("cells")
+            columns = {col["field"]: col for col in cells_metadata["columns"]}
+            assert "X_umap_1" in columns
+            assert "X_umap_2" in columns
+            assert "leiden" in columns
+            assert columns["leiden"]["datatype"] in ["text", "text16"]
+
+    def test_spatial_multi_table_x_umap_shares_columns_and_prefixes_leiden_values(self):
+        """Merged spatial tables should share X_umap/leiden columns while prefixing Leiden labels."""
+        factory = MockAnnDataFactory(random_seed=42)
+        adata_a = factory.create_minimal(24, 12)
+        adata_b = factory.create_minimal(18, 9)
+
+        _compute_table_x_umap_and_leiden(
+            adata_a,
+            leiden_resolution=0.5,
+        )
+        _compute_table_x_umap_and_leiden(
+            adata_b,
+            leiden_resolution=0.5,
+        )
+        _prefix_table_leiden_categories(adata_a, "table_a")
+        _prefix_table_leiden_categories(adata_b, "table_b")
+        adata_a.obs["table_name"] = "table_a"
+        adata_b.obs["table_name"] = "table_b"
+
+        merged = _concat_spatial_tables([adata_a, adata_b])
+
+        assert "leiden" in merged.obs.columns
+
+        merged_obs = cast(DataFrame, merged.obs)
+        table_a_rows = merged_obs["table_name"] == "table_a"
+        table_b_rows = merged_obs["table_name"] == "table_b"
+
+        assert merged_obs.loc[table_a_rows, "leiden"].str.startswith("table_a__").all()
+        assert merged_obs.loc[table_b_rows, "leiden"].str.startswith("table_b__").all()
+
+        with temp_mdv_project() as test_dir:
+            with suppress_anndata_warnings():
+                mdv = convert_scanpy_to_mdv(test_dir, merged, delete_existing=True)
+
+            cells_metadata = mdv.get_datasource_metadata("cells")
+            columns = {col["field"]: col for col in cells_metadata["columns"]}
+            assert "X_umap_1" in columns
+            assert "X_umap_2" in columns
+            assert columns["leiden"]["datatype"] in ["text", "text16"]
 
 
 class TestConversionErrorHandling:
