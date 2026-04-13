@@ -90,17 +90,33 @@ function createChartManagerDataSource(dataStore: ReturnType<typeof createDataSou
     };
 }
 
+function createChartManager(
+    dataSources: ReturnType<typeof createChartManagerDataSource>[],
+    mainDataSource: ReturnType<typeof createDataSource>,
+) {
+    return {
+        _sync_colors: vi.fn(),
+        dataSources,
+        getDataSource: vi.fn(() => mainDataSource),
+    };
+}
+
+function setupDialog({
+    mainDataSource = createDataSource("main-ds"),
+    extraSources = [],
+}: {
+    mainDataSource?: ReturnType<typeof createDataSource>;
+    extraSources?: ReturnType<typeof createChartManagerDataSource>[];
+} = {}) {
+    const mainSource = createChartManagerDataSource(mainDataSource);
+    const chartManager = createChartManager([mainSource, ...extraSources], mainDataSource);
+    const dialog = new ColorPalette(chartManager, mainSource);
+    return { chartManager, dialog, mainDataSource, mainSource };
+}
+
 describe("ColorPalette wrapper", () => {
     test("mounts the React component with the selected datasource", () => {
-        const mainDataSource = createDataSource("main-ds");
-        const mainSource = createChartManagerDataSource(mainDataSource);
-        const chartManager = {
-            _sync_colors: vi.fn(),
-            dataSources: [mainSource],
-            getDataSource: vi.fn(() => mainDataSource),
-        };
-
-        const dialog = new ColorPalette(chartManager, mainSource);
+        const { chartManager, dialog } = setupDialog();
 
         expect(chartManager.getDataSource).toHaveBeenCalledWith("main-ds");
         expect(createMdvPortalMock).toHaveBeenCalledTimes(1);
@@ -136,17 +152,12 @@ describe("ColorPalette wrapper", () => {
                 },
             ],
         });
-        const mainSource = createChartManagerDataSource(mainDataSource);
         const syncedSource = createChartManagerDataSource(syncedTarget);
         const linkedSource = createChartManagerDataSource(linkedTarget);
-
-        const chartManager = {
-            _sync_colors: vi.fn(),
-            dataSources: [mainSource, syncedSource, linkedSource],
-            getDataSource: vi.fn(() => mainDataSource),
-        };
-
-        const dialog = new ColorPalette(chartManager, mainSource);
+        const { chartManager, dialog } = setupDialog({
+            mainDataSource,
+            extraSources: [syncedSource, linkedSource],
+        });
         dialog.applyColors("cell_type", ["#AA0000", "#00AA00"]);
 
         expect(mainDataSource.setColumnColors).toHaveBeenCalledWith("cell_type", ["#AA0000", "#00AA00"]);
@@ -168,16 +179,7 @@ describe("ColorPalette wrapper", () => {
     test("close unmounts the React root and closes the base dialog", () => {
         const unmount = vi.fn();
         createMdvPortalMock.mockReturnValueOnce({ unmount });
-
-        const mainDataSource = createDataSource("main-ds");
-        const mainSource = createChartManagerDataSource(mainDataSource);
-        const chartManager = {
-            _sync_colors: vi.fn(),
-            dataSources: [mainSource],
-            getDataSource: vi.fn(() => mainDataSource),
-        };
-
-        const dialog = new ColorPalette(chartManager, mainSource);
+        const { dialog } = setupDialog();
         dialog.close();
 
         expect(unmount).toHaveBeenCalledTimes(1);

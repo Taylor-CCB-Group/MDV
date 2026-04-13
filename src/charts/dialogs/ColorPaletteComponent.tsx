@@ -12,7 +12,7 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type DataStore from "../../datastore/DataStore.js";
 import CustomPaletteDialog from "./CustomPaletteDialog";
 
@@ -442,8 +442,9 @@ function ColorPaletteComponent({ dataSource, dataSourceLabel, onApply }: ColorPa
 
                                         <Box
                                             component="input"
-                                            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                                handleEntryColorChange(entry.index, event.target.value.toUpperCase());
+                                            aria-label={`Pick color for ${entry.label || "(empty value)"}`}
+                                            onChange={(event) => {
+                                                handleEntryColorChange(entry.index, (event.target as HTMLInputElement).value.toUpperCase());
                                             }}
                                             sx={{
                                                 backgroundColor: "transparent",
