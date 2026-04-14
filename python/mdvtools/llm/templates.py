@@ -162,6 +162,10 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - The suggested columns and chart type are given by """+final_answer+"""
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
         - Set the view using `project.set_view(view_name, view_object)`
+        - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`.
+          To show a subset, either:
+            (a) create a filtered datasource (only when creating a new project / adding a new datasource is allowed), or
+            (b) include a `SelectionDialogPlot` so the user can filter interactively in the UI.
 
     5. Parameter Handling:
         - The string """+final_answer+""" guides which columns and chart types to use.

@@ -1,4 +1,5 @@
 from mdvtools.llm.code_manipulation import parse_view_name
+from mdvtools.llm.code_manipulation import prepare_code
 
 
 class TestParseViewName:
@@ -51,3 +52,29 @@ def main():
     print(view_name)
 """
         assert parse_view_name(code) == "a view name in multiline code" 
+
+
+def test_prepare_code_does_not_append_else_when_llm_includes_else_main(tmp_path):
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+import os
+
+def main():
+    view_name = "v"
+    return
+
+if __name__ == "__main__":
+    main()
+else:
+    main()
+```"""
+    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=False)
+    # Must compile; regression for stray `else:` being appended.
+    compile(out, "<string>", "exec")

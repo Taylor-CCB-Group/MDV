@@ -37,8 +37,14 @@ def extract_explanation_from_response(response: str):
     return explanation.strip()
 
 
-def prepare_code(result: str, data: Optional[str | pd.DataFrame], project: MDVProject, log = print, 
-                 modify_existing_project=False, view_name="default"):
+def prepare_code(
+    result: str,
+    data: Optional[str | pd.DataFrame],
+    project: MDVProject,
+    log=print,
+    modify_existing_project=False,
+    view_name="default",
+):
     """Given a response from the LLM, extract the code and post-process it, 
     attempting to ensure that 
     - parameters are appropriately ordered.
@@ -76,8 +82,20 @@ def prepare_code(result: str, data: Optional[str | pd.DataFrame], project: MDVPr
     # %run temp_code_3.pyc
     log("# Executing the code...")
     # - in order to get this to run in a chat context, we might want to get rid of the call to `p.add_datasource`
-    final_code = f"""{packages_functions}\n{captured_lines}
-else:
+    # The LLM output often includes:
+    #   if __name__ == "__main__": main()
+    #   else: main()
+    # We must not blindly append another `else: main()` (it will create invalid syntax).
+    captured_str = str(captured_lines)
+    has_module_guard = '__name__ == "__main__"' in captured_str or "__name__ == '__main__'" in captured_str
+    has_trailing_else_main = "else:\n    main()" in captured_str or "else:\n\tmain()" in captured_str
+
+    if has_module_guard or has_trailing_else_main:
+        final_code = f"{packages_functions}\n{captured_lines}"
+    else:
+        final_code = f"""{packages_functions}\n{captured_lines}
+
+if __name__ == "__main__":
     main()"""
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:
@@ -99,7 +117,7 @@ else:
         ## but sometimes there might be a problem with it clashing with existing views, or with quotes in the view name...
         # final_code = final_code.replace("view_name = \"default\"", f"view_name = \"{view_name}\"")
         # so we have a sticking plaster solution for this...
-        final_code = patch_viewname(final_code, project)
+        final_code = patch_viewname(final_code, project, fallback_view_name=view_name)
         
         # Lint the code with ruff
         final_code = _lint_code_with_ruff(final_code, log)
@@ -143,14 +161,30 @@ def _lint_code_with_ruff(code: str, log=print):
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-def patch_viewname(code: str, project: MDVProject):
+def patch_viewname(code: str, project: MDVProject, fallback_view_name: Optional[str] = None):
     """Given a code string, replace the view_name with a unique name, 
     attempting to escape any quotes that might have been in the original.
     """
     # Error: 'MDVProject' object is not callable... not sure where or why.
     view_name = parse_view_name(code)
     if view_name is None:
-        raise ValueError("No view name found in the code.")
+        # LLM output sometimes forgets to define view_name. In that case, inject one
+        # so downstream logic can proceed (and we can still de-duplicate against existing views).
+        injected = fallback_view_name or "Chat view"
+        # Escape any quotes/newlines safely.
+        escaped_injected = json.dumps(injected)[1:-1]
+        # Insert near the top, after imports if present; otherwise prepend.
+        lines = code.splitlines()
+        insert_at = 0
+        for i, line in enumerate(lines):
+            if line.strip().startswith(("import ", "from ")):
+                insert_at = i + 1
+                continue
+            # first non-import line
+            break
+        lines.insert(insert_at, f'view_name = "{escaped_injected}"')
+        code = "\n".join(lines)
+        view_name = injected
     print(f'original view_name: {view_name}')
     escaped_view_name = json.dumps(view_name) # this should escape any quotes in the view_name
     # but it also adds quotes around the view_name, so we need to remove them...
