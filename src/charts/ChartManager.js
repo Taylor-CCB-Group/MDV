@@ -15,7 +15,7 @@ import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
-import ColorChooser from "./dialogs/ColorChooser";
+import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
@@ -1612,10 +1612,10 @@ export class ChartManager {
                 },
                 func: () => {
                     try {
-                        new ColorChooser(this, ds);
+                        new ColorPaletteWrapper(this, ds);
                     } catch (error) {
-                        console.error("error making ColorChooser", error);
-                        this.createInfoAlert("Error making color chooser", {
+                        console.error("error making ColorPalette", error);
+                        this.createInfoAlert("Error making Color Palette", {
                             type: "warning",
                             duration: 2000,
                         });
