@@ -1,5 +1,5 @@
 from mdvtools.llm.code_manipulation import parse_view_name
-from mdvtools.llm.code_manipulation import prepare_code
+from mdvtools.llm.code_manipulation import prepare_code, _defines_function_named_main
 
 
 class TestParseViewName:
@@ -77,4 +77,47 @@ else:
 ```"""
     out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=False)
     # Must compile; regression for stray `else:` being appended.
+    compile(out, "<string>", "exec")
+
+
+def test_defines_function_named_main_helper():
+    assert _defines_function_named_main("def main():\n    pass\n")
+    assert _defines_function_named_main("async def main():\n    pass\n")
+    assert _defines_function_named_main("def foo():\n    pass\ndef main():\n    pass\n")
+    assert not _defines_function_named_main("x = 1\nprint(x)\n")
+    assert not _defines_function_named_main("def run():\n    pass\n")
+
+
+def test_prepare_code_appends_main_only_when_def_main_exists():
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+def main():
+    x = 1
+```"""
+    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=False)
+    assert 'if __name__ == "__main__":\n    main()' in out
+
+
+def test_prepare_code_no_append_main_for_top_level_only():
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+x = 1
+print(x)
+```"""
+    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=False)
+    assert 'if __name__ == "__main__":\n    main()' not in out
     compile(out, "<string>", "exec")

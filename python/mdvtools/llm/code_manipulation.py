@@ -12,6 +12,26 @@ import os
 if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
 
+# Match `def main(...):` / `async def main(...):` at line start (fallback when AST parse fails).
+_MAIN_DEF_RE = re.compile(r"^\s*(?:async\s+)?def\s+main\s*\(", re.MULTILINE)
+
+
+def _defines_function_named_main(captured: str) -> bool:
+    """
+    True if the LLM-extracted snippet defines a function named `main`.
+    Used to avoid appending `main()` when the model emitted only top-level code.
+    """
+    if not captured or not captured.strip():
+        return False
+    try:
+        tree = ast.parse(captured)
+    except SyntaxError:
+        return bool(_MAIN_DEF_RE.search(captured))
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "main":
+            return True
+    return False
+
 
 def extract_code_from_response(response: str):
     """Extracts Python code from a markdown string response."""
@@ -92,11 +112,13 @@ def prepare_code(
 
     if has_module_guard or has_trailing_else_main:
         final_code = f"{packages_functions}\n{captured_lines}"
-    else:
+    elif _defines_function_named_main(captured_str):
         final_code = f"""{packages_functions}\n{captured_lines}
 
 if __name__ == "__main__":
     main()"""
+    else:
+        final_code = f"{packages_functions}\n{captured_lines}"
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:
         # not at all robust... won't be needed in future

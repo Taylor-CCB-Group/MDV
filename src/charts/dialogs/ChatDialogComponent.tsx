@@ -1,14 +1,27 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
 import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
-import { Box, Button, Divider, IconButton, InputAdornment, Skeleton, TextField } from '@mui/material';
+import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Box,
+    Button,
+    Divider,
+    IconButton,
+    InputAdornment,
+    Skeleton,
+    TextField,
+    Typography,
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import _ from 'lodash';
 import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
 import remarkGfm from 'remark-gfm';
@@ -82,7 +95,33 @@ const SuggestedQuestions = ({ onSelect, suggestedQuestions }: { onSelect: (q: st
     </div>
 );
 
-const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQuestions }: ChatMessage & MessageType) => {
+/** Long previews collapse by default to keep the thread scannable. */
+const PREVIEW_COLLAPSE_LINES = 24;
+const PREVIEW_COLLAPSE_CHARS = 2000;
+
+function previewShouldCollapse(content: string): boolean {
+    return (
+        content.length > PREVIEW_COLLAPSE_CHARS ||
+        content.split('\n').length > PREVIEW_COLLAPSE_LINES
+    );
+}
+
+type MessageProps = ChatMessage & MessageType;
+
+const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
+    {
+    text,
+    sender,
+    view,
+    verification,
+    data_preview,
+    onClose,
+    error,
+    updateInput,
+    suggestedQuestions,
+    },
+    ref,
+) {
     const isUser = sender === 'user';
     const [copied, setCopied] = useState(false);
     const pythonSections = extractPythonSections(text);
@@ -103,7 +142,11 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
             isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />;
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(typeof text === 'string' ? text : JSON.stringify(text, null, 2));
+            const body = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+            const parts: string[] = [body];
+            if (verification?.trim()) parts.push(verification.trim());
+            if (data_preview?.trim()) parts.push(data_preview.trim());
+            await navigator.clipboard.writeText(parts.join('\n\n---\n\n'));
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
@@ -112,7 +155,7 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
     };
 
     return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
-        <div className='selectable mt-4'>
+        <div ref={ref} className='selectable mt-4'>
             <div>{messageIcon}</div>
             <div className={`mb-2 p-4 rounded-lg ${messageStyle} relative markdown-body`}>
                 {/* <JsonView src={text} /> */}
@@ -131,6 +174,30 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
                     </IconButton>
                 )}
                 <MessageMarkdown text={text} />
+                {sender === 'bot' && !error && verification?.trim() && (
+                    <ChatPreviewBlock
+                        title="What you can verify"
+                        content={verification.trim()}
+                        defaultExpandedWhenLong
+                    />
+                )}
+                {sender === 'bot' && !error && data_preview?.trim() && (
+                    <ChatPreviewBlock title="Data preview (script output)" content={data_preview.trim()} />
+                )}
+                {view && sender === 'bot' && !error && (
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                            Review the generated code and the verification summaries above, then open the view.
+                        </Typography>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => navigateToView(view, false, onClose)}
+                        >
+                            Load view &apos;{view}&apos;...
+                        </Button>
+                    </Box>
+                )}
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
@@ -143,18 +210,10 @@ const Message = ({ text, sender, view, onClose, error, updateInput, suggestedQue
             
             {/* Uncomment later and add logic for feedback buttons */}
             {/* {(sender === 'bot') && <MessageFeedback />} */}
-            {view && 
-                <Button 
-                    variant="contained" 
-                    color="primary" 
-                    onClick={() => navigateToView(view, false, onClose)}
-                >
-                    Load view '{view}'...
-                </Button>
-            }
         </div>
     );
-}
+}));
+Message.displayName = 'Message';
 
 const MessageFeedback = () => {
     const [isStarred, setIsStarred] = useState<boolean>(false);
@@ -266,6 +325,43 @@ const MessageMarkdown = ({ text }: { text: string }) => {
     );
 }
 
+const ChatPreviewBlock = ({
+    title,
+    content,
+    defaultExpandedWhenLong,
+}: {
+    title: string;
+    content: string;
+    /** When content is long, start expanded so users see verification before scrolling to the button. */
+    defaultExpandedWhenLong?: boolean;
+}) => {
+    const collapse = previewShouldCollapse(content);
+    if (!collapse) {
+        return (
+            <div className="mb-3 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-slate-100/80 dark:bg-slate-900/60">
+                <div className="font-semibold mb-2 text-sm">{title}</div>
+                <MessageMarkdown text={content} />
+            </div>
+        );
+    }
+    return (
+        <Accordion
+            defaultExpanded={Boolean(defaultExpandedWhenLong)}
+            disableGutters
+            className="mb-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-slate-100/80 dark:bg-slate-900/60 before:hidden"
+        >
+            <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
+                <Typography component="span" variant="body2" className="font-semibold">
+                    {title}
+                </Typography>
+            </AccordionSummary>
+            <AccordionDetails className="pt-0">
+                <MessageMarkdown text={content} />
+            </AccordionDetails>
+        </Accordion>
+    );
+};
+
 const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
     const verbose = useMemo(() => 
         props.verboseProgress.map(s => s.substring(s.length-100)).join('\n'), 
@@ -300,6 +396,7 @@ export type ChatBotProps = {
 const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose, suggestedQuestions}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const lastMessageRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();
 
     const handleSend = useCallback(async () => {
@@ -332,17 +429,41 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
     }, []);
 
     useLayoutEffect(() => {
-        // Only scroll when there are new messages or progress updates
-        if (messages || requestProgress) {
+        if (!messages?.length) return;
+
+        const inProgress =
+            requestProgress !== null && requestProgress.progress < 100;
+        if (isSending && inProgress) {
             scrollToBottom();
+            return;
         }
-    }, [messages, requestProgress, scrollToBottom]);
+
+        const last = messages[messages.length - 1];
+        const hasPreview =
+            last?.sender === 'bot' &&
+            !last?.error &&
+            (Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
+
+        if (!isSending && hasPreview && lastMessageRef.current) {
+            lastMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+
+        scrollToBottom();
+    }, [messages, requestProgress, isSending, scrollToBottom]);
     
     return (
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
             <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
-                {messages.map((message) => (
-                    <Message key={`${message.id}-${message.sender}`} onClose={onClose} {...message} updateInput={updateInput} suggestedQuestions={suggestedQuestions} />
+                {messages.map((message, index) => (
+                    <Message
+                        key={`${message.id}-${message.sender}`}
+                        ref={index === messages.length - 1 ? lastMessageRef : undefined}
+                        onClose={onClose}
+                        {...message}
+                        updateInput={updateInput}
+                        suggestedQuestions={suggestedQuestions}
+                    />
                 ))}
                 {isSending ?  
                     (requestProgress ? 

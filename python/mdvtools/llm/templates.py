@@ -151,7 +151,8 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
                 - Observation/metadata datasource (df1): `"""+roles.obs_datasource+"""`
                 - Wrapper-capable expression datasources (feature tables): 
 """+expr_lines+"""
-            - Use `project.get_datasource_as_dataframe(<datasource_name>)` to load these tables.
+            - Use `project.get_datasource_as_dataframe(<datasource_name>)` to load these tables, or
+              `project.get_datasource_as_dataframe(<datasource_name>, columns=[...])` to load a subset. Each entry may be a metadata **field id** (e.g. cluster column on `cells`) or a **chart FieldName wrapper** string for expression columns on the **observation (row) datasource** (same format as chart `params`, e.g. `rna_expr|GENE(rna_expr)|12`). Do not pass wrappers to the feature-table datasource dataframe.
 
     3. Datasource Registration:
         - When modifying an existing project, DO NOT call project.add_datasource(...).
@@ -161,6 +162,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected **field ids** (see Parameter Handling).
             - The suggested columns and chart type are given by """+final_answer+"""
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
+        - **Before** `project.set_view(...)`, print a concise text preview of any table, aggregate, or subset the charts depend on (for example `print(df_result.head(40).to_string())` or grouped top-N). Keep rows/columns bounded so the output stays readable; this stdout is shown in the chat window.
         - Set the view using `project.set_view(view_name, view_object)`
         - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`.
           To show a subset, either:

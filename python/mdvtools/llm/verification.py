@@ -1,15 +1,12 @@
 """
-Build a verification summary for Chat MDV from project metadata and generated code,
-and merge it into the view as a TextBox chart.
+Build a verification summary for Chat MDV from project metadata and generated code.
+The summary is returned to the chat client (not embedded as a view TextBox chart).
 """
 from __future__ import annotations
 
 import ast
-import json
 import re
 from typing import TYPE_CHECKING, Any, Optional
-
-from mdvtools.charts.text_box_plot import TextBox
 
 if TYPE_CHECKING:
     from mdvtools.mdvproject import MDVProject
@@ -375,75 +372,3 @@ def build_verification_summary(
     return "\n".join(lines)
 
 
-def _convert_plot_to_json(plot: Any) -> dict[str, Any]:
-    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
-
-
-def _chart_bottom_y(chart: dict[str, Any]) -> float:
-    pos = chart.get("position") or [0, 0]
-    size = chart.get("size") or [0, 0]
-    if not isinstance(pos, (list, tuple)) or len(pos) < 2:
-        return 0.0
-    if not isinstance(size, (list, tuple)) or len(size) < 2:
-        return float(pos[1])
-    return float(pos[1]) + float(size[1])
-
-
-def _is_verification_textbox(chart: dict[str, Any]) -> bool:
-    if chart.get("type") != "text_box_chart":
-        return False
-    title = (chart.get("title") or "").strip().lower()
-    return title in ("what you can verify", "verification")
-
-
-def append_verification_textbox(
-    project: Any,
-    view_name: str,
-    verification_text: str,
-    primary_datasource: Optional[str] = None,
-) -> bool:
-    """
-    Append a TextBox with verification text to the given view's primary datasource chart list.
-    Returns True if the view was updated.
-    """
-    view = project.get_view(view_name)
-    if not view or "initialCharts" not in view:
-        return False
-
-    initial = view["initialCharts"]
-    if not isinstance(initial, dict) or not initial:
-        return False
-
-    ds_keys = list(initial.keys())
-    primary_ds = primary_datasource if primary_datasource in initial else ds_keys[0]
-    charts = initial.get(primary_ds)
-    if not isinstance(charts, list):
-        return False
-
-    # Remove prior verification TextBox to avoid duplicates on re-run
-    charts = [c for c in charts if isinstance(c, dict) and not _is_verification_textbox(c)]
-
-    max_bottom = 0.0
-    for c in charts:
-        if isinstance(c, dict):
-            max_bottom = max(max_bottom, _chart_bottom_y(c))
-
-    margin = 24.0
-    box_width = 880.0
-    box_height = min(320.0, max(160.0, 24.0 * verification_text.count("\n") + 80.0))
-    y_pos = max_bottom + margin if max_bottom > 0 else 10.0
-
-    tb = TextBox(
-        title="What you can verify",
-        param=[],
-        size=[int(box_width), int(box_height)],
-        position=[10, int(y_pos)],
-    )
-    tb.set_text(verification_text)
-    chart_json = _convert_plot_to_json(tb)
-
-    charts.append(chart_json)
-    initial[primary_ds] = charts
-    view["initialCharts"] = initial
-    project.set_view(view_name, view)
-    return True

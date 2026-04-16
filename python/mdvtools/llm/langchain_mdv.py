@@ -35,9 +35,10 @@ from .local_files_utils import crawl_local_repo, extract_python_code_from_py, ex
 from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
 from .column_field_resolve import normalize_view_chart_params
-from .verification import append_verification_textbox, build_verification_summary, parse_datasource_name
+from .verification import build_verification_summary
 from .datasource_roles import infer_datasource_roles
 from .code_execution import execute_code
+from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
 
 # packages for memory
@@ -403,6 +404,7 @@ class ProjectChat(ProjectChatProtocol):
                 "error": False,
                 "message": "Success",
                 "verification": None,
+                "data_preview": format_stdout_for_chat(strdout),
             }
         
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
@@ -516,7 +518,9 @@ class ProjectChat(ProjectChatProtocol):
             if not ok:
                 # Log code execution error
                 raise Exception(f"Code execution failed: \n{stderr}")
-            
+
+            data_preview_text = format_stdout_for_chat(stdout)
+
             with time_block("b15: Parse view name"):
                 # Parse view name from the code
                 view_name = parse_view_name(final_code)
@@ -536,19 +540,13 @@ class ProjectChat(ProjectChatProtocol):
                     log(f"normalize chart params: {norm_ex}")
 
             verification_text = ""
-            with time_block("b15b: Verification summary and TextBox"):
+            with time_block("b15b: Verification summary"):
                 try:
                     verification_text = build_verification_summary(
                         self.project, final_code, view_name
                     )
-                    append_verification_textbox(
-                        self.project,
-                        view_name,
-                        verification_text,
-                        primary_datasource=parse_datasource_name(final_code),
-                    )
                 except Exception as ver_ex:
-                    log(f"verification TextBox: {ver_ex}")
+                    log(f"verification summary: {ver_ex}")
 
             with time_block("b16: Log chat item"):
                  # Extract the explanation section from the LLM's response (removing code blocks)
@@ -587,6 +585,7 @@ class ProjectChat(ProjectChatProtocol):
                     context=context,
                     view_name=view_name,
                     verification=verification_text or None,
+                    data_preview=data_preview_text,
                 )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
@@ -599,6 +598,7 @@ class ProjectChat(ProjectChatProtocol):
                     "error": False,
                     "message": "Success",
                     "verification": verification_text or None,
+                    "data_preview": data_preview_text,
                 }
         except Exception as e:
             # Log general error
@@ -614,4 +614,5 @@ class ProjectChat(ProjectChatProtocol):
                 "error": True,
                 "message": f"ERROR: {error_message}",
                 "verification": None,
+                "data_preview": None,
             }

@@ -151,6 +151,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                             "view": result["view_name"],
                             "id": id,
                             "verification": result.get("verification"),
+                            "data_preview": result.get("data_preview"),
                         },
                         namespace=f"/project/{project.id}",
                         to=room,

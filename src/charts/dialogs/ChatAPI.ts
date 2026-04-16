@@ -13,6 +13,8 @@ const completedChatResponseSchema = z.object({
     view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
     /** Provenance summary (also embedded as a TextBox in the created view). */
     verification: z.string().optional().nullable(),
+    /** Truncated stdout from executed script (tabular preview). */
+    data_preview: z.string().optional().nullable(),
     // timestamp: z.string(),
     error: z.boolean().optional(),
 });
@@ -52,6 +54,7 @@ const chatLogItemSchema = z.object({
     view_name: z.string().optional().nullable(),
     error: z.boolean().optional(),
     verification: z.string().optional().nullable(),
+    data_preview: z.string().optional().nullable(),
 });
 // this is possible - may consider it at some point.
 // .transform((data) => ({
@@ -67,8 +70,10 @@ type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 export type ChatMessage = {
     text: string;
     view?: string;
-    /** Same text as the "What you can verify" TextBox in the view; not shown as a separate chat widget. */
+    /** Provenance summary (same as the view TextBox when present). */
     verification?: string | null;
+    /** Truncated script stdout shown in chat before the main reply. */
+    data_preview?: string | null;
     sender: 'user' | 'bot' | 'system';
     id: string;
     conversationId: string;
@@ -190,6 +195,7 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
         text: log.response,
         view: viewName,
         verification: log?.verification,
+        data_preview: log?.data_preview,
         error: log?.error,
     };
     
@@ -420,6 +426,7 @@ const useChat = () => {
                     conversationId,
                     view: response?.view,
                     verification: response?.verification ?? undefined,
+                    data_preview: response?.data_preview ?? undefined,
                 }])
             }
         } catch (error: any) {

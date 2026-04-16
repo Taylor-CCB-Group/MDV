@@ -37,6 +37,7 @@ class ChatLogItem:
     view_name: Optional[str] = None
     error: Optional[bool] = None
     verification: Optional[str] = None
+    data_preview: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -50,6 +51,7 @@ class ChatLogItem:
             "view_name": self.view_name,
             "error": self.error,
             "verification": self.verification,
+            "data_preview": self.data_preview,
         }
 
     @classmethod
@@ -65,6 +67,7 @@ class ChatLogItem:
             view_name=data.get("view_name"),
             error=data.get("error"),
             verification=data.get("verification"),
+            data_preview=data.get("data_preview"),
         )
 
 class ChatLogger:
@@ -282,6 +285,7 @@ def log_chat_item(
     view_name: str | None,
     error: bool = False,
     verification: str | None = None,
+    data_preview: str | None = None,
 ):
     """
     Log a chat interaction to the chat log file.
@@ -294,6 +298,7 @@ def log_chat_item(
         context: Context of the response code generated which contains file names
         error: Whether this log is for an error
         verification: Optional provenance text (same as the view TextBox), omitted on error
+        data_preview: Optional truncated script stdout for chat, omitted on error
     """
     # Create a ChatLogger instance for this project
     chat_file = os.path.join(project.dir, "chat_log.json")
@@ -303,6 +308,7 @@ def log_chat_item(
         view_name = None
         prompt_template = prompt_template or ""
         verification = None
+        data_preview = None
 
     # Ensure context is always a non-optional string for ChatLogItem
     context_str: str = context if context is not None else "[]"
@@ -317,5 +323,6 @@ def log_chat_item(
         view_name=view_name,
         error=error,
         verification=verification,
+        data_preview=data_preview,
     )
     chat_logger.log_chat(chat_item)

@@ -31,6 +31,24 @@ from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict):
+    try:
+        payload = {
+            "sessionId": "5187b3",
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with open("/app/.cursor/debug-5187b3.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, default=str) + "\n")
+    except Exception:
+        pass
+
+
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
@@ -167,14 +185,113 @@ class MDVProject:
         ds["columns"][col_index[0]][parameter] = value
         self.set_datasource_metadata(ds)
 
-    def get_datasource_as_dataframe(self, datasource: str) -> pandas.DataFrame:
+    def get_datasource_as_dataframe(
+        self, datasource: str, columns: Optional[List[str]] = None
+    ) -> pandas.DataFrame:
         ## nb, I'd quite like to have some 'DataSourceName' type alias so we know it's not just any string...
+        from mdvtools.llm.column_field_resolve import _WRAPPER_RE
+
         ds = self.get_datasource_metadata(datasource)
         df = pandas.DataFrame()
         for c in ds["columns"]:
             data = self.get_column(datasource, c["field"])
             df[c["field"]] = data
-        return df
+        if columns is None:
+            return df
+
+        # Chart "wrapper" tokens (e.g. gs|GENE(gs)|0) are not metadata field ids; they address
+        # rows-as-columns matrix columns. Handle those alongside normal field ids.
+        out: dict[str, Any] = {}
+        n_rows = int(ds.get("size", len(df) if len(df) else 0))
+        for col in columns:
+            key = col.strip() if isinstance(col, str) else col
+            if not isinstance(key, str):
+                raise AttributeError(f"invalid column key: {col!r}")
+            if _WRAPPER_RE.match(key):
+                out[col] = self._read_wrapper_expression_column(
+                    datasource, key, n_rows
+                )
+            elif key in df.columns:
+                out[col] = df[key]
+            else:
+                raise AttributeError(
+                    f"column {key!r} not found in {datasource} datasource "
+                    f"(have metadata fields: {list(df.columns)})"
+                )
+        return pandas.DataFrame(out)
+
+    def _resolve_rows_as_columns_subgroup(
+        self, row_datasource: str, subgroup_key: str
+    ) -> tuple[str, bool]:
+        """
+        Return (h5 matrix group name under the row datasource, is_sparse).
+        Tries exact subgroup key, then `{key}_expr`, then the sole subgroup if unambiguous.
+        """
+        lnks = self.get_links(row_datasource, "rows_as_columns") or []
+        candidates = [subgroup_key, f"{subgroup_key}_expr", f"{subgroup_key}_EXPR"]
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            for cand in candidates:
+                if cand in subgroups:
+                    info = subgroups[cand]
+                    name = str(info.get("name", cand))
+                    sparse = info.get("type") == "sparse"
+                    return name, sparse
+            if len(subgroups) == 1:
+                _k, info = next(iter(subgroups.items()))
+                name = str(info.get("name", _k))
+                sparse = info.get("type") == "sparse"
+                return name, sparse
+        avail: list[str] = []
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            avail.extend(list(subgroups.keys()))
+        raise AttributeError(
+            f"rows-as-columns subgroup {subgroup_key!r} not found on {row_datasource!r}. "
+            f"Available subgroup keys: {avail}"
+        )
+
+    def _read_subgroup_matrix_column(
+        self, grp: Any, col_index: int, sparse: bool, n_rows: int
+    ) -> numpy.ndarray:
+        """One matrix column (genes x cells): cells are rows, col_index selects a gene column."""
+        if not sparse:
+            _len = int(grp["length"][0])
+            offset = col_index * _len
+            return numpy.asarray(grp["x"][offset : offset + _len], dtype=numpy.float32)
+        p = grp["p"]
+        offset = p[col_index : col_index + 2]
+        start, end = int(offset[0]), int(offset[1])
+        _indexes = numpy.array(grp["i"][start:end], dtype=numpy.int64)
+        _values = numpy.array(grp["x"][start:end], dtype=numpy.float32)
+        dense = numpy.zeros(n_rows, dtype=numpy.float32)
+        if _indexes.size:
+            dense[_indexes] = _values
+        return dense
+
+    def _read_wrapper_expression_column(
+        self, row_datasource: str, wrapper: str, n_rows: int
+    ) -> list[float]:
+        from mdvtools.llm.column_field_resolve import _WRAPPER_RE
+
+        m = _WRAPPER_RE.match(wrapper.strip())
+        if not m:
+            raise AttributeError(f"invalid expression wrapper: {wrapper!r}")
+        subgroup_key = m.group(1).strip()
+        col_index = int(m.group(3))
+        group_name, sparse = self._resolve_rows_as_columns_subgroup(
+            row_datasource, subgroup_key
+        )
+        h5 = self._get_h5_handle(read_only=True)
+        try:
+            gr = h5[row_datasource]
+            if not isinstance(gr, h5py.Group):
+                raise AttributeError(f"datasource {row_datasource!r} is not an h5 group")
+            sgrp = gr[group_name]
+            arr = self._read_subgroup_matrix_column(sgrp, col_index, sparse, n_rows)
+            return [float(x) for x in arr]
+        finally:
+            h5.close()
 
     def check_columns_exist(self, datasource, columns):
         md = self.get_datasource_metadata(datasource)
@@ -587,21 +704,92 @@ class MDVProject:
             mode = "w"
         elif not read_only:
             mode = "a"
+        # #region agent log
+        _agent_debug_log(
+            "pre-fix",
+            "H1",
+            "mdvproject.py:_get_h5_handle:entry",
+            "attempting h5 open",
+            {
+                "h5file": self.h5file,
+                "mode": mode,
+                "read_only": read_only,
+                "attempt_in": attempt,
+                "pid": os.getpid(),
+            },
+        )
+        # #endregion
         try:
-            return h5py.File(self.h5file, mode)
-        except Exception:
+            handle = h5py.File(self.h5file, mode)
+            # #region agent log
+            _agent_debug_log(
+                "pre-fix",
+                "H4",
+                "mdvproject.py:_get_h5_handle:success",
+                "h5 open success",
+                {
+                    "h5file": self.h5file,
+                    "mode": mode,
+                    "attempt_in": attempt,
+                    "pid": os.getpid(),
+                },
+            )
+            # #endregion
+            return handle
+        except Exception as e:
             # certain environments seem to have issues with the handle not being closed instantly
             # if there is a better way to do this, please change it
             # if there are multiple processes trying to access the file, this may also help
             # (although if they're trying to write, who knows what bad things may happen to the project in general)
+            # #region agent log
+            _agent_debug_log(
+                "pre-fix",
+                "H2",
+                "mdvproject.py:_get_h5_handle:except",
+                "h5 open failed",
+                {
+                    "h5file": self.h5file,
+                    "mode": mode,
+                    "read_only": read_only,
+                    "attempt_in": attempt,
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "pid": os.getpid(),
+                },
+            )
+            # #endregion
             time.sleep(0.1)
             attempt += 1
-            logger.error(f"error opening h5 file, attempt {attempt}...")
+            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            if lock_error:
+                logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
+            else:
+                logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
+            # #region agent log
+            _agent_debug_log(
+                "pre-fix",
+                "H3",
+                "mdvproject.py:_get_h5_handle:retry",
+                "retrying h5 open",
+                {
+                    "h5file": self.h5file,
+                    "mode": mode,
+                    "read_only": read_only,
+                    "attempt_out": attempt,
+                    "lock_error": lock_error,
+                    "pid": os.getpid(),
+                },
+            )
+            # #endregion
+            if attempt >= 20:
+                raise RuntimeError(
+                    f"unable to open h5 file after {attempt} attempts: {self.h5file}"
+                ) from e
             return self._get_h5_handle(read_only, attempt)
 
     def get_column(self, datasource: str, column, raw=False):
         cm = self.get_column_metadata(datasource, column)
-        h5 = self._get_h5_handle()
+        h5 = self._get_h5_handle(read_only=True)
         gr = h5[datasource]
         if not isinstance(gr, h5py.Group):
             h5.close()
