@@ -276,11 +276,11 @@ def build_verification_summary(
     else:
         lines.append("")
         lines.append(
-            "- **Wrapper expression:** not used in this view (no `<subgroup>|…(<subgroup>)|…` parameters detected)."
+            "- **Wrapper expression:** not used in this response (no `<subgroup>|…(<subgroup>)|…` parameters detected)."
         )
         if _has_genes_table(project) and not gene_tokens:
             lines.append(
-                "- **Note:** this project includes a genes table; this view does not plot gene expression columns."
+                "- **Note:** this project includes a genes table; this response does not use wrapper-based gene expression columns."
             )
 
     fh = _filter_hints(final_code)
@@ -328,7 +328,7 @@ def build_verification_summary(
     # Fallback to code-only details if we couldn't format saved-view charts.
     if not charts_md:
         lines.append("")
-        lines.append("### Columns / parameters (from code)")
+        lines.append("### Columns / outputs (from code)")
         if gene_tokens:
             lines.append(
                 f"- Gene expression column(s): {', '.join(f'`{t}`' for t in gene_tokens)}"
@@ -349,7 +349,7 @@ def build_verification_summary(
                 else ""
             )
             lines.append(
-                f"- Other chart parameters (strings): {', '.join(f'`{c}`' for c in sample)}{extra}"
+                f"- Other referenced parameters (strings): {', '.join(f'`{c}`' for c in sample)}{extra}"
             )
         elif not gene_tokens:
             lines.append(
@@ -357,7 +357,7 @@ def build_verification_summary(
             )
 
         lines.append("")
-        lines.append("### Chart types (from code)")
+        lines.append("### Chart types (if any, from code)")
         ctypes = _extract_chart_types(final_code)
         if ctypes:
             lines.append(f"- {', '.join(ctypes)}")

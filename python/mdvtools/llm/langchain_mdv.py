@@ -77,6 +77,66 @@ chat_debug_handler.setFormatter(formatter)
 # attach the handler
 chat_debug_logger.addHandler(chat_debug_handler)
 
+
+_CHART_CLASS_RE = re.compile(
+    r"\b(DotPlot|ScatterPlot|HeatmapPlot|HistogramPlot|BoxPlot|ViolinPlot|"
+    r"DensityScatterPlot|ScatterPlot3D|RowChart|StackedRowChart|PieChart|RingChart|"
+    r"AbundanceBoxPlot|MultiLinePlot|TablePlot|WordcloudPlot|SankeyPlot|"
+    r"SelectionDialogPlot|RowSummaryBox|TextBox)\s*\("
+)
+
+
+def _is_text_table_intent(question: str) -> bool:
+    q = question.lower()
+    text_table_keywords = [
+        "predict",
+        "annotate",
+        "annotation",
+        "label",
+        "list",
+        "table",
+        "summarize",
+        "summary",
+        "top ",
+        "rank",
+        "mapping",
+        "which cell type",
+        "cell type",
+    ]
+    chart_intent_keywords = [
+        "plot",
+        "chart",
+        "visualize",
+        "scatter",
+        "heatmap",
+        "umap",
+        "tsne",
+        "violin",
+        "histogram",
+        "dotplot",
+    ]
+    has_text_table = any(k in q for k in text_table_keywords)
+    has_explicit_chart = any(k in q for k in chart_intent_keywords)
+    return has_text_table and not has_explicit_chart
+
+
+def _extract_chart_classes(code: str) -> list[str]:
+    seen: list[str] = []
+    for m in _CHART_CLASS_RE.finditer(code):
+        c = m.group(1)
+        if c not in seen:
+            seen.append(c)
+    return seen
+
+
+def _is_text_table_only_code(code: str) -> bool:
+    chart_classes = _extract_chart_classes(code)
+    if not chart_classes:
+        return True
+    allowed = {"TextBox", "TablePlot", "SelectionDialogPlot", "RowSummaryBox"}
+    return all(c in allowed for c in chart_classes)
+
+
 class SuggestedQuestions(BaseModel):
     """A list of suggested questions to ask about the data."""
     questions: List[str] = Field(
@@ -500,6 +560,37 @@ class ProjectChat(ProjectChatProtocol):
                     modify_existing_project=True,
                     view_name=question,
                 )
+
+                if _is_text_table_intent(question) and _is_text_table_only_code(final_code):
+                    chat_debug_logger.info(
+                        "Detected text/table-first intent with chart-only output; regenerating with chat-first instruction."
+                    )
+                    chat_first_query = (
+                        f"{charts_part}\n\n"
+                        "IMPORTANT: This request is text/table-first. "
+                        "Prefer chat explanation and concise bounded stdout (`print(...)`) instead of creating "
+                        "TextBox/TablePlot/SelectionDialog-only outputs unless the user explicitly requested a chart."
+                    )
+                    output_qa_retry = qa_chain.invoke({"query": chat_first_query})
+                    result_retry = output_qa_retry["result"]
+                    final_code_retry = prepare_code(
+                        result_retry,
+                        self.df,
+                        self.project,
+                        log,
+                        modify_existing_project=True,
+                        view_name=question,
+                    )
+                    if not _is_text_table_only_code(final_code_retry):
+                        output_qa = output_qa_retry
+                        result = result_retry
+                        final_code = final_code_retry
+                    else:
+                        # Keep retry result anyway when it remains text/table-only;
+                        # downstream chat explanation/stdout still carries the answer.
+                        output_qa = output_qa_retry
+                        result = result_retry
+                        final_code = final_code_retry
 
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")

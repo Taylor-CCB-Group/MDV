@@ -191,11 +191,18 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Only perform wrapper expression if you have a usable feature table for the modality (e.g. `rna`, `protein`) with its `name_column` and at least one subgroup key.
         - If none are available, proceed without wrapper expression and prefer non-expression charts.
 
-    7. Queries requiring subsetting of the dataset:
-        If to answer the question requires a subset of the data or filtering the data, make sure to:
-        - Add a selection dialog plot with all the parameters that were passed on as params. Make sure it has a title.
+    7. Chat-first textual/table outputs:
+        - For requests that primarily ask for textual summaries, mappings, rankings, annotations, or table-like listings,
+          prioritize chat output over plot creation.
+        - In these cases, provide the answer in:
+            (a) the markdown explanation text, and
+            (b) bounded script stdout via `print(...)` before any `project.set_view(...)`.
+        - Do NOT create `TextBox` or `TablePlot` by default when the user intent is primarily textual/table output.
 
-    8. Always add a selection dialog plot along the other charts. It must have all the parameters that were passed on as params. It must have a title.
+    8. Selection dialog usage:
+        - Add `SelectionDialogPlot` only when interactive filtering materially helps answer the question
+          (for example, when the user asks to explore subsets interactively).
+        - Do not add a selection dialog unconditionally.
 
     9. Your Task:
         - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+final_answer+"""
@@ -233,7 +240,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - Text box plot: Requires no columns, just text.  
             - Violin plot: Requires only one categorical column and one numerical column.  
             - Wordcloud: Requires one categorical column.
-    Output format: Return the python code that is to be run to generate the charts.
+    Output format: Return python code for the requested result.
+    - For chart-oriented requests, return code that creates the chart view(s).
+    - For textual/table-first requests, return code that computes and prints concise, bounded tabular/text output in chat.
 
     After generating the code, include a detailed explanation in your response (renderable by markdown renderer) that covers:
     1. Why this chart is the best way to answer the question
