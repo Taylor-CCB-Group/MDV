@@ -9,15 +9,22 @@ class MultiBoxPlot extends SVGChart {
         super(dataStore, div, config, { x: { type: "band" }, y: {} });
         const c = this.config;
         c.type = "multi_box_plot";
-        const names = [];
         this.dim = this.dataStore.getDimension("catrange_dimension");
-        for (let n = 1; n < c.param.length; n++) {
-            names.push(this.dataStore.getColumnName(c.param[n]));
-        }
-        this.x_scale.domain(names);
-        this.names = names;
+        this._updateNames();
         this.y_scale.domain([1, 0]);
         this.addToolTip();
+        this.onDataFiltered();
+    }
+
+    _updateNames() {
+        const names = this.config.param.slice(1).map((field) => this.dataStore.getColumnName(field));
+        this.names = names;
+        this.x_scale.domain(names);
+    }
+
+    setParams(params) {
+        this.config.param = params;
+        this._updateNames();
         this.onDataFiltered();
     }
 
@@ -156,6 +163,10 @@ BaseChart.types["multi_box_plot"] = {
     class: MultiBoxPlot,
     allow_user_add: false,
     params: [
+        {
+            type: "text",
+            name: "Category column",
+        },
         {
             type: "_multi_column:number",
             name: "Fields",

@@ -110,6 +110,48 @@ class RowSummaryBox extends BaseChart {
         this.imViewer.img.__doc__ = doc;
     }
 
+    onColumnRemoved(column, impact) {
+        if (impact?.action === "delete") {
+            return super.onColumnRemoved(column, impact);
+        }
+        if (!Array.isArray(this.config.param)) {
+            return false;
+        }
+
+        const currentParam = this.config.param;
+        const removedIndex = currentParam.indexOf(column);
+        if (removedIndex === -1) {
+            return false;
+        }
+        // The image key is stored by param index, so removing that field is not
+        // safely prunable; the chart must be deleted instead.
+        if (this.config.image && this.config.image.param === removedIndex) {
+            return true;
+        }
+        if (!impact?.nextParam) {
+            return false;
+        }
+
+        this.config.param = impact.nextParam;
+        if (this.config.image && this.config.image.param > removedIndex) {
+            this.config.image.param -= 1;
+        }
+        if (this.img_data && this.config.image) {
+            this.img_data.key_column = this.config.param[this.config.image.param];
+        }
+
+        const holder = this.paramHolders[column];
+        if (holder) {
+            const section = holder.closest(".mdv-section");
+            if (section) {
+                section.remove();
+            }
+            delete this.paramHolders[column];
+        }
+
+        return false;
+    }
+
     getSettings() {
         return super.getSettings();
     }

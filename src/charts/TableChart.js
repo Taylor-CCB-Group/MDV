@@ -4,6 +4,7 @@ import { DataModel } from "../table/DataModel.js";
 import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import { BaseDialog } from "../utilities/Dialog.js";
+import ColumnRemovalImpactDialogWrapper from "./dialogs/ColumnRemovalImpactDialogWrapper";
 
 class TableChart extends BaseChart {
     constructor(dataStore, div, config) {
@@ -209,6 +210,12 @@ class TableChart extends BaseChart {
         let cols = this.grid.getColumns();
         cols = cols.filter((x) => x.field !== column);
         this.config.param = this.config.param.filter((x) => x !== column);
+        if (this.config.sort?.columnId === column) {
+            this.config.sort = undefined;
+        }
+        if (this.config.column_widths?.[column] != null) {
+            delete this.config.column_widths[column];
+        }
         this.dataModel.setColumns(this.config.param);
         this.grid.setColumns(cols);
         return false;
@@ -327,6 +334,25 @@ class TableChart extends BaseChart {
     _removeColumn(col) {
         //remove column and set as dirty plus
         this.dataModel.removeColumn(col, true, true);
+    }
+
+    requestColumnRemoval(col) {
+        const chartManager = window.mdv?.chartManager;
+        if (chartManager) {
+            const impact = chartManager.analyzeColumnRemoval(
+                this.dataStore.name,
+                col,
+                this.config.id,
+            );
+            const impactedCharts = impact.charts.filter((chart) => !chart.isSourceChart);
+            if (impactedCharts.length > 0) {
+                new ColumnRemovalImpactDialogWrapper(col, impact, () => {
+                    this._removeColumn(col);
+                });
+                return;
+            }
+        }
+        this._removeColumn(col);
     }
 
     _updateOverlay(args) {
@@ -465,7 +491,7 @@ class EditColumnDialog extends BaseDialog {
         ).addEventListener("click", () => {
             const r = replace || this.replaceInput.value;
             if (r === "_delete_column_") {
-                this.table._removeColumn(this.col);
+                this.table.requestColumnRemoval(this.col);
                 this.close();
             } else {
                 this.dataModel.replaceValues(this.valInput.value, r, this.col);

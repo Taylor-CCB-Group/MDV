@@ -15,6 +15,7 @@ import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 import tippy, {type Instance as TippyInstance} from "tippy.js";
+import type { ChartColumnImpact } from "./columnRemovalUtils";
 import 'tippy.js/dist/tippy.css'; 
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
@@ -636,27 +637,68 @@ class BaseChart<T extends BaseConfig> {
      * If so, the chart will be removed but no callbacks will be involved
      * @returns `true` if the chart has been removed
      */
-    onColumnRemoved(column: FieldName) {
-        let cols = this.config.param;
-        let isDirty = false;
-        if (typeof this.config.param === "string") {
-            cols = [this.config.param];
-        }
-        for (const p of cols) {
-            if (column === p) {
-                isDirty = true;
-                break;
+    onColumnRemoved(column: FieldName, impact?: ChartColumnImpact) {
+        if (!impact) {
+            let cols = this.config.param;
+            let isDirty = false;
+            if (typeof this.config.param === "string") {
+                cols = [this.config.param];
             }
+            for (const p of cols) {
+                if (column === p) {
+                    isDirty = true;
+                    break;
+                }
+            }
+            if (isDirty) {
+                this.remove(false);
+                return true;
+            }
+            if (this.colorByColumn) {
+                if (this.config.color_by === column) {
+                    this.config.color_by = undefined;
+                    this.colorByDefault?.();
+                }
+            }
+            return false;
         }
-        if (isDirty) {
-            this.remove(false);
+
+        if (impact.action === "delete") {
             return true;
         }
-        if (this.colorByColumn) {
-            if (this.config.color_by === column) {
-                this.config.color_by = undefined;
-                this.colorByDefault?.();
+
+        // Most chart types only need the shared cleanup below; only charts with
+        // extra local state override `onColumnRemoved`.
+        if (impact.nextParam) {
+            this.setParams(impact.nextParam);
+        }
+
+        if (impact.clearColorBy && this.config.color_by) {
+            this.config.color_by = undefined;
+            this.colorByDefault?.();
+        }
+
+        if (impact.tooltipUpdate && "tooltip" in this.config) {
+            const configWithTooltip = this.config as T & {
+                tooltip?: {
+                    show?: boolean;
+                    column?: FieldSpec | FieldSpecs;
+                };
+            };
+            if (configWithTooltip.tooltip) {
+                configWithTooltip.tooltip.column = impact.tooltipUpdate.nextColumn;
+                if (impact.tooltipUpdate.disableTooltip) {
+                    configWithTooltip.tooltip.show = false;
+                }
             }
+        }
+
+        if (impact.clearBackgroundFilter && "background_filter" in this.config) {
+            (this.config as T & { background_filter?: unknown }).background_filter = undefined;
+        }
+
+        if (impact.configEntryUpdates) {
+            Object.assign(this.config, impact.configEntryUpdates);
         }
         return false;
     }

@@ -14,6 +14,7 @@ import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import { flattenFields } from "@/lib/columnTypeHelpers";
+import type { ColumnRemovalImpact } from "@/charts/columnRemovalUtils";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -77,6 +78,10 @@ const useSlickGridReact = () => {
     const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [bulkEditColumn, setBulkEditColumn] = useState<string | null>(null);
+    const [pendingColumnRemoval, setPendingColumnRemoval] = useState<{
+        columnName: string;
+        impact: ColumnRemovalImpact;
+    } | null>(null);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -358,7 +363,21 @@ const useSlickGridReact = () => {
                     if (!isEditModeRef.current) {
                         return;
                     }
-                    // const dataModel = new DataModel(dataStore, { autoupdate: false });
+                    if (chartManager) {
+                        const impact = chartManager.analyzeColumnRemoval(
+                            dataStore.name,
+                            column.field,
+                            chartId,
+                        );
+                        const hasCrossChartUsage = impact.charts.some((item: { isSourceChart: boolean }) => !item.isSourceChart);
+                        if (hasCrossChartUsage) {
+                            setPendingColumnRemoval({
+                                columnName: column.field,
+                                impact,
+                            });
+                            return;
+                        }
+                    }
                     dataModel.removeColumn(column.field);
                 }
             },
@@ -380,7 +399,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore, dataModel]);
+    }, [chart, chartManager, config, dataStore, dataModel, chartId]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
@@ -545,6 +564,18 @@ const useSlickGridReact = () => {
         setIsBulkEditDialogOpen(false);
         setBulkEditColumn(null);
     }, []);
+
+    const closeColumnRemovalDialog = useCallback(() => {
+        setPendingColumnRemoval(null);
+    }, []);
+
+    const confirmColumnRemoval = useCallback(() => {
+        if (!pendingColumnRemoval) {
+            return;
+        }
+        dataModel.removeColumn(pendingColumnRemoval.columnName);
+        setPendingColumnRemoval(null);
+    }, [dataModel, pendingColumnRemoval]);
 
     // Columns to be displayed for cloning
     const cloneableColumns = useMemo(() => {
@@ -728,6 +759,9 @@ const useSlickGridReact = () => {
         bulkEditColumn,
         closeBulkEditDialog,
         handleBulkEdit,
+        pendingColumnRemoval,
+        closeColumnRemovalDialog,
+        confirmColumnRemoval,
     };
 };
 

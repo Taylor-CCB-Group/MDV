@@ -61,6 +61,10 @@ class DotPlot extends SVGChart {
     //     this.config.param = params;
     //     this.setFields(params.slice(1));
     // }
+    setParams(params) {
+        this.config.param = params;
+        this._setFields(params.slice(1));
+    }
 
     remove(notify = true) {
         this.dim.destroy(notify);

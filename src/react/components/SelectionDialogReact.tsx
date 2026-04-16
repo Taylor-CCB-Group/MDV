@@ -4,6 +4,7 @@ import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
+import type { ChartColumnImpact } from "@/charts/columnRemovalUtils";
 
 // export type CommonFilter = { noClear?: boolean, invert?: boolean }; //todo - implement these features.
 export type CategoryFilter = { category: string[] };
@@ -57,6 +58,37 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         })();
     }
 
+    onColumnRemoved(column: string, impact?: ChartColumnImpact): boolean {
+        if (impact?.action === "delete") {
+            return super.onColumnRemoved(column, impact);
+        }
+        const nextParam = impact?.nextParam;
+        if (!nextParam) {
+            return false;
+        }
+
+        action(() => {
+            // The shared analyzer has already decided that this chart survives;
+            // this override just keeps filter/order state aligned with pruned params.
+            this.config.param = nextParam;
+            delete this.config.filters[column];
+
+            const nextOrder = { ...(this.config.order ?? {}) };
+            const removedOrder = nextOrder[column];
+            delete nextOrder[column];
+            if (removedOrder !== undefined) {
+                for (const field in nextOrder) {
+                    if (nextOrder[field] > removedOrder) {
+                        nextOrder[field] -= 1;
+                    }
+                }
+            }
+            this.config.order = nextOrder;
+        })();
+
+        return false;
+    }
+
     getSettings(){
           const settings = super.getSettings();
           const c = this.config;
@@ -87,3 +119,5 @@ BaseChart.types["selection_dialog"] = {
     ],
 }
 // BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];
+
+export default SelectionDialogReact;

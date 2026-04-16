@@ -66,6 +66,7 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import { analyzeChartColumnImpact } from "./columnRemovalUtils";
 
 
 //order of column data in an array buffer
@@ -970,29 +971,78 @@ export class ChartManager {
         this.viewManager.checkAndChangeView(view);
     }
 
+    /**
+     * Returns the impact of removing a column before any datastore mutation occurs.
+     * @param {string} dataSourceName
+     * @param {string} column
+     * @param {string | null} [sourceChartId=null]
+     */
+    analyzeColumnRemoval(dataSourceName, column, sourceChartId = null) {
+        const ds = this.dsIndex[dataSourceName];
+        if (!ds) {
+            throw new Error(`Unknown data source '${dataSourceName}'`);
+        }
+
+        const charts = [];
+        for (const id in this.charts) {
+            const info = this.charts[id];
+            if (info.dataSource !== ds) {
+                continue;
+            }
+            const impact = analyzeChartColumnImpact(
+                info.chart.config,
+                BaseChart.types[info.chart.config.type],
+                column,
+                { sourceChartId },
+            );
+            if (!impact) {
+                continue;
+            }
+            charts.push(impact);
+        }
+
+        return {
+            dataSource: dataSourceName,
+            column,
+            charts,
+        };
+    }
+
     _columnRemoved(ds, col) {
-        const ids_to_delete = [];
+        const impact = this.analyzeColumnRemoval(ds.name, col);
+        const impactById = new Map(impact.charts.map((chartImpact) => [chartImpact.chartId, chartImpact]));
+        const idsToDelete = [];
+        const chartsToDelete = [];
         for (const id in this.charts) {
             const info = this.charts[id];
             if (info.dataSource === ds) {
                 const ch = info.chart;
-                const div = ch.getDiv();
-                const del = ch.onColumnRemoved(col);
+                const chartImpact = impactById.get(ch.config.id);
+                if (!chartImpact) {
+                    continue;
+                }
+                // Apply the same impact object that powered the confirmation
+                // dialog, so preview and execution cannot drift apart.
+                const del = ch.onColumnRemoved(col, chartImpact);
                 if (del) {
-                    div.remove(false);
-                    ids_to_delete.push(id);
-                    this._removeLinks(ch);
-                    this._callListeners("chart_removed", ch);
+                    idsToDelete.push(id);
+                    chartsToDelete.push(ch);
                 }
             }
         }
-        //onColumnRemoved will remove the chart if it contains
-        //data from the column, it will also remove the filter,
-        //but not call any listeners
-        if (ids_to_delete.length > 0) {
+
+        // Dispose/remove deleted charts before firing "filtered", otherwise
+        // stale reactions can render against already-removed column data.
+        for (const chart of chartsToDelete) {
+            chart.remove(false);
+            chart.getDiv().remove();
+            this._removeLinks(chart);
+            this._callListeners("chart_removed", chart);
+        }
+        if (idsToDelete.length > 0) {
             ds.dataStore._callListeners("filtered");
         }
-        for (const id of ids_to_delete) {
+        for (const id of idsToDelete) {
             delete this.charts[id];
         }
     }

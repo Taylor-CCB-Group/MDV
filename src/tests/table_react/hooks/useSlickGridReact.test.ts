@@ -19,7 +19,7 @@ vi.mock("@/react/hooks", () => ({
     useChartID: () => "test-chart-id",
     useTheme: () => "dark",
     useOrderedParamColumns: () => mockOrderedParamColumns,
-    useChartManager: () => ({ config: { permission: mockPermission } }),
+    useChartManager: () => mockChartManager,
 }));
 
 vi.mock("@/react/selectionHooks", () => ({
@@ -37,6 +37,7 @@ let mockOrderedParamColumns: LoadedDataColumn<DataType>[];
 let mockSortedIndices: Uint32Array;
 let mockHighlightedIndices: number[];
 let mockPermission: "edit" | "view";
+let mockChartManager: any;
 
 describe("useSlickGridReact", () => {
     beforeEach(() => {
@@ -73,6 +74,14 @@ describe("useSlickGridReact", () => {
         mockSortedIndices = new Uint32Array([0, 1, 2]);
         mockHighlightedIndices = [];
         mockPermission = "edit";
+        mockChartManager = {
+            config: { permission: mockPermission },
+            analyzeColumnRemoval: vi.fn(() => ({
+                dataSource: "test-ds",
+                column: "age",
+                charts: [],
+            })),
+        };
 
         // Setup mock config with observable properties
         mockConfig = observable({
@@ -97,6 +106,9 @@ describe("useSlickGridReact", () => {
         };
 
         mockChart = {
+            config: {
+                id: "test-chart-id",
+            },
             setAddColumnDialogOpener: vi.fn(),
             setGridRef: vi.fn(),
         };
@@ -277,6 +289,69 @@ describe("useSlickGridReact", () => {
             expect(mockDataStore.removeColumn).toHaveBeenCalledTimes(1);
         });
 
+        test("should open removal confirmation when another chart depends on the column", () => {
+            mockChartManager.analyzeColumnRemoval.mockReturnValue({
+                dataSource: "test-ds",
+                column: "age",
+                charts: [
+                    {
+                        chartId: "test-chart-id",
+                        chartTitle: "Current Table",
+                        chartType: "table_chart_react",
+                        isSourceChart: true,
+                        action: "update",
+                        reasons: [{ kind: "param.multi" }],
+                        paramSlotImpacts: [],
+                        nextParam: ["name"],
+                        clearColorBy: false,
+                        clearBackgroundFilter: false,
+                    },
+                    {
+                        chartId: "other-chart",
+                        chartTitle: "Other chart",
+                        chartType: "heat_map",
+                        isSourceChart: false,
+                        action: "delete",
+                        reasons: [{ kind: "param.single" }],
+                        paramSlotImpacts: [],
+                        clearColorBy: false,
+                        clearBackgroundFilter: false,
+                    },
+                ],
+            });
+
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const mockGridInstance = createSlickGridMock();
+            const mockEvent = new CustomEvent("gridCreated", {
+                detail: mockGridInstance,
+            }) as any;
+
+            act(() => {
+                result.current.handleGridCreated(mockEvent);
+            });
+
+            const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
+            const headerMenuCall = pubSub.subscribe.mock.calls.find(
+                ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
+            );
+            const headerMenuHandler = headerMenuCall?.[1];
+
+            act(() => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+            });
+
+            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toEqual(
+                expect.objectContaining({
+                    columnName: "age",
+                }),
+            );
+        });
+
         test("should respect updated permissions in existing header menu handlers", () => {
             const { result, rerender } = renderHook(() => useSlickGridReact());
 
@@ -299,6 +374,7 @@ describe("useSlickGridReact", () => {
             const headerMenuHandler = headerMenuCall?.[1];
 
             mockPermission = "view";
+            mockChartManager.config.permission = "view";
             rerender();
 
             act(() => {
@@ -341,6 +417,60 @@ describe("useSlickGridReact", () => {
 
             expect(result.current.isFindReplaceOpen).toBe(false);
             expect(result.current.searchColumn).toBeNull();
+        });
+    });
+
+    describe("column removal dialog", () => {
+        test("should confirm a pending column removal", () => {
+            mockChartManager.analyzeColumnRemoval.mockReturnValue({
+                dataSource: "test-ds",
+                column: "age",
+                charts: [
+                    {
+                        chartId: "other-chart",
+                        chartTitle: "Other chart",
+                        chartType: "heat_map",
+                        isSourceChart: false,
+                        action: "update",
+                        reasons: [{ kind: "param.multi" }],
+                        paramSlotImpacts: [],
+                        nextParam: ["name"],
+                        clearColorBy: false,
+                        clearBackgroundFilter: false,
+                    },
+                ],
+            });
+
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const mockGridInstance = createSlickGridMock();
+            const mockEvent = new CustomEvent("gridCreated", {
+                detail: mockGridInstance,
+            }) as any;
+
+            act(() => {
+                result.current.handleGridCreated(mockEvent);
+            });
+
+            const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
+            const headerMenuCall = pubSub.subscribe.mock.calls.find(
+                ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
+            );
+            const headerMenuHandler = headerMenuCall?.[1];
+
+            act(() => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+            });
+
+            act(() => {
+                result.current.confirmColumnRemoval();
+            });
+
+            expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
+            expect(result.current.pendingColumnRemoval).toBeNull();
         });
     });
 
