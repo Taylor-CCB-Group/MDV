@@ -115,28 +115,35 @@ class RowSummaryBox extends BaseChart {
             return super.onColumnRemoved(column, impact);
         }
         if (!Array.isArray(this.config.param)) {
-            return false;
+            return super.onColumnRemoved(column, impact);
         }
 
         const currentParam = this.config.param;
         const removedIndex = currentParam.indexOf(column);
-        if (removedIndex === -1) {
-            return false;
-        }
+        const nextParam =
+            impact?.nextParam ?? currentParam.filter((field) => field !== column);
         // The image key is stored by param index, so removing that field is not
         // safely prunable; the chart must be deleted instead.
         if (this.config.image && this.config.image.param === removedIndex) {
             return true;
         }
-        if (!impact?.nextParam) {
-            return false;
-        }
-
-        this.config.param = impact.nextParam;
-        if (this.config.image && this.config.image.param > removedIndex) {
+        if (removedIndex !== -1 && this.config.image && this.config.image.param > removedIndex) {
             this.config.image.param -= 1;
         }
-        if (this.img_data && this.config.image) {
+
+        const didDelete = super.onColumnRemoved(column, {
+            ...impact,
+            action: "update",
+            nextParam,
+        });
+        if (didDelete) {
+            return true;
+        }
+
+        if (removedIndex === -1) {
+            return false;
+        }
+        if (this.img_data && this.config.image && Array.isArray(this.config.param)) {
             this.img_data.key_column = this.config.param[this.config.image.param];
         }
 

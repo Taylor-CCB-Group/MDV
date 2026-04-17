@@ -667,12 +667,6 @@ class BaseChart<T extends BaseConfig> {
             return true;
         }
 
-        // Most chart types only need the shared cleanup below; only charts with
-        // extra local state override `onColumnRemoved`.
-        if (impact.nextParam) {
-            this.setParams(impact.nextParam);
-        }
-
         if (impact.clearColorBy && this.config.color_by) {
             this.config.color_by = undefined;
             this.colorByDefault?.();
@@ -699,6 +693,12 @@ class BaseChart<T extends BaseConfig> {
 
         if (impact.configEntryUpdates) {
             Object.assign(this.config, impact.configEntryUpdates);
+        }
+
+        // Most chart types only need the shared cleanup above; only charts with
+        // extra local state override `onColumnRemoved`.
+        if (impact.nextParam) {
+            this.setParams(impact.nextParam);
         }
         return false;
     }

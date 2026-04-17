@@ -3,6 +3,7 @@ import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import type DataStore from "@/datastore/DataStore";
+import { flattenFields } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
 import type { ChartColumnImpact } from "@/charts/columnRemovalUtils";
 
@@ -62,24 +63,61 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         if (impact?.action === "delete") {
             return super.onColumnRemoved(column, impact);
         }
-        const nextParam = impact?.nextParam;
-        if (!nextParam) {
+        const currentParam = Array.isArray(this.config.param) ? this.config.param : [];
+        const nextParam =
+            impact?.nextParam ?? currentParam.filter((field) => !flattenFields(field).includes(column));
+        const nextFieldSet = new Set(nextParam.flatMap((field) => flattenFields(field)));
+        const removedFields = currentParam
+            .flatMap((field) => flattenFields(field))
+            .filter((field) => !nextFieldSet.has(field));
+
+        const chartImpact: ChartColumnImpact = impact ?? {
+            chartId: this.config.id,
+            chartTitle: this.config.title,
+            chartType: this.config.type,
+            chartTypeLabel: BaseChart.types[this.config.type]?.name ?? this.config.type,
+            isSourceChart: false,
+            action: "update",
+            reasons: [],
+            paramSlotImpacts: [],
+            nextParam,
+            clearColorBy: false,
+            clearBackgroundFilter: false,
+        };
+
+        const didDelete = super.onColumnRemoved(column, {
+            ...chartImpact,
+            action: "update",
+            nextParam,
+        });
+        if (didDelete) {
+            return true;
+        }
+        if (removedFields.length === 0) {
             return false;
         }
 
         action(() => {
             // The shared analyzer has already decided that this chart survives;
             // this override just keeps filter/order state aligned with pruned params.
-            this.config.param = nextParam;
-            delete this.config.filters[column];
+            for (const field of removedFields) {
+                delete this.config.filters[field];
+            }
 
             const nextOrder = { ...(this.config.order ?? {}) };
-            const removedOrder = nextOrder[column];
-            delete nextOrder[column];
-            if (removedOrder !== undefined) {
+            const removedOrders = removedFields
+                .map((field) => nextOrder[field])
+                .filter((order): order is number => order !== undefined)
+                .sort((a, b) => a - b);
+            for (const field of removedFields) {
+                delete nextOrder[field];
+            }
+            if (removedOrders.length > 0) {
                 for (const field in nextOrder) {
-                    if (nextOrder[field] > removedOrder) {
-                        nextOrder[field] -= 1;
+                    const currentOrder = nextOrder[field];
+                    const shift = removedOrders.filter((order) => order < currentOrder).length;
+                    if (shift > 0) {
+                        nextOrder[field] -= shift;
                     }
                 }
             }

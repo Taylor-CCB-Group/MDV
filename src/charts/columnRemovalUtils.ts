@@ -109,7 +109,7 @@ function getColorField(config: BaseConfig): string | undefined {
 
 function getParamLayouts(
     param: FieldSpecs | undefined,
-    chartType: Pick<ChartType<BaseConfig>, "params"> | undefined,
+    chartType: (Pick<ChartType<BaseConfig>, "params"> & { name?: string }) | undefined,
 ): ParamLayoutSlot[] {
     const currentParam =
         param == null ? [] : Array.isArray(param) ? param : [param];
@@ -168,11 +168,9 @@ function getParamLayouts(
         ];
     }
 
-    return currentParam.map((entry, index) => ({
-        mode: "single",
-        paramIndex: index,
-        entries: [entry],
-    }));
+    throw new Error(
+        `Unsupported column-removal param layout for '${chartType?.name ?? "unknown chart"}': multi-column params must be first or last.`,
+    );
 }
 
 function getTooltipUpdate(config: BaseConfig, column: string): TooltipRemovalUpdate | undefined {
@@ -232,7 +230,6 @@ export function analyzeChartColumnImpact(
                 remainingFields: 0,
             });
             action = "delete";
-            nextParamSlots.push(slot);
             continue;
         }
 
