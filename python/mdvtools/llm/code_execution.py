@@ -1,3 +1,9 @@
+"""
+ChatMDV execution layer: runs generated Python in a subprocess.
+
+This module is part of the ChatMDV boundary (see CHATMDV_BOUNDARY.md). It should surface
+actionable diagnostics when subprocess execution fails, without changing core MDV data APIs.
+"""
 import subprocess
 import warnings
 import tempfile
@@ -88,11 +94,20 @@ def run_subprocess(command: list[str]) -> tuple[str | None, str]:
         )
         return result.stdout.decode(), result.stderr.decode()
     except subprocess.CalledProcessError as e:
-        # Handle subprocess errors
+        # Handle subprocess errors (include returncode and previews; stderr may be empty e.g. SIGKILL)
         print(f"Subprocess error: {e}")
         print(f"Standard Output: {e.stdout}")
         print(f"Standard Error: {e.stderr}")
-        return None, e.stderr.decode()
+        decoded_out = e.stdout.decode(errors="replace") if e.stdout else ""
+        decoded_err = e.stderr.decode(errors="replace") if e.stderr else ""
+        diagnostic = (
+            f"Subprocess failed with returncode={e.returncode}. "
+            f"stdout_preview={decoded_out[:400]!r}. "
+            f"stderr_preview={decoded_err[:400]!r}"
+        )
+        if decoded_err:
+            diagnostic = f"{diagnostic}\n{decoded_err}"
+        return None, diagnostic
     except Exception as e:
         # Handle other exceptions
         print(f"General error: {e}")

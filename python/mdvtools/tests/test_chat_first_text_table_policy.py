@@ -38,6 +38,33 @@ def test_prompt_includes_chat_first_text_table_policy(monkeypatch):
     assert "Chat-first textual/table outputs" in prompt
     assert "Do NOT create `TextBox` or `TablePlot` by default" in prompt
     assert "Do not add a selection dialog unconditionally." in prompt
+    assert "Feature table field compatibility" in prompt
+    assert "Field ID" in prompt
+    assert "Marker genes and missing columns" in prompt
+    assert "Visualization vs analysis consistency" in prompt
+    assert "Single source of truth" in prompt
+
+
+def test_prompt_includes_marker_gene_policy_with_h5ad(monkeypatch):
+    fake_roles = SimpleNamespace(
+        expressions=[],
+        obs_datasource="cells",
+    )
+
+    monkeypatch.setattr(templates, "infer_datasource_roles", lambda _project: fake_roles)
+    monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
+
+    prompt = templates.get_createproject_prompt_RAG(
+        project=_FakeProject(),
+        path_to_data="/project/scanpy_data.h5ad",
+        datasource_name="cells",
+        final_answer='fields "leiden"\ncharts "Table Plot"',
+        question="top 5 marker genes per cluster",
+    )
+
+    assert "rank_genes_groups" in prompt
+    assert "Marker genes and missing columns" in prompt
+    assert "Visualization vs analysis consistency" in prompt
 
 
 def test_verification_uses_response_wording_not_view_wording():

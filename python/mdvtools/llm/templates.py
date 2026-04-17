@@ -1,30 +1,33 @@
 from mdvtools.mdvproject import MDVProject
 from typing import Any
 from mdvtools.markdown_utils import create_project_markdown, create_column_markdown
-from mdvtools.llm.datasource_roles import infer_datasource_roles
+from mdvtools.llm.datasource_roles import (
+    infer_datasource_roles,
+    format_feature_table_field_policy,
+    format_marker_gene_scanpy_fallback_policy,
+    format_visualization_consistency_policy,
+)
 prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
 2. Use only the two DataFrames provided:
    - df1: observation/metadata table (e.g. cells)
-   - df2: linked feature table for wrapper-based expression (e.g. rna/protein), containing a feature name column (typically 'name')
+   - df2: linked feature table for wrapper-based expression (e.g. rna/genes/protein). The gene/feature label column may be `name`, `gene_ids`, or another id — inspect `df2.columns`; do not assume `name` unless present.
 3. Column selection logic:
    - For non-expression queries: select columns from df1 only. Inspect df1, using df1.columns
    - For expression-related queries (e.g., expression of a gene/protein, comparison of features, highest expressing features):
-       a. Use ONLY feature names from df2["name"] — do NOT use other columns unless explicitly instructed.
-       b. If a specific feature is mentioned by the user, check if it exists in df2["name"].
-           - If it does not exist, assume the user provided a gene name and that df2["name"] may contain gene IDs instead.
-                - Attempt to match the user-provided gene name to the corresponding gene ID using any available mapping logic (e.g., a lookup function or mapping dictionary).
-                - If a corresponding gene ID is found in df2["name"], return that value.
-           - If it exists, return it.
-           - If no match is found, ignore the requested gene and instead select one or more gene names from df2["name"].
-       c. If no feature is mentioned, select one or more feature names from df2["name"].
-       d. Only use values from df2["name"] — do NOT use any other columns from df2.
+       a. Resolve the feature-label column from `df2.columns` (see Datasource roles / name_column when available). Use ONLY values from that column for feature identifiers — do NOT use unrelated metadata columns unless explicitly instructed.
+       b. If a specific feature is mentioned by the user, check if it exists in that label column.
+           - If it does not exist, assume the user provided a synonym and the label column may use different ids (e.g. Ensembl). Attempt mapping or lookup within `df2` only.
+           - If a match is found, return that label value.
+           - If no match is found, ignore the requested gene and select from available labels in `df2`.
+       c. If no feature is mentioned, select one or more feature labels from `df2`.
+       d. Only use the resolved label column from df2 for feature strings — do not invent column names.
 4. Always return the list of required columns as a quoted comma-separated string, like:
    - "col1", "col2"
    - Or for expression-related: "col", "feature_name"   (make sure "col" is from df1) 
 5. For expression-related queries:
-   - Return both df1 columns and the selected feature name (from df2["name"]).
+   - Return both df1 columns and the selected feature name (from the resolved df2 label column).
    - Only return the name as a string (e.g., "gene_name")—do not wrap it.
 6. NEVER create new DataFrames or modify existing ones.
 7. Ensure that the selected columns match the visualization requirements:  
@@ -116,6 +119,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     except Exception:
         context_md = create_project_markdown(project)
     roles = infer_datasource_roles(project)
+    feature_field_policy = format_feature_table_field_policy(roles)
+    marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data)
+    viz_consistency_policy = format_visualization_consistency_policy()
     expr_lines = ""
     if roles.expressions:
         expr_lines = "\n".join(
@@ -145,6 +151,8 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             adata = sc.read_h5ad(data_path)
             data_frame_obs = adata.obs
             data_frame_var = adata.var.assign(name=adata.var_names.to_list())
+        - Exception: for **marker genes / top genes per cluster** when MDV tables lack needed columns, if `data_path`
+          is a `.h5ad` file, you SHOULD use `sc.read_h5ad` and Scanpy as described under "Marker genes" below.
         - OTHERWISE (no scanpy or no .h5ad):
             - DO NOT use scanpy.
             - Use the existing MDV datasources already registered in the project:
@@ -153,6 +161,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
 """+expr_lines+"""
             - Use `project.get_datasource_as_dataframe(<datasource_name>)` to load these tables, or
               `project.get_datasource_as_dataframe(<datasource_name>, columns=[...])` to load a subset. Each entry may be a metadata **field id** (e.g. cluster column on `cells`) or a **chart FieldName wrapper** string for expression columns on the **observation (row) datasource** (same format as chart `params`, e.g. `rna_expr|GENE(rna_expr)|12`). Do not pass wrappers to the feature-table datasource dataframe.
+
+        - Marker genes and missing columns (ChatMDV):
+"""+marker_gene_policy+"""
 
     3. Datasource Registration:
         - When modifying an existing project, DO NOT call project.add_datasource(...).
@@ -163,21 +174,27 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - The suggested columns and chart type are given by """+final_answer+"""
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
         - **Before** `project.set_view(...)`, print a concise text preview of any table, aggregate, or subset the charts depend on (for example `print(df_result.head(40).to_string())` or grouped top-N). Keep rows/columns bounded so the output stays readable; this stdout is shown in the chat window.
+        - **Before** `project.set_view(...)`, ensure saved charts use the **same data pipeline** as those printed previews (see "Visualization vs analysis consistency" below).
         - Set the view using `project.set_view(view_name, view_object)`
         - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`.
           To show a subset, either:
             (a) create a filtered datasource (only when creating a new project / adding a new datasource is allowed), or
             (b) include a `SelectionDialogPlot` so the user can filter interactively in the UI.
+        - Visualization vs analysis consistency (ChatMDV):
+"""+viz_consistency_policy+"""
 
     5. Parameter Handling:
         - The string """+final_answer+""" guides which columns and chart types to use.
         - **Critical:** For cell-level (obs) columns, each string in `params` must be the datasource **Field ID** exactly as shown in the Project Data Context tables (the **Field ID** column), NOT the display "Column Name" alone. MDV matches charts to data by internal `field` keys; display names may differ from field ids.
+        - **Same for feature/genes datasources:** charts such as RowSummaryBox or TablePlot on `genes` must use **Field ID** strings from the Project Data Context for that datasource (e.g. `gene_ids`), not guessed names like `name` unless listed.
         - If you copy from `data_frame_obs.columns`, prefer the MDV field id for that column from the context table when they differ.
+        - Feature table field compatibility (ChatMDV):
+"""+feature_field_policy+"""
         - For wrapper-based expression (rows-as-columns), DO NOT treat features as plain obs columns.
           Use the FieldName wrapper format:
             `"<subgroup>|<feature>(<subgroup>)|<index>"`
           where:
-            - `<feature>` comes from the feature table's `name_column` (often `name`)
+            - `<feature>` is a value from the feature table's label column (`name_column` from the link, e.g. `gene_ids` or `name` — match the project)
             - `<index>` is the row index of that feature in the feature table (0-based)
             - `<subgroup>` is a subgroup key from the rows-as-columns link (often something like `*_expr`)
         - Example (wrapper expression):
@@ -190,6 +207,8 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     6. Gene-Related Queries:
         - Only perform wrapper expression if you have a usable feature table for the modality (e.g. `rna`, `protein`) with its `name_column` and at least one subgroup key.
         - If none are available, proceed without wrapper expression and prefer non-expression charts.
+        - For marker / top-N gene requests, follow **section 2 "Marker genes and missing columns"** (cells vs `genes`, Scanpy when `.h5ad` available).
+        - When combining marker-gene results with charts, follow **section 4 "Visualization vs analysis consistency"** so the view matches Scanpy/MDV logic.
 
     7. Chat-first textual/table outputs:
         - For requests that primarily ask for textual summaries, mappings, rankings, annotations, or table-like listings,
@@ -213,7 +232,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Generate a valid Python script that creates and visualizes the appropriate chart using the MDVProject framework.
         - Update these variables with these values:
             - project_path = '"""+project.dir+"""'
-            - data_path = '"""+path_to_data+"""'  # may be empty; if empty or HAS_SCANPY is False, DO NOT use scanpy.
+            - data_path = '"""+path_to_data+"""'  # may be empty; if empty or HAS_SCANPY is False, DO NOT use scanpy except for marker-gene workflows when this path is a `.h5ad` file (see section 2).
             - view_name = a string, in double quotes, describing what is being visualized.
             - datasource_name = '"""+datasource_name+"""'
         - The possible charts are given by """+final_answer+""" and should follow the following visualisation guidelines for each type of chart:

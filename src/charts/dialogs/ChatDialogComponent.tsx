@@ -99,10 +99,38 @@ const SuggestedQuestions = ({ onSelect, suggestedQuestions }: { onSelect: (q: st
 const PREVIEW_COLLAPSE_LINES = 24;
 const PREVIEW_COLLAPSE_CHARS = 2000;
 
+/** Data preview: stay expanded unless output is extremely large. */
+const DATA_PREVIEW_COLLAPSE_LINES = 120;
+const DATA_PREVIEW_COLLAPSE_CHARS = 80_000;
+
 function previewShouldCollapse(content: string): boolean {
     return (
         content.length > PREVIEW_COLLAPSE_CHARS ||
         content.split('\n').length > PREVIEW_COLLAPSE_LINES
+    );
+}
+
+function previewShouldCollapseData(content: string): boolean {
+    return (
+        content.length > DATA_PREVIEW_COLLAPSE_CHARS ||
+        content.split('\n').length > DATA_PREVIEW_COLLAPSE_LINES
+    );
+}
+
+/** Pipe-style markdown table vs monospace tabular stdout (e.g. pandas to_string). */
+function dataPreviewLooksLikeMarkdownTable(content: string): boolean {
+    const t = content.trim();
+    return t.startsWith('|') || /^[^\n]*\|[^\n]*\n[-|\s:]{3,}/m.test(content);
+}
+
+function DataPreviewBody({ content }: { content: string }) {
+    if (dataPreviewLooksLikeMarkdownTable(content)) {
+        return <MessageMarkdown text={content} />;
+    }
+    return (
+        <pre className="mb-0 max-h-[70vh] overflow-auto font-mono text-xs leading-snug text-slate-900 whitespace-pre-wrap break-words md:text-sm dark:text-slate-100">
+            {content}
+        </pre>
     );
 }
 
@@ -124,11 +152,15 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
 ) {
     const isUser = sender === 'user';
     const [copied, setCopied] = useState(false);
-    const pythonSections = extractPythonSections(text);
+    const pythonSections = extractPythonSections(typeof text === 'string' ? text : '');
     try {
-        text = JSON.parse(text);
+        if (typeof text === 'string') {
+            text = JSON.parse(text);
+        }
     } catch (e) {
     }
+    const markdownContent =
+        typeof text === 'string' ? text : JSON.stringify(text, null, 2);
 
     const messageStyle = isUser ? 
         'bg-teal-200 self-end dark:bg-teal-900' :
@@ -142,10 +174,10 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
             isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />;
     const handleCopy = async () => {
         try {
-            const body = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
-            const parts: string[] = [body];
-            if (verification?.trim()) parts.push(verification.trim());
+            const parts: string[] = [];
             if (data_preview?.trim()) parts.push(data_preview.trim());
+            if (verification?.trim()) parts.push(verification.trim());
+            if (markdownContent) parts.push(markdownContent);
             await navigator.clipboard.writeText(parts.join('\n\n---\n\n'));
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -173,7 +205,13 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                         )}
                     </IconButton>
                 )}
-                <MessageMarkdown text={text} />
+                {sender === 'bot' && !error && data_preview?.trim() && (
+                    <ChatPreviewBlock
+                        variant="data"
+                        title="Data preview (script output)"
+                        content={data_preview.trim()}
+                    />
+                )}
                 {sender === 'bot' && !error && verification?.trim() && (
                     <ChatPreviewBlock
                         title="What you can verify"
@@ -181,13 +219,28 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                         defaultExpandedWhenLong
                     />
                 )}
-                {sender === 'bot' && !error && data_preview?.trim() && (
-                    <ChatPreviewBlock title="Data preview (script output)" content={data_preview.trim()} />
+                {sender === 'bot' && !error && (data_preview?.trim() || verification?.trim()) ? (
+                    <Accordion
+                        defaultExpanded={false}
+                        disableGutters
+                        className="mt-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-slate-50/80 dark:bg-slate-900/40 before:hidden"
+                    >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
+                            <Typography component="span" variant="body2" className="font-semibold">
+                                Explanation and generated code
+                            </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails className="pt-0">
+                            <MessageMarkdown text={markdownContent} />
+                        </AccordionDetails>
+                    </Accordion>
+                ) : (
+                    <MessageMarkdown text={markdownContent} />
                 )}
                 {view && sender === 'bot' && !error && (
                     <Box sx={{ mt: 2 }}>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                            Review the generated code and the verification summaries above, then open the view.
+                            Review the data preview and verification above, then open the view.
                         </Typography>
                         <Button
                             variant="contained"
@@ -329,35 +382,38 @@ const ChatPreviewBlock = ({
     title,
     content,
     defaultExpandedWhenLong,
+    variant = 'default',
 }: {
     title: string;
     content: string;
     /** When content is long, start expanded so users see verification before scrolling to the button. */
     defaultExpandedWhenLong?: boolean;
+    /** Script stdout: prefer expanded, monospace tabular unless extremely large. */
+    variant?: 'default' | 'data';
 }) => {
-    const collapse = previewShouldCollapse(content);
+    const isData = variant === 'data';
+    const collapse = isData ? previewShouldCollapseData(content) : previewShouldCollapse(content);
+    const body = isData ? <DataPreviewBody content={content} /> : <MessageMarkdown text={content} />;
     if (!collapse) {
         return (
-            <div className="mb-3 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-slate-100/80 dark:bg-slate-900/60">
-                <div className="font-semibold mb-2 text-sm">{title}</div>
-                <MessageMarkdown text={content} />
+            <div className="mb-3 rounded-lg border border-gray-300 bg-slate-100/80 p-3 dark:border-gray-600 dark:bg-slate-900/60">
+                <div className="mb-2 text-sm font-semibold">{title}</div>
+                {body}
             </div>
         );
     }
     return (
         <Accordion
-            defaultExpanded={Boolean(defaultExpandedWhenLong)}
+            defaultExpanded={isData ? true : Boolean(defaultExpandedWhenLong)}
             disableGutters
-            className="mb-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-slate-100/80 dark:bg-slate-900/60 before:hidden"
+            className="mb-3 rounded-lg border border-gray-300 bg-slate-100/80 dark:border-gray-600 dark:bg-slate-900/60 before:hidden"
         >
             <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
                 <Typography component="span" variant="body2" className="font-semibold">
                     {title}
                 </Typography>
             </AccordionSummary>
-            <AccordionDetails className="pt-0">
-                <MessageMarkdown text={content} />
-            </AccordionDetails>
+            <AccordionDetails className="max-h-[80vh] overflow-auto pt-0">{body}</AccordionDetails>
         </Accordion>
     );
 };

@@ -355,6 +355,11 @@ class ProjectChat(ProjectChatProtocol):
                     "\n\nDatasource roles:\n"
                     f"- df1 maps to obs datasource '{roles.obs_datasource}'\n"
                     f"{expr_lines}\n"
+                    "- For any chart `params` on the feature table (df2), use **Field ID** strings from "
+                    "`df2.columns` / project metadata (e.g. `gene_ids`), not assumed `name`.\n"
+                    "- Do not pair Scanpy-computed summary tables with MDV wrapper-based expression charts for the "
+                    "same metric unless values are guaranteed identical; prefer one pipeline (see ChatMDV viz consistency "
+                    "in RAG).\n"
                 )
         except Exception:
             role_hint = ""

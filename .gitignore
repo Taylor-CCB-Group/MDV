@@ -78,3 +78,5 @@ tests_playwright/test-data/temp/
 /scripts/schemas/datasources-array-schema.json
 /python/mdvtools/llm/structured_schemas.py
 /scripts/python/mdvtools/llm/structured_schemas.py
+
+.cursor/

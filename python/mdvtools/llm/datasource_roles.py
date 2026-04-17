@@ -110,3 +110,81 @@ def infer_datasource_roles(project: Any) -> InferredDatasourceRoles:
 
     return InferredDatasourceRoles(obs_datasource=obs, expressions=expressions)
 
+
+def format_feature_table_field_policy(roles: InferredDatasourceRoles) -> str:
+    """
+    Prompt text for RAG: use actual feature-table field ids and name_column from metadata.
+
+    Avoids assuming a pandas column literally named ``name`` (many projects use ``gene_ids`` etc.).
+    """
+    if not roles.expressions:
+        return (
+            "- Feature-table gene labels: inspect `df2.columns` and the Project Data Context **Field ID** "
+            "for each feature datasource. Do not assume a column named `name` unless it appears in `df2` "
+            "and in the context table."
+        )
+    lines: list[str] = []
+    for e in roles.expressions:
+        lines.append(
+            f"- For feature datasource `{e.datasource_name}`, the rows-as-columns link declares "
+            f"`name_column`=`{e.name_column}`. Use that column for feature labels in code and the **same Field ID** "
+            f"in chart ``params`` (e.g. RowSummaryBox on `genes`). Do not substitute `name` unless it matches."
+        )
+    return "\n".join(lines)
+
+
+def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
+    """
+    Prompt text: marker-gene requests must not assume cluster/DE columns exist on the ``genes`` table.
+
+    When a ``.h5ad`` path is available, prefer computing markers in Scanpy and printing to chat.
+    """
+    p = (path_to_data or "").strip()
+    has_h5ad = bool(p) and p.lower().endswith(".h5ad")
+
+    semantic = (
+        "- **Marker genes / top genes per cluster:** Cluster labels (e.g. `leiden`, `final_analysis`) live on the "
+        "**observation (cells)** datasource or `adata.obs`, not on the **genes** feature table. Per-gene DE stats "
+        "(e.g. `dge_mean_diff`) may exist on `genes` *only if* listed in Project Data Context for that datasource.\n"
+        "- **Never** assert that `genes` contains `leiden` or other cell-level columns. Do not `raise ValueError` "
+        "requiring columns that are not present in `project.get_datasource_as_dataframe('genes').columns` / context.\n"
+    )
+
+    if has_h5ad:
+        return (
+            semantic
+            + "- If the MDV `genes` table lacks columns needed for ranking (or you need full expression), and "
+            "`data_path` is a `.h5ad` file: load `adata = sc.read_h5ad(data_path)`, pick the cluster column from "
+            "`adata.obs.columns`, then compute markers with Scanpy (e.g. `sc.tl.rank_genes_groups` with "
+            "`groupby=<cluster_key>`, or mean expression per group). Print a **bounded** table (top 5 per cluster) "
+            "via `print(...)` as the primary answer. Prefer this path over failing on missing MDV columns.\n"
+            + "- When using AnnData for markers, you may still load `MDVProject(project_path)` read-only for context; "
+            "do not call `project.add_datasource` unless explicitly creating a new project.\n"
+        )
+
+    return (
+        semantic
+        + "- If there is **no** `.h5ad` at `data_path`, compute from MDV only: use **cells** for cluster ids and "
+        "expression via row-datasource wrappers or bulk reads; do not require DE columns on `genes` unless they exist.\n"
+    )
+
+
+def format_visualization_consistency_policy() -> str:
+    """
+    Prompt text: charts must reflect the same pipeline as printed tables (no Scanpy stdout + unrelated MDV wrappers).
+    """
+    return (
+        "- **Single source of truth:** Any chart in `project.set_view(...)` must reflect the **same** quantitative "
+        "pipeline as tables or summaries you `print(...)` in this script—not a second independent computation unless "
+        "you state they are equivalent.\n"
+        "- **Scanpy / AnnData primary:** If results come from `adata` (e.g. `sc.tl.rank_genes_groups`, means from "
+        "`adata[...].X`), **do not** default to HeatmapPlot/DotPlot built only from **wrapper** `params` "
+        "(`<subgroup>|<gene>(<subgroup>)|<index>`) to show “the same” figure—wrappers read the MDV project matrix, "
+        "which may differ from the `.h5ad` used in Scanpy.\n"
+        "- **Preferred instead:** bounded `print(...)` of the Scanpy/pandas result; optional `TablePlot`/`TextBox` "
+        "from the **same** `DataFrame`; or charts using **only** MDV datasources/wrappers end-to-end with no parallel "
+        "Scanpy table for the same visualization.\n"
+        "- **Avoid by default:** pairing Scanpy-printed marker or expression tables with a separate wrapper-based "
+        "expression heatmap that is not explicitly derived from the same array you printed.\n"
+    )
+
