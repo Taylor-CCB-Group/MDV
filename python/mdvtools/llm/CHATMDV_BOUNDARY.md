@@ -17,6 +17,7 @@ Chat-generated behavior (prompting, code policy, execution wrappers, verificatio
 
 - [`python/mdvtools/tests/test_chat_first_text_table_policy.py`](../tests/test_chat_first_text_table_policy.py)
 - [`python/mdvtools/tests/test_datasource_roles.py`](../tests/test_datasource_roles.py)
+- [`python/mdvtools/tests/test_column_field_resolve.py`](../tests/test_column_field_resolve.py)
 - [`python/mdvtools/tests/test_code_execution.py`](../tests/test_code_execution.py)
 
 Add new ChatMDV policy tests here rather than spreading across unrelated test files.
@@ -31,7 +32,11 @@ If the UI errors on a bad chart `param` (e.g. wrong field id), **fix prompts / f
 
 **Marker genes / missing DE columns:** Use `format_marker_gene_scanpy_fallback_policy()` in [`datasource_roles.py`](datasource_roles.py) and the RAG text in [`templates.py`](templates.py). When a `.h5ad` exists at `data_path`, the model should compute markers in Scanpy and print to chat instead of asserting cell-level columns on the `genes` datasource.
 
+**Table charts vs chat-only (cells):** Use `format_obs_table_chart_param_policy()` in [`datasource_roles.py`](datasource_roles.py). Chart `param` tokens must be Field IDs on **that** datasource (e.g. do not use `genes`-table `gene_ids` on a chart bound to `cells`). For top-marker Scanpy tables, default to **bounded `print(...)`**—not `table_chart`—unless those columns already exist on the target datasource. Optional post-save validation may drop charts whose `param` tokens still do not resolve—see [`column_field_resolve.py`](column_field_resolve.py).
+
 **Visualization vs analysis consistency:** Use `format_visualization_consistency_policy()` in [`datasource_roles.py`](datasource_roles.py). Saved MDV charts must reflect the same pipeline as printed tables—do not mix Scanpy/AnnData outputs with unrelated wrapper-based expression heatmaps for the same quantitative claim.
+
+**`rank_genes_groups` vs DotPlot/Heatmap on `cells`:** Use `format_marker_ranking_viz_policy()` and `CHAT_RANK_GENES_DATASOURCE_NAME` in [`datasource_roles.py`](datasource_roles.py). Do not use wrapper-based DotPlot or Heatmap on the **observation** datasource as a substitute for the full Scanpy marker **statistics table**. Prefer **bounded `print`**, or persist the long-format `DataFrame` with `add_datasource('chat_rank_genes_result', ..., replace_data=True, add_to_view=...)`; avoid `set_view` that overwrites `initialCharts` and drops the scratch table.
 
 ## Pre-merge drift check
 

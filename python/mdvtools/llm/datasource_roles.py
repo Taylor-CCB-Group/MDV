@@ -133,6 +133,80 @@ def format_feature_table_field_policy(roles: InferredDatasourceRoles) -> str:
     return "\n".join(lines)
 
 
+# Conventional datasource name for ChatMDV-persisted Scanpy marker tables (long format).
+CHAT_RANK_GENES_DATASOURCE_NAME = "chat_rank_genes_result"
+
+
+def format_marker_ranking_viz_policy() -> str:
+    """
+    Prompt text: do not use DotPlot/Heatmap on ``cells`` as a stand-in for ``rank_genes_groups``; optional scratch DS.
+
+    Wrapper charts on the observation datasource read the MDV matrix—they cannot reproduce the full per-cluster
+    statistics table from Scanpy and often show wrong gene or cluster counts.
+    """
+    ds = CHAT_RANK_GENES_DATASOURCE_NAME
+    # One complete call block so the model does not emit a dangling `'chat_rank_genes_result',` line (IndentationError).
+    example_block = (
+        "\n  ```python\n"
+        "  project.add_datasource(\n"
+        f'      "{ds}",\n'
+        "      marker_df,\n"
+        "      replace_data=True,\n"
+        "      add_to_view=view_name,\n"
+        "  )\n"
+        "  ```\n"
+    )
+    return (
+        "- **`rank_genes_groups` vs DotPlot / Heatmap on `cells`:** If the primary answer is a **Scanpy marker table** "
+        "(`sc.tl.rank_genes_groups`, `adata.uns['rank_genes_groups']`, or the same printed long-format `DataFrame`), "
+        "**do not** add **DotPlot**, **Heatmap**, or other **wrapper-`param` expression charts** on **`cells`** to "
+        "represent that table—those charts use the **MDV** expression matrix and a **subset** of genes; they are **not** "
+        "the ranked statistics (scores, p-values, all top-N per cluster) and often show **wrong** gene or cluster counts.\n"
+        "- **Still allowed:** DotPlot / Heatmap on `cells` for **user-named genes** or exploratory expression when you "
+        "are **not** claiming the chart equals the full `rank_genes_groups` output.\n"
+        "- **Interpretation / cell-type questions:** Prefer **print + markdown** without `add_datasource` unless the user "
+        "clearly needs the marker table **in the saved project view** (see section 7 \"Precedence vs marker persistence\").\n"
+        "- **In-view table (optional):** persist the printed long-format `DataFrame` with **one** complete call—either "
+        f"the single line `project.add_datasource('{ds}', marker_df, replace_data=True, add_to_view=view_name)` "
+        "or the multi-line form below. Column names become field ids; a default table is attached. **Do not** then call "
+        "`set_view` with a **new** `initialCharts` dict that **drops** this datasource—merge with "
+        "`project.get_view(view_name)` if you add charts, or rely on `add_datasource` alone."
+        + example_block
+        + "- **Syntax guard:** **Never** output a **fragment** such as a lone line `'"
+        + ds
+        + "',` or any indented line that is only a string and comma—**that causes `IndentationError`**. Omit "
+        "`add_datasource` entirely if you are not using it.\n"
+        "- **Print-only view:** If you do not add that datasource, **do not** add a wrapper DotPlot/Heatmap on `cells` for "
+        "the marker table; you may call `set_view` with an **empty** `initialCharts` mapping or omit `set_view` after "
+        "printing.\n"
+    )
+
+
+def format_obs_table_chart_param_policy() -> str:
+    """
+    Prompt text: chart ``param`` strings must match Field IDs per datasource; Scanpy marker tables default to chat stdout.
+
+    For marker tables: do not invent ``cells`` field ids; optional in-view copy via ``add_datasource`` to
+    ``CHAT_RANK_GENES_DATASOURCE_NAME`` (see body). Avoid ad-hoc ``set_column`` on ``cells`` for long-format marker output.
+    """
+    ds = CHAT_RANK_GENES_DATASOURCE_NAME
+    return (
+        "- **Table chart / TablePlot and `params`:** Each string in `params` must be a **Field ID** listed in Project "
+        "Data Context for **the same datasource** as the chart (the key under `initialCharts`, e.g. `cells`). "
+        "Field IDs are per datasource: a column like `gene_ids` on the **`genes`** datasource is **not** valid as a "
+        "`param` on a chart bound to **`cells`** unless `cells` also lists that Field ID.\n"
+        "- **Scanpy column names on `cells`:** Names from `rank_genes_groups` or `DataFrame.columns` (e.g. `gene`, `score`) "
+        "do **not** automatically exist on `cells`. Do **not** put those into `table_chart` **on `cells`** unless listed "
+        "in context.\n"
+        f"- **Scratch marker table datasource:** After `add_datasource('{ds}', marker_df, ...)`, charts under "
+        f"`initialCharts['{ds}']` use field ids from that `DataFrame`—that is the supported in-view table path.\n"
+        "- **Otherwise:** Show the table with **bounded `print(...)`**. If you do not use `add_datasource`, do **not** add "
+        "`table_chart` on `cells` with guessed column names.\n"
+        "- **Rare:** `project.set_column(...)` on `cells` only for **one value per observation row** aligned with `cells`—"
+        "not for long-format marker tables.\n"
+    )
+
+
 def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
     """
     Prompt text: marker-gene requests must not assume cluster/DE columns exist on the ``genes`` table.
@@ -148,8 +222,13 @@ def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
         "(e.g. `dge_mean_diff`) may exist on `genes` *only if* listed in Project Data Context for that datasource.\n"
         "- **Never** assert that `genes` contains `leiden` or other cell-level columns. Do not `raise ValueError` "
         "requiring columns that are not present in `project.get_datasource_as_dataframe('genes').columns` / context.\n"
+        "- **Do not** save a `table_chart`/`TablePlot` on `cells` using Scanpy marker `DataFrame` column names unless "
+        "those exact Field IDs exist on `cells` in Project Data Context. **Primary** answer: **bounded `print(...)`** in "
+        "chat; use **`add_datasource('chat_rank_genes_result', ...)`** only when an **in-view** copy of that table is "
+        "appropriate (see sections 3 and 7 and \"Marker ranking vs DotPlot\").\n"
     )
 
+    ds = CHAT_RANK_GENES_DATASOURCE_NAME
     if has_h5ad:
         return (
             semantic
@@ -157,15 +236,21 @@ def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
             "`data_path` is a `.h5ad` file: load `adata = sc.read_h5ad(data_path)`, pick the cluster column from "
             "`adata.obs.columns`, then compute markers with Scanpy (e.g. `sc.tl.rank_genes_groups` with "
             "`groupby=<cluster_key>`, or mean expression per group). Print a **bounded** table (top 5 per cluster) "
-            "via `print(...)` as the primary answer. Prefer this path over failing on missing MDV columns.\n"
-            + "- When using AnnData for markers, you may still load `MDVProject(project_path)` read-only for context; "
-            "do not call `project.add_datasource` unless explicitly creating a new project.\n"
+            "via `print(...)` as the **primary** answer.\n"
+            + "- **In-view table (optional):** When the user clearly needs the marker table **in the saved view**, you may "
+            "call "
+            f"`project.add_datasource('{ds}', marker_df, replace_data=True, add_to_view=view_name)` "
+            f"to persist the long-format marker `DataFrame` under the conventional name `{ds}` (see \"Marker ranking vs "
+            "DotPlot\" in Parameter Handling). **Do not** add other arbitrary datasources.\n"
+            + "- When using AnnData for markers, load `MDVProject(project_path)` for context; `add_datasource` is **only** "
+            f"allowed for that `{ds}` marker table when needed—not for unrelated uploads.\n"
         )
 
     return (
         semantic
         + "- If there is **no** `.h5ad` at `data_path`, compute from MDV only: use **cells** for cluster ids and "
-        "expression via row-datasource wrappers or bulk reads; do not require DE columns on `genes` unless they exist.\n"
+        "expression via row-datasource wrappers or bulk reads; do not require DE columns on `genes` unless they exist. "
+        "For marker listings, prefer **bounded `print(...)`** over a `table_chart` with guessed column names.\n"
     )
 
 
@@ -181,6 +266,8 @@ def format_visualization_consistency_policy() -> str:
         "`adata[...].X`), **do not** default to HeatmapPlot/DotPlot built only from **wrapper** `params` "
         "(`<subgroup>|<gene>(<subgroup>)|<index>`) to show “the same” figure—wrappers read the MDV project matrix, "
         "which may differ from the `.h5ad` used in Scanpy.\n"
+        "- **`rank_genes_groups` tables:** Do not use DotPlot/Heatmap on `cells` with wrappers as a substitute for the "
+        "full printed marker statistics table; see \"Marker ranking vs DotPlot\" under Parameter Handling.\n"
         "- **Preferred instead:** bounded `print(...)` of the Scanpy/pandas result; optional `TablePlot`/`TextBox` "
         "from the **same** `DataFrame`; or charts using **only** MDV datasources/wrappers end-to-end with no parallel "
         "Scanpy table for the same visualization.\n"

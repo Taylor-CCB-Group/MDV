@@ -36,6 +36,12 @@ def test_prompt_includes_chat_first_text_table_policy(monkeypatch):
     )
 
     assert "Chat-first textual/table outputs" in prompt
+    assert "Precedence vs marker persistence" in prompt
+    assert "interpretation" in prompt.lower()
+    assert "**narrow** ChatMDV" in prompt or "narrow** ChatMDV" in prompt
+    assert "chat_rank_genes_result" in prompt
+    assert "decide **whether** a saved-view chart is needed" in prompt
+    assert "print/markdown-only" in prompt
     assert "Do NOT create `TextBox` or `TablePlot` by default" in prompt
     assert "Do not add a selection dialog unconditionally." in prompt
     assert "Feature table field compatibility" in prompt
@@ -43,6 +49,7 @@ def test_prompt_includes_chat_first_text_table_policy(monkeypatch):
     assert "Marker genes and missing columns" in prompt
     assert "Visualization vs analysis consistency" in prompt
     assert "Single source of truth" in prompt
+    assert "Marker ranking vs DotPlot" in prompt
 
 
 def test_prompt_includes_marker_gene_policy_with_h5ad(monkeypatch):

@@ -33,8 +33,8 @@ sys.exit(1)"""
     assert not ok, "expected error"
     # The current implementation of run_subprocess returns None for stdout on error.
     assert stdout is None
-    # sys.exit(1) does not write to stderr.
-    assert stderr == ""
+    assert "Failed Python source" in stderr
+    assert code_returns_error in stderr
 
 
 def test_raises_exception():

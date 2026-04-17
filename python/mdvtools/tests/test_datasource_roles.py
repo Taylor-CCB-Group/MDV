@@ -1,6 +1,11 @@
+import inspect
+
 from mdvtools.llm.datasource_roles import (
+    CHAT_RANK_GENES_DATASOURCE_NAME,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
+    format_marker_ranking_viz_policy,
+    format_obs_table_chart_param_policy,
     format_visualization_consistency_policy,
     infer_datasource_roles,
 )
@@ -68,6 +73,31 @@ def test_format_visualization_consistency_policy():
     assert "Single source of truth" in text
     assert "Scanpy" in text or "AnnData" in text
     assert "wrapper" in text.lower()
+    assert "rank_genes_groups" in text
+
+
+def test_format_obs_table_chart_param_policy():
+    doc = inspect.getdoc(format_obs_table_chart_param_policy)
+    assert doc is not None
+    assert "CHAT_RANK_GENES_DATASOURCE_NAME" in doc or "chat stdout" in doc.lower()
+    assert "avoid persisting extra datasources" not in doc.lower()
+
+    text = format_obs_table_chart_param_policy()
+    assert "Field ID" in text
+    assert "cells" in text
+    assert "print" in text.lower() or "`print" in text
+    assert CHAT_RANK_GENES_DATASOURCE_NAME in text
+
+
+def test_format_marker_ranking_viz_policy():
+    text = format_marker_ranking_viz_policy()
+    assert "rank_genes_groups" in text
+    assert "DotPlot" in text
+    assert "Heatmap" in text
+    assert "Interpretation / cell-type questions" in text
+    assert CHAT_RANK_GENES_DATASOURCE_NAME in text
+    assert "project.add_datasource(" in text
+    assert "IndentationError" in text
 
 
 def test_format_marker_gene_scanpy_fallback_with_h5ad():
@@ -75,12 +105,17 @@ def test_format_marker_gene_scanpy_fallback_with_h5ad():
     assert "rank_genes_groups" in text
     assert "Never" in text or "never" in text.lower()
     assert "leiden" in text.lower()
+    assert "table_chart" in text or "TablePlot" in text
+    assert "**Primary** answer" in text or "Primary" in text
+    assert CHAT_RANK_GENES_DATASOURCE_NAME in text
+    assert "add_datasource" in text
 
 
 def test_format_marker_gene_scanpy_fallback_without_h5ad():
     text = format_marker_gene_scanpy_fallback_policy("")
     assert "Marker genes" in text or "marker" in text.lower()
     assert "MDV only" in text or "wrappers" in text.lower()
+    assert "print" in text.lower()
 
 
 def test_format_feature_table_field_policy_without_expressions():

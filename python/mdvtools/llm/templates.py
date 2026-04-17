@@ -5,6 +5,8 @@ from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
+    format_marker_ranking_viz_policy,
+    format_obs_table_chart_param_policy,
     format_visualization_consistency_policy,
 )
 prompt_data = """
@@ -121,6 +123,8 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     roles = infer_datasource_roles(project)
     feature_field_policy = format_feature_table_field_policy(roles)
     marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data)
+    table_chart_param_policy = format_obs_table_chart_param_policy()
+    marker_ranking_viz_policy = format_marker_ranking_viz_policy()
     viz_consistency_policy = format_visualization_consistency_policy()
     expr_lines = ""
     if roles.expressions:
@@ -166,8 +170,11 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
 """+marker_gene_policy+"""
 
     3. Datasource Registration:
-        - When modifying an existing project, DO NOT call project.add_datasource(...).
-        - Only add datasources when explicitly creating a new project from raw data (not the default).
+        - When modifying an existing project, do **not** call `project.add_datasource(...)` for arbitrary new tables **except**
+          the **ChatMDV marker-result** case: persist a long-format Scanpy marker `DataFrame` with
+          `project.add_datasource('chat_rank_genes_result', marker_df, replace_data=True, add_to_view=view_name)` as
+          described under "Marker ranking vs DotPlot" (Parameter Handling). No other ad-hoc datasources.
+        - When creating a **new** project from raw data (not the default chat flow), normal `add_datasource` rules apply.
 
     4. Plot Construction:
         - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected **field ids** (see Parameter Handling).
@@ -178,7 +185,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Set the view using `project.set_view(view_name, view_object)`
         - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`.
           To show a subset, either:
-            (a) create a filtered datasource (only when creating a new project / adding a new datasource is allowed), or
+            (a) create a filtered datasource when building a **new** project from raw data, or use the **narrow** ChatMDV
+                exception in section 3 (`chat_rank_genes_result` via `add_datasource` for long-format Scanpy marker tables
+                when editing a project), or
             (b) include a `SelectionDialogPlot` so the user can filter interactively in the UI.
         - Visualization vs analysis consistency (ChatMDV):
 """+viz_consistency_policy+"""
@@ -186,8 +195,12 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     5. Parameter Handling:
         - The string """+final_answer+""" guides which columns and chart types to use.
         - **Critical:** For cell-level (obs) columns, each string in `params` must be the datasource **Field ID** exactly as shown in the Project Data Context tables (the **Field ID** column), NOT the display "Column Name" alone. MDV matches charts to data by internal `field` keys; display names may differ from field ids.
-        - **Same for feature/genes datasources:** charts such as RowSummaryBox or TablePlot on `genes` must use **Field ID** strings from the Project Data Context for that datasource (e.g. `gene_ids`), not guessed names like `name` unless listed.
+        - **Feature / genes datasources only:** For charts whose `initialCharts` key is the **`genes`** (or other feature) datasource, use **Field ID** strings from the Project Data Context **for that datasource**—for example `gene_ids` if listed there—not guessed names like `name` unless listed. Do **not** assume `gene_ids` is a valid Field ID on **`cells`**.
         - If you copy from `data_frame_obs.columns`, prefer the MDV field id for that column from the context table when they differ.
+        - Table chart / obs vs Scanpy output (ChatMDV):
+"""+table_chart_param_policy+"""
+        - Marker ranking vs DotPlot / Heatmap (ChatMDV):
+"""+marker_ranking_viz_policy+"""
         - Feature table field compatibility (ChatMDV):
 """+feature_field_policy+"""
         - For wrapper-based expression (rows-as-columns), DO NOT treat features as plain obs columns.
@@ -213,6 +226,11 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     7. Chat-first textual/table outputs:
         - For requests that primarily ask for textual summaries, mappings, rankings, annotations, or table-like listings,
           prioritize chat output over plot creation.
+        - **Precedence vs marker persistence:** For questions focused on **interpretation**, **cell-type prediction**, or
+          **biology** without an explicit request to **keep tables or charts in the saved project view**, use **bounded
+          `print(...)` and markdown explanation only**—do **not** call `project.add_datasource('chat_rank_genes_result', ...)`
+          or add saved-view charts solely to duplicate chat output. Use that `add_datasource` path only when the user
+          clearly needs the marker table **in the MDV view** (see section 3 and "Marker ranking vs DotPlot").
         - In these cases, provide the answer in:
             (a) the markdown explanation text, and
             (b) bounded script stdout via `print(...)` before any `project.set_view(...)`.
@@ -224,12 +242,15 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Do not add a selection dialog unconditionally.
 
     9. Your Task:
-        - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+final_answer+"""
+        - Interpret the user question and decide **whether** a saved-view chart is needed, and if so **which** chart type
+          fits the question: """+question+final_answer+"""
         - Use **field ids** from the Project Data Context (Field ID column) in `params` as appropriate:
             - Wrap only expression feature names using the `<subgroup>|<feature>(<subgroup>)|<index>` form as shown in section 5.
             - For all non-gene columns, use the exact **Field ID** string. Field ids are case sensitive.
         - Use formatted f-strings for all dynamic strings.
-        - Generate a valid Python script that creates and visualizes the appropriate chart using the MDVProject framework.
+        - Generate a valid Python script that implements the analysis. **If** a saved-view chart or table is appropriate,
+          create it with the MDVProject framework; **otherwise** the script may be print/markdown-only with an empty or
+          minimal `set_view` (see sections 4–7 and "Marker ranking vs DotPlot").
         - Update these variables with these values:
             - project_path = '"""+project.dir+"""'
             - data_path = '"""+path_to_data+"""'  # may be empty; if empty or HAS_SCANPY is False, DO NOT use scanpy except for marker-gene workflows when this path is a `.h5ad` file (see section 2).

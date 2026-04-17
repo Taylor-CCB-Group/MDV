@@ -28,6 +28,16 @@ ax.legend(title='Fruit color')
 
 plt.show()"""
 
+
+def _stderr_with_failed_source(stderr_diagnostic: str, final_code: str) -> str:
+    """Append executed source so callers (e.g. chat error surfaces) can debug SyntaxError etc."""
+    return (
+        f"{stderr_diagnostic}\n\n"
+        f"--- Failed Python source ({len(final_code)} chars) ---\n"
+        f"{final_code}"
+    )
+
+
 def execute_plt_test():
     with concurrent.futures.ThreadPoolExecutor() as executor:
         try:
@@ -78,7 +88,7 @@ def execute_code(final_code: str, open_code=False, log = print):
             else:
                 log("--- Execution failed ---")
                 log(final_code)
-                return False, stdout, stderr
+                return False, stdout, _stderr_with_failed_source(stderr, final_code)
 
 
 def run_subprocess(command: list[str]) -> tuple[str | None, str]:

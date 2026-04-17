@@ -105,6 +105,32 @@ def main():
     assert 'if __name__ == "__main__":\n    main()' in out
 
 
+def test_prepare_code_multiline_add_datasource_compiles_with_modify_existing():
+    """Regression: naive commenting of project.add_datasource broke multiline calls (unmatched ')')."""
+
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+view_name = "v"
+project.add_datasource(
+    'chat_rank_genes_result',
+    df,
+    replace_data=True,
+    add_to_view=view_name,
+)
+```"""
+    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=True)
+    compile(out, "<string>", "exec")
+    assert "project.add_datasource(" in out
+    assert "# project.add_datasource" not in out
+
+
 def test_prepare_code_no_append_main_for_top_level_only():
     class FakeProject:
         def __init__(self):

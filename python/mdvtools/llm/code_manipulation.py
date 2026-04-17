@@ -121,10 +121,9 @@ if __name__ == "__main__":
         final_code = f"{packages_functions}\n{captured_lines}"
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:
-        # not at all robust... won't be needed in future
-        final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
-        #final_code = final_code.replace("project.add_datasource(datasource_name, data_frame_obs)", "# project.add_datasource(datasource_name, data_frame_obs)")
-        #final_code = final_code.replace("project.add_datasource(datasource_name_2, data_frame_var)", "# project.add_datasource(datasource_name_2, data_frame_var)")
+        # Do NOT do naive `replace("project.add_datasource", "# project.add_datasource")`: it only comments the first
+        # line of a multiline call, leaving arguments and the closing `)` — that yields SyntaxError: unmatched ')'.
+        # ChatMDV policy (templates section 3) allows `add_datasource` for `chat_rank_genes_result` when editing a project.
 
         #final_code = final_code.replace("project.add_rows_as_columns_link", "# project.add_rows_as_columns_link")
         #final_code = final_code.replace("project.add_rows_as_columns_subgroup", "# project.add_rows_as_columns_subgroup") 

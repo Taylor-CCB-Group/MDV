@@ -88,6 +88,67 @@ def _normalize_chart_dict(
         ]
 
 
+def _chart_param_string_tokens(chart: dict[str, Any]) -> list[str]:
+    """Collect string tokens from chart ``param`` for validation."""
+    p = chart.get("param")
+    if p is None:
+        return []
+    if isinstance(p, str):
+        return [p]
+    if isinstance(p, list):
+        return [str(x) for x in p if isinstance(x, str)]
+    return []
+
+
+def _param_token_valid_for_datasource(token: str, field_set: set[str]) -> bool:
+    if _WRAPPER_RE.match(token):
+        return True
+    return token in field_set
+
+
+def prune_view_charts_with_invalid_params(view: dict[str, Any], project: Any) -> tuple[dict[str, Any], int]:
+    """
+    Drop charts whose ``param`` strings are not valid field ids on that chart's datasource.
+
+    Wrapper expression tokens (``subgroup|feature(subgroup)|index``) are kept. Used after
+    :func:`normalize_view_chart_params` so display-name resolution has already run.
+    """
+    out = copy.deepcopy(view)
+    initial = out.get("initialCharts")
+    if not isinstance(initial, dict):
+        return out, 0
+    removed = 0
+    for ds_name, charts in list(initial.items()):
+        if not isinstance(charts, list):
+            continue
+        try:
+            md = project.get_datasource_metadata(ds_name)
+            columns = md.get("columns") or []
+        except Exception as e:
+            logger.warning("prune_view_charts_with_invalid_params: datasource %s: %s", ds_name, e)
+            continue
+        field_set = field_set_from_columns(columns)
+        kept: list[Any] = []
+        for ch in charts:
+            if not isinstance(ch, dict):
+                kept.append(ch)
+                continue
+            tokens = _chart_param_string_tokens(ch)
+            bad = [t for t in tokens if not _param_token_valid_for_datasource(t, field_set)]
+            if bad:
+                removed += 1
+                logger.warning(
+                    "Dropping chart type=%r on datasource %r: param tokens not in metadata: %s",
+                    ch.get("type"),
+                    ds_name,
+                    bad,
+                )
+                continue
+            kept.append(ch)
+        initial[ds_name] = kept
+    return out, removed
+
+
 def normalize_view_chart_params(
     view: dict[str, Any],
     project: Any,

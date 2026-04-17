@@ -20,6 +20,7 @@ ALLOWED_FILES: frozenset[str] = frozenset(
     {
         "python/mdvtools/tests/test_chat_first_text_table_policy.py",
         "python/mdvtools/tests/test_datasource_roles.py",
+        "python/mdvtools/tests/test_column_field_resolve.py",
         "python/mdvtools/tests/test_code_execution.py",
     }
 )

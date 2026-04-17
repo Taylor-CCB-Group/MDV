@@ -34,7 +34,7 @@ from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
-from .column_field_resolve import normalize_view_chart_params
+from .column_field_resolve import normalize_view_chart_params, prune_view_charts_with_invalid_params
 from .verification import build_verification_summary
 from .datasource_roles import infer_datasource_roles
 from .code_execution import execute_code
@@ -355,9 +355,13 @@ class ProjectChat(ProjectChatProtocol):
                     "\n\nDatasource roles:\n"
                     f"- df1 maps to obs datasource '{roles.obs_datasource}'\n"
                     f"{expr_lines}\n"
-                    "- For any chart `params` on the feature table (df2), use **Field ID** strings from "
-                    "`df2.columns` / project metadata (e.g. `gene_ids`), not assumed `name`.\n"
-                    "- Do not pair Scanpy-computed summary tables with MDV wrapper-based expression charts for the "
+                    "- For any chart `params` on the **feature table datasource** (df2), use **Field ID** strings from "
+                    "`df2.columns` / project metadata for **that** datasource (e.g. `gene_ids` when listed for `genes`); "
+                    "do not use those ids as `params` on charts bound to **cells** unless `cells` lists the same Field ID.\n"
+                    "- Do not pair Scanpy `rank_genes_groups` tables with DotPlot/Heatmap on cells using wrapper `params` "
+                    "as a substitute for that table (see ChatMDV \"Marker ranking vs DotPlot\" in RAG); optional "
+                    "`add_datasource('chat_rank_genes_result', ...)` for an in-view table.\n"
+                    "- Do not pair other Scanpy summary tables with MDV wrapper-based expression charts for the "
                     "same metric unless values are guaranteed identical; prefer one pipeline (see ChatMDV viz consistency "
                     "in RAG).\n"
                 )
@@ -631,7 +635,14 @@ class ProjectChat(ProjectChatProtocol):
                         normalized = normalize_view_chart_params(
                             view_obj, self.project
                         )
-                        self.project.set_view(view_name, normalized)
+                        pruned, n_dropped = prune_view_charts_with_invalid_params(
+                            normalized, self.project
+                        )
+                        if n_dropped:
+                            log(
+                                f"pruned {n_dropped} chart(s) with param tokens not in datasource metadata"
+                            )
+                        self.project.set_view(view_name, pruned)
                 except Exception as norm_ex:
                     log(f"normalize chart params: {norm_ex}")
 

@@ -22,3 +22,13 @@ def test_run_subprocess_sigkill_style_empty_streams():
         out, err = code_execution.run_subprocess(["python", "x.py"])
     assert out is None
     assert "returncode=-9" in err
+
+
+def test_execute_code_failure_includes_source_for_syntax_error():
+    bad = "print('ok'\n"  # SyntaxError: unmatched '('
+    ok, stdout, stderr = code_execution.execute_code(bad, log=lambda *_a, **_k: None)
+    assert ok is False
+    assert stdout is None
+    assert "Failed Python source" in stderr
+    assert bad in stderr
+    assert "SyntaxError" in stderr or "unmatched" in stderr.lower()
