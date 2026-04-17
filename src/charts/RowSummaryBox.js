@@ -131,14 +131,11 @@ class RowSummaryBox extends BaseChart {
             this.config.image.param -= 1;
         }
 
-        const didDelete = super.onColumnRemoved(column, {
+        super.onColumnRemoved(column, {
             ...impact,
             action: "update",
             nextParam,
         });
-        if (didDelete) {
-            return true;
-        }
 
         if (removedIndex === -1) {
             return false;
