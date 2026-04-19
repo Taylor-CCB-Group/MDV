@@ -15,7 +15,7 @@ import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 import tippy, {type Instance as TippyInstance} from "tippy.js";
-import type { ChartColumnImpact } from "./columnRemovalUtils";
+import type { ChartColumnImpact } from "@/types/columnRemovalTypes";
 import 'tippy.js/dist/tippy.css'; 
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;

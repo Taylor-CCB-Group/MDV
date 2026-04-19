@@ -14,7 +14,7 @@ import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import { flattenFields } from "@/lib/columnTypeHelpers";
-import type { ColumnRemovalImpact } from "@/charts/columnRemovalUtils";
+import type { ColumnRemovalImpact } from "@/types/columnRemovalTypes";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type

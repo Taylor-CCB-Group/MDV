@@ -5,7 +5,7 @@ import SelectionDialogComponent from "./SelectionDialogComponent";
 import type DataStore from "@/datastore/DataStore";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
-import type { ChartColumnImpact } from "@/charts/columnRemovalUtils";
+import type { ChartColumnImpact } from "@/types/columnRemovalTypes";
 
 // export type CommonFilter = { noClear?: boolean, invert?: boolean }; //todo - implement these features.
 export type CategoryFilter = { category: string[] };

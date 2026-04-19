@@ -9,7 +9,7 @@ import { getTableExportBlob } from "@/datastore/dataExportUtils";
 import { createEl } from "@/utilities/ElementsTyped";
 import { DataModel } from "@/table/DataModel";
 import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
-import type { ChartColumnImpact } from "@/charts/columnRemovalUtils";
+import type { ChartColumnImpact } from "@/types/columnRemovalTypes";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;

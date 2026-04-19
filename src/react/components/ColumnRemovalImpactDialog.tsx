@@ -1,5 +1,5 @@
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
-import type { ChartColumnImpact, ColumnRemovalImpact } from "@/charts/columnRemovalUtils";
+import type { ChartColumnImpact, ColumnRemovalImpact } from "@/types/columnRemovalTypes";
 import { describeColumnImpactReason } from "@/charts/columnRemovalUtils";
 import {
     Button,

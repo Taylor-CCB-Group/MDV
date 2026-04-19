@@ -26,15 +26,18 @@ function containsField(value: unknown, column: string): boolean {
     return specs ? specs.some((spec) => flattenFields(spec).includes(column)) : false;
 }
 
-function getColorField(config: BaseConfig): string | undefined {
+function getColorFields(config: BaseConfig): string[] {
     const colorBy = (config as LegacyColorByLike).color_by;
     if (!colorBy) {
-        return undefined;
+        return [];
     }
     if (typeof colorBy === "string") {
-        return colorBy;
+        return [colorBy];
     }
-    return colorBy.column?.field;
+    if ("column" in colorBy) {
+        return colorBy.column?.field ? [colorBy.column.field] : [];
+    }
+    return flattenFields(colorBy as FieldSpec);
 }
 
 function getParamLayouts(
@@ -203,7 +206,7 @@ export function analyzeChartColumnImpact(
         });
     }
 
-    const clearColorBy = getColorField(config) === column;
+    const clearColorBy = getColorFields(config).includes(column);
     if (clearColorBy) {
         // Secondary color binding is survivable: clear it and let the chart
         // fall back to its default coloring behavior.

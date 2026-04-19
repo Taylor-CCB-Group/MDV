@@ -1,6 +1,6 @@
-import type { ColumnRemovalImpact } from "@/charts/columnRemovalUtils";
 import ColumnRemovalImpactDialog from "@/react/components/ColumnRemovalImpactDialog";
 import { createMdvPortal } from "@/react/react_utils";
+import type { ColumnRemovalImpact } from "@/types/columnRemovalTypes";
 import { BaseDialog } from "@/utilities/Dialog";
 import { useState } from "react";
 
