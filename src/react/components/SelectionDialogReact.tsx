@@ -66,12 +66,17 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         const currentParam = Array.isArray(this.config.param) ? this.config.param : [];
         const nextParam =
             impact?.nextParam ?? currentParam.filter((field) => !flattenFields(field).includes(column));
+        // `config.param` can contain query-backed FieldSpecs, so diff the
+        // flattened concrete field names rather than assuming `column` is the
+        // only key that disappears from filters/order.
         const nextFieldSet = new Set(nextParam.flatMap((field) => flattenFields(field)));
         const removedFields = currentParam
             .flatMap((field) => flattenFields(field))
             .filter((field) => !nextFieldSet.has(field));
 
         const chartImpact: ChartColumnImpact = impact ?? {
+            // Fallback for any non-standard caller. In the normal flow
+            // ChartManager provides a richer impact object.
             chartId: this.config.id,
             chartTitle: this.config.title,
             chartType: this.config.type,
@@ -85,6 +90,8 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
             clearBackgroundFilter: false,
         };
 
+        // Delegate param pruning and shared config cleanup to BaseChart instead
+        // of mutating `config.param` directly here.
         const didDelete = super.onColumnRemoved(column, {
             ...chartImpact,
             action: "update",
@@ -94,6 +101,8 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
             return true;
         }
         if (removedFields.length === 0) {
+            // BaseChart already handled the generic cleanup; there are just no
+            // selection-dialog-specific filter/order keys to prune.
             return false;
         }
 
@@ -105,6 +114,8 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
             }
 
             const nextOrder = { ...(this.config.order ?? {}) };
+            // `order` is stored as dense integer positions, so after removing
+            // one or more fields every later entry must shift left.
             const removedOrders = removedFields
                 .map((field) => nextOrder[field])
                 .filter((order): order is number => order !== undefined)

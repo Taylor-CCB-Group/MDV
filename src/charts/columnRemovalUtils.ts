@@ -1,88 +1,18 @@
+import type {
+    BackgroundFilterLike,
+    ChartColumnImpact,
+    ChartColumnImpactAction,
+    ChartColumnImpactReason,
+    LegacyColorByLike,
+    ParamLayoutSlot,
+    ParamSlotImpact,
+    RowSummaryConfigLike,
+    TooltipConfigLike,
+    TooltipRemovalUpdate,
+} from "@/types/columnRemovalTypes";
 import type { BaseConfig } from "./BaseChart";
 import type { ChartType } from "./ChartTypes";
 import { flattenFields, isMultiColumn, type FieldSpec, type FieldSpecs } from "@/lib/columnTypeHelpers";
-
-export type ChartColumnImpactAction = "update" | "delete";
-
-export type ChartColumnImpactReasonKind =
-    | "param.single"
-    | "param.multi"
-    | "color_by"
-    | "tooltip.single"
-    | "tooltip.multi"
-    | "background_filter"
-    | "config_entry.single"
-    | "config_entry.multi";
-
-export type ChartColumnImpactReason = {
-    kind: ChartColumnImpactReasonKind;
-    entry?: string;
-};
-
-export type ParamSlotImpact = {
-    paramIndex: number;
-    mode: "single" | "multi";
-    action: "delete" | "prune";
-    remainingFields: number;
-};
-
-export type TooltipRemovalUpdate = {
-    nextColumn?: FieldSpec | FieldSpecs;
-    disableTooltip: boolean;
-};
-
-export type ChartColumnImpact = {
-    chartId: string;
-    chartTitle: string;
-    chartType: string;
-    chartTypeLabel: string;
-    isSourceChart: boolean;
-    action: ChartColumnImpactAction;
-    reasons: ChartColumnImpactReason[];
-    paramSlotImpacts: ParamSlotImpact[];
-    nextParam?: FieldSpecs;
-    configEntryUpdates?: Record<string, FieldSpec | FieldSpecs | undefined>;
-    tooltipUpdate?: TooltipRemovalUpdate;
-    clearColorBy: boolean;
-    clearBackgroundFilter: boolean;
-};
-
-export type ColumnRemovalImpact = {
-    dataSource: string;
-    column: string;
-    charts: ChartColumnImpact[];
-};
-
-type ParamLayoutSlot = {
-    mode: "single" | "multi";
-    paramIndex: number;
-    entries: FieldSpecs;
-};
-
-type TooltipConfigLike = {
-    tooltip?: {
-        show?: boolean;
-        column?: FieldSpec | FieldSpecs;
-    };
-};
-
-type BackgroundFilterLike = {
-    background_filter?: {
-        column?: string;
-    };
-};
-
-type RowSummaryConfigLike = {
-    type?: string;
-    image?: {
-        param?: number;
-    };
-    param?: FieldSpecs;
-};
-
-type LegacyColorByLike = {
-    color_by?: string | { column?: { field?: string } };
-};
 
 function getFieldSpecs(value: unknown): FieldSpecs | null {
     if (value == null) {
@@ -111,14 +41,15 @@ function getParamLayouts(
     param: FieldSpecs | undefined,
     chartType: (Pick<ChartType<BaseConfig>, "params"> & { name?: string }) | undefined,
 ): ParamLayoutSlot[] {
-    const currentParam =
-        param == null ? [] : Array.isArray(param) ? param : [param];
+    const currentParam = param == null ? [] : Array.isArray(param) ? param : [param];
     const chartParams = chartType?.params ?? [];
 
     if (currentParam.length === 0) {
         return [];
     }
     if (chartParams.length === 0) {
+        // No metadata means we cannot infer any optional multi-column slot, so
+        // the safest assumption is that every param entry is required.
         return currentParam.map((entry, index) => ({
             mode: "single",
             paramIndex: index,
@@ -128,6 +59,8 @@ function getParamLayouts(
 
     const multiIndex = chartParams.findIndex((slot) => isMultiColumn(slot.type));
     if (multiIndex === -1) {
+        // Simple case: config.param is just a positional list of required
+        // single-column params.
         return currentParam.map((entry, index) => ({
             mode: "single",
             paramIndex: index,
@@ -138,6 +71,13 @@ function getParamLayouts(
     if (multiIndex === 0) {
         const singleSuffixCount = chartParams.length - 1;
         const multiEnd = Math.max(0, currentParam.length - singleSuffixCount);
+        // Example layout:
+        //   params metadata: [multi, single, single]
+        //   config.param:     [a, b, c, d]
+        // becomes:
+        //   slot0(multi): [a, b]
+        //   slot1(single): [c]
+        //   slot2(single): [d]
         return [
             {
                 mode: "multi",
@@ -154,6 +94,12 @@ function getParamLayouts(
 
     if (multiIndex === chartParams.length - 1) {
         const singlePrefixCount = chartParams.length - 1;
+        // Example layout:
+        //   params metadata: [single, multi]
+        //   config.param:     [a, b, c]
+        // becomes:
+        //   slot0(single): [a]
+        //   slot1(multi):  [b, c]
         return [
             ...chartParams.slice(0, singlePrefixCount).map((_, index) => ({
                 mode: "single" as const,
@@ -168,6 +114,9 @@ function getParamLayouts(
         ];
     }
 
+    // The UI and shared cleanup code only understand one multi-column slot,
+    // and only when it is first or last. Throw here rather than silently
+    // guessing a different layout and pruning the wrong field.
     throw new Error(
         `Unsupported column-removal param layout for '${chartType?.name ?? "unknown chart"}': multi-column params must be first or last.`,
     );
@@ -195,7 +144,7 @@ function getTooltipUpdate(config: BaseConfig, column: string): TooltipRemovalUpd
 
 export function analyzeChartColumnImpact(
     config: BaseConfig,
-    chartType: Pick<ChartType<BaseConfig>, "params" | "configEntriesUsingColumns"> & { name?: string } | undefined,
+    chartType: (Pick<ChartType<BaseConfig>, "params" | "configEntriesUsingColumns"> & { name?: string }) | undefined,
     column: string,
     opts: { sourceChartId?: string } = {},
 ): ChartColumnImpact | null {
@@ -208,6 +157,10 @@ export function analyzeChartColumnImpact(
     // This is the shared prune-vs-delete decision point. Each chart's `params`
     // metadata tells us whether a removed field hits a required single slot or
     // a prunable multi-column slot.
+    //
+    // Once `action` flips to `"delete"` we keep it that way. Later config
+    // references may still add useful reason metadata, but they do not make the
+    // chart valid again.
     for (const slot of getParamLayouts(config.param, chartType)) {
         if (slot.entries.length === 0) {
             nextParamSlots.push(slot);
@@ -252,6 +205,8 @@ export function analyzeChartColumnImpact(
 
     const clearColorBy = getColorField(config) === column;
     if (clearColorBy) {
+        // Secondary color binding is survivable: clear it and let the chart
+        // fall back to its default coloring behavior.
         touched = true;
         reasons.push({ kind: "color_by" });
     }
@@ -260,15 +215,13 @@ export function analyzeChartColumnImpact(
     if (tooltipUpdate) {
         touched = true;
         reasons.push({
-            kind: Array.isArray((config as TooltipConfigLike).tooltip?.column)
-                ? "tooltip.multi"
-                : "tooltip.single",
+            kind: Array.isArray((config as TooltipConfigLike).tooltip?.column) ? "tooltip.multi" : "tooltip.single",
         });
     }
 
-    const clearBackgroundFilter =
-        (config as BackgroundFilterLike).background_filter?.column === column;
+    const clearBackgroundFilter = (config as BackgroundFilterLike).background_filter?.column === column;
     if (clearBackgroundFilter) {
+        // Background filter is also a survivable secondary reference.
         touched = true;
         reasons.push({ kind: "background_filter" });
     }
@@ -299,6 +252,8 @@ export function analyzeChartColumnImpact(
     }
 
     if (!touched) {
+        // Exclude unaffected charts from the impact list entirely so both the
+        // dialog and execution path stay focused only on real dependents.
         return null;
     }
 
@@ -327,6 +282,8 @@ export function analyzeChartColumnImpact(
         action,
         reasons,
         paramSlotImpacts,
+        // Convert the surviving logical slots back into the flat param array
+        // shape expected by `config.param` / `setParams()`.
         nextParam: nextParamSlots.flatMap((slot) => slot.entries),
         configEntryUpdates: Object.keys(configEntryUpdates).length > 0 ? configEntryUpdates : undefined,
         tooltipUpdate,

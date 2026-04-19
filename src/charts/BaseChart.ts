@@ -638,6 +638,7 @@ class BaseChart<T extends BaseConfig> {
      * @returns `true` if the chart has been removed
      */
     onColumnRemoved(column: FieldName, impact?: ChartColumnImpact) {
+        // Backward compatible - if impact is not provided (legacy)
         if (!impact) {
             let cols = this.config.param;
             let isDirty = false;
@@ -663,10 +664,12 @@ class BaseChart<T extends BaseConfig> {
             return false;
         }
 
+        // Column is used as axis param and the chart needs to be deleted
         if (impact.action === "delete") {
             return true;
         }
 
+        // Column is used in secondary settings, clear the relevant settings
         if (impact.clearColorBy && this.config.color_by) {
             this.config.color_by = undefined;
             this.colorByDefault?.();
@@ -695,8 +698,6 @@ class BaseChart<T extends BaseConfig> {
             Object.assign(this.config, impact.configEntryUpdates);
         }
 
-        // Most chart types only need the shared cleanup above; only charts with
-        // extra local state override `onColumnRemoved`.
         if (impact.nextParam) {
             this.setParams(impact.nextParam);
         }

@@ -36,6 +36,9 @@ class DotPlot extends SVGChart {
         //this.fractionScale = scaleSqrt().domain([0, 100]);
         this.mobxAutorun(() => {
             const nextFieldNames = this.config.param.slice(1);
+            // `setParams()` keeps `fieldNames` in sync immediately so the
+            // post-removal "filtered" event does not see stale columns; skip
+            // the autorun body when it would only repeat the same update.
             if (
                 this.fieldNames?.length === nextFieldNames.length &&
                 this.fieldNames.every((fieldName, index) => fieldName === nextFieldNames[index])
@@ -52,6 +55,7 @@ class DotPlot extends SVGChart {
     //   but that was itself a hack.
     // @loadColumnData
     _syncFields(fieldNames) {
+        // Update the fieldNames
         this.fieldNames = fieldNames;
         const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         this.x_scale.domain(yLabels);

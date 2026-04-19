@@ -985,13 +985,14 @@ export class ChartManager {
 
         const charts = [];
         for (const id in this.charts) {
-            const info = this.charts[id];
-            if (info.dataSource !== ds) {
+            const chartInfo = this.charts[id];
+            if (chartInfo.dataSource !== ds) {
                 continue;
             }
+            // Build the column impact object for each chart
             const impact = analyzeChartColumnImpact(
-                info.chart.config,
-                BaseChart.types[info.chart.config.type],
+                chartInfo.chart.config,
+                BaseChart.types[chartInfo.chart.config.type],
                 column,
                 { sourceChartId },
             );
@@ -1009,20 +1010,20 @@ export class ChartManager {
     }
 
     _columnRemoved(ds, col) {
+        // Get the impact of column removal for all charts
         const impact = this.analyzeColumnRemoval(ds.name, col);
         const impactById = new Map(impact.charts.map((chartImpact) => [chartImpact.chartId, chartImpact]));
         const idsToDelete = [];
         const chartsToDelete = [];
         for (const id in this.charts) {
-            const info = this.charts[id];
-            if (info.dataSource === ds) {
-                const ch = info.chart;
+            const chartInfo = this.charts[id];
+            if (chartInfo.dataSource === ds) {
+                const ch = chartInfo.chart;
                 const chartImpact = impactById.get(ch.config.id);
                 if (!chartImpact) {
                     continue;
                 }
-                // Apply the same impact object that powered the confirmation
-                // dialog, so preview and execution cannot drift apart.
+                // Call the onColumnRemoved for each chart and return if the chart needs to be deleted
                 const del = ch.onColumnRemoved(col, chartImpact);
                 if (del) {
                     idsToDelete.push(id);

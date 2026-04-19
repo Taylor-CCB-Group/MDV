@@ -371,6 +371,7 @@ const useSlickGridReact = () => {
                         );
                         const hasCrossChartUsage = impact.charts.some((item: { isSourceChart: boolean }) => !item.isSourceChart);
                         if (hasCrossChartUsage) {
+                            // Keep the computed impact in state
                             setPendingColumnRemoval({
                                 columnName: column.field,
                                 impact,
@@ -573,6 +574,8 @@ const useSlickGridReact = () => {
         if (!pendingColumnRemoval) {
             return;
         }
+        // By the time we get here the user has already approved the exact
+        // computed impact; confirmation simply performs the mutation.
         dataModel.removeColumn(pendingColumnRemoval.columnName);
         setPendingColumnRemoval(null);
     }, [dataModel, pendingColumnRemoval]);

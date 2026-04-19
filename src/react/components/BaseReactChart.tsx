@@ -100,6 +100,11 @@ export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> 
         // Dispose chart listeners/reactions immediately, but defer the React
         // unmount so components do not reconcile against column data that was
         // nulled in the same synchronous removal tick.
+        //
+        // This gives us the safest ordering during column removal:
+        // - stop reacting now
+        // - let the current synchronous datastore/change cycle finish
+        // - then unmount the React tree
         const root = this.root;
         this.root = undefined;
         super.remove();
