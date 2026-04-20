@@ -352,7 +352,6 @@ describe("analyzeChartColumnImpact", () => {
             "removed_tooltip",
         ]);
     });
-
     test("finds missing sort columns referenced by tables", () => {
         const missingColumns = getMissingColumnsForChartConfig(
             {
