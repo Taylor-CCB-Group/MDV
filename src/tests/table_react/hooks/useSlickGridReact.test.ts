@@ -81,6 +81,10 @@ describe("useSlickGridReact", () => {
                 column: "age",
                 charts: [],
             })),
+            getSanitizedSavedViews: vi.fn(() => Promise.resolve({ other_view: { initialCharts: {} } })),
+            viewManager: {
+                saveView: vi.fn(() => Promise.resolve()),
+            },
         };
 
         // Setup mock config with observable properties
@@ -257,7 +261,7 @@ describe("useSlickGridReact", () => {
             expect(mockGridInstance.slickGrid.render).toHaveBeenCalled();
         });
 
-        test("should remove an editable column from the header menu command", () => {
+        test("should open the removal confirmation for an editable column", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const mockGridInstance = createSlickGridMock();
@@ -285,8 +289,12 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
-            expect(mockDataStore.removeColumn).toHaveBeenCalledTimes(1);
+            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toEqual(
+                expect.objectContaining({
+                    columnName: "age",
+                }),
+            );
         });
 
         test("should open removal confirmation when another chart depends on the column", () => {
@@ -421,7 +429,7 @@ describe("useSlickGridReact", () => {
     });
 
     describe("column removal dialog", () => {
-        test("should confirm a pending column removal", () => {
+        test("should confirm a pending column removal and save immediately", async () => {
             mockChartManager.analyzeColumnRemoval.mockReturnValue({
                 dataSource: "test-ds",
                 column: "age",
@@ -465,11 +473,16 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            act(() => {
-                result.current.confirmColumnRemoval();
+            await act(async () => {
+                await result.current.confirmColumnRemoval();
             });
 
             expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
+            expect(mockChartManager.getSanitizedSavedViews).toHaveBeenCalledTimes(1);
+            expect(mockChartManager.viewManager.saveView).toHaveBeenCalledWith(
+                undefined,
+                { other_view: { initialCharts: {} } },
+            );
             expect(result.current.pendingColumnRemoval).toBeNull();
         });
     });

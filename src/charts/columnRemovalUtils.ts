@@ -40,6 +40,18 @@ function getColorFields(config: BaseConfig): string[] {
     return flattenFields(colorBy as FieldSpec);
 }
 
+function addFieldsToSet(fields: Set<string>, value: unknown) {
+    const specs = getFieldSpecs(value);
+    if (!specs) {
+        return;
+    }
+    for (const spec of specs) {
+        for (const field of flattenFields(spec)) {
+            fields.add(field);
+        }
+    }
+}
+
 function getParamLayouts(
     param: FieldSpecs | undefined,
     chartType: (Pick<ChartType<BaseConfig>, "params"> & { name?: string }) | undefined,
@@ -293,6 +305,206 @@ export function analyzeChartColumnImpact(
         clearColorBy,
         clearBackgroundFilter,
     };
+}
+
+function applyTooltipUpdate(config: BaseConfig, tooltipUpdate: TooltipRemovalUpdate | undefined) {
+    if (!tooltipUpdate) {
+        return;
+    }
+    const tooltipConfig = {
+        ...((config as TooltipConfigLike).tooltip ?? {}),
+    };
+    tooltipConfig.column = tooltipUpdate.nextColumn;
+    if (tooltipUpdate.disableTooltip) {
+        tooltipConfig.show = false;
+    }
+    (config as TooltipConfigLike).tooltip = tooltipConfig;
+}
+
+function getRemovedConcreteFields(
+    previousParam: FieldSpecs | undefined,
+    nextParam: FieldSpecs | undefined,
+): string[] {
+    const previousFields = (previousParam ?? []).flatMap((field) => flattenFields(field));
+    const nextFieldSet = new Set((nextParam ?? []).flatMap((field) => flattenFields(field)));
+    return previousFields.filter((field) => !nextFieldSet.has(field));
+}
+
+function applySelectionDialogCleanup(config: BaseConfig, removedFields: string[]) {
+    if (removedFields.length === 0) {
+        return;
+    }
+    const selectionConfig = config as BaseConfig & {
+        filters?: Record<string, unknown>;
+        order?: Record<string, number>;
+    };
+    if (selectionConfig.filters) {
+        for (const field of removedFields) {
+            delete selectionConfig.filters[field];
+        }
+    }
+    if (!selectionConfig.order) {
+        return;
+    }
+    const removedOrders = removedFields
+        .map((field) => selectionConfig.order?.[field])
+        .filter((order): order is number => order !== undefined)
+        .sort((a, b) => a - b);
+    for (const field of removedFields) {
+        delete selectionConfig.order[field];
+    }
+    if (removedOrders.length === 0) {
+        return;
+    }
+    for (const field in selectionConfig.order) {
+        const currentOrder = selectionConfig.order[field];
+        const shift = removedOrders.filter((order) => order < currentOrder).length;
+        if (shift > 0) {
+            selectionConfig.order[field] -= shift;
+        }
+    }
+}
+
+function applyTableCleanup(config: BaseConfig, removedFields: string[]) {
+    if (removedFields.length === 0) {
+        return;
+    }
+    const tableConfig = config as BaseConfig & {
+        order?: Record<string, number>;
+        sort?: { columnId?: string } | null;
+        column_widths?: Record<string, number>;
+    };
+    if (tableConfig.order) {
+        const removedOrders = removedFields
+            .map((field) => tableConfig.order?.[field])
+            .filter((order): order is number => order !== undefined)
+            .sort((a, b) => a - b);
+        for (const field of removedFields) {
+            delete tableConfig.order[field];
+        }
+        if (removedOrders.length > 0) {
+            for (const field in tableConfig.order) {
+                const currentOrder = tableConfig.order[field];
+                const shift = removedOrders.filter((order) => order < currentOrder).length;
+                if (shift > 0) {
+                    tableConfig.order[field] -= shift;
+                }
+            }
+        }
+    }
+    if (tableConfig.sort && removedFields.includes(tableConfig.sort.columnId ?? "")) {
+        tableConfig.sort = null;
+    }
+    if (tableConfig.column_widths) {
+        for (const field of removedFields) {
+            delete tableConfig.column_widths[field];
+        }
+    }
+}
+
+function applyRowSummaryCleanup(
+    config: BaseConfig,
+    previousParam: FieldSpecs | undefined,
+    removedFields: string[],
+) {
+    if (removedFields.length === 0 || !Array.isArray(previousParam)) {
+        return;
+    }
+    const rowSummaryConfig = config as BaseConfig & {
+        image?: { param?: number };
+    };
+    if (rowSummaryConfig.image?.param === undefined) {
+        return;
+    }
+    const removedIndexes = removedFields
+        .map((field) => previousParam.findIndex((entry) => flattenFields(entry).includes(field)))
+        .filter((index) => index !== -1)
+        .sort((a, b) => a - b);
+    const imageIndex = rowSummaryConfig.image.param;
+    const shift = removedIndexes.filter((index) => index < imageIndex).length;
+    if (shift > 0) {
+        rowSummaryConfig.image.param -= shift;
+    }
+}
+
+function applyColumnRemovalImpactToConfig(
+    config: BaseConfig,
+    impact: ChartColumnImpact,
+): BaseConfig | null {
+    if (impact.action === "delete") {
+        return null;
+    }
+
+    const previousParam = Array.isArray(config.param)
+        ? [...config.param]
+        : config.param
+          ? [config.param]
+          : undefined;
+
+    if (impact.clearColorBy && "color_by" in config) {
+        delete (config as LegacyColorByLike).color_by;
+    }
+    applyTooltipUpdate(config, impact.tooltipUpdate);
+    if (impact.clearBackgroundFilter && "background_filter" in config) {
+        delete (config as BackgroundFilterLike).background_filter;
+    }
+    if (impact.configEntryUpdates) {
+        Object.assign(config, impact.configEntryUpdates);
+    }
+    if (impact.nextParam) {
+        config.param = impact.nextParam;
+    }
+
+    const removedFields = getRemovedConcreteFields(previousParam, impact.nextParam);
+    if (config.type === "selection_dialog") {
+        applySelectionDialogCleanup(config, removedFields);
+    } else if (config.type === "table_chart" || config.type === "table_chart_react") {
+        applyTableCleanup(config, removedFields);
+    } else if (config.type === "row_summary_box") {
+        applyRowSummaryCleanup(config, previousParam, removedFields);
+    }
+
+    return config;
+}
+
+export function sanitizeChartConfigForRemovedColumns(
+    config: BaseConfig,
+    chartType: (Pick<ChartType<BaseConfig>, "params" | "configEntriesUsingColumns"> & { name?: string }) | undefined,
+    removedColumns: string[],
+): BaseConfig | null {
+    let nextConfig: BaseConfig | null = config;
+    for (const column of removedColumns) {
+        if (!nextConfig) {
+            return null;
+        }
+        const impact = analyzeChartColumnImpact(nextConfig, chartType, column);
+        if (!impact) {
+            continue;
+        }
+        nextConfig = applyColumnRemovalImpactToConfig(nextConfig, impact);
+    }
+    return nextConfig;
+}
+
+export function getMissingColumnsForChartConfig(
+    config: BaseConfig,
+    chartType: (Pick<ChartType<BaseConfig>, "params" | "configEntriesUsingColumns"> & { name?: string }) | undefined,
+    existingFields: Set<string>,
+): string[] {
+    const referencedFields = new Set<string>();
+    addFieldsToSet(referencedFields, config.param);
+    for (const field of getColorFields(config)) {
+        referencedFields.add(field);
+    }
+    addFieldsToSet(referencedFields, (config as TooltipConfigLike).tooltip?.column);
+    const backgroundFilterField = (config as BackgroundFilterLike).background_filter?.column;
+    if (backgroundFilterField) {
+        referencedFields.add(backgroundFilterField);
+    }
+    for (const entry of chartType?.configEntriesUsingColumns ?? []) {
+        addFieldsToSet(referencedFields, (config as Record<string, unknown>)[entry]);
+    }
+    return [...referencedFields].filter((field) => !existingFields.has(field));
 }
 
 export function describeColumnImpactReason(reason: ChartColumnImpactReason): string {

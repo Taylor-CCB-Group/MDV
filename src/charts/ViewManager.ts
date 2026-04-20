@@ -33,6 +33,7 @@ export type State =
           currentView: string;
           all_views: string[] | null;
           updatedColumns: UpdatedColumns;
+          updatedViews?: Record<string, View>;
           metadata: MetaData;
           chartErrors?: ChartError[];
       }
@@ -132,7 +133,8 @@ class ViewManager {
             contentDiv.innerHTML = "";
             this.setView(view);
             this.cm.viewLoader(view).then(async (data: object) => {
-                await this.cm._init(data);
+                const cleanedData = this.cm.filterRemovedColumnsFromViewData(data);
+                await this.cm._init(cleanedData);
                 const state = this.cm.getState();
                 this.setLastSavedState(state);
                 // todo: uncomment when we fix state issues
@@ -183,24 +185,34 @@ class ViewManager {
 
     // Save the current state
     @action
-    async saveView(errorHandler?: (state: State) => boolean) {
+    async saveView(
+        errorHandler?: (state: State) => boolean,
+        updatedViews?: Record<string, View>,
+    ) {
         const t = performance.now();
         try {
             const imageUrl = await this.createImageofView();
-            const state = this.cm.getState();
-            if (state.chartErrors.length > 0) {
+            const state: State = this.cm.getState();
+            if (!state) {
+                throw new Error("Unable to save view: state is unavailable");
+            }
+            const chartErrors = state.chartErrors ?? [];
+            if (chartErrors.length > 0) {
                 // handling the errors differently if errorHandler is supplied
                 if (errorHandler) {
                     const handled = errorHandler(state);
                     // handle it differently if required
                     if (!handled) {
-                        throw state.chartErrors;
+                        throw chartErrors;
                     }
                 } else {
-                    throw state.chartErrors;
+                    throw chartErrors;
                 }
             }
             state.view.viewImage = imageUrl;
+            if (updatedViews && Object.keys(updatedViews).length > 0) {
+                state.updatedViews = updatedViews;
+            }
             this.cm._callListeners("state_saved", state);
             this.setLastSavedState(state);
         } catch (error) {

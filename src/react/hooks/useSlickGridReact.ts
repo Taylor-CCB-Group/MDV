@@ -15,6 +15,7 @@ import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 import type { ColumnRemovalImpact } from "@/types/columnRemovalTypes";
+import type { View } from "@/charts/ViewManager";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -96,6 +97,19 @@ const useSlickGridReact = () => {
     const dataModel = useMemo(() => 
         new DataModel(dataStore, { autoupdate: false })
     , [dataStore]);
+    const commitColumnRemoval = useCallback(
+        async (columnName: string) => {
+            dataModel.removeColumn(columnName);
+            if (!chartManager?.viewManager) {
+                return;
+            }
+            const updatedViews: Record<string, View> | undefined = chartManager.getSanitizedSavedViews
+                ? await chartManager.getSanitizedSavedViews()
+                : undefined;
+            await chartManager.viewManager.saveView(undefined, updatedViews);
+        },
+        [chartManager, dataModel],
+    );
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
@@ -369,15 +383,14 @@ const useSlickGridReact = () => {
                             column.field,
                             chartId,
                         );
-                        const hasCrossChartUsage = impact.charts.some((item: { isSourceChart: boolean }) => !item.isSourceChart);
-                        if (hasCrossChartUsage) {
-                            // Keep the computed impact in state
-                            setPendingColumnRemoval({
-                                columnName: column.field,
-                                impact,
-                            });
-                            return;
-                        }
+                        // Remove-column is a committed schema change, so we always
+                        // confirm using the computed impact, even when no other
+                        // currently open charts depend on the field.
+                        setPendingColumnRemoval({
+                            columnName: column.field,
+                            impact,
+                        });
+                        return;
                     }
                     dataModel.removeColumn(column.field);
                 }
@@ -570,15 +583,18 @@ const useSlickGridReact = () => {
         setPendingColumnRemoval(null);
     }, []);
 
-    const confirmColumnRemoval = useCallback(() => {
+    const confirmColumnRemoval = useCallback(async () => {
         if (!pendingColumnRemoval) {
             return;
         }
-        // By the time we get here the user has already approved the exact
-        // computed impact; confirmation simply performs the mutation.
-        dataModel.removeColumn(pendingColumnRemoval.columnName);
-        setPendingColumnRemoval(null);
-    }, [dataModel, pendingColumnRemoval]);
+        try {
+            // By the time we get here the user has already approved the exact
+            // computed impact; confirmation performs the mutation and commits it.
+            await commitColumnRemoval(pendingColumnRemoval.columnName);
+        } finally {
+            setPendingColumnRemoval(null);
+        }
+    }, [commitColumnRemoval, pendingColumnRemoval]);
 
     // Columns to be displayed for cloning
     const cloneableColumns = useMemo(() => {

@@ -66,7 +66,11 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
-import { analyzeChartColumnImpact } from "./columnRemovalUtils";
+import {
+    analyzeChartColumnImpact,
+    getMissingColumnsForChartConfig,
+    sanitizeChartConfigForRemovedColumns,
+} from "./columnRemovalUtils";
 
 
 //order of column data in an array buffer
@@ -695,7 +699,8 @@ export class ChartManager {
             this.viewManager.setView(currentView);
             dataLoader.viewLoader(currentView).then(async (data) => {
                 try {
-                    await this._init(data, firstTime);
+                    const cleanedData = this.filterRemovedColumnsFromViewData(data);
+                    await this._init(cleanedData, firstTime);
                     if (currentView) {
                         const state = this.getState();
                         if (!state.view?.viewImage) {
@@ -720,7 +725,7 @@ export class ChartManager {
         //only one view hard coded in config
         //! This else block is not called, but if it is called at some point, make sure the state save works properly
         else {
-            this._init(config.only_view, firstTime)
+            this._init(this.filterRemovedColumnsFromViewData(config.only_view), firstTime)
             .then(async () => {
                     const state = this.getState();
                     if (!state.view?.viewImage) {
@@ -969,6 +974,69 @@ export class ChartManager {
 
     changeView(view) {
         this.viewManager.checkAndChangeView(view);
+    }
+
+    /**
+     * Saved views can still reference columns that were removed and committed
+     * earlier. Clean those configs before `_init()` recreates charts so view
+     * switches and reloads never resurrect broken charts.
+     * @param {any} data
+     */
+    filterRemovedColumnsFromViewData(data) {
+        if (!data?.initialCharts) {
+            return data;
+        }
+        const cleanedData = JSON.parse(JSON.stringify(data));
+        for (const dsName in cleanedData.initialCharts) {
+            const dataStore = this.dsIndex[dsName]?.dataStore;
+            if (!dataStore) {
+                continue;
+            }
+            const existingFields = new Set(Object.keys(dataStore.columnIndex));
+            cleanedData.initialCharts[dsName] = cleanedData.initialCharts[dsName]
+                .map((config) => {
+                    const chartType = BaseChart.types[config.type];
+                    const missingColumns = getMissingColumnsForChartConfig(
+                        config,
+                        chartType,
+                        existingFields,
+                    );
+                    if (missingColumns.length === 0) {
+                        return config;
+                    }
+                    return sanitizeChartConfigForRemovedColumns(
+                        config,
+                        chartType,
+                        missingColumns,
+                    );
+                })
+                .filter(Boolean);
+        }
+        return cleanedData;
+    }
+
+    /**
+     * @returns {Promise<Record<string, import("./ViewManager").View>>}
+     */
+    async getSanitizedSavedViews() {
+        /** @type {Record<string, import("./ViewManager").View>} */
+        const updatedViews = {};
+        const currentView = this.viewManager.current_view;
+        const allViews = this.viewManager.all_views ?? [];
+        for (const viewName of allViews) {
+            if (viewName === currentView) {
+                continue;
+            }
+            const originalView = await this.viewLoader(viewName);
+            if (!originalView) {
+                continue;
+            }
+            const cleanedView = this.filterRemovedColumnsFromViewData(originalView);
+            if (JSON.stringify(cleanedView) !== JSON.stringify(originalView)) {
+                updatedViews[viewName] = cleanedView;
+            }
+        }
+        return updatedViews;
     }
 
     /**

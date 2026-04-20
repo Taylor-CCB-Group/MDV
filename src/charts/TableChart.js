@@ -336,6 +336,13 @@ class TableChart extends BaseChart {
         this.dataModel.removeColumn(col, true, true);
     }
 
+    async _removeColumnAndCommit(col) {
+        this._removeColumn(col);
+        const chartManager = window.mdv?.chartManager;
+        const updatedViews = await chartManager?.getSanitizedSavedViews?.();
+        await chartManager?.viewManager?.saveView(undefined, updatedViews);
+    }
+
     requestColumnRemoval(col) {
         const chartManager = window.mdv?.chartManager;
         if (chartManager) {
@@ -344,13 +351,10 @@ class TableChart extends BaseChart {
                 col,
                 this.config.id,
             );
-            const impactedCharts = impact.charts.filter((chart) => !chart.isSourceChart);
-            if (impactedCharts.length > 0) {
-                new ColumnRemovalImpactDialogWrapper(col, impact, () => {
-                    this._removeColumn(col);
-                });
-                return;
-            }
+            new ColumnRemovalImpactDialogWrapper(col, impact, () => {
+                this._removeColumnAndCommit(col);
+            });
+            return;
         }
         this._removeColumn(col);
     }
