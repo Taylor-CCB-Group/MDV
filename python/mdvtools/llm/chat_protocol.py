@@ -9,6 +9,7 @@ class AskQuestionResult(TypedDict):
     message: str
     verification: Optional[str]
     data_preview: Optional[str]
+    needs_refresh: bool
 
 
 class HandleError(Protocol):
@@ -68,6 +69,7 @@ except Exception as e:
                 message=f"Sorry, I can't help you right now\n\n{msg}",
                 verification=None,
                 data_preview=None,
+                needs_refresh=False,
             )
 
 # Tell the type checker we’re exposing a ProjectChat conforming to the protocol

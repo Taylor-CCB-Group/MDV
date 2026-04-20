@@ -40,6 +40,7 @@ from .datasource_roles import infer_datasource_roles
 from .code_execution import execute_code
 from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
+from .chat_client_refresh import client_needs_refresh_after_chat
 
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
@@ -474,6 +475,7 @@ class ProjectChat(ProjectChatProtocol):
                 "message": "Success",
                 "verification": None,
                 "data_preview": format_stdout_for_chat(strdout),
+                "needs_refresh": False,
             }
         
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
@@ -632,6 +634,21 @@ class ProjectChat(ProjectChatProtocol):
                 try:
                     view_obj = self.project.get_view(view_name)
                     if view_obj:
+                        ic = view_obj.get("initialCharts")
+                        if isinstance(ic, dict):
+                            valid_names = {
+                                str(d["name"])
+                                for d in (self.project.datasources or [])
+                                if isinstance(d, dict) and d.get("name")
+                            }
+                            for ds_name in ic:
+                                if ds_name not in valid_names:
+                                    chat_debug_logger.warning(
+                                        "View %s initialCharts references unknown datasource %r (have: %s)",
+                                        view_name,
+                                        ds_name,
+                                        sorted(valid_names),
+                                    )
                         normalized = normalize_view_chart_params(
                             view_obj, self.project
                         )
@@ -644,7 +661,12 @@ class ProjectChat(ProjectChatProtocol):
                             )
                         self.project.set_view(view_name, pruned)
                 except Exception as norm_ex:
-                    log(f"normalize chart params: {norm_ex}")
+                    chat_debug_logger.warning(
+                        "normalize_view_chart_params failed for view %s: %s",
+                        view_name,
+                        norm_ex,
+                        exc_info=True,
+                    )
 
             verification_text = ""
             with time_block("b15b: Verification summary"):
@@ -653,7 +675,12 @@ class ProjectChat(ProjectChatProtocol):
                         self.project, final_code, view_name
                     )
                 except Exception as ver_ex:
-                    log(f"verification summary: {ver_ex}")
+                    chat_debug_logger.warning(
+                        "build_verification_summary failed for view %s: %s",
+                        view_name,
+                        ver_ex,
+                        exc_info=True,
+                    )
 
             with time_block("b16: Log chat item"):
                  # Extract the explanation section from the LLM's response (removing code blocks)
@@ -706,6 +733,7 @@ class ProjectChat(ProjectChatProtocol):
                     "message": "Success",
                     "verification": verification_text or None,
                     "data_preview": data_preview_text,
+                    "needs_refresh": client_needs_refresh_after_chat(final_code),
                 }
         except Exception as e:
             # Log general error
@@ -722,4 +750,5 @@ class ProjectChat(ProjectChatProtocol):
                 "message": f"ERROR: {error_message}",
                 "verification": None,
                 "data_preview": None,
+                "needs_refresh": False,
             }

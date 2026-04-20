@@ -6,7 +6,9 @@ from mdvtools.llm.datasource_roles import (
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
+    format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
+    format_scanpy_hybrid_routing_policy,
     format_visualization_consistency_policy,
 )
 prompt_data = """
@@ -125,7 +127,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data)
     table_chart_param_policy = format_obs_table_chart_param_policy()
     marker_ranking_viz_policy = format_marker_ranking_viz_policy()
+    hybrid_routing_policy = format_scanpy_hybrid_routing_policy()
     viz_consistency_policy = format_visualization_consistency_policy()
+    no_hallucination_policy = format_no_hallucination_chart_policy()
     expr_lines = ""
     if roles.expressions:
         expr_lines = "\n".join(
@@ -175,8 +179,12 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
           `project.add_datasource('chat_rank_genes_result', marker_df, replace_data=True, add_to_view=view_name)` as
           described under "Marker ranking vs DotPlot" (Parameter Handling). No other ad-hoc datasources.
         - When creating a **new** project from raw data (not the default chat flow), normal `add_datasource` rules apply.
+        - Hybrid Scanpy routing contract (ChatMDV):
+"""+hybrid_routing_policy+"""
 
     4. Plot Construction:
+        - No hallucinated datasources or columns (all chart types):
+"""+no_hallucination_policy+"""
         - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected **field ids** (see Parameter Handling).
             - The suggested columns and chart type are given by """+final_answer+"""
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
@@ -199,22 +207,28 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - If you copy from `data_frame_obs.columns`, prefer the MDV field id for that column from the context table when they differ.
         - Table chart / obs vs Scanpy output (ChatMDV):
 """+table_chart_param_policy+"""
+        - For marker table views on `chat_rank_genes_result`, build `params` from persisted datasource metadata after
+          `add_datasource(..., replace_data=True, ...)` (or from `marker_df.columns` when equivalent), then verify each
+          param token exists in that datasource field set before `set_view(...)`. If tokens do not resolve, keep bounded
+          `print(...)` output and skip saving a broken chart.
         - Marker ranking vs DotPlot / Heatmap (ChatMDV):
 """+marker_ranking_viz_policy+"""
         - Feature table field compatibility (ChatMDV):
 """+feature_field_policy+"""
         - For wrapper-based expression (rows-as-columns), DO NOT treat features as plain obs columns.
           Use the FieldName wrapper format:
-            `"<subgroup>|<feature>(<subgroup>)|<index>"`
+            `"<subgroup_key>|<feature>(<subgroup_key>)|<index>"`
           where:
+            - `<subgroup_key>` **must** match a key from the rows-as-columns link for this project (see **section 2**
+              “default_subgroup=...” lines). Do **not** copy tutorial examples that use `rna_expr` unless that key is listed.
             - `<feature>` is a value from the feature table's label column (`name_column` from the link, e.g. `gene_ids` or `name` — match the project)
             - `<index>` is the row index of that feature in the feature table (0-based)
-            - `<subgroup>` is a subgroup key from the rows-as-columns link (often something like `*_expr`)
         - Example (wrapper expression):
             ```python
+            subgroup_key = "gs"  # use the default_subgroup from section 2 / Datasource roles for this project
             feature = "GENE_OR_PROTEIN_NAME"
             feature_index = data_frame_var[name_column].tolist().index(feature)
-            wrapper = f"<subgroup>|<feature>(<subgroup>)|<index>"
+            wrapper = f"{{subgroup_key}}|{{feature}}({{subgroup_key}})|{{feature_index}}"
             ```
 
     6. Gene-Related Queries:
@@ -241,7 +255,17 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
           (for example, when the user asks to explore subsets interactively).
         - Do not add a selection dialog unconditionally.
 
-    9. Your Task:
+    9. Follow-up phrasing and intent routing:
+        - Resolve follow-up phrases like “those genes”, “same”, and “visualize that” to the most recent marker/DE result in context.
+        - If no prior marker list exists, compute a bounded top-N marker table first, then plot from that explicit gene list.
+        - Route intent consistently:
+            - Marker ranking/stat requests -> text/table-first (optional datasource persistence when view storage requested).
+            - Text box requests -> datasource table/text chart on the marker datasource.
+            - Heatmap/Dot/Bubble/Violin of marker genes -> expression visualization from valid expression fields/wrappers.
+            - Cluster count/distribution -> aggregate from `cells.<cluster_key>` with optional ring/bar chart.
+            - Cell-type prediction -> text-first with uncertainty notes; only persist when one-value-per-cell mapping is explicit.
+
+    10. Your Task:
         - Interpret the user question and decide **whether** a saved-view chart is needed, and if so **which** chart type
           fits the question: """+question+final_answer+"""
         - Use **field ids** from the Project Data Context (Field ID column) in `params` as appropriate:

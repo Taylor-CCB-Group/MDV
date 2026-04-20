@@ -1789,7 +1789,20 @@ class DataStore {
      * @returns {[number, number]} An array - the first value being the min value and the second the max value
      */
     getMinMaxForColumn(column) {
-        const c = this.columnIndex[column];
+        let c = this.columnIndex[column];
+        if (
+            !c &&
+            typeof column === "string" &&
+            column.includes("|")
+        ) {
+            this.addColumnFromField(column);
+            c = this.columnIndex[column];
+        }
+        if (!c) {
+            throw new Error(
+                `Trying to get minMax for unknown column '${column}' in datasource '${this.name}'`,
+            );
+        }
         if (!isDatatypeNumeric(c.datatype)) {
             throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
         }

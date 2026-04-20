@@ -111,6 +111,27 @@ def infer_datasource_roles(project: Any) -> InferredDatasourceRoles:
     return InferredDatasourceRoles(obs_datasource=obs, expressions=expressions)
 
 
+def format_no_hallucination_chart_policy() -> str:
+    """
+    Prompt text: every chart type must reference real datasources and columns from project metadata only.
+    """
+    return (
+        "- **Metadata-first chart params (all chart types):** Before building *any* chart (DotPlot, Heatmap, Scatter, "
+        "BoxPlot, ViolinPlot, TablePlot, SelectionDialogPlot, RowChart, Sankey, etc.), **discover** what exists: "
+        "`[d['name'] for d in project.datasources]` and `project.get_datasource_metadata(<ds>)` for each datasource "
+        "you reference. **Never** invent a datasource name for `initialCharts` keys or `datasource_name=...`.\n"
+        "- **Column field ids:** Every string in `params`, and column slots like `color_by` / `tooltip.column` / "
+        "`background_filter.column` when used, must be a **Field ID** from that datasource’s metadata (Project Data "
+        "Context), or a valid expression **wrapper** whose subgroup prefix appears under "
+        "`links.*.rows_as_columns.subgroups` for the observation datasource. Do not guess `leiden`, `gs`, or `gene_ids` "
+        "unless they appear in that metadata.\n"
+        "- **Pre-flight check:** Before `project.set_view(...)`, verify columns resolve, e.g. "
+        "`project.get_datasource_as_dataframe(obs_ds, columns=[...])` with the same field/wrapper strings as the chart "
+        "(optional but recommended when using wrappers). If resolution fails, use bounded `print(...)` and omit broken "
+        "charts.\n"
+    )
+
+
 def format_feature_table_field_policy(roles: InferredDatasourceRoles) -> str:
     """
     Prompt text for RAG: use actual feature-table field ids and name_column from metadata.
@@ -129,6 +150,13 @@ def format_feature_table_field_policy(roles: InferredDatasourceRoles) -> str:
             f"- For feature datasource `{e.datasource_name}`, the rows-as-columns link declares "
             f"`name_column`=`{e.name_column}`. Use that column for feature labels in code and the **same Field ID** "
             f"in chart ``params`` (e.g. RowSummaryBox on `genes`). Do not substitute `name` unless it matches."
+        )
+        lines.append(
+            f"- **Wrapper `param` tokens on `{roles.obs_datasource}`:** expression columns use "
+            f'`{e.subgroup_key}|<gene>({e.subgroup_key})|<index>` — the first segment **must** be `{e.subgroup_key}` '
+            "(the subgroup key from metadata). **Never** use example names like `rna_expr` or `protein_expr` unless "
+            "that exact key appears in Project Data Context / Datasource roles for this project; wrong keys cause "
+            "frontend errors (`subgroup` undefined)."
         )
     return "\n".join(lines)
 
@@ -200,6 +228,12 @@ def format_obs_table_chart_param_policy() -> str:
         "in context.\n"
         f"- **Scratch marker table datasource:** After `add_datasource('{ds}', marker_df, ...)`, charts under "
         f"`initialCharts['{ds}']` use field ids from that `DataFrame`—that is the supported in-view table path.\n"
+        f"- **Marker datasource param source of truth:** For `table_chart` on `{ds}`, derive `params` from actual "
+        "persisted fields (e.g. `project.get_datasource_metadata(...)['columns']` and/or `marker_df.columns`) rather "
+        "than hard-coded names. If your requested marker tokens (`cluster/gene/...` or Scanpy "
+        "`group/names/...`) are missing after persistence, do not save a broken chart.\n"
+        "- **Post-write marker check:** After writing marker table datasource, verify every chart param token exists in "
+        "that datasource field set before `set_view`; if not, fallback to bounded `print(...)` output only.\n"
         "- **Otherwise:** Show the table with **bounded `print(...)`**. If you do not use `add_datasource`, do **not** add "
         "`table_chart` on `cells` with guessed column names.\n"
         "- **Rare:** `project.set_column(...)` on `cells` only for **one value per observation row** aligned with `cells`—"
@@ -273,5 +307,38 @@ def format_visualization_consistency_policy() -> str:
         "Scanpy table for the same visualization.\n"
         "- **Avoid by default:** pairing Scanpy-printed marker or expression tables with a separate wrapper-based "
         "expression heatmap that is not explicitly derived from the same array you printed.\n"
+    )
+
+
+def format_scanpy_hybrid_routing_policy() -> str:
+    """
+    Prompt text: hybrid routing contract for Scanpy outputs (row-aligned -> cells; non-row-aligned -> datasource table).
+    """
+    ds = CHAT_RANK_GENES_DATASOURCE_NAME
+    return (
+        "- **Hybrid Scanpy routing contract (core-first):** Route outputs by row alignment, not by convenience.\n"
+        "- **Write to `cells` only when 1-row-per-observation:** cluster labels (`leiden`/`louvain`), subcluster labels "
+        "merged back by explicit id, and embedding coordinates (`X_umap_*`, `X_pca_*`) that map directly to observations.\n"
+        f"- **Use datasource tables for non-row-aligned outputs:** marker/DE long-format tables (e.g. `rank_genes_groups`) "
+        f"belong in `{ds}`-style datasources, not ad-hoc columns on `cells`.\n"
+        "- **ID-safe merge required for `set_column(...)`:** align by explicit observation id (e.g. `cell_id`) and never "
+        "by implicit DataFrame index position.\n"
+        "- **Pre-chart validation gate:** before creating charts on a new field, verify field metadata exists on the target "
+        "datasource and verify non-missing/category counts are sensible; if unresolved, fall back to bounded `print(...)`.\n"
+        f"- **Marker table strictness (`{ds}`):** derive marker table chart params from datasource metadata after "
+        "write/replace, not assumptions. Accept common Scanpy aliases only when they resolve to real persisted fields.\n"
+        "- **Intent routing examples:**\n"
+        "  - marker list / top-N DE -> bounded text table first; optional persisted table datasource when user asks for a "
+        "saved view or text box.\n"
+        "  - text box requests -> datasource-bound table/text on marker datasource, not guessed marker-stat fields on `cells`.\n"
+        "  - heatmap / dot / bubble / violin for marker genes -> expression visualization on valid expression fields/wrappers; "
+        "do not claim these replace full DE-stat tables.\n"
+        "  - cluster distribution/counts -> aggregate from `cells.<cluster_key>` and optionally show ring/bar chart.\n"
+        "  - cell-type prediction from markers -> text-first; write `predicted_cell_type` to `cells` only when mapping is "
+        "explicit and one-value-per-cell can be derived.\n"
+        "- **Follow-up resolution:** phrases like “those genes”, “same”, or “visualize that” should resolve to the most "
+        "recent marker result; if none exists, recompute bounded top-N markers first.\n"
+        "- **When user says “use scanpy”:** prefer AnnData/Scanpy compute path when available, while still enforcing this "
+        "routing contract for where outputs are persisted.\n"
     )
 

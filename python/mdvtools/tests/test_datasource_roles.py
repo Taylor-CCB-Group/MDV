@@ -5,7 +5,9 @@ from mdvtools.llm.datasource_roles import (
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
+    format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
+    format_scanpy_hybrid_routing_policy,
     format_visualization_consistency_policy,
     infer_datasource_roles,
 )
@@ -66,6 +68,17 @@ def test_format_feature_table_field_policy_lists_name_columns():
     assert "name_column" in text
     assert "`rna`" in text or "rna" in text
     assert "Do not substitute" in text or "gene_ids" in text or "name_column" in text
+    assert "Wrapper `param` tokens" in text
+    assert "rna_expr" in text
+    assert "rna_expr|" in text or "subgroup_key" in text
+
+
+def test_format_no_hallucination_chart_policy():
+    text = format_no_hallucination_chart_policy()
+    assert "Metadata-first chart params" in text
+    assert "Never** invent" in text or "invent a datasource" in text
+    assert "color_by" in text
+    assert "get_datasource_as_dataframe" in text
 
 
 def test_format_visualization_consistency_policy():
@@ -87,6 +100,8 @@ def test_format_obs_table_chart_param_policy():
     assert "cells" in text
     assert "print" in text.lower() or "`print" in text
     assert CHAT_RANK_GENES_DATASOURCE_NAME in text
+    assert "derive `params` from actual persisted fields" in text
+    assert "Post-write marker check" in text
 
 
 def test_format_marker_ranking_viz_policy():
@@ -130,4 +145,17 @@ def test_format_feature_table_field_policy_without_expressions():
     text = format_feature_table_field_policy(roles)
     assert "df2.columns" in text
     assert "Field ID" in text
+
+
+def test_format_scanpy_hybrid_routing_policy():
+    text = format_scanpy_hybrid_routing_policy()
+    assert "Hybrid Scanpy routing contract" in text
+    assert "1-row-per-observation" in text
+    assert "cell_id" in text
+    assert CHAT_RANK_GENES_DATASOURCE_NAME in text
+    assert "text box" in text.lower()
+    assert "dot / bubble / violin" in text.lower()
+    assert "cluster distribution" in text.lower()
+    assert "predicted_cell_type" in text
+    assert "Marker table strictness" in text
 

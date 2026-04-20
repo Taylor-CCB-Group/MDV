@@ -1963,6 +1963,27 @@ export class ChartManager {
         });
     }
 
+    /**
+     * Map a chart param token to the DataStore column `field` id when it matches
+     * `field` or display `name` in metadata. Virtual expression columns use
+     * `subgroup|label(subgroup)|index` and are returned unchanged.
+     * @param {object} dStore DataStore instance
+     * @param {string} token
+     * @returns {string}
+     */
+    _resolveToDataStoreFieldKey(dStore, token) {
+        if (typeof token !== "string") {
+            return token;
+        }
+        if (dStore.columnIndex[token]) {
+            return token;
+        }
+        const c = dStore.columns.find(
+            (col) => col.field === token || col.name === token,
+        );
+        return c ? c.field : token;
+    }
+
     async _getColumnsAsync(dataSource, columns) {
         // there could be links as well as column `fields` in columns.
         // let's make a mechanism for awaiting the link - and initial linked cols.
@@ -2022,27 +2043,40 @@ export class ChartManager {
                 }
             }
         }
-        const reqCols = columns.filter((x) => {
-            //column already loading - but what if something went wrong earlier?
-            if (this.columnsLoading[dataSource][x]) {
-                return false;
-            }
-            const col = dStore.columnIndex[x];
-            //no record of column- need to load it (plus metadata)
-            if (!col) {
-                // what if x is something like a MulticolumnQuery?
-                if (typeof x !== "string") {
-                    // we could make dataStore understand it as a 'field'...
-                    // or if we return false to filter it out, chart deserialise can handle it?
-                    return false;
-                } else {
-                    dStore.addColumnFromField(x);
-                    return true;
+        const reqCols = [];
+        for (const x of columns) {
+            if (typeof x !== "string") {
+                const col = dStore.columnIndex[x];
+                if (!col) {
+                    continue;
                 }
+                if (!col.data) {
+                    reqCols.push(x);
+                }
+                continue;
             }
-            //only load if has no data
-            return !col.data;
-        });
+            const fieldKey = this._resolveToDataStoreFieldKey(dStore, x);
+            if (this.columnsLoading[dataSource][fieldKey]) {
+                continue;
+            }
+            let col = dStore.columnIndex[fieldKey];
+            if (!col) {
+                if (fieldKey.includes("|")) {
+                    dStore.addColumnFromField(fieldKey);
+                    reqCols.push(fieldKey);
+                } else {
+                    throw new Error(
+                        `Unknown column '${x}' in datasource '${dataSource}'. ` +
+                            `If you added or replaced a datasource in this session, refresh the page. ` +
+                            `Chart param tokens must match column field ids in project metadata.`,
+                    );
+                }
+                continue;
+            }
+            if (!col.data) {
+                reqCols.push(fieldKey);
+            }
+        }
 
         //No columns needed
         //but columns requested by other actions may still be loading
@@ -2078,8 +2112,13 @@ export class ChartManager {
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols, dataSource, func) {
+        const dStore = this.dsIndex[dataSource].dataStore;
         for (const col of neededCols) {
-            if (this.columnsLoading[dataSource][col]) {
+            const key =
+                typeof col === "string"
+                    ? this._resolveToDataStoreFieldKey(dStore, col)
+                    : col;
+            if (this.columnsLoading[dataSource][key]) {
                 setTimeout(() => {
                     this._haveColumnsLoaded(neededCols, dataSource, func);
                 }, 500);

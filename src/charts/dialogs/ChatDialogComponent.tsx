@@ -143,6 +143,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     view,
     verification,
     data_preview,
+    needs_refresh,
     onClose,
     error,
     updateInput,
@@ -245,7 +246,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                         <Button
                             variant="contained"
                             color="primary"
-                            onClick={() => navigateToView(view, false, onClose)}
+                            onClick={() => navigateToView(view, Boolean(needs_refresh), onClose)}
                         >
                             Load view &apos;{view}&apos;...
                         </Button>

@@ -15,6 +15,8 @@ const completedChatResponseSchema = z.object({
     verification: z.string().optional().nullable(),
     /** Truncated stdout from executed script (tabular preview). */
     data_preview: z.string().optional().nullable(),
+    /** Reload the page when opening the view so datasources.json changes are picked up. */
+    needs_refresh: z.boolean().optional(),
     // timestamp: z.string(),
     error: z.boolean().optional(),
 });
@@ -74,6 +76,8 @@ export type ChatMessage = {
     verification?: string | null;
     /** Truncated script stdout shown in chat before the main reply. */
     data_preview?: string | null;
+    /** When true, "Load view" should reload the app so new/updated datasources load in ChartManager. */
+    needs_refresh?: boolean;
     sender: 'user' | 'bot' | 'system';
     id: string;
     conversationId: string;
@@ -427,6 +431,7 @@ const useChat = () => {
                     view: response?.view,
                     verification: response?.verification ?? undefined,
                     data_preview: response?.data_preview ?? undefined,
+                    needs_refresh: response?.needs_refresh ?? false,
                 }])
             }
         } catch (error: any) {
