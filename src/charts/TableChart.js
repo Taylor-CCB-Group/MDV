@@ -198,9 +198,9 @@ class TableChart extends BaseChart {
         this.mode = tempMode;
     }
 
-    onColumnRemoved(column) {
+    onColumnRemoved(column, impact) {
         if (this.config.param.indexOf(column) === -1) {
-            return false;
+            return super.onColumnRemoved(column, impact);
         }
         const editor = this.grid.getCellEditor();
         if (editor) {
@@ -571,6 +571,7 @@ export default TableChart;
 BaseChart.types["table_chart"] = {
     class: TableChart,
     name: "Table (Classic)",
+    configEntriesUsingColumns: ["sort"],
     params: [
         {
             type: "_multi_column:all",

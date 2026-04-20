@@ -177,6 +177,37 @@ describe("analyzeChartColumnImpact", () => {
         });
     });
 
+    test("clears sort config entries without deleting table charts", () => {
+        const impact = analyzeChartColumnImpact(
+            {
+                id: "chart-sort",
+                title: "Table",
+                type: "table_chart_react",
+                size: [400, 300],
+                legend: "",
+                param: ["expr2"],
+                sort: {
+                    columnId: "expr1",
+                    ascending: true,
+                },
+            } as any,
+            {
+                params: [{ type: "_multi_column:all", name: "fields" }],
+                configEntriesUsingColumns: ["sort"],
+            } as any,
+            "expr1",
+        );
+
+        expect(impact?.action).toBe("update");
+        expect(impact?.configEntryUpdates).toEqual({
+            sort: null,
+        });
+        expect(impact?.reasons).toContainEqual({
+            kind: "config_entry.single",
+            entry: "sort",
+        });
+    });
+
     test("treats row summary image key removal as destructive", () => {
         const impact = analyzeChartColumnImpact(
             {
@@ -320,5 +351,29 @@ describe("analyzeChartColumnImpact", () => {
             "removed_filter",
             "removed_tooltip",
         ]);
+    });
+
+    test("finds missing sort columns referenced by tables", () => {
+        const missingColumns = getMissingColumnsForChartConfig(
+            {
+                id: "chart-12",
+                title: "Table",
+                type: "table_chart_react",
+                size: [400, 300],
+                legend: "",
+                param: ["expr2"],
+                sort: {
+                    columnId: "removed_sort",
+                    ascending: true,
+                },
+            } as any,
+            {
+                params: [{ type: "_multi_column:all", name: "fields" }],
+                configEntriesUsingColumns: ["sort"],
+            } as any,
+            new Set(["expr2"]),
+        );
+
+        expect(missingColumns).toEqual(["removed_sort"]);
     });
 });

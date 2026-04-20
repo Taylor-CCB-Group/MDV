@@ -21,9 +21,33 @@ function getFieldSpecs(value: unknown): FieldSpecs | null {
     return Array.isArray(value) ? value : [value as FieldSpec];
 }
 
+function getReferencedFields(value: unknown): string[] {
+    if (value == null) {
+        return [];
+    }
+    if (Array.isArray(value)) {
+        return value.flatMap((entry) => getReferencedFields(entry));
+    }
+    if (typeof value === "string") {
+        return [value];
+    }
+    if (typeof value !== "object") {
+        return [];
+    }
+    if ("columnId" in value && typeof value.columnId === "string") {
+        return [value.columnId];
+    }
+    if ("field" in value && typeof value.field === "string") {
+        return [value.field];
+    }
+    if ("fields" in value && Array.isArray(value.fields)) {
+        return value.fields.filter((field): field is string => typeof field === "string");
+    }
+    return [];
+}
+
 function containsField(value: unknown, column: string): boolean {
-    const specs = getFieldSpecs(value);
-    return specs ? specs.some((spec) => flattenFields(spec).includes(column)) : false;
+    return getReferencedFields(value).includes(column);
 }
 
 function getColorFields(config: BaseConfig): string[] {
@@ -41,14 +65,8 @@ function getColorFields(config: BaseConfig): string[] {
 }
 
 function addFieldsToSet(fields: Set<string>, value: unknown) {
-    const specs = getFieldSpecs(value);
-    if (!specs) {
-        return;
-    }
-    for (const spec of specs) {
-        for (const field of flattenFields(spec)) {
-            fields.add(field);
-        }
+    for (const field of getReferencedFields(value)) {
+        fields.add(field);
     }
 }
 
@@ -243,7 +261,7 @@ export function analyzeChartColumnImpact(
 
     // `configEntriesUsingColumns` covers column references that are not part of
     // `config.param`, for example image labels or sort-by fields.
-    const configEntryUpdates: Record<string, FieldSpec | FieldSpecs | undefined> = {};
+    const configEntryUpdates: Record<string, unknown> = {};
     for (const entry of chartType?.configEntriesUsingColumns ?? []) {
         const value = (config as Record<string, unknown>)[entry];
         if (value == null || !containsField(value, column)) {
@@ -251,6 +269,16 @@ export function analyzeChartColumnImpact(
         }
 
         touched = true;
+        if (
+            typeof value === "object" &&
+            value !== null &&
+            "columnId" in value &&
+            typeof value.columnId === "string"
+        ) {
+            reasons.push({ kind: "config_entry.single", entry });
+            configEntryUpdates[entry] = null;
+            continue;
+        }
         if (Array.isArray(value)) {
             const nextValue = value.filter((item) => !flattenFields(item as FieldSpec).includes(column));
             reasons.push({ kind: "config_entry.multi", entry });

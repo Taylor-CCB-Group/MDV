@@ -39,7 +39,7 @@ export type ChartColumnImpact = {
     reasons: ChartColumnImpactReason[];
     paramSlotImpacts: ParamSlotImpact[];
     nextParam?: FieldSpecs;
-    configEntryUpdates?: Record<string, FieldSpec | FieldSpecs | undefined>;
+    configEntryUpdates?: Record<string, unknown>;
     tooltipUpdate?: TooltipRemovalUpdate;
     clearColorBy: boolean;
     clearBackgroundFilter: boolean;

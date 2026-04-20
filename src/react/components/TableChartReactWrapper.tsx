@@ -156,14 +156,14 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     // Overriding the onColumnRemoved to update table config and avoid removing the whole table
     onColumnRemoved(column: string, impact?: ChartColumnImpact) {
         if (!Array.isArray(this.config.param)) {
-            return false;
+            return super.onColumnRemoved(column, impact);
         }
         // `config.param` can contain either plain field names or query-backed FieldSpec objects
         // flatten each spec to concrete field names so removals work for both
         const containsRemovedColumn = (fieldSpec: FieldSpec) =>
             flattenFields(fieldSpec).includes(column);
         if (!this.config.param.some(containsRemovedColumn)) {
-            return false;
+            return super.onColumnRemoved(column, impact);
         }
 
         action(() => {
@@ -257,6 +257,7 @@ BaseChart.types["table_chart_react"] = {
     name: "Table",
     class: TableChartReact,
     allow_user_add: true,
+    configEntriesUsingColumns: ["sort"],
     params: [
         {
             type: "_multi_column:all",

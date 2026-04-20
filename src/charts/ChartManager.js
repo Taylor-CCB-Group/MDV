@@ -983,10 +983,15 @@ export class ChartManager {
      * @param {any} data
      */
     filterRemovedColumnsFromViewData(data) {
+        return this.sanitizeViewDataForRemovedColumns(data).data;
+    }
+
+    sanitizeViewDataForRemovedColumns(data) {
         if (!data?.initialCharts) {
-            return data;
+            return { data, changed: false };
         }
         const cleanedData = JSON.parse(JSON.stringify(data));
+        let changed = false;
         for (const dsName in cleanedData.initialCharts) {
             const dataStore = this.dsIndex[dsName]?.dataStore;
             if (!dataStore) {
@@ -1004,6 +1009,7 @@ export class ChartManager {
                     if (missingColumns.length === 0) {
                         return config;
                     }
+                    changed = true;
                     return sanitizeChartConfigForRemovedColumns(
                         config,
                         chartType,
@@ -1012,7 +1018,7 @@ export class ChartManager {
                 })
                 .filter(Boolean);
         }
-        return cleanedData;
+        return { data: cleanedData, changed };
     }
 
     /**
@@ -1021,20 +1027,38 @@ export class ChartManager {
     async getSanitizedSavedViews() {
         /** @type {Record<string, import("./ViewManager").View>} */
         const updatedViews = {};
+        if (!this.viewLoader) {
+            return updatedViews;
+        }
         const currentView = this.viewManager.current_view;
-        const allViews = this.viewManager.all_views ?? [];
-        for (const viewName of allViews) {
-            if (viewName === currentView) {
+        const allViews = (this.viewManager.all_views ?? []).filter(
+            (viewName) => viewName !== currentView,
+        );
+        const results = await Promise.allSettled(
+            allViews.map(async (viewName) => {
+                try {
+                    const originalView = await this.viewLoader(viewName);
+                    if (!originalView) {
+                        return null;
+                    }
+                    const { data: cleanedView, changed } =
+                        this.sanitizeViewDataForRemovedColumns(originalView);
+                    if (!changed) {
+                        return null;
+                    }
+                    return [viewName, cleanedView];
+                } catch (error) {
+                    console.error(`Failed to sanitize saved view '${viewName}'`, error);
+                    return null;
+                }
+            }),
+        );
+        for (const result of results) {
+            if (result.status !== "fulfilled" || !result.value) {
                 continue;
             }
-            const originalView = await this.viewLoader(viewName);
-            if (!originalView) {
-                continue;
-            }
-            const cleanedView = this.filterRemovedColumnsFromViewData(originalView);
-            if (JSON.stringify(cleanedView) !== JSON.stringify(originalView)) {
-                updatedViews[viewName] = cleanedView;
-            }
+            const [viewName, cleanedView] = result.value;
+            updatedViews[viewName] = cleanedView;
         }
         return updatedViews;
     }
