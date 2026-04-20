@@ -52,6 +52,7 @@ import HistogramWidget, {
 import {
     getNumericColumnData,
     getSharedNumericColumnData,
+    type NumericColumnData,
 } from "@/lib/columnTypeHelpers";
 import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
 import { useDebounce } from "use-debounce";
@@ -62,6 +63,7 @@ import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 const HISTOGRAM_BINS = 100;
+const EMPTY_NUMERIC_DATA = new Float32Array(0);
 
 type Props<K extends DataType> = {
     column: DataColumn<K>;
@@ -108,7 +110,7 @@ const TextComponent = observer(({
             newFilter.category = newValue;
             conf.filters[column.field] = newFilter;
         })();
-    }, [conf.filters, column.field, filter]);
+    }, [conf.filters, column.field, filter, column.datatype]);
 
     useCloseOnIntersection(ref, () => setOpen(false));
 
@@ -375,7 +377,18 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 
     const filteredIndices = useSimplerFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
-    const numericData = getNumericColumnData(column);
+    const numericData = useMemo<NumericColumnData>(() => {
+        try {
+            return getNumericColumnData(column);
+        } catch (error) {
+            console.warn(
+                `Skipping range filter histogram for unloaded column '${column.field}'`,
+                error,
+            );
+            return EMPTY_NUMERIC_DATA;
+        }
+    }, [column]);
+    const hasNumericData = numericData.length > 0;
     const overallHistogramQuery = useQuery<number[]>({
         queryKey: [
             "selection-dialog-overall-histogram",
@@ -403,8 +416,11 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     });
     const overallHistogram = overallHistogramQuery.data ?? [];
     const queryHistogram = useCallback(async () => {
+        if (!hasNumericData) {
+            return;
+        }
         await overallHistogramQuery.refetch();
-    }, [overallHistogramQuery]);
+    }, [hasNumericData, overallHistogramQuery]);
 
     const filteredHistogram = useMemo(
         () => createHistogram(numericData, column.minMax[0], column.minMax[1], HISTOGRAM_BINS, filteredIndices),
@@ -827,6 +843,10 @@ const SelectionDialogComponent = () => {
     //! since this is outside the ErrorBoundary, problems in this hook are not well handled
     //we could consider returning some kind of `Result` object from this hook...
     const orderedParams = useOrderedParamColumns();
+    const visibleOrderedParams = useMemo(
+        () => orderedParams.filter((column) => column.data != null),
+        [orderedParams],
+    );
     const config = useConfig<SelectionDialogConfig>();
     useResetButton();
     const showAddRow = false;
@@ -846,12 +866,16 @@ const SelectionDialogComponent = () => {
 
         // Check if dragged and dropped item are different and other sanity checks
         if (active && over && active.id !== over?.id) {
-            const oldIndex = orderedParams.findIndex(p => p.field === active.id);
-            const newIndex = orderedParams.findIndex(p => p.field === over.id);
+            const oldIndex = visibleOrderedParams.findIndex(p => p.field === active.id);
+            const newIndex = visibleOrderedParams.findIndex(p => p.field === over.id);
 
             if (oldIndex !== -1 && newIndex !== -1) {
                 // Update the config.order with the new order
-                const newOrderedFields = arrayMove(orderedParams.map(p => p.field), oldIndex, newIndex);
+                const newOrderedFields = arrayMove(
+                    visibleOrderedParams.map(p => p.field),
+                    oldIndex,
+                    newIndex,
+                );
                 const newOrder: Record<string, number> = {};
                 newOrderedFields.forEach((field, index) => {
                     newOrder[field] = index;
@@ -862,7 +886,7 @@ const SelectionDialogComponent = () => {
                 });
             }
         }
-    }, [config, orderedParams]);
+    }, [config, visibleOrderedParams]);
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             <DndContext
@@ -871,10 +895,10 @@ const SelectionDialogComponent = () => {
                 onDragEnd={onDragEnd}
             >
                 <SortableContext 
-                    items={orderedParams.map(col => col.field)}
+                    items={visibleOrderedParams.map(col => col.field)}
                     strategy={verticalListSortingStrategy}
                 >
-                    {orderedParams.map((col) => <AbstractComponent key={col.field} column={col} />)}
+                    {visibleOrderedParams.map((col) => <AbstractComponent key={col.field} column={col} />)}
                 </SortableContext>
             </DndContext>
             {showAddRow && <ErrorBoundary FallbackComponent={

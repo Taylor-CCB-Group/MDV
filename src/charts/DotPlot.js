@@ -35,7 +35,17 @@ class DotPlot extends SVGChart {
         }
         //this.fractionScale = scaleSqrt().domain([0, 100]);
         this.mobxAutorun(() => {
-            this._setFields(this.config.param.slice(1));
+            const nextFieldNames = this.config.param.slice(1);
+            // `setParams()` keeps `fieldNames` in sync immediately so the
+            // post-removal "filtered" event does not see stale columns; skip
+            // the autorun body when it would only repeat the same update.
+            if (
+                this.fieldNames?.length === nextFieldNames.length &&
+                this.fieldNames.every((fieldName, index) => fieldName === nextFieldNames[index])
+            ) {
+                return;
+            }
+            this._setFields(nextFieldNames);
         });
     }
     
@@ -44,15 +54,20 @@ class DotPlot extends SVGChart {
     //   as long as we had the workaround in `setParams()` to manually look for activeQuery
     //   but that was itself a hack.
     // @loadColumnData
+    _syncFields(fieldNames) {
+        // Update the fieldNames
+        this.fieldNames = fieldNames;
+        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
+        this.x_scale.domain(yLabels);
+    }
+
     _setFields(fieldNames) {
         //! we don't want to mutate the config object... 
         // we want to have a special value which signifies that it should use this behaviour.
         // then when we save state, it will have the appropriate value.
         //this.config.param = [p0, ...fieldNames]; //first is the category column
-        this.fieldNames = fieldNames;
+        this._syncFields(fieldNames);
         // await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
-        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
-        this.x_scale.domain(yLabels);
         this.onDataFiltered();
     }
     // prefering to setFields in an autorun so there's less potential for confusion
@@ -61,6 +76,10 @@ class DotPlot extends SVGChart {
     //     this.config.param = params;
     //     this.setFields(params.slice(1));
     // }
+    setParams(params) {
+        this.config.param = params;
+        this._syncFields(params.slice(1));
+    }
 
     remove(notify = true) {
         this.dim.destroy(notify);

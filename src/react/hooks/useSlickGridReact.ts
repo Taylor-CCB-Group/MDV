@@ -14,6 +14,8 @@ import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import { flattenFields } from "@/lib/columnTypeHelpers";
+import type { ColumnRemovalImpact } from "@/types/columnRemovalTypes";
+import type { View } from "@/charts/ViewManager";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -77,6 +79,10 @@ const useSlickGridReact = () => {
     const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [bulkEditColumn, setBulkEditColumn] = useState<string | null>(null);
+    const [pendingColumnRemoval, setPendingColumnRemoval] = useState<{
+        columnName: string;
+        impact: ColumnRemovalImpact;
+    } | null>(null);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -91,6 +97,19 @@ const useSlickGridReact = () => {
     const dataModel = useMemo(() => 
         new DataModel(dataStore, { autoupdate: false })
     , [dataStore]);
+    const commitColumnRemoval = useCallback(
+        async (columnName: string) => {
+            dataModel.removeColumn(columnName);
+            if (!chartManager?.viewManager) {
+                return;
+            }
+            const updatedViews: Record<string, View> | undefined = chartManager.getSanitizedSavedViews
+                ? await chartManager.getSanitizedSavedViews()
+                : undefined;
+            await chartManager.viewManager.saveView(undefined, updatedViews);
+        },
+        [chartManager, dataModel],
+    );
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
@@ -358,7 +377,21 @@ const useSlickGridReact = () => {
                     if (!isEditModeRef.current) {
                         return;
                     }
-                    // const dataModel = new DataModel(dataStore, { autoupdate: false });
+                    if (chartManager) {
+                        const impact = chartManager.analyzeColumnRemoval(
+                            dataStore.name,
+                            column.field,
+                            chartId,
+                        );
+                        // Remove-column is a committed schema change, so we always
+                        // confirm using the computed impact, even when no other
+                        // currently open charts depend on the field.
+                        setPendingColumnRemoval({
+                            columnName: column.field,
+                            impact,
+                        });
+                        return;
+                    }
                     dataModel.removeColumn(column.field);
                 }
             },
@@ -380,7 +413,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore, dataModel]);
+    }, [chart, chartManager, config, dataStore, dataModel, chartId]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
@@ -545,6 +578,23 @@ const useSlickGridReact = () => {
         setIsBulkEditDialogOpen(false);
         setBulkEditColumn(null);
     }, []);
+
+    const closeColumnRemovalDialog = useCallback(() => {
+        setPendingColumnRemoval(null);
+    }, []);
+
+    const confirmColumnRemoval = useCallback(async () => {
+        if (!pendingColumnRemoval) {
+            return;
+        }
+        try {
+            // By the time we get here the user has already approved the exact
+            // computed impact; confirmation performs the mutation and commits it.
+            await commitColumnRemoval(pendingColumnRemoval.columnName);
+        } finally {
+            setPendingColumnRemoval(null);
+        }
+    }, [commitColumnRemoval, pendingColumnRemoval]);
 
     // Columns to be displayed for cloning
     const cloneableColumns = useMemo(() => {
@@ -728,6 +778,9 @@ const useSlickGridReact = () => {
         bulkEditColumn,
         closeBulkEditDialog,
         handleBulkEdit,
+        pendingColumnRemoval,
+        closeColumnRemovalDialog,
+        confirmColumnRemoval,
     };
 };
 

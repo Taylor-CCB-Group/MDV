@@ -9,6 +9,7 @@ import { getTableExportBlob } from "@/datastore/dataExportUtils";
 import { createEl } from "@/utilities/ElementsTyped";
 import { DataModel } from "@/table/DataModel";
 import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
+import type { ChartColumnImpact } from "@/types/columnRemovalTypes";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -153,16 +154,16 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     }
 
     // Overriding the onColumnRemoved to update table config and avoid removing the whole table
-    onColumnRemoved(column: string) {
+    onColumnRemoved(column: string, impact?: ChartColumnImpact) {
         if (!Array.isArray(this.config.param)) {
-            return false;
+            return super.onColumnRemoved(column, impact);
         }
         // `config.param` can contain either plain field names or query-backed FieldSpec objects
         // flatten each spec to concrete field names so removals work for both
         const containsRemovedColumn = (fieldSpec: FieldSpec) =>
             flattenFields(fieldSpec).includes(column);
         if (!this.config.param.some(containsRemovedColumn)) {
-            return false;
+            return super.onColumnRemoved(column, impact);
         }
 
         action(() => {
@@ -194,6 +195,16 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                 delete this.config.column_widths[column];
             }
         })();
+
+        if (impact && !impact.isSourceChart) {
+            // The source table manages its own visible columns/order, but other
+            // table charts still need the shared non-table cleanup path.
+            super.onColumnRemoved(column, {
+                ...impact,
+                action: "update",
+                nextParam: this.config.param,
+            });
+        }
 
         return false;
     }
@@ -246,6 +257,7 @@ BaseChart.types["table_chart_react"] = {
     name: "Table",
     class: TableChartReact,
     allow_user_add: true,
+    configEntriesUsingColumns: ["sort"],
     params: [
         {
             type: "_multi_column:all",

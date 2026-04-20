@@ -3,7 +3,9 @@ import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import type DataStore from "@/datastore/DataStore";
+import { flattenFields } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
+import type { ChartColumnImpact } from "@/types/columnRemovalTypes";
 
 // export type CommonFilter = { noClear?: boolean, invert?: boolean }; //todo - implement these features.
 export type CategoryFilter = { category: string[] };
@@ -57,6 +59,85 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         })();
     }
 
+    onColumnRemoved(column: string, impact?: ChartColumnImpact): boolean {
+        if (impact?.action === "delete") {
+            return super.onColumnRemoved(column, impact);
+        }
+        const currentParam = Array.isArray(this.config.param) ? this.config.param : [];
+        const nextParam =
+            impact?.nextParam ?? currentParam.filter((field) => !flattenFields(field).includes(column));
+        // `config.param` can contain query-backed FieldSpecs, so diff the
+        // flattened concrete field names rather than assuming `column` is the
+        // only key that disappears from filters/order.
+        const nextFieldSet = new Set(nextParam.flatMap((field) => flattenFields(field)));
+        const removedFields = currentParam
+            .flatMap((field) => flattenFields(field))
+            .filter((field) => !nextFieldSet.has(field));
+
+        const chartImpact: ChartColumnImpact = impact ?? {
+            // Fallback for any non-standard caller. In the normal flow
+            // ChartManager provides a richer impact object.
+            chartId: this.config.id,
+            chartTitle: this.config.title,
+            chartType: this.config.type,
+            chartTypeLabel: BaseChart.types[this.config.type]?.name ?? this.config.type,
+            isSourceChart: false,
+            action: "update",
+            reasons: [],
+            paramSlotImpacts: [],
+            nextParam,
+            clearColorBy: false,
+            clearBackgroundFilter: false,
+        };
+
+        // Delegate param pruning and shared config cleanup to BaseChart instead
+        // of mutating `config.param` directly here.
+        const didDelete = super.onColumnRemoved(column, {
+            ...chartImpact,
+            action: "update",
+            nextParam,
+        });
+        if (didDelete) {
+            return true;
+        }
+        if (removedFields.length === 0) {
+            // BaseChart already handled the generic cleanup; there are just no
+            // selection-dialog-specific filter/order keys to prune.
+            return false;
+        }
+
+        action(() => {
+            // The shared analyzer has already decided that this chart survives;
+            // this override just keeps filter/order state aligned with pruned params.
+            for (const field of removedFields) {
+                delete this.config.filters[field];
+            }
+
+            const nextOrder = { ...(this.config.order ?? {}) };
+            // `order` is stored as dense integer positions, so after removing
+            // one or more fields every later entry must shift left.
+            const removedOrders = removedFields
+                .map((field) => nextOrder[field])
+                .filter((order): order is number => order !== undefined)
+                .sort((a, b) => a - b);
+            for (const field of removedFields) {
+                delete nextOrder[field];
+            }
+            if (removedOrders.length > 0) {
+                for (const field in nextOrder) {
+                    const currentOrder = nextOrder[field];
+                    const shift = removedOrders.filter((order) => order < currentOrder).length;
+                    if (shift > 0) {
+                        nextOrder[field] -= shift;
+                    }
+                }
+            }
+            this.config.order = nextOrder;
+        })();
+
+        return false;
+    }
+
     getSettings(){
           const settings = super.getSettings();
           const c = this.config;
@@ -87,3 +168,5 @@ BaseChart.types["selection_dialog"] = {
     ],
 }
 // BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];
+
+export default SelectionDialogReact;

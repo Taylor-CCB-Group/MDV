@@ -110,6 +110,59 @@ class RowSummaryBox extends BaseChart {
         this.imViewer.img.__doc__ = doc;
     }
 
+    onColumnRemoved(column, impact) {
+        if (impact?.action === "delete") {
+            return super.onColumnRemoved(column, impact);
+        }
+        if (!Array.isArray(this.config.param)) {
+            return super.onColumnRemoved(column, impact);
+        }
+
+        const currentParam = this.config.param;
+        const removedIndex = currentParam.indexOf(column);
+        const nextParam =
+            impact?.nextParam ?? currentParam.filter((field) => field !== column);
+
+        // The image key is stored by param index, so removing that field is not
+        // safely prunable; the chart must be deleted instead.
+        if (this.config.image && this.config.image.param === removedIndex) {
+            return true;
+        }
+        // Adjust the stored image-param index
+        if (removedIndex !== -1 && this.config.image && this.config.image.param > removedIndex) {
+            this.config.image.param -= 1;
+        }
+
+        // Call onColumnRemoved and update the relevant settings
+        super.onColumnRemoved(column, {
+            ...impact,
+            action: "update",
+            nextParam,
+        });
+
+        if (removedIndex === -1) {
+            // Shared cleanup may still have handled tooltip/color/background
+            // filter state even though there was no visible summary section to remove.
+            return false;
+        }
+        if (this.img_data && this.config.image && Array.isArray(this.config.param)) {
+            // `img_data` is runtime-only derived state, so keep it aligned with
+            // the new image param index after pruning params.
+            this.img_data.key_column = this.config.param[this.config.image.param];
+        }
+
+        const holder = this.paramHolders[column];
+        if (holder) {
+            const section = holder.closest(".mdv-section");
+            if (section) {
+                section.remove();
+            }
+            delete this.paramHolders[column];
+        }
+
+        return false;
+    }
+
     getSettings() {
         return super.getSettings();
     }
