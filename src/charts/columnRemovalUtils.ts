@@ -61,7 +61,9 @@ function getColorFields(config: BaseConfig): string[] {
     if ("column" in colorBy) {
         return colorBy.column?.field ? [colorBy.column.field] : [];
     }
-    return flattenFields(colorBy as FieldSpec);
+    // Fallback for legacy/variant color_by object shapes. This keeps the
+    // return value stable as string[] and avoids runtime iteration errors.
+    return getReferencedFields(colorBy);
 }
 
 function addFieldsToSet(fields: Set<string>, value: unknown) {
