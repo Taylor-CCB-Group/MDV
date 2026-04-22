@@ -29,36 +29,4 @@ describe("DataStore.removeColumn", () => {
         expect(store.dirtyColumns.removed).toEqual({ temp: true });
         expect(store._callListeners).toHaveBeenCalledWith("column_removed", "temp");
     });
-
-    test("discardPendingAddedColumns removes unsaved added columns without marking them removed", () => {
-        const fresh = {
-            field: "fresh",
-            data: new Uint8Array([1, 2, 3]),
-            buffer: new SharedArrayBuffer(3),
-        };
-        const store = {
-            columnIndex: { fresh },
-            columns: [fresh],
-            columnsWithData: ["fresh"],
-            dirtyColumns: {
-                added: { fresh: true },
-                removed: {},
-                data_changed: { fresh: true },
-                colors_changed: { fresh: true },
-            },
-            _callListeners: vi.fn(),
-            removeColumn: DataStore.prototype.removeColumn,
-        };
-
-        DataStore.prototype.discardPendingAddedColumns.call(store);
-
-        expect(store.columnIndex.fresh).toBeUndefined();
-        expect(store.columns).toEqual([]);
-        expect(store.columnsWithData).toEqual([]);
-        expect(store.dirtyColumns.added).toEqual({});
-        expect(store.dirtyColumns.removed).toEqual({});
-        expect(store.dirtyColumns.data_changed).toEqual({});
-        expect(store.dirtyColumns.colors_changed).toEqual({});
-        expect(store._callListeners).not.toHaveBeenCalled();
-    });
 });

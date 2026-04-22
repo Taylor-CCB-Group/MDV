@@ -417,23 +417,6 @@ class DataStore {
     }
 
     /**
-     * Drop any columns that were added locally but never persisted. Unlike
-     * removals, unsaved additions are not referenced by existing saved views,
-     * so switching away should simply forget them.
-     */
-    discardPendingAddedColumns() {
-        const addedFields = Object.keys(this.dirtyColumns.added);
-        if (addedFields.length === 0) {
-            return;
-        }
-        for (const field of addedFields) {
-            delete this.dirtyColumns.added[field];
-            this.removeColumn(field, false, false);
-        }
-        this.dirtyColumns.added = {};
-    }
-
-    /**
      * Returns the current filter, which is just an array corresponding
      * to the index of the row, which contains 0 if it is present or
      * greater than 0 if it has been filtrered out. Do not modify the array.
