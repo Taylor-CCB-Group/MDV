@@ -130,12 +130,6 @@ class ViewManager {
                 }
             }
             this.cm.removeAllCharts();
-            // Unsaved added columns are view-local draft data. Drop them before
-            // loading the next view so param pickers/options reflect only
-            // persisted datasource columns.
-            for (const ds of this.cm.dataSources) {
-                ds.dataStore.discardPendingAddedColumns?.();
-            }
             contentDiv.innerHTML = "";
             this.setView(view);
             this.cm.viewLoader(view).then(async (data: object) => {
