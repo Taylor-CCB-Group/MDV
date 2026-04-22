@@ -25,10 +25,6 @@ vi.mock("@/react/components/BulkEditColumnDialog", () => ({
     default: () => <div data-testid="mock-bulk-edit-dialog" />,
 }));
 
-vi.mock("@/react/components/ColumnRemovalImpactDialog", () => ({
-    default: () => <div data-testid="mock-column-removal-dialog" />,
-}));
-
 vi.mock("@/charts/dialogs/ReusableAlertDialog", () => ({
     default: () => <div data-testid="mock-alert-dialog" />,
 }));
@@ -80,9 +76,6 @@ describe("TableChartReactComponent", () => {
             bulkEditColumn: null,
             closeBulkEditDialog: vi.fn(),
             handleBulkEdit: vi.fn(),
-            pendingColumnRemoval: null,
-            closeColumnRemovalDialog: vi.fn(),
-            confirmColumnRemoval: vi.fn(),
         };
 
         mockFindReplaceReturn = {
@@ -130,10 +123,4 @@ describe("TableChartReactComponent", () => {
         const feedbackDialog = screen.queryByTestId("feedback-alert-dialog");
         expect(feedbackDialog).toBeNull();
     });
-
-    test("should render the column removal dialog component", () => {
-        render(<TableChartReactComponent />);
-
-        expect(screen.getByTestId("mock-column-removal-dialog")).toBeDefined();
-    });
-}); 
+});
