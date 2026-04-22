@@ -275,6 +275,7 @@ class TestLoadConfig(unittest.TestCase):
     @patch('os.path.dirname')
     @patch('os.path.abspath')
     @patch.dict(os.environ, {
+        'DB_BACKEND': 'postgres',
         'DB_USER': 'test_user',
         'DB_PASSWORD': 'test_password',
         'DB_NAME': 'test_db',
@@ -300,8 +301,8 @@ class TestLoadConfig(unittest.TestCase):
         mock_dirname.return_value = '/test'
         mock_read_secret.side_effect = ['secret_user', 'secret_password', 'secret_db']
         
-        # Clear all environment variables to ensure secrets are used
-        with patch.dict(os.environ, {}, clear=True):
+        # Keep postgres backend while clearing credentials to ensure secrets are used
+        with patch.dict(os.environ, {'DB_BACKEND': 'postgres'}, clear=True):
             load_config(self.app)
         
         expected_uri = 'postgresql://secret_user:secret_password@test_host/secret_db'
