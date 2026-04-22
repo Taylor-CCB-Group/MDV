@@ -66,11 +66,6 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
-import {
-    analyzeChartColumnImpact,
-    getMissingColumnsForChartConfig,
-    sanitizeChartConfigForRemovedColumns,
-} from "./columnRemovalUtils";
 
 
 //order of column data in an array buffer
@@ -699,8 +694,7 @@ export class ChartManager {
             this.viewManager.setView(currentView);
             dataLoader.viewLoader(currentView).then(async (data) => {
                 try {
-                    const cleanedData = this.filterRemovedColumnsFromViewData(data);
-                    await this._init(cleanedData, firstTime);
+                    await this._init(data, firstTime);
                     if (currentView) {
                         const state = this.getState();
                         if (!state.view?.viewImage) {
@@ -725,7 +719,7 @@ export class ChartManager {
         //only one view hard coded in config
         //! This else block is not called, but if it is called at some point, make sure the state save works properly
         else {
-            this._init(this.filterRemovedColumnsFromViewData(config.only_view), firstTime)
+            this._init(config.only_view, firstTime)
             .then(async () => {
                     const state = this.getState();
                     if (!state.view?.viewImage) {
@@ -976,166 +970,29 @@ export class ChartManager {
         this.viewManager.checkAndChangeView(view);
     }
 
-    /**
-     * Saved views can still reference columns that were removed and committed
-     * earlier. Clean those configs before `_init()` recreates charts so view
-     * switches and reloads never resurrect broken charts.
-     * @param {any} data
-     */
-    filterRemovedColumnsFromViewData(data) {
-        return this.sanitizeViewDataForRemovedColumns(data).data;
-    }
-
-    sanitizeViewDataForRemovedColumns(data) {
-        if (!data?.initialCharts) {
-            return { data, changed: false };
-        }
-        const cleanedData = JSON.parse(JSON.stringify(data));
-        let changed = false;
-        for (const dsName in cleanedData.initialCharts) {
-            const dataStore = this.dsIndex[dsName]?.dataStore;
-            if (!dataStore) {
-                continue;
-            }
-            const existingFields = new Set(Object.keys(dataStore.columnIndex));
-            cleanedData.initialCharts[dsName] = cleanedData.initialCharts[dsName]
-                .map((config) => {
-                    const chartType = BaseChart.types[config.type];
-                    const missingColumns = getMissingColumnsForChartConfig(
-                        config,
-                        chartType,
-                        existingFields,
-                    );
-                    if (missingColumns.length === 0) {
-                        return config;
-                    }
-                    changed = true;
-                    return sanitizeChartConfigForRemovedColumns(
-                        config,
-                        chartType,
-                        missingColumns,
-                    );
-                })
-                .filter(Boolean);
-        }
-        return { data: cleanedData, changed };
-    }
-
-    /**
-     * @returns {Promise<Record<string, import("./ViewManager").View>>}
-     */
-    async getSanitizedSavedViews() {
-        /** @type {Record<string, import("./ViewManager").View>} */
-        const updatedViews = {};
-        if (!this.viewLoader) {
-            return updatedViews;
-        }
-        const currentView = this.viewManager.current_view;
-        const allViews = (this.viewManager.all_views ?? []).filter(
-            (viewName) => viewName !== currentView,
-        );
-        const results = await Promise.allSettled(
-            allViews.map(async (viewName) => {
-                try {
-                    const originalView = await this.viewLoader(viewName);
-                    if (!originalView) {
-                        return null;
-                    }
-                    const { data: cleanedView, changed } =
-                        this.sanitizeViewDataForRemovedColumns(originalView);
-                    if (!changed) {
-                        return null;
-                    }
-                    return [viewName, cleanedView];
-                } catch (error) {
-                    console.error(`Failed to sanitize saved view '${viewName}'`, error);
-                    return null;
-                }
-            }),
-        );
-        for (const result of results) {
-            if (result.status !== "fulfilled" || !result.value) {
-                continue;
-            }
-            const [viewName, cleanedView] = result.value;
-            updatedViews[viewName] = cleanedView;
-        }
-        return updatedViews;
-    }
-
-    /**
-     * Returns the impact of removing a column before any datastore mutation occurs.
-     * @param {string} dataSourceName
-     * @param {string} column
-     * @param {string | null} [sourceChartId=null]
-     */
-    analyzeColumnRemoval(dataSourceName, column, sourceChartId = null) {
-        const ds = this.dsIndex[dataSourceName];
-        if (!ds) {
-            throw new Error(`Unknown data source '${dataSourceName}'`);
-        }
-
-        const charts = [];
-        for (const id in this.charts) {
-            const chartInfo = this.charts[id];
-            if (chartInfo.dataSource !== ds) {
-                continue;
-            }
-            // Build the column impact object for each chart
-            const impact = analyzeChartColumnImpact(
-                chartInfo.chart.config,
-                BaseChart.types[chartInfo.chart.config.type],
-                column,
-                { sourceChartId },
-            );
-            if (!impact) {
-                continue;
-            }
-            charts.push(impact);
-        }
-
-        return {
-            dataSource: dataSourceName,
-            column,
-            charts,
-        };
-    }
-
     _columnRemoved(ds, col) {
-        // Get the impact of column removal for all charts
-        const impact = this.analyzeColumnRemoval(ds.name, col);
-        const impactById = new Map(impact.charts.map((chartImpact) => [chartImpact.chartId, chartImpact]));
-        const idsToDelete = [];
-        const chartsToDelete = [];
+        const ids_to_delete = [];
         for (const id in this.charts) {
-            const chartInfo = this.charts[id];
-            if (chartInfo.dataSource === ds) {
-                const ch = chartInfo.chart;
-                const chartImpact = impactById.get(ch.config.id);
-                if (!chartImpact) {
-                    continue;
-                }
-                // Call the onColumnRemoved for each chart and return if the chart needs to be deleted
-                const del = ch.onColumnRemoved(col, chartImpact);
+            const info = this.charts[id];
+            if (info.dataSource === ds) {
+                const ch = info.chart;
+                const div = ch.getDiv();
+                const del = ch.onColumnRemoved(col);
                 if (del) {
-                    idsToDelete.push(id);
-                    chartsToDelete.push(ch);
+                    div.remove(false);
+                    ids_to_delete.push(id);
+                    this._removeLinks(ch);
+                    this._callListeners("chart_removed", ch);
                 }
             }
         }
-
-        // Dispose/remove deleted charts before firing "filtered", otherwise
-        // stale reactions can render against already-removed column data.
-        for (const chart of chartsToDelete) {
-            chart.remove(false);
-            chart.getDiv().remove();
-            this._removeLinks(chart);
-            this._callListeners("chart_removed", chart);
-        }
-        if (idsToDelete.length > 0) {
+        //onColumnRemoved will remove the chart if it contains
+        //data from the column, it will also remove the filter,
+        //but not call any listeners
+        if (ids_to_delete.length > 0) {
             ds.dataStore._callListeners("filtered");
         }
-        for (const id of idsToDelete) {
+        for (const id of ids_to_delete) {
             delete this.charts[id];
         }
     }

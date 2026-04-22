@@ -1712,10 +1712,6 @@ class MDVProject:
         # view will be deleted if view is null
         if state.get("currentView"):
             self.set_view(state["currentView"], state["view"])
-        updated_views = state.get("updatedViews")
-        if updated_views:
-            for view_name, view_data in updated_views.items():
-                self.set_view(view_name, view_data)
         ud = state.get("updatedColumns")
         # update/add/delete any columns
         if ud:
