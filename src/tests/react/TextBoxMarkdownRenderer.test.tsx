@@ -45,6 +45,12 @@ describe("TextBoxMarkdownRenderer", () => {
         await waitFor(() => {
             expect(mermaidMocks.render).toHaveBeenCalled();
         });
+        expect(mermaidMocks.initialize).toHaveBeenCalledWith(
+            expect.objectContaining({
+                theme: "base",
+                themeCSS: expect.stringContaining("fill: none !important;"),
+            }),
+        );
         await waitFor(() => {
             const diagram = document.querySelector(".mdv-textbox-mermaid-diagram");
             expect(diagram?.innerHTML).toContain("<svg>");

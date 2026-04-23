@@ -62,6 +62,25 @@ const TextBoxMarkdownRenderer = ({ markdown }: { markdown: string }) => {
 
     const markdownComponents = useMemo(
         () => ({
+            pre({
+                children,
+                className,
+            }: {
+                children?: ReactNode;
+                className?: string;
+            }) {
+                return (
+                    <div
+                        className={
+                            className
+                                ? `mdv-textbox-fenced ${className}`
+                                : "mdv-textbox-fenced"
+                        }
+                    >
+                        {children}
+                    </div>
+                );
+            },
             code({
                 className,
                 children,

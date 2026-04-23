@@ -618,6 +618,13 @@ select, input, textarea {
     word-break: break-word;
 }
 
+/* Fenced code / custom blocks: use div instead of <pre> so block UI (e.g. Mermaid) is valid (pre only allows phrasing content). */
+.mdv-textbox-fenced {
+    margin: 0.75em 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .react-chart {
     height: 100%;
     min-height: 0;
