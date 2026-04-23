@@ -104,10 +104,26 @@ const TextBoxMarkdownRenderer = ({ markdown }: { markdown: string }) => {
                     ? getTextBoxFencedRenderer(language)
                     : undefined;
                 if (!renderer) {
+                    const blockLang = getCodeBlockLanguage(className);
+                    const text = toCodeString(children).replace(/\n$/, "");
+                    const isMultiline = text.includes("\n");
+                    if (!isMultiline) {
+                        return (
+                            <code className={className} {...props}>
+                                {children}
+                            </code>
+                        );
+                    }
+                    const summaryLabel = blockLang || "text";
                     return (
-                        <code className={className} {...props}>
-                            {children}
-                        </code>
+                        <details className="mdv-textbox-codeblock" open>
+                            <summary className="mdv-textbox-summary mdv-textbox-codeblock-summary">
+                                {summaryLabel}
+                            </summary>
+                            <code className={className} {...props}>
+                                {children}
+                            </code>
+                        </details>
                     );
                 }
 

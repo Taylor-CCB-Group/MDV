@@ -625,6 +625,39 @@ select, input, textarea {
     word-break: break-word;
 }
 
+.mdv-textbox-codeblock {
+    border: 1px solid var(--border_menu_bar_color);
+    border-left-width: 4px;
+    border-radius: 6px;
+    background: var(--background_color);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+}
+
+.mdv-textbox-codeblock > .mdv-textbox-codeblock-summary {
+    padding: 0.4rem 0.55rem;
+    font-family: ui-monospace, system-ui, monospace;
+    font-size: 0.86em;
+    text-transform: none;
+    border-bottom: 1px solid var(--border_menu_bar_color);
+    user-select: none;
+    color: var(--text_color);
+    list-style-position: outside;
+}
+
+.mdv-textbox-codeblock > code {
+    display: block;
+    margin: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0.5rem 0.65rem;
+    white-space: pre;
+    font-size: 0.9em;
+    background: var(--primary_background);
+    color: var(--text_color);
+    border: none;
+}
+
 .react-chart {
     height: 100%;
     min-height: 0;
