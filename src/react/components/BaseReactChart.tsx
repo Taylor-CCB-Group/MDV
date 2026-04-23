@@ -67,7 +67,7 @@ export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> 
         // const Observed = observer(ReactComponentFunction);
         this.reactEl = createEl(
             "div",
-            { className: "react-chart" },
+            { classes: ["react-chart"] },
             this.contentDiv,
         ); //other things may still be added to contentDiv outside react (e.g. legend)
         this.ComponentFn = ReactComponentFunction;

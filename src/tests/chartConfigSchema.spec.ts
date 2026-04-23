@@ -3,6 +3,35 @@ import { getChartConfigSchema } from "@/charts/schemas/ChartConfigRegistry";
 import { safeValidateChartConfig } from "@/charts/schemas/ChartConfigSchema";
 
 describe("chart config schema registration", () => {
+    test("validates text box configs for runtime and legacy aliases", () => {
+        const runtimeConfig = {
+            id: "text-box-runtime",
+            title: "Text Box Runtime",
+            type: "text_box_chart",
+            text: "## Section\nRuntime config",
+            param: [],
+            size: [420, 240],
+        };
+
+        const legacyAliasConfig = {
+            ...runtimeConfig,
+            id: "text-box-legacy",
+            title: "Text Box Legacy",
+            type: "text_box",
+        };
+
+        expect(getChartConfigSchema("text_box_chart")).toBeDefined();
+        expect(getChartConfigSchema("text_box")).toBeDefined();
+        expect(safeValidateChartConfig(runtimeConfig)).toMatchObject({
+            type: "text_box_chart",
+            text: "## Section\nRuntime config",
+        });
+        expect(safeValidateChartConfig(legacyAliasConfig)).toMatchObject({
+            type: "text_box",
+            text: "## Section\nRuntime config",
+        });
+    });
+
     test("validates the new deck contour scatter chart config", () => {
         const config = {
             id: "deck-contour-1",
