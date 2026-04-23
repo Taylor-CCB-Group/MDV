@@ -50,5 +50,3 @@ BaseChart.types["text_box_chart"] = {
         config.text = extraControls.text ?? "";
     },
 };
-
-export default 42;

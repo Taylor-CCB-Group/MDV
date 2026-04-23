@@ -27,7 +27,7 @@ import "./TableChart.js";
 import "./WGL3DScatterPlot.js";
 import "./WGLScatterPlot.js";
 import "./RingChart.js";
-import "./TextBoxChart.js";
+import "../react/components/TextBoxChartReactWrapper";
 import "./HeatMap.js";
 import "./ViolinPlot.js";
 import "./BoxPlot.js";
