@@ -84,21 +84,13 @@ const TextBoxMarkdownRenderer = ({ markdown }: { markdown: string }) => {
             code({
                 className,
                 children,
-                inline,
+                node: _node,
                 ...props
             }: {
                 className?: string;
                 children?: ReactNode;
-                inline?: boolean;
+                node?: unknown;
             }) {
-                if (inline) {
-                    return (
-                        <code className={className} {...props}>
-                            {children}
-                        </code>
-                    );
-                }
-
                 const language = getCodeBlockLanguage(className);
                 const renderer = language
                     ? getTextBoxFencedRenderer(language)
