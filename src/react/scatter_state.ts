@@ -7,9 +7,9 @@ import {
     useConfig,
     useFieldSpec,
     useFieldSpecs,
-    useFilterArray,
-    useFilteredIndices,
+    useOwnedFilteredIndices,
     useParamColumns,
+    type FilterOwner,
 } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -177,9 +177,8 @@ export function useRegionScale() {
  * It can be a bit janky when reacting to changes originating from the same view,
  * we should consider a better approach.
  */
-function useZoomOnFilter(modelMatrix: Matrix4) {
+function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
     const config = useConfig<ScatterPlotConfig>();
-    const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
     const [chartWidth, chartHeight] = useChartSize(); //not sure we want this, potentially re-rendering too often...
     // not using as dependency for scaling viewState to data - we don't want to zoom as chart size changes
@@ -337,7 +336,11 @@ export function getMissingColorFilterValue(
  * As of now, charts with appropriate spatial context can call `useSpatialLayers()` at any point
  * to access the scatterplot layer, and the tooltip function.
  */
-export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: FieldName | null) {
+export function useScatterplotLayer(
+    modelMatrix: Matrix4,
+    hoveredFieldId?: FieldName | null,
+    filterOwner?: FilterOwner | null,
+) {
     const id = useChartID();
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
@@ -346,7 +349,12 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     const { opacity } = config;
     const radiusScale = useScatterRadius();
 
-    const data = useFilteredIndices();
+    const {
+        aggregateFilteredRows,
+        ownerVisibleRows,
+        isExternallyFiltered,
+    } = useOwnedFilteredIndices(filterOwner);
+    const data = ownerVisibleRows;
     const params = useParamColumns();
     const [cx, cy, cz] = params;
     const scale = useRegionScale();
@@ -485,7 +493,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     );
 
     // const { modelMatrix, setModelMatrix } = useScatterModelMatrix();
-    const viewState = useZoomOnFilter(modelMatrix);
+    const viewState = useZoomOnFilter(modelMatrix, aggregateFilteredRows);
     const { point_shape } = config;
 
     const extensions = useMemo(() => {
@@ -592,7 +600,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     ]);
 
     const greyOnFilter = config.on_filter === "grey";
-    const filterValue = useFilterArray();
     const greyScatterplotLayer = useMemo(
         () =>
             new ScatterplotLayer({
@@ -616,12 +623,18 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
                     depthTest: false,
                 },
                 getFilterValue: (_: unknown, { index }: { index: number }) => {
-                    if (!filterValue[index]) return 0;
+                    if (!isExternallyFiltered(index)) return 0;
                     return getMissingColorFilterValue(index, colorColumn, shouldFilterMissing, fallbackOnZero);
                 },
                 filterRange: [0.5, 1],
                 updateTriggers: {
-                    getFilterValue: [data, filterValue, colorColumn, shouldFilterMissing, fallbackOnZero],
+                    getFilterValue: [
+                        aggregateFilteredRows,
+                        isExternallyFiltered,
+                        colorColumn,
+                        shouldFilterMissing,
+                        fallbackOnZero,
+                    ],
                     getPosition: [cx.data, cy.data, cz?.data],
                 },
                 extensions: [new DataFilterExtension()],
@@ -635,9 +648,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             opacity,
             radiusScale,
             modelMatrix,
-            filterValue,
-            data,
             greyOnFilter,
+            aggregateFilteredRows,
+            isExternallyFiltered,
             colorColumn,
             shouldFilterMissing,
             fallbackOnZero,

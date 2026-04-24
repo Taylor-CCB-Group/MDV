@@ -263,7 +263,11 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?:
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    const scatterProps = useScatterplotLayer(rectRange.modelMatrix, hoveredFieldId);
+    const scatterProps = useScatterplotLayer(
+        rectRange.modelMatrix,
+        hoveredFieldId,
+        rectRange.rangeDimension,
+    );
     return { rectRange, measure, scatterProps };
 }
 
