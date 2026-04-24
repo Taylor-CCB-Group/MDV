@@ -86,7 +86,7 @@ const Main = observer(
 
         // this isn't updating when we tweak the config...
         const { scatterProps, selectionLayer } = useSpatialLayers();
-        const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
+        const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
         const { showJson } = useConfig<VivRoiConfig>();
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
@@ -203,6 +203,7 @@ const Main = observer(
                     jsonLayer, 
                     gateDisplayLayer, 
                     selectionLayer, 
+                    greyScatterplotLayer,
                     scatterplotLayer, 
                     gateLabelLayer,
                 ].filter(l => l !== null),
@@ -227,6 +228,7 @@ const Main = observer(
                 gateLabelLayer,
                 gateDisplayLayer,
                 scatterplotLayer,
+                greyScatterplotLayer,
                 selectionLayer,
                 jsonLayer,
                 id,

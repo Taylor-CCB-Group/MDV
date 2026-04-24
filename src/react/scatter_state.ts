@@ -7,6 +7,7 @@ import {
     useConfig,
     useFieldSpec,
     useFieldSpecs,
+    useFilterArray,
     useFilteredIndices,
     useParamColumns,
 } from "./hooks";
@@ -18,6 +19,7 @@ import type { ViewState } from "./components/VivScatterComponent";
 import SpatialLayer from "@/webgl/SpatialLayer";
 import { ScatterSquareExtension, ScatterDensityExension } from "../webgl/ScatterDeckExtension";
 import type { LayerExtension } from "@deck.gl/core";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
@@ -117,7 +119,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_fillThreshold: 2,
     densityFields: [],
     dimension: "2d",
-    on_filter: "hide", //safer in case of large datasets
+    on_filter: "grey",
     // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
     field_legend: {
@@ -588,6 +590,60 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         updateHighlightedRows,
         paintHoveredRow,
     ]);
+
+    const greyOnFilter = config.on_filter === "grey";
+    const filterValue = useFilterArray();
+    const greyScatterplotLayer = useMemo(
+        () =>
+            new ScatterplotLayer({
+                id: `scatter-grey_${getVivId(`${id}detail-react`)}`,
+                data: { length: cx.data.length },
+                opacity,
+                stroked: false,
+                filled: true,
+                radiusScale,
+                getPosition: (_: unknown, { target, index }: { target: number[]; index: number }) => {
+                    target[0] = cx.data[index];
+                    target[1] = cy.data[index];
+                    if (cz) target[2] = cz.data[index];
+                    return target as unknown as [number, number];
+                },
+                getFillColor: [200, 200, 200],
+                getLineColor: [0, 0, 0],
+                billboard: true,
+                modelMatrix,
+                parameters: {
+                    depthTest: false,
+                },
+                getFilterValue: (_: unknown, { index }: { index: number }) => {
+                    if (!filterValue[index]) return 0;
+                    return getMissingColorFilterValue(index, colorColumn, shouldFilterMissing, fallbackOnZero);
+                },
+                filterRange: [0.5, 1],
+                updateTriggers: {
+                    getFilterValue: [data, filterValue, colorColumn, shouldFilterMissing, fallbackOnZero],
+                    getPosition: [cx.data, cy.data, cz?.data],
+                },
+                extensions: [new DataFilterExtension()],
+                visible: greyOnFilter,
+            }),
+        [
+            id,
+            cx,
+            cy,
+            cz,
+            opacity,
+            radiusScale,
+            modelMatrix,
+            filterValue,
+            data,
+            greyOnFilter,
+            colorColumn,
+            shouldFilterMissing,
+            fallbackOnZero,
+        ],
+    );
+
     const onScatterGlobalKeyDown = useCallback(
         (event: KeyboardEvent) => {
             if (!scatterKeyboardActiveRef.current) return;
@@ -676,12 +732,21 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     return useMemo(
         () => ({
             scatterplotLayer,
+            greyScatterplotLayer,
             getTooltip,
             modelMatrix,
             viewState,
             unproject,
             setScatterKeyboardActive,
         }),
-        [scatterplotLayer, getTooltip, modelMatrix, viewState, unproject, setScatterKeyboardActive],
+        [
+            scatterplotLayer,
+            greyScatterplotLayer,
+            getTooltip,
+            modelMatrix,
+            viewState,
+            unproject,
+            setScatterKeyboardActive,
+        ],
     );
 }

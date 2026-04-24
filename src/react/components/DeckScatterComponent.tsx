@@ -1,9 +1,8 @@
 import DeckGL from "@deck.gl/react";
 import { OrthographicView, OrbitView } from "@deck.gl/core";
 import { observer } from "mobx-react-lite";
-import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
-import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
-import { DataFilterExtension } from "@deck.gl/extensions";
+import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { LineLayer } from "@deck.gl/layers";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
@@ -12,7 +11,7 @@ import type { DataColumn, FieldName, LoadedDataColumn, NumberDataType } from "@/
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
-import { getMissingColorFilterValue, useScatterRadius, useShouldFilterNaN } from "../scatter_state";
+import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
@@ -137,7 +136,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
     const contourConfig = useConfig<DualContourLegacyConfig>();
-    const { opacity, viewState, on_filter, dimension } = config;
+    const { viewState, dimension } = config;
     const is2d = dimension === "2d";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
@@ -171,15 +170,10 @@ const DeckScatter = observer(function DeckScatterComponent({
     const chartHeight = height - margin.top - margin.bottom - 3.5;
     useZoomOnFilter(data);
 
-    const greyOnFilter = on_filter === "grey";
-
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
     //! beware unproject from here is not what we want, should review
-    const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
-
-    const filterValue = useFilterArray();
-    const { shouldFilter: shouldFilterMissing, colorColumn, fallbackOnZero } = useShouldFilterNaN();
+    const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
 
     const {
         gateLabelLayer,
@@ -190,67 +184,6 @@ const DeckScatter = observer(function DeckScatterComponent({
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
     const showLegend = contourConfig.field_legend.display;
     const legendPosition = { x: 10, y: 10 };
-
-    // this should move in to scatter_state, common with viv...
-    const greyScatterplotLayer = useMemo(
-        () =>
-            new ScatterplotLayer({
-                id: `scatterplot-layer-grey-${id}`,
-                data: { length: cx.data.length },
-                // pickable: true,
-                opacity,
-                stroked: false,
-                filled: true,
-                radiusScale,
-                getPosition: (_, { target, index }) => {
-                    target[0] = cx.data[index];
-                    target[1] = cy.data[index];
-                    // we need to review whether changes are needed here related to density...
-                    if (cz) target[2] = cz.data[index];
-                    return target as [number, number];
-                },
-                getFillColor: [200, 200, 200],
-                getLineColor: [0, 0, 0],
-                billboard: true,
-                parameters: {
-                    depthTest: false,
-                },
-                transitions: {
-                    getPosition: {
-                        duration: 100,
-                        //https://easings.net/#easeInOutCubic
-                        easing: (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
-                        // type: "spring",
-                    },
-                },
-                getFilterValue: (_: unknown, { index }: { index: number }) => {
-                    if (!filterValue[index]) return 0;
-                    return getMissingColorFilterValue(index, colorColumn, shouldFilterMissing, fallbackOnZero);
-                },
-                filterRange: [0.5, 1],
-                updateTriggers: {
-                    //! using `data` as a trigger as `filterValue` was behind by one frame or something
-                    getFilterValue: [data, filterValue, colorColumn, shouldFilterMissing, fallbackOnZero],
-                    getPosition: [cx.data, cy.data, cz?.data],
-                },
-                extensions: [new DataFilterExtension()],
-                visible: greyOnFilter,
-            }),
-        [
-            cx,
-            cy,
-            cz,
-            opacity,
-            radiusScale,
-            id,
-            filterValue,
-            data,
-            greyOnFilter,
-            colorColumn,
-            shouldFilterMissing,
-            fallbackOnZero,
-        ],
-    );
 
     const axisLinesLayer = useMemo(() => {
         if (is2d) return null;
@@ -295,7 +228,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     }, [chartWidth, chartHeight, config.dimension, id]);
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [gateDisplayLayer, selectionLayer, scatterplotLayer, greyScatterplotLayer, gateLabelLayer, axisLinesLayer, 
+    const layers = [gateDisplayLayer, selectionLayer, greyScatterplotLayer, scatterplotLayer, gateLabelLayer, axisLinesLayer, 
     ].filter(x => x !== null);
     
     const outerContainer = useOuterContainer();
