@@ -199,10 +199,6 @@ const Main = observer(
                     }
                     return getTooltip();
                 },
-                style: {
-                    zIndex: "-1",
-                },
-                //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
                 layers: [
                     jsonLayer, 
                     gateDisplayLayer, 
