@@ -13,14 +13,14 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
-import { getCategoryFilterIndices, rowMatchesCategoryFilter, type CategoryFilterColumn } from "./categoryFilterUtils";
+import { getCategoryFilterIndices, rowMatchesCategoryFilter, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
 import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
 import {
     getOwnerVisibleRows,
     isRowFilteredByOtherOwner,
     type FilterArrayLike,
     type RowScopePredicate,
-} from "./filterOwnership";
+} from "@/lib/filterOwnership";
 
 /** Region constraint for `filterPoly` — restricts the polygon filter to rows in a specific region. */
 export type FilterPolyRegionOpts = { regionField: string; regionValue: string };

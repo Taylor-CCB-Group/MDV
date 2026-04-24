@@ -1,7 +1,7 @@
 import {
     getOwnerVisibleRows,
     isRowFilteredByOtherOwner,
-} from "@/react/filterOwnership";
+} from "@/lib/filterOwnership";
 import { describe, expect, test } from "vitest";
 
 function toRows(rows: Uint32Array) {
