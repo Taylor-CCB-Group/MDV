@@ -134,19 +134,6 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                 includePointShape: true,
             }),
             g({
-                type: "radiobuttons",
-                label: "Action on Filter",
-                choices: [
-                    ["Hide Points", "hide"],
-                    ["Gray Out Points", "grey"],
-                ],
-                current_value: c.on_filter,
-                func: (x) => {
-                    //@ts-ignore x is a string, but we have a narrow "hide" | "grey" type
-                    c.on_filter = x;
-                },
-            }),
-            g({
                 type: "button",
                 label: "Center Plot",
                 //@ts-expect-error - no nay `never` no more
