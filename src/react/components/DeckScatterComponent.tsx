@@ -228,7 +228,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     }, [chartWidth, chartHeight, config.dimension, id]);
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [gateDisplayLayer, selectionLayer, scatterplotLayer, greyScatterplotLayer, gateLabelLayer, axisLinesLayer, 
+    const layers = [gateDisplayLayer, selectionLayer, greyScatterplotLayer, scatterplotLayer, gateLabelLayer, axisLinesLayer, 
     ].filter(x => x !== null);
     
     const outerContainer = useOuterContainer();
