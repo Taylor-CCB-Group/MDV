@@ -215,7 +215,9 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 )}
                 {sender === 'bot' && !error && verification?.trim() && (
                     <ChatPreviewBlock
-                        title="What you can verify"
+                        //title="What you can verify"
+                        //title='xxxxx'
+                        title=""
                         content={verification.trim()}
                         defaultExpandedWhenLong
                     />

@@ -230,7 +230,6 @@ def build_verification_summary(
     """
     lines: list[str] = []
     lines.append("## What you can verify")
-    lines.append("")
 
     ds_names = _project_datasource_names(project)
     lines.append(f"- **Datasources in project:** {', '.join(ds_names) if ds_names else '(none)'}")
