@@ -77,22 +77,18 @@ function getChartTitle(config: BaseConfig) {
 
 function getSettingUsagePaths(config: BaseConfig, chartType: ChartTypeMetadata | undefined, columnName: string) {
     const usagePaths: ColumnRemovalUsagePath[] = [];
+    const check = (path: ColumnRemovalUsagePath, value: unknown) => {
+        if (getReferencedFields(value).includes(columnName)) {
+            usagePaths.push(path);
+        }
+    };
 
-    if (getReferencedFields((config as Record<string, unknown>).color_by).includes(columnName)) {
-        usagePaths.push("color_by");
-    }
-    if (getReferencedFields((config as Record<string, unknown>).tooltip).includes(columnName)) {
-        usagePaths.push("tooltip");
-    }
-    if (getReferencedFields((config as Record<string, unknown>).background_filter).includes(columnName)) {
-        usagePaths.push("background_filter");
-    }
+    check("color_by", Reflect.get(config, "color_by"));
+    check("tooltip", Reflect.get(config, "tooltip"));
+    check("background_filter", Reflect.get(config, "background_filter"));
 
     for (const entry of chartType?.configEntriesUsingColumns ?? []) {
-        const value = (config as Record<string, unknown>)[entry];
-        if (getReferencedFields(value).includes(columnName)) {
-            usagePaths.push(entry);
-        }
+        check(entry, Reflect.get(config, entry));
     }
 
     return usagePaths;
