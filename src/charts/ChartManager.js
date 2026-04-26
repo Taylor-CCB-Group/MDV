@@ -66,6 +66,7 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import { analyzeChartColumnImpact } from "./columnRemovalUtils";
 
 
 //order of column data in an array buffer
@@ -968,6 +969,77 @@ export class ChartManager {
 
     changeView(view) {
         this.viewManager.checkAndChangeView(view);
+    }
+
+    /**
+     * @param {string} dataSourceName
+     * @param {string} columnName
+     * @param {string | null} [sourceChartId=null]
+     */
+    async analyzeColumnRemoval(dataSourceName, columnName, sourceChartId = null) {
+        const dataSource = this.dsIndex[dataSourceName];
+        if (!dataSource) {
+            throw new Error(`Unknown data source '${dataSourceName}'`);
+        }
+
+        const currentViewCharts = [];
+        for (const chartId in this.charts) {
+            const chartInfo = this.charts[chartId];
+            if (chartInfo.dataSource !== dataSource) {
+                continue;
+            }
+            if (chartInfo.chart.config.id === sourceChartId) {
+                continue;
+            }
+            const impact = analyzeChartColumnImpact(
+                chartInfo.chart.config,
+                BaseChart.types[chartInfo.chart.config.type],
+                columnName,
+            );
+            if (impact) {
+                currentViewCharts.push(impact);
+            }
+        }
+
+        const savedViews = [];
+        if (this.viewLoader) {
+            const currentView = this.viewManager.current_view;
+            const allViews = this.viewManager.all_views ?? [];
+            const results = await Promise.allSettled(
+                allViews
+                    .filter((viewName) => viewName !== currentView)
+                    .map(async (viewName) => {
+                        const viewData = await this.viewLoader(viewName);
+                        const chartConfigs = viewData?.initialCharts?.[dataSourceName] ?? [];
+                        const charts = chartConfigs
+                            .map((config) =>
+                                analyzeChartColumnImpact(
+                                    config,
+                                    BaseChart.types[config.type],
+                                    columnName,
+                                ),
+                            )
+                            .filter(Boolean);
+                        if (charts.length === 0) {
+                            return null;
+                        }
+                        return { viewName, charts };
+                    }),
+            );
+
+            for (const result of results) {
+                if (result.status === "fulfilled" && result.value) {
+                    savedViews.push(result.value);
+                }
+            }
+        }
+
+        return {
+            dataSourceName,
+            columnName,
+            currentViewCharts,
+            savedViews,
+        };
     }
 
     _columnRemoved(ds, col) {

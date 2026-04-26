@@ -13,6 +13,7 @@ import { DataModel } from "@/table/DataModel";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
+import type { ColumnRemovalImpact } from "@/charts/columnRemovalUtils";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 
 /**
@@ -77,6 +78,10 @@ const useSlickGridReact = () => {
     const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [bulkEditColumn, setBulkEditColumn] = useState<string | null>(null);
+    const [pendingColumnRemoval, setPendingColumnRemoval] = useState<{
+        columnName: string;
+        impact: ColumnRemovalImpact;
+    } | null>(null);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -91,6 +96,52 @@ const useSlickGridReact = () => {
     const dataModel = useMemo(() => 
         new DataModel(dataStore, { autoupdate: false })
     , [dataStore]);
+
+    const getCurrentDisplayedFields = useCallback(() => {
+        const gridColumns = gridRef.current?.slickGrid?.getColumns();
+        if (gridColumns && gridColumns.length > 0) {
+            return gridColumns
+                .map((column) => column.field)
+                .filter(
+                    (field): field is string =>
+                        typeof field === "string" && field !== "__index__",
+                );
+        }
+        return orderedParamColumnsRef.current.map((column) => column.field);
+    }, []);
+
+    const requestColumnRemoval = useCallback(async (columnName: string) => {
+        try {
+            const impact = chartManager?.analyzeColumnRemoval
+                ? await chartManager.analyzeColumnRemoval(
+                    dataStore.name,
+                    columnName,
+                    chartId,
+                )
+                : {
+                    dataSourceName: dataStore.name,
+                    columnName,
+                    currentViewCharts: [],
+                    savedViews: [],
+                };
+            setPendingColumnRemoval({
+                columnName,
+                impact,
+            });
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to analyze column removal");
+            setFeedbackAlert({
+                type: "error",
+                title: "Remove Column Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    columnName,
+                },
+            });
+        }
+    }, [chartId, chartManager, dataModel, dataStore.name]);
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
@@ -329,6 +380,22 @@ const useSlickGridReact = () => {
             config.order = newOrder;
         }));
 
+        slickEventHandler.subscribe(grid.onColumnsResized, action(() => {
+            const columnWidths: Record<string, number> = {};
+            const gridColumns = grid.getColumns();
+            for (const column of gridColumns) {
+                if (
+                    typeof column.field === "string" &&
+                    column.field !== "__index__" &&
+                    column.width &&
+                    column.width !== 100
+                ) {
+                    columnWidths[column.field] = column.width;
+                }
+            }
+            config.column_widths = columnWidths;
+        }));
+
         const pubSub = grid.getPubSubService();
         if (!pubSub) {
             // strong assertion acts as a type-guard
@@ -358,8 +425,7 @@ const useSlickGridReact = () => {
                     if (!isEditModeRef.current) {
                         return;
                     }
-                    // const dataModel = new DataModel(dataStore, { autoupdate: false });
-                    dataModel.removeColumn(column.field);
+                    void requestColumnRemoval(column.field);
                 }
             },
         ));
@@ -380,7 +446,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore, dataModel]);
+    }, [chart, config, dataStore, requestColumnRemoval]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
@@ -546,9 +612,32 @@ const useSlickGridReact = () => {
         setBulkEditColumn(null);
     }, []);
 
+    const closeColumnRemovalDialog = useCallback(() => {
+        setPendingColumnRemoval(null);
+    }, []);
+
+    const confirmColumnRemoval = useCallback(async () => {
+        if (!pendingColumnRemoval) {
+            return;
+        }
+        dataModel.removeColumn(pendingColumnRemoval.columnName);
+        if (chartManager?.viewManager?.saveView) {
+            await chartManager.viewManager.saveView();
+        } else {
+            chartManager?.saveState?.();
+        }
+        setPendingColumnRemoval(null);
+    }, [chartManager, dataModel, pendingColumnRemoval]);
+
+    const openColumnRemovalView = useCallback((viewName: string) => {
+        setPendingColumnRemoval(null);
+        chartManager?.changeView?.(viewName);
+    }, [chartManager]);
+
     // Columns to be displayed for cloning
     const cloneableColumns = useMemo(() => {
-        return orderedParamColumns
+        return dataStore.columns
+            .filter((column) => !column.subgroup)
             .map((column) => ({
                 field: column.field,
                 name: column.name,
@@ -557,13 +646,13 @@ const useSlickGridReact = () => {
                 delimiter: column.delimiter,
             }))
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [orderedParamColumns]);
+    }, [dataStore.columns]);
 
     const addColumnDefaultPosition = useMemo(() => {
         return config.include_index ? 2 : Math.min(2, orderedParamColumns.length + 1);
     }, [config.include_index, orderedParamColumns.length]);
 
-    const handleAddColumn = useCallback(({
+    const handleAddColumn = useCallback(async ({
         name,
         datatype,
         cloneColumn,
@@ -595,6 +684,24 @@ const useSlickGridReact = () => {
         }
 
         try {
+            if (cloneColumn && !dataStore.columnIndex[cloneColumn]?.data) {
+                if (!chartManager?.loadColumnSet) {
+                    throw new Error(`Column ${cloneColumn} not found`);
+                }
+                await new Promise<void>((resolve, reject) => {
+                    try {
+                        chartManager.loadColumnSet([cloneColumn], dataStore.name, () => {
+                            resolve();
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+                if (!dataStore.columnIndex[cloneColumn]?.data) {
+                    throw new Error(`Column ${cloneColumn} not found`);
+                }
+            }
+
             // const dataModel = new DataModel(dataStore, { autoupdate: false });
             // Create a new column
             dataModel.createColumn({
@@ -606,7 +713,7 @@ const useSlickGridReact = () => {
             });
 
             // Get the position of the column to be inserted
-            const orderedFields = orderedParamColumnsRef.current.map((column) => column.field);
+            const orderedFields = getCurrentDisplayedFields();
             const displayedFields = config.include_index
                 ? ["__index__", ...orderedFields]
                 : [...orderedFields];
@@ -621,8 +728,19 @@ const useSlickGridReact = () => {
                 ? Math.max(0, insertionIndex - 1)
                 : insertionIndex;
 
+            // Rebuild the current param order from the live grid so unsaved reorders are respected.
+            const currentParam = [...(config.param ?? [])];
+            const orderedParamEntries = orderedFields
+                .map((field) =>
+                    currentParam.find((entry) => flattenFields(entry).includes(field)),
+                )
+                .filter((entry): entry is NonNullable<typeof currentParam[number]> => entry !== undefined);
+            const remainingParamEntries = currentParam.filter(
+                (entry) => !orderedParamEntries.includes(entry),
+            );
+
             // Splice into a copy of config.param to preserve any FieldSpec/ColumnQuery objects
-            const nextParam = [...(config.param ?? [])];
+            const nextParam = [...orderedParamEntries, ...remainingParamEntries];
             nextParam.splice(paramInsertionIndex, 0, trimmedName);
 
             // Flatten the params so ordering retains the query objects
@@ -631,8 +749,8 @@ const useSlickGridReact = () => {
                 nextRenderedFields.map((field, index) => [field, index]),
             );
 
+            chart.setParams(nextParam);
             runInAction(() => {
-                config.param = nextParam;
                 config.order = nextOrder;
             });
 
@@ -655,7 +773,7 @@ const useSlickGridReact = () => {
                 },
             });
         }
-    }, [config, dataStore, dataModel, isEditMode]);
+    }, [chart, chartManager, config, dataStore, dataModel, getCurrentDisplayedFields, isEditMode]);
 
     const handleBulkEdit = useCallback(({
         action,
@@ -728,6 +846,10 @@ const useSlickGridReact = () => {
         bulkEditColumn,
         closeBulkEditDialog,
         handleBulkEdit,
+        pendingColumnRemoval,
+        closeColumnRemovalDialog,
+        confirmColumnRemoval,
+        openColumnRemovalView,
     };
 };
 

@@ -6,8 +6,6 @@ import type { TableChartReactConfig } from "@/react/components/TableChartReactWr
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
-const editorClassName = "TextEditorWithMaxLength";
-
 // Mock all the context hooks
 vi.mock("@/react/context", () => ({
     useDataStore: () => mockDataStore,
@@ -19,7 +17,7 @@ vi.mock("@/react/hooks", () => ({
     useChartID: () => "test-chart-id",
     useTheme: () => "dark",
     useOrderedParamColumns: () => mockOrderedParamColumns,
-    useChartManager: () => ({ config: { permission: mockPermission } }),
+    useChartManager: () => mockChartManager,
 }));
 
 vi.mock("@/react/selectionHooks", () => ({
@@ -37,6 +35,33 @@ let mockOrderedParamColumns: LoadedDataColumn<DataType>[];
 let mockSortedIndices: Uint32Array;
 let mockHighlightedIndices: number[];
 let mockPermission: "edit" | "view";
+let mockChartManager: any;
+
+function setupGrid(result: { current: ReturnType<typeof useSlickGridReact> }) {
+    const mockGridInstance = createSlickGridMock();
+    const mockEvent = new CustomEvent("gridCreated", {
+        detail: mockGridInstance,
+    }) as any;
+
+    act(() => {
+        result.current.handleGridCreated(mockEvent);
+    });
+
+    const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
+    const headerMenuCall = pubSub.subscribe.mock.calls.find(
+        ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
+    );
+    const headerMenuHandler = headerMenuCall?.[1];
+
+    expect(headerMenuHandler).toBeTruthy();
+
+    return {
+        gridInstance: mockGridInstance,
+        headerMenuHandler,
+        columnsReorderedHandler: (mockGridInstance.slickGrid.onColumnsReordered as any).subscribe.mock.calls[0]?.[0],
+        columnsResizedHandler: (mockGridInstance.slickGrid.onColumnsResized as any).subscribe.mock.calls[0]?.[0],
+    };
+}
 
 describe("useSlickGridReact", () => {
     beforeEach(() => {
@@ -73,6 +98,22 @@ describe("useSlickGridReact", () => {
         mockSortedIndices = new Uint32Array([0, 1, 2]);
         mockHighlightedIndices = [];
         mockPermission = "edit";
+        mockChartManager = {
+            config: { permission: mockPermission },
+            analyzeColumnRemoval: vi.fn().mockResolvedValue({
+                dataSourceName: "test-ds",
+                columnName: "age",
+                currentViewCharts: [],
+                savedViews: [],
+            }),
+            saveState: vi.fn(),
+            viewManager: {
+                saveView: vi.fn().mockResolvedValue(undefined),
+            },
+            loadColumnSet: vi.fn((_columns: string[], _dsName: string, callback: () => void) => {
+                callback();
+            }),
+        };
 
         // Setup mock config with observable properties
         mockConfig = observable({
@@ -90,7 +131,9 @@ describe("useSlickGridReact", () => {
             cleanColumnData: vi.fn(),
             removeColumn: vi.fn(),
             addListener: vi.fn(),
+            columns: mockOrderedParamColumns,
             size: 3,
+            name: "test-ds",
             columnIndex: Object.fromEntries(
                 mockOrderedParamColumns.map((column) => [column.field, column]),
             ),
@@ -99,6 +142,11 @@ describe("useSlickGridReact", () => {
         mockChart = {
             setAddColumnDialogOpener: vi.fn(),
             setGridRef: vi.fn(),
+            setParams: vi.fn((nextParam: string[]) => {
+                runInAction(() => {
+                    mockConfig.param = nextParam;
+                });
+            }),
         };
     });
 
@@ -231,83 +279,161 @@ describe("useSlickGridReact", () => {
         test("should set grid ref and initialize grid", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
-            const mockGridInstance = createSlickGridMock();
-
-            const mockEvent = new CustomEvent("gridCreated", {
-                detail: mockGridInstance,
-            }) as any;
-
-            act(() => {
-                result.current.handleGridCreated(mockEvent);
-            });
+            const { gridInstance: mockGridInstance } = setupGrid(result);
 
             expect(mockGridInstance.slickGrid.setData).toHaveBeenCalled();
             expect(mockGridInstance.slickGrid.render).toHaveBeenCalled();
         });
 
-        test("should remove an editable column from the header menu command", () => {
-            const { result } = renderHook(() => useSlickGridReact());
-
-            const mockGridInstance = createSlickGridMock();
-            const mockEvent = new CustomEvent("gridCreated", {
-                detail: mockGridInstance,
-            }) as any;
-
-            act(() => {
-                result.current.handleGridCreated(mockEvent);
+        test("should open the removal impact dialog when charts use the column", async () => {
+            mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                dataSourceName: "test-ds",
+                columnName: "age",
+                currentViewCharts: [
+                    {
+                        chartTitle: "Scatter",
+                        chartType: "scatter_plot",
+                        chartTypeLabel: "scatter_plot",
+                        action: "remove_chart",
+                        usage: "param",
+                        usagePaths: ["param"],
+                    },
+                ],
+                savedViews: [],
             });
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
 
-            const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
-            const headerMenuCall = pubSub.subscribe.mock.calls.find(
-                ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
-            );
-
-            expect(headerMenuCall).toBeTruthy();
-
-            const headerMenuHandler = headerMenuCall?.[1];
-
-            act(() => {
+            await act(async () => {
                 headerMenuHandler({
                     column: { field: "age" },
                     command: "remove-column",
                 });
+                await Promise.resolve();
+            });
+
+            expect(mockChartManager.analyzeColumnRemoval).toHaveBeenCalledWith(
+                "test-ds",
+                "age",
+                "test-chart-id",
+            );
+            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toEqual(
+                expect.objectContaining({
+                    columnName: "age",
+                }),
+            );
+        });
+
+        test("should respect updated permissions in existing header menu handlers", async () => {
+            const { result, rerender } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            mockPermission = "view";
+            mockChartManager.config.permission = "view";
+            rerender();
+
+            await act(async () => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+                await Promise.resolve();
+            });
+
+            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("column removal", () => {
+        test("should open a confirmation dialog when there are no impacts", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                    dataSourceName: "test-ds",
+                    columnName: "age",
+                    currentViewCharts: [],
+                    savedViews: [],
+                });
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+                await Promise.resolve();
+            });
+
+            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toEqual(
+                expect.objectContaining({
+                    columnName: "age",
+                }),
+            );
+        });
+
+        test("should remove the column after confirmation when there are no impacts", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                    dataSourceName: "test-ds",
+                    columnName: "age",
+                    currentViewCharts: [],
+                    savedViews: [],
+                });
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+                await Promise.resolve();
+            });
+
+            await act(async () => {
+                await result.current.confirmColumnRemoval();
             });
 
             expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
-            expect(mockDataStore.removeColumn).toHaveBeenCalledTimes(1);
+            expect(mockChartManager.viewManager.saveView).toHaveBeenCalledTimes(1);
+            expect(mockChartManager.saveState).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toBeNull();
         });
 
-        test("should respect updated permissions in existing header menu handlers", () => {
-            const { result, rerender } = renderHook(() => useSlickGridReact());
-
-            const mockGridInstance = createSlickGridMock();
-            const mockEvent = new CustomEvent("gridCreated", {
-                detail: mockGridInstance,
-            }) as any;
-
-            act(() => {
-                result.current.handleGridCreated(mockEvent);
+        test("should block removal when impacts exist in saved views", async () => {
+            mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                dataSourceName: "test-ds",
+                columnName: "age",
+                currentViewCharts: [],
+                savedViews: [
+                    {
+                        viewName: "Other View",
+                        charts: [
+                            {
+                                chartTitle: "Scatter",
+                                chartType: "scatter_plot",
+                                chartTypeLabel: "scatter_plot",
+                                action: "remove_chart",
+                                usage: "param",
+                                usagePaths: ["param"],
+                            },
+                        ],
+                    },
+                ],
             });
 
-            const pubSub = mockGridInstance.slickGrid.getPubSubService() as any;
-            const headerMenuCall = pubSub.subscribe.mock.calls.find(
-                ([eventName]: [string]) => eventName === "onHeaderMenuCommand",
-            );
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
 
-            expect(headerMenuCall).toBeTruthy();
-
-            const headerMenuHandler = headerMenuCall?.[1];
-
-            mockPermission = "view";
-            rerender();
-
-            act(() => {
+            await act(async () => {
                 headerMenuHandler({
                     column: { field: "age" },
                     command: "remove-column",
                 });
+                await Promise.resolve();
             });
 
+            expect(result.current.pendingColumnRemoval?.impact.savedViews).toHaveLength(1);
             expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
         });
     });
@@ -383,10 +509,30 @@ describe("useSlickGridReact", () => {
 
     describe("add column", () => {
         test("should expose cloneable text columns", () => {
+            mockDataStore.columns = [
+                ...mockOrderedParamColumns,
+                {
+                    field: "hidden",
+                    name: "Hidden",
+                    datatype: "text",
+                },
+                {
+                    field: "genes|TP53",
+                    name: "TP53",
+                    datatype: "double",
+                    subgroup: "genes",
+                },
+            ];
+            mockDataStore.columnIndex.hidden = {
+                field: "hidden",
+                name: "Hidden",
+                datatype: "text",
+            };
             const { result } = renderHook(() => useSlickGridReact());
 
             expect(result.current.cloneableColumns).toEqual([
                 { field: "age", name: "Age", datatype: "integer" },
+                { field: "hidden", name: "Hidden", datatype: "text" },
                 { field: "id", name: "Id", datatype: "unique", stringLength: 2 },
                 { field: "name", name: "Name", datatype: "text" },
             ]);
@@ -404,6 +550,7 @@ describe("useSlickGridReact", () => {
             });
 
             expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+            expect(mockChart.setParams).toHaveBeenCalledWith(["age", "annotation", "name", "id"]);
             expect(mockConfig.param).toEqual(["age", "annotation", "name", "id"]);
             expect(mockConfig.order).toEqual({
                 age: 0,
@@ -412,6 +559,33 @@ describe("useSlickGridReact", () => {
                 id: 3,
             });
             expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["annotation"]);
+        });
+
+        test("should insert a new column using the current unsaved grid order", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+
+            gridInstance.slickGrid.getColumns = vi.fn(() => [
+                { field: "id", width: 100 },
+                { field: "age", width: 100 },
+                { field: "name", width: 100 },
+            ] as any);
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    datatype: "double",
+                    position: 2,
+                });
+            });
+
+            expect(mockChart.setParams).toHaveBeenCalledWith(["id", "annotation", "age", "name"]);
+            expect(mockConfig.order).toEqual({
+                id: 0,
+                annotation: 1,
+                age: 2,
+                name: 3,
+            });
         });
 
         test("should preserve existing column widths when adding a column", () => {
@@ -459,6 +633,50 @@ describe("useSlickGridReact", () => {
                 datatype: "integer",
                 editable: true,
             });
+        });
+
+        test("should load a hidden real column before cloning it", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            mockDataStore.columns = [
+                ...mockOrderedParamColumns,
+                {
+                    field: "n_genes_by_counts",
+                    name: "n_genes_by_counts",
+                    datatype: "double",
+                },
+            ];
+            mockDataStore.columnIndex.n_genes_by_counts = {
+                field: "n_genes_by_counts",
+                name: "n_genes_by_counts",
+                datatype: "double",
+                data: null,
+            };
+            mockChartManager.loadColumnSet = vi.fn((_columns: string[], _dsName: string, callback: () => void) => {
+                mockDataStore.columnIndex.n_genes_by_counts = {
+                    field: "n_genes_by_counts",
+                    name: "n_genes_by_counts",
+                    datatype: "double",
+                    data: new Float32Array([1, 2, 3]),
+                };
+                callback();
+            });
+
+            await act(async () => {
+                await result.current.handleAddColumn({
+                    name: "active link col",
+                    datatype: "text",
+                    cloneColumn: "n_genes_by_counts",
+                    position: 2,
+                });
+            });
+
+            expect(mockChartManager.loadColumnSet).toHaveBeenCalledWith(
+                ["n_genes_by_counts"],
+                "test-ds",
+                expect.any(Function),
+            );
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
         });
 
         test("should reject duplicate column names", () => {
@@ -520,4 +738,25 @@ describe("useSlickGridReact", () => {
         });
     });
 
+    describe("column width retention", () => {
+        test("should sync unsaved resized widths into config immediately", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { columnsResizedHandler, gridInstance } = setupGrid(result);
+
+            gridInstance.slickGrid.getColumns = vi.fn(() => [
+                { field: "age", width: 180 },
+                { field: "name", width: 260 },
+                { field: "id", width: 100 },
+            ] as any);
+
+            act(() => {
+                columnsResizedHandler?.({}, {});
+            });
+
+            expect(mockConfig.column_widths).toEqual({
+                age: 180,
+                name: 260,
+            });
+        });
+    });
 });

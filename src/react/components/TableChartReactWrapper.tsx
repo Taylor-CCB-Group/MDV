@@ -200,28 +200,48 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
 
     getConfig() {
         const config = super.getConfig();
-        
-        // Serialize current grid widths to config.column_widths for persistence
-        // This ensures persisted state reflects actual grid state at serialization time
-        // Grid manages widths internally during runtime, but we serialize them here for persistence
-        if (this.gridRef?.current?.slickGrid) {
-            try {
-                const columns = this.gridRef.current.slickGrid.getColumns();
-                const columnWidths: Record<string, number> = {};
-                
-                for (const col of columns) {
-                    if (col.width && col.width !== 100) {
-                        columnWidths[col.field] = col.width;
-                    }
-                }
-                
-                config.column_widths = columnWidths;
-            } catch (e) {
-                // If grid is not available or error occurs, keep existing config.column_widths
-                console.warn("Could not read grid widths in getConfig():", e);
+
+        const gridColumns = this.gridRef?.current?.slickGrid?.getColumns();
+        const visibleFields = gridColumns
+            ?.map((column) => column.field)
+            .filter(
+                (field): field is string =>
+                    typeof field === "string" &&
+                    field !== "__index__" &&
+                    Boolean(this.dataStore.columnIndex[field]),
+            );
+
+        const fallbackFields =
+            Array.isArray(this.config.param)
+                ? this.config.param.flatMap((fieldSpec) => flattenFields(fieldSpec))
+                    .filter((field) => Boolean(this.dataStore.columnIndex[field]))
+                : [];
+
+        const persistedFields = visibleFields ?? fallbackFields;
+        config.param = persistedFields;
+
+        config.order = Object.fromEntries(
+            persistedFields.map((field, index) => [field, index]),
+        );
+
+        const columnWidths: Record<string, number> = {};
+        for (const column of gridColumns ?? []) {
+            if (
+                typeof column.field === "string" &&
+                column.field !== "__index__" &&
+                persistedFields.includes(column.field) &&
+                column.width &&
+                column.width !== 100
+            ) {
+                columnWidths[column.field] = column.width;
             }
         }
-        
+        config.column_widths = columnWidths;
+
+        if (config.sort?.columnId && !persistedFields.includes(config.sort.columnId)) {
+            config.sort = null;
+        }
+
         return config;
     }
 
