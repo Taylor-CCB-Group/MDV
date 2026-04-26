@@ -200,10 +200,9 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
 
     getConfig() {
         const config = super.getConfig();
-
-        const gridColumns = this.gridRef?.current?.slickGrid?.getColumns();
+        const gridColumns = this.gridRef?.current?.slickGrid?.getColumns() ?? [];
         const visibleFields = gridColumns
-            ?.map((column) => column.field)
+            .map((column) => column.field)
             .filter(
                 (field): field is string =>
                     typeof field === "string" &&
@@ -211,35 +210,64 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                     Boolean(this.dataStore.columnIndex[field]),
             );
 
-        const fallbackFields =
-            Array.isArray(this.config.param)
-                ? this.config.param.flatMap((fieldSpec) => flattenFields(fieldSpec))
-                    .filter((field) => Boolean(this.dataStore.columnIndex[field]))
-                : [];
+        if (visibleFields.length > 0 && Array.isArray(config.param)) {
+            // Preserve query-backed param entries while reordering to match current grid visibility.
+            const activeParams = this.activeQueries.activeParams();
+            const serializedEntries = config.param;
+            const selectedIndices = new Set<number>();
+            const orderedParam: typeof config.param = [];
 
-        const persistedFields = visibleFields ?? fallbackFields;
-        config.param = persistedFields;
-
-        config.order = Object.fromEntries(
-            persistedFields.map((field, index) => [field, index]),
-        );
-
-        const columnWidths: Record<string, number> = {};
-        for (const column of gridColumns ?? []) {
-            if (
-                typeof column.field === "string" &&
-                column.field !== "__index__" &&
-                persistedFields.includes(column.field) &&
-                column.width &&
-                column.width !== 100
-            ) {
-                columnWidths[column.field] = column.width;
+            for (const field of visibleFields) {
+                const index = activeParams.findIndex((entry, entryIndex) => {
+                    if (selectedIndices.has(entryIndex)) {
+                        return false;
+                    }
+                    return flattenFields(entry).includes(field);
+                });
+                if (index === -1) {
+                    continue;
+                }
+                selectedIndices.add(index);
+                orderedParam.push(serializedEntries[index]);
             }
-        }
-        config.column_widths = columnWidths;
 
-        if (config.sort?.columnId && !persistedFields.includes(config.sort.columnId)) {
-            config.sort = null;
+            // Keep unmatched query-backed entries so an active link is not lost when it
+            // currently resolves to zero concrete fields.
+            for (let i = 0; i < activeParams.length; i += 1) {
+                if (selectedIndices.has(i)) {
+                    continue;
+                }
+                if (typeof activeParams[i] === "string") {
+                    continue;
+                }
+                if (serializedEntries[i] !== undefined) {
+                    orderedParam.push(serializedEntries[i]);
+                }
+            }
+
+            config.param = orderedParam;
+            config.order = Object.fromEntries(
+                visibleFields.map((field, index) => [field, index]),
+            );
+
+            const visibleFieldSet = new Set(visibleFields);
+            const columnWidths: Record<string, number> = {};
+            for (const column of gridColumns) {
+                if (
+                    typeof column.field === "string" &&
+                    column.field !== "__index__" &&
+                    visibleFieldSet.has(column.field) &&
+                    column.width &&
+                    column.width !== 100
+                ) {
+                    columnWidths[column.field] = column.width;
+                }
+            }
+            config.column_widths = columnWidths;
+
+            if (config.sort?.columnId && !visibleFieldSet.has(config.sort.columnId)) {
+                config.sort = null;
+            }
         }
 
         return config;
