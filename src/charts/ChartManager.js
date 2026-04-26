@@ -1005,9 +1005,9 @@ export class ChartManager {
         if (this.viewLoader) {
             const currentView = this.viewManager.current_view;
             const allViews = this.viewManager.all_views ?? [];
+            const otherViews = allViews.filter((viewName) => viewName !== currentView);
             const results = await Promise.allSettled(
-                allViews
-                    .filter((viewName) => viewName !== currentView)
+                otherViews
                     .map(async (viewName) => {
                         const viewData = await this.viewLoader(viewName);
                         const chartConfigs = viewData?.initialCharts?.[dataSourceName] ?? [];
@@ -1027,10 +1027,21 @@ export class ChartManager {
                     }),
             );
 
-            for (const result of results) {
+            const failedViews = [];
+            for (const [index, result] of results.entries()) {
                 if (result.status === "fulfilled" && result.value) {
                     savedViews.push(result.value);
+                    continue;
                 }
+                if (result.status === "rejected") {
+                    failedViews.push(otherViews[index]);
+                }
+            }
+
+            if (failedViews.length > 0) {
+                throw new Error(
+                    `Failed to check column usage in saved views: ${failedViews.join(", ")}`,
+                );
             }
         }
 

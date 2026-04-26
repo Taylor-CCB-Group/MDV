@@ -436,6 +436,33 @@ describe("useSlickGridReact", () => {
             expect(result.current.pendingColumnRemoval?.impact.savedViews).toHaveLength(1);
             expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
         });
+
+        test("should surface an error and block removal when column analysis fails", async () => {
+            mockChartManager.analyzeColumnRemoval.mockRejectedValueOnce(
+                new Error("Failed to check column usage in saved views: Other View"),
+            );
+
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+                await Promise.resolve();
+            });
+
+            expect(result.current.pendingColumnRemoval).toBeNull();
+            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Remove Column Error",
+                    message: "Failed to check column usage in saved views: Other View",
+                }),
+            );
+        });
     });
 
     describe("find and replace dialog", () => {
