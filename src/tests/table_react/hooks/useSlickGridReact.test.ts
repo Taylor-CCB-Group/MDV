@@ -345,6 +345,8 @@ describe("useSlickGridReact", () => {
             });
 
             expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(mockChartManager.analyzeColumnRemoval).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toBeNull();
         });
     });
 
