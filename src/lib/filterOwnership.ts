@@ -57,14 +57,19 @@ export function isRowFilteredByOtherOwner(
 }
 
 export function getOwnerVisibleRows({
-    aggregateRows,
     globalFilter,
     localFilter,
     localFilterIsActive = false,
     scopePredicate,
 }: OwnerVisibleRowsInput) {
     if (!localFilterIsActive) {
-        return aggregateRows;
+        const rows: number[] = [];
+        for (let rowIndex = 0; rowIndex < globalFilter.length; rowIndex += 1) {
+            if ((globalFilter[rowIndex] ?? 0) !== 0) continue;
+            if (scopePredicate && !scopePredicate(rowIndex)) continue;
+            rows.push(rowIndex);
+        }
+        return Uint32Array.from(rows);
     }
 
     const rows: number[] = [];

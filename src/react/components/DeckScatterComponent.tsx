@@ -1,5 +1,5 @@
 import DeckGL from "@deck.gl/react";
-import { OrthographicView, OrbitView } from "@deck.gl/core";
+import { OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { LineLayer } from "@deck.gl/layers";
@@ -20,6 +20,7 @@ import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -233,7 +234,28 @@ const DeckScatter = observer(function DeckScatterComponent({
     ].filter(x => x !== null);
     
     const outerContainer = useOuterContainer();
+    const deckContainerRef = useRef<HTMLDivElement | null>(null);
     const deckRef = useRef<any>();
+    const getTooltipContent = useCallback(
+        (info: PickingInfo) => {
+            const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
+            return getCombinedScatterTooltip(
+                richInfo,
+                {
+                    gateDisplayLayerId: gateDisplayLayer?.id,
+                    gateLabelLayerId: gateLabelLayer?.id,
+                    getPointTooltip: getTooltip,
+                },
+            );
+        },
+        [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
+    );
+    const {
+        clearTooltip,
+        getTooltip: getPortalTooltip,
+        suppressTooltipUntilPointerUp,
+        tooltipPortal,
+    } = useOuterContainerDeckTooltip(getTooltipContent, deckContainerRef);
 
     // unproject used for updating ranges - use deck viewport instead of layer
     const unproject = useCallback((coords: [number, number]) => {
@@ -275,13 +297,18 @@ const DeckScatter = observer(function DeckScatterComponent({
         <>
             <AxisComponent config={config} unproject={unproject}>
                 <div
+                    ref={deckContainerRef}
                     aria-label="Scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none" }}
-                    onMouseDown={(event) => {
+                    onPointerDown={suppressTooltipUntilPointerUp}
+                    onMouseDown={() => {
                         setScatterKeyboardActive(true);
                     }}
                     onMouseEnter={() => setScatterKeyboardActive(true)}
-                    onMouseLeave={() => setScatterKeyboardActive(false)}
+                    onMouseLeave={() => {
+                        clearTooltip();
+                        setScatterKeyboardActive(false);
+                    }}
                 >
                     <DeckGL
                         ref={deckRef}
@@ -296,23 +323,14 @@ const DeckScatter = observer(function DeckScatterComponent({
                         onViewStateChange={(v) => {
                             action(() => (config.viewState = v.viewState))();
                         }}
-                        getTooltip={(info) => {
-                            const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
-                            return getCombinedScatterTooltip(
-                                richInfo,
-                                {
-                                    gateDisplayLayerId: gateDisplayLayer?.id,
-                                    gateLabelLayerId: gateLabelLayer?.id,
-                                    getPointTooltip: getTooltip,
-                                },
-                            );
-                        }}
+                        getTooltip={getPortalTooltip}
                         getCursor={({ isDragging }) => {
                             return isDragging ? "grabbing" : "crosshair";
                         }}
                     />
                 </div>
             </AxisComponent>
+            {tooltipPortal}
             {showLegend && (
                 <FieldContourLegend
                     fields={legendFields}

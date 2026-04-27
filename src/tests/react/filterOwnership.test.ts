@@ -9,16 +9,14 @@ function toRows(rows: Uint32Array) {
 }
 
 describe("filter ownership", () => {
-    test("keeps aggregate rows when there are no local filters", () => {
-        const aggregateRows = new Uint32Array([0, 1, 2]);
+    test("derives owner-visible rows from the current global filter without local filters", () => {
         const globalFilter = new Uint8Array([0, 0, 0]);
 
         const ownerVisibleRows = getOwnerVisibleRows({
-            aggregateRows,
+            aggregateRows: new Uint32Array([0]),
             globalFilter,
         });
 
-        expect(ownerVisibleRows).toBe(aggregateRows);
         expect(toRows(ownerVisibleRows)).toEqual([0, 1, 2]);
     });
 
