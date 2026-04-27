@@ -131,6 +131,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             ...getSharedScatterSettings(c, {
                 chart: this,
                 includeDensitySettings: deckContourScatterTypes.has(c.type),
+                includeDensityModeToggle: deckContourScatterTypes.has(c.type),
                 includePointShape: true,
             }),
             g({

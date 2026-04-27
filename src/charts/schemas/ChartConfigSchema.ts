@@ -110,6 +110,7 @@ const ContourVisualConfigSchema = z.object({
 
 const DensityFieldsConfigSchema = z.object({
     densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+    density_mode: z.enum(["overlay", "grid"]).optional().describe("Whether density fields are overlaid or shown as a small-multiple grid"),
 }).describe("Density field selection shared by contour-based charts");
 
 const LegacyContourCategorySelectionConfigSchema = z.object({
