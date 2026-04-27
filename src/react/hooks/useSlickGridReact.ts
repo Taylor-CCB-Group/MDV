@@ -723,20 +723,39 @@ const useSlickGridReact = () => {
                 displayedFields.length,
             );
 
-            // Map the display-layer index to config.param index, skip the "__index__" slot
-            const paramInsertionIndex = config.include_index
+            const currentParam = chart.activeQueries.activeParams();
+            const renderedEntryIndices = orderedFields
+                .map((field) =>
+                    currentParam.findIndex((entry) => flattenFields(entry).includes(field)),
+                )
+                .filter((entryIndex) => entryIndex !== -1);
+
+            // Active-link params expand to multiple visible columns, but they must remain a single
+            // top-level param entry so save/reload keeps them as active links instead of plain links.
+            const orderedParamIndices: number[] = [];
+            const seenParamIndices = new Set<number>();
+            for (const entryIndex of renderedEntryIndices) {
+                if (seenParamIndices.has(entryIndex)) {
+                    continue;
+                }
+                seenParamIndices.add(entryIndex);
+                orderedParamIndices.push(entryIndex);
+            }
+
+            // Map the display-layer insertion point to a top-level param insertion point.
+            // If the user inserts inside an expanded active-link group, normalize it to the
+            // group boundary instead of splitting the query-backed param entry.
+            const fieldInsertionIndex = config.include_index
                 ? Math.max(0, insertionIndex - 1)
                 : insertionIndex;
+            const paramInsertionIndex = new Set(
+                renderedEntryIndices.slice(0, fieldInsertionIndex),
+            ).size;
 
             // Rebuild the current param order from the live grid so unsaved reorders are respected.
-            const currentParam = [...(config.param ?? [])];
-            const orderedParamEntries = orderedFields
-                .map((field) =>
-                    currentParam.find((entry) => flattenFields(entry).includes(field)),
-                )
-                .filter((entry): entry is NonNullable<typeof currentParam[number]> => entry !== undefined);
+            const orderedParamEntries = orderedParamIndices.map((entryIndex) => currentParam[entryIndex]);
             const remainingParamEntries = currentParam.filter(
-                (entry) => !orderedParamEntries.includes(entry),
+                (_entry, entryIndex) => !seenParamIndices.has(entryIndex),
             );
 
             // Splice into a copy of config.param to preserve any FieldSpec/ColumnQuery objects

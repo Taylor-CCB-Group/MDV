@@ -142,9 +142,12 @@ describe("useSlickGridReact", () => {
         mockChart = {
             setAddColumnDialogOpener: vi.fn(),
             setGridRef: vi.fn(),
-            setParams: vi.fn((nextParam: string[]) => {
+            activeQueries: {
+                activeParams: vi.fn(() => mockConfig.param),
+            },
+            setParams: vi.fn((nextParam: Array<string | Record<string, unknown>>) => {
                 runInAction(() => {
-                    mockConfig.param = nextParam;
+                    mockConfig.param = nextParam as typeof mockConfig.param;
                 });
             }),
         };
@@ -628,6 +631,67 @@ describe("useSlickGridReact", () => {
             });
 
             expect(mockConfig.column_widths).toEqual({ age: 150, name: 220 });
+        });
+
+        test("should keep an active-link param intact when inserting near its expanded columns", () => {
+            const activeLinkParam = {
+                columns: [],
+                fields: ["gene_a", "gene_b"],
+                initialize: async () => undefined,
+            };
+            mockConfig.param = ["gene_a", "gene_b", "age"] as typeof mockConfig.param;
+            mockChart.activeQueries.activeParams.mockReturnValue([activeLinkParam, "age"]);
+            mockOrderedParamColumns = [
+                {
+                    field: "gene_a",
+                    name: "gene_a",
+                    datatype: "double",
+                    data: new Float32Array([1, 2, 3]),
+                    editable: false,
+                },
+                {
+                    field: "gene_b",
+                    name: "gene_b",
+                    datatype: "double",
+                    data: new Float32Array([4, 5, 6]),
+                    editable: false,
+                },
+                mockOrderedParamColumns[0],
+            ] as any;
+            mockDataStore.columns = mockOrderedParamColumns;
+            mockDataStore.columnIndex = Object.fromEntries(
+                mockOrderedParamColumns.map((column) => [column.field, column]),
+            );
+
+            const { result } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+            vi.spyOn(gridInstance.slickGrid, "getColumns").mockReturnValue([
+                { id: "gene_a", field: "gene_a", width: 100 },
+                { id: "gene_b", field: "gene_b", width: 100 },
+                { id: "age", field: "age", width: 100 },
+            ]);
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    datatype: "text",
+                    position: 2,
+                });
+            });
+
+            expect(mockChart.setParams).toHaveBeenCalledWith([
+                expect.objectContaining({
+                    fields: ["gene_a", "gene_b"],
+                }),
+                "annotation",
+                "age",
+            ]);
+            expect(mockConfig.order).toEqual({
+                gene_a: 0,
+                gene_b: 1,
+                annotation: 2,
+                age: 3,
+            });
         });
 
         test("should pass clone metadata through to the model", () => {

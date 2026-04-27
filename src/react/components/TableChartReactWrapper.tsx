@@ -48,6 +48,57 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
     return config;
 }
 
+export function orderSerializedTableParams(
+    activeParams: TableChartReactConfig["param"],
+    serializedEntries: unknown[],
+    visibleFields: string[],
+) {
+    const selectedIndices = new Set<number>();
+    const matchedIndicesInDisplayOrder: number[] = [];
+
+    // Map each visible concrete field back to the first unmatched top-level param entry
+    // that produced it, so query-backed params are treated as one logical group.
+    for (const field of visibleFields) {
+        const index = activeParams.findIndex((entry, entryIndex) => {
+            if (selectedIndices.has(entryIndex)) {
+                return false;
+            }
+            return flattenFields(entry).includes(field);
+        });
+        if (index === -1) {
+            continue;
+        }
+        selectedIndices.add(index);
+        matchedIndicesInDisplayOrder.push(index);
+    }
+
+    const orderedParam: unknown[] = [];
+    let matchedIndexPointer = 0;
+    // Keep unmatched query-backed entries at their original top-level position so an
+    // active link is not lost or moved just because it currently resolves to zero
+    // concrete fields.
+    // For matched entries, use the visible display order; for unmatched query entries,
+    // preserve the original top-level position from activeParams.
+    for (let i = 0; i < activeParams.length; i += 1) {
+        if (selectedIndices.has(i)) {
+            const matchedIndex = matchedIndicesInDisplayOrder[matchedIndexPointer];
+            matchedIndexPointer += 1;
+            if (matchedIndex !== undefined) {
+                orderedParam.push(serializedEntries[matchedIndex]);
+            }
+            continue;
+        }
+        if (typeof activeParams[i] === "string") {
+            continue;
+        }
+        if (serializedEntries[i] !== undefined) {
+            orderedParam.push(serializedEntries[i]);
+        }
+    }
+
+    return orderedParam;
+}
+
 export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     private gridRef?: { current: SlickgridReactInstance | null };
     private addColumnDialogOpener?: () => void;
@@ -211,41 +262,12 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             );
 
         if (visibleFields.length > 0 && Array.isArray(config.param)) {
-            // Preserve query-backed param entries while reordering to match current grid visibility.
             const activeParams = this.activeQueries.activeParams();
-            const serializedEntries = config.param;
-            const selectedIndices = new Set<number>();
-            const orderedParam: typeof config.param = [];
-
-            for (const field of visibleFields) {
-                const index = activeParams.findIndex((entry, entryIndex) => {
-                    if (selectedIndices.has(entryIndex)) {
-                        return false;
-                    }
-                    return flattenFields(entry).includes(field);
-                });
-                if (index === -1) {
-                    continue;
-                }
-                selectedIndices.add(index);
-                orderedParam.push(serializedEntries[index]);
-            }
-
-            // Keep unmatched query-backed entries so an active link is not lost when it
-            // currently resolves to zero concrete fields.
-            for (let i = 0; i < activeParams.length; i += 1) {
-                if (selectedIndices.has(i)) {
-                    continue;
-                }
-                if (typeof activeParams[i] === "string") {
-                    continue;
-                }
-                if (serializedEntries[i] !== undefined) {
-                    orderedParam.push(serializedEntries[i]);
-                }
-            }
-
-            config.param = orderedParam;
+            // Params affect the active link and if turned into concrete fields, active link
+            // can turn to link, hence preserving the active link params
+            config.param = orderSerializedTableParams(activeParams, config.param, visibleFields);
+            
+            // Rest of the properties don't affect the active link
             config.order = Object.fromEntries(
                 visibleFields.map((field, index) => [field, index]),
             );
