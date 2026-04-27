@@ -31,7 +31,7 @@ function getUsagePathLabel(path: string) {
 function getFixInstructions(chart: ChartColumnImpact) {
     const fixes = chart.usagePaths.map((path) => {
         if (path === "param") {
-            return "Remove this column from the chart data, or remove the chart if it is no longer needed.";
+            return "Open the chart settings and remove or change the column from parameters, or remove the chart if it is no longer needed.";
         }
         if (path === "color_by") {
             return "Open the chart settings and choose a different column for color-by.";
@@ -48,23 +48,48 @@ function getFixInstructions(chart: ChartColumnImpact) {
     return [...new Set(fixes)];
 }
 
-function getUsageSummaryLabel(chart: ChartColumnImpact) {
-    if (chart.usagePaths.length === 1) {
-        return getUsagePathLabel(chart.usagePaths[0]);
+function trimChartTitle(title: string, maxLength = 42) {
+    if (title.length <= maxLength) {
+        return title;
     }
-    return `${chart.usagePaths.length} places`;
+    return `${title.slice(0, maxLength - 1)}…`;
+}
+
+function getChartHeader(chart: ChartColumnImpact) {
+    const hasCustomTitle =
+        chart.chartTitle.trim().length > 0 &&
+        chart.chartTitle !== chart.chartType &&
+        chart.chartTitle !== chart.chartTypeLabel;
+
+    if (!hasCustomTitle) {
+        return {
+            primaryLabel: chart.chartTypeLabel,
+            secondaryLabel: null,
+            fullPrimaryLabel: chart.chartTypeLabel,
+        };
+    }
+
+    return {
+        primaryLabel: trimChartTitle(chart.chartTitle),
+        secondaryLabel: chart.chartTypeLabel,
+        fullPrimaryLabel: chart.chartTitle,
+    };
+}
+
+function getUsageBadgeLabel(chart: ChartColumnImpact) {
+    return `Used as ${chart.usagePaths.map((path) => getUsagePathLabel(path)).join(", ")}`;
 }
 
 function SectionHeader({ count, title }: { count: number; title: string }) {
     return (
         <Stack alignItems="center" direction="row" spacing={1.25}>
-            <Typography fontSize="1.05rem" fontWeight={700}>
+            <Typography fontWeight={700}>
                 {title}
             </Typography>
             <Box
                 sx={{
-                    minWidth: 32,
-                    height: 32,
+                    minWidth: 20,
+                    height: 20,
                     borderRadius: "999px",
                     bgcolor: "action.selected",
                     color: "text.primary",
@@ -72,7 +97,6 @@ function SectionHeader({ count, title }: { count: number; title: string }) {
                     alignItems: "center",
                     justifyContent: "center",
                     px: 1,
-                    fontSize: "0.95rem",
                     fontWeight: 700,
                 }}
             >
@@ -91,6 +115,7 @@ function ChartImpactCard({
     onOpenView?: (viewName: string) => void;
     viewName?: string;
 }) {
+    const { fullPrimaryLabel, primaryLabel, secondaryLabel } = getChartHeader(chart);
 
     return (
         <Stack
@@ -105,12 +130,43 @@ function ChartImpactCard({
                     theme.palette.mode === "dark" ? theme.palette.grey[800] : theme.palette.grey[50],
             }}
         >
-            <Typography fontWeight={700}>
-                {chart.chartTitle}
-            </Typography>
-            <Typography color="text.secondary" variant="body1">
-                {chart.chartTypeLabel}
-            </Typography>
+            <Stack
+                alignItems={{ sm: "center", xs: "flex-start" }}
+                direction={{ sm: "row", xs: "column" }}
+                justifyContent="space-between"
+                spacing={1}
+            >
+                <Stack minWidth={0} spacing={0.35} sx={{ flex: 1 }}>
+                    <Stack alignItems="center" direction="row" minWidth={0} spacing={1}>
+                        <Typography
+                            fontWeight={700}
+                            noWrap
+                            title={fullPrimaryLabel}
+                            sx={{ minWidth: 0 }}
+                        >
+                            {primaryLabel}
+                        </Typography>
+                        {secondaryLabel ? (
+                            <Typography color="text.secondary" noWrap variant="body1">
+                                ({secondaryLabel})
+                            </Typography>
+                        ) : null}
+                    </Stack>
+                </Stack>
+                <Box
+                    sx={{
+                        borderRadius: "999px",
+                        bgcolor: "action.hover",
+                        px: 1,
+                        py: 0.4,
+                        fontSize: "0.8rem",
+                        fontWeight: 500,
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    {getUsageBadgeLabel(chart)}
+                </Box>
+            </Stack>
             <Accordion
                 disableGutters
                 elevation={0}
@@ -130,7 +186,7 @@ function ChartImpactCard({
                     expandIcon={<ExpandMoreIcon />}
                     sx={{
                         minHeight: "36px",
-                        px: 1,
+                        p: 1,
                         borderRadius: 1,
                         bgcolor: "action.hover",
                         "&.Mui-expanded": {
@@ -147,7 +203,7 @@ function ChartImpactCard({
                         },
                     }}
                 >
-                    <Typography fontWeight={700}>
+                    <Typography fontWeight={700} variant="body2">
                         How to fix
                     </Typography>
                 </AccordionSummary>
@@ -155,7 +211,7 @@ function ChartImpactCard({
                     sx={{
                         px: 1,
                         pt: 1,
-                        pb: 0.25,
+                        pb: 1,
                         bgcolor: "transparent",
                     }}
                 >
@@ -268,8 +324,8 @@ function SavedViewImpactSection({
                     <Typography fontWeight={700}>{savedView.viewName}</Typography>
                     <Box
                         sx={{
-                            minWidth: 32,
-                            height: 32,
+                            minWidth: 20,
+                            height: 20,
                             borderRadius: "999px",
                             bgcolor: "action.selected",
                             color: "text.primary",
@@ -277,7 +333,6 @@ function SavedViewImpactSection({
                             alignItems: "center",
                             justifyContent: "center",
                             px: 1,
-                            fontSize: "0.95rem",
                             fontWeight: 700,
                         }}
                     >
@@ -363,7 +418,7 @@ export default function ColumnRemovalImpactDialog({
             <DialogContent dividers>
                 <Stack spacing={2}>
                     <Alert severity={"error"}>
-                        <Typography fontWeight={700} variant="body1">
+                        <Typography fontWeight={700} variant="body1" sx={{ textTransform: isBlocked ? "none" : "uppercase" }}>
                             {isBlocked
                                 ? "This column is currently used by charts or saved views."
                                 : "This action is irreversible."}
@@ -393,10 +448,10 @@ export default function ColumnRemovalImpactDialog({
                                     1. Find the affected view and chart below.
                                 </Typography>
                                 <Typography color="text.secondary" variant="body2">
-                                    2. Read the 'Used as' section to see exactly where the column is used.
+                                    2. Read the 'How to fix' section to see exactly where the column is used and how to fix.
                                 </Typography>
                                 <Typography color="text.secondary" variant="body2">
-                                    3. Open that chart, remove this column from the listed place, then try deleting the column again.
+                                    3. Try deleting the column again.
                                 </Typography>
                             </Stack>
                         </Box>
@@ -414,7 +469,7 @@ export default function ColumnRemovalImpactDialog({
             <DialogActions>
                 <Button onClick={onClose}>Cancel</Button>
                 <Button color="error" disabled={isBlocked} onClick={onConfirm}>
-                    {isBlocked ? "Deletion Blocked" : "Permanently Delete Column"}
+                    {isBlocked ? "Deletion Blocked" : "Delete Column & Save"}
                 </Button>
             </DialogActions>
         </Dialog>
