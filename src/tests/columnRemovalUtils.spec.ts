@@ -1,13 +1,16 @@
 import { describe, expect, test } from "vitest";
+import type { BaseConfig } from "@/charts/BaseChart";
 import { analyzeChartColumnImpact } from "@/charts/columnRemovalUtils";
 
-function createChartConfig(overrides: Record<string, unknown> = {}) {
+type TestChartConfig = BaseConfig & Record<string, unknown>;
+
+function createChartConfig(overrides: Partial<TestChartConfig> = {}): TestChartConfig {
     return {
         id: "chart-1",
         title: "Chart",
         type: "scatter_plot",
-        param: ["x", "y"],
-        size: [400, 300] as [number, number],
+        param: ["x", "y"] as BaseConfig["param"],
+        size: [400, 300],
         legend: "none",
         ...overrides,
     };
@@ -19,7 +22,7 @@ describe("columnRemovalUtils", () => {
             createChartConfig({
                 title: "Scatter",
                 param: ["x", "age"],
-            }) as any,
+            }),
             undefined,
             "age",
         );
@@ -39,7 +42,7 @@ describe("columnRemovalUtils", () => {
             createChartConfig({
                 title: "Scatter",
                 color_by: "age",
-            }) as any,
+            }),
             undefined,
             "age",
         );
@@ -58,7 +61,7 @@ describe("columnRemovalUtils", () => {
             createChartConfig({
                 title: "Scatter",
                 tooltip: { column: "age" },
-            }) as any,
+            }),
             undefined,
             "age",
         );
@@ -68,7 +71,7 @@ describe("columnRemovalUtils", () => {
                 title: "Heatmap",
                 type: "heat_map",
                 background_filter: { column: "age" },
-            }) as any,
+            }),
             undefined,
             "age",
         );
@@ -93,7 +96,7 @@ describe("columnRemovalUtils", () => {
                 title: "Custom",
                 type: "custom",
                 tooltip_columns: [{ field: "age" }],
-            }) as any,
+            }),
             { configEntriesUsingColumns: ["tooltip_columns"], name: "custom" },
             "age",
         );
