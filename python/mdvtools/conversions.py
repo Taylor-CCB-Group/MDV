@@ -191,8 +191,21 @@ def convert_scanpy_to_mdv(
 def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False, chunk_data=False):
     md=mudata_object
     p= MDVProject(folder,delete_existing=delete_existing)
+    # get the modallites
+    mods = md.mod.keys()
+ 
+    #try and work out redundant columns
+
+    prefix= tuple(mods)
+
+    global_cols = [x for x in md.obs.columns if not x.startswith(prefix)]
+    repeat_cols = [f"{x}:{y}" for x in mods for y in global_cols]
+ 
+
+    table = md.obs.drop(columns=repeat_cols,errors='ignore')
+     
     #are there any general drs
-    table = _add_dims(md.obs,md.obsm,max_dims)
+    table = _add_dims(table,md.obsm,max_dims)
     #add drs derived from modalities (cell clustering)
     for name,mod in md.mod.items():
         table = _add_dims(table,mod.obsm,max_dims,name)
@@ -200,8 +213,10 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
     columns= [{"name":"cell_id","datatype":"unique"}]
     p.add_datasource("cells",table,columns)
 
-    for mod in md.mod.keys():
+    for mod in mods:
         mdata = md.mod[mod]
+        if mdata.n_vars==0:
+            continue
 
         #adds the index to the data as a name column
         #This is usually the unique gene name - but not always

@@ -738,14 +738,19 @@ class MDVProject:
             )
         # py-right: dictionary key must be hashable
         newdf = pandas.DataFrame({index_col: self.get_column(datasource, index_col)})  # type: ignore
+        fields = [c["field"] for c in columns]
+        aligned = newdf[[index_col]].merge(
+            data[fields],
+            left_on=index_col,
+            right_index=True,
+            how="left",
+        ).fillna(missing_value)
+
         h5 = self._get_h5_handle()
         gr = h5[datasource]
         assert isinstance(gr, h5py.Group)
         for c in columns:
-            d = {k: v for k, v in zip(data.index, data[c["field"]])}
-            # v slow - needs improving
-            # py-right: `Argument of type "Series | Unknown | DataFrame" cannot be assigned to parameter "data" of type "Series"`
-            ncol = newdf.apply(lambda row: d.get(row[0], missing_value), axis=1)
+            ncol = aligned[c["field"]]
             assert isinstance(ncol, pandas.Series)
             add_column_to_group(c, ncol, gr, len(ncol), self.skip_column_clean)
             ds["columns"].append(c)
@@ -1416,7 +1421,7 @@ class MDVProject:
         
         # Calculate how many elements we can process with available memory
         # Use 25% of available memory to be very safe for large datasets
-        safe_memory_bytes = available_memory_mb * 1024 * 1024 * 0.25
+        safe_memory_bytes = available_memory_mb * 1024 * 1024 * 0.5
         max_elements = safe_memory_bytes / bytes_per_element
         
         if rows * cols <= max_elements:
