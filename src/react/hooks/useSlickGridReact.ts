@@ -623,8 +623,29 @@ const useSlickGridReact = () => {
         const { columnName } = pendingColumnRemoval;
         try {
             dataModel.removeColumn(columnName);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to remove the column");
+            setPendingColumnRemoval(null);
+            setFeedbackAlert({
+                type: "error",
+                title: "Remove Column Error",
+                message: `Column ${columnName} could not be removed.`,
+                stack: error.stack,
+                metadata: {
+                    columnName,
+                    removeError: error.message,
+                },
+            });
+            return;
+        }
+
+        try {
             if (chartManager?.viewManager?.saveView) {
                 await chartManager.viewManager.saveView();
+                if (chartManager.viewManager.hasUnsavedChanges?.()) {
+                    throw new Error("Saving the updated view did not complete successfully");
+                }
             } else {
                 chartManager?.saveState?.();
             }
