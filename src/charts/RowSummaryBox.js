@@ -93,6 +93,9 @@ class RowSummaryBox extends BaseChart {
     }
 
     onDataHighlighted(data) {
+        if (data.indexes.length === 0) {
+            return;
+        }
         const i = data.indexes[0];
         if (this.imViewer) {
             this.imViewer.setImage(this._getImage(i));

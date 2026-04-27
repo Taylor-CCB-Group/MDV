@@ -408,7 +408,7 @@ export async function getSingleSelectionStats2D({ loader, selection }: { loader:
         contrastLimits[0] = domain[0];
         contrastLimits[1] = domain[1];
     }
-    return { domain, contrastLimits };
+    return { domain, contrastLimits, raster };
 }
 
 export async function getSingleSelectionStats3D({ loader, selection }: { loader: LOADER, selection: VivSelection }) {
@@ -444,6 +444,7 @@ export async function getSingleSelectionStats3D({ loader, selection }: { loader:
                 statsTop.contrastLimits[1],
             ),
         ] satisfies [number, number],
+        raster: rasterMid,
     };
 }
 
@@ -462,7 +463,8 @@ export const getMultiSelectionStats = async ({ loader, selections, use3d }: { lo
     );
     const domains = stats.map((stat) => stat.domain);
     const contrastLimits = stats.map((stat) => stat.contrastLimits);
-    return { domains, contrastLimits };
+    const raster = stats.map((stat) => stat.raster);
+    return { domains, contrastLimits, raster };
 };
 
 /* eslint-disable no-useless-escape */

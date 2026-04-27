@@ -8,7 +8,7 @@ REQUIRED_FILES = {"views.json", "state.json", "datasources.json"}
 
 
 def register_routes(app, ENABLE_AUTH):
-    from flask import abort, jsonify, session, redirect, url_for, render_template
+    from flask import abort, jsonify, session, redirect, url_for, render_template, send_file
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
     from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
@@ -51,6 +51,17 @@ def register_routes(app, ENABLE_AUTH):
             is_auth_enabled = True if enable_auth == "1" else False
             return jsonify({"enable_auth": is_auth_enabled})
         logger.info("Route registered: /enable_auth")
+
+        @app.route('/secondary_logo')
+        def secondary_logo():
+            """Serve optional logo from /app/mdv/logo.png if present."""
+            # todo: update this to be more configurable, keeping it simple for now
+            path = "/app/mdv/logo.png" 
+            if not os.path.isfile(path):
+                abort(404)
+            return send_file(path, mimetype="image/png")
+
+        logger.info("Route registered: /secondary_logo")
 
         @app.route('/extension_config', methods=['GET'])
         def extension_config():

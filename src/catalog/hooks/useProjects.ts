@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Project, ProjectAccessType } from "../utils/projectUtils";
 import { parseErrorResponse } from "../utils/apiUtils";
+import { apiFetch, buildApiUrl } from "@/utils/mdvRouting";
 
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -27,7 +28,7 @@ const useProjects = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch("projects", {
+            const response = await apiFetch("projects", {
                 headers: {
                     Accept: "application/json",
                 },
@@ -93,7 +94,7 @@ const useProjects = () => {
         setError(null);
 
         try {
-            const response = await fetch("create_project", {
+            const response = await apiFetch("create_project", {
                 method: "POST",
                 headers: {
                     Accept: "application/json",
@@ -153,7 +154,7 @@ const useProjects = () => {
             setError(null);
 
             try {
-                const response = await fetch(`delete_project/${id}`, {
+                const response = await apiFetch(`delete_project/${id}`, {
                     method: "DELETE",
                     headers: {
                         Accept: "application/json",
@@ -224,7 +225,7 @@ const useProjects = () => {
                 const formData = new FormData();
                 formData.append("name", newName.trim());
 
-                const response = await fetch(`projects/${id}/rename`, {
+                const response = await apiFetch(`projects/${id}/rename`, {
                     method: "PUT",
                     body: formData,
                     headers: {
@@ -272,7 +273,7 @@ const useProjects = () => {
                 const formData = new FormData();
                 formData.append("type", newType.toLowerCase());
 
-                const response = await fetch(`projects/${id}/access`, {
+                const response = await apiFetch(`projects/${id}/access`, {
                     method: "PUT",
                     body: formData,
                     headers: {
@@ -322,7 +323,7 @@ const useProjects = () => {
             setError(null);
 
             try {
-                const response = await fetch(`export_project/${id}`);
+                const response = await fetch(buildApiUrl(`export_project/${id}`));
                 if (response.ok) {
                     // Fetch blob from response
                     const blob = await response.blob();
@@ -361,7 +362,7 @@ const useProjects = () => {
             setError(null);
 
             try {
-                const response = await fetch("rescan_projects");
+                const response = await apiFetch("rescan_projects");
                 if (response.ok) {
                    console.log("Rescan successful");
                    // Refresh the project list so newly discovered projects appear (works with or without auth)

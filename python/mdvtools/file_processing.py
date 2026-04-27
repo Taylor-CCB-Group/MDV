@@ -1,6 +1,175 @@
 import os
+import csv
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
+
+# Validate against a bounded sample so large uploads still flow through the
+# existing lazy Polars ingestion path without loading the entire file into memory.
+TABULAR_VALIDATION_SAMPLE_ROWS = 50
+
+
+def _is_empty_or_numeric(value: str) -> bool:
+    """Return True when a value is empty or numeric-like."""
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return True
+    try:
+        float(cleaned)
+        return True
+    except ValueError:
+        return False
+
+
+def _first_row_looks_like_data(row: list[str]) -> bool:
+    """
+    Detect likely missing-header files where first row is data.
+    We keep this conservative to avoid false positives.
+    """
+    if not row:
+        return True
+
+    cleaned = [cell.strip() for cell in row]
+    non_empty = [cell for cell in cleaned if cell != ""]
+    if not non_empty:
+        return True
+
+    lowered = [cell.lower() for cell in non_empty]
+    if len(set(lowered)) != len(lowered):
+        return True
+
+    if len(non_empty) < 2:
+        return False
+
+    data_like_count = sum(1 for cell in non_empty if _is_empty_or_numeric(cell))
+    return data_like_count >= max(2, int(len(non_empty) * 0.6))
+
+
+def _get_delimiter_from_extension(original_filename: str) -> str:
+    """Choose delimiter from extension: csv -> comma, tsv/tab/txt -> tab."""
+    lower = (original_filename or "").lower()
+    if lower.endswith(".csv"):
+        return ","
+    if lower.endswith((".tsv", ".tab", ".txt")):
+        return "\t"
+    return ","
+
+
+def _delimiter_label(delimiter: str) -> str:
+    return "tab-separated" if delimiter == "\t" else "comma-separated"
+
+
+def _read_rows_without_blanks(filepath: str, delimiter: str, max_rows: int | None = None) -> list[list[str]]:
+    """Read file rows, skipping blank lines and optionally stopping after a small sample."""
+    rows: list[list[str]] = []
+    with open(filepath, "r", encoding="utf-8-sig", errors="replace", newline="") as file:
+        reader = csv.reader(file, delimiter=delimiter)
+        for row in reader:
+            if not any(cell.strip() for cell in row):
+                continue
+            rows.append(row)
+            if max_rows is not None and len(rows) >= max_rows:
+                break
+    return rows
+
+
+def _rows_have_consistent_width(rows: list[list[str]]) -> bool:
+    if not rows:
+        return False
+
+    expected_width = len(rows[0])
+    return all(len(row) == expected_width for row in rows)
+
+
+def _detect_obvious_delimiter_mismatch(
+    filepath: str,
+    original_filename: str,
+    rows: list[list[str]],
+    delimiter: str,
+) -> None:
+    """
+    Reject files that collapse to one column under the extension-based delimiter
+    when the alternate common delimiter clearly parses them as multi-column data.
+    """
+    if not rows or len(rows[0]) != 1:
+        return
+
+    alternate_delimiter = "," if delimiter == "\t" else "\t"
+    try:
+        alternate_rows = _read_rows_without_blanks(
+            filepath,
+            alternate_delimiter,
+            max_rows=TABULAR_VALIDATION_SAMPLE_ROWS,
+        )
+    except Exception:
+        return
+
+    if not alternate_rows:
+        return
+
+    alternate_header = alternate_rows[0]
+    if len(alternate_header) <= 1 or not _rows_have_consistent_width(alternate_rows):
+        return
+
+    expected = _delimiter_label(delimiter)
+    detected = _delimiter_label(alternate_delimiter)
+    raise ValidationError(
+        f"'{original_filename}' looks {detected}, not {expected}. "
+        "Please export the file with the expected delimiter and try again.",
+        status_code=400,
+    )
+
+
+def _validate_tabular_structure(filepath: str, original_filename: str, delimiter: str):
+    """Fail fast on common malformed tabular inputs before datasource creation."""
+    try:
+        rows = _read_rows_without_blanks(
+            filepath,
+            delimiter,
+            max_rows=TABULAR_VALIDATION_SAMPLE_ROWS,
+        )
+    except Exception as e:
+        raise ValidationError(f"Unable to read '{original_filename}': {str(e)}", status_code=400)
+
+    if not rows:
+        raise ValidationError(f"'{original_filename}' appears to be empty.", status_code=400)
+
+    header = rows[0]
+    non_empty_header_cells = [cell.strip() for cell in header if cell.strip()]
+    if not non_empty_header_cells:
+        expected = _delimiter_label(delimiter)
+        raise ValidationError(
+            f"'{original_filename}' is not a valid {expected} file with a header row.",
+            status_code=400,
+        )
+
+    _detect_obvious_delimiter_mismatch(filepath, original_filename, rows, delimiter)
+
+    if len(set(cell.lower() for cell in non_empty_header_cells)) != len(non_empty_header_cells):
+        raise ValidationError(
+            f"'{original_filename}' contains duplicate column names in the header row.",
+            status_code=400,
+        )
+
+    # Check a small sample of rows for shape mismatches; this catches obvious
+    # delimiter/quoting problems without scanning the full file up front.
+    expected_width = len(header)
+    for sample_row in rows[1:]:
+        if len(sample_row) != expected_width:
+            raise ValidationError(
+                f"'{original_filename}' has inconsistent columns between header and data rows. "
+                "Please verify delimiter and quoting.",
+                status_code=400,
+            )
+
+    # This heuristic is intentionally conservative. We only want to reject
+    # files that strongly look like they are missing a header row.
+    if _first_row_looks_like_data(header):
+        raise ValidationError(
+            f"'{original_filename}' appears to be missing a valid header row. "
+            "Please ensure the first row contains column names.",
+            status_code=400,
+        )
+
 
 def datasource_processing(project, filepath, original_filename, view, replace, supplied_only, resume=False):
     """
@@ -35,15 +204,25 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
             print("Found existing progress file, attempting to resume...")
             # The add_datasource_polars method will handle the resumption logic
         
+        has_existing_datasources = len(project.datasources) > 0
+
+        add_to_view_param = None if has_existing_datasources else (view or "default")
+        delimiter = _get_delimiter_from_extension(original_filename)
+        _validate_tabular_structure(filepath, original_filename, delimiter)
+        
         # Add the datasource to the project with resume flag
-        dodgy_columns = project.add_datasource_polars(
+        result = project.add_datasource_polars(
             name=original_filename,
             dataframe=filepath,
-            add_to_view=view,
+            add_to_view=add_to_view_param,
             supplied_columns_only=supplied_only,
             replace_data=replace,
-            separator=","
+            separator=delimiter,
+            preserve_views_on_replace=True
         )
+
+        dodgy_columns = result[0]
+        created_view = result[1] if len(result) > 1 else None
         
         # Get and return the metadata
         metadata = project.get_datasource_metadata(original_filename)
@@ -52,6 +231,9 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
         if dodgy_columns:
             result["dodgy_columns"] = dodgy_columns
             result["warning"] = f"Some columns could not be processed: {dodgy_columns}"
+
+        if created_view:
+            result["created_view"] = created_view
         
         return result
         
@@ -79,6 +261,8 @@ def anndata_processing(project, filepath, original_filename):
     print(f"Filepath: {filepath}")
 
     try:
+        had_existing_datasources = len(project.datasources) > 0
+
         # Read the AnnData file
         anndata = sc.read(filepath)
         
@@ -86,6 +270,14 @@ def anndata_processing(project, filepath, original_filename):
         convert_scanpy_to_mdv(project.dir, anndata)
         
         result = {"success": True, "message": "AnnData processed successfully"}
+        created_view = None
+
+        if had_existing_datasources:
+            created_view = project.create_view_with_all_datasources(
+                view_name=f"View: {original_filename}", make_default=False
+            )
+            result["created_view"] = created_view
+
         return result
         
     except Exception as e:

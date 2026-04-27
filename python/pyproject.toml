@@ -1,15 +1,6 @@
 [tool.poetry]
-name = "mdvtools"
-version = "0.0.1"
-description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
-authors = [
-    "Martin Sergeant <m.j.sergeant1@googlemail.com>",
-    "PeterTodd <peter.todd@well.ox.ac.uk>",
-]
-readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
 ]
 
@@ -24,6 +15,8 @@ h5py = "^3.10.0"
 mudata = ">=0.3.0"
 # numpy 2.3.0 drops support for Python 3.10
 numpy = "<2.3.0"
+# numcodecs 0.15.x lacks Linux arm64 wheels for Python 3.12, which breaks Docker buildx arm64 builds.
+numcodecs = ">=0.16.1"
 pandas = "2.3.2"
 scanpy = "1.11.4"
 scipy = "^1.11.3"
@@ -41,8 +34,8 @@ python-dotenv = "^1.0.1"
 nbformat = "^5.10.4"
 polars = "^1.31.0"
 ruff = "^0.3.7"
-spatialdata = "^0.5.0"
-spatialdata-io = "^0.3.0"
+spatialdata = "^0.7.2"
+spatialdata-io = "^0.6.0"
 
 [tool.poetry.group.dev]
 optional = true
@@ -101,12 +94,36 @@ flask-jwt-extended = "^4.7.1"
 redis = "^5.2.1"
 
 [tool.pyright]
-venvPath = "../venv/"
+venvPath = ".."
+venv = "venv"
+pythonVersion = "3.12"
+exclude = [
+    "manual_tests",
+    "mdvtools/auth",
+    "mdvtools/dbutils",
+    "mdvtools/test_projects",
+]
 typeCheckingMode = "standard"
 
-# [project.urls]
-# "Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
-# "Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
+[project]
+name = "mdvtools"
+version = "1.2.3"
+description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = ">=3.11,<3.13"
+authors = [
+    { name = "Martin Sergeant", email = "m.j.sergeant1@googlemail.com" },
+    { name = "PeterTodd", email = "peter.todd@well.ox.ac.uk" },
+]
+dynamic = ["dependencies", "classifiers"]
+
+[project.urls]
+"Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
+"Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
+
+[project.scripts]
+mdvtools = "mdvtools.cli:cli"
 
 
 [build-system]

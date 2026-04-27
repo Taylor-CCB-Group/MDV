@@ -1,7 +1,8 @@
 from scanpy import AnnData
+import scanpy as sc
 import scipy
 import pandas as pd
-from os.path import join, split
+from os.path import join, split, exists
 import os
 import re
 import json
@@ -9,6 +10,7 @@ import gzip
 import copy
 import yaml
 import shutil
+from math import ceil
 import h5py
 import logging
 from pathlib import Path
@@ -20,15 +22,116 @@ from .mdvproject import MDVProject,create_bed_gz_file
 logger = logging.getLogger(__name__)
 
 
+def _coerce_x_to_csc_without_nonfinite(
+    scanpy_object: AnnData,
+) -> tuple[AnnData, bool]:
+    """
+    Ensure ``adata.X`` is CSC and contains no explicit non-finite entries.
+
+    Non-finite values are converted to 0 and removed from the sparse structure
+    so they become implicit missing values.
+    """
+    matrix = scanpy_object.X
+    if scipy.sparse.issparse(matrix):
+        sparse_matrix = scipy.sparse.csc_matrix(matrix, copy=True)
+        if sparse_matrix.data.size == 0:
+            scanpy_object.X = sparse_matrix
+            return scanpy_object, False
+        finite_mask = np.isfinite(sparse_matrix.data)
+        if finite_mask.all():
+            scanpy_object.X = sparse_matrix
+            return scanpy_object, False
+        non_finite = int((~finite_mask).sum())
+        sparse_matrix.data = np.nan_to_num(
+            sparse_matrix.data,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        )
+        sparse_matrix.eliminate_zeros()
+        scanpy_object.X = sparse_matrix
+        logger.warning(
+            "Replacing %s non-finite values in adata.X and converting to CSC for UMAP/Leiden computation",
+            non_finite,
+        )
+        return scanpy_object, True
+
+    dense_matrix = np.asarray(matrix)
+    finite_mask = np.isfinite(dense_matrix)
+    non_finite = int((~finite_mask).sum())
+    sanitized = np.nan_to_num(
+        dense_matrix,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
+        copy=True,
+    )
+    csc_matrix = scipy.sparse.csc_matrix(sanitized)
+    csc_matrix.eliminate_zeros()
+    scanpy_object.X = csc_matrix
+    if finite_mask.all():
+        return scanpy_object, False
+    logger.warning(
+        "Replacing %s non-finite values in adata.X and converting dense X to CSC for UMAP/Leiden computation",
+        non_finite,
+    )
+    return scanpy_object, True
+
+
+def _prepare_x_umap_and_leiden(
+    scanpy_object: AnnData,
+    compute_x_umap: bool,
+    leiden_resolution: float,
+    leiden_column: str,
+    umap_key: str = "X_umap",
+) -> AnnData:
+    """
+    Optionally compute a neighbor graph, UMAP embedding, and Leiden clusters from ``adata.X``.
+
+    The Leiden labels are coerced to pandas categorical strings so they are exported as text.
+    """
+    if not compute_x_umap:
+        if leiden_column in scanpy_object.obs.columns:
+            scanpy_object.obs[leiden_column] = pd.Categorical(
+                scanpy_object.obs[leiden_column].astype(str)
+            )
+        return scanpy_object
+
+    if hasattr(scanpy_object, "isbacked") and scanpy_object.isbacked:
+        logger.info("Loading backed AnnData into memory for X-based UMAP/Leiden computation")
+        scanpy_object = scanpy_object.to_memory()
+
+    scanpy_object, _ = _coerce_x_to_csc_without_nonfinite(scanpy_object)
+    sc.pp.neighbors(scanpy_object, use_rep="X")
+    sc.tl.umap(scanpy_object)
+    if umap_key != "X_umap":
+        scanpy_object.obsm[umap_key] = scanpy_object.obsm["X_umap"].copy()
+        del scanpy_object.obsm["X_umap"]
+
+    sc.tl.leiden(scanpy_object, resolution=leiden_resolution, key_added=leiden_column)
+    scanpy_object.obs[leiden_column] = pd.Categorical(
+        scanpy_object.obs[leiden_column].astype(str)
+    )
+    return scanpy_object
+
+
 def convert_scanpy_to_mdv(
     folder: str, 
     scanpy_object: AnnData, 
     max_dims: int = 3, 
     delete_existing: bool = False, 
     label: str = "",
+    obs_datasource_name: str = "cells",
+    var_datasource_name: str = "genes",
     chunk_data: bool = False,
     add_layer_data = True,
-    gene_identifier_column = None
+    gene_identifier_column = None,
+    link_name_column: str | None = None,
+    rows_as_columns_name_column: str | None = None,
+    gene_columns: List[dict[str, Any]] | None = None,
+    compute_x_umap: bool = False,
+    leiden_resolution: float = 1.0,
+    leiden_column: str = "leiden",
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -46,6 +149,10 @@ def convert_scanpy_to_mdv(
             If False, merges with existing data. Defaults to False.
         label (str, optional): Prefix to add to datasource names and metadata columns
             when merging with existing data. Defaults to "".
+        obs_datasource_name (str, optional): Base name for the observation datasource.
+            Defaults to "cells".
+        var_datasource_name (str, optional): Base name for the variable datasource.
+            Defaults to "genes".
         chunk_data (bool, optional): For dense matrices, transposing and flattening
             will be performed in chunks. Saves memory but takes longer. Default is False.
         add_layer_data (bool, optional): If True (default) then the layer data (log values etc.)
@@ -53,6 +160,17 @@ def convert_scanpy_to_mdv(
         gene_identifier_column: (str, optional) This is the gene column that the user will use to
             identify the gene. If not specified (default) than a column 'name' will be added that is
             created from the index (which is usaully the unique gene name)
+        link_name_column (str, optional): Column in the variable datasource whose
+            values should be used as the dynamic column names for the ``rows_as_columns`` link.
+            Defaults to ``gene_identifier_column``.
+        rows_as_columns_name_column (str, optional): Deprecated alias for ``link_name_column``.
+        gene_columns: (list[dict], optional) Column metadata overrides for the genes datasource.
+        compute_x_umap (bool, optional): If True, compute neighbors, UMAP and Leiden clusters
+            directly from ``adata.X`` before export. Defaults to False.
+        leiden_resolution (float, optional): Resolution passed to Leiden when
+            ``compute_x_umap`` is True. Defaults to 1.0.
+        leiden_column (str, optional): Observation column name used for Leiden labels.
+            The exported column is always coerced to text/categorical. Defaults to "leiden".
     Returns:
         MDVProject: The configured MDV project object with the converted data
 
@@ -88,6 +206,21 @@ def convert_scanpy_to_mdv(
     # Validate input AnnData
     if scanpy_object.n_obs == 0 or scanpy_object.n_vars == 0:
         raise ValueError("Cannot convert empty AnnData object (0 cells or 0 genes)")
+    if rows_as_columns_name_column is not None and link_name_column is not None:
+        raise ValueError(
+            "Specify only one of 'link_name_column' or 'rows_as_columns_name_column'"
+        )
+    if rows_as_columns_name_column is not None:
+        link_name_column = rows_as_columns_name_column
+    obs_ds_name = f"{label}{obs_datasource_name}"
+    var_ds_name = f"{label}{var_datasource_name}"
+
+    scanpy_object = _prepare_x_umap_and_leiden(
+        scanpy_object,
+        compute_x_umap=compute_x_umap,
+        leiden_resolution=leiden_resolution,
+        leiden_column=leiden_column,
+    )
     
     mdv = MDVProject(folder, delete_existing=delete_existing)
 
@@ -111,7 +244,20 @@ def convert_scanpy_to_mdv(
         "name":"cell_id",
         "datatype":"unique"
     }]
-    mdv.add_datasource(f"{label}cells", cell_table,columns)
+    leiden_like_columns = sorted(
+        {
+            column_name
+            for column_name in cell_table.columns
+            if column_name == leiden_column or column_name.endswith("__leiden")
+        }
+    )
+    for column_name in leiden_like_columns:
+        columns.append({
+            "name": column_name,
+            "field": column_name,
+            "datatype": "text",
+        })
+    mdv.add_datasource(obs_ds_name, cell_table,columns)
 
     # create datasource 'genes'
     gene_table = scanpy_object.var
@@ -124,15 +270,21 @@ def convert_scanpy_to_mdv(
     if not gene_identifier_column:
         gene_identifier_column= f"{label}name"
         gene_table[gene_identifier_column] = gene_table.index
+    if link_name_column and link_name_column not in gene_table.columns:
+        raise ValueError(
+            f"link_name_column '{link_name_column}' not found in variable metadata"
+        )
+    if not link_name_column:
+        link_name_column = gene_identifier_column
     gene_table = _add_dims(gene_table, scanpy_object.varm, max_dims)
 
     #originally column had to be unique - but now is just text
     #need to coerce gene name column to unique
     #columns=[{"name":"name","datatype":"text16"}]
-    mdv.add_datasource(f"{label}genes", gene_table)
+    mdv.add_datasource(var_ds_name, gene_table, columns=gene_columns)
 
     # link the two datasets
-    mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", gene_identifier_column, "Gene Expr")
+    mdv.add_rows_as_columns_link(obs_ds_name, var_ds_name, link_name_column, "Gene Expr")
 
     #get the matrix in the correct format
     print("Getting Matrix")
@@ -144,7 +296,7 @@ def convert_scanpy_to_mdv(
         # add the gene expression
         print("Adding gene expression")
         mdv.add_rows_as_columns_subgroup(
-            f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",
+            obs_ds_name, var_ds_name, "gs", matrix, name="gene_scores", label="Gene Scores",
             # sparse=sparse, #this should be inferred from the matrix
             chunk_data=chunk_data
         )
@@ -155,12 +307,12 @@ def convert_scanpy_to_mdv(
             matrix,sparse = get_matrix(matrix)
             print(f"Adding layer {layer}")
             mdv.add_rows_as_columns_subgroup(
-                f"{label}cells", f"{label}genes", layer, matrix, chunk_data=chunk_data
+                obs_ds_name, var_ds_name, layer, matrix, chunk_data=chunk_data
             )
 
     if delete_existing:
         # If we're deleting existing, create new default view
-        mdv.set_view("default", {"initialCharts": {"cells": [], "genes": []}}, True)
+        mdv.set_view("default", {"initialCharts": {obs_ds_name: [], var_ds_name: []}}, True)
         mdv.set_editable(True)
     else:
         # If we're not deleting existing, update existing views with new datasources
@@ -173,16 +325,16 @@ def convert_scanpy_to_mdv(
                 new_view_data["initialCharts"] = {}
             
             # Add new datasources to initialCharts
-            new_view_data["initialCharts"][f"{label}cells"] = []
-            new_view_data["initialCharts"][f"{label}genes"] = []
+            new_view_data["initialCharts"][obs_ds_name] = []
+            new_view_data["initialCharts"][var_ds_name] = []
             
             # Initialize dataSources if they don't exist
             if "dataSources" not in new_view_data:
                 new_view_data["dataSources"] = {}
             
             # Add new datasources with panel widths
-            new_view_data["dataSources"][f"{label}cells"] = {"panelWidth": 50}
-            new_view_data["dataSources"][f"{label}genes"] = {"panelWidth": 50}
+            new_view_data["dataSources"][obs_ds_name] = {"panelWidth": 50}
+            new_view_data["dataSources"][var_ds_name] = {"panelWidth": 50}
             
             new_views[view_name] = new_view_data
         
@@ -705,6 +857,176 @@ def create_regulamentary_project(
         {
             "initialCharts": {
                 "elements": view,
+            }
+        },
+    )
+    return p
+
+def create_capsequm_project(
+    output: str,
+    results_folder: str,
+    extra_bigwigs: list | None = None
+):
+    """
+    Creates a CAPSeqUM project from the results folder.
+
+    Args:
+        output (str): Path to the output directory for the MDV project.
+        results_folder (str): Base path to the results directory.
+        extra_bigwigs (list, optional): List of additional bigWig files to include. Defaults to None.
+
+    Returns:
+        MDVProject: The created MDV project object.
+    """
+    if extra_bigwigs is None:
+        extra_bigwigs = []
+    p = MDVProject(output, delete_existing=True)
+    # get info from config file
+    with open(join(results_folder,"config.yml"), 'r') as file:
+        config = yaml.safe_load(file)
+    # read  in the oligo data
+    df = pd.read_csv(join(results_folder, "all_oligos.tsv"), sep="\t")
+    #add extra column merging is_best_oligo and pass_filter
+    df["oligo_status"]=["best" if bool(x) else "pass" if bool(y) else "fail"\
+                         for x,y in zip(df["is_best_oligo"], df["pass_filter"])]
+    #get first best oligo to set genome browser location
+    best_df = df[df["oligo_status"] == "best"]
+    first_best = best_df.iloc[0] if not best_df.empty else df.iloc[0]
+    chr_val = first_best["chr"]
+    start_val = max(0, first_best["start"] - 500)
+    stop_val = first_best["stop"] + 500
+
+    #customize some of the columns
+    cols = [
+        {"name": "sequence", "datatype": "unique"},
+        {
+            "name": "oligo_status", 
+            "datatype": "text",
+            "values": ["best", "pass", "fail"],
+            "colors": ["#4CAF50", "#9D9E48", "#F44336"],
+        },
+        {"name": "start", "datatype": "int32"},
+        {"name": "stop", "datatype": "int32"}
+    ]
+    p.add_datasource("oligos", df, columns=cols)
+
+    # make a datasource of the regions
+    regions_file = join(results_folder, "regions", "regions.bed")
+    #does it have features i.e. SNPs
+    features_file  = join(results_folder, "regions","features.bed")
+    has_features = exists(features_file)
+  
+    rds  = pd.read_csv(features_file if has_features else regions_file, sep="\t", header=None)
+    rds.columns = ["chr", "start", "stop","region"]
+    #get failed regions
+    failed_file = join(results_folder, "failed_regions.txt")
+    failed= set()
+    if os.path.exists(failed_file):
+        failed = pd.read_csv(failed_file, sep="\t", header=None)
+        failed.columns = ["region"]
+        failed = set(failed["region"].tolist()) 
+    #add a column to the regions dataframe showing if oligos were found
+    rds["oligos found"] = ["No" if x in failed else "Yes" for x in rds["region"]]
+    p.add_datasource("regions", rds, columns=[ 
+        {"name": "start", "datatype": "int32"},
+        {"name": "stop", "datatype": "int32"},
+        {"name": "region", "datatype": "unique"},
+        {"name": "oligos found", "datatype": "text", 
+         "values":["Yes","No"],"colors":["#4CAF50","#F44336"]}
+    ])
+
+    op = config["oligo_parameters"]
+    # for features (snps) - need wide view margins to see all oligos
+    vm = op["length"]*2 +50 if has_features else 500
+    p.add_genome_browser(
+        "regions", ["chr", "start", "stop"],name="all_regions",
+        extra_params={
+            "default_parameters": {
+                "color_by": "oligos found",
+                "highlight_selected_region": True,
+                "view_margins": {"type": "fixed_length", "value": vm},
+                "color_legend": {"display": False, "pos": [5, 5]}
+            }
+        }
+    )
+
+    #calculate height of track based on overlap i.e. how stacked the oligos are
+    step = op.get("step", 1)
+    if step <= 0:
+        logger.warning(f"Invalid step value {step} in oligo parameters. Defaulting to 1.")
+        step = 1
+    ot_height = ceil(op["length"]/step) * 7.5
+    extra_params = {
+        "default_parameters": {
+            "color_by": "oligo_status",
+            "highlight_selected_region":True,
+            # will update when regions are selected
+            "sync_with_datastores": [
+                "regions"
+            ],
+            "view_margins": {"type": "fixed_length", "value": 500},
+             "genome_location": {
+                "chr": chr_val,
+                "start": int(start_val),
+                "end": int(stop_val)
+            },
+            "color_legend": {"display": False, "pos": [5, 5]}
+        },
+        "default_track_parameters":{
+            "height":ot_height,
+            "displayMode":"SQUISHED"
+        }
+    }
+
+    p.add_genome_browser("oligos", ["chr", "start", "stop"],extra_params=extra_params)
+    if config.get("genome"):
+        try:
+            p.add_refseq_track("oligos", config["genome"])
+        except Exception as e:
+           logger.warning(f"Could not add refseq track for genome '{config['genome']}'. Reason: {e}")
+
+    tracks =[]
+    if config.get("create_offtarget_bigwig"):
+        tracks.append({"file": join(results_folder, "offtarget.bw"),"color":"#72211F",})
+   
+    
+    if has_features:
+        tracks.append({"file": features_file,"hideLabels":True,"color":"#6B81E4"})
+    original = join(results_folder, "summits", "original_regions.bed")
+    hideLabels=False
+    if exists(original):
+        tracks.append({"file": original,"color":"#A0A0A0" })
+        hideLabels =True
+    tracks.append({
+        "file": join(results_folder, "regions", "regions.bed"),
+        "hideLabels":hideLabels,
+        "name":"Regions" if not exists(original) else "Summit Regions",
+        "color": "#6B81E4",
+    })
+    for bws in extra_bigwigs:
+        tracks.append({"file": bws,"color":"#463B86",})
+    p.add_tracks("oligos", tracks )
+
+    gb = p.get_genome_browser("oligos")
+    gb.update(
+        {
+            "id": "browser",
+            "size": [838,460],
+            "position": [5,5],
+            "title": "oligos",
+        }
+    )
+    tdir = join(split(os.path.abspath(__file__))[0], "templates")
+    with open(join(tdir, "views", "capsequm.json")) as f:
+        views = json.load(f)
+    
+    views["oligos"].append(gb)
+    p.set_view(
+        "default",
+        {
+            "initialCharts": {
+                "oligos": views["oligos"],
+                "regions": views["regions"]
             }
         },
     )

@@ -22,16 +22,13 @@ export function ChartProvider<T extends BaseConfig>({
         </ChartContext.Provider>
     );
 }
-// infer?
-function typedChart<T extends BaseConfig>(chart: BaseChart<T>) {
-    const t = chart.config.type; //would need to look up the type in the chart registry to infer the type.
-    return chart;
-}
-export function useChart<T extends BaseConfig>(): BaseChart<T> {
-    //todo: typing...
-    const chart = typedChart(useContext(ChartContext));
+export function useChart<
+    T extends BaseConfig,
+    C extends BaseChart<T> = BaseChart<T>,
+>(): C {
+    const chart = useContext(ChartContext);
     if (!chart) throw new Error("no chart context");
-    return chart;
+    return chart as C;
 }
 export function useDataStore(foreignDataStore?: DataStore) {
     const dataStore = useContext(DataStoreContext);

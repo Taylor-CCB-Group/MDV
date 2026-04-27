@@ -48,13 +48,13 @@ const UserProfile: React.FC = () => {
             <IconButton
                 onClick={handleClick}
                 size="small"
-                sx={{ ml: 2 }}
+                sx={{ ml: 1, mr: 1.5 }}
                 aria-controls={anchorEl ? "account-menu" : undefined}
                 aria-haspopup="true"
                 aria-expanded={anchorEl ? "true" : undefined}
             >
                 <Avatar
-                    sx={{ width: 32, height: 32 }}
+                    sx={{ width: 32, height: 32, color: "inherit" }}
                     src={user.avatarUrl}
                     alt={user.name}
                 >
@@ -84,28 +84,29 @@ const UserProfile: React.FC = () => {
                     <Box
                         sx={{
                             display: "flex",
-                            alignItems: "center",
+                            alignItems: "flex-start",
                             mb: 2,
                             gap: 1,
+                            px: 1
                         }}
                     >
                         <Avatar
-                            sx={{ width: 100, height: 100 }}
+                            sx={{ width: 100, height: 100, color: "inherit" }}
                             src={user.avatarUrl}
                             alt={user.name}
                         >
                             {!user.avatarUrl && (
-                                <Person sx={{ fontSize: 60 }} />
+                                <Person sx={{ fontSize: 50 }} />
                             )}
                         </Avatar>
                         <Box>
-                            <Typography variant="subtitle1">
+                            <Typography variant="subtitle1" sx={{fontWeight: 600}}>
                                 {user.name}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" sx={{mt: 0.5}}>
                                 {user.email}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" sx={{mt:1}}>
                                 {user.association}
                             </Typography>
                         </Box>

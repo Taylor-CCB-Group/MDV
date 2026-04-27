@@ -80,25 +80,59 @@ def get_auth_provider():
     
     return create_auth_provider(auth_method, current_app)
 
-def is_authenticated():
-    """Validate the current user via Auth0 or Shibboleth."""
-    ENABLE_AUTH = current_app.config.get("ENABLE_AUTH", False)
-    
-    if not ENABLE_AUTH:
-        return True
-    
-    # Quick check: if user is already in session, they're authenticated
-    if 'user' in session:
-        return True
-    
-    try:
-        provider = get_auth_provider()
-    except Exception as e:
-        current_app.logger.error(f"Failed to get auth provider: {e}")
-        return False
+def is_authenticated(project_id=None):
+    """
+    Validate the current user (and optionally project read access).
 
-    user, error_response = provider.validate_user()
-    return user is not None and error_response is None
+    When project_id is provided and ENABLE_AUTH is True, also verifies the user
+    has at least read access to the project (can_read, can_write, or is_owner).
+
+    :param project_id: Optional project ID (int or str). If provided and auth is
+        enabled, requires the user to have read-level access to this project.
+    :return: Tuple (success: bool, reason: Optional[str]). When success is True,
+        reason is None. When False, reason is a short message for logging (e.g.
+        "Authentication required.", "No access to this project.").
+    """
+    ENABLE_AUTH = current_app.config.get("ENABLE_AUTH", False)
+
+    if not ENABLE_AUTH:
+        return (True, None)
+
+    # Session / provider validation
+    if "user" not in session:
+        try:
+            provider = get_auth_provider()
+        except Exception as e:
+            current_app.logger.error(f"Failed to get auth provider: {e}")
+            return (False, "Authentication unavailable.")
+        user, error_response = provider.validate_user()
+        if user is None or error_response is not None:
+            return (False, "Authentication required.")
+    else:
+        user = session.get("user")
+
+    # Optional project read-access check
+    if project_id is not None and ENABLE_AUTH:
+        user_id = user.get("id") if user else None
+        if not user_id:
+            return (False, "Authentication required.")
+        try:
+            pid = int(project_id)
+        except (ValueError, TypeError):
+            return (False, "Invalid project.")
+        perms = user_project_cache.get(user_id, {}).get(pid)
+        has_read_access = (
+            perms
+            and (
+                perms.get("can_read")
+                or perms.get("can_write")
+                or perms.get("is_owner")
+            )
+        )
+        if not has_read_access:
+            return (False, "No access to this project.")
+
+    return (True, None)
 
 def register_before_request_auth(app):
     """Attach the before_request auth logic to the Flask app."""
@@ -126,7 +160,8 @@ def register_before_request_auth(app):
         if any(requested_path.startswith(route) for route in whitelist_routes):
             return None
 
-        if not is_authenticated():
+        ok, _reason = is_authenticated()
+        if not ok:
             redirect_uri = app.config.get("LOGIN_REDIRECT_URL", "/login_dev")
             logger.info(f"Unauthorized access to {requested_path}. Redirecting.")
             return redirect(redirect_uri)

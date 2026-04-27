@@ -24,6 +24,10 @@ import {
 } from "./utils";
 import { COLOR_PALLETE, FILL_PIXEL_VALUE } from "./constants";
 import { useVivConfig } from "@/react/context";
+// pending bug fixes...
+// import { getOrCreateVivLoader } from "@/react/viv_loader_cache";
+
+const EMPTY_RASTER = { width: 0, height: 0, data: new Float32Array() };
 
 const useSavedVivConfig = () => {
     const c = useVivConfig();
@@ -87,6 +91,7 @@ export const useImage = (
             if (use3d) toggleUse3d();
             if (!source) throw "this should never happen - this is a type-guard";
             const { urlOrFile } = source;
+            // const newLoader = await getOrCreateVivLoader(
             const newLoader = await createLoader(
                 urlOrFile,
                 toggleIsOffsetsSnackbarOn,
@@ -152,6 +157,7 @@ export const useImage = (
             let newContrastLimits: Limits = [];
             let newDomains: Limits = [];
             let newColors: Colors = [];
+            let newRaster = [] as typeof EMPTY_RASTER[];
             const isRgb = guessRgb(metadata);
             if (isRgb) {
                 if (isInterleaved(loader[0].shape)) {
@@ -159,6 +165,7 @@ export const useImage = (
                     newContrastLimits = [[0, 255]];
                     newDomains = [[0, 255]];
                     newColors = [[255, 0, 0]];
+                    newRaster = [EMPTY_RASTER];
                 } else {
                     newContrastLimits = [
                         [0, 255],
@@ -175,6 +182,7 @@ export const useImage = (
                         [0, 255, 0],
                         [0, 0, 255],
                     ];
+                    newRaster = [EMPTY_RASTER, EMPTY_RASTER, EMPTY_RASTER];
                 }
                 if (lensEnabled) {
                     toggleLensEnabled();
@@ -188,6 +196,7 @@ export const useImage = (
                 });
                 newDomains = stats.domains;
                 newContrastLimits = stats.contrastLimits;
+                newRaster = stats.raster;
                 // If there is only one channel, use white.
                 newColors =
                     newDomains.length === 1
@@ -207,6 +216,7 @@ export const useImage = (
                 selections: newSelections,
                 domains: newDomains,
                 contrastLimits: newContrastLimits,
+                raster: newRaster,
                 colors: newColors,
                 channelsVisible: newColors.map(() => true),
             });

@@ -1,9 +1,14 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import type { CategoricalDataType } from '@/charts/charts';
-import { useCategoryContour, getDensitySettings, type DualContourLegacyConfig } from './contour_state';
+import { autorun, makeAutoObservable, runInAction } from 'mobx';
+import {
+    useCategoryContour,
+    getDensitySettings,
+    getContourVisualSettings,
+    type DualContourLegacyConfig,
+} from './contour_state';
 import type { CategoryContourProps } from './contour_state';
-import type BaseChart from '@/charts/BaseChart';
 import type { BaseConfig } from '@/charts/BaseChart';
 import { scatterDefaults } from './scatter_state';
 
@@ -142,6 +147,44 @@ describe('useCategoryContour', () => {
         expect(typeof result.current?.getPosition).toBe('function');
     });
 
+    test('recomputes contour colors when the active category column gains a new value in place', () => {
+        const mockContourParameter = {
+            field: 'test-field',
+            values: ['cat1'],
+            data: new Uint8Array([0]),
+            datatype: 'multitext' as CategoricalDataType,
+        };
+
+        (useFieldSpec as any).mockReturnValue(mockContourParameter);
+        (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([0]));
+        (useDataStore as any).mockReturnValue({
+            getColumnColors: vi.fn(() =>
+                mockContourParameter.values.length === 1
+                    ? [[255, 0, 0]]
+                    : [[255, 0, 0], [0, 255, 0]],
+            ),
+        });
+
+        const { result, rerender } = renderHook(
+            ({ category }) =>
+                useCategoryContour({
+                    ...baseProps,
+                    parameter: 'test-field',
+                    category,
+                }),
+            {
+                initialProps: { category: 'cat1' as string | string[] | undefined },
+            },
+        );
+
+        expect(result.current?.colorRange[0]).toEqual([255, 0, 0]);
+
+        mockContourParameter.values.push('cat2');
+        rerender({ category: 'cat2' });
+
+        expect(result.current?.colorRange[0]).toEqual([0, 255, 0]);
+    });
+
     test('handles empty data array when contourParameter is falsy but category is provided', () => {
         (useFieldSpec as any).mockReturnValue(undefined);
         (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([]));
@@ -215,56 +258,38 @@ describe('useCategoryContour', () => {
     });
 });
 
-describe('getDensitySettings disposer management', () => {
-    test('getDensitySettings attaches disposer to returned spec', () => {
-        const mockDataStore = {
-            getColumnValues: vi.fn(() => ['cat1', 'cat2', 'cat3']),
-        };
-        
-        const mockChart = {
-            dataStore: mockDataStore,
-        } as unknown as BaseChart<BaseConfig>;
-        
-        const mockConfig: DualContourLegacyConfig & BaseConfig = {
+describe('getDensitySettings category selection wiring', () => {
+    test('scatter defaults seed density settings keys so later edits stay observable', () => {
+        const config = makeAutoObservable({
             ...scatterDefaults,
             id: 'test-chart',
-            size: [800, 600],
+            size: [800, 600] as [number, number],
             title: 'Test Chart',
             legend: '',
             type: 'scatter',
-            param: ['x', 'y', 'test-field'],
-            contourParameter: 'test-field',
-            category1: [],
-            category2: [],
-        };
-        
-        const spec = getDensitySettings(mockConfig, mockChart);
-        
-        // Check that _disposers array exists and has one disposer
-        expect(spec._disposers).toBeDefined();
-        expect(Array.isArray(spec._disposers)).toBe(true);
-        expect(spec._disposers).toHaveLength(1);
-        
-        // Check that the disposer is a function (IReactionDisposer)
-        const disposer = spec._disposers?.[0];
-        expect(disposer).toBeDefined();
-        expect(typeof disposer).toBe('function');
-        
-        // Verify the disposer can be called (cleanup)
-        if (disposer) {
-            expect(() => disposer()).not.toThrow();
-        }
+            param: ['x', 'y'] as string[],
+        });
+        const observed: Array<{ contourParameter: typeof config.contourParameter; category1: string[] }> = [];
+        const dispose = autorun(() => {
+            observed.push({
+                contourParameter: config.contourParameter,
+                category1: Array.isArray(config.category1) ? [...config.category1] : [],
+            });
+        });
+
+        runInAction(() => {
+            config.contourParameter = 'test-field';
+            config.category1 = ['tag-a'];
+        });
+        dispose();
+
+        expect(observed).toEqual([
+            { contourParameter: undefined, category1: [] },
+            { contourParameter: 'test-field', category1: ['tag-a'] },
+        ]);
     });
-    
-    test('getDensitySettings disposer updates values when contourParameter changes', () => {
-        const mockDataStore = {
-            getColumnValues: vi.fn(() => ['cat1', 'cat2']),
-        };
-        
-        const mockChart = {
-            dataStore: mockDataStore,
-        } as unknown as BaseChart<BaseConfig>;
-        
+
+    test('builds category selection controls that read from live config state', () => {
         const mockConfig: DualContourLegacyConfig & BaseConfig = {
             ...scatterDefaults,
             id: 'test-chart',
@@ -274,27 +299,98 @@ describe('getDensitySettings disposer management', () => {
             type: 'scatter',
             param: ['x', 'y', 'test-field'],
             contourParameter: 'test-field',
-            category1: [],
-            category2: [],
+            category1: ['cat1'],
+            category2: ['cat2'],
         };
-        
-        const spec = getDensitySettings(mockConfig, mockChart);
-        
-        // The autorun should have been set up and called getColumnValues
-        expect(mockDataStore.getColumnValues).toHaveBeenCalledWith('test-field');
-        
-        // Change the contourParameter
-        mockConfig.contourParameter = 'new-field';
-        mockDataStore.getColumnValues.mockReturnValue(['new1', 'new2']);
-        
-        // Trigger the autorun by accessing the observable
-        // (In a real scenario, changing the config would trigger mobx reactivity)
-        // For this test, we're just verifying the disposer is attached
-        
-        // Clean up
-        const disposer = spec._disposers?.[0];
-        if (disposer) {
-            disposer();
+
+        const spec = getDensitySettings(mockConfig);
+
+        expect(spec._disposers).toBeUndefined();
+        expect(spec.type).toBe('folder');
+        const categoryFolder = spec.current_value[0];
+        if (categoryFolder.type !== 'folder') {
+            throw new Error('expected category selection folder');
         }
+        const [contourParameter, category1, category2] = categoryFolder.current_value;
+        if (contourParameter.type !== 'column') {
+            throw new Error('expected contour parameter column selector');
+        }
+        if (category1.type !== 'category_selection' || category2.type !== 'category_selection') {
+            throw new Error('expected dedicated category selection specs');
+        }
+
+        expect(contourParameter.columnType).toEqual(['text', 'text16', 'multitext']);
+        expect(category1.getCurrentValue?.()).toEqual(['cat1']);
+        expect(category2.getCurrentValue?.()).toEqual(['cat2']);
+        expect(category1.sourceColumn?.()).toBe('test-field');
+        expect(category2.sourceColumn?.()).toBe('test-field');
+    });
+
+    test('category selection getters follow source column and category changes', () => {
+        const mockConfig: DualContourLegacyConfig & BaseConfig = {
+            ...scatterDefaults,
+            id: 'test-chart',
+            size: [800, 600],
+            title: 'Test Chart',
+            legend: '',
+            type: 'scatter',
+            param: ['x', 'y', 'test-field'],
+            contourParameter: 'test-field',
+            category1: ['cat1'],
+            category2: ['cat2'],
+        };
+
+        const spec = getDensitySettings(mockConfig);
+        const categoryFolder = spec.current_value[0];
+        if (categoryFolder.type !== 'folder') {
+            throw new Error('expected category selection folder');
+        }
+        const [, category1, category2] = categoryFolder.current_value;
+        if (category1.type !== 'category_selection' || category2.type !== 'category_selection') {
+            throw new Error('expected dedicated category selection specs');
+        }
+
+        mockConfig.contourParameter = 'new-field';
+        mockConfig.category1 = ['new1'];
+        mockConfig.category2 = [];
+
+        expect(category1.sourceColumn?.()).toBe('new-field');
+        expect(category2.sourceColumn?.()).toBe('new-field');
+        expect(category1.getCurrentValue?.()).toEqual(['new1']);
+        expect(category2.getCurrentValue?.()).toEqual([]);
+    });
+});
+
+describe('getContourVisualSettings', () => {
+    test('maps KDE bandwidth through the slider spec without coupling to UI copy', () => {
+        const config = {
+            contour_fill: false,
+            contour_fillThreshold: 2,
+            contour_bandwidth: 0.1,
+            contour_intensity: 1,
+            contour_opacity: 0.5,
+        };
+
+        const [bandwidthSetting] = getContourVisualSettings(config);
+        if (bandwidthSetting.type !== 'slider') {
+            throw new Error('expected first contour setting to be a slider');
+        }
+        const initialBandwidth = config.contour_bandwidth;
+
+        expect(bandwidthSetting.min).toBeLessThan(bandwidthSetting.current_value);
+        expect(bandwidthSetting.max).toBeGreaterThan(bandwidthSetting.current_value);
+
+        bandwidthSetting.func?.(bandwidthSetting.current_value);
+        expect(config.contour_bandwidth).toBeCloseTo(initialBandwidth);
+
+        if (bandwidthSetting.min === undefined || bandwidthSetting.max === undefined) {
+            throw new Error('bandwidth slider should define min/max');
+        }
+
+        bandwidthSetting.func?.(bandwidthSetting.min);
+        expect(config.contour_bandwidth).toBeLessThan(initialBandwidth);
+
+        bandwidthSetting.func?.(bandwidthSetting.max);
+        expect(config.contour_bandwidth).toBeGreaterThan(initialBandwidth);
     });
 });

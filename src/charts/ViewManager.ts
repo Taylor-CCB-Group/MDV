@@ -2,9 +2,27 @@ import { action, observable, toJS } from "mobx";
 import type ChartManager from "./ChartManager";
 import type { DataSource } from "./charts";
 import _ from "lodash";
-import { toPng } from "html-to-image";
+import screenshot from "@/utilities/Screenshot";
+import { getPostData, getProjectRoot } from "@/dataloaders/DataLoaderUtil";
 
-export type View = any;
+/** Per–data-source view config (panel layout and optional highlight state). */
+export type ViewDataDataSource = {
+    panelWidth?: number;
+    layout?: string;
+    /** Persisted row indices to highlight when the view is loaded. */
+    highlight?: number[];
+};
+
+/** View state: dataSources keyed by data source name, initialCharts, optional links. */
+export type View = {
+    name?: string;
+    dataSources: Record<string, ViewDataDataSource>;
+    initialCharts: Record<string, unknown[]>;
+    links?: unknown[];
+    viewImage?: string;
+    [key: string]: unknown;
+};
+
 export type UpdatedColumns = any;
 export type MetaData = any;
 export type ChartError = any;
@@ -33,6 +51,7 @@ class ViewManager {
     @observable accessor current_view = "";
     @observable accessor all_views: string[];
     @observable accessor lastSavedState: State;
+    @observable accessor showGallery = false;
     private cm: ChartManager;
 
     constructor(current_view = "", all_views: string[] = []) {
@@ -105,7 +124,7 @@ class ViewManager {
         try {
             const { viewData, dsIndex, contentDiv } = this.cm;
             for (const ds in this.cm.viewData.dataSources) {
-                if (viewData.dataSources[ds].layout === "gridstack") {
+                if (viewData.dataSources[ds]?.layout === "gridstack") {
                     this.cm.gridStack.destroy(dsIndex[ds] as DataSource);
                 }
             }
@@ -134,14 +153,13 @@ class ViewManager {
     }
 
     async createImageofView() {
+        const t = performance.now();
         try {
             // aspect ratio doesn't work properly when the window is resized, commenting for now
-            const bounds = this.cm.contentDiv.getBoundingClientRect();
-            const aspect = bounds.width / bounds.height;
-            const dataUrl = await toPng(this.cm.contentDiv, {
-                canvasWidth: 250,
-                canvasHeight: 250 / aspect,
-            });
+            const root = this.cm.contentDiv;
+            const dataUrl = await screenshot(root);
+            const dt = performance.now() - t;
+            console.log(`createImageOfView took ${(dt/1000).toFixed(1)}s`);
             return dataUrl;
         } catch (error) {
             console.error("error while creating image", error);
@@ -166,6 +184,7 @@ class ViewManager {
     // Save the current state
     @action
     async saveView(errorHandler?: (state: State) => boolean) {
+        const t = performance.now();
         try {
             const imageUrl = await this.createImageofView();
             const state = this.cm.getState();
@@ -187,6 +206,7 @@ class ViewManager {
         } catch (error) {
             console.error("error while saving view", error);
         }
+        console.log(`view saved in ${((performance.now() - t)/1000).toFixed(1)}s`);
     }
 
     // Add a new view
@@ -202,7 +222,7 @@ class ViewManager {
             if (!isCloneView) {
                 //remove all charts and links
                 for (const ds in viewData.dataSources) {
-                    if (viewData.dataSources[ds].layout === "gridstack") {
+                    if (viewData.dataSources[ds]?.layout === "gridstack") {
                         const d = dsIndex[ds];
                         if (!d) continue;
                         this.cm.gridStack.destroy(d);
@@ -233,7 +253,7 @@ class ViewManager {
                 
                 // Clear existing gridstack instances
                 for (const ds in viewData.dataSources) {
-                    if (viewData.dataSources[ds].layout === "gridstack") {
+                    if (viewData.dataSources[ds]?.layout === "gridstack") {
                         const d = dsIndex[ds];
                         if (!d) continue;
                         this.cm.gridStack.destroy(d);
@@ -288,6 +308,54 @@ class ViewManager {
     @action
     async saveAsView(viewName: string) {
         await this.addView(viewName, {}, true);
+    }
+
+    @action
+    setShowGallery(show: boolean) {
+        this.showGallery = show;
+    }
+
+    @action
+    async renameView(oldName: string, newName: string) {
+        try {
+            const root = getProjectRoot();
+            const resp = await getPostData(`${root}/rename_view`, { old_name: oldName, new_name: newName });
+            if (!resp?.success) throw new Error(resp?.error ?? "Rename failed");
+            const updated = this.all_views.map((v) => (v === oldName ? newName : v));
+            this.setAllViews(updated);
+            if (this.current_view === oldName) {
+                this.setView(newName);
+            }
+        } catch (error) {
+            console.error("error renaming view", error);
+            throw error;
+        }
+    }
+
+    @action
+    async reorderViews(newOrder: string[]) {
+        try {
+            const root = getProjectRoot();
+            const resp = await getPostData(`${root}/reorder_views`, { order: newOrder });
+            if (!resp?.success) throw new Error(resp?.error ?? "Reorder failed");
+            this.setAllViews(newOrder);
+        } catch (error) {
+            console.error("error reordering views", error);
+            throw error;
+        }
+    }
+
+    @action
+    async setGalleryDefault(show: boolean) {
+        try {
+            const root = getProjectRoot();
+            const resp = await getPostData(`${root}/set_gallery_default`, { show });
+            if (!resp?.success) throw new Error(resp?.error ?? "Set gallery default failed");
+            this.cm.config.show_gallery_on_open = show;
+        } catch (error) {
+            console.error("error setting gallery default", error);
+            throw error;
+        }
     }
 
     checkUnsavedState(action: () => void) {

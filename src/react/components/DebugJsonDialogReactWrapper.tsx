@@ -7,10 +7,18 @@ import type BaseChart from "../../charts/BaseChart";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 const DebugChart = observer(
-    ({ chart, header }: { chart: any; header?: string }) => {
+    ({
+        chart,
+        header,
+        showValidationSection = false,
+    }: {
+        chart: any;
+        header?: string;
+        showValidationSection?: boolean;
+    }) => {
         return (
             <>
-                <Gui json={chart} header={header} />
+                <Gui json={chart} header={header} showValidationSection={showValidationSection} />
                 <ReactQueryDevtools initialIsOpen={false}  />
             </>
         );
@@ -35,7 +43,7 @@ class DebugChartReactWrapper extends BaseDialog {
         const config = {
             //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
             width: 500,
-            title: `Debug ${name}`,
+            title: `Debug / Report ${name}`,
             doc,
             onclose: () => {
                 chart?.dialogs.splice(chart.dialogs.indexOf(this), 1);
@@ -45,7 +53,16 @@ class DebugChartReactWrapper extends BaseDialog {
     }
     init(parent: any) {
         const div = createEl("div", {}, this.dialog);
-        this.root = createMdvPortal(<DebugChart chart={parent} />, div, this);
+        const showValidationSection = Boolean(
+            parent &&
+            typeof parent === "object" &&
+            "validationFindings" in parent,
+        );
+        this.root = createMdvPortal(
+            <DebugChart chart={parent} showValidationSection={showValidationSection} />,
+            div,
+            this,
+        );
     }
     close() {
         super.close();

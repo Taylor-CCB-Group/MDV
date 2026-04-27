@@ -9,7 +9,7 @@
         "lib": ["ESNext", "DOM", "DOM.Iterable"],
         "allowJs": true,
         // "checkJs": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "noUnusedParameters": false,
         "noUnusedLocals": false,
         //https://mobx.js.org/installation.html#use-spec-compliant-transpilation-for-class-properties
@@ -18,7 +18,6 @@
         "sourceMap": true,
         "noEmit": false,
         "skipLibCheck": true,
-        // "baseUrl": ".",
         "paths": {
             "@/*": ["./src/*"]
         },
@@ -34,5 +33,6 @@
         "dist",
         "vite-dist",
         "python",
+        "scripts"
     ]
 }

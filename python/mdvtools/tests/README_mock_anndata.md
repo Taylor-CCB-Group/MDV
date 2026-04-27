@@ -132,6 +132,21 @@ The edge case generator creates AnnData with problematic data:
 - Many unique categories
 - Mixed data types in categorical columns
 
+## Manual integration testing (unique column)
+
+To create an MDV project that includes a unique-typed column so you can test editing from the frontend and verify round-trip / `set_column_with_raw_data` behaviour:
+
+```bash
+# From repo root, with mdv environment active
+python -m mdvtools.tests.example_mock_usage --create-unique-project ./test_unique_project
+```
+
+Then serve the project and open it in the browser; the `cells` datasource will have a `cell_id` unique column you can edit and save. Alternatively use `generate_test_data` with `--with-unique-column`:
+
+```bash
+python -m mdvtools.tests.generate_test_data ~/mdv/test_unique --mock --with-unique-column
+```
+
 ## Testing Examples
 
 ### Basic Conversion Testing

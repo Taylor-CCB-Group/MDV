@@ -40,6 +40,11 @@ class SingleHeatMap extends SVGChart {
         const i = data.indexes[0];
         const s = this.graph_area.selectAll("rect");
         s.attr("stroke", "white").style("stroke-width", "0px");
+        if (i === undefined) {
+            this.highlight = null;
+            return;
+        }
+
         s.filter((d) => {
             if (d && d[3] === i) {
                 return true;

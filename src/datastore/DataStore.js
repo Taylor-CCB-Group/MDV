@@ -14,6 +14,13 @@ import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import { isDatatypeNumeric } from "@/lib/utils";
+import {
+    getMultitextCapacity,
+    getMultitextDelimiter,
+    getMultitextJoinDelimiter,
+} from "@/lib/multitext";
+import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
+import { logValidationError } from "@/lib/validationLogging";
 
 
 class DataStore {
@@ -40,6 +47,19 @@ class DataStore {
      * rotations applied to them
      */
     constructor(size, config = {}, dataLoader = null) {
+        // Best-effort, non-fatal validation of the datasource config.
+        // This logs schema violations and records them for later inspection
+        // in the debug dialog, but does not modify the incoming config.
+        // nb - we could probably change this constructor signature to use size from config
+        const result = DataSourceSchema.safeParse(config);
+        if (!result.success) {
+            logValidationError({
+                context: "datasource",
+                name: config?.name,
+                rawConfig: config,
+                error: result.error,
+            });
+        }
         // by keeping a reference to the original config metadata, we can later compare
         // it to new config from server to determine if it has changed etc.
         this.config = config;
@@ -76,6 +96,7 @@ class DataStore {
         this.syncColumnColors = [];
         this.linkColumns = [];
         this.regions = config.regions;
+        this.gates = config.gates;
 
         //for react / mobx... makeAutoObservable causes problems with webworker.postMessage:
         // `DOMException: Failed to execute 'postMessage' on 'Worker': [object Array] could not be cloned.`
@@ -90,9 +111,12 @@ class DataStore {
         // for re-usable filteredIndices
         this.addListener(
             "invalidateFilteredIndicesCache",
-            action(() => {
+            action((type, _data) => {
                 //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
-                this._filteredIndicesPromise = null;
+                // Make the promise null only if the data is filtered, changed or added
+                if (type === "filtered" || type === "data_changed" || type === "data_added") {
+                    this._filteredIndicesPromise = null;
+                }
             }),
         );
 
@@ -445,6 +469,10 @@ class DataStore {
             ...column, //may be useful to get any other properties we didn't explicitly copy before.
             getValue: (index) => {
                 const col = this.columnIndex[column.field];
+                // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
+                if (!col) {
+                    return "";
+                }
                 if (!col.data) {
                     console.error(`Column ${column.field} has no data`);
                     return;
@@ -463,10 +491,13 @@ class DataStore {
                 }
                 //multitext displayed as comma delimited values
                 else if (col.datatype === "multitext") {
-                    const delim = ", ";
+                    const delim = getMultitextJoinDelimiter(
+                        getMultitextDelimiter(col),
+                    );
+                    const capacity = getMultitextCapacity(col);
                     const d = col.data.slice(
-                        index * col.stringLength,
-                        index * col.stringLength + col.stringLength,
+                        index * capacity,
+                        index * capacity + capacity,
                     );
                     v = Array.from(d.filter((x) => x !== 65535))
                         .map((x) => col.values[x])
@@ -501,6 +532,9 @@ class DataStore {
         if (data) {
             this.setColumnData(column.field, data);
         }
+        // Delete column from dirtyColumns.removed if it exists (this could happen when a column is removed and the state is not saved)
+        // This avoids the new column from getting deleted
+        delete this.dirtyColumns.removed[c.field];
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
         }
@@ -1233,6 +1267,7 @@ class DataStore {
         let size = newSize;
         if (c.datatype === "integer" || c.datatype === "double") {
             size = size * 4;
+            // not what's expected for "integer"... or "double", for that matter.
             arrType = Float32Array;
         } else if (c.datatype === "int32") {
             size = size * 4;
@@ -1353,14 +1388,14 @@ class DataStore {
             return buff;
         }
         if (col.datatype === "multitext") {
-            const delim = col.delimiter || ",";
+            const delim = getMultitextDelimiter(col);
             const vals = new Set();
             let max = 0;
             //first parse - get all possible values and max number
             //of values in a single field
             for (let i = 0; i < len; i++) {
                 const v = arr[i];
-                const vs = v.split(",");
+                const vs = v.split(delim);
                 max = Math.max(max, vs.length);
                 vs.forEach((x) => vals.add(x.trim()));
             }
@@ -1384,7 +1419,7 @@ class DataStore {
                 if (v === "") {
                     continue;
                 }
-                const vs = v.split(",");
+                const vs = v.split(delim);
                 vs.sort();
                 for (let n = 0; n < vs.length; n++) {
                     data[b + n] = map[vs[n].trim()];
@@ -1475,7 +1510,8 @@ class DataStore {
             const max = ov.max == null ? c.minMax[1] : ov.max;
             const bins = config.bins || 100;
             const interval_size = (max - min) / bins;
-            const fallbackColor = config.asArray ? [255, 255, 255] : "#ffffff";
+            const gray = config.asArray ? [128, 128, 128] : "#808080";
+            const fallbackColor = ov.hideMissing ? undefined : gray;
             //the actual function - bins the value and returns the color for that bin
             function getColor(v) {
                 if (isFallback(v)) return fallbackColor;
@@ -1861,6 +1897,25 @@ class DataStore {
 
     removeColumn(column, dirty = false, notify = false) {
         const c = this.columnIndex[column];
+        // Delete the column from entries of dirtyColumns
+        delete this.dirtyColumns.data_changed[column];
+        delete this.dirtyColumns.colors_changed[column];
+        // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
+        if (!c) {
+            // If column is marked dirty, then remove it from the dirtyColumns
+            if (dirty) {
+                if (this.dirtyColumns.added[column]) {
+                    delete this.dirtyColumns.added[column];
+                } else {
+                    this.dirtyColumns.removed[column] = true;
+                }
+            }
+            // Notify that column is removed if notify is true
+            if (notify) {
+                this._callListeners("column_removed", column);
+            }
+            return;
+        }
         c.data = null;
         c.buffer = null;
         this.columns = this.columns.filter((c) => c.field !== column);

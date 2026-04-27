@@ -13,7 +13,7 @@ import warnings
 import shutil
 import random
 import string
-from os.path import join, split, exists
+from os.path import join, split, exists, basename
 from pathlib import Path
 import scipy.sparse
 from werkzeug.utils import secure_filename
@@ -37,10 +37,16 @@ ColumnName = str  # NewType("ColumnName", str)
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
 datatype_mappings = {
+    "int8": "integer",
+    "int16": "integer",
+    "uint8": "integer",
+    "uint16": "integer",
+    "uint32": "integer",
     "int64": "integer",
     "float64": "double",
     "float32": "double",
     "object": "text",
+    "str":"text",
     "category": "text",
     "bool": "text",
     "int32": "double",
@@ -623,11 +629,16 @@ class MDVProject:
         return data
 
     def set_column_with_raw_data(self, datasource, column, raw_data):
-        """Adds or updates a column with raw data
+        """Adds or updates a column with raw data.
+
         Args:
             datasource (str): The name of the datasource.
-            column (dict): The complete metadata for the column
-            raw_data (list|array): The raw binary data for the column
+            column (dict): The complete metadata for the column (must include
+                stringLength for datatype 'unique').
+            raw_data (list|array): The raw data for the column. For numeric
+                datatypes this is the numeric array; for text/text16 the
+                encoded indices; for unique, string-like or bytes (decoded
+                string[] when called from save_state).
         """
         h5 = self._get_h5_handle()
         cid = column["field"]
@@ -636,10 +647,58 @@ class MDVProject:
             raise AttributeError(f"{datasource} is not a group")
         if ds.get(cid):
             del ds[cid]
+        num_rows = len(raw_data)
         dt = numpy_dtypes.get(column["datatype"])
         if not dt:
-            dt = h5py.string_dtype("utf-8", column["stringLength"])
-        ds.create_dataset(cid, len(raw_data), data=raw_data, dtype=dt)
+            # Handle unique columns - need stringLength
+            if column["datatype"] == "unique":
+                string_length = column.get("stringLength")
+                if not isinstance(string_length, (int, numpy.integer)) or int(string_length) <= 0:
+                    raise ValueError(
+                        f"Column {cid} of type 'unique' requires 'stringLength' in metadata"
+                    )
+                string_length = int(string_length)
+                
+                # No conversion: "raw" means the caller supplies string-like data.
+                # Frontend (save_state) sends decoded string[] from getMd(); direct callers must pass strings/bytes.
+                if len(raw_data) > 0 and any(
+                    isinstance(v, (int, float, numpy.integer, numpy.floating))
+                    for v in raw_data
+                ):
+                    raise ValueError(
+                        f"Column {cid} of type 'unique' expects array of strings (or bytes); "
+                        f"got numeric data. Use set_column() for int-to-string conversion."
+                    )
+                # Compute max byte length (handling None, str, and bytes)
+                if len(raw_data) > 0:
+                    def _byte_len(v):
+                        if v is None:
+                            return 0
+                        if isinstance(v, (bytes, bytearray, numpy.bytes_)):
+                            return len(v)
+                        if not isinstance(v, (str, numpy.str_)):
+                            raise ValueError(
+                                f"Column {cid} of type 'unique' expects string-like values, got {type(v).__name__}."
+                            )
+                        return len(str(v).encode("utf-8"))
+                    max_str_len = max(_byte_len(v) for v in raw_data)
+                    if max_str_len > string_length:
+                        string_length = max_str_len
+                        # Update column metadata so it persists correctly (JS decoder uses stringLength)
+                        column["stringLength"] = string_length
+                # Normalize only None/bytes for storage; no int/float conversion
+                raw_data = [
+                    ""
+                    if v is None
+                    else (v.decode("utf-8") if isinstance(v, (bytes, bytearray, numpy.bytes_)) else str(v))
+                    for v in raw_data
+                ]
+                dt = h5py.string_dtype("utf-8", string_length)
+            else:
+                raise ValueError(
+                    f"Unknown datatype: {column['datatype']} for column {cid}"
+                )
+        ds.create_dataset(cid, num_rows, data=raw_data, dtype=dt)
         ds = self.get_datasource_metadata(datasource)
         cols = ds["columns"]
         ind = [c for c, x in enumerate(cols) if x["field"] == cid]
@@ -656,9 +715,10 @@ class MDVProject:
             datasource (str): The name of the datasource.
             column (str|dict):  metadata for the column. Can be a string with the column's name,
                 although datatype should also be included as the inferred datatype
-                is not always correct
-            raw_data (list|array): Anything that can be converted into a pandas Series
-            The data should be in the correct order
+                is not always correct.
+            data (list|array): Anything that can be converted into a pandas Series.
+                The data should be in the correct order. For datatype 'unique',
+                int/numeric are converted to string (e.g. CSV-inferred cell_id).
         """
         if isinstance(column, str):
             column = {"name": column}
@@ -847,7 +907,7 @@ class MDVProject:
             raise AttributeError(
                 f"genome browser track already exists for {datasource}"
             )
-        track_name = f"{secure_filename(datasource)}.bed"
+        track_name = f"{secure_filename(name)}.bed"
         if not custom_track:
             # get all the genome locations
             loc = [self.get_column(datasource, x) for x in parameters]
@@ -890,19 +950,23 @@ class MDVProject:
     def get_genome_browser(self, datasource):
         ds = self.get_datasource_metadata(datasource)
         info = ds.get("genome_browser")
+        if not info:
+            raise AttributeError(f"no genome browser for {datasource}")
+        default_track =  {
+            "short_label": info["default_track"]["label"],
+            "url": info["default_track"]["url"],
+            "track_id": "_base_track",
+            "decode_function": "generic",
+            "height": 15,
+            "displayMode": "EXPANDED"
+        }
+        if info.get("default_track_parameters"):
+            default_track.update(info["default_track_parameters"])
+        
         gb = {
             "type": "genome_browser",
             "param": info["location_fields"],
-            "tracks": [
-                {
-                    "short_label": info["default_track"]["label"],
-                    "url": info["default_track"]["url"],
-                    "track_id": "_base_track",
-                    "decode_function": "generic",
-                    "height": 15,
-                    "displayMode": "EXPANDED",
-                }
-            ],
+            "tracks": [default_track]
         }
         at = info.get("atac_bam_track")
         if at:
@@ -919,7 +983,7 @@ class MDVProject:
         if dt:
             for t in dt:
                 gb["tracks"].append(t)
-        if info["default_parameters"]:
+        if info.get("default_parameters"):
             gb.update(info["default_parameters"])
         return gb
 
@@ -950,6 +1014,83 @@ class MDVProject:
         # copy to tracks folder
         shutil.copy(reft, join(self.trackfolder, f"{genome}.bed.gz"))
         shutil.copy(reft + ".tbi", join(self.trackfolder, f"{genome}.bed.gz.tbi"))
+        self.set_datasource_metadata(ds)
+
+    def add_tracks(self,datasource: str,tracks: list[dict]) :
+        """Adds a list of tracks to the datasource's genome browser.
+        
+        Args:
+            tracks (list[dict]): A list of track dictionaries to add.
+            datasource (str): The name of the datasource to which the tracks will be added.
+        """
+        ds = self.get_datasource_metadata(datasource)
+        gb = ds.get("genome_browser")
+        if not gb:
+            raise AttributeError(f"no genome browser for {datasource}")
+        dt = gb.get("default_tracks", [])
+        for track in tracks:
+            if not isinstance(track, dict):
+                raise TypeError("Each track must be a dictionary")
+            if  "file" not in track:
+                raise ValueError("Each track must specify a local or remote file")
+            fname = basename(track["file"])
+            track_name = track.get("name", fname.split(".")[0])
+            track_type= track.get("type")
+            if not track_type:
+                if fname.endswith((".bb",".bed.gz", ".bed")):
+                    track_type = "bed"
+                elif fname.endswith((".bw", ".bigwig")):
+                    track_type = "wig"
+            if not track_type:
+                raise AttributeError(f"The type of track {fname} cannot be deduced")
+            #no need to do anything - will be served from the original location
+            if track["file"].startswith("http"):
+                url = track["file"]
+            else:
+                if not exists(track["file"]):
+                    raise FileNotFoundError(f"Track file {track['file']} does not exist")
+                # tracks already compressed and indexed - just copy to tracks folder
+                if track_type == "wig" or fname.endswith(".gz") or fname.endswith(".bb"):
+                    to_file = join(self.trackfolder, fname)
+                    # For .gz files, verify index exists before copying
+                    if fname.endswith(".gz"):
+                        i_file = track["file"] + ".tbi"
+                        if not exists(i_file):
+                            raise FileNotFoundError(f"Index file {i_file} not found")
+                        shutil.copyfile(i_file, f"{to_file}.tbi")
+                    shutil.copy(track["file"], to_file)
+                        
+                # assume its a just a bed file- compress and index it
+                else:
+                    check_htslib()
+                    t_file = track["file"]
+                    o_file = join(self.trackfolder, fname)
+                    create_bed_gz_file(t_file, o_file)        
+                    fname= fname+".gz"
+                url = f"./tracks/{fname}"
+            #will need to adapt this for other browsers
+            mtrack ={
+                "short_label": track_name,
+                "url": url,
+                "track_id": track.get("id",track_name),
+                "color": track.get("color", "black"),
+            }
+
+            if track_type== "bed":
+                mtrack["type"] = "bed"
+                mtrack["format"] = "feature"
+                mtrack["featureHeight"] = track.get("featureHeight", 10)
+                mtrack["height"] = mtrack["featureHeight"] + 12
+                mtrack["displayMode"] = track.get("displayMode", "EXPANDED")
+            elif track_type == "wig":
+                mtrack["type"] = "bigwig"
+                mtrack["format"]="wig"
+                mtrack["height"] = track.get("height", 50)
+            for param in ["hideLabels"]:
+                if track.get(param):
+                    mtrack[param] = track[param]
+            dt.append(mtrack)
+        gb["default_tracks"] = dt
         self.set_datasource_metadata(ds)
 
     def add_datasource(
@@ -1092,8 +1233,9 @@ class MDVProject:
         supplied_columns_only=False,
         replace_data=False,
         add_to_view: Optional[str] = "default",
-        separator="\t"
-    ) -> list[dict[str, str]]:
+        separator="\t",
+        preserve_views_on_replace: bool = False,
+    ) -> tuple[list[str], Optional[str]]:
         """Adds a polars dataframe to the project. Each column's datatype will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
@@ -1106,6 +1248,7 @@ class MDVProject:
             replace_data (bool, optional): If True, the existing datasource will be overwritten, Default is False,
             add_to_view (string, optional): The datasource will be added to the specified view.
             separator (str, optional): If a path to text file is supplied, then this should be the file's delimiter.
+            preserve_views_on_replace (bool, optional): If True and replace_data is True, existing views are preserved when replacing datasource.
         """
         dodgy_columns = []  # To hold any columns that can't be added
         gr = None  # Initialize the group variable
@@ -1130,6 +1273,8 @@ class MDVProject:
             # Get columns to add using polars-compatible function.
             # Pass num_rows to avoid recalculating it for LazyFrames.
             columns = get_column_info_polars(columns, dataframe, supplied_columns_only, num_rows)
+
+            has_existing_datasources = len(self.datasources) > 0
             
             # Check if the datasource already exists
             try:
@@ -1142,7 +1287,7 @@ class MDVProject:
             if ds:
                 # Delete the existing datasource if replace_data is True
                 if replace_data:
-                    self.delete_datasource(name)
+                    self.delete_datasource(name, delete_views=not preserve_views_on_replace)
                 else:
                     raise FileExistsError(
                         f"Attempt to create datasource '{name}' failed because it already exists."
@@ -1203,6 +1348,7 @@ class MDVProject:
             
             print("Updated datasource metadata")
             
+            created_view = None
             # Add to view if specified
             if add_to_view:
                 # TablePlot parameters
@@ -1234,6 +1380,10 @@ class MDVProject:
                     v["initialCharts"][name].append(table_plot_json)
                     
                 self.set_view(add_to_view, v)
+            elif has_existing_datasources:
+                created_view = self.create_view_with_all_datasources(
+                    view_name=f"View: {name}", make_default=False
+                )
             
             # Update the project's update timestamp using the dedicated method
             if self.backend_db:
@@ -1241,12 +1391,37 @@ class MDVProject:
                 ProjectService.set_project_update_timestamp(self.id)
             
             print(f"In MDVProject.add_datasource_polars: Added datasource successfully '{name}'")
-            return dodgy_columns
+            return (dodgy_columns, created_view)
 
         except Exception as e:
             print(f"Error in MDVProject.add_datasource_polars : Error adding datasource '{name}': {e}")
             raise  # Re-raise the exception to propagate it to the caller
 
+    def create_view_with_all_datasources(self, view_name, make_default=False):
+        """
+        Create a new view containing all current datasources, each with a table plot.
+        Each datasource entry gets layout "gridstack" so the frontend does not crash on missing layout.
+        """
+        all_ds = self.datasources
+        base_name = view_name
+        suffix = 0
+
+        while self.get_view(view_name):
+            suffix += 1
+            view_name = f"{base_name} ({suffix})"
+
+        view_data = {"dataSources": {}, "initialCharts": {}}
+        for ds in all_ds:
+            ds_name = ds["name"]
+            view_data["dataSources"][ds_name] = {"layout": "gridstack"}
+            columns = [x["field"] for x in ds.get("columns", [])]
+            if columns:
+                table_plot = self.create_table_plot(ds_name, columns, [792, 472], [10, 10])
+                view_data["initialCharts"][ds_name] = [self.convert_plot_to_json(table_plot)]
+            else:
+                view_data["initialCharts"][ds_name] = []
+        self.set_view(view_name, view_data, make_default=make_default)
+        return view_name
 
     def create_table_plot(self, title, params, size, position):
         """Create and configure a TablePlot instance with the given parameters."""
@@ -1532,6 +1707,12 @@ class MDVProject:
             # TODO also copy any linked avivator images
 
     def save_state(self, state):
+        """Apply state from frontend (e.g. POST /save_state).
+
+        For updatedColumns, the frontend sends column data already decoded: unique
+        columns come as string[] from ChartManager getMd() (Uint8Array decoded by
+        stringLength). set_column_with_raw_data() expects that form (no int/float).
+        """
         # update/add or view
         # view will be deleted if view is null
         if state.get("currentView"):
@@ -1627,6 +1808,7 @@ class MDVProject:
         # remove the view
         else:
             if views.get(name):
+                logger.info(f"deleting view '{name}'")
                 del views[name]
         self.views = views
 
@@ -1639,12 +1821,74 @@ class MDVProject:
                 state["initial_view"] = name
         # delete from list
         else:
-            state["all_views"].remove(name)
+            # error: list.remove(x): x not in list
+            # could it be that there are multiple MDVProject instances in the server and self.state isn't updated?
+            # but also... in multi-user concurrent kind of scenario this kind of state could easily be out-of-sync.
+            if name in state["all_views"]:
+                state["all_views"].remove(name)
+            else:
+                logger.warning(f"'{name}' not found in all_views when removing...")
             iv = state.get("initial_view")
             # if the deleted view is the default view then
             # change the default view to the first view in the list
-            if iv:
-                state["initial_view"] = state["all_views"][0]
+            if iv and iv == name:
+                # will frontend etc have a problem with this being None?
+                # not particularly - it'll load with AddView dialog, which is about as graceful as we could hope for.
+                # there was a potential error here when removing final view...
+                state["initial_view"] = state["all_views"][0] if state["all_views"] else None
+        self.state = state
+
+    def rename_view(self, old_name: str, new_name: str):
+        """Rename a view: update the key in views.json and the entry in state.json."""
+        new_name = (new_name or "").strip()
+        if not new_name:
+            raise ValueError("View name cannot be empty")
+
+        with self.lock("write"):
+            views = self.views
+            state = self.state
+
+            if old_name not in views:
+                raise ValueError(f"View '{old_name}' does not exist")
+            if old_name not in state.get("all_views", []):
+                raise ValueError(f"View '{old_name}' is missing from state.json")
+            if new_name in views and new_name != old_name:
+                raise ValueError(f"View '{new_name}' already exists")
+
+            view_data = views.pop(old_name)
+            view_data["name"] = new_name
+            views[new_name] = view_data
+
+            idx = state["all_views"].index(old_name)
+            state["all_views"][idx] = new_name
+            if state.get("initial_view") == old_name:
+                state["initial_view"] = new_name
+
+            # Updating view.json and state.json at the same time to avoid stale values in either files
+            self.views = views
+            self.state = state
+
+    def reorder_views(self, order: list[str]):
+        """Set the order of views in state.json all_views."""
+        state = self.state
+        existing = state["all_views"]
+        valid_views = list[str](self.views.keys())
+        # Performing type, length, duplication and source of truth checks
+        if (
+            not isinstance(order, list)
+            or len(order) != len(existing)
+            or len(set[str](order)) != len(order) 
+            or set[str](order) != set[str](existing)
+            or set[str](order) != set[str](valid_views)
+        ):
+            raise ValueError("Reorder list must contain exactly the same view names")
+        state["all_views"] = order
+        self.state = state
+
+    def set_gallery_default(self, show: bool):
+        """Set whether the gallery view should open by default when the project loads."""
+        state = self.state
+        state["show_gallery_on_open"] = show
         self.state = state
 
     def convert_data_to_binary(self, outdir=None):
@@ -2061,21 +2305,34 @@ def save_json_atomic(path, data):
     Save JSON data to a file atomically.
     Hopefully this will be safer - in certain situations we were ending up with truncated output files.
     This method was suggested by ChatGPT: https://chatgpt.com/share/6813337b-9acc-800b-a6cd-6d058f339cd5
+
+    Now modified to avoid permissions issues e.g. with shared projects in cluster
+    There will be some additional overhead as a result, probably not significant.
     """
     dir_name = os.path.dirname(path)
+    
+    # Get permissions from existing file if it exists, otherwise use default group permissions
+    if os.path.exists(path):
+        existing_mode = os.stat(path).st_mode
+    else:
+        # Default to 0664 (rw-rw-r--) for group access in cluster environments
+        existing_mode = 0o664
+    
     with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False) as tmp:
         json.dump(data, tmp, indent=2, allow_nan=False)
         tmp.flush()
         os.fsync(tmp.fileno())
         temp_name = tmp.name
+    
+    # Set permissions on temp file to match existing file or use default
+    os.chmod(temp_name, existing_mode)
+    
     # potential issues particularly in Docker where the files are on a different volume
     # safest option is to sync like this before and after, but may be overkill
     # 'sync' will fail silently on windows
     os.system("sync")
     os.replace(temp_name, path)  # Atomic move on most OSes
     os.system("sync")
-    #file is saved with restictive permissions (this may be intentional)
-    #
     # this method is lower overhead than os.system("sync") 
     # but stress testing indicates it is less robust
     # dir_fd = os.open(dir_name, os.O_DIRECTORY)
@@ -2112,6 +2369,7 @@ def add_column_to_group(
     group (h5py.Group): The group to add the data to
     length (int): The length of the data
     """
+    col.setdefault("original_dtype", str(data.dtype))
 
     if (
         col["datatype"] == "text"
@@ -2153,6 +2411,9 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
+            # unique: ensure string (e.g. CSV-inferred int cell_id)
+            if pandas.api.types.is_numeric_dtype(data):
+                data = data.astype(str)
             max_len = max(data.str.len())
             utf8_type = h5py.string_dtype("utf-8", int(max_len))
             col["datatype"] = "unique"
@@ -2181,7 +2442,7 @@ def add_column_to_group(
         for i in range(0, length):
             b = i * maxv
             try:
-                v = data[i]  # may raise KeyError if data is None at this index
+                v = data.iloc[i] if hasattr(data, "iloc") else data[i]
                 if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
@@ -2208,12 +2469,32 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
+        if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
+            try:
+                numeric = numpy.asarray(
+                    pandas.to_numeric(clean, errors="coerce"),
+                    dtype=numpy.float64,
+                )
+                finite_numeric = numeric[numpy.isfinite(numeric)]
+                out_of_range = finite_numeric[finite_numeric > 16_777_216]
+                if len(out_of_range) != 0:
+                    col.setdefault("storage_warnings", []).append(
+                        "uint32 -> float32 (integer): "
+                        f"{len(out_of_range)} value(s) exceed exact-integer range "
+                        f"(max={float(finite_numeric.max()):.0f}); precision loss possible."
+                    )
+            except Exception:
+                pass
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
+        if na.size == 0:
+            col["minMax"] = [0.0, 0.0]
+            col["quantiles"] = {}
+            return
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
@@ -2232,7 +2513,12 @@ def get_column_info(columns, dataframe, supplied_columns_only):
 
     if not supplied_columns_only:
         cols = [
-            {"datatype": datatype_mappings[d.name], "name": c, "field": c}
+            {
+                "datatype": datatype_mappings[d.name],
+                "name": c,
+                "field": c,
+                "original_dtype": d.name,
+            }
             for d, c in zip(dataframe.dtypes, dataframe.columns)
         ]
         # replace with user given column metadata
@@ -2295,6 +2581,7 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
     import numpy as np
     
     field = col_info["field"]
+    col_info.setdefault("original_dtype", str(polars_series.dtype))
     
     # Handle different column types
     if col_info["datatype"] in ["text", "text16", "multitext"]:
@@ -2366,6 +2653,21 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 # fillna is necessary because NaN cannot be cast to int
                 data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
 
+            if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
+                try:
+                    numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
+                    arr = numeric.to_numpy()
+                    finite = arr[np.isfinite(arr)]
+                    out_of_range = finite[finite > 16_777_216]
+                    if len(out_of_range) != 0:
+                        col_info.setdefault("storage_warnings", []).append(
+                            "uint32 -> float32 (integer): "
+                            f"{len(out_of_range)} value(s) exceed exact-integer range "
+                            f"(max={float(finite.max()):.0f}); precision loss possible."
+                        )
+                except Exception:
+                    pass
+
             # Create dataset
             h5_group.create_dataset(field, data=data)
 
@@ -2413,7 +2715,8 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
             cols.append({
                 "datatype": mdv_dtype,
                 "name": col_name,
-                "field": col_name
+                "field": col_name,
+                "original_dtype": str(polars_dtype),
             })
         
         # Replace with user given column metadata

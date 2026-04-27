@@ -39,16 +39,11 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             We should check authentication here,
             **nb the coupling of sockets and "chat" should be removed.**
             """
-            if not is_authenticated():
+            ok, reason = is_authenticated(project_id=project.id)
+            if not ok:
+                if reason:
+                    logger.info("WebSocket connect rejected: %s", reason)
                 return False
-            # todo - check access level, whether chat is enabled etc
-            # at the time you connect, flask_socketio session by default is "forked from http session"
-            # if we made SocketIO instance with manage_session=False, then they would reference the same session.
-            # Not sure how this relates to how we handle auth, access_level etc.
-            # https://blog.miguelgrinberg.com/post/flask-socketio-and-the-user-session
-            # https://flask-socketio.readthedocs.io/en/latest/implementation_notes.html#using-flask-login-with-flask-socketio
-            
-
         bot: Optional[ProjectChatProtocol] = None
         @project_bp.route("/chat_init", access_level='editable', methods=["POST"])
         def chat_init():
@@ -79,7 +74,8 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
         def chat(data):
-            if not is_authenticated():
+            ok, _reason = is_authenticated(project_id=project.id)
+            if not ok:
                 return
 
             nonlocal bot

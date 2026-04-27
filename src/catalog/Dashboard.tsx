@@ -9,8 +9,10 @@ import {
 } from "@mui/icons-material";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
+import HelpIcon from "@mui/icons-material/Help";
 import {
     AppBar,
+    Alert,
     Backdrop,
     Box,
     Button,
@@ -40,16 +42,19 @@ import {
     type SortOrder,
     sortProjects,
 } from "./utils/projectUtils";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
 import usePermissions from "./PermissionsContext";
 import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import HelpDialog from "./HelpDialog";
+import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
 const Dashboard: React.FC = () => {
+    const isProduction = import.meta.env.PROD;
     const {
         projects,
         isLoading: projectsLoading,
@@ -75,7 +80,10 @@ const Dashboard: React.FC = () => {
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [open, setOpen] = useState(false);
+    const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+    const [customLogoVisible, setCustomLogoVisible] = useState(true);
     const theme = useTheme();
+    const showLocalBackendNotice = shouldShowLocalBackendNotice();
 
     const isLoading = projectsLoading || permissionsLoading;
 
@@ -93,10 +101,12 @@ const Dashboard: React.FC = () => {
     const handleCreateProject = async () => {
         try {
             const newProject = await createProject();
-            const base = import.meta.env.DEV
-                ? "http://localhost:5170?dir=/"
-                : "";
-            window.location.href = `${base}project/${newProject?.id}`;
+            if (!newProject?.id) {
+                console.error("Project creation succeeded without a valid project id.", newProject);
+                return;
+            }
+
+            window.location.href = buildProjectUrl(newProject.id);
         } catch (error) {
             console.error("Failed to create project:", error);
         }
@@ -151,6 +161,17 @@ const Dashboard: React.FC = () => {
                             alt="MDV Projects Logo"
                             src={mdvLogo}
                         />
+                        <Box
+                            component="img"
+                            sx={{
+                                height: 40,
+                                ml: 1,
+                                display: customLogoVisible ? "block" : "none",
+                            }}
+                            alt="Custom deployment logo"
+                            src="secondary_logo"
+                            onError={() => setCustomLogoVisible(false)}
+                        />
                         <Box sx={{ flexGrow: 1 }} />
                         <Paper
                             component="form"
@@ -159,7 +180,7 @@ const Dashboard: React.FC = () => {
                                 display: "flex",
                                 alignItems: "center",
                                 width: 400,
-                                mr: 2, // Add margin to the right
+                                mr: 2,
                             }}
                         >
                             <InputBase
@@ -177,24 +198,49 @@ const Dashboard: React.FC = () => {
                             </IconButton>
                         </Paper>
                         {authEnabled && <UserProfile />}
-                        <IconButton
-                            sx={{ ml: 1 }}
-                            onClick={toggleColorMode}
-                            color="inherit"
-                            data-testid="theme_toggle_catalog"
+                        <Tooltip title="Toggle theme">
+                            <IconButton
+                                sx={{ mr: 2 }}
+                                onClick={toggleColorMode}
+                                color="inherit"
+                                data-testid="theme_toggle_catalog"
+                                aria-label="Toggle theme"
+                            >
+                                {mode === "dark" ? (
+                                    <Brightness4Icon />
+                                ) : (
+                                    <Brightness7Icon />
+                                )}
+                            </IconButton>
+                        </Tooltip>
+                        <Button
+                            variant="outlined"
+                            startIcon={<HelpIcon />}
+                            onClick={() => setHelpDialogOpen(true)}
+                            sx={{
+                                borderWidth: 1.5,
+                                borderRadius: 2,
+                                textTransform: "none",
+                                px: 1.5,
+                                py: 0.75,
+                            }}
                         >
-                            {mode === "dark" ? (
-                                <Brightness4Icon />
-                            ) : (
-                                <Brightness7Icon />
-                            )}
-                        </IconButton>
+                            Help / Feedback
+                        </Button>
                     </Toolbar>
                 </AppBar>
 
                 <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+                    {showLocalBackendNotice && (
+                        <Alert severity="info" sx={{ mb: 3 }}>
+                            This preview build needs to talk to an MDV app running locally on <code>http://localhost:5055</code>.
+                            If your browser asks whether this site can communicate with local apps or devices, allow it for this preview:
+                            the Netlify page is only the frontend, and project lists plus <code>/project/:id</code> data are loaded from your local MDV container.
+                            No local data is sent to a remote server.
+                        </Alert>
+                    )}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
-                        {permissions.createProject && (
+                        {!isProduction && permissions.createProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
                                 <ButtonBase
                                     sx={{
@@ -226,7 +272,7 @@ const Dashboard: React.FC = () => {
                                 </ButtonBase>
                             </Grid>
                         )}
-                        {permissions.importProject && (
+                        {!isProduction && permissions.importProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
                                 <ButtonBase
                                     sx={{
@@ -268,7 +314,7 @@ const Dashboard: React.FC = () => {
                             mb: 1,
                         }}
                     >
-                        <Typography variant="h5">{authEnabled ? "Recent Projects" : "Published Projects"}</Typography>
+                        <Typography variant="h5">{!isPublicPage ? "Recent Projects" : "Published Projects"}</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                             {/* Hide rescan projects on public page */}
                             {!isPublicPage && (
@@ -295,7 +341,7 @@ const Dashboard: React.FC = () => {
                                         onClick={onRescanClick}
                                     >
                                         <RefreshCwIcon />
-                                        <Typography 
+                                        <Typography
                                             sx={{
                                                 marginLeft: 1
                                             }}
@@ -338,7 +384,7 @@ const Dashboard: React.FC = () => {
                                     >
                                         {/* Hide last modified on public page */}
                                         Sort by:{" "}
-                                        {!isPublicPage ? 
+                                        {!isPublicPage ?
                                             sortBy === "lastModified"
                                                 ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
                                                 : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
@@ -375,7 +421,7 @@ const Dashboard: React.FC = () => {
                             open={Boolean(anchorEl)}
                             onClose={() => setAnchorEl(null)}
                         >
-                            {!isPublicPage && 
+                            {!isPublicPage &&
                                 (<MenuItem
                                     onClick={() => handleSort("lastModified")}
                                     sx={{
@@ -451,7 +497,7 @@ const Dashboard: React.FC = () => {
                     )}
                 </Container>
                 {error && (
-                    <ReusableDialog
+                    <ReusableAlertDialog
                         open={isErrorModalOpen}
                         handleClose={closeErrorModal}
                         isAlertErrorComponent
@@ -462,8 +508,14 @@ const Dashboard: React.FC = () => {
                         }
                     />
                 )}
-                {open && permissions.importProject && (
+                {open && !isProduction && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
+                )}
+                {helpDialogOpen && (
+                    <HelpDialog
+                        open={helpDialogOpen}
+                        onClose={() => setHelpDialogOpen(false)}
+                    />
                 )}
             </Box>
             {isLoading && (

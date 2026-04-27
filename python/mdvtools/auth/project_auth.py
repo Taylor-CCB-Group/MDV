@@ -55,6 +55,18 @@ def project_pre_dispatch_checks(project_id: str, options: dict):
         logger.exception(f"Error getting project permissions for user {user_id} and project {project_id}: {e}")
         return jsonify({"error": "Failed to get project permissions"}), 500
 
+    # Require at least read-level access for every project request when auth is enabled
+    has_read_access = (
+        project_permissions
+        and (
+            project_permissions.get("can_read")
+            or project_permissions.get("can_write")
+            or project_permissions.get("is_owner")
+        )
+    )
+    if not has_read_access:
+        return jsonify({"error": "You do not have access to this project."}), 403
+
     # Check for access level only if specified in options
     if options.get('access_level') == 'editable':
         # Check permission from the database model

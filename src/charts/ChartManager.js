@@ -15,7 +15,7 @@ import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
-import ColorChooser from "./dialogs/ColorChooser";
+import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
@@ -27,7 +27,7 @@ import "./TableChart.js";
 import "./WGL3DScatterPlot.js";
 import "./WGLScatterPlot.js";
 import "./RingChart.js";
-import "./TextBoxChart.js";
+import "../react/components/TextBoxChartReactWrapper";
 import "./HeatMap.js";
 import "./ViolinPlot.js";
 import "./BoxPlot.js";
@@ -56,7 +56,7 @@ import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action } from "mobx";
+import { makeObservable, observable, action, makeAutoObservable } from "mobx";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -64,6 +64,8 @@ import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
+import { getOrCreateGateManager } from "@/react/gates/useGateManager";
+import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 
 
 //order of column data in an array buffer
@@ -120,6 +122,7 @@ function listenPreferredColorScheme(callback) {
 * 
 */
 export class ChartManager {
+    validationFindings = new ValidationFindingsStore();
     /**
      * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
      * @param {import("@/charts/charts").DataSource[]} dataSources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
@@ -141,7 +144,8 @@ export class ChartManager {
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
      * @param {boolean?} [config.chat_enabled] 
-     * @param {string?} [config.mdv_api_root] 
+     * @param {string?} [config.mdv_api_root]
+     * @param {boolean?} [config.show_gallery_on_open] whether to open the gallery view by default
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
      * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
      * 
@@ -187,6 +191,9 @@ export class ChartManager {
         /** @type {{[k: string]: DataSource | undefined}} */
         this.dsIndex = {};
         this.columnsLoading = {};
+        // Aggregated validation/schema findings for UI + reporting.
+        // Created before React mounts the menu bar so observers track it from first render.
+        this.validationFindings = new ValidationFindingsStore();
         for (const d of dataSources) {
             const ds = {
                 name: d.name,
@@ -306,8 +313,16 @@ export class ChartManager {
             this._loadView(config, dataLoader, true);
         }
 
-        //add links
+        //add links and create gate manager for each datasource
         for (const ds of this.dataSources) {
+
+            // Gate manager is created after initialising the config
+            try {
+                getOrCreateGateManager(ds.dataStore);
+            } catch (err) {
+                console.error(`Failed to initialise gates for datasource "${ds.name}"`, err);
+            }
+
             const links = ds.dataStore.links;
             if (links) {
                 for (const ods in links) {
@@ -391,6 +406,8 @@ export class ChartManager {
                             resultSet,
                         );
                     } else if (type === "data_highlighted") {
+                        // todo - review whether this whole valuesetLink is really relevant,
+                        // and if so whether to consider empty highlight logic here.
                         await this._getColumnsAsync(ds.name, [
                             link.source_column,
                         ]);
@@ -541,7 +558,7 @@ export class ChartManager {
 
     _setUpChangeLayoutMenu(ds) {
         this.layoutMenus[ds.name] = new ContextMenu(() => {
-            const lo = this.viewData.dataSources[ds.name].layout || "absolute";
+            const lo = this.viewData.dataSources[ds.name]?.layout || "absolute";
             return [
                 {
                     text: "Absolute",
@@ -559,6 +576,7 @@ export class ChartManager {
 
     changeLayout(type, ds) {
         const view = this.viewData.dataSources[ds.name];
+        if (!view) return;
         const current = view.layout || "absolute";
         if (type === current) {
             return;
@@ -687,6 +705,11 @@ export class ChartManager {
                             });
                         }
                     }
+
+                    // Open the view gallery on initial load if show_gallery_on_open is true
+                    if (firstTime && config.show_gallery_on_open) {
+                        this.viewManager.setShowGallery(true);
+                    }
                 } catch (error) {
                     console.error("Error during view initialization:", error);
                     // Consider adding user-facing error handling here
@@ -705,6 +728,10 @@ export class ChartManager {
                             console.log("Error occurred: ", state.chartErrors);
                             return false;
                         });
+                    }
+                    // Open the view gallery on initial load if show_gallery_on_open is true
+                    if (firstTime && config.show_gallery_on_open) {
+                        this.viewManager.setShowGallery(true);
                     }
             });
         }
@@ -883,6 +910,20 @@ export class ChartManager {
         // is it ever with a value that would cause the chart.getConfig() to have a different result?
         // We are relying on the config being stable/settled when these promises resolve.
         console.log('after await Promise.all(chartPromises);');
+
+        // Restore highlighted indices from view data (e.g. after loading or switching view)
+        // this should probably happen before chart init so that they have stable config when finished
+        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
+            const spec = this.viewData.dataSources[dsName];
+            const highlight = spec?.highlight;
+            const dstore = this.dsIndex[dsName]?.dataStore;
+            if (!dstore?.dataHighlighted) continue;
+            if (Array.isArray(highlight) && highlight.length > 0) {
+                dstore.dataHighlighted(highlight, null);
+            } else {
+                dstore.dataHighlighted([], null);
+            }
+        }
 
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
@@ -1077,8 +1118,14 @@ export class ChartManager {
             removed: [],
             colors_changed: [],
         };
+        // Although, removed columns are deleted from the dirtyColumns in DataStore
+        // If a stale entry is still present, some checks are added to skip them
         for (const c in dc.added) {
             const td = getMd(c);
+            // Skip stale entries
+            if (!td) {
+                continue;
+            }
             rv.columns.push(td);
             rv.added.push(c);
         }
@@ -1089,14 +1136,23 @@ export class ChartManager {
         for (const c in dc.data_changed) {
             if (!rv.columns[c]) {
                 const td = getMd(c);
+                // Skip stale entries
+                if (!td) {
+                    continue;
+                }
                 rv.columns.push(td);
             }
         }
 
         for (const cc in dc.colors_changed) {
+            const column = dataStore.columnIndex[cc];
+            // Skip if the removed column is still present
+            if (!column) {
+                continue;
+            }
             rv.colors_changed.push({
                 column: cc,
-                colors: dataStore.columnIndex[cc].colors,
+                colors: column.colors,
             });
         }
 
@@ -1104,17 +1160,70 @@ export class ChartManager {
 
         function getMd(c) {
             const cl = dataStore.columnIndex[c];
+            // Skip stale entries if present
+            if (!cl) {
+                return null;
+            }
             const md = {
                 values: cl.values,
                 datatype: cl.datatype,
                 name: cl.name,
-                editable: true,
+                // Use the existing editable field value if it exists, default to true
+                editable: cl.editable ?? true,
                 field: cl.field,
             };
-            const arr = new Array(cl.data.length);
-            for (let i = 0; i < cl.data.length; i++) {
-                arr[i] = cl.data[i];
+            const numRows = dataStore.size;
+            
+            // Add datatype-specific metadata required to reconstruct client-created columns on reload.
+            if (
+                (cl.datatype === "unique" || cl.datatype === "multitext") &&
+                cl.stringLength
+            ) {
+                md.stringLength = cl.stringLength;
             }
+            if (cl.datatype === "multitext" && cl.delimiter) {
+                md.delimiter = cl.delimiter;
+            }
+            
+            let arr;
+            if (cl.datatype === "unique") {
+                // For unique columns, convert Uint8Array to array of strings (expected by server)
+                const textDecoder = new TextDecoder();
+                const stringLength = cl.stringLength;
+
+                if (!stringLength || typeof stringLength !== "number" || stringLength <= 0) {
+                    console.error(
+                        `Column ${c} has invalid or missing stringLength: ${stringLength}.`
+                    );
+                    // Fallback as empty values to keep it consistent with other columns
+                    return { metadata: md, data: new Array(numRows).fill("") };
+                }
+
+                arr = new Array(numRows);
+                
+                for (let i = 0; i < numRows; i++) {
+                    const baseIndex = i * stringLength;
+
+                    if (!cl.data || baseIndex + stringLength > cl.data.length) {
+                        throw new Error(
+                            `Invalid unique-column buffer for '${c}' at row ${i} (stringLength=${stringLength}).`
+                        );
+                    }
+
+                    const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
+                    // TextDecoder cannot decode a SharedArrayBuffer-backed view in some browsers.
+                    const decoded = textDecoder.decode(Uint8Array.from(rowBytes));
+                    // Remove null padding characters
+                    arr[i] = decoded.replace(/\0+$/, "");
+                }
+            } else {
+                // For other datatypes, get the values from data array
+                arr = new Array(cl.data.length);
+                for (let i = 0; i < cl.data.length; i++) {
+                    arr[i] = cl.data[i];
+                }
+            }
+            
             return { metadata: md, data: arr };
         }
     }
@@ -1158,7 +1267,7 @@ export class ChartManager {
                 const config = chart.getConfig();
                 const div = chart.getDiv();
                 const d = this.viewData.dataSources[chInfo.dataSource.name];
-                if (d.layout === "gridstack") {
+                if (d?.layout === "gridstack") {
                    //this is handled by gridstack now
                 } else {
                     config.position = [div.offsetLeft, div.offsetTop];
@@ -1174,6 +1283,23 @@ export class ChartManager {
 
         const view = JSON.parse(JSON.stringify(this.viewData));
         view.initialCharts = initialCharts;
+        for (const ds of this.dataSources) {
+            const h = ds.dataStore.getHighlightedData?.();
+            // adding empty entries to view.dataSources here is no-bueno.
+            if (!view.dataSources[ds.name]) {
+                // not expecting that there should be any highlight data to save when the dataSource is not part of the view
+                if (h) {
+                    console.warn(`unexpected highlighted data for dataSource '${ds.name}' which is not part of current viewData`);
+                }
+                continue;
+            }
+            if (Array.isArray(h) && h.length > 0) {
+                view.dataSources[ds.name].highlight = [...h];
+            } else {
+                // biome-ignore lint/performance/noDelete: setting it to undefined would mean there would still be the key, not a perf issue here.
+                delete view.dataSources[ds.name].highlight;
+            }
+        }
         const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
         return {
             view: view,
@@ -1486,10 +1612,10 @@ export class ChartManager {
                 },
                 func: () => {
                     try {
-                        new ColorChooser(this, ds);
+                        new ColorPaletteWrapper(this, ds);
                     } catch (error) {
-                        console.error("error making ColorChooser", error);
-                        this.createInfoAlert("Error making color chooser", {
+                        console.error("error making ColorPalette", error);
+                        this.createInfoAlert("Error making Color Palette", {
                             type: "warning",
                             duration: 2000,
                         });
@@ -1701,7 +1827,7 @@ export class ChartManager {
                     height: `${height}px`,
                     left: `${left}px`,
                     top: `${top}px`,
-                    background: t.main_panel_color,
+                    background: "var(--main_panel_color)",
                     zIndex: "2",
                     display: "flex",
                     alignItems: "center",
@@ -1750,14 +1876,7 @@ export class ChartManager {
             this.clearInfoAlerts();
             spinner.remove();
             ellipsis.remove();
-            // const id = this.createInfoAlert(
-            //     `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
-            //     {
-            //         type: "warning",
-            //     },
-            // );
-            // const idiv = this.infoAlerts[id].div;
-            // idiv.onclick = () => idiv.remove();
+            div.style.border = "1px solid var(--border_menu_bar_color)";
             const debugNode = createEl(
                 "div",
                 {
@@ -1773,7 +1892,14 @@ export class ChartManager {
                 },
                 div,
             );
-            createMdvPortal(ErrorComponentReactWrapper({ error, height, width, extraMetaData: { config } }), debugNode);
+            const errorObj = error instanceof Error ? 
+                error 
+                :
+                typeof(error) === "string" ?
+                    { message: error }
+                    :
+                    { message: "An error occurred while creating the chart" };
+            createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {
@@ -2304,7 +2430,7 @@ export class ChartManager {
         if (
             ds &&
             this.gridStack &&
-            this.viewData.dataSources[ds.name].layout === "gridstack"
+            this.viewData.dataSources[ds.name]?.layout === "gridstack"
         ) {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;

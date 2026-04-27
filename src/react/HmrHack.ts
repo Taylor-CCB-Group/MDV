@@ -1,5 +1,6 @@
 import "../react/components/VivMDVReact";
 import "../react/components/DeckScatterReactWrapper";
+import "../react/components/SplatterPlotReactWrapper";
 import "../charts/dialogs/AnnotationDialogReact";
 // import addChart from "../charts/dialogs/AddChartDialogReact";
 // arr.push(addChart);
@@ -7,6 +8,7 @@ import "./components/HighlightedFeatureChart";
 import "./components/GeneNetworkChart";
 import "./components/SelectionDialogReact";
 import "../charts/dialogs/AddColumnsFromRowsDialogReact";
+import "../react/components/TableChartReactWrapper";
 
 /**
  * Charts are registered with ChartManager by being added to a BaseChart.types object,

@@ -38,6 +38,10 @@ export function setProjectRoot(root: string) {
     projectRoot = root;
 }
 
+export function getProjectRoot() {
+    return projectRoot;
+}
+
 //https://stackoverflow.com/questions/29855098/is-there-a-built-in-javascript-function-similar-to-os-path-join
 export function buildPath(...args: string[]) {
     return args

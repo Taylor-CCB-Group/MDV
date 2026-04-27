@@ -10,7 +10,7 @@ import {
     FormGroup,
     TextField,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 const AddViewDialogComponent = (props: {
     open: boolean;
@@ -51,8 +51,27 @@ const AddViewDialogComponent = (props: {
         await viewManager.addView(viewName, checkedDs, isCloneView);
         props.onClose();
     };
+
+    const isCreateDisabled = checkInvalidName(viewName) || !viewName || (!checkDsSelected() && !isCloneView);
+
+    // Allow enter-to-submit behaviour
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (isCreateDisabled) return;
+        onCreate();
+    };
+
     return (
-        <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
+        <Dialog
+            open={props.open}
+            onClose={props.onClose}
+            fullWidth
+            maxWidth="xs"
+            PaperProps={{
+                component: "form",
+                onSubmit: handleSubmit,
+            }}
+        >
             <DialogTitle>Add New View</DialogTitle>
             <DialogContent dividers>
                 <FormControlLabel
@@ -91,11 +110,7 @@ const AddViewDialogComponent = (props: {
                 )}
             </DialogContent>
             <DialogActions>
-                <Button
-                    color="primary"
-                    onClick={onCreate}
-                    disabled={checkInvalidName(viewName) || !viewName || (!checkDsSelected() && !isCloneView)}
-                >
+                <Button color="primary" type="submit" disabled={isCreateDisabled}>
                     Create View
                 </Button>
                 <Button color="error" onClick={props.onClose}>

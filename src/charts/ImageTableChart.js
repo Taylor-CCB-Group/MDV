@@ -62,6 +62,11 @@ class ImageTableChart extends BaseChart {
         if (data.source === this) {
             return;
         }
+        if (data.indexes.length === 0) {
+            //clear any selected tiles
+            this.grid.setSelectedTiles([]);
+            return;
+        }
         const id = data.indexes[0];
         this.grid.scrollToTile(id, true);
     }

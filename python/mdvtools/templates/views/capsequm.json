@@ -1,0 +1,145 @@
+{
+    "oligos":[{
+        "id": "tIuHGh",
+        "include_index": false,
+        "param": [
+        "stop",
+        "chr",
+        "start",
+        "sequence",
+        "total_number_of_alignments",
+        "density_score",
+        "repeat_length",
+        "repeat_class",
+        "GC%",
+        "region",
+        "pass_filter",
+        "final_score",
+        "is_best_oligo",
+        "distance_to_center",
+        "oligo_status"
+        ],
+        "position": [
+        438,
+        475
+        ],
+        "size": [
+        417,
+        381
+        ],
+        "title": [
+        "oligos"
+        ],
+        "type": "table_chart",
+        "column_widths": {}
+    },
+    {
+        "title": "",
+        "legend": "",
+        "param": [
+        "region",
+        "pass_filter",
+        "is_best_oligo",
+        "density_score",
+        "repeat_length"
+        
+        ],
+        "type": "selection_dialog",
+        "filters": {
+        "density_score": null,
+        "repeat_length": null,
+        "region": null,
+        "pass_filter": null,
+        "is_best_oligo": null
+        },
+        "noClearFilters": false,
+        "id": "jYHIzR",
+        "size": [
+        376,
+        846
+        ],
+        "position": [
+        864,
+        5
+        ]
+    },
+    {
+        "title": "",
+        "legend": "",
+        "param": [
+        "region",
+        "oligo_status",
+        "sequence",
+        "density_score",
+        "repeat_length",
+        "distance_to_center",
+        "final_score",
+        "repeat_class",
+        "GC%"
+        ],
+        "type": "row_summary_box",
+        "id": "BKOFWq",
+        "size": [
+        416,
+        360
+        ],
+        "position": [
+        16,
+        473
+        ]
+    }],
+    "regions": [
+        {
+          "title": "",
+          "legend": "",
+          "param": [
+            "region",
+            "oligos found",
+            "chr",
+            "start"
+          ],
+          "type": "table_chart",
+          "id": "4b8nb0",
+          "size": [
+            419,
+            367
+          ],
+          "column_widths": {
+            "region": 188,
+            "chr": 60
+          },
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "title": "oligos found",
+          "legend": "",
+          "param": [
+            "oligos found"
+          ],
+          "type": "ring_chart",
+          "id": "zYsaJu",
+          "size": [
+            224,
+            225
+          ],
+          "axis": {
+            "x": {
+              "textSize": 13,
+              "label": "",
+              "size": 25,
+              "tickfont": 10
+            }
+          },
+          "position": [
+            2,
+            384
+          ]
+        }
+    ]
+}
+
+
+

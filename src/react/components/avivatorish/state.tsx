@@ -49,6 +49,11 @@ export type ChannelsState = {
     contrastLimits: [number, number][];
     colors: [number, number, number][];
     domains: [number, number][];
+    raster: {
+        width: number;
+        height: number;
+        data: ArrayLike<number>;
+    }[];
     selections: { z: number; c: number; t: number }[];
     loader: any; //TBD
     image: number;
@@ -65,6 +70,7 @@ export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
     contrast: [] as number[],
     colors: [],
     domains: [] as [number, number][],
+    raster: [],
     selections: [] as { z: number; c: number; t: number }[],
     ids: [],
     // not for serialization... think about this.
@@ -78,6 +84,7 @@ const DEFAUlT_CHANNEL_VALUES = {
     contrast: 0.5,
     colors: [255, 255, 255],
     domains: [0, 65535],
+    raster: { width: 0, height: 0, data: new Float32Array() },
     selections: { z: 0, c: 0, t: 0 },
     ids: "",
 };

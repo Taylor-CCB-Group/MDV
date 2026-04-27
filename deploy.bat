@@ -23,7 +23,7 @@ if errorlevel 1 (
 REM Function to download and run docker-compose
 :run_docker_compose
 echo Setting DOCKER_COMPOSE_URL environment variable...
-set DOCKER_COMPOSE_URL=https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/jh-dev/docker-local.yml
+set DOCKER_COMPOSE_URL=https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/main/docker-local.yml
 echo Downloading docker-compose.yml from %DOCKER_COMPOSE_URL%...
 curl -fsSL -o docker-compose.yml %DOCKER_COMPOSE_URL%
 if errorlevel 1 (
@@ -31,8 +31,15 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo Pulling stable Docker images...
+docker compose -f docker-compose.yml pull
+if errorlevel 1 (
+    echo Error: Failed to pull Docker images. Check the configuration and try again.
+    exit /b 1
+)
+
 echo Running docker-compose with docker-compose.yml...
-docker-compose -f docker-compose.yml up -d
+docker compose -f docker-compose.yml up -d
 if errorlevel 1 (
     echo Error: Failed to run docker-compose. Check the configuration and try again.
     exit /b 1

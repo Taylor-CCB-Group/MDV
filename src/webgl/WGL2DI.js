@@ -96,6 +96,7 @@ class WGL2DI {
             pick_color: 1,
             localFilter: 1,
             globalFilter: 1,
+            colorFilter: 1,
         };
 
         this.circles = {};
@@ -273,12 +274,18 @@ class WGL2DI {
     colorPoints(colorFunc) {
         const len = this.circles.count;
         const colors = this.circles.color;
+        const cf = this.circles.colorFilter;
         for (let n = 0; n < len; n++) {
             const col = colorFunc(n);
             const cp = n * 3;
-            colors[cp] = col[0];
-            colors[cp + 1] = col[1];
-            colors[cp + 2] = col[2];
+            if (col) {
+                colors[cp] = col[0];
+                colors[cp + 1] = col[1];
+                colors[cp + 2] = col[2];
+                cf[n] = 1;
+            } else {
+                cf[n] = 0;
+            }
         }
         //color highlights
         if (this.highlightPoints) {
@@ -640,13 +647,16 @@ class WGL2DI {
         this.circles.globalFilter = config.globalFilter;
         this.circles.pick_color = new Uint8Array(len * 3);
         this.circles.color = new Uint8Array(len * 3);
+        this.circles.colorFilter = new Uint8Array(len);
         for (let n = 0; n < len; n++) {
             const p = n * 3;
-            // col may be undefined
-            const col = config.colorFunc(n) || [255, 0, 0];
-            this.circles.color[p] = col[0];
-            this.circles.color[p + 1] = col[1];
-            this.circles.color[p + 2] = col[2];
+            const col = config.colorFunc(n);
+            if (col) {
+                this.circles.color[p] = col[0];
+                this.circles.color[p + 1] = col[1];
+                this.circles.color[p + 2] = col[2];
+                this.circles.colorFilter[n] = 1;
+            }
             const pb = this._getRGBFromIndex(n + 1) || [255, 0, 0];
             this.circles.pick_color[p] = pb[0];
             this.circles.pick_color[p + 1] = pb[1];
@@ -666,16 +676,22 @@ class WGL2DI {
         this.circles.globalFilter = config.globalFilter;
         const newPickColor = new Uint8Array(newSize * 3);
         const newColor = new Uint8Array(newSize * 3);
+        const newColorFilter = new Uint8Array(newSize);
         newColor.set(this.circles.color);
         newPickColor.set(this.circles.pick_color);
+        newColorFilter.set(this.circles.colorFilter);
         this.circles.color = newColor;
         this.circles.pick_color = newPickColor;
+        this.circles.colorFilter = newColorFilter;
         for (let n = this.circles.count; n < newSize; n++) {
             const p = n * 3;
             const col = config.colorFunc(n);
-            this.circles.color[p] = col[0];
-            this.circles.color[p + 1] = col[1];
-            this.circles.color[p + 2] = col[2];
+            if (col) {
+                this.circles.color[p] = col[0];
+                this.circles.color[p + 1] = col[1];
+                this.circles.color[p + 2] = col[2];
+                this.circles.colorFilter[n] = 1;
+            }
             const pb = this._getRGBFromIndex(n + 1);
             this.circles.pick_color[p] = pb[0];
             this.circles.pick_color[p + 1] = pb[1];
@@ -1449,6 +1465,7 @@ class WGL2DI {
 			attribute vec3 color;
 			attribute float lFilter;
 			attribute float gFilter;
+			attribute float colorFilter;
 			varying vec3 fragColor;
 			varying float op;
 			varying float has_border;
@@ -1473,6 +1490,9 @@ class WGL2DI {
 			void main() {
 				float dd = 0.0;
 				grey_out=0.0;
+				if (colorFilter == 0.0) {
+					return;
+				}
 				if (lFilter==2.0){
 					return;
 				}
@@ -1515,6 +1535,7 @@ class WGL2DI {
                 color: this.regl.prop("color"),
                 lFilter: this.regl.prop("localFilter"),
                 gFilter: this.regl.prop("globalFilter"),
+                colorFilter: this.regl.prop("colorFilter"),
             },
 
             uniforms: {
@@ -1874,6 +1895,7 @@ class WGL2DI {
             attribute vec3 color;
             attribute float lFilter;
             attribute float gFilter;
+            attribute float colorFilter;
 			
 			uniform float time;
             uniform float cdistance;
@@ -1893,7 +1915,10 @@ class WGL2DI {
 			varying float grey_out;
 
             void main () {
-				grey_out=0.0; 
+				grey_out=0.0;
+				if (colorFilter == 0.0) {
+					return;
+				}
 			    if (gFilter>0.0 && gFilter != lFilter) {
 					if(hide_on_filter==1.0){
 						return;
@@ -1919,6 +1944,7 @@ class WGL2DI {
                 color: this.regl.prop("color"),
                 lFilter: this.regl.prop("localFilter"),
                 gFilter: this.regl.prop("globalFilter"),
+                colorFilter: this.regl.prop("colorFilter"),
             },
 
             uniforms: {

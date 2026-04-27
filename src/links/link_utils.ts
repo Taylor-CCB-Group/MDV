@@ -42,6 +42,7 @@ export type HighlightColumnLink = {
     targets: LinkTarget[];
 };
 
+/** this is unused, but we may want to review introducing related functionality */
 export function addHighlightColumnLink(
     link: HighlightColumnLink,
     cm: ChartManager,
@@ -435,6 +436,12 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     //todo check link.name is a good id for the listener
     tds.addListener(link.name, async (type, data) => {
         if (type === "data_highlighted") {
+            // when highlight changes to empty, go back to showing 'filtered'
+            // would be nice to have a better type for data here.
+            if (data.indexes.length === 0) {
+                setFieldsFromFilter();
+                return;
+            }
             const vals = data.indexes.map(getField);
             runInAction(() => {
                 link.observableFields = vals;

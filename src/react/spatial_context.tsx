@@ -5,7 +5,8 @@ import { Matrix4 } from "@math.gl/core";
 import { CompositeMode, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { useChartID, useRangeDimension2D } from "./hooks";
+import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
@@ -13,6 +14,9 @@ import { action, toJS } from "mobx";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type { FieldName } from "@/charts/charts";
+import type { Tool } from "./components/SelectionOverlay";
+import { useGateManager } from "./gates/useGateManager";
+import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -26,8 +30,13 @@ export type RangeState = {
     rangeDimension: RangeDimension;
     selectionFeatureCollection: FeatureCollection;
     editableLayer: MonkeyPatchEditableGeoJsonLayer;
+    editingGateId: string | null;
+    setEditingGateId: (id: string | null) => void;
+    setSelectionFeatureCollection: (newSelection: FeatureCollection) => void
     selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
+    selectedTool: Tool;
+    setSelectedTool: (tool: Tool) => void;
     modelMatrix: Matrix4;
 };
 export type MeasureState = {
@@ -85,6 +94,7 @@ function useScatterModelMatrix() {
 function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
+    const gateManager = useGateManager();
     // making selectionFeatureCollection part of config, so it can be persisted
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
@@ -95,37 +105,102 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         chart.config.selectionFeatureCollection = newSelection;
     }), []);
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
+    const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
+    const [editingGateId, setEditingGateId] = useState<string | null>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
 
+    const getFillColor = useCallback((): [number, number, number, number] => {
+        if (!editingGateId) return SELECTION_FILL_COLOR; // Neutral grey fill
+
+        const gate = gateManager.gates.get(editingGateId);
+        const [r, g, b] = gate?.color ?? DEFAULT_GATE_COLOR;
+        
+        return [r, g, b, 45]; // lower opacity of original color
+    }, [editingGateId, gateManager]);
+    
+    const getLineColor = useCallback((): [number, number, number, number] => {
+        
+        if (!editingGateId) return SELECTION_LINE_COLOR; // Dark grey selection line
+        const gate = gateManager.gates.get(editingGateId);
+        const [r, g, b] = gate?.color ?? DEFAULT_GATE_COLOR;
+
+        // brighten the color to make it look highlighted
+        return [
+            Math.min(255, r + 60),
+            Math.min(255, g + 60),
+            Math.min(255, b + 60),
+            255,
+        ];
+    }, [editingGateId, gateManager]);
+
     useEffect(() => {
-        console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
             setSelectionFeatureCollection(getEmptyFeatureCollection());
+            setEditingGateId(null);
         }
     }, [chart, setSelectionFeatureCollection]);
+
     useEffect(() => {
         if (coords.length === 0) {
             chart.resetButton.style.display = "none";
             removeFilter();
             return;
         }
-        // todo - consider whether the shape is a simple AABB & apply faster filter if so.
-        //rangeDimension.filterPoly(coords, [cols[0], cols[1]]); //this doesn't notify 🙄
         chart.resetButton.style.display = "inline";
-        filterPoly(coords);
-    }, [coords, filterPoly, removeFilter, chart]);
+
+        const ds = chart.dataStore;
+        const regionField = ds.regions?.region_field;
+        // Get the region value of the gate if it exists
+        const regionValue = editingGateId
+            ? gateManager.gates.get(editingGateId)?.region
+            : undefined;
+
+        // Guard async callbacks with cancellation flag so only the latest
+        // effect run calls the filterPoly thereby avoiding stale polygon filter if
+        // the older effect is resolved later
+        let cancelled = false;
+
+        if (regionField && regionValue) {
+            const regionOptions: FilterPolyRegionOpts = { regionField, regionValue };
+            if (ds.columnIndex[regionField]?.data) {
+                filterPoly(coords, regionOptions);
+            } else {
+                // Load the region if it's not loaded
+                loadColumn(ds.name, regionField)
+                    .then(() => {
+                        if (!cancelled) filterPoly(coords, regionOptions);
+                    })
+                    .catch((error) => {
+                        console.error(`Could not load region column '${regionField}':`, error);
+                        if (!cancelled) filterPoly(coords); // fallback: polygon-only
+                    });
+            }
+        } else {
+            // No active region (or no region metadata): plain polygon filter.
+            filterPoly(coords);
+        }
+
+        return () => {
+            cancelled = true;
+        }
+    }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
+    
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
+
+    // todo: we need to do something about editing gate color
+    //! When the dev tools are open, there is lagging while dragging this layer
     const editableLayer = useMemo(() => {
         return new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection as any,
             mode: selectionMode,
-            getFillColor: [140, 140, 140, 50],
-            getLineColor: [255, 255, 255, 200],
-            getLineWidth: 1,
+            getFillColor,
+            getLineColor,
+            getLineWidth: 2,
+            lineWidthMinPixels: 2.5,
             getEditHandlePointRadius: 2,
             editHandlePointStrokeWidth: 1,
             editHandleIconSizeScale: 1,
@@ -134,7 +209,6 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 const intermediate = h.properties.editHandleType === "intermediate";
                 return [0, 0, intermediate ? 200 : 0, 255]
             },
-            lineWidthMinPixels: 1,
             selectedFeatureIndexes,
             // adding `action` here gets rid of warnings but doesn't help with performance.
             onEdit: action(({ updatedData }) => {
@@ -160,15 +234,21 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             }
         })
     }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
-        setSelectionFeatureCollection
+        setSelectionFeatureCollection, getFillColor, getLineColor,
     ]);
+
     return {
         editableLayer,
         rangeDimension,
         selectionFeatureCollection,
         selectionMode,
         setSelectionMode,
-        modelMatrix
+        setSelectionFeatureCollection,
+        modelMatrix,
+        editingGateId,
+        setEditingGateId,
+        selectedTool,
+        setSelectedTool,
     };
 }
 function useCreateMeasure() {
@@ -183,7 +263,11 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?:
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    const scatterProps = useScatterplotLayer(rectRange.modelMatrix, hoveredFieldId);
+    const scatterProps = useScatterplotLayer(
+        rectRange.modelMatrix,
+        hoveredFieldId,
+        rectRange.rangeDimension,
+    );
     return { rectRange, measure, scatterProps };
 }
 
@@ -236,6 +320,6 @@ export function useSpatialLayers() {
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
     return {
         getTooltip, scatterProps, selectionLayer: rectRange.editableLayer,
-        selectionProps: rectRange
+        selectionProps: rectRange,
     };
 }

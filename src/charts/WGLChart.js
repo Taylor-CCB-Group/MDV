@@ -43,7 +43,7 @@ class WGLChart extends SVGChart {
     }
 
     onDataHighlighted(data) {
-        this.app.setHighlightPoints(data.indexes);
+        this.app.setHighlightPoints(data.indexes?.length ? data.indexes : null);
         this.app.refresh();
     }
 
@@ -70,6 +70,8 @@ class WGLChart extends SVGChart {
                 asArray: true,
                 overideValues: {
                     colorLogScale: this.config.log_color_scale,
+                    fallbackOnZero: this.config.fallbackOnZero,
+                    hideMissing: this.config.hideMissing,
                 },
             };
             this._addTrimmedColor(c.color_by, conf);
