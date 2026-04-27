@@ -455,31 +455,40 @@ export function useScatterplotLayer(
     // but this isn't really all that bad, so maybe we can stick with it.
     const tooltipCols = useFieldSpecs(config.tooltip.column);
     const getTooltipVal = useCallback(
-        (i: number) => {
+        (rowIndex: number) => {
             // if (!tooltipCol?.data) return '#'+i;
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
                     // Sanitise the strings before passing
-                    const value = col.data ? col.getValue(data[i]) : "loading...";
+                    const value = col.data ? col.getValue(rowIndex) : "loading...";
                     const strValue = value === undefined || value === null ? "" : String(value);
                     return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
             });
         },
-        [tooltipCols, data],
+        [tooltipCols],
+    );
+    const getTooltipRowIndex = useCallback(
+        (info?: PickingInfo | null) => {
+            const pickingInfo = info ?? hoverInfoRef.current;
+            if (!pickingInfo || pickingInfo.index === -1) return undefined;
+            if (typeof pickingInfo.object === "number") return pickingInfo.object;
+            return data[pickingInfo.index];
+        },
+        [data],
     );
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        () => {
+        (info?: PickingInfo | null) => {
             if (!config.tooltip.show) return null;
             if (!config.tooltip.column) return null;
             // testing reading object properties --- pending further development (for GeoJSON layer in particular)
             // also consider some other things like transcripts / stats heatmap etc...
             // (not hardcoding DN property etc)
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
-            const hoverInfo = hoverInfoRef.current;
-            if (!hoverInfo || hoverInfo.index === -1) return null;
-            const tooltipVal = getTooltipVal(hoverInfo.index);
+            const rowIndex = getTooltipRowIndex(info);
+            if (rowIndex === undefined) return null;
+            const tooltipVal = getTooltipVal(rowIndex);
             if (!tooltipVal) return null;
             const tooltip: TooltipContent = {
                 //todo - this should be in a popper / should follow useOuterConainer...
@@ -489,7 +498,7 @@ export function useScatterplotLayer(
             };
             return tooltip;
         },
-        [getTooltipVal, config.tooltip.show, config.tooltip.column],
+        [getTooltipRowIndex, getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
 
     // const { modelMatrix, setModelMatrix } = useScatterModelMatrix();

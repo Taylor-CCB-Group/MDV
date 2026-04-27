@@ -21,6 +21,11 @@ import { useOuterContainer } from "../screen_state";
 import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
 import useGateLayers from "../hooks/useGateLayers";
 import { escapeHtml } from "@/utilities/Utilities";
+import {
+    findPickedInfo,
+    getPickingInfoLayerId,
+    pickingInfoMatchesLayer,
+} from "@/lib/deckPicking";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -185,26 +190,41 @@ const Main = observer(
         const deckProps: Partial<DeckGLProps> = useMemo(
             () => ({
                 getTooltip: (info: any) => {
-                    const layerId = info?.layer?.id;
-                    const obj = info?.object;
-                    if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
-                        return { 
-                            html: `<strong>${escapeHtml(obj.properties.gateName)}</strong><br/><small>Click on the label to edit</small>` 
+                    const gateInfo = findPickedInfo(
+                        info,
+                        (pickedInfo) => gateDisplayLayer?.id === getPickingInfoLayerId(pickedInfo),
+                    );
+                    const gateObject = gateInfo?.object;
+                    if (gateObject?.properties?.gateName) {
+                        return {
+                            html: `<strong>${escapeHtml(gateObject.properties.gateName)}</strong><br/><small>Click on the label to edit</small>`
                         };
                     }
-                    if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
-                        return { 
-                            html: `<strong>${escapeHtml(obj.text)}</strong><br/><small>Click on the label to edit</small>` 
+                    const labelInfo = findPickedInfo(
+                        info,
+                        (pickedInfo) => gateLabelLayer?.id === getPickingInfoLayerId(pickedInfo),
+                    );
+                    const labelObject = labelInfo?.object;
+                    if (labelObject?.text != null) {
+                        return {
+                            html: `<strong>${escapeHtml(labelObject.text)}</strong><br/><small>Click on the label to edit</small>`
                         };
                     }
-                    return getTooltip();
+                    const scatterInfo = findPickedInfo(
+                        info,
+                        (pickedInfo) =>
+                            pickingInfoMatchesLayer(pickedInfo, (layerId) =>
+                                layerId.includes("scatter_") || layerId.includes("spatial.scatterplot"),
+                            ),
+                    );
+                    return getTooltip(scatterInfo);
                 },
                 layers: [
-                    jsonLayer, 
-                    gateDisplayLayer, 
-                    selectionLayer, 
+                    jsonLayer,
                     greyScatterplotLayer,
-                    scatterplotLayer, 
+                    scatterplotLayer,
+                    gateDisplayLayer,
+                    selectionLayer,
                     gateLabelLayer,
                 ].filter(l => l !== null),
                 id: `${id}deck`,
