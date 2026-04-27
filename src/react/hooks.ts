@@ -1,5 +1,5 @@
 import type React from "react";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
@@ -32,6 +32,8 @@ type ChartScopeConfig = {
     background_filter?: ChartScopeCategoryFilter;
     category_filters?: ChartScopeCategoryFilter[];
 };
+
+let nextFilteredIndicesListenerId = 0;
 
 function isAllCategoryFilter(category?: string | string[] | null) {
     if (category == null) return true;
@@ -351,11 +353,15 @@ export function useRegion() {
  */
 function useFilteredIndicesRefreshVersion() {
     const dataStore = useDataStore();
-    const listenerId = useId();
+    const listenerKeyRef = useRef<string | null>(null);
+    let listenerKey = listenerKeyRef.current;
+    if (listenerKey === null) {
+        listenerKey = `filtered-indices-${nextFilteredIndicesListenerId++}`;
+        listenerKeyRef.current = listenerKey;
+    }
     const [refreshVersion, setRefreshVersion] = useState(0);
 
     useEffect(() => {
-        const key = `filtered-indices-${listenerId}`;
         const listener = (type: string) => {
             if (!shouldRefreshFilteredIndices(type)) {
                 return;
@@ -363,9 +369,9 @@ function useFilteredIndicesRefreshVersion() {
             setRefreshVersion((version) => version + 1);
         };
 
-        dataStore.addListener(key, listener);
-        return () => dataStore.removeListener(key);
-    }, [dataStore, listenerId]);
+        dataStore.addListener(listenerKey, listener);
+        return () => dataStore.removeListener(listenerKey);
+    }, [dataStore, listenerKey]);
 
     return refreshVersion;
 }
