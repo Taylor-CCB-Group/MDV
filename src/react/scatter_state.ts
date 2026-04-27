@@ -470,7 +470,7 @@ export function useScatterplotLayer(
     );
     const getTooltipRowIndex = useCallback(
         (info?: PickingInfo | null) => {
-            const pickingInfo = info ?? hoverInfoRef.current;
+            const pickingInfo = info === undefined ? hoverInfoRef.current : info;
             if (!pickingInfo || pickingInfo.index === -1) return undefined;
             if (typeof pickingInfo.object === "number") return pickingInfo.object;
             return data[pickingInfo.index];

@@ -16,15 +16,10 @@ import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import useGateLayers from "../hooks/useGateLayers";
-import { escapeHtml } from "@/utilities/Utilities";
 import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
-import {
-    findPickedInfo,
-    getPickingInfoLayerId,
-    getPickingInfoWithAlternates,
-    pickingInfoMatchesLayer,
-} from "@/lib/deckPicking";
+import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
+import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -303,34 +298,14 @@ const DeckScatter = observer(function DeckScatterComponent({
                         }}
                         getTooltip={(info) => {
                             const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
-                            const gateInfo = findPickedInfo(
+                            return getCombinedScatterTooltip(
                                 richInfo,
-                                (pickedInfo) => gateDisplayLayer?.id === getPickingInfoLayerId(pickedInfo),
+                                {
+                                    gateDisplayLayerId: gateDisplayLayer?.id,
+                                    gateLabelLayerId: gateLabelLayer?.id,
+                                    getPointTooltip: getTooltip,
+                                },
                             );
-                            const gateObject = gateInfo?.object;
-                            if (gateObject?.properties?.gateName) {
-                                return {
-                                    html: `<strong>${escapeHtml(gateObject.properties.gateName)}</strong><br/><small>Click on the label to edit</small>`
-                                };
-                            }
-                            const labelInfo = findPickedInfo(
-                                richInfo,
-                                (pickedInfo) => gateLabelLayer?.id === getPickingInfoLayerId(pickedInfo),
-                            );
-                            const labelObject = labelInfo?.object;
-                            if (labelObject?.text != null) {
-                                return {
-                                    html: `<strong>${escapeHtml(labelObject.text)}</strong><br/><small>Click on the label to edit</small>`
-                                };
-                            }
-                            const scatterInfo = findPickedInfo(
-                                richInfo,
-                                (pickedInfo) =>
-                                    pickingInfoMatchesLayer(pickedInfo, (layerId) =>
-                                        layerId.includes("scatter_") || layerId.includes("spatial.scatterplot"),
-                                    ),
-                            );
-                            return getTooltip(scatterInfo);
                         }}
                         getCursor={({ isDragging }) => {
                             return isDragging ? "grabbing" : "crosshair";

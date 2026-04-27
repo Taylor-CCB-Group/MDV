@@ -20,12 +20,7 @@ import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useOuterContainer } from "../screen_state";
 import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
 import useGateLayers from "../hooks/useGateLayers";
-import { escapeHtml } from "@/utilities/Utilities";
-import {
-    findPickedInfo,
-    getPickingInfoLayerId,
-    pickingInfoMatchesLayer,
-} from "@/lib/deckPicking";
+import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -190,34 +185,14 @@ const Main = observer(
         const deckProps: Partial<DeckGLProps> = useMemo(
             () => ({
                 getTooltip: (info: any) => {
-                    const gateInfo = findPickedInfo(
+                    return getCombinedScatterTooltip(
                         info,
-                        (pickedInfo) => gateDisplayLayer?.id === getPickingInfoLayerId(pickedInfo),
+                        {
+                            gateDisplayLayerId: gateDisplayLayer?.id,
+                            gateLabelLayerId: gateLabelLayer?.id,
+                            getPointTooltip: getTooltip,
+                        },
                     );
-                    const gateObject = gateInfo?.object;
-                    if (gateObject?.properties?.gateName) {
-                        return {
-                            html: `<strong>${escapeHtml(gateObject.properties.gateName)}</strong><br/><small>Click on the label to edit</small>`
-                        };
-                    }
-                    const labelInfo = findPickedInfo(
-                        info,
-                        (pickedInfo) => gateLabelLayer?.id === getPickingInfoLayerId(pickedInfo),
-                    );
-                    const labelObject = labelInfo?.object;
-                    if (labelObject?.text != null) {
-                        return {
-                            html: `<strong>${escapeHtml(labelObject.text)}</strong><br/><small>Click on the label to edit</small>`
-                        };
-                    }
-                    const scatterInfo = findPickedInfo(
-                        info,
-                        (pickedInfo) =>
-                            pickingInfoMatchesLayer(pickedInfo, (layerId) =>
-                                layerId.includes("scatter_") || layerId.includes("spatial.scatterplot"),
-                            ),
-                    );
-                    return getTooltip(scatterInfo);
                 },
                 layers: [
                     jsonLayer,
