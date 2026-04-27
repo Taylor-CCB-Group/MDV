@@ -5,6 +5,7 @@ import type {
     Disposer,
     LoadedDataColumn,
     FieldName,
+    NumberDataType,
 } from "@/charts/charts";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -50,9 +51,17 @@ export type FieldContourProps = {
     intensity: number;
     opacity: number;
     fillThreshold: number;
-    fields?: LoadedDataColumn<"double">[];
+    fields?: LoadedDataColumn<NumberDataType>[];
     hoveredFieldId?: FieldName | null;
 }
+
+export function isLoadedNumericContourField(field: DataColumn<any>): field is LoadedDataColumn<NumberDataType> {
+    return (
+        (field.datatype === "double" || field.datatype === "integer" || field.datatype === "int32") &&
+        field.data !== undefined
+    );
+}
+
 function rgb(
     r: number,
     g: number,
@@ -342,6 +351,9 @@ export type ContourVisualConfig = {
     contour_intensity: number;
     contour_opacity: number;
 }
+
+export type DensityMode = "overlay" | "grid";
+
 /** In future I think we want something more flexible & expressive,
  * but this should be somewhat compatible with the previous implementation
  */
@@ -351,6 +363,7 @@ export type DualContourLegacyConfig = {
     category1?: string | string[];
     category2?: string | string[];
     densityFields?: FieldSpecs; // don't have a way of specifying datatype here
+    density_mode?: DensityMode;
     field_legend: {
         display: boolean;
         // todo - more legend configuration options
@@ -359,13 +372,14 @@ export type DualContourLegacyConfig = {
 
 type DensityVisualisationFolderOptions = {
     categorySelectionControls: AnyGuiSpec[];
+    displayControls?: AnyGuiSpec[];
     legendControls?: AnyGuiSpec[];
     disposers?: Disposer[];
 };
 
 export function getDensityVisualisationFolder(
     config: ContourVisualConfig,
-    { categorySelectionControls, legendControls = [], disposers = [] }: DensityVisualisationFolderOptions,
+    { categorySelectionControls, displayControls = [], legendControls = [], disposers = [] }: DensityVisualisationFolderOptions,
 ) {
     const currentValue: AnyGuiSpec[] = [
         g({
@@ -373,6 +387,7 @@ export function getDensityVisualisationFolder(
             label: "Category selection",
             current_value: categorySelectionControls,
         }),
+        ...displayControls,
         ...getContourVisualSettings(config),
     ];
 
@@ -463,7 +478,10 @@ function useContourCategorySelections(config: DualContourLegacyConfig) {
     return categories;
 }
 
-export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
+export function getDensitySettings(
+    c: DualContourLegacyConfig & BaseConfig,
+    { includeDensityModeToggle = false }: { includeDensityModeToggle?: boolean } = {},
+) {
     return getDensityVisualisationFolder(c, {
         categorySelectionControls: [
             //maybe 2-spaces format is better...
@@ -519,6 +537,19 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
                 },
             }),
         ],
+        displayControls: includeDensityModeToggle
+            ? [
+                  g({
+                      type: "check",
+                      label: "Show density fields as grid",
+                      current_value: c.density_mode === "grid",
+                      func: (x) => {
+                          c.density_mode = x ? "grid" : "overlay";
+                          if (x) c.contour_fill = true;
+                      },
+                  }),
+              ]
+            : [],
         legendControls: [
             g({
                 type: "check",
@@ -619,10 +650,14 @@ export function useLegacyDualContour(hoveredFieldId?: FieldName | null): Contour
         fillThreshold: config.contour_fillThreshold ?? 2,
     };
     const fields = useFieldSpecs(config.densityFields);
+    const overlayFields =
+        config.density_mode === "grid"
+            ? []
+            : fields.filter(isLoadedNumericContourField);
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        fields: fields.filter(field => field.datatype === "double") as LoadedDataColumn<"double">[],
+        fields: overlayFields,
         hoveredFieldId,
     });
     const contour1 = useCategoryContour({
@@ -653,8 +688,8 @@ export function useFieldContourLegend(densityFields?: FieldSpecs): FieldLegendIt
     const fields = useFieldSpecs(densityFields);
     
     return useMemo(() => {
-        // Filter to only double fields (matching the filter in useLegacyDualContour)
-        const doubleFields = fields.filter(field => field.datatype === "double");
+        // Filter to numeric fields (matching the filter in useLegacyDualContour)
+        const doubleFields = fields.filter(isLoadedNumericContourField);
         
         return doubleFields.map(field => ({
             name: field.name,

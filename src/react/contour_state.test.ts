@@ -287,6 +287,7 @@ describe('getDensitySettings category selection wiring', () => {
             { contourParameter: undefined, category1: [] },
             { contourParameter: 'test-field', category1: ['tag-a'] },
         ]);
+        expect(config.density_mode).toBe('overlay');
     });
 
     test('builds category selection controls that read from live config state', () => {
@@ -324,6 +325,33 @@ describe('getDensitySettings category selection wiring', () => {
         expect(category2.getCurrentValue?.()).toEqual(['cat2']);
         expect(category1.sourceColumn?.()).toBe('test-field');
         expect(category2.sourceColumn?.()).toBe('test-field');
+    });
+
+    test('builds a density grid mode toggle', () => {
+        const mockConfig: DualContourLegacyConfig & BaseConfig = {
+            ...scatterDefaults,
+            id: 'test-chart',
+            size: [800, 600],
+            title: 'Test Chart',
+            legend: '',
+            type: 'scatter',
+            param: ['x', 'y'],
+            density_mode: 'overlay',
+        };
+
+        const spec = getDensitySettings(mockConfig, { includeDensityModeToggle: true });
+        const densityModeToggle = spec.current_value[1];
+        if (densityModeToggle.type !== 'check') {
+            throw new Error('expected density mode check setting');
+        }
+
+        expect(densityModeToggle.label).toBe('Show density fields as grid');
+        expect(densityModeToggle.current_value).toBe(false);
+        densityModeToggle.func?.(true);
+        expect(mockConfig.density_mode).toBe('grid');
+        expect(mockConfig.contour_fill).toBe(true);
+        densityModeToggle.func?.(false);
+        expect(mockConfig.density_mode).toBe('overlay');
     });
 
     test('category selection getters follow source column and category changes', () => {
