@@ -1,5 +1,8 @@
 # Playwright Tests
 
+These tests should be launched from the repository root so Playwright uses
+`playwright.config.ts`.
+
 ## Quick Start
 
 ```bash
@@ -18,6 +21,18 @@ npm run playwright-test
 
 That's it! Tests run from your host machine and connect to the devcontainer app via `localhost:5055`.
 
+For local Vite development without the devcontainer, start the app and point
+Playwright at that server:
+
+```bash
+npm run dev -- --host 127.0.0.1 --port 5173
+TEST_BASE_URL=http://127.0.0.1:5173 npm run playwright-test -- tests_playwright/catalog/catalog_view.spec.ts --project=chromium --reporter=list
+```
+
+The npm scripts call the local Playwright dependency directly. This avoids
+`npx playwright` reaching out to the npm registry in restricted agent
+environments.
+
 ## Common Workflows
 
 ### Run Tests with UI
@@ -27,15 +42,13 @@ npm run playwright-test-ui
 
 ### Run Specific Tests
 ```bash
-cd tests_playwright
-npx playwright test catalog/
-npx playwright test project/
+npm run playwright-test -- tests_playwright/catalog/
+npm run playwright-test -- tests_playwright/project/
 ```
 
 ### Run Tests in Debug Mode
 ```bash
-cd tests_playwright
-npx playwright test --debug
+npm run playwright-test -- --debug
 ```
 
 ## Prerequisites
@@ -78,7 +91,7 @@ For programmatic use, import from `mdvtools.tests.test_project_factory`.
 
 ## Configuration
 
-The `playwright.config.ts` file is located in this directory. Key settings:
+The `playwright.config.ts` file is located at the repository root. Key settings:
 
 - **baseURL**: Defaults to `http://localhost:5055` (devcontainer exposed port)
 - **Override**: Set `TEST_BASE_URL` environment variable to use a different URL
@@ -109,11 +122,10 @@ npx playwright install --with-deps
 ### Tests are failing unexpectedly
 ```bash
 # Run with more verbose output
-cd tests_playwright
-npx playwright test --reporter=list
+npm run playwright-test -- --reporter=list
 
 # Run in headed mode to see what's happening
-npx playwright test --headed
+npm run playwright-test -- --headed
 ```
 
 ### Need to reset database
