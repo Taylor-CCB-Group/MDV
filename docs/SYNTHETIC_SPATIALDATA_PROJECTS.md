@@ -112,7 +112,7 @@ paths that match the `~/mdv/synth-spatial--...` naming convention.
 
 ## Candidate Generator Interface
 
-Prefer a module command rather than ad hoc notebooks:
+Use the module command rather than ad hoc notebooks:
 
 ```bash
 cd python
@@ -121,25 +121,40 @@ cd python
   --n-cells 100000 \
   --seed 42 \
   --output ~/mdv/synth-spatial--scatter-table--100k \
-  --register-hint
+  --force
 ```
 
-Possible options:
+Current options:
 
-- `--profile`: one of a small number of named chart/view presets;
+- `--profile`: currently `scatter-table` or `spatial-overview`;
 - `--n-cells`: primary scale parameter;
-- `--n-regions`: optional, default 1;
-- `--n-genes`: optional if the profile includes gene-like columns;
-- `--seed`: required for reproducibility, default fixed for tests;
-- `--force`: replace an existing generated project at the exact output path;
-- `--cleanup`: remove generated filesystem output and optionally soft-delete a
-  registered project when a matching project id is known.
+- `--n-genes`: generated expression-like variable count;
+- `--image-size`: generated image extent in pixels;
+- `--seed`: fixed by default for reproducibility;
+- `--output`: output MDV project path, defaulting to a flat
+  `~/mdv/synth-spatial--<profile>--<n-cells>` path;
+- `--force`: replace an existing generated project at the exact output path.
+
+The first implementation creates a representative SpatialData object with an RGB
+image, circle shapes, an AnnData table linked to the shapes, and
+`obsm["spatial"]` row coordinates. The explicit `obsm["spatial"]` matrix is
+important: MDV's current converter treats tables without it as non-spatial even
+if SpatialData table metadata links them to an annotated element.
+
+Planned but not implemented yet:
+
+- `--n-regions`;
+- `--cleanup`;
+- automatic DB registration;
+- profile-specific performance comparison views.
 
 ## Initial Profiles
 
 ### `scatter-table`
 
 Purpose: compare core scatter and table implementations at different row counts.
+The generator currently creates the backing data; the comparison views below are
+the next layer to add.
 
 Views:
 
