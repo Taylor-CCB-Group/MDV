@@ -127,7 +127,11 @@ def convert_scanpy_to_mdv(
     add_layer_data = True,
     gene_identifier_column = None,
     link_name_column: str | None = None,
+    add_reverse_link: bool = False,
+    reverse_link_name_column: str = "name",
     rows_as_columns_name_column: str | None = None,
+    x_data_name  :str = "Gene Expr",
+    x_data_transformation = "Gene Score",
     gene_columns: List[dict[str, Any]] | None = None,
     compute_x_umap: bool = False,
     leiden_resolution: float = 1.0,
@@ -163,6 +167,13 @@ def convert_scanpy_to_mdv(
         link_name_column (str, optional): Column in the variable datasource whose
             values should be used as the dynamic column names for the ``rows_as_columns`` link.
             Defaults to ``gene_identifier_column``.
+        add_reverse_link (bool, optional) : If True then then  var will be linked to obs 
+            e.g. you can select expression for every gene for a particular cell. Defaults to False
+        reverse_link_name_column (str,optional) : The obs (cell) column name whose values should
+           be used as the dynamic column nsames for the reverse link. Default is name
+        x_data_name (str,optional): The name of the type of data in the X matrix e.g. log counts,
+            log1p etc. Defaults to the generic "Gene Expr"
+        x_data_transformation (str,optional) : The type of transformation applied to X e.g. rae 
         rows_as_columns_name_column (str, optional): Deprecated alias for ``link_name_column``.
         gene_columns: (list[dict], optional) Column metadata overrides for the genes datasource.
         compute_x_umap (bool, optional): If True, compute neighbors, UMAP and Leiden clusters
@@ -284,7 +295,15 @@ def convert_scanpy_to_mdv(
     mdv.add_datasource(var_ds_name, gene_table, columns=gene_columns)
 
     # link the two datasets
-    mdv.add_rows_as_columns_link(obs_ds_name, var_ds_name, link_name_column, "Gene Expr")
+    mdv.add_rows_as_columns_link(obs_ds_name, var_ds_name, link_name_column, x_data_name)
+
+    
+    if add_reverse_link:
+        if reverse_link_name_column not in cell_table.columns:
+            raise ValueError(
+                f" reverse_link_column_name '{reverse_link_name_column}' not found in obs data"
+            )
+        mdv.add_rows_as_columns_link(var_ds_name, obs_ds_name, reverse_link_name_column, x_data_name)
 
     #get the matrix in the correct format
     print("Getting Matrix")
@@ -296,10 +315,21 @@ def convert_scanpy_to_mdv(
         # add the gene expression
         print("Adding gene expression")
         mdv.add_rows_as_columns_subgroup(
-            obs_ds_name, var_ds_name, "gs", matrix, name="gene_scores", label="Gene Scores",
+            obs_ds_name, var_ds_name, "gs", matrix, name="gene_scores", label=x_data_transformation,
             # sparse=sparse, #this should be inferred from the matrix
             chunk_data=chunk_data
         )
+        if add_reverse_link:
+            reverse_matrix = matrix.T
+            if scipy.sparse.issparse(reverse_matrix) and not isinstance(reverse_matrix, scipy.sparse.csc_matrix):
+                reverse_matrix = scipy.sparse.csc_matrix(reverse_matrix)
+            mdv.add_rows_as_columns_subgroup(
+                var_ds_name,
+                obs_ds_name,
+                x_data_transformation,
+                reverse_matrix,
+                chunk_data=chunk_data,
+            )
 
     #now add layers
     if add_layer_data:
@@ -390,6 +420,7 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
         #It is derived from the index and is usually the gene 'name'
         #However it may not be appropriate and can be changed later on 
         p.add_rows_as_columns_link("cells",mod,"name",mod)
+
         matrix,sparse= get_matrix(mdata.X,md.obs_names,mdata.obs_names)
         #sometimes X is empty - all the data is in the layers
         if matrix.shape[1] !=0:

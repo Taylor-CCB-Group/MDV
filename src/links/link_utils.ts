@@ -368,14 +368,23 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     // While we're here, check for anything that may be inconsistent with our assumptions.
     // Maybe we can have a lot of rows with the same name_column value, returning equivalent rows_as_columns data?
     const valueToRowIndex = new Map<string, number>();
-    //! this is O(n) when we shouldn't need it...
-    nameCol.data.forEach((valueIndex, rowIndex) => {
-        const value = nameCol.values[valueIndex];
-        if (valueToRowIndex.has(value)) {
-            console.warn(`Multiple rows with the same value '${value}' in column '${link.name_column}'`);
+
+    if (nameCol.datatype === "unique") {
+        // For unique columns, data is byte-packed and should be resolved via DataStore.getColumnIndex.
+        const indexObj = tds.getColumnIndex(link.name_column) as Record<string, number>;
+        for (const [value, rowIndex] of Object.entries(indexObj)) {
+            valueToRowIndex.set(value, rowIndex);
         }
-        valueToRowIndex.set(value, rowIndex);
-    });
+    } else {
+        //! this is O(n) when we shouldn't need it...
+        nameCol.data.forEach((valueIndex, rowIndex) => {
+            const value = nameCol.values[valueIndex];
+            if (valueToRowIndex.has(value)) {
+                console.warn(`Multiple rows with the same value '${value}' in column '${link.name_column}'`);
+            }
+            valueToRowIndex.set(value, rowIndex);
+        });
+    }
     link.valueToRowIndex = valueToRowIndex;
     
     

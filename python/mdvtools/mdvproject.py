@@ -41,7 +41,8 @@ datatype_mappings = {
     "int16": "integer",
     "uint8": "integer",
     "uint16": "integer",
-    "uint32": "integer",
+    "uint32": "int32",
+    "Int64":"int32", #loss of precision
     "int64": "integer",
     "float64": "double",
     "float32": "double",

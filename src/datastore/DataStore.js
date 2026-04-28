@@ -1116,7 +1116,7 @@ class DataStore {
      * to the row's index. Only for text and unique columns. Will give unpredictable
      * results if a value is present more than once in the column.
      * The index is cached, so calling multiple times will not affect performance.
-     * @param {string[]} column The column's field/id
+     * @param {string} column The column's field/id
      * @returns {object} An object whose keys are the columns values which point
      * to the row's index
      */
