@@ -141,6 +141,15 @@ image, circle shapes, an AnnData table linked to the shapes, and
 important: MDV's current converter treats tables without it as non-spatial even
 if SpatialData table metadata links them to an annotated element.
 
+For larger `scatter-table` samples, the generator switches to an image-annotated
+table instead of one shape per row. This keeps the project SpatialData-backed
+while avoiding million-feature GeoJSON/shapely overhead that would obscure the
+scatter/table performance question. The 1m-row sample generated in this pass is:
+
+```text
+~/mdv/synth-spatial--scatter-table--1m/
+```
+
 Planned but not implemented yet:
 
 - `--n-regions`;
@@ -213,6 +222,51 @@ TEST_BASE_URL=http://127.0.0.1:5174 npm run playwright-test -- tests_playwright/
 
 For focused performance work, add dedicated specs rather than overloading the
 functional project tests.
+
+## UI-Authored Comparison Views
+
+The Python chart helper API is useful for older charts, but it should not be the
+source of truth for newer React-backed chart configs. For comparison views, use
+the normal UI path first and inspect the saved `views.json`.
+
+Current probe result from `~/mdv/synth-spatial--ui-chart-probe--25`:
+
+- UI label `Row Chart` saved as `row_chart`;
+- UI label `2D Scatter Plot` saved as `wgl_scatter_plot_dev`;
+- UI label `2D Scatter Plot (Classic)` saved as `wgl_scatter_plot`;
+- UI label `Table` saved as `table_chart_react`;
+- UI label `Table (Classic)` saved as `table_chart`.
+
+The new scatter is implemented by `DeckScatterReactWrapper.tsx`, but the
+persistent chart type is currently `wgl_scatter_plot_dev`, not `DeckScatter`.
+That makes UI-authored config a safer starting point than hand-written Python
+chart config for these comparison views.
+
+Recommended agent/human loop:
+
+1. Generate or copy a flat project under `~/mdv`, for example
+   `~/mdv/synth-spatial--ui-chart-probe--25`.
+2. Serve it editably:
+
+   ```bash
+   ./venv/bin/python -c 'from mdvtools.mdvproject import MDVProject; p=MDVProject("/Users/ptodd/mdv/synth-spatial--ui-chart-probe--25"); p.set_editable(True); p.serve(open_browser=False, port=5062, websocket=False)'
+   ```
+
+3. Use Playwright against `http://127.0.0.1:5062/` to add charts through the Add
+   Chart dialog.
+4. Save the current view through the app, then inspect
+   `~/mdv/synth-spatial--ui-chart-probe--25/views.json`.
+5. If the saved config is stable and useful, promote that view shape into a
+   reusable fixture or generator step.
+
+One caveat from the first probe: the Add Chart defaults chose
+`quality_score x quality_score` for both scatter implementations and only
+`cell_type` for the table implementations. That is good enough to establish the
+saved config shape, but performance comparison views should explicitly set
+`x/y` for scatter plots and include a broader table column list.
+
+The current generated comparison view uses `x/y` for both scatter charts and all
+non-internal cell columns for both table charts.
 
 ## Interview Questions
 
