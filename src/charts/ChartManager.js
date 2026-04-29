@@ -66,8 +66,6 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
-import { analyzeChartColumnImpact } from "./columnRemovalUtils";
-
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -971,88 +969,6 @@ export class ChartManager {
         this.viewManager.checkAndChangeView(view);
     }
 
-    /**
-     * @param {string} dataSourceName
-     * @param {string} columnName
-     * @param {string | null} [sourceChartId=null]
-     */
-    async analyzeColumnRemoval(dataSourceName, columnName, sourceChartId = null) {
-        const dataSource = this.dsIndex[dataSourceName];
-        if (!dataSource) {
-            throw new Error(`Unknown data source '${dataSourceName}'`);
-        }
-
-        const currentViewCharts = [];
-        for (const chartId in this.charts) {
-            const chartInfo = this.charts[chartId];
-            if (chartInfo.dataSource !== dataSource) {
-                continue;
-            }
-            if (chartInfo.chart.config.id === sourceChartId) {
-                continue;
-            }
-            const impact = analyzeChartColumnImpact(
-                chartInfo.chart.config,
-                BaseChart.types[chartInfo.chart.config.type],
-                columnName,
-            );
-            if (impact) {
-                currentViewCharts.push(impact);
-            }
-        }
-
-        const savedViews = [];
-        if (this.viewLoader) {
-            const currentView = this.viewManager.current_view;
-            const allViews = this.viewManager.all_views ?? [];
-            const otherViews = allViews.filter((viewName) => viewName !== currentView);
-            const results = await Promise.allSettled(
-                otherViews
-                    .map(async (viewName) => {
-                        const viewData = await this.viewLoader(viewName);
-                        const chartConfigs = viewData?.initialCharts?.[dataSourceName] ?? [];
-                        const charts = chartConfigs
-                            .map((config) =>
-                                analyzeChartColumnImpact(
-                                    config,
-                                    BaseChart.types[config.type],
-                                    columnName,
-                                ),
-                            )
-                            .filter(Boolean);
-                        if (charts.length === 0) {
-                            return null;
-                        }
-                        return { viewName, charts };
-                    }),
-            );
-
-            const failedViews = [];
-            for (const [index, result] of results.entries()) {
-                if (result.status === "fulfilled" && result.value) {
-                    savedViews.push(result.value);
-                    continue;
-                }
-                if (result.status === "rejected") {
-                    failedViews.push(otherViews[index]);
-                }
-            }
-
-            if (failedViews.length > 0) {
-                throw new Error(
-                    `Failed to check column usage in saved views: ${failedViews.join(", ")}`,
-                );
-            }
-        }
-
-        return {
-            dataSourceName,
-            columnName,
-            currentViewCharts,
-            savedViews,
-        };
-    }
-
     _columnRemoved(ds, col) {
         const ids_to_delete = [];
         for (const id in this.charts) {
@@ -1337,7 +1253,10 @@ export class ChartManager {
             if (dstore.dirtyMetadata.size !== 0) {
                 metadata[ds.name] = {};
                 for (const param of dstore.dirtyMetadata) {
-                    metadata[ds.name][param] = dstore[param];
+                    metadata[ds.name][param] =
+                        param === "columns"
+                            ? dstore.getAllColumnsMetadata()
+                            : dstore[param];
                 }
             }
         }
@@ -2145,8 +2064,22 @@ export class ChartManager {
                     // or if we return false to filter it out, chart deserialise can handle it?
                     return false;
                 } else {
-                    dStore.addColumnFromField(x);
-                    return true;
+                    const metadata = dStore
+                        .getAllColumnsMetadata?.()
+                        .find((column) => column.field === x);
+                    // Soft-deleted table columns can temporarily disappear from columnIndex while
+                    // stale chart reactions still ask for them. Restore real datasource columns
+                    // from metadata first, and only use addColumnFromField() for true virtual
+                    // fields like subgroup|name|index. Plain stale names should be skipped.
+                    if (metadata && !metadata.deleted) {
+                        dStore.addColumn(metadata, metadata.data, false, false);
+                        return true;
+                    }
+                    if (x.includes("|")) {
+                        dStore.addColumnFromField(x);
+                        return true;
+                    }
+                    return false;
                 }
             }
             //only load if has no data

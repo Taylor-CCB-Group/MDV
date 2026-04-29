@@ -160,8 +160,14 @@ class DataStore {
         this.tree_diagram = config.tree_diagram;
 
         if (config.columns) {
+            config.columns = config.columns.map((column) =>
+                this._toColumnMetadata(column),
+            );
             for (const c of config.columns) {
-                this.addColumn(c, c.data);
+                if (this._isSoftDeletedColumn(c)) {
+                    continue;
+                }
+                this.addColumn(c, c.data, false, false);
             }
         }
 
@@ -451,10 +457,116 @@ class DataStore {
         }
     }
 
+    /**
+     * Build a metadata-only column object for persistence.
+     * Removes runtime-only fields like data/buffer/getValue.
+     * @param {Column} column
+     * @returns {Column}
+     */
+    _toColumnMetadata(column) {
+        const metadata = { ...column };
+        delete metadata.data;
+        delete metadata.buffer;
+        delete metadata.getValue;
+        const isDeleted = this._isSoftDeletedColumn(metadata);
+        if (isDeleted) {
+            metadata.deleted = true;
+        } else {
+            delete metadata.deleted;
+        }
+        return metadata;
+    }
+
+    _isSoftDeletedColumn(column) {
+        return Boolean(column?.deleted);
+    }
+
+    /**
+     * Replace the persisted columns metadata list.
+     * @param {Column[]} columns
+     * @returns {void}
+     */
+    _setColumnsMetadata(columns) {
+        this.config.columns = columns.map((column) => this._toColumnMetadata(column));
+    }
+
+    /**
+     * Find a column metadata entry by field id.
+     * @param {string} field
+     * @returns {number}
+     */
+    _findColumnMetadataIndex(field) {
+        return (this.config.columns ?? []).findIndex((item) => item.field === field);
+    }
+
+    /**
+     * Insert or update one column in persisted metadata.
+     * If the column already exists, it is restored as not deleted.
+     * @param {Column} column
+     * @returns {void}
+     */
+    _updateColumnMetadata(column) {
+        const metadata = this._toColumnMetadata(column);
+        const nextColumns = [...(this.config.columns ?? [])];
+        const index = this._findColumnMetadataIndex(metadata.field);
+        if (index === -1) {
+            nextColumns.push(metadata);
+        } else {
+            // A user can delete a column and later add a new column with the same name/field.
+            // In that case we should revive the deleted slot but treat it like a fresh column,
+            // so stale metadata from the old deleted column does not leak back into the new one.
+            nextColumns[index] = {
+                ...metadata,
+                deleted: false,
+            };
+        }
+        this._setColumnsMetadata(nextColumns);
+    }
+
+    /**
+     * Remove one column from persisted metadata by field id.
+     * @param {string} field
+     * @returns {void}
+     */
+    _removeColumnMetadata(field) {
+        this._setColumnsMetadata(
+            (this.config.columns ?? []).filter((column) => column.field !== field),
+        );
+    }
+
+    /**
+     * Remove a column from runtime-visible collections only.
+     * @param {string} column
+     * @param {boolean} [notify=false]
+     * @returns {boolean}
+     */
+    _removeVisibleColumn(column, notify = false) {
+        const c = this.columnIndex[column];
+        if (!c) {
+            if (notify) {
+                this._callListeners("column_removed", column);
+            }
+            return false;
+        }
+        c.data = null;
+        c.buffer = null;
+        this.columns = this.columns.filter((item) => item.field !== column);
+        delete this.columnIndex[column];
+        const i = this.columnsWithData.indexOf(column);
+        if (i !== -1) {
+            this.columnsWithData.splice(i, 1);
+        }
+        if (notify) {
+            this._callListeners("column_removed", column);
+        }
+        return true;
+    }
+
     /*
      * todo infer generic type for column, not sure how to do this in jsdoc
      * @typedef {import("@/charts/charts.js").DataColumn<any>} Column
      *  */
+
     /**
      * Adds a column's metadata and optionally it's data to the DataStore
      * [Data Source](../../docs/extradocs/datasource.md)
@@ -463,7 +575,7 @@ class DataStore {
      * @param {boolean} [dirty=false] true for columns that are not synched with the backend,
      * ~~for example 'virtual' columns added from a `rows_as_columns` link~~
      */
-    addColumn(column, data = null, dirty = false) {
+    addColumn(column, data = null, dirty = false, trackMetadata = true) {
         /** @type {Column} */
         const c = {
             ...column, //may be useful to get any other properties we didn't explicitly copy before.
@@ -527,6 +639,9 @@ class DataStore {
             c.minMax = this._normalizeMinMax(c, column.minMax);
         }
 
+        if (trackMetadata) {
+            this._updateColumnMetadata(c);
+        }
         this.columns.push(c);
         this.columnIndex[c.field] = c;
         if (data) {
@@ -1854,6 +1969,37 @@ class DataStore {
         return this.columns.map((x) => x.field);
     }
 
+    getAllColumnsMetadata() {
+        return (this.config.columns ?? []).map((column) => ({ ...column }));
+    }
+
+    hasColumnMetadata(field) {
+        return (this.config.columns ?? []).some((column) => column.field === field);
+    }
+
+    /**
+     * Removes the column and all its data.
+     * This remains as the explicit hard-delete datastore path and is not used by the
+     * current React table delete flow, which goes through softDeleteColumn().
+     * @param {string} column - the columns id/field
+     * @param {boolean} [dirty=false] if true, tags that the column should also be removed from the
+     * backend
+     * @param {boolean} [notify=false] if true notifies any listeners that the column has been removed
+     */
+    removeColumn(column, dirty = false, notify = false) {
+        delete this.dirtyColumns.data_changed[column];
+        delete this.dirtyColumns.colors_changed[column];
+        this._removeColumnMetadata(column);
+        if (dirty) {
+            if (this.dirtyColumns.added[column]) {
+                delete this.dirtyColumns.added[column];
+            } else {
+                this.dirtyColumns.removed[column] = true;
+            }
+        }
+        this._removeVisibleColumn(column, notify);
+    }
+
     /**
      * @param {string | undefined} column - the column's field/id
      * @param {"name_value" | undefined} format - if "name_value", returns `{name: string, value: string}[]` for use in settings 'dropdown' widget
@@ -1888,54 +2034,65 @@ class DataStore {
     }
 
     /**
-     * Removes the column and all its data
-     * @param {string} column - the columns id/field
-     * @param {boolean} [dirty=false] if true, tags that the column should also be removed from the
-     * backend
-     * @param {boolean} [notify=false] if true notifies any listeners that the column has been removed
+     * Soft-delete a column by marking metadata as deleted.
+     * Also removes the column from runtime-visible collections.
+     * @param {string} column
+     * @param {boolean} [dirty=false]
+     * @param {boolean} [notify=false]
+     * @returns {void}
      */
-
-    removeColumn(column, dirty = false, notify = false) {
-        const c = this.columnIndex[column];
-        // Delete the column from entries of dirtyColumns
+    softDeleteColumn(column, dirty = false, notify = false) {
         delete this.dirtyColumns.data_changed[column];
         delete this.dirtyColumns.colors_changed[column];
-        // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
-        if (!c) {
-            // If column is marked dirty, then remove it from the dirtyColumns
-            if (dirty) {
-                if (this.dirtyColumns.added[column]) {
-                    delete this.dirtyColumns.added[column];
-                } else {
-                    this.dirtyColumns.removed[column] = true;
-                }
-            }
-            // Notify that column is removed if notify is true
-            if (notify) {
-                this._callListeners("column_removed", column);
-            }
+
+        // New unsaved columns should disappear completely rather than be tombstoned.
+        if (this.dirtyColumns.added[column]) {
+            delete this.dirtyColumns.added[column];
+            this._removeColumnMetadata(column);
+            this._removeVisibleColumn(column, notify);
             return;
         }
-        c.data = null;
-        c.buffer = null;
-        this.columns = this.columns.filter((c) => c.field !== column);
-        delete this.columnIndex[column];
-        const i = this.columnsWithData.indexOf(column);
-        if (i !== -1) {
-            this.columnsWithData.splice(i, 1);
-        }
-        if (dirty) {
-            //added and removed without saving
-            if (this.dirtyColumns.added[column]) {
-                delete this.dirtyColumns.added[column];
-            } else {
-                this.dirtyColumns.removed[column] = true;
+
+        const index = this._findColumnMetadataIndex(column);
+        if (index === -1) {
+            const visibleColumn = this.columnIndex[column];
+            if (!visibleColumn) {
+                // Stale/reactive path: nothing visible and no metadata to update.
+                // Avoid inventing partial metadata here, otherwise a soft delete could save an
+                // invalid datasource entry for a column that no longer really exists.
+                this._removeVisibleColumn(column, notify);
+                return;
             }
+            // Soft delete can race with metadata state (for example after local add/remove cycles).
+            // If runtime still knows the column but metadata does not, recover a full metadata
+            // entry from the live column so the delete persists as a valid tombstone.
+            const fallbackMetadata = this._toColumnMetadata(visibleColumn);
+            this._setColumnsMetadata([
+                ...(this.config.columns ?? []),
+                {
+                    ...fallbackMetadata,
+                    deleted: true,
+                },
+            ]);
+            if (dirty) {
+                this.dirtyMetadata.add("columns");
+            }
+            this._removeVisibleColumn(column, notify);
+            return;
         }
-        if (notify) {
-            this._callListeners("column_removed", column);
+
+        const nextColumns = [...(this.config.columns ?? [])];
+        nextColumns[index] = {
+            ...nextColumns[index],
+            deleted: true,
+        };
+        this._setColumnsMetadata(nextColumns);
+        if (dirty) {
+            this.dirtyMetadata.add("columns");
         }
+        this._removeVisibleColumn(column, notify);
     }
+
 }
 
 function linspace(start, end, n) {

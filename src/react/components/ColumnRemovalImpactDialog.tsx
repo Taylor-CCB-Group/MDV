@@ -2,7 +2,7 @@ import type {
     ChartColumnImpact,
     ColumnRemovalImpact,
     SavedViewColumnImpact,
-} from "@/charts/columnRemovalUtils";
+} from "@/charts/types/columnRemoval";
 import {
     Accordion,
     AccordionDetails,
@@ -420,13 +420,13 @@ export default function ColumnRemovalImpactDialog({
                     <Alert severity={"error"}>
                         <Typography fontWeight={700} variant="body1" sx={{ textTransform: isBlocked ? "none" : "uppercase" }}>
                             {isBlocked
-                                ? "This column is currently used by charts or saved views."
-                                : "This action is irreversible."}
+                                ? "This column cannot be deleted yet because it is still used by charts or saved views."
+                                : "This will remove the column from the project."}
                         </Typography>
                         <Typography sx={{ mt: 0.75 }} variant="body1">
                             {isBlocked
                                 ? "Deletion is blocked for now. For each chart below, check the 'Used as' section to see exactly whether this column is used in param, color_by, tooltip, background_filter, or another chart setting."
-                                : "Deleting this column will permanently remove it from the datasource. This action cannot be undone, and the current view will be saved immediately after deletion."}
+                                : "This is a soft delete. The column will no longer be shown in MDV, but in exported project files its definition may still appear marked as deleted rather than kept as an active column. The current view will be saved immediately after deletion."}
                         </Typography>
                     </Alert>
 

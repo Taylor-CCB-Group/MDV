@@ -4,6 +4,7 @@ import { describe, test, expect, beforeEach, vi } from "vitest";
 import { observable, runInAction } from "mobx";
 import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
+import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 // Mock all the context hooks
@@ -27,6 +28,14 @@ vi.mock("@/react/selectionHooks", () => ({
 vi.mock("@/react/hooks/useSortedFilteredIndices", () => ({
     default: () => mockSortedIndices,
 }));
+
+vi.mock("@/charts/columnRemovalUtils", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/charts/columnRemovalUtils")>();
+    return {
+        ...actual,
+        analyzeColumnRemoval: vi.fn(),
+    };
+});
 
 let mockDataStore: any;
 let mockConfig: TableChartReactConfig;
@@ -100,21 +109,26 @@ describe("useSlickGridReact", () => {
         mockPermission = "edit";
         mockChartManager = {
             config: { permission: mockPermission },
-            analyzeColumnRemoval: vi.fn().mockResolvedValue({
-                dataSourceName: "test-ds",
-                columnName: "age",
-                currentViewCharts: [],
-                savedViews: [],
-            }),
+            charts: {},
             saveState: vi.fn(),
             viewManager: {
                 saveView: vi.fn().mockResolvedValue(undefined),
                 hasUnsavedChanges: vi.fn(() => false),
+                current_view: "Current View",
+                all_views: ["Current View", "Other View"],
             },
+            viewLoader: vi.fn(),
             loadColumnSet: vi.fn((_columns: string[], _dsName: string, callback: () => void) => {
                 callback();
             }),
         };
+
+        vi.mocked(analyzeColumnRemoval).mockResolvedValue({
+            dataSourceName: "test-ds",
+            columnName: "age",
+            currentViewCharts: [],
+            savedViews: [],
+        });
 
         // Setup mock config with observable properties
         mockConfig = observable({
@@ -130,7 +144,10 @@ describe("useSlickGridReact", () => {
             dataChanged: vi.fn(),
             addColumn: vi.fn(),
             cleanColumnData: vi.fn(),
+            softDeleteColumn: vi.fn(),
             removeColumn: vi.fn(),
+            hasColumnMetadata: vi.fn(() => false),
+            getAllColumnsMetadata: vi.fn(() => []),
             addListener: vi.fn(),
             columns: mockOrderedParamColumns,
             size: 3,
@@ -201,11 +218,11 @@ describe("useSlickGridReact", () => {
                     title: "Bulk Edit",
                     iconCssClass: "mdi mdi-table-edit",
                 },
-                {
-                    command: "remove-column",
-                    title: "Remove Column",
-                    iconCssClass: "mdi mdi-delete",
-                },
+                                    {
+                                        command: "remove-column",
+                                        title: "Delete Column",
+                                        iconCssClass: "mdi mdi-delete",
+                                    },
             ]);
         });
 
@@ -290,7 +307,7 @@ describe("useSlickGridReact", () => {
         });
 
         test("should open the removal impact dialog when charts use the column", async () => {
-            mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+            vi.mocked(analyzeColumnRemoval).mockResolvedValueOnce({
                 dataSourceName: "test-ds",
                 columnName: "age",
                 currentViewCharts: [
@@ -316,12 +333,14 @@ describe("useSlickGridReact", () => {
                 await Promise.resolve();
             });
 
-            expect(mockChartManager.analyzeColumnRemoval).toHaveBeenCalledWith(
-                "test-ds",
-                "age",
-                "test-chart-id",
+            expect(analyzeColumnRemoval).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    dataSourceName: "test-ds",
+                    columnName: "age",
+                    sourceChartId: "test-chart-id",
+                }),
             );
-            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(mockDataStore.softDeleteColumn).not.toHaveBeenCalled();
             expect(result.current.pendingColumnRemoval).toEqual(
                 expect.objectContaining({
                     columnName: "age",
@@ -345,8 +364,8 @@ describe("useSlickGridReact", () => {
                 await Promise.resolve();
             });
 
-            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
-            expect(mockChartManager.analyzeColumnRemoval).not.toHaveBeenCalled();
+            expect(mockDataStore.softDeleteColumn).not.toHaveBeenCalled();
+            expect(analyzeColumnRemoval).not.toHaveBeenCalled();
             expect(result.current.pendingColumnRemoval).toBeNull();
         });
     });
@@ -357,7 +376,7 @@ describe("useSlickGridReact", () => {
             const { headerMenuHandler } = setupGrid(result);
 
             await act(async () => {
-                mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                vi.mocked(analyzeColumnRemoval).mockResolvedValueOnce({
                     dataSourceName: "test-ds",
                     columnName: "age",
                     currentViewCharts: [],
@@ -370,7 +389,7 @@ describe("useSlickGridReact", () => {
                 await Promise.resolve();
             });
 
-            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(mockDataStore.softDeleteColumn).not.toHaveBeenCalled();
             expect(result.current.pendingColumnRemoval).toEqual(
                 expect.objectContaining({
                     columnName: "age",
@@ -378,12 +397,12 @@ describe("useSlickGridReact", () => {
             );
         });
 
-        test("should remove the column after confirmation when there are no impacts", async () => {
+        test("should soft-delete the column after confirmation when there are no impacts", async () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { headerMenuHandler } = setupGrid(result);
 
             await act(async () => {
-                mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                vi.mocked(analyzeColumnRemoval).mockResolvedValueOnce({
                     dataSourceName: "test-ds",
                     columnName: "age",
                     currentViewCharts: [],
@@ -400,22 +419,22 @@ describe("useSlickGridReact", () => {
                 await result.current.confirmColumnRemoval();
             });
 
-            expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
+            expect(mockDataStore.softDeleteColumn).toHaveBeenCalledWith("age", true, true);
             expect(mockChartManager.viewManager.saveView).toHaveBeenCalledTimes(1);
             expect(mockChartManager.saveState).not.toHaveBeenCalled();
             expect(result.current.pendingColumnRemoval).toBeNull();
         });
 
-        test("should surface an error if column removal fails before saving", async () => {
-            mockDataStore.removeColumn.mockImplementationOnce(() => {
-                throw new Error("remove failed");
+        test("should surface an error if column deletion fails before saving", async () => {
+            mockDataStore.softDeleteColumn.mockImplementationOnce(() => {
+                throw new Error("delete failed");
             });
 
             const { result } = renderHook(() => useSlickGridReact());
             const { headerMenuHandler } = setupGrid(result);
 
             await act(async () => {
-                mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                vi.mocked(analyzeColumnRemoval).mockResolvedValueOnce({
                     dataSourceName: "test-ds",
                     columnName: "age",
                     currentViewCharts: [],
@@ -432,30 +451,30 @@ describe("useSlickGridReact", () => {
                 await result.current.confirmColumnRemoval();
             });
 
-            expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
+            expect(mockDataStore.softDeleteColumn).toHaveBeenCalledWith("age", true, true);
             expect(mockChartManager.viewManager.saveView).not.toHaveBeenCalled();
             expect(result.current.pendingColumnRemoval).toBeNull();
             expect(result.current.feedbackAlert).toEqual(
                 expect.objectContaining({
                     type: "error",
-                    title: "Remove Column Error",
-                    message: "Column age could not be removed.",
+                    title: "Delete Column Error",
+                    message: "Column age could not be deleted.",
                     metadata: expect.objectContaining({
                         columnName: "age",
-                        removeError: "remove failed",
+                        deleteError: "delete failed",
                     }),
                 }),
             );
         });
 
-        test("should surface an error if saving leaves the view unsaved after column removal", async () => {
+        test("should surface an error if saving leaves the view unsaved after column deletion", async () => {
             mockChartManager.viewManager.hasUnsavedChanges.mockReturnValueOnce(true);
 
             const { result } = renderHook(() => useSlickGridReact());
             const { headerMenuHandler } = setupGrid(result);
 
             await act(async () => {
-                mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+                vi.mocked(analyzeColumnRemoval).mockResolvedValueOnce({
                     dataSourceName: "test-ds",
                     columnName: "age",
                     currentViewCharts: [],
@@ -472,15 +491,16 @@ describe("useSlickGridReact", () => {
                 await result.current.confirmColumnRemoval();
             });
 
-            expect(mockDataStore.removeColumn).toHaveBeenCalledWith("age", true, true);
+            expect(mockDataStore.softDeleteColumn).toHaveBeenCalledWith("age", true, true);
             expect(mockChartManager.viewManager.saveView).toHaveBeenCalledTimes(1);
             expect(mockChartManager.viewManager.hasUnsavedChanges).toHaveBeenCalledTimes(1);
             expect(result.current.pendingColumnRemoval).toBeNull();
             expect(result.current.feedbackAlert).toEqual(
                 expect.objectContaining({
                     type: "error",
-                    title: "Remove Column Error",
-                    message: "Column age was removed, but saving the updated view failed.",
+                    title: "Delete Column Error",
+                    message:
+                        "Column age was deleted locally, but saving the updated view failed. Reloading the project may restore this column.",
                     metadata: expect.objectContaining({
                         columnName: "age",
                         saveError: "Saving the updated view did not complete successfully",
@@ -490,7 +510,7 @@ describe("useSlickGridReact", () => {
         });
 
         test("should expose saved-view impacts on pendingColumnRemoval", async () => {
-            mockChartManager.analyzeColumnRemoval.mockResolvedValueOnce({
+            vi.mocked(analyzeColumnRemoval).mockResolvedValueOnce({
                 dataSourceName: "test-ds",
                 columnName: "age",
                 currentViewCharts: [],
@@ -523,11 +543,11 @@ describe("useSlickGridReact", () => {
             });
 
             expect(result.current.pendingColumnRemoval?.impact.savedViews).toHaveLength(1);
-            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(mockDataStore.softDeleteColumn).not.toHaveBeenCalled();
         });
 
         test("should surface an error and block removal when column analysis fails", async () => {
-            mockChartManager.analyzeColumnRemoval.mockRejectedValueOnce(
+            vi.mocked(analyzeColumnRemoval).mockRejectedValueOnce(
                 new Error("Failed to check column usage in saved views: Other View"),
             );
 
@@ -543,11 +563,11 @@ describe("useSlickGridReact", () => {
             });
 
             expect(result.current.pendingColumnRemoval).toBeNull();
-            expect(mockDataStore.removeColumn).not.toHaveBeenCalled();
+            expect(mockDataStore.softDeleteColumn).not.toHaveBeenCalled();
             expect(result.current.feedbackAlert).toEqual(
                 expect.objectContaining({
                     type: "error",
-                    title: "Remove Column Error",
+                    title: "Delete Column Error",
                     message: "Failed to check column usage in saved views: Other View",
                 }),
             );
@@ -812,7 +832,7 @@ describe("useSlickGridReact", () => {
             });
         });
 
-        test("should load a hidden real column before cloning it", async () => {
+        test("should load an unloaded real column before cloning it", async () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             mockDataStore.columns = [
@@ -856,8 +876,11 @@ describe("useSlickGridReact", () => {
             expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
         });
 
-        test("should reject duplicate column names", () => {
-            mockDataStore.columnIndex = { age: { field: "age" } };
+        test("should reject duplicate column names when the field exists in active metadata", () => {
+            mockDataStore.columnIndex = {};
+            mockDataStore.getAllColumnsMetadata.mockReturnValueOnce([
+                { field: "age", name: "Age", datatype: "text" },
+            ]);
             const { result } = renderHook(() => useSlickGridReact());
 
             act(() => {
@@ -876,6 +899,71 @@ describe("useSlickGridReact", () => {
                     message: "Column age already exists",
                 }),
             );
+        });
+
+        test("should allow reusing the name of a deleted column", () => {
+            mockDataStore.columnIndex = {};
+            mockDataStore.getAllColumnsMetadata.mockReturnValueOnce([
+                { field: "annotation", name: "Annotation", datatype: "text", deleted: true },
+            ]);
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    datatype: "double",
+                    position: 2,
+                });
+            });
+
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+            expect(result.current.feedbackAlert).toBeNull();
+        });
+
+        test("should not duplicate a revived column if a stale unsaved param entry still exists", () => {
+            mockDataStore.columnIndex = {};
+            mockDataStore.getAllColumnsMetadata.mockReturnValueOnce([
+                { field: "annotation", name: "Annotation", datatype: "text", deleted: true },
+            ]);
+            mockConfig.param = ["age", "annotation", "name", "id"] as typeof mockConfig.param;
+
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "annotation",
+                    datatype: "double",
+                    position: 2,
+                });
+            });
+
+            expect(mockChart.setParams).toHaveBeenCalledWith(["age", "annotation", "name", "id"]);
+            expect(mockConfig.param).toEqual(["age", "annotation", "name", "id"]);
+        });
+
+        test("should drop stale deleted plain-string params before adding a brand-new column", () => {
+            mockDataStore.columnIndex = {};
+            mockConfig.param = ["age", "column 5", "column 6", "name", "id"] as typeof mockConfig.param;
+            mockChart.activeQueries.activeParams.mockReturnValue([
+                "age",
+                "column 5",
+                "column 6",
+                "name",
+                "id",
+            ]);
+
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "column 8",
+                    datatype: "double",
+                    position: 2,
+                });
+            });
+
+            expect(mockChart.setParams).toHaveBeenCalledWith(["age", "column 8", "name", "id"]);
+            expect(mockConfig.param).toEqual(["age", "column 8", "name", "id"]);
         });
     });
 

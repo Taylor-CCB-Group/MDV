@@ -1,6 +1,9 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type { BaseConfig } from "@/charts/BaseChart";
-import { analyzeChartColumnImpact } from "@/charts/columnRemovalUtils";
+import {
+    analyzeChartColumnImpact,
+    analyzeColumnRemoval,
+} from "@/charts/columnRemovalUtils";
 
 type TestChartConfig = BaseConfig & Record<string, unknown>;
 
@@ -109,5 +112,87 @@ describe("columnRemovalUtils", () => {
             }),
         );
     });
+    test("collects impacts from current and saved views", async () => {
+        const impact = await analyzeColumnRemoval({
+            dataSourceName: "cells",
+            columnName: "age",
+            sourceChartId: "table-1",
+            currentViewName: "Current View",
+            allViewNames: ["Current View", "Other View"],
+            currentCharts: [
+                {
+                    dataSourceName: "cells",
+                    config: createChartConfig({
+                        id: "table-1",
+                        title: "",
+                        type: "table_chart_react",
+                        param: ["age"],
+                    }),
+                },
+                {
+                    dataSourceName: "cells",
+                    config: createChartConfig({
+                        id: "scatter-1",
+                        title: "Scatter",
+                        type: "wgl_scatter_plot_dev",
+                        param: ["x", "y"],
+                        color_by: "age",
+                    }),
+                },
+            ],
+            viewLoader: vi.fn(async () => ({
+                initialCharts: {
+                    cells: [
+                        createChartConfig({
+                            id: "saved-1",
+                            title: "",
+                            type: "selection_dialog",
+                            param: ["age"],
+                        }),
+                    ],
+                },
+            })),
+        });
 
+        expect(impact).toEqual({
+            dataSourceName: "cells",
+            columnName: "age",
+            currentViewCharts: [
+                expect.objectContaining({
+                    chartId: "scatter-1",
+                    usage: "settings",
+                    usagePaths: ["color_by"],
+                }),
+            ],
+            savedViews: [
+                {
+                    viewName: "Other View",
+                    charts: [
+                        expect.objectContaining({
+                            chartId: "saved-1",
+                            usage: "param",
+                            usagePaths: ["param"],
+                        }),
+                    ],
+                },
+            ],
+        });
+    });
+
+    test("fails closed when a saved view cannot be loaded", async () => {
+        await expect(
+            analyzeColumnRemoval({
+                dataSourceName: "cells",
+                columnName: "age",
+                currentCharts: [],
+                currentViewName: "Current View",
+                allViewNames: ["Current View", "Broken View"],
+                viewLoader: vi.fn(async () => {
+                    throw new Error("load failed");
+                }),
+            }),
+        ).rejects.toThrow(
+            "Failed to check column usage in saved views: Broken View",
+        );
+    });
 });

@@ -13,7 +13,8 @@ import { DataModel } from "@/table/DataModel";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
-import type { ColumnRemovalImpact } from "@/charts/columnRemovalUtils";
+import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
+import type { ColumnRemovalImpact } from "@/charts/types/columnRemoval";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 
 /**
@@ -112,12 +113,19 @@ const useSlickGridReact = () => {
 
     const requestColumnRemoval = useCallback(async (columnName: string) => {
         try {
-            const impact = chartManager?.analyzeColumnRemoval
-                ? await chartManager.analyzeColumnRemoval(
-                    dataStore.name,
+            const impact = chartManager
+                ? await analyzeColumnRemoval({
+                    dataSourceName: dataStore.name,
                     columnName,
-                    chartId,
-                )
+                    sourceChartId: chartId,
+                    currentViewName: chartManager.viewManager?.current_view ?? null,
+                    allViewNames: chartManager.viewManager?.all_views ?? [],
+                    currentCharts: Object.values(chartManager.charts ?? {}).map((chartInfo) => ({
+                        dataSourceName: chartInfo.dataSource.name,
+                        config: chartInfo.chart.config,
+                    })),
+                    viewLoader: chartManager.viewLoader,
+                })
                 : {
                     dataSourceName: dataStore.name,
                     columnName,
@@ -130,10 +138,10 @@ const useSlickGridReact = () => {
             });
         } catch (err) {
             const error =
-                err instanceof Error ? err : new Error("Failed to analyze column removal");
+                err instanceof Error ? err : new Error("Failed to analyze column deletion");
             setFeedbackAlert({
                 type: "error",
-                title: "Remove Column Error",
+                title: "Delete Column Error",
                 message: error.message,
                 stack: error.stack,
                 metadata: {
@@ -141,7 +149,7 @@ const useSlickGridReact = () => {
                 },
             });
         }
-    }, [chartId, chartManager, dataModel, dataStore.name]);
+    }, [chartId, chartManager, dataStore.name]);
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
@@ -228,7 +236,7 @@ const useSlickGridReact = () => {
                                     },
                                     {
                                         command: "remove-column",
-                                        title: "Remove Column",
+                                        title: "Delete Column",
                                         iconCssClass: "mdi mdi-delete",
                                     },
                                 ]
@@ -625,16 +633,16 @@ const useSlickGridReact = () => {
             dataModel.removeColumn(columnName);
         } catch (err) {
             const error =
-                err instanceof Error ? err : new Error("Failed to remove the column");
+                err instanceof Error ? err : new Error("Failed to delete the column");
             setPendingColumnRemoval(null);
             setFeedbackAlert({
                 type: "error",
-                title: "Remove Column Error",
-                message: `Column ${columnName} could not be removed.`,
+                title: "Delete Column Error",
+                message: `Column ${columnName} could not be deleted.`,
                 stack: error.stack,
                 metadata: {
                     columnName,
-                    removeError: error.message,
+                    deleteError: error.message,
                 },
             });
             return;
@@ -652,12 +660,12 @@ const useSlickGridReact = () => {
             setPendingColumnRemoval(null);
         } catch (err) {
             const error =
-                err instanceof Error ? err : new Error("Failed to save the updated view after deletion");
+                err instanceof Error ? err : new Error("Failed to save the updated view after deleting");
             setPendingColumnRemoval(null);
             setFeedbackAlert({
                 type: "error",
-                title: "Remove Column Error",
-                message: `Column ${columnName} was removed, but saving the updated view failed.`,
+                title: "Delete Column Error",
+                message: `Column ${columnName} was deleted locally, but saving the updated view failed. Reloading the project may restore this column.`,
                 stack: error.stack,
                 metadata: {
                     columnName,
@@ -712,7 +720,10 @@ const useSlickGridReact = () => {
             return;
         }
 
-        if (dataStore.columnIndex[trimmedName]) {
+        const existingMetadata = dataStore.getAllColumnsMetadata?.().find(
+            (column) => column.field === trimmedName,
+        );
+        if (dataStore.columnIndex[trimmedName] || (existingMetadata && !existingMetadata.deleted)) {
             setFeedbackAlert({
                 type: "error",
                 title: "Add Column Error",
@@ -760,8 +771,21 @@ const useSlickGridReact = () => {
                 Math.max(parsedPosition - 1, 0),
                 displayedFields.length,
             );
+            const displayedFieldSet = new Set(orderedFields);
 
-            const currentParam = chart.activeQueries.activeParams();
+            // Locally deleted plain columns can linger in activeParams() even after the table UI
+            // has removed them. If we rebuild nextParam from that stale state, re-adding another
+            // column can resurrect deleted names, cause duplicate visible columns, and eventually
+            // make ChartManager try to load plain names as virtual fields. Rebuild from what is
+            // actually displayed, while still keeping query-backed entries intact.
+            const currentParam = chart.activeQueries
+                .activeParams()
+                .filter((entry) => {
+                    if (typeof entry !== "string") {
+                        return true;
+                    }
+                    return entry !== trimmedName && displayedFieldSet.has(entry);
+                });
             const renderedEntryIndices = orderedFields
                 .map((field) =>
                     currentParam.findIndex((entry) => flattenFields(entry).includes(field)),

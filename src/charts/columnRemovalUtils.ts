@@ -1,39 +1,15 @@
 import type { BaseConfig } from "./BaseChart";
-import type { ChartType } from "./ChartTypes";
+import { chartTypes, type ChartType } from "./ChartTypes";
+import type {
+    AnalyzeColumnRemovalArgs,
+    ChartColumnImpact,
+    ColumnRemovalImpact,
+    ColumnRemovalUsagePath,
+    SavedViewColumnImpact,
+} from "./types/columnRemoval";
 
 type ChartTypeMetadata = Pick<ChartType<BaseConfig>, "configEntriesUsingColumns"> & {
     name?: string;
-};
-
-export type ColumnRemovalAction = "remove_chart" | "block_delete";
-export type ColumnRemovalUsage = "param" | "settings";
-export type ColumnRemovalUsagePath =
-    | "param"
-    | "color_by"
-    | "tooltip"
-    | "background_filter"
-    | string;
-
-export type ChartColumnImpact = {
-    chartId?: string;
-    chartTitle: string;
-    chartType: string;
-    chartTypeLabel: string;
-    action: ColumnRemovalAction;
-    usage: ColumnRemovalUsage;
-    usagePaths: ColumnRemovalUsagePath[];
-};
-
-export type SavedViewColumnImpact = {
-    viewName: string;
-    charts: ChartColumnImpact[];
-};
-
-export type ColumnRemovalImpact = {
-    dataSourceName: string;
-    columnName: string;
-    currentViewCharts: ChartColumnImpact[];
-    savedViews: SavedViewColumnImpact[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -132,5 +108,77 @@ export function analyzeChartColumnImpact(
         action: "block_delete",
         usage: "settings",
         usagePaths: settingUsagePaths,
+    };
+}
+
+export async function analyzeColumnRemoval({
+    dataSourceName,
+    columnName,
+    sourceChartId = null,
+    currentViewName = null,
+    allViewNames = [],
+    currentCharts,
+    viewLoader,
+}: AnalyzeColumnRemovalArgs): Promise<ColumnRemovalImpact> {
+    const currentViewCharts = currentCharts
+        .filter((chart) => chart.dataSourceName === dataSourceName)
+        .filter((chart) => chart.config.id !== sourceChartId)
+        .map((chart) =>
+            analyzeChartColumnImpact(
+                chart.config,
+                chartTypes[chart.config.type],
+                columnName,
+            ),
+        )
+        .filter((impact) => impact !== null);
+
+    const savedViews: SavedViewColumnImpact[] = [];
+    if (viewLoader) {
+        const otherViews = allViewNames.filter((viewName) => viewName !== currentViewName);
+        const results = await Promise.allSettled(
+            otherViews.map(async (viewName) => {
+                const viewData = await viewLoader(viewName);
+                const chartConfigs = viewData?.initialCharts?.[dataSourceName] ?? [];
+                const charts = chartConfigs
+                    .map((config) =>
+                        analyzeChartColumnImpact(
+                            config,
+                            chartTypes[config.type],
+                            columnName,
+                        ),
+                    )
+                    .filter((impact) => impact !== null);
+
+                if (charts.length === 0) {
+                    return null;
+                }
+
+                return { viewName, charts };
+            }),
+        );
+
+        const failedViews: string[] = [];
+        for (const [index, result] of results.entries()) {
+            if (result.status === "fulfilled" && result.value) {
+                savedViews.push(result.value);
+                continue;
+            }
+            if (result.status === "rejected") {
+                failedViews.push(otherViews[index]);
+            }
+        }
+
+        if (failedViews.length > 0) {
+            throw new Error(
+                `Failed to check column usage in saved views: ${failedViews.join(", ")}`,
+            );
+        }
+    }
+
+    return {
+        dataSourceName,
+        columnName,
+        currentViewCharts,
+        savedViews,
     };
 }
