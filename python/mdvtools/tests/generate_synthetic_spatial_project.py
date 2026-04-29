@@ -618,7 +618,15 @@ def parse_args() -> argparse.Namespace:
         help="Output MDV project path. Defaults to a flat ~/mdv/synth-spatial--... path.",
     )
     parser.add_argument("--force", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    for flag, value in (
+        ("--n-cells", args.n_cells),
+        ("--n-genes", args.n_genes),
+        ("--image-size", args.image_size),
+    ):
+        if value <= 0:
+            parser.error(f"{flag} must be greater than zero")
+    return args
 
 
 def main() -> None:

@@ -2,6 +2,32 @@ import { chromium } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
+function readRequiredValue(argv, index, flag) {
+    const next = argv[index + 1];
+    if (!next || next.startsWith("--")) {
+        throw new Error(`${flag} requires a value`);
+    }
+    return next;
+}
+
+function readRequiredList(argv, index, flag) {
+    const value = readRequiredValue(argv, index, flag);
+    const values = value.split(",").map((item) => item.trim()).filter(Boolean);
+    if (values.length === 0) {
+        throw new Error(`${flag} requires at least one non-empty value`);
+    }
+    return values;
+}
+
+function readRequiredInteger(argv, index, flag) {
+    const value = readRequiredValue(argv, index, flag);
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed)) {
+        throw new Error(`${flag} requires a numeric value`);
+    }
+    return parsed;
+}
+
 function readArgs(argv) {
     const args = {
         categories: ["type_0", "type_1", "type_2"],
@@ -14,26 +40,31 @@ function readArgs(argv) {
     };
     for (let index = 2; index < argv.length; index += 1) {
         const arg = argv[index];
-        const next = argv[index + 1];
         if (arg === "--headed") {
             args.headed = true;
-            index -= 1;
+            continue;
         } else if (arg === "--url") {
-            args.url = next;
+            args.url = readRequiredValue(argv, index, arg);
         } else if (arg === "--views") {
-            args.views = next.split(",").map((value) => value.trim()).filter(Boolean);
+            args.views = readRequiredList(argv, index, arg);
         } else if (arg === "--categories") {
-            args.categories = next.split(",").map((value) => value.trim()).filter(Boolean);
+            args.categories = readRequiredList(argv, index, arg);
         } else if (arg === "--out") {
-            args.out = next;
+            args.out = readRequiredValue(argv, index, arg);
         } else if (arg === "--repeats") {
-            args.repeats = Number.parseInt(next, 10);
+            args.repeats = readRequiredInteger(argv, index, arg);
         } else if (arg === "--settle-ms") {
-            args.settleMs = Number.parseInt(next, 10);
+            args.settleMs = readRequiredInteger(argv, index, arg);
         } else {
             throw new Error(`Unknown argument: ${arg}`);
         }
         index += 1;
+    }
+    if (args.repeats <= 0) {
+        throw new Error("--repeats must be greater than zero");
+    }
+    if (args.settleMs < 0) {
+        throw new Error("--settle-ms must be zero or greater");
     }
     return args;
 }
@@ -67,7 +98,7 @@ async function profileView(page, baseUrl, viewName, categories, settleMs) {
         }));
         const rowChart = Object.values(cm.charts)
             .map((entry) => entry.chart)
-            .find((chart) => chart.config.type === "row_chart");
+            .find((chart) => chart.config.type === "row_chart" && !chart.config.wordcloud);
         const rowParam = rowChart?.config?.param?.[0] ?? null;
         const rowValues = rowParam ? rowChart.dataStore.getColumnValues(rowParam) : [];
         const dataStore = rowChart?.dataStore;
@@ -99,7 +130,7 @@ async function profileView(page, baseUrl, viewName, categories, settleMs) {
             const cm = window.mdv.chartManager;
             const rowChart = Object.values(cm.charts)
                 .map((entry) => entry.chart)
-                .find((chart) => chart.config.type === "row_chart");
+                .find((chart) => chart.config.type === "row_chart" && !chart.config.wordcloud);
             if (!rowChart) throw new Error("No row chart found");
             const dataStore = rowChart.dataStore;
             const label = [...document.querySelectorAll(".row-text")]
@@ -107,11 +138,16 @@ async function profileView(page, baseUrl, viewName, categories, settleMs) {
             if (!label) throw new Error(`No row chart label found for ${cat}`);
 
             const before = performance.now();
-            const eventPromise = new Promise((resolve) => {
+            const eventPromise = new Promise((resolve, reject) => {
                 const listenerId = `profile-${Date.now()}-${Math.random()}`;
+                const timeoutId = setTimeout(() => {
+                    dataStore.removeListener(listenerId);
+                    reject(new Error(`Timed out waiting for filtered event for ${cat}`));
+                }, 15_000);
                 dataStore.addListener(listenerId, (type, data) => {
                     if (type !== "filtered") return;
                     dataStore.removeListener(listenerId);
+                    clearTimeout(timeoutId);
                     resolve({
                         eventAt: performance.now(),
                         filterSize: dataStore.filterSize,
@@ -148,7 +184,7 @@ async function profileView(page, baseUrl, viewName, categories, settleMs) {
     await page.evaluate(() => {
         const rowChart = Object.values(window.mdv.chartManager.charts)
             .map((entry) => entry.chart)
-            .find((chart) => chart.config.type === "row_chart");
+            .find((chart) => chart.config.type === "row_chart" && !chart.config.wordcloud);
         rowChart?.removeFilter();
     });
     await page.waitForTimeout(250);
