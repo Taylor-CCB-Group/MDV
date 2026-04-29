@@ -1796,7 +1796,12 @@ class DataStore {
     }
 
     /**
-     * Returns the min/max values for a given column
+     * Returns the min/max values for a given column.
+     *
+     * Note: this method is not metadata-only. If `minMax` is missing it will attempt
+     * to derive it from loaded column data. Callers that rely on lazy-loading should
+     * ensure column data is loaded before using this API.
+     *
      * @param {string} column The column id(field). Should be a numeric column, otherwise an error will be thrown
      * @returns {[number, number]} An array - the first value being the min value and the second the max value
      */
@@ -1821,7 +1826,17 @@ class DataStore {
         // Compute and normalize if missing
         if (!c.minMax) {
             if (!c.data) {
-                throw new Error(`Attempting to compute minMax for column '${column}' which is not loaded...`);
+                throw new Error(
+                    `getMinMaxForColumn('${column}') requires loaded data when minMax metadata is missing. ` +
+                        `This API may derive minMax from column data and is not guaranteed to be metadata-only.`,
+                );
+            }
+            if (!c.__warnedMinMaxComputedFromData) {
+                // Signpost implicit fallback so this is easier to notice while developing lazy-loading flows.
+                console.warn(
+                    `DataStore '${this.name}': deriving minMax from loaded data for '${column}' because metadata minMax is missing.`,
+                );
+                c.__warnedMinMaxComputedFromData = true;
             }
             const computed = this._computeMinMaxFromData(c);
             // Normalize ensures [min, max] ordering and handles edge cases
