@@ -48,6 +48,15 @@ export type ColorConfig = {
 export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
 export type ColorOptions = any;
 export type ContextMenuItem = { text: string, icon: string, func: () => void };
+export type SettingsDialogFolderState = {
+    isOpen: boolean;
+    isOpenBeforeSearch: boolean;
+    appliedSearchTerm: string;
+};
+export type SettingsDialogState = {
+    searchTerm: string;
+    folderStates: Record<string, SettingsDialogFolderState>;
+};
 /**
  * A JSON string representing a chart configuration.
  * 
@@ -67,6 +76,7 @@ class BaseChart<T extends BaseConfig> {
     resetButton: HTMLButtonElement | HTMLSpanElement;
     contextMenu: ContextMenu;
     dialogs: BaseDialog[] = [];
+    settingsDialogState?: SettingsDialogState;
     legendIcon: HTMLElement;
     observable: { container: HTMLElement };
     width = 0;
@@ -75,6 +85,7 @@ class BaseChart<T extends BaseConfig> {
     legend: any;
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
+    _fullscreenChangeHandler: () => void;
     // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
     activeQueries: ColumnQueryMapper<T>;
     /**
@@ -237,60 +248,64 @@ class BaseChart<T extends BaseConfig> {
         );
 
         let oldSize = config.size;
-        this.div.addEventListener(
-            "fullscreenchange",
-            action(() => {
-                //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
-                if (this.__doc__.fullscreenElement) {
-                    if (this.div === this.__doc__.fullscreenElement) {               
-                        this.observable.container = this.div;
-                        const rect = window.screen;
-                        this.setSize(rect.width, rect.height);
-                        for (const d of this.dialogs) {
-                            d.setParent(this.contentDiv);
-                        }
-    
-    
-                        // Updating the icon
-                        if (this.fullscreenIcon) {
-                            const iconEl = this.fullscreenIcon.querySelector("i");
-                            if (iconEl) {
-                                iconEl.classList.remove("fa-expand");
-                                iconEl.classList.add("fa-compress");
-                            }
-                            this.fullscreenIcon.setAttribute("aria-label", "Exit Full Screen");
-                        }
-                    }
-                    this.isFullscreen = true;
-                } else {
-                    this.observable.container = this.__doc__.body;
-                 
-                    // Reset the size of chart
-                    this.setSize(...oldSize);
-                    const cm = window.mdv.chartManager;
-                    // we could make GridstackManager also change the setSize method?
-                    // then we'd avoid any gridstack code in here
-                    // but this is probably easier to understand anyway.
-                    if (cm.viewData.dataSources[this.dataStore.name]?.layout === "gridstack") {
-                        cm.gridStack.manageChart(this, this.dataSource, false, true);
-                    }
+        this._fullscreenChangeHandler = action(() => {
+            //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
+            if (this.__doc__.fullscreenElement) {
+                if (this.div === this.__doc__.fullscreenElement) {               
+                    this.observable.container = this.div;
+                    const rect = window.screen;
+                    this.setSize(rect.width, rect.height);
                     for (const d of this.dialogs) {
-                        d.setParent(null);
+                        d.setParent(this.contentDiv);
                     }
+
 
                     // Updating the icon
                     if (this.fullscreenIcon) {
                         const iconEl = this.fullscreenIcon.querySelector("i");
                         if (iconEl) {
-                            iconEl.classList.remove("fa-compress");
-                            iconEl.classList.add("fa-expand");
+                            iconEl.classList.remove("fa-expand");
+                            iconEl.classList.add("fa-compress");
                         }
-                        this.fullscreenIcon.setAttribute("aria-label", "Full Screen");
+                        this.fullscreenIcon.setAttribute("aria-label", "Exit Full Screen");
                     }
-                    this.isFullscreen = false;
+                } else if (this.__doc__.fullscreenElement.contains(this.div)) {
+                    // An ancestor element (e.g. datasource panel) is fullscreen -
+                    // update the container so MUI modals render inside the fullscreen element
+                    this.observable.container = this.__doc__.fullscreenElement as HTMLElement;
                 }
-            }),
-        );
+                this.isFullscreen = true;
+            } else {
+                this.observable.container = this.__doc__.body;
+             
+                // Reset the size of chart
+                this.setSize(...oldSize);
+                const cm = window.mdv.chartManager;
+                // we could make GridstackManager also change the setSize method?
+                // then we'd avoid any gridstack code in here
+                // but this is probably easier to understand anyway.
+                if (cm.viewData.dataSources[this.dataStore.name]?.layout === "gridstack") {
+                    cm.gridStack.manageChart(this, this.dataSource, false, true);
+                }
+                for (const d of this.dialogs) {
+                    d.setParent(null);
+                }
+
+                // Updating the icon
+                if (this.fullscreenIcon) {
+                    const iconEl = this.fullscreenIcon.querySelector("i");
+                    if (iconEl) {
+                        iconEl.classList.remove("fa-compress");
+                        iconEl.classList.add("fa-expand");
+                    }
+                    this.fullscreenIcon.setAttribute("aria-label", "Full Screen");
+                }
+                this.isFullscreen = false;
+            }
+        });
+        // Listen on the document so we catch fullscreen changes on ancestor elements
+        // (e.g. datasource panel fullscreen), not just when this.div itself goes fullscreen.
+        this.__doc__.addEventListener("fullscreenchange", this._fullscreenChangeHandler);
         this.fullscreenIcon = this.addMenuIcon("fas fa-expand", "Full Screen", {
             func: async () => {
                 try {
@@ -698,6 +713,9 @@ class BaseChart<T extends BaseConfig> {
         }
         this.menuTooltips.forEach(t => t.destroy());
         this.menuTooltips = [];
+        if (this._fullscreenChangeHandler) {
+            this.__doc__.removeEventListener("fullscreenchange", this._fullscreenChangeHandler);
+        }
         // dynamic props?
     }
     removeLayout?(): void;

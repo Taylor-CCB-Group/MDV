@@ -1,6 +1,6 @@
 import { getDefaultInitialViewState, ColorPaletteExtension, DetailView } from "@hms-dbmi/viv";
 import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
@@ -18,9 +18,10 @@ import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useOuterContainer } from "../screen_state";
-import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
+import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
 import useGateLayers from "../hooks/useGateLayers";
-import { escapeHtml } from "@/utilities/Utilities";
+import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -83,10 +84,11 @@ const Main = observer(
         const id = useChartID();
         const detailId = `${id}detail-react`;
         const outerContainer = useOuterContainer();
+        const deckContainerRef = useRef<HTMLDivElement | null>(null);
 
         // this isn't updating when we tweak the config...
         const { scatterProps, selectionLayer } = useSpatialLayers();
-        const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
+        const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
         const { showJson } = useConfig<VivRoiConfig>();
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
@@ -182,32 +184,35 @@ const Main = observer(
             ],
         );
 
+        const getTooltipContent = useCallback(
+            (info: PickingInfo) => {
+                return getCombinedScatterTooltip(
+                    info,
+                    {
+                        gateDisplayLayerId: gateDisplayLayer?.id,
+                        gateLabelLayerId: gateLabelLayer?.id,
+                        getPointTooltip: getTooltip,
+                    },
+                );
+            },
+            [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
+        );
+        const {
+            clearTooltip,
+            getTooltip: getPortalTooltip,
+            suppressTooltipUntilPointerUp,
+            tooltipPortal,
+        } = useOuterContainerDeckTooltip(getTooltipContent, deckContainerRef);
+
         const deckProps: Partial<DeckGLProps> = useMemo(
             () => ({
-                getTooltip: (info: any) => {
-                    const layerId = info?.layer?.id;
-                    const obj = info?.object;
-                    if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
-                        return { 
-                            html: `<strong>${escapeHtml(obj.properties.gateName)}</strong><br/><small>Click on the label to edit</small>` 
-                        };
-                    }
-                    if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
-                        return { 
-                            html: `<strong>${escapeHtml(obj.text)}</strong><br/><small>Click on the label to edit</small>` 
-                        };
-                    }
-                    return getTooltip();
-                },
-                style: {
-                    zIndex: "-1",
-                },
-                //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
+                getTooltip: getPortalTooltip,
                 layers: [
-                    jsonLayer, 
-                    gateDisplayLayer, 
-                    selectionLayer, 
-                    scatterplotLayer, 
+                    jsonLayer,
+                    greyScatterplotLayer,
+                    scatterplotLayer,
+                    gateDisplayLayer,
+                    selectionLayer,
                     gateLabelLayer,
                 ].filter(l => l !== null),
                 id: `${id}deck`,
@@ -231,10 +236,11 @@ const Main = observer(
                 gateLabelLayer,
                 gateDisplayLayer,
                 scatterplotLayer,
+                greyScatterplotLayer,
                 selectionLayer,
                 jsonLayer,
                 id,
-                getTooltip,
+                getPortalTooltip,
                 controllerOptions,
             ],
         );
@@ -251,13 +257,18 @@ const Main = observer(
                     />
                 )}
                 <div
+                    ref={deckContainerRef}
                     aria-label="Spatial scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none" }}
+                    onPointerDown={suppressTooltipUntilPointerUp}
                     onMouseDown={() => {
                         setScatterKeyboardActive(true);
                     }}
                     onMouseEnter={() => setScatterKeyboardActive(true)}
-                    onMouseLeave={() => setScatterKeyboardActive(false)}
+                    onMouseLeave={() => {
+                        clearTooltip();
+                        setScatterKeyboardActive(false);
+                    }}
                 >
                     <MDVivViewer
                         outerContainer={outerContainer}
@@ -280,6 +291,7 @@ const Main = observer(
                         deckProps={deckProps}
                     />
                 </div>
+                {tooltipPortal}
             </>
         );
 });

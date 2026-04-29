@@ -8,6 +8,7 @@ import { ScaleBarLayer } from "@hms-dbmi/viv";
 import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
+import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
@@ -394,6 +395,18 @@ class MDVivViewerWrapper extends React.PureComponent<
         if (scaleBarLayer) {
             layers.push(scaleBarLayer);
         }
+        const getTooltip = deckProps?.getTooltip;
+        const deckPropsWithPicking = getTooltip
+            ? {
+                  ...deckProps,
+                  getTooltip: (info: PickingInfo) => {
+                      const deckInstance = this.state.deckRef?.current && "deck" in this.state.deckRef.current
+                          ? this.state.deckRef.current.deck
+                          : null;
+                      return getTooltip(getPickingInfoWithAlternates(info, deckInstance));
+                  },
+              }
+            : deckProps;
         return (
             <div
                 className="h-full w-full"
@@ -403,7 +416,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                     // MDV: we mess with deck internals via ref to get eventManager to work in popouts
                     ref={this.state.deckRef}
                     // eslint-disable-next-line react/jsx-props-no-spreading
-                    {...(deckProps ?? {})}
+                    {...(deckPropsWithPicking ?? {})}
                     layerFilter={this.layerFilter}
                     layers={layers}
                     onViewStateChange={this._onViewStateChange}

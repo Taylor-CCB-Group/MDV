@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
+import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
-import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
+import { useChartID, useChartManager, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
 import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
-import { action } from "mobx";
+import { action, runInAction } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
 import { InputEditor } from "slickgrid-react";
+import { DataModel } from "@/table/DataModel";
+import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import type { AddColumnParams } from "../components/AddTableColumnDialog";
+import type { BulkEditAction } from "../components/BulkEditColumnDialog";
+import { flattenFields } from "@/lib/columnTypeHelpers";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -56,15 +61,22 @@ const useSlickGridReact = () => {
     const config = useConfig<TableChartReactConfig>();
     const dataStore = useDataStore();
     const chartId = useChartID();
-    const chart = useChart<TableChartReactConfig>();
+    const chart = useChart<TableChartReactConfig, TableChartReact>();
     const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
     const sortedFilteredIndices = useSortedFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
     const theme = useTheme();
+    const chartManager = useChartManager();
+    const permission = chartManager?.config?.permission;
+    const isEditMode = permission === "edit";
 
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [searchColumn, setSearchColumn] = useState<string | null>(null);
+    const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
+    const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
+    const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
+    const [bulkEditColumn, setBulkEditColumn] = useState<string | null>(null);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -73,11 +85,28 @@ const useSlickGridReact = () => {
     const gridRef = useRef<SlickgridReactInstance | null>(null);
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
     const cleanupRef = useRef<(() => void) | null>(null); // Cleanup event handlers
+    const isEditModeRef = useRef(isEditMode);
+
+    // Single instance of data model used in many places
+    const dataModel = useMemo(() => 
+        new DataModel(dataStore, { autoupdate: false })
+    , [dataStore]);
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
     }, [sortedFilteredIndices, orderedParamColumns]);
+
+    useEffect(() => {
+        isEditModeRef.current = isEditMode;
+    }, [isEditMode]);
+
+    useEffect(() => {
+        chart.setAddColumnDialogOpener(() => setIsAddColumnDialogOpen(true));
+        return () => {
+            chart.setAddColumnDialogOpener(undefined);
+        };
+    }, [chart]);
 
     // Extract initial widths from config once (non-observable)
     // This avoids rules-of-hooks issues and prevents columnDefs from reacting to config.column_widths changes
@@ -136,9 +165,23 @@ const useSlickGridReact = () => {
                         commandItems: [
                             {
                                 command: "find-replace",
-                                title: isColumnEditable ? "Find & Replace" : "Find",
+                                title: isColumnEditable && isEditMode ? "Find & Replace" : "Find",
                                 iconCssClass: "mdi mdi-magnify",
                             },
+                            ...(isColumnEditable && isEditMode
+                                ? [
+                                    {
+                                        command: "bulk-edit",
+                                        title: "Bulk Edit",
+                                        iconCssClass: "mdi mdi-table-edit",
+                                    },
+                                    {
+                                        command: "remove-column",
+                                        title: "Remove Column",
+                                        iconCssClass: "mdi mdi-delete",
+                                    },
+                                ]
+                                : []),
                         ],
                     },
                 },
@@ -146,7 +189,7 @@ const useSlickGridReact = () => {
         }
 
         return cols;
-    }, [config.include_index, orderedParamColumns, initialWidths]);
+    }, [config.include_index, orderedParamColumns, initialWidths, isEditMode]);
 
     /**
      * A new data provider gets created whenever any of the dependencies change which
@@ -188,7 +231,7 @@ const useSlickGridReact = () => {
             gridRef.current = e.detail;
             
             // Store gridRef in chart instance for getConfig() access
-            (chart as any).gridRef = gridRef;
+            chart.setGridRef(gridRef);
 
             const grid = e.detail.slickGrid;
             if (grid && dataProvider) {
@@ -305,6 +348,18 @@ const useSlickGridReact = () => {
                 } else if (command === "find-replace") {
                     setSearchColumn(column.field);
                     setIsFindReplaceOpen(true);
+                } else if (command === "bulk-edit") {
+                    if (!isEditModeRef.current) {
+                        return;
+                    }
+                    setBulkEditColumn(column.field);
+                    setIsBulkEditDialogOpen(true);
+                } else if (command === "remove-column") {
+                    if (!isEditModeRef.current) {
+                        return;
+                    }
+                    // const dataModel = new DataModel(dataStore, { autoupdate: false });
+                    dataModel.removeColumn(column.field);
                 }
             },
         ));
@@ -325,7 +380,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore]);
+    }, [config, chart, dataStore, dataModel]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
@@ -462,7 +517,7 @@ const useSlickGridReact = () => {
                     // hack - seems somewhat closer to getting the right size here?
                     defaultRatioForStringType: 1.1,
                 },
-                editable: true,
+                editable: isEditMode,
                 enableCellNavigation: true,
                 enableExcelCopyBuffer: true,
                 multiSelect: true,
@@ -474,13 +529,173 @@ const useSlickGridReact = () => {
                     hideColumnHideCommand: true, // Disabled to avoid messing with the column order
                 },
             }) satisfies GridOption, // helps with autocomplete for options
-        [chartId, theme],
+        [chartId, theme, isEditMode],
     );
 
     const onDialogClose = useCallback(() => {
         setIsFindReplaceOpen(false);
         setSearchColumn(null);
     }, []);
+
+    const closeAddColumnDialog = useCallback(() => {
+        setIsAddColumnDialogOpen(false);
+    }, []);
+
+    const closeBulkEditDialog = useCallback(() => {
+        setIsBulkEditDialogOpen(false);
+        setBulkEditColumn(null);
+    }, []);
+
+    // Columns to be displayed for cloning
+    const cloneableColumns = useMemo(() => {
+        return orderedParamColumns
+            .map((column) => ({
+                field: column.field,
+                name: column.name,
+                datatype: column.datatype,
+                stringLength: column.stringLength,
+                delimiter: column.delimiter,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [orderedParamColumns]);
+
+    const addColumnDefaultPosition = useMemo(() => {
+        return config.include_index ? 2 : Math.min(2, orderedParamColumns.length + 1);
+    }, [config.include_index, orderedParamColumns.length]);
+
+    const handleAddColumn = useCallback(({
+        name,
+        datatype,
+        cloneColumn,
+        position,
+        stringLength,
+        delimiter,
+    }: AddColumnParams) => {
+        if (!isEditMode) {
+            return;
+        }
+        const trimmedName = name.trim();
+
+        if (!trimmedName) {
+            setFeedbackAlert({
+                type: "warning",
+                title: "Add Column Warning",
+                message: "Column name is required.",
+            });
+            return;
+        }
+
+        if (dataStore.columnIndex[trimmedName]) {
+            setFeedbackAlert({
+                type: "error",
+                title: "Add Column Error",
+                message: `Column ${trimmedName} already exists`,
+            });
+            return;
+        }
+
+        try {
+            // const dataModel = new DataModel(dataStore, { autoupdate: false });
+            // Create a new column
+            dataModel.createColumn({
+                name: trimmedName,
+                datatype: datatype,
+                cloneColumn,
+                stringLength,
+                delimiter,
+            });
+
+            // Get the position of the column to be inserted
+            const orderedFields = orderedParamColumnsRef.current.map((column) => column.field);
+            const displayedFields = config.include_index
+                ? ["__index__", ...orderedFields]
+                : [...orderedFields];
+            const parsedPosition = position ?? displayedFields.length + 1;
+            const insertionIndex = Math.min(
+                Math.max(parsedPosition - 1, 0),
+                displayedFields.length,
+            );
+
+            // Map the display-layer index to config.param index, skip the "__index__" slot
+            const paramInsertionIndex = config.include_index
+                ? Math.max(0, insertionIndex - 1)
+                : insertionIndex;
+
+            // Splice into a copy of config.param to preserve any FieldSpec/ColumnQuery objects
+            const nextParam = [...(config.param ?? [])];
+            nextParam.splice(paramInsertionIndex, 0, trimmedName);
+
+            // Flatten the params so ordering retains the query objects
+            const nextRenderedFields = nextParam.flatMap((entry) => flattenFields(entry));
+            const nextOrder = Object.fromEntries(
+                nextRenderedFields.map((field, index) => [field, index]),
+            );
+
+            runInAction(() => {
+                config.param = nextParam;
+                config.order = nextOrder;
+            });
+
+            // Notify datastore and rerender the grid
+            dataStore.dataChanged([trimmedName]);
+            gridRef.current?.slickGrid?.invalidate();
+            setIsAddColumnDialogOpen(false);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to add editable column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Add Column Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    columnName: trimmedName,
+                    cloneColumn,
+                    position,
+                },
+            });
+        }
+    }, [config, dataStore, dataModel, isEditMode]);
+
+    const handleBulkEdit = useCallback(({
+        action,
+        columnName,
+        value,
+    }: {
+        action: BulkEditAction;
+        columnName: string;
+        value: string;
+    }) => {
+        if (!isEditMode) {
+            return;
+        }
+        try {
+            // const dataModel = new DataModel(dataStore, { autoupdate: false });
+            const rowIndices = Array.from(sortedFilteredIndicesRef.current);
+
+            if (action === "fill-all") {
+                dataModel.fillColumn(columnName, value, rowIndices, false);
+            } else {
+                dataModel.fillColumn(columnName, value, rowIndices, true);
+            }
+
+            gridRef.current?.slickGrid?.invalidate();
+            closeBulkEditDialog();
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to bulk edit column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Bulk Edit Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    action,
+                    columnName,
+                },
+            });
+        }
+    }, [closeBulkEditDialog, dataModel, isEditMode]);
 
     return {
         config,
@@ -499,8 +714,20 @@ const useSlickGridReact = () => {
         options,
         columnDefs,
         handleGridCreated,
+        isEditMode,
         isColumnEditable,
         onDialogClose,
+        feedbackAlert,
+        setFeedbackAlert,
+        isAddColumnDialogOpen,
+        cloneableColumns,
+        addColumnDefaultPosition,
+        closeAddColumnDialog,
+        handleAddColumn,
+        isBulkEditDialogOpen,
+        bulkEditColumn,
+        closeBulkEditDialog,
+        handleBulkEdit,
     };
 };
 

@@ -5,6 +5,7 @@ This module is part of the ChatMDV boundary (see CHATMDV_BOUNDARY.md). It should
 actionable diagnostics when subprocess execution fails, without changing core MDV data APIs.
 """
 import subprocess
+import sys
 import warnings
 import tempfile
 import concurrent.futures
@@ -87,7 +88,7 @@ def execute_code(
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             stdout, stderr = run_subprocess(
-                ["python", temp.name],
+                [sys.executable, temp.name],
                 on_output_line=on_output_line,
                 on_heartbeat=on_heartbeat,
             )

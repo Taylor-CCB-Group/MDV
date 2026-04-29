@@ -55,6 +55,11 @@ ColumnName = str  # NewType("ColumnName", str)
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
 datatype_mappings = {
+    "int8": "integer",
+    "int16": "integer",
+    "uint8": "integer",
+    "uint16": "integer",
+    "uint32": "integer",
     "int64": "integer",
     "float64": "double",
     "float32": "double",
@@ -2547,6 +2552,7 @@ def add_column_to_group(
     group (h5py.Group): The group to add the data to
     length (int): The length of the data
     """
+    col.setdefault("original_dtype", str(data.dtype))
 
     if (
         col["datatype"] == "text"
@@ -2619,7 +2625,7 @@ def add_column_to_group(
         for i in range(0, length):
             b = i * maxv
             try:
-                v = data[i]  # may raise KeyError if data is None at this index
+                v = data.iloc[i] if hasattr(data, "iloc") else data[i]
                 if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
@@ -2646,12 +2652,32 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
+        if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
+            try:
+                numeric = numpy.asarray(
+                    pandas.to_numeric(clean, errors="coerce"),
+                    dtype=numpy.float64,
+                )
+                finite_numeric = numeric[numpy.isfinite(numeric)]
+                out_of_range = finite_numeric[finite_numeric > 16_777_216]
+                if len(out_of_range) != 0:
+                    col.setdefault("storage_warnings", []).append(
+                        "uint32 -> float32 (integer): "
+                        f"{len(out_of_range)} value(s) exceed exact-integer range "
+                        f"(max={float(finite_numeric.max()):.0f}); precision loss possible."
+                    )
+            except Exception:
+                pass
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
+        if na.size == 0:
+            col["minMax"] = [0.0, 0.0]
+            col["quantiles"] = {}
+            return
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
@@ -2670,7 +2696,12 @@ def get_column_info(columns, dataframe, supplied_columns_only):
 
     if not supplied_columns_only:
         cols = [
-            {"datatype": datatype_mappings[d.name], "name": c, "field": c}
+            {
+                "datatype": datatype_mappings[d.name],
+                "name": c,
+                "field": c,
+                "original_dtype": d.name,
+            }
             for d, c in zip(dataframe.dtypes, dataframe.columns)
         ]
         # replace with user given column metadata
@@ -2733,6 +2764,7 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
     import numpy as np
     
     field = col_info["field"]
+    col_info.setdefault("original_dtype", str(polars_series.dtype))
     
     # Handle different column types
     if col_info["datatype"] in ["text", "text16", "multitext"]:
@@ -2804,6 +2836,21 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 # fillna is necessary because NaN cannot be cast to int
                 data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
 
+            if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
+                try:
+                    numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
+                    arr = numeric.to_numpy()
+                    finite = arr[np.isfinite(arr)]
+                    out_of_range = finite[finite > 16_777_216]
+                    if len(out_of_range) != 0:
+                        col_info.setdefault("storage_warnings", []).append(
+                            "uint32 -> float32 (integer): "
+                            f"{len(out_of_range)} value(s) exceed exact-integer range "
+                            f"(max={float(finite.max()):.0f}); precision loss possible."
+                        )
+                except Exception:
+                    pass
+
             # Create dataset
             h5_group.create_dataset(field, data=data)
 
@@ -2851,7 +2898,8 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
             cols.append({
                 "datatype": mdv_dtype,
                 "name": col_name,
-                "field": col_name
+                "field": col_name,
+                "original_dtype": str(polars_dtype),
             })
         
         # Replace with user given column metadata

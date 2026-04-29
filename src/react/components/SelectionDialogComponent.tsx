@@ -1,4 +1,4 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler, useSimplerFilteredIndices } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, useOwnedFilteredIndices, usePasteHandler } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useId, useRef } from "react";
@@ -55,6 +55,7 @@ import {
 } from "@/lib/columnTypeHelpers";
 import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
 import { useDebounce } from "use-debounce";
+import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 
 
 
@@ -86,17 +87,23 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
     return filter;
 }
 
-const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
+const TextComponent = observer(({
+    column,
+}: Props<CategoricalDataType>) => {
     const [open, setOpen] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
     const conf = useConfig<SelectionDialogConfig>();
-    const { values } = column;
+    const values = useLiveCategorySelectionValues(column.field);
     const filter = useFilterConfig(column);
     const value = filter?.category || [];
     const setValue = useCallback((newValue: string[]) => {
-        const newFilter = filter || { category: [] };
+        const newFilter =
+            filter ||
+            (column.datatype === "multitext"
+                ? { category: [], operand: "or" as const }
+                : { category: [] });
         action(() => {
             newFilter.category = newValue;
             conf.filters[column.field] = newFilter;
@@ -300,17 +307,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
 });
 
 const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
-    // todo: think about what to do with null config for filter
-    console.log("multitext selection dialog has missing features for 'operand' and other logic");
-    // !!! - uncommenting this stuff makes the entire chart disappear when the filter is removed
-    // const config = useFilterConfig(column);
-    // const operand = config.operand || "or";
-    return (
-        <>
-            {/* operand: {operand} */}
-            <TextComponent column={column} />
-        </>
-    )
+    return <TextComponent column={column} />;
 });
 
 const UniqueComponent = observer(({ column }: Props<"unique">) => {
@@ -376,7 +373,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         filter.filter("filterRange", [column.field], { min, max }, true);
     }, [column, filter, debouncedValue]);
 
-    const filteredIndices = useSimplerFilteredIndices();
+    const { ownerVisibleRows: filteredIndices } = useOwnedFilteredIndices(filter);
     const highlightedIndices = useHighlightedIndices();
     const numericData = getNumericColumnData(column);
     const overallHistogramQuery = useQuery<number[]>({

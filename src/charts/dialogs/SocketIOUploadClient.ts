@@ -72,6 +72,10 @@ export class SocketIOUploadClient {
         
         if (lowerName.endsWith('.csv')) {
             return { type: 'csv', contentType: 'text/csv' };
+        } else if (lowerName.endsWith('.tsv') || lowerName.endsWith('.tab')) {
+            return { type: 'tsv', contentType: 'text/tab-separated-values' };
+        } else if (lowerName.endsWith('.txt')) {
+            return { type: 'tsv', contentType: 'text/plain' };
         } else if (lowerName.endsWith('.h5ad')) {
             return { type: 'anndata', contentType: 'application/x-hdf' };
         } else if (lowerName.endsWith('.tiff') || lowerName.endsWith('.tif')) {
@@ -145,6 +149,9 @@ export class SocketIOUploadClient {
         this.socket.on('upload_processing_initiated', (data: any) => {
             console.log('Server initiated processing:', data);
             if (data.file_id === this.state.fileId) {
+                if (this.processingComplete || this.state.status === 'completed') {
+                    return;
+                }
                 this.updateStatus('processing', 'Server processing file...');
                 this.serverRespondedToQuery = true;
             }
@@ -153,6 +160,9 @@ export class SocketIOUploadClient {
         this.socket.on('upload_processing', (data: any) => {
             console.log('Server processing file:', data);
             if (data.file_id === this.state.fileId) {
+                if (this.processingComplete || this.state.status === 'completed') {
+                    return;
+                }
                 this.updateStatus('processing', 'File processing started');
             }
         });
@@ -313,8 +323,8 @@ export class SocketIOUploadClient {
             content_type: contentType,
         };
 
-        // Add CSV-specific parameters
-        if (type === 'csv') {
+        // Tabular datasource parameters (CSV / TSV / tab-delimited text)
+        if (type === 'csv' || type === 'tsv') {
             startMsg.name = this.config.datasourceName || 
                            this.config.fileName?.replace(/\.[^/.]+$/, '') || 
                            this.config.file.name.replace(/\.[^/.]+$/, '');
@@ -519,17 +529,24 @@ private async waitForProcessing(): Promise<void> {
                 console.log('Upload transfer completed');
             }
 
-            // Wait for processing
-            this.updateStatus('processing', 'Processing file...');
-            console.log('Waiting for server processing...');
-            await this.waitForProcessing();
+            // Wait for processing only if completion wasn't already received.
+            if (!this.processingComplete && this.state.status !== 'completed') {
+                this.updateStatus('processing', 'Processing file...');
+                console.log('Waiting for server processing...');
+                await this.waitForProcessing();
+            }
 
             if (this.state.result) {
                 console.log('Upload completed successfully:', this.state.result);
                 return this.state.result;
-            } else {
-                throw new Error('Upload completed but no result received');
             }
+
+            // If backend emitted upload_error, preserve that message instead of replacing it.
+            if (this.state.error) {
+                throw new Error(this.state.error);
+            }
+
+            throw new Error('Upload completed but no result received');
 
         } catch (error) {
             console.error('Upload error:', error);

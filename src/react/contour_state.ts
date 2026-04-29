@@ -1,5 +1,12 @@
-import type { CategoricalDataType, DataColumn, LoadedDataColumn, FieldName } from "@/charts/charts";
-import { useMemo } from "react";
+import type {
+    AnyGuiSpec,
+    CategoricalDataType,
+    DataColumn,
+    Disposer,
+    LoadedDataColumn,
+    FieldName,
+} from "@/charts/charts";
+import { useEffect, useMemo, useState } from "react";
 import {
     useCategoryFilterIndices,
     useConfig,
@@ -11,10 +18,9 @@ import {
 import { useDataStore } from "./context";
 // import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
-import { g, isArray, toArray } from "@/lib/utils";
-import { observable, autorun } from "mobx";
+import { g, isArray } from "@/lib/utils";
+import { reaction, toJS } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
-import type BaseChart from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getFieldColor } from "./fieldColorManager";
 import type { FieldLegendItem } from "./components/FieldContourLegend";
@@ -75,37 +81,42 @@ function useColorRange(
     category: string | string[] | undefined,
 ) {
     const ds = useDataStore();
-    const columnColors = useMemo(
-        () =>
-            contourParameter ? ds.getColumnColors(contourParameter.field, {
-                asArray: true,
-                useValue: true,
-            }) : viridis,
-        [ds, contourParameter],
-    );
+    const categorySnapshot = Array.isArray(category) ? [...category] : category;
+    const categoryKey = Array.isArray(categorySnapshot)
+        ? categorySnapshot.join("\u0000")
+        : categorySnapshot ?? "";
+    // Category columns can mutate in place, for example when annotation values are added
+    // to an existing multitext column. Derive colors from the latest column contents on
+    // every render rather than memoizing against the stable column object identity.
+    const columnColors =
+        contourParameter
+            ? ds.getColumnColors(contourParameter.field, {
+                  asArray: true,
+                  useValue: true,
+              })
+            : viridis;
     /**
      * if the category refers to a specific value,
      * return its index in `category.values` (and associated `columnColors`).
      * otherwise return `-1` indicating that we should use the default color range
      * (currently hardcoded to `viridis`)
      */
-    const categoryValueIndex = useMemo(() => {
+    const categoryValueIndex = (() => {
         // if (!category) return contourParameter.values.map((_, i) => i); //NO: -1 is a clue to use general 'viridis' color range atm.
-        if (!contourParameter || !category) return -1;
+        if (!contourParameter || !categorySnapshot) return -1;
         //we could do something different here... would need more clever color handling on the receiving end
-        if (Array.isArray(category)) return category.length > 1 ? -1 : contourParameter.values.indexOf(category[0]);
-        return contourParameter.values.indexOf(category);
-    }, [contourParameter, category]);
+        if (Array.isArray(categorySnapshot))
+            return categorySnapshot.length > 1 ? -1 : contourParameter.values.indexOf(categorySnapshot[0]);
+        return contourParameter.values.indexOf(categorySnapshot);
+    })();
     const colorRange = useMemo(() => {
         if (categoryValueIndex === -1) return viridis;
         const color = columnColors[categoryValueIndex];
-        // return [[...color, 255], [...color, 255]];
-        console.log("color", color, category);
         // return [color];
         // workaround for https://github.com/visgl/deck.gl/issues/9219
         // always use same length array so it doesn't delete the texture
         return new Array(viridis.length).fill(color);
-    }, [categoryValueIndex, columnColors, category]);
+    }, [categoryValueIndex, columnColors, categoryKey]);
     return colorRange;
 }
 
@@ -346,6 +357,48 @@ export type DualContourLegacyConfig = {
     };
 } & ContourVisualConfig;
 
+type DensityVisualisationFolderOptions = {
+    categorySelectionControls: AnyGuiSpec[];
+    legendControls?: AnyGuiSpec[];
+    disposers?: Disposer[];
+};
+
+export function getDensityVisualisationFolder(
+    config: ContourVisualConfig,
+    { categorySelectionControls, legendControls = [], disposers = [] }: DensityVisualisationFolderOptions,
+) {
+    const currentValue: AnyGuiSpec[] = [
+        g({
+            type: "folder",
+            label: "Category selection",
+            current_value: categorySelectionControls,
+        }),
+        ...getContourVisualSettings(config),
+    ];
+
+    if (legendControls.length > 0) {
+        currentValue.push(
+            g({
+                type: "folder",
+                label: "Legend",
+                current_value: legendControls,
+            }),
+        );
+    }
+
+    const folderSpec = g({
+        type: "folder",
+        label: "Density Visualisation",
+        current_value: currentValue,
+    });
+
+    if (disposers.length > 0) {
+        folderSpec._disposers = disposers;
+    }
+
+    return folderSpec;
+}
+
 const contourBandwidthSlider = {
     minBandwidth: 0.01,
     maxBandwidth: 250,
@@ -369,118 +422,114 @@ function sliderValueToBandwidth(value: number) {
     return 10 ** safeValue;
 }
 
-export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
-    const { dataStore } = chart;
-    // make it so that if we change the parameter, we get the new values in the dropdowns
-    // empty array will be replaced with the new values
-    const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
-    
-    // Create autorun that will be disposed when the settings dialog closes
-    // The disposer is stored in the _disposers array on the returned GuiSpec
-    // so it gets cleaned up properly when the dialog closes
-    const disposer = autorun(() => {
-        if (typeof c.contourParameter !== "string") {
-            // as of now, categorical parameter like this is expected to be a string here
-            // we would like to be operating on a version of state that just had a column object
-            // complete with values, regardless of provenance, and not need to refer to dataStore
-            console.error("unexpected type for contourParameter");
-            return;
-        }
-        // getColumnValues() may throw or return undefined, especially with linked data...
-        // actually, there is another issue when we don't really have a categorical column...
-        try {
-            const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
-            const cats = ocats.map((x) => ({ t: x }));
-            catsValues[0] = cats;
-        } catch (e) {
-            console.error(`error updating contour values with '${c.contourParameter}' (${e})`);
-        }
-    });
-    
-    // If we have a "category_selection" widget and it properly observed `c.contourParameter`,
-    // we wouldn't need this autorun here.
-    // this is related to existing selection dialog widget - both should be able to understand multitext better.
-    const folderSpec = g({
-        type: "folder",
-        label: "Density Visualisation",
-        current_value: [
+function toCategorySelection(value: string | string[] | undefined) {
+    if (isArray(value)) return value.filter((item): item is string => typeof item === "string");
+    return typeof value === "string" ? [value] : [];
+}
+
+function areStringArraysEqual(a: string[], b: string[]) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function useContourCategorySelections(config: DualContourLegacyConfig) {
+    const [categories, setCategories] = useState(() => ({
+        category1: toCategorySelection(config.category1),
+        category2: toCategorySelection(config.category2),
+    }));
+
+    useEffect(() => {
+        return reaction(
+            () => [toJS(config.category1), toJS(config.category2)] as const,
+            ([rawCategory1, rawCategory2]) => {
+                const nextCategory1 = toCategorySelection(rawCategory1);
+                const nextCategory2 = toCategorySelection(rawCategory2);
+                setCategories((previous) => {
+                    if (
+                        areStringArraysEqual(previous.category1, nextCategory1) &&
+                        areStringArraysEqual(previous.category2, nextCategory2)
+                    ) {
+                        return previous;
+                    }
+                    return {
+                        category1: nextCategory1,
+                        category2: nextCategory2,
+                    };
+                });
+            },
+            { fireImmediately: true },
+        );
+    }, [config]);
+
+    return categories;
+}
+
+export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
+    return getDensityVisualisationFolder(c, {
+        categorySelectionControls: [
+            //maybe 2-spaces format is better...
             g({
-                type: "folder",
-                label: "Category selection",
-                current_value: [
-                    //maybe 2-spaces format is better...
-                    g({
-                        type: "column", //todo, make this "column" and fix odd behaviour with showing the value...
-                        //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
-                        //^^ maybe get Furquan to work on this.
-                        label: "Contour parameter",
-                        current_value: c.contourParameter || "",
-                        columnType: "text",
-                        func: (x) => {
-                            if (x === c.contourParameter) return;
-                            if (!isArray(c.param)) throw "expected param array";
-                            c.contourParameter = x;
-                            //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
-                            //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
-                            //nb - when we switch back to a contourParameter that had categories associated, the GUI state is changing
-                            // back to the old setting (but not updating the state).
-                            // Shouldn't this line mean that it forgets the old categories?
-                            c.category1 = c.category2 = [];
-                        },
-                    }),
-                    g({
-                        type: "multidropdown",
-                        label: "Contour Category 1",
-                        current_value: toArray(c.category1 || "None"),
-                        values: catsValues,
-                        func(x) {
-                            // if (x === "None") x = null;
-                            c.category1 = x;
-                        },
-                    }),
-                    g({
-                        type: "multidropdown",
-                        label: "Contour Category 2",
-                        current_value: toArray(c.category2 || "None"),
-                        values: catsValues,
-                        func(x) {
-                            // if (x === "None") x = null;
-                            c.category2 = x;
-                        },
-                    }),
-                    g({
-                        type: "multicolumn",
-                        label: "Density Fields",
-                        //@ts-expect-error - pending optional columns
-                        current_value: c.densityFields,
-                        columnType: "double",
-                        func: (x) => {
-                            c.densityFields = x;
-                        },
-                    })
-                ],
+                type: "column", //todo, make this "column" and fix odd behaviour with showing the value...
+                //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
+                //^^ maybe get Furquan to work on this.
+                label: "Contour parameter",
+                current_value: c.contourParameter || "",
+                columnType: ["text", "text16", "multitext"],
+                func: (x) => {
+                    if (x === c.contourParameter) return;
+                    if (!isArray(c.param)) throw "expected param array";
+                    c.contourParameter = x;
+                    //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
+                    //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
+                    //nb - when we switch back to a contourParameter that had categories associated, the GUI state is changing
+                    // back to the old setting (but not updating the state).
+                    // Shouldn't this line mean that it forgets the old categories?
+                    c.category1 = c.category2 = [];
+                },
             }),
-            ...getContourVisualSettings(c),
             g({
-                type: "folder",
-                label: "Legend",
-                current_value: [
-                    g({
-                        type: "check",
-                        label: "Show Field Legend",
-                        current_value: c.field_legend.display,
-                        func: (x) => {
-                            c.field_legend.display = x;
-                        },
-                    }),
-                ],
+                type: "category_selection",
+                label: "Contour Category 1",
+                current_value: toCategorySelection(c.category1),
+                sourceColumn: () => c.contourParameter,
+                getCurrentValue: () => toCategorySelection(c.category1),
+                func(x) {
+                    // if (x === "None") x = null;
+                    c.category1 = isArray(x) ? [...x] : x;
+                },
+            }),
+            g({
+                type: "category_selection",
+                label: "Contour Category 2",
+                current_value: toCategorySelection(c.category2),
+                sourceColumn: () => c.contourParameter,
+                getCurrentValue: () => toCategorySelection(c.category2),
+                func(x) {
+                    // if (x === "None") x = null;
+                    c.category2 = isArray(x) ? [...x] : x;
+                },
+            }),
+            g({
+                type: "multicolumn",
+                label: "Density Fields",
+                //@ts-expect-error - pending optional columns
+                current_value: c.densityFields,
+                columnType: "double",
+                func: (x) => {
+                    c.densityFields = x;
+                },
+            }),
+        ],
+        legendControls: [
+            g({
+                type: "check",
+                label: "Show Field Legend",
+                current_value: c.field_legend.display,
+                func: (x) => {
+                    c.field_legend.display = x;
+                },
             }),
         ],
     });
-    
-    // Attach the disposer to the spec so it gets cleaned up when the settings dialog closes
-    folderSpec._disposers = [disposer];
-    return folderSpec;
 }
 
 /**
@@ -558,6 +607,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
  */
 export function useLegacyDualContour(hoveredFieldId?: FieldName | null): ContourLayerProps[] {
     const config = useConfig<DualContourLegacyConfig>();
+    const { category1, category2 } = useContourCategorySelections(config);
     // todo: this is currently short-circuiting for non-viv deck scatter...
     // breaking rule of hooks etc, should be fixed
     const commonProps = {
@@ -578,12 +628,12 @@ export function useLegacyDualContour(hoveredFieldId?: FieldName | null): Contour
     const contour1 = useCategoryContour({
         ...commonProps,
         id: "contour1",
-        category: config.category1,
+        category: category1,
     });
     const contour2 = useCategoryContour({
         ...commonProps,
         id: "contour2",
-        category: config.category2,
+        category: category2,
     });
     const stableArray = useMemo(
         () => [contour1, contour2, ...fieldContours].filter(v => v !== undefined),
