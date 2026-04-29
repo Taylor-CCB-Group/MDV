@@ -111,7 +111,13 @@ import sys
 
 
 
-def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasource_name: str, final_answer: str, question: str) -> str:
+def get_createproject_prompt_RAG(
+    project: MDVProject,
+    path_to_data: str,
+    datasource_name: str,
+    final_answer: str,
+    question: str,
+) -> str:
     """
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
     Handles both standard and gene-related queries.

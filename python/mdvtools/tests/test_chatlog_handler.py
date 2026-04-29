@@ -1,11 +1,8 @@
 import logging
 
+from langchain_core.outputs import Generation, LLMResult
+
 from mdvtools.llm.chatlog import LangchainLoggingHandler
-
-
-class _DummyResponse:
-    def __init__(self) -> None:
-        self.generations = [[]]
 
 
 def test_langchain_logging_handler_avoids_info_noise(caplog):
@@ -16,7 +13,7 @@ def test_langchain_logging_handler_avoids_info_noise(caplog):
 
     with caplog.at_level(logging.INFO):
         handler.on_chat_model_start({}, [])
-        handler.on_llm_end(_DummyResponse())
+        handler.on_llm_end(LLMResult(generations=[[Generation(text="ok")]]))
         handler.on_chain_start({"name": "demo"}, {})
         handler.on_chain_end({})
 

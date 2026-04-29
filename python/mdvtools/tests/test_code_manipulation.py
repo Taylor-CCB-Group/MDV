@@ -1,5 +1,8 @@
+from typing import cast
+
 from mdvtools.llm.code_manipulation import parse_view_name
 from mdvtools.llm.code_manipulation import prepare_code, _defines_function_named_main
+from mdvtools.mdvproject import MDVProject
 
 
 class TestParseViewName:
@@ -75,7 +78,7 @@ if __name__ == "__main__":
 else:
     main()
 ```"""
-    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=False)
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=False)
     # Must compile; regression for stray `else:` being appended.
     compile(out, "<string>", "exec")
 
@@ -101,7 +104,7 @@ def test_prepare_code_appends_main_only_when_def_main_exists():
 def main():
     x = 1
 ```"""
-    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=False)
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=False)
     assert 'if __name__ == "__main__":\n    main()' in out
 
 
@@ -125,7 +128,7 @@ project.add_datasource(
     add_to_view=view_name,
 )
 ```"""
-    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=True)
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=True)
     compile(out, "<string>", "exec")
     assert "project.add_datasource(" in out
     assert "# project.add_datasource" not in out
@@ -144,6 +147,6 @@ def test_prepare_code_no_append_main_for_top_level_only():
 x = 1
 print(x)
 ```"""
-    out = prepare_code(llm, data=None, project=FakeProject(), modify_existing_project=False)
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=False)
     assert 'if __name__ == "__main__":\n    main()' not in out
     compile(out, "<string>", "exec")

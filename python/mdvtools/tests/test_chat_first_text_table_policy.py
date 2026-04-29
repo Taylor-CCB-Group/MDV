@@ -1,9 +1,11 @@
 from types import SimpleNamespace
+from typing import cast
 
 from langchain.prompts import PromptTemplate
 
 from mdvtools.llm import templates
 from mdvtools.llm.verification import build_verification_summary
+from mdvtools.mdvproject import MDVProject
 
 
 class _FakeProject:
@@ -30,7 +32,7 @@ def test_prompt_includes_chat_first_text_table_policy(monkeypatch):
     monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
 
     prompt = templates.get_createproject_prompt_RAG(
-        project=_FakeProject(),
+        project=cast(MDVProject, _FakeProject()),
         path_to_data="",
         datasource_name="cells",
         final_answer='fields "leiden"\ncharts "Table Plot"',
@@ -77,7 +79,7 @@ def test_prompt_includes_marker_gene_policy_with_h5ad(monkeypatch):
     monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
 
     prompt = templates.get_createproject_prompt_RAG(
-        project=_FakeProject(),
+        project=cast(MDVProject, _FakeProject()),
         path_to_data="/project/scanpy_data.h5ad",
         datasource_name="cells",
         final_answer='fields "leiden"\ncharts "Table Plot"',
@@ -101,7 +103,7 @@ def test_createproject_prompt_RAG_formats_as_retrieval_qa_template(monkeypatch):
     monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
 
     prompt = templates.get_createproject_prompt_RAG(
-        project=_FakeProject(),
+        project=cast(MDVProject, _FakeProject()),
         path_to_data="",
         datasource_name="cells",
         final_answer='fields "leiden"\ncharts "Table Plot"',

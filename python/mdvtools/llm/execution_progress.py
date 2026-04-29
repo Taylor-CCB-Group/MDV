@@ -4,7 +4,7 @@ import json
 import re
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 
 PROGRESS_PREFIX = "CHATMDV_PROGRESS:"
@@ -103,7 +103,12 @@ def infer_progress_event_from_output(line: str) -> ProgressEvent | None:
 
 
 class ProgressThrottler:
-    def __init__(self, *, min_interval_seconds: float = 3.0, clock: callable = time.monotonic):
+    def __init__(
+        self,
+        *,
+        min_interval_seconds: float = 3.0,
+        clock: Callable[[], float] = time.monotonic,
+    ):
         self.min_interval_seconds = min_interval_seconds
         self.clock = clock
         self._last_emit_ts = 0.0
