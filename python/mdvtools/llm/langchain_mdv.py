@@ -42,6 +42,7 @@ from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
 from .chat_client_refresh import client_needs_refresh_after_chat
 from .execution_progress import (
+    attach_failed_source_context,
     ProgressEvent,
     ProgressThrottler,
     build_heartbeat_event,
@@ -431,8 +432,8 @@ class ProjectChat(ProjectChatProtocol):
         
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room, conversation_id)
-        log = socket_api.log
-        log(f"Asking question: {question}")
+        log = chat_debug_logger.info
+        chat_debug_logger.info("Asking question: %s", question)
 
         if question == "test error":
             raise Exception("testing error response as requested")
@@ -497,7 +498,7 @@ class ProjectChat(ProjectChatProtocol):
             socket_api.update_chat_progress(
                 _step_message(1, "Understanding your request"), id, progress, 0, step_index=1, step_total=total_steps
             )
-            log(f"Asking the LLM: '{question}'")
+            chat_debug_logger.info("Asking the LLM: %r", question)
             if self.init_error:
                 socket_api.update_chat_progress(
                     f"Agent initialisation error: {str(self.error_message)}", id, 100, 0
@@ -515,6 +516,14 @@ class ProjectChat(ProjectChatProtocol):
                     step_total=total_steps,
                 )
                 progress += 31
+                socket_api.update_chat_progress(
+                    _step_message(3, "Generating runnable analysis code (this can take up to 1-2 minutes)"),
+                    id,
+                    progress,
+                    0,
+                    step_index=3,
+                    step_total=total_steps,
+                )
                 response = agent(question)
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
             
@@ -597,7 +606,7 @@ class ProjectChat(ProjectChatProtocol):
                     result,
                     self.df,
                     self.project,
-                    log,
+                    chat_debug_logger.info,
                     modify_existing_project=True,
                     view_name=question,
                 )
@@ -618,7 +627,7 @@ class ProjectChat(ProjectChatProtocol):
                         result_retry,
                         self.df,
                         self.project,
-                        log,
+                        chat_debug_logger.info,
                         modify_existing_project=True,
                         view_name=question,
                     )
@@ -660,7 +669,7 @@ class ProjectChat(ProjectChatProtocol):
                         result_retry,
                         self.df,
                         self.project,
-                        log,
+                        chat_debug_logger.info,
                         modify_existing_project=True,
                         view_name=question,
                     )
@@ -668,7 +677,7 @@ class ProjectChat(ProjectChatProtocol):
                 final_code, preflight_meta = preflight_with_single_retry(
                     initial_code=final_code,
                     regenerate_once=_regenerate_for_preflight,
-                    log=log,
+                    log=chat_debug_logger.info,
                     datasource_fields=datasource_fields,
                 )
                 chat_debug_logger.info("Preflight metadata: %s", preflight_meta)
@@ -754,7 +763,13 @@ class ProjectChat(ProjectChatProtocol):
                 chat_debug_logger.error("Code execution failed diagnostics:\n%s", stderr)
                 friendly = friendly_subprocess_failure_message(stderr or "")
                 if friendly is not None:
-                    raise Exception(friendly)
+                    raise Exception(
+                        attach_failed_source_context(
+                            friendly,
+                            stderr or "",
+                            fallback_code=final_code,
+                        )
+                    )
                 raise Exception(f"Code execution failed: \n{stderr}")
 
             data_preview_text = format_stdout_for_chat(stdout)

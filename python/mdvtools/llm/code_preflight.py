@@ -37,6 +37,12 @@ CHART_CLASS_MODULES: dict[str, str] = {
     "TextBox": "mdvtools.charts.text_box_plot",
 }
 
+_CHART_LIKE_SUFFIXES = ("Chart", "Plot", "Box")
+_CHART_NAME_HINTS: dict[str, str] = {
+    "Histogram": "HistogramPlot",
+    "MultilineChart": "MultiLinePlot",
+}
+
 
 @dataclass(frozen=True)
 class PreflightIssue:
@@ -107,6 +113,29 @@ def _extract_chart_calls(tree: ast.AST) -> list[tuple[str, ast.Call]]:
         elif isinstance(fn, ast.Attribute):
             calls.append((fn.attr, node))
     return calls
+
+
+def _is_chart_like_name(name: str) -> bool:
+    if name in CHART_CLASS_MODULES:
+        return True
+    if name in _CHART_NAME_HINTS:
+        return True
+    if not name or not name[0].isupper():
+        return False
+    return name.endswith(_CHART_LIKE_SUFFIXES)
+
+
+def _build_unknown_chart_message(name: str) -> str:
+    hint = _CHART_NAME_HINTS.get(name)
+    if hint is not None:
+        return (
+            f"Unknown chart class `{name}`. "
+            f"Use an allowlisted mdvtools chart class (did you mean `{hint}`?)."
+        )
+    return (
+        f"Unknown chart class `{name}`. "
+        "Use an allowlisted mdvtools chart class."
+    )
 
 
 def _extract_string_list(node: ast.AST) -> list[str] | None:
@@ -310,16 +339,13 @@ def validate_generated_code_preflight(
 
         issues.extend(_check_keyword_args(class_name, call))
 
-    # Catch common hallucinations like MultilineChart vs MultiLinePlot.
+    # Catch unknown chart-like constructor names before runtime NameError.
     for name, call in chart_calls:
-        if name.endswith("Chart") and name not in CHART_CLASS_MODULES:
+        if _is_chart_like_name(name) and name not in CHART_CLASS_MODULES:
             issues.append(
                 PreflightIssue(
                     code="unknown_chart_class",
-                    message=(
-                        f"Unknown chart class `{name}`. "
-                        "Use an allowlisted mdvtools chart class (for multiline, use `MultiLinePlot`)."
-                    ),
+                    message=_build_unknown_chart_message(name),
                     line=getattr(call, "lineno", None),
                     column=getattr(call, "col_offset", None),
                     symbol=name,

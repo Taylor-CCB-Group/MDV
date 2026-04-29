@@ -1,4 +1,5 @@
 from mdvtools.llm.execution_progress import (
+    attach_failed_source_context,
     ProgressEvent,
     ProgressThrottler,
     build_heartbeat_event,
@@ -88,3 +89,23 @@ def test_friendly_subprocess_failure_message_non_kill_is_none():
         "Subprocess failed with returncode=1. stdout_preview='x'. stderr_preview='y'"
     )
     assert message is None
+
+
+def test_attach_failed_source_context_uses_stderr_block():
+    base = "Runtime stopped due to memory limits."
+    stderr = (
+        "Subprocess failed with returncode=-9\n"
+        "--- Failed Python source (10 chars) ---\n"
+        "print('x')\n"
+    )
+    combined = attach_failed_source_context(base, stderr)
+    assert "Runtime stopped due to memory limits." in combined
+    assert "--- Failed Python source" in combined
+    assert "print('x')" in combined
+
+
+def test_attach_failed_source_context_uses_fallback_when_missing():
+    base = "Runtime stopped due to memory limits."
+    combined = attach_failed_source_context(base, "no source in stderr", fallback_code="print('fallback')")
+    assert "--- Failed Python source" in combined
+    assert "print('fallback')" in combined

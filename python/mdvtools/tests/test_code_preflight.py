@@ -25,6 +25,18 @@ def main():
     assert any(i.code == "unknown_chart_class" for i in res.issues)
 
 
+def test_preflight_rejects_unknown_histogram_alias():
+    code = """
+def main():
+    h = Histogram(title="h", params=["Age"])
+"""
+    res = validate_generated_code_preflight(code)
+    assert res.ok is False
+    msgs = " | ".join(i.message for i in res.issues)
+    assert "Unknown chart class `Histogram`" in msgs
+    assert "did you mean `HistogramPlot`?" in msgs
+
+
 def test_preflight_allows_valid_multi_chart_script():
     code = """
 from mdvtools.charts.box_plot import BoxPlot
@@ -42,6 +54,27 @@ def main():
     assert "BoxPlot" in res.chart_classes
     assert "ViolinPlot" in res.chart_classes
     assert "MultiLinePlot" in res.chart_classes
+
+
+def test_preflight_allows_histogram_plot_class():
+    code = """
+from mdvtools.charts.histogram_plot import HistogramPlot
+
+def main():
+    h = HistogramPlot(
+        title="h",
+        param="Age",
+        bin_number=10,
+        display_min=0,
+        display_max=100,
+        size=[1, 1],
+        position=[0, 0],
+    )
+"""
+    res = validate_generated_code_preflight(code)
+    assert res.ok is True
+    assert res.issues == []
+    assert "HistogramPlot" in res.chart_classes
 
 
 def test_preflight_flow_retries_once_and_returns_metadata():

@@ -170,3 +170,31 @@ def friendly_subprocess_failure_message(stderr_diagnostic: str) -> str | None:
         "(for example marker-gene ranking across ~1M cells). "
         "Try a lighter run (subset/downsample/per-group) or rerun in a higher-memory environment."
     )
+
+
+def attach_failed_source_context(
+    message: str,
+    stderr_diagnostic: str,
+    *,
+    fallback_code: str | None = None,
+    max_chars: int = 8000,
+) -> str:
+    marker = "--- Failed Python source"
+    source_block = ""
+    marker_index = stderr_diagnostic.find(marker)
+    if marker_index >= 0:
+        source_block = stderr_diagnostic[marker_index:].strip()
+    elif fallback_code:
+        source_block = (
+            f"--- Failed Python source ({len(fallback_code)} chars) ---\n{fallback_code}"
+        )
+
+    if not source_block:
+        return message
+
+    if len(source_block) > max_chars:
+        source_block = (
+            source_block[:max_chars]
+            + "\n\n--- Failed Python source truncated for display ---"
+        )
+    return f"{message}\n\n{source_block}"
