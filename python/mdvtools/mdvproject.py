@@ -32,23 +32,6 @@ from mdvtools.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict):
-    try:
-        payload = {
-            "sessionId": "5187b3",
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        with open("/app/.cursor/debug-5187b3.log", "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, default=str) + "\n")
-    except Exception:
-        pass
-
-
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
@@ -732,60 +715,14 @@ class MDVProject:
             mode = "w"
         elif not read_only:
             mode = "a"
-        # #region agent log
-        _agent_debug_log(
-            "pre-fix",
-            "H1",
-            "mdvproject.py:_get_h5_handle:entry",
-            "attempting h5 open",
-            {
-                "h5file": self.h5file,
-                "mode": mode,
-                "read_only": read_only,
-                "attempt_in": attempt,
-                "pid": os.getpid(),
-            },
-        )
-        # #endregion
         try:
             handle = h5py.File(self.h5file, mode)
-            # #region agent log
-            _agent_debug_log(
-                "pre-fix",
-                "H4",
-                "mdvproject.py:_get_h5_handle:success",
-                "h5 open success",
-                {
-                    "h5file": self.h5file,
-                    "mode": mode,
-                    "attempt_in": attempt,
-                    "pid": os.getpid(),
-                },
-            )
-            # #endregion
             return handle
         except Exception as e:
             # certain environments seem to have issues with the handle not being closed instantly
             # if there is a better way to do this, please change it
             # if there are multiple processes trying to access the file, this may also help
             # (although if they're trying to write, who knows what bad things may happen to the project in general)
-            # #region agent log
-            _agent_debug_log(
-                "pre-fix",
-                "H2",
-                "mdvproject.py:_get_h5_handle:except",
-                "h5 open failed",
-                {
-                    "h5file": self.h5file,
-                    "mode": mode,
-                    "read_only": read_only,
-                    "attempt_in": attempt,
-                    "error_type": type(e).__name__,
-                    "error": str(e),
-                    "pid": os.getpid(),
-                },
-            )
-            # #endregion
             time.sleep(0.1)
             attempt += 1
             lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
@@ -793,22 +730,6 @@ class MDVProject:
                 logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
             else:
                 logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
-            # #region agent log
-            _agent_debug_log(
-                "pre-fix",
-                "H3",
-                "mdvproject.py:_get_h5_handle:retry",
-                "retrying h5 open",
-                {
-                    "h5file": self.h5file,
-                    "mode": mode,
-                    "read_only": read_only,
-                    "attempt_out": attempt,
-                    "lock_error": lock_error,
-                    "pid": os.getpid(),
-                },
-            )
-            # #endregion
             if attempt >= 20:
                 raise RuntimeError(
                     f"unable to open h5 file after {attempt} attempts: {self.h5file}"
