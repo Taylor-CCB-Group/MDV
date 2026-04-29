@@ -270,10 +270,24 @@ class MDVProject:
     ) -> numpy.ndarray:
         """One matrix column (genes x cells): cells are rows, col_index selects a gene column."""
         if not sparse:
-            _len = int(grp["length"][0])
-            offset = col_index * _len
-            return numpy.asarray(grp["x"][offset : offset + _len], dtype=numpy.float32)
+            rows_per_col = int(grp["length"][0])
+            n_cols = len(grp["x"]) // rows_per_col
+            if not (0 <= col_index < n_cols):
+                raise IndexError(
+                    f"col_index {col_index} out of range for dense subgroup matrix "
+                    f"(valid range: [0, {n_cols - 1}])"
+                )
+            offset = col_index * rows_per_col
+            return numpy.asarray(
+                grp["x"][offset : offset + rows_per_col], dtype=numpy.float32
+            )
         p = grp["p"]
+        n_cols = len(p) - 1
+        if not (0 <= col_index < n_cols):
+            raise IndexError(
+                f"col_index {col_index} out of range for sparse subgroup matrix "
+                f"(valid range: [0, {n_cols - 1}])"
+            )
         offset = p[col_index : col_index + 2]
         start, end = int(offset[0]), int(offset[1])
         _indexes = numpy.array(grp["i"][start:end], dtype=numpy.int64)
