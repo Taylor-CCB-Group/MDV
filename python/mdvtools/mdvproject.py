@@ -197,31 +197,40 @@ class MDVProject:
         from mdvtools.llm.column_field_resolve import _WRAPPER_RE
 
         ds = self.get_datasource_metadata(datasource)
-        df = pandas.DataFrame()
-        for c in ds["columns"]:
-            data = self.get_column(datasource, c["field"])
-            df[c["field"]] = data
-        if columns is None:
-            return df
+        fields = [c["field"] for c in ds["columns"]]
+        field_set = set(fields)
 
-        # Chart "wrapper" tokens (e.g. gs|GENE(gs)|0) are not metadata field ids; they address
-        # rows-as-columns matrix columns. Handle those alongside normal field ids.
-        out: dict[str, Any] = {}
-        n_rows = int(ds.get("size", len(df) if len(df) else 0))
+        if columns is None:
+            out: dict[str, Any] = {}
+            for field in fields:
+                out[field] = self.get_column(datasource, field)
+            return pandas.DataFrame(out)
+
+        requested_keys: list[str] = []
         for col in columns:
             key = col.strip() if isinstance(col, str) else col
             if not isinstance(key, str):
                 raise AttributeError(f"invalid column key: {col!r}")
+            requested_keys.append(key)
+
+        # Chart "wrapper" tokens (e.g. gs|GENE(gs)|0) are not metadata field ids; they address
+        # rows-as-columns matrix columns. Handle those alongside normal field ids.
+        out: dict[str, Any] = {}
+        n_rows = int(ds.get("size", 0))
+        if "size" not in ds and fields:
+            # Preserve old fallback behavior without eagerly reading all columns.
+            n_rows = len(self.get_column(datasource, fields[0]))
+        for key in requested_keys:
             if _WRAPPER_RE.match(key):
-                out[col] = self._read_wrapper_expression_column(
+                out[key] = self._read_wrapper_expression_column(
                     datasource, key, n_rows
                 )
-            elif key in df.columns:
-                out[col] = df[key]
+            elif key in field_set:
+                out[key] = self.get_column(datasource, key)
             else:
                 raise AttributeError(
                     f"column {key!r} not found in {datasource} datasource "
-                    f"(have metadata fields: {list(df.columns)})"
+                    f"(have metadata fields: {fields})"
                 )
         return pandas.DataFrame(out)
 
