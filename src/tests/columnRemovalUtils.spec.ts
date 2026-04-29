@@ -3,6 +3,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import {
     analyzeChartColumnImpact,
     analyzeColumnRemoval,
+    getReferencedFields,
 } from "@/charts/columnRemovalUtils";
 
 type TestChartConfig = BaseConfig & Record<string, unknown>;
@@ -112,6 +113,48 @@ describe("columnRemovalUtils", () => {
             }),
         );
     });
+
+    test("extracts referenced fields from nested field and fields objects", () => {
+        const extracted = getReferencedFields({
+            field: { field: "gene" },
+            fields: [
+                "age",
+                { field: "cluster" },
+                { fields: [{ field: "donor" }] },
+                123,
+            ],
+            columnId: "sample_id",
+        });
+
+        expect(extracted).toEqual([
+            "gene",
+            "age",
+            "cluster",
+            "donor",
+            "sample_id",
+        ]);
+    });
+
+    test("detects nested config field references in analyzeChartColumnImpact", () => {
+        const impact = analyzeChartColumnImpact(
+            createChartConfig({
+                title: "Nested",
+                type: "custom",
+                nested_config: { fields: [{ field: "age" }] },
+            }),
+            { configEntriesUsingColumns: ["nested_config"], name: "custom" },
+            "age",
+        );
+
+        expect(impact).toEqual(
+            expect.objectContaining({
+                action: "block_delete",
+                usage: "settings",
+                usagePaths: ["nested_config"],
+            }),
+        );
+    });
+
     test("collects impacts from current and saved views", async () => {
         const impact = await analyzeColumnRemoval({
             dataSourceName: "cells",

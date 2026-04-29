@@ -29,19 +29,37 @@ export function getReferencedFields(value: unknown): string[] {
     if (!isRecord(value)) {
         return [];
     }
+    const referencedFields: string[] = [];
+
     if (typeof value.field === "string") {
-        return [value.field];
+        referencedFields.push(value.field);
+    } else if (isRecord(value.field)) {
+        referencedFields.push(...getReferencedFields(value.field));
     }
+
     if (Array.isArray(value.fields)) {
-        return value.fields.filter((field): field is string => typeof field === "string");
+        referencedFields.push(
+            ...value.fields.flatMap((field) => {
+                if (typeof field === "string") {
+                    return [field];
+                }
+                if (isRecord(field)) {
+                    return getReferencedFields(field);
+                }
+                return [];
+            }),
+        );
     }
+
     if (typeof value.columnId === "string") {
-        return [value.columnId];
+        referencedFields.push(value.columnId);
     }
+
     if ("column" in value) {
-        return getReferencedFields(value.column);
+        referencedFields.push(...getReferencedFields(value.column));
     }
-    return [];
+
+    return referencedFields;
 }
 
 function getChartTitle(config: BaseConfig) {

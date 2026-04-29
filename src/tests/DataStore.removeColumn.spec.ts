@@ -36,6 +36,7 @@ function createStore() {
             colors_changed: {},
         },
         dirtyMetadata: new Set(),
+        indexes: { temp: { old: 1 } },
         _callListeners: vi.fn(),
     });
 }
@@ -73,6 +74,7 @@ describe("DataStore soft delete", () => {
         expect(store.dirtyColumns.colors_changed).toEqual({});
         expect(store.dirtyColumns.removed).toEqual({});
         expect(store.dirtyMetadata.has("columns")).toBe(true);
+        expect(store.indexes.temp).toBeUndefined();
         expect(store.getAllColumnsMetadata()).toEqual([
             {
                 field: "temp",

@@ -552,6 +552,7 @@ class DataStore {
         c.buffer = null;
         this.columns = this.columns.filter((item) => item.field !== column);
         delete this.columnIndex[column];
+        delete this.indexes[column];
         const i = this.columnsWithData.indexOf(column);
         if (i !== -1) {
             this.columnsWithData.splice(i, 1);
