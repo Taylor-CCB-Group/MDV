@@ -9,6 +9,7 @@ default so it can be discovered by the existing project rescan flow.
 from __future__ import annotations
 
 import argparse
+import copy
 import os
 import shutil
 import tempfile
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from mdvtools.spatial.conversion import (
     SpatialDataConversionArgs,
@@ -59,18 +61,40 @@ def _create_anndata(n_cells: int, n_genes: int, image_size: int, seed: int):
 
     rng = np.random.default_rng(seed)
     np.random.seed(seed)
-    adata = generate_anndata(n_obs=n_cells, n_vars=n_genes)
-    adata.X = np.asarray(adata.X, dtype=np.float32)
+    if n_cells > 1_000_000:
+        try:
+            import anndata as ad
+        except ImportError as error:
+            raise SystemExit(
+                "anndata is required by dummy-spatialdata. Install the Python "
+                "dev dependencies before generating large synthetic projects."
+            ) from error
+        adata = ad.AnnData(
+            X=rng.random((n_cells, n_genes), dtype=np.float32),
+            obs=pd.DataFrame(index=pd.RangeIndex(n_cells)),
+            var=pd.DataFrame(index=pd.Index([f"var_{i}" for i in range(n_genes)])),
+        )
+    else:
+        adata = generate_anndata(n_obs=n_cells, n_vars=n_genes)
+        adata.X = np.asarray(adata.X, dtype=np.float32)
     adata.obsm["spatial"] = np.column_stack(
         [
             rng.uniform(0, image_size, n_cells),
             rng.uniform(0, image_size, n_cells),
         ]
     ).astype(np.float32, copy=False)
-    adata.obs["cell_type"] = [f"type_{i % 6}" for i in range(n_cells)]
-    adata.obs["sample_id"] = [f"sample_{i % 3}" for i in range(n_cells)]
-    adata.obs["quality_score"] = rng.normal(0, 1, n_cells)
-    adata.obs["total_counts"] = rng.poisson(2000, n_cells)
+    cell_type_codes = np.arange(n_cells, dtype=np.int32) % 6
+    sample_codes = np.arange(n_cells, dtype=np.int32) % 3
+    adata.obs["cell_type"] = pd.Categorical.from_codes(
+        cell_type_codes,
+        categories=[f"type_{i}" for i in range(6)],
+    )
+    adata.obs["sample_id"] = pd.Categorical.from_codes(
+        sample_codes,
+        categories=[f"sample_{i}" for i in range(3)],
+    )
+    adata.obs["quality_score"] = rng.normal(0, 1, n_cells).astype(np.float32)
+    adata.obs["total_counts"] = rng.poisson(2000, n_cells).astype(np.int32)
     return adata
 
 
@@ -249,75 +273,107 @@ def _add_scatter_table_comparison_view(
     var_datasource_name: str,
 ) -> None:
     table_columns = _table_columns(mdv, obs_datasource_name)
-    view = {
-        "dataSources": {
-            obs_datasource_name: {"layout": "gridstack", "panelWidth": 100},
-            var_datasource_name: {"layout": "gridstack", "panelWidth": 0},
+    row_chart = {
+        "title": "cell_type",
+        "legend": "",
+        "type": "row_chart",
+        "param": ["cell_type"],
+        "id": "synth_row_cell_type",
+        "size": [400, 300],
+        "axis": {
+            "x": {
+                "textSize": 13,
+                "label": "",
+                "size": 25,
+                "tickfont": 10,
+            }
         },
-        "initialCharts": {
-            obs_datasource_name: [
-                {
-                    "title": "cell_type",
-                    "legend": "",
-                    "type": "row_chart",
-                    "param": ["cell_type"],
-                    "id": "synth_row_cell_type",
-                    "size": [400, 300],
-                    "axis": {
-                        "x": {
-                            "textSize": 13,
-                            "label": "",
-                            "size": 25,
-                            "tickfont": 10,
-                        }
-                    },
-                    "gssize": [4, 2],
-                    "gsposition": [0, 0],
-                },
-                _scatter_config(
-                    chart_id="synth_scatter_react",
-                    chart_type="wgl_scatter_plot_dev",
-                    title="React scatter x/y",
-                    gsposition=[4, 0],
-                    image_size=image_size,
-                ),
-                _scatter_config(
-                    chart_id="synth_scatter_classic",
-                    chart_type="wgl_scatter_plot",
-                    title="Classic scatter x/y",
-                    gsposition=[8, 0],
-                    image_size=image_size,
-                ),
-                {
-                    "title": "React table all columns",
-                    "legend": "",
-                    "type": "table_chart_react",
-                    "param": table_columns,
-                    "column_widths": {},
-                    "order": {},
-                    "include_index": False,
-                    "sort": None,
-                    "id": "synth_table_react",
-                    "size": [900, 500],
-                    "gssize": [6, 4],
-                    "gsposition": [0, 2],
-                },
-                {
-                    "title": "Classic table all columns",
-                    "legend": "",
-                    "type": "table_chart",
-                    "param": table_columns,
-                    "id": "synth_table_classic",
-                    "size": [900, 500],
-                    "gssize": [6, 4],
-                    "gsposition": [6, 2],
-                    "column_widths": {},
-                },
-            ],
-            var_datasource_name: [],
-        },
+        "gssize": [4, 2],
+        "gsposition": [0, 0],
     }
-    mdv.set_view("Scatter/table comparison", view)
+    react_scatter = _scatter_config(
+        chart_id="synth_scatter_react",
+        chart_type="wgl_scatter_plot_dev",
+        title="React scatter x/y",
+        gsposition=[4, 0],
+        image_size=image_size,
+    )
+    classic_scatter = _scatter_config(
+        chart_id="synth_scatter_classic",
+        chart_type="wgl_scatter_plot",
+        title="Classic scatter x/y",
+        gsposition=[8, 0],
+        image_size=image_size,
+    )
+    react_table = {
+        "title": "React table all columns",
+        "legend": "",
+        "type": "table_chart_react",
+        "param": table_columns,
+        "column_widths": {},
+        "order": {},
+        "include_index": False,
+        "sort": None,
+        "id": "synth_table_react",
+        "size": [900, 500],
+        "gssize": [6, 4],
+        "gsposition": [0, 2],
+    }
+    classic_table = {
+        "title": "Classic table all columns",
+        "legend": "",
+        "type": "table_chart",
+        "param": table_columns,
+        "id": "synth_table_classic",
+        "size": [900, 500],
+        "gssize": [6, 4],
+        "gsposition": [6, 2],
+        "column_widths": {},
+    }
+
+    def view_for(charts: list[dict]) -> dict:
+        return {
+            "dataSources": {
+                obs_datasource_name: {"layout": "gridstack", "panelWidth": 100},
+                var_datasource_name: {"layout": "gridstack", "panelWidth": 0},
+            },
+            "initialCharts": {
+                obs_datasource_name: charts,
+                var_datasource_name: [],
+            },
+        }
+
+    comparison_view = view_for(
+        [
+            copy.deepcopy(row_chart),
+            copy.deepcopy(react_scatter),
+            copy.deepcopy(classic_scatter),
+            copy.deepcopy(react_table),
+            copy.deepcopy(classic_table),
+        ]
+    )
+    react_view = view_for(
+        [
+            copy.deepcopy(row_chart),
+            copy.deepcopy(react_table),
+            copy.deepcopy(react_scatter),
+        ]
+    )
+    classic_view = view_for(
+        [
+            copy.deepcopy(classic_scatter),
+            copy.deepcopy(row_chart),
+            copy.deepcopy(classic_table),
+        ]
+    )
+    react_view["initialCharts"][obs_datasource_name][1]["gsposition"] = [4, 0]
+    react_view["initialCharts"][obs_datasource_name][2]["gsposition"] = [0, 2]
+    classic_view["initialCharts"][obs_datasource_name][0]["gsposition"] = [0, 2]
+    classic_view["initialCharts"][obs_datasource_name][2]["gsposition"] = [4, 0]
+
+    mdv.set_view("Scatter/table comparison", comparison_view)
+    mdv.set_view("react view", react_view)
+    mdv.set_view("classic view", classic_view)
 
 
 def generate_project(

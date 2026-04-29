@@ -150,6 +150,13 @@ scatter/table performance question. The 1m-row sample generated in this pass is:
 ~/mdv/synth-spatial--scatter-table--1m/
 ```
 
+A 10m-row stress sample was also generated with only two genes to keep the
+stress centred on row count, scatter plots, and tables:
+
+```text
+~/mdv/synth-spatial--scatter-table--10m/
+```
+
 Planned but not implemented yet:
 
 - `--n-regions`;
@@ -223,6 +230,29 @@ TEST_BASE_URL=http://127.0.0.1:5174 npm run playwright-test -- tests_playwright/
 For focused performance work, add dedicated specs rather than overloading the
 functional project tests.
 
+A lightweight Playwright profiler is available for ad hoc row-chart filter
+timing against an already-served project:
+
+```bash
+node scripts/profile_mdv_interactions.mjs \
+  --url http://localhost:5055/project/191 \
+  --views "react view,classic view" \
+  --categories type_0,type_1,type_2 \
+  --out output/playwright/project-191-row-filter-profile.json
+```
+
+The profiler records:
+
+- time from category click to the datastore `filtered` event;
+- time to materialise `DataStore.getFilteredIndices()`;
+- time after two animation frames, as a coarse visual-settle marker;
+- chart/view metadata and console warnings/errors.
+
+First 1m-row observation: category filtering itself was tens of milliseconds,
+while React chart updates were dominated by filtered-index materialisation. The
+first cold React click took much longer than subsequent clicks, so repeat runs
+and warm/cold separation should be part of the next profiling pass.
+
 ## UI-Authored Comparison Views
 
 The Python chart helper API is useful for older charts, but it should not be the
@@ -267,6 +297,9 @@ saved config shape, but performance comparison views should explicitly set
 
 The current generated comparison view uses `x/y` for both scatter charts and all
 non-internal cell columns for both table charts.
+Generated `scatter-table` projects also include split `react view` and
+`classic view` views so Playwright profiling can compare one chart family at a
+time.
 
 ## Interview Questions
 
