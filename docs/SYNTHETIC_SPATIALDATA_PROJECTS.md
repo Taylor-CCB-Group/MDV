@@ -129,6 +129,11 @@ Current options:
 - `--profile`: currently `scatter-table` or `spatial-overview`;
 - `--n-cells`: primary scale parameter;
 - `--n-genes`: generated expression-like variable count;
+- `--n-coordinate-systems`: number of image-backed coordinate systems/regions;
+- `--coordinate-system-cell-counts`: optional comma-separated per-region cell
+  counts such as `1k,5k,10k,25k,50k,100k,250k,500k,1m,2m`; when supplied,
+  `--n-cells` is inferred from the sum and `--n-coordinate-systems` from the
+  number of entries;
 - `--image-size`: generated image extent in pixels;
 - `--seed`: fixed by default for reproducibility;
 - `--output`: output MDV project path, defaulting to a flat
@@ -150,19 +155,28 @@ scatter/table performance question. The 1m-row sample generated in this pass is:
 ~/mdv/synth-spatial--scatter-table--1m/
 ```
 
-A 10m-row stress sample was also generated with only two genes to keep the
-stress centred on row count, scatter plots, and tables:
+A staggered multi-region stress sample should use deliberately uneven coordinate
+system sizes rather than uniform round-robin assignment. A useful first shape is
+ten regions ranging from 1k cells up to 2m cells:
 
-```text
-~/mdv/synth-spatial--scatter-table--10m/
+```bash
+cd python
+../venv/bin/python -m mdvtools.tests.generate_synthetic_spatial_project \
+  --profile scatter-table \
+  --n-genes 2 \
+  --image-size 1024 \
+  --coordinate-system-cell-counts 1k,5k,10k,25k,50k,100k,250k,500k,1m,2m \
+  --output ~/mdv/synth-spatial--scatter-table--staggered-regions \
+  --force
 ```
+
+This produces 3,941,000 total cells while preserving small, medium, and large
+region-local working sets in one project.
 
 Planned but not implemented yet:
 
-- `--n-regions`;
 - `--cleanup`;
 - automatic DB registration;
-- profile-specific performance comparison views.
 
 ## Initial Profiles
 
@@ -252,6 +266,52 @@ First 1m-row observation: category filtering itself was tens of milliseconds,
 while React chart updates were dominated by filtered-index materialisation. The
 first cold React click took much longer than subsequent clicks, so repeat runs
 and warm/cold separation should be part of the next profiling pass.
+
+## Scatter Memory Audit
+
+The important unit for browser memory is the current view-local working set, not
+only the total project row count. Older large projects could contain tens of
+millions of cells globally while showing one or two images with roughly 1m cells
+in the active view. A single 10m-region spatial view is a different and much
+harder shape.
+
+Current buffer hotspots to audit:
+
+- `DataStore.filterBuffer`: one byte per row for the datasource global filter;
+- `Dimension.filterArray`: one byte per row for each active dimension/filter;
+- `DataStore.getFilteredIndices()`: allocates a `Uint32Array`-sized
+  `SharedArrayBuffer` for all currently visible rows;
+- legacy `WGLScatterPlot` passes full `x`, `y`, local-filter, and global-filter
+  buffers into its WebGL layer;
+- React/deck scatter uses `useFilteredIndices()` and `DataFilterExtension`,
+  which can duplicate row-index and filter-state buffers around each filter
+  interaction;
+- spatial/Viv scatter defaults may add a background filter for the selected
+  `spatial_region`, which is good for view-local size but still currently
+  starts from datasource-scale filter machinery.
+
+Confirmed follow-up issue: the current startup path eagerly creates a
+`GateManager` for every datasource, and `GateManager` eagerly creates an empty
+`__gates__` multitext membership column. With the current `stringLength` of 24,
+that is `rows * 24 * 2` bytes, or roughly 480 MB for 10m rows, even before any
+view-specific chart data loads. Do not patch around this in generated project
+metadata: a metadata-only `__gates__` column can make later gate creation fail
+under the current implementation. The safer follow-up is to make gate manager
+creation and gate membership buffers genuinely lazy in application code, with
+dedicated gating regression coverage.
+
+Future improvements to consider:
+
+- make region/image-local row-index subsets first-class, so spatial views can
+  avoid materialising datasource-wide filtered indices when a region is active;
+- cache region membership/index arrays and reuse them across Viv, deck scatter,
+  row chart, and table instead of recomputing full filtered indices per path;
+- prefer filter masks or index views that are scoped to the active region for
+  chart rendering;
+- measure memory per chart instance with 1m, 5m, and 10m visible rows, including
+  cold and warm filter interactions;
+- add a profiling mode that reports active filter buffers, filtered-index buffer
+  lengths, loaded column byte sizes, and deck/WebGL layer row counts.
 
 ## UI-Authored Comparison Views
 

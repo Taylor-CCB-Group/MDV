@@ -36,6 +36,85 @@ def _size_label(n_cells: int) -> str:
     return str(n_cells)
 
 
+def _parse_size_label(value: str) -> int:
+    normalized = value.strip().lower().replace("_", "")
+    if not normalized:
+        raise argparse.ArgumentTypeError("cell count cannot be empty")
+    multiplier = 1
+    if normalized[-1] == "k":
+        multiplier = 1_000
+        normalized = normalized[:-1]
+    elif normalized[-1] == "m":
+        multiplier = 1_000_000
+        normalized = normalized[:-1]
+    try:
+        count = int(float(normalized) * multiplier)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"invalid cell count: {value}") from error
+    if count <= 0:
+        raise argparse.ArgumentTypeError("cell counts must be positive")
+    return count
+
+
+def _parse_cell_count_list(value: str) -> list[int]:
+    counts = [_parse_size_label(part) for part in value.split(",")]
+    if not counts:
+        raise argparse.ArgumentTypeError("at least one coordinate-system count is required")
+    return counts
+
+
+def _default_coordinate_system_cell_counts(n_cells: int, n_coordinate_systems: int) -> list[int]:
+    if n_cells < n_coordinate_systems:
+        raise SystemExit("n-cells must be at least n-coordinate-systems")
+    if n_coordinate_systems == 1:
+        return [n_cells]
+
+    base = [
+        1_000,
+        5_000,
+        10_000,
+        25_000,
+        50_000,
+        100_000,
+        250_000,
+        500_000,
+        1_000_000,
+        2_000_000,
+    ]
+    if n_coordinate_systems <= len(base):
+        counts = base[:n_coordinate_systems]
+    else:
+        counts = base + [2_000_000] * (n_coordinate_systems - len(base))
+
+    base_total = sum(counts)
+    if base_total == n_cells:
+        return counts
+    if base_total > n_cells:
+        weights = np.asarray(counts, dtype=np.float64)
+        scaled = np.maximum(1, np.floor(weights / weights.sum() * n_cells).astype(np.int64))
+        diff = n_cells - int(scaled.sum())
+        for index in range(abs(diff)):
+            target = index % n_coordinate_systems
+            if diff > 0:
+                scaled[target] += 1
+            elif scaled[target] > 1:
+                scaled[target] -= 1
+        return scaled.astype(int).tolist()
+
+    max_per_coordinate_system = max(2_000_000, int(np.ceil(n_cells / n_coordinate_systems)))
+    counts = counts.copy()
+    remaining = n_cells - base_total
+    index = len(counts) - 1
+    while remaining > 0:
+        capacity = max_per_coordinate_system - counts[index]
+        if capacity > 0:
+            added = min(capacity, remaining)
+            counts[index] += added
+            remaining -= added
+        index = (index - 1) % len(counts)
+    return counts
+
+
 def _default_output(profile: str, n_cells: int) -> Path:
     return Path.home() / "mdv" / f"synth-spatial--{profile}--{_size_label(n_cells)}"
 
@@ -50,7 +129,13 @@ def _configure_cache_dirs() -> None:
     os.environ.setdefault("XDG_CACHE_HOME", str(cache_dir))
 
 
-def _create_anndata(n_cells: int, n_genes: int, image_size: int, seed: int):
+def _create_anndata(
+    n_cells: int,
+    n_genes: int,
+    image_size: int,
+    seed: int,
+    coordinate_system_cell_counts: list[int],
+):
     try:
         from dummy_spatialdata import generate_anndata
     except ImportError as error:
@@ -93,6 +178,15 @@ def _create_anndata(n_cells: int, n_genes: int, image_size: int, seed: int):
         sample_codes,
         categories=[f"sample_{i}" for i in range(3)],
     )
+    if len(coordinate_system_cell_counts) > 1:
+        region_codes = np.repeat(
+            np.arange(len(coordinate_system_cell_counts), dtype=np.int32),
+            coordinate_system_cell_counts,
+        )
+        adata.obs["region"] = pd.Categorical.from_codes(
+            region_codes,
+            categories=[f"image_{i}" for i in range(len(coordinate_system_cell_counts))],
+        )
     adata.obs["quality_score"] = rng.normal(0, 1, n_cells).astype(np.float32)
     adata.obs["total_counts"] = rng.poisson(2000, n_cells).astype(np.int32)
     return adata
@@ -104,6 +198,7 @@ def _create_spatialdata(
     n_genes: int,
     image_size: int,
     seed: int,
+    coordinate_system_cell_counts: list[int],
 ):
     try:
         import dummy_spatialdata as ds
@@ -113,13 +208,25 @@ def _create_spatialdata(
             "or run `../venv/bin/pip install dummy-spatialdata==0.1.9`."
         ) from error
 
-    adata = _create_anndata(n_cells, n_genes, image_size, seed)
+    n_coordinate_systems = len(coordinate_system_cell_counts)
+    adata = _create_anndata(
+        n_cells,
+        n_genes,
+        image_size,
+        seed,
+        coordinate_system_cell_counts,
+    )
     image_shape = {"x": image_size, "y": image_size}
+    coordinate_system_names = [
+        "global" if n_coordinate_systems == 1 else f"coordinate_system_{i}"
+        for i in range(n_coordinate_systems)
+    ]
     coordinate_systems = {
-        "global": {"transformations": ["identity"], "shape": image_shape}
+        name: {"transformations": ["identity"], "shape": image_shape}
+        for name in coordinate_system_names
     }
 
-    if n_cells <= 100_000:
+    if n_cells <= 100_000 and n_coordinate_systems == 1:
         return ds.generate_dataset(
             images=[
                 {
@@ -150,26 +257,31 @@ def _create_spatialdata(
             "dev dependencies before generating synthetic SpatialData projects."
         ) from error
 
-    image = ds.generate_imagemodel(
-        {
-            "type": "rgb",
-            "shape": image_shape,
-            "coordinate_system": ["global"],
-        },
-        key="image_0",
-        coordinate_systems=coordinate_systems,
-    )
+    images = {
+        f"image_{index}": ds.generate_imagemodel(
+            {
+                "type": "rgb",
+                "shape": image_shape,
+                "coordinate_system": [coordinate_system_names[index]],
+            },
+            key=f"image_{index}",
+            coordinate_systems=coordinate_systems,
+        )
+        for index in range(n_coordinate_systems)
+    }
     adata.obs["instance_id"] = adata.obs.index
-    adata.obs["region"] = "image_0"
+    if n_coordinate_systems == 1:
+        adata.obs["region"] = "image_0"
+    regions = [f"image_{index}" for index in range(n_coordinate_systems)]
     table = TableModel.parse(
         adata,
-        region="image_0",
+        region=regions if n_coordinate_systems > 1 else "image_0",
         region_key="region",
         instance_key="instance_id",
     )
-    images: Any = {"image_0": image}
+    images_for_sdata: Any = images
     tables: Any = {"table_0": table}
-    return sd.SpatialData(images=images, tables=tables)
+    return sd.SpatialData(images=images_for_sdata, tables=tables)
 
 
 def _table_columns(mdv, datasource: str) -> list[str]:
@@ -376,6 +488,25 @@ def _add_scatter_table_comparison_view(
     mdv.set_view("classic view", classic_view)
 
 
+def _make_safe_large_default(mdv) -> None:
+    views = mdv.views
+    state = mdv.state
+    original_default = views.get("default")
+    data_summary = views.get("Data summary")
+    if original_default is not None:
+        views["Spatial overview (loads all rows)"] = original_default
+    if data_summary is not None:
+        views["default"] = copy.deepcopy(data_summary)
+    mdv.views = views
+
+    all_views = state.get("all_views", [])
+    if "Spatial overview (loads all rows)" not in all_views and original_default is not None:
+        all_views.append("Spatial overview (loads all rows)")
+    state["all_views"] = all_views
+    state["initial_view"] = "default"
+    mdv.state = state
+
+
 def generate_project(
     *,
     output: Path,
@@ -384,8 +515,14 @@ def generate_project(
     n_genes: int,
     image_size: int,
     seed: int,
+    n_coordinate_systems: int,
+    coordinate_system_cell_counts: list[int],
     force: bool,
 ) -> None:
+    if n_cells != sum(coordinate_system_cell_counts):
+        raise SystemExit("n-cells must match the sum of coordinate-system cell counts")
+    if n_coordinate_systems != len(coordinate_system_cell_counts):
+        raise SystemExit("n-coordinate-systems must match coordinate-system cell counts")
     if output.exists():
         if not force:
             raise SystemExit(f"{output} already exists. Pass --force to replace it.")
@@ -405,6 +542,7 @@ def generate_project(
             n_genes=n_genes,
             image_size=image_size,
             seed=seed,
+            coordinate_system_cell_counts=coordinate_system_cell_counts,
         )
         sdata.write(str(source_path))
 
@@ -428,6 +566,8 @@ def generate_project(
                 obs_datasource_name=args.obs_datasource_name,
                 var_datasource_name=args.var_datasource_name,
             )
+            if n_cells >= 5_000_000 and n_coordinate_systems == 1:
+                _make_safe_large_default(mdv)
         state = mdv.state
         state["provenance"] = {
             "created_by": "mdvtools synthetic spatialdata generator",
@@ -437,6 +577,8 @@ def generate_project(
             "n_genes": n_genes,
             "image_size": image_size,
             "seed": seed,
+            "n_coordinate_systems": n_coordinate_systems,
+            "coordinate_system_cell_counts": coordinate_system_cell_counts,
             "cleanup_group": "synth-spatial",
         }
         mdv.state = state
@@ -456,6 +598,17 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--n-cells", type=int, default=1000)
     parser.add_argument("--n-genes", type=int, default=50)
+    parser.add_argument("--n-coordinate-systems", type=int, default=1)
+    parser.add_argument(
+        "--coordinate-system-cell-counts",
+        type=_parse_cell_count_list,
+        default=None,
+        help=(
+            "Comma-separated per-coordinate-system row counts, e.g. "
+            "1k,5k,10k,25k,50k,100k,250k,500k,1m,2m. "
+            "When supplied, --n-cells is ignored and inferred from the sum."
+        ),
+    )
     parser.add_argument("--image-size", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
@@ -470,14 +623,28 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    output = args.output or _default_output(args.profile, args.n_cells)
+    coordinate_system_cell_counts = args.coordinate_system_cell_counts
+    n_cells = args.n_cells
+    n_coordinate_systems = args.n_coordinate_systems
+    if coordinate_system_cell_counts is not None:
+        n_cells = sum(coordinate_system_cell_counts)
+        n_coordinate_systems = len(coordinate_system_cell_counts)
+    else:
+        coordinate_system_cell_counts = _default_coordinate_system_cell_counts(
+            n_cells,
+            n_coordinate_systems,
+        )
+
+    output = args.output or _default_output(args.profile, n_cells)
     generate_project(
         output=output.expanduser(),
         profile=args.profile,
-        n_cells=args.n_cells,
+        n_cells=n_cells,
         n_genes=args.n_genes,
         image_size=args.image_size,
         seed=args.seed,
+        n_coordinate_systems=n_coordinate_systems,
+        coordinate_system_cell_counts=coordinate_system_cell_counts,
         force=args.force,
     )
 
