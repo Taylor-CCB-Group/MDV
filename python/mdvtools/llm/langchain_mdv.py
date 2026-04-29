@@ -41,6 +41,15 @@ from .code_execution import execute_code
 from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
 from .chat_client_refresh import client_needs_refresh_after_chat
+from .execution_progress import (
+    ProgressEvent,
+    ProgressThrottler,
+    build_heartbeat_event,
+    friendly_subprocess_failure_message,
+    infer_progress_event_from_output,
+    parse_explicit_progress_line,
+)
+from .preflight_flow import preflight_with_single_retry
 
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
@@ -374,6 +383,8 @@ class ProjectChat(ProjectChatProtocol):
         {role_hint}
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
         Use these to correct the column names mentioned by the user.
+        Before writing any `project.get_datasource_as_dataframe(datasource_name, columns=[...])` call, you must verify the datasource schema and only request columns that exist on that datasource.
+        Never assume a `name` column exists on `cells`; if the task asks for genes/markers, use the expression datasource or explicit marker ranking outputs instead of `cells.name`.
         You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
         Use `df.info()` or `df.index()`.
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
@@ -603,6 +614,46 @@ class ProjectChat(ProjectChatProtocol):
                         result = result_retry
                         final_code = final_code_retry
 
+            with time_block("b13b: Preflight validate and retry"):
+                datasource_fields: dict[str, set[str]] = {}
+                for ds in self.project.datasources or []:
+                    if not isinstance(ds, dict):
+                        continue
+                    ds_name = ds.get("name")
+                    cols = ds.get("columns")
+                    if not isinstance(ds_name, str) or not isinstance(cols, list):
+                        continue
+                    datasource_fields[ds_name] = {
+                        str(c.get("field"))
+                        for c in cols
+                        if isinstance(c, dict) and c.get("field")
+                    }
+
+                def _regenerate_for_preflight(issue_text: str) -> str:
+                    retry_query = (
+                        f"{charts_part}\n\n"
+                        "Fix this code preflight validation failure and return corrected runnable code only.\n"
+                        f"Preflight issues:\n{issue_text}"
+                    )
+                    output_qa_retry = qa_chain.invoke({"query": retry_query})
+                    result_retry = output_qa_retry["result"]
+                    return prepare_code(
+                        result_retry,
+                        self.df,
+                        self.project,
+                        log,
+                        modify_existing_project=True,
+                        view_name=question,
+                    )
+
+                final_code, preflight_meta = preflight_with_single_retry(
+                    initial_code=final_code,
+                    regenerate_once=_regenerate_for_preflight,
+                    log=log,
+                    datasource_fields=datasource_fields,
+                )
+                chat_debug_logger.info("Preflight metadata: %s", preflight_meta)
+
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
             with time_block("b14: Execute code"):  # ~9% of time
@@ -610,15 +661,74 @@ class ProjectChat(ProjectChatProtocol):
                     "Executing code...", id, progress, 9
                 )
                 progress += 9
+                progress_throttler = ProgressThrottler(min_interval_seconds=3.0)
+                current_stage: str | None = None
+
+                def emit_progress_event(event: ProgressEvent) -> None:
+                    nonlocal current_stage
+                    if event.stage:
+                        current_stage = event.stage
+                    if event.progress == 0 and progress > 0:
+                        event = ProgressEvent(
+                            message=event.message,
+                            progress=progress,
+                            delta=event.delta,
+                            stage=event.stage,
+                            step_index=event.step_index,
+                            step_total=event.step_total,
+                            eta_seconds=event.eta_seconds,
+                            elapsed_seconds=event.elapsed_seconds,
+                            source=event.source,
+                        )
+                    if not progress_throttler.should_emit(event):
+                        return
+                    socket_api.update_chat_progress(
+                        event.message,
+                        id,
+                        event.progress,
+                        event.delta,
+                        stage=event.stage,
+                        step_index=event.step_index,
+                        step_total=event.step_total,
+                        eta_seconds=event.eta_seconds,
+                        elapsed_seconds=event.elapsed_seconds,
+                        source=event.source,
+                    )
+
+                def handle_output_line(_source: str, line: str) -> None:
+                    explicit = parse_explicit_progress_line(line)
+                    if explicit is not None:
+                        emit_progress_event(explicit)
+                        return
+                    inferred = infer_progress_event_from_output(line)
+                    if inferred is not None:
+                        emit_progress_event(inferred)
+
+                def handle_heartbeat(elapsed_seconds: float) -> None:
+                    emit_progress_event(
+                        build_heartbeat_event(
+                            elapsed_seconds,
+                            stage=current_stage,
+                        )
+                    )
+
                 ok, stdout, stderr = execute_code(
-                    final_code, open_code=False, log=log
+                    final_code,
+                    open_code=False,
+                    log=log,
+                    on_output_line=handle_output_line,
+                    on_heartbeat=handle_heartbeat,
                 )
                 chat_debug_logger.info(f"Code Execution Result - OK: {ok}")
                 chat_debug_logger.info(f"Code Execution STDOUT:\n{stdout}")
                 chat_debug_logger.info(f"Code Execution STDERR:\n{stderr}")
 
             if not ok:
-                # Log code execution error
+                # Preserve full diagnostics in backend logs, but surface friendly messaging for kill-style exits.
+                chat_debug_logger.error("Code execution failed diagnostics:\n%s", stderr)
+                friendly = friendly_subprocess_failure_message(stderr or "")
+                if friendly is not None:
+                    raise Exception(friendly)
                 raise Exception(f"Code execution failed: \n{stderr}")
 
             data_preview_text = format_stdout_for_chat(stdout)

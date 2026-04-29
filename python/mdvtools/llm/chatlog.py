@@ -158,7 +158,14 @@ class ChatSocketAPI:
     def log(self, msg: str):
         self.logger.info(msg)
     
-    def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
+    def update_chat_progress(
+        self,
+        message: str,
+        id: str,
+        progress: int,
+        delta: int,
+        **extra: Any,
+    ):
         """
         Send a message to the chat log and also update the progress bar.
         
@@ -179,9 +186,18 @@ class ChatSocketAPI:
         # if to is None:
         #     log(f"Chat progress update for {id} but no associated user found, skipping.")
         #     return
-        self.socketio.emit(self.progress_name, {
+        payload: dict[str, Any] = {
             "message": message, "id": id, "progress": progress, "delta": delta
-        }, namespace=self.project_namespace, to=self.room)
+        }
+        payload.update(extra)
+        # Keep readable progress logs while adding structured context for observability.
+        self.logger.info("chat_progress %s", payload)
+        self.socketio.emit(
+            self.progress_name,
+            payload,
+            namespace=self.project_namespace,
+            to=self.room,
+        )
 
 class ChatSocketIOHandler(logging.StreamHandler):
     def __init__(self, socketio: SocketIO, event_name: str, namespace: str, id: str, room: str):
