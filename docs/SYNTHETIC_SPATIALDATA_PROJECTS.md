@@ -1,40 +1,29 @@
 # Synthetic SpatialData Projects
 
-This note records the first-pass convention for using generated SpatialData-like
-projects in MDV development, agent workflows, and performance investigations.
+This note records the reusable conventions for generated SpatialData-backed MDV
+projects. The aim is repeatable local projects for chart development,
+performance profiling, and agent-driven checks without committing large
+fixtures.
 
-## Why
+For scatter/table performance background, see
+[issue #433](https://github.com/Taylor-CCB-Group/MDV/issues/433).
 
-We want representative, repeatable projects that can be generated at arbitrary
-sizes, opened interactively from the normal project catalog, and used by agents
-or tests without relying on large checked-in fixtures.
+## At A Glance
 
-The immediate package candidate is `dummy-spatialdata`, added to the Python dev
-dependency group for Python 3.12 environments. It depends on the SpatialData
-ecosystem and `dummy-anndata`. A later pass should review whether
-`dummy-anndata` can replace part of `python/mdvtools/tests/mock_anndata.py`.
+- Use generated projects for repeatable local chart, spatial, and performance
+  work without checking large fixtures into git.
+- Keep the first scope modest: representative columns and common chart families,
+  not every obscure chart configuration.
+- Put interactive generated projects directly under `~/mdv`; nested folders in
+  `~/mdv` are not supported by the project scanner.
+- Treat generated projects as disposable. Use exact path cleanup only, and keep
+  provenance metadata so later cleanup can be automated safely.
+- For new React-backed chart configs, prefer creating the view through the UI
+  and then inspecting `views.json` before encoding the shape in Python.
 
-## First-Pass Scope
+## Project Convention
 
-Keep this deliberately modest:
-
-- generate spatial projects with configurable cell counts;
-- include enough categorical, numeric, text, coordinate, image/region, and table
-  columns to exercise common charts;
-- create a small set of named views for performance comparison;
-- make projects easy to register in the normal catalog;
-- make cleanup safe and explicit.
-
-Do not try to cover every chart configuration permutation yet. The first goal is
-repeatable comparison and developer confidence, not exhaustive combinatorics.
-
-## Proposed Project Location
-
-Use immediate children of `~/mdv` for interactive projects because the existing
-filesystem scanner treats each direct child as a candidate MDV project. Do not
-nest generated projects under grouping folders inside `~/mdv`.
-
-Recommended naming:
+Use flat, disposable paths:
 
 ```text
 ~/mdv/synth-spatial--<profile>--<run-id>/
@@ -43,14 +32,13 @@ Recommended naming:
 Examples:
 
 ```text
-~/mdv/synth-spatial--scatter-table--10k/
 ~/mdv/synth-spatial--scatter-table--100k/
 ~/mdv/synth-spatial--scatter-table--1m/
-~/mdv/synth-spatial--selection-dialog--100k/
+~/mdv/synth-spatial--scatter-table--staggered-regions/
 ```
 
-The generated MDV project itself should live at the final path. Intermediate
-SpatialData stores can live under the project, for example:
+The generated MDV project should live at that final path. SpatialData source
+stores may live inside the project, for example:
 
 ```text
 ~/mdv/synth-spatial--scatter-table--100k/spatial/source.zarr/
@@ -58,21 +46,12 @@ SpatialData stores can live under the project, for example:
 
 That keeps the project portable and lets cleanup remove one subtree.
 
-## Registration
+Generated projects include `state.json.provenance.cleanup_group =
+"synth-spatial"`. Agents should only remove exact direct-child paths matching
+the `~/mdv/synth-spatial--...` convention, and should avoid broad cleanup of
+`~/mdv`.
 
-For a running database-backed app:
-
-1. Generate the project into a direct child path such as
-   `~/mdv/synth-spatial--scatter-table--100k`.
-2. Use the existing `/rescan_projects` route, or restart the app, so
-   `serve_projects_from_filesystem()` registers filesystem projects missing from
-   the database.
-3. Generated project names should start with `synth-spatial:` so they are easy
-   to find and cleanup by name pattern.
-
-For direct/manual serving, use the project path without DB registration.
-
-Project `state.json` should include provenance:
+Example provenance:
 
 ```json
 {
@@ -81,41 +60,34 @@ Project `state.json` should include provenance:
     "generator": "dummy-spatialdata",
     "profile": "scatter-table",
     "n_cells": 100000,
+    "n_genes": 50,
+    "image_size": 512,
     "seed": 42,
+    "n_coordinate_systems": 1,
+    "coordinate_system_cell_counts": [100000],
     "cleanup_group": "synth-spatial"
   }
 }
 ```
 
-This matches the existing cleanup script's idea of test-generated projects while
-giving us a more specific selector for future cleanup commands.
+For a DB-backed app, generate the project and then use `/rescan_projects` or
+restart the app so `serve_projects_from_filesystem()` can register it. For
+direct/manual serving, use the project path directly.
 
-## Cleanup
+Cleanup rules:
 
-Generated projects should be disposable by convention.
+- filesystem cleanup: remove the exact generated project directory, such as
+  `rm -rf ~/mdv/synth-spatial--scatter-table--100k`;
+- DB-backed cleanup: prefer `/delete_project/<id>` or the existing local
+  cleanup utilities rather than direct database edits;
+- future improvement: add a selector for
+  `state.json.provenance.cleanup_group == "synth-spatial"`.
 
-Filesystem cleanup:
+## Generator
 
-```bash
-rm -rf ~/mdv/synth-spatial--<profile>--<run-id>
-```
-
-Database-backed cleanup should prefer existing project-management paths:
-
-- soft-delete via `/delete_project/<id>` when operating through the app;
-- use `python/mdvtools/dbutils/cleanup_projects.py` for local development
-  database cleanup;
-- future improvement: add a selector that filters `state.json.provenance.cleanup_group == "synth-spatial"`.
-
-Avoid deleting all of `~/mdv` from an agent. Only delete direct child project
-paths that match the `~/mdv/synth-spatial--...` naming convention.
-
-## Candidate Generator Interface
-
-Use the module command rather than ad hoc notebooks:
+Run from `python/` using the local venv:
 
 ```bash
-cd python
 ../venv/bin/python -m mdvtools.tests.generate_synthetic_spatial_project \
   --profile scatter-table \
   --n-cells 100000 \
@@ -124,43 +96,32 @@ cd python
   --force
 ```
 
-Current options:
+Important options:
 
 - `--profile`: currently `scatter-table` or `spatial-overview`;
-- `--n-cells`: primary scale parameter;
+- `--n-cells`: total row count when per-coordinate-system counts are not given;
 - `--n-genes`: generated expression-like variable count;
-- `--n-coordinate-systems`: number of image-backed coordinate systems/regions;
-- `--coordinate-system-cell-counts`: optional comma-separated per-region cell
-  counts such as `1k,5k,10k,25k,50k,100k,250k,500k,1m,2m`; when supplied,
-  `--n-cells` is inferred from the sum and `--n-coordinate-systems` from the
-  number of entries;
+- `--n-coordinate-systems`: number of image-backed coordinate systems;
+- `--coordinate-system-cell-counts`: comma-separated per-region counts such as
+  `1k,5k,10k,25k,50k,100k,250k,500k,1m,2m`; when supplied, `--n-cells` and
+  `--n-coordinate-systems` are inferred;
 - `--image-size`: generated image extent in pixels;
-- `--seed`: fixed by default for reproducibility;
-- `--output`: output MDV project path, defaulting to a flat
-  `~/mdv/synth-spatial--<profile>--<n-cells>` path;
-- `--force`: replace an existing generated project at the exact output path.
+- `--output`: flat `~/mdv` project path;
+- `--force`: replace the exact output path.
 
-The first implementation creates a representative SpatialData object with an RGB
-image, circle shapes, an AnnData table linked to the shapes, and
-`obsm["spatial"]` row coordinates. The explicit `obsm["spatial"]` matrix is
-important: MDV's current converter treats tables without it as non-spatial even
-if SpatialData table metadata links them to an annotated element.
+For small single-region projects, the generator uses `dummy-spatialdata` shapes.
+For larger `scatter-table` projects, it uses an image-annotated table rather
+than one shape per row, keeping the project SpatialData-backed without
+million-feature GeoJSON overhead.
 
-For larger `scatter-table` samples, the generator switches to an image-annotated
-table instead of one shape per row. This keeps the project SpatialData-backed
-while avoiding million-feature GeoJSON/shapely overhead that would obscure the
-scatter/table performance question. The 1m-row sample generated in this pass is:
+The project includes enough categorical, numeric, coordinate, image/region, and
+table columns to exercise common scatter, row-chart, and table workflows. A
+later pass should review whether `dummy-anndata` can replace part of
+`python/mdvtools/tests/mock_anndata.py`.
 
-```text
-~/mdv/synth-spatial--scatter-table--1m/
-```
-
-A staggered multi-region stress sample should use deliberately uneven coordinate
-system sizes rather than uniform round-robin assignment. A useful first shape is
-ten regions ranging from 1k cells up to 2m cells:
+The staggered multi-region stress shape is:
 
 ```bash
-cd python
 ../venv/bin/python -m mdvtools.tests.generate_synthetic_spatial_project \
   --profile scatter-table \
   --n-genes 2 \
@@ -170,82 +131,43 @@ cd python
   --force
 ```
 
-This produces 3,941,000 total cells while preserving small, medium, and large
-region-local working sets in one project.
+That produces 3,941,000 total cells with small, medium, and large region-local
+working sets in one project.
 
-Planned but not implemented yet:
+## Views And Chart Types
 
-- `--cleanup`;
-- automatic DB registration;
+Generated `scatter-table` projects include:
 
-## Initial Profiles
+- `Scatter/table comparison`: row chart, classic scatter, React/deck scatter,
+  classic table, and React table;
+- `react view`: React/deck scatter plus React table;
+- `classic view`: classic scatter plus classic table.
 
-### `scatter-table`
+The UI-authored chart type mapping currently used for these views is:
 
-Purpose: compare core scatter and table implementations at different row counts.
-The generator currently creates the backing data; the comparison views below are
-the next layer to add.
+- `Row Chart` -> `row_chart`;
+- `2D Scatter Plot` -> `wgl_scatter_plot_dev`;
+- `2D Scatter Plot (Classic)` -> `wgl_scatter_plot`;
+- `Table` -> `table_chart_react`;
+- `Table (Classic)` -> `table_chart`.
 
-Views:
+Although the newer scatter is implemented by
+`DeckScatterReactWrapper.tsx`, the persisted chart type is currently
+`wgl_scatter_plot_dev`.
 
-- `Deck scatter + React table`
-- `WGL scatter + legacy table`
-- `Deck scatter + legacy table`
-- `WGL scatter + React table`
+When expanding generated views, use this loop:
 
-Charts/components of interest:
+1. Generate or copy a small flat project under `~/mdv`.
+2. Serve it editably with `MDVProject(...).set_editable(True)`.
+3. Use Playwright or the browser UI to add charts through the normal Add Chart
+   dialog.
+4. Save the view, inspect `views.json`, and promote only stable useful config
+   into the generator.
 
-- `src/react/components/DeckScatterReactWrapper.tsx`
-- `src/charts/WGLScatterPlot.js`
-- `src/charts/TableChart.js`
-- `src/react/components/TableChartReactWrapper.tsx`
+## Profiling
 
-### `selection-dialog`
-
-Purpose: measure the cost of adding selection/filter UI and linked selection
-state.
-
-Views:
-
-- `Scatter/table baseline`
-- `Scatter/table + selection dialog`
-
-Component of interest:
-
-- `src/react/components/SelectionDialogComponent.tsx`
-
-### `spatial-overview`
-
-Purpose: keep one representative spatial view with regions/images/coordinates so
-conversion regressions are visible.
-
-Views:
-
-- `Spatial overview`
-- `Spatial overview + table`
-
-## Performance Measurements
-
-Start with browser-level metrics that agents can collect consistently:
-
-- time to first visible project content;
-- time until chart manager and charts are ready;
-- row count and chart count;
-- interaction latency for pan/zoom/filter/select where practical;
-- browser console errors;
-- optional trace and screenshot artifacts under `output/playwright/`.
-
-Use Playwright from the repo root:
-
-```bash
-TEST_BASE_URL=http://127.0.0.1:5174 npm run playwright-test -- tests_playwright/project/ --project=chromium --reporter=list
-```
-
-For focused performance work, add dedicated specs rather than overloading the
-functional project tests.
-
-A lightweight Playwright profiler is available for ad hoc row-chart filter
-timing against an already-served project:
+Use Playwright from the repo root. For focused ad hoc row-chart timing against
+an already-served project:
 
 ```bash
 node scripts/profile_mdv_interactions.mjs \
@@ -257,138 +179,57 @@ node scripts/profile_mdv_interactions.mjs \
 
 The profiler records:
 
-- time from category click to the datastore `filtered` event;
+- time from row-chart category click to the datastore `filtered` event;
 - time to materialise `DataStore.getFilteredIndices()`;
-- time after two animation frames, as a coarse visual-settle marker;
-- chart/view metadata and console warnings/errors.
+- time after two animation frames as a coarse visual-settle marker;
+- chart/view metadata and browser console warnings/errors.
 
-First 1m-row observation: category filtering itself was tens of milliseconds,
-while React chart updates were dominated by filtered-index materialisation. The
-first cold React click took much longer than subsequent clicks, so repeat runs
-and warm/cold separation should be part of the next profiling pass.
+Early observations from 1m-row profiling:
 
-## Scatter Memory Audit
+- category filter updates themselves were usually tens of milliseconds;
+- React/deck chart updates were dominated by filtered-index materialisation;
+- the first cold React click was much slower than later clicks, so warm/cold
+  runs should be separated.
 
-The important unit for browser memory is the current view-local working set, not
-only the total project row count. Older large projects could contain tens of
-millions of cells globally while showing one or two images with roughly 1m cells
-in the active view. A single 10m-region spatial view is a different and much
-harder shape.
+## Follow-Up Leads
 
-Current buffer hotspots to audit:
+Issue #433 captures the broader comparison:
 
-- `DataStore.filterBuffer`: one byte per row for the datasource global filter;
-- `Dimension.filterArray`: one byte per row for each active dimension/filter;
-- `DataStore.getFilteredIndices()`: allocates a `Uint32Array`-sized
-  `SharedArrayBuffer` for all currently visible rows;
-- legacy `WGLScatterPlot` passes full `x`, `y`, local-filter, and global-filter
-  buffers into its WebGL layer;
-- React/deck scatter uses `useFilteredIndices()` and `DataFilterExtension`,
-  which can duplicate row-index and filter-state buffers around each filter
-  interaction;
-- spatial/Viv scatter defaults may add a background filter for the selected
-  `spatial_region`, which is good for view-local size but still currently
-  starts from datasource-scale filter machinery.
+- classic scatter re-renders external filter changes quickly, but panning and
+  zooming can degrade badly once filters are active;
+- React/deck scatter has more overhead on filter updates, and continuous
+  selection-region updates are more expensive than the classic mouse-up flow;
+- deck rendering is generally reasonable, but zoomed-out overdraw with many
+  points per pixel needs attention;
+- classic scatter has visual legibility and trackpad/camera-interaction issues;
+- deck.gl's WebGPU path is worth exploring as it matures.
 
-Confirmed follow-up issue: the current startup path eagerly creates a
-`GateManager` for every datasource, and `GateManager` eagerly creates an empty
-`__gates__` multitext membership column. With the current `stringLength` of 24,
-that is `rows * 24 * 2` bytes, or roughly 480 MB for 10m rows, even before any
-view-specific chart data loads. Do not patch around this in generated project
-metadata: a metadata-only `__gates__` column can make later gate creation fail
-under the current implementation. The safer follow-up is to make gate manager
-creation and gate membership buffers genuinely lazy in application code, with
-dedicated gating regression coverage.
+Memory/performance areas to audit:
 
-Future improvements to consider:
+- `DataStore.filterBuffer`, `Dimension.filterArray`, and
+  `DataStore.getFilteredIndices()` allocations;
+- duplicated row-index/filter-state buffers in React/deck paths;
+- region-local filtering so spatial views do not materialise datasource-wide
+  filtered indices unnecessarily;
+- a lazy gating implementation: the current startup path eagerly creates a
+  `GateManager`, which creates an empty `__gates__` multitext membership buffer
+  of `rows * 24 * 2` bytes. Avoid metadata-only generated-project workarounds;
+  fix this in application code with gating regression coverage.
 
-- make region/image-local row-index subsets first-class, so spatial views can
-  avoid materialising datasource-wide filtered indices when a region is active;
-- cache region membership/index arrays and reuse them across Viv, deck scatter,
-  row chart, and table instead of recomputing full filtered indices per path;
-- prefer filter masks or index views that are scoped to the active region for
-  chart rendering;
-- measure memory per chart instance with 1m, 5m, and 10m visible rows, including
-  cold and warm filter interactions;
-- add a profiling mode that reports active filter buffers, filtered-index buffer
-  lengths, loaded column byte sizes, and deck/WebGL layer row counts.
+Useful code entry points for that audit:
 
-## UI-Authored Comparison Views
+- `src/react/components/DeckScatterReactWrapper.tsx`;
+- `src/charts/WGLScatterPlot.js`;
+- `src/charts/TableChart.js`;
+- `src/react/components/TableChartReactWrapper.tsx`;
+- `src/react/components/SelectionDialogComponent.tsx`;
+- `src/datastore/DataStore.js`;
+- `src/datastore/Dimension.js`;
+- `src/react/gates/GateManager.ts`.
 
-The Python chart helper API is useful for older charts, but it should not be the
-source of truth for newer React-backed chart configs. For comparison views, use
-the normal UI path first and inspect the saved `views.json`.
+Future passes:
 
-Current probe result from `~/mdv/synth-spatial--ui-chart-probe--25`:
-
-- UI label `Row Chart` saved as `row_chart`;
-- UI label `2D Scatter Plot` saved as `wgl_scatter_plot_dev`;
-- UI label `2D Scatter Plot (Classic)` saved as `wgl_scatter_plot`;
-- UI label `Table` saved as `table_chart_react`;
-- UI label `Table (Classic)` saved as `table_chart`.
-
-The new scatter is implemented by `DeckScatterReactWrapper.tsx`, but the
-persistent chart type is currently `wgl_scatter_plot_dev`, not `DeckScatter`.
-That makes UI-authored config a safer starting point than hand-written Python
-chart config for these comparison views.
-
-Recommended agent/human loop:
-
-1. Generate or copy a flat project under `~/mdv`, for example
-   `~/mdv/synth-spatial--ui-chart-probe--25`.
-2. Serve it editably:
-
-   ```bash
-   ./venv/bin/python -c 'from mdvtools.mdvproject import MDVProject; p=MDVProject("/Users/ptodd/mdv/synth-spatial--ui-chart-probe--25"); p.set_editable(True); p.serve(open_browser=False, port=5062, websocket=False)'
-   ```
-
-3. Use Playwright against `http://127.0.0.1:5062/` to add charts through the Add
-   Chart dialog.
-4. Save the current view through the app, then inspect
-   `~/mdv/synth-spatial--ui-chart-probe--25/views.json`.
-5. If the saved config is stable and useful, promote that view shape into a
-   reusable fixture or generator step.
-
-One caveat from the first probe: the Add Chart defaults chose
-`quality_score x quality_score` for both scatter implementations and only
-`cell_type` for the table implementations. That is good enough to establish the
-saved config shape, but performance comparison views should explicitly set
-`x/y` for scatter plots and include a broader table column list.
-
-The current generated comparison view uses `x/y` for both scatter charts and all
-non-internal cell columns for both table charts.
-Generated `scatter-table` projects also include split `react view` and
-`classic view` views so Playwright profiling can compare one chart family at a
-time.
-
-## Interview Questions
-
-These are the decisions to settle before writing the first generator:
-
-1. What row-count ladder should represent "small", "normal", "large", and
-   "stress" for day-to-day work? A starting guess is `10k`, `100k`, `1m`.
-2. Do we care more about initial render time, steady-state interaction latency,
-   memory growth, or all three for the first benchmark?
-3. Should generated projects be registered automatically when a DB-backed app is
-   running, or should generation only print the rescan/open instructions?
-4. Should test-generated catalog entries be visible to everyone in local auth
-   mode, or owned by the current admin user after rescan?
-5. Which charts are mandatory in the first comparison view, and which should be
-   follow-up once the harness is stable?
-6. What pass/fail threshold is useful initially: absolute budgets, regression
-   against a stored baseline, or just structured measurement artifacts?
-7. Should generated SpatialData source stores be retained inside the MDV project
-   for debugging, or optionally omitted after conversion to save disk?
-8. What naming convention do you want in the catalog: terse machine names
-   (`synth-spatial:scatter-table:100k`) or more readable names
-   (`Synthetic spatial scatter/table 100k`)?
-
-## Subsequent Passes
-
-1. Inspect `dummy-spatialdata`'s API directly after installing it and map its
-   generated elements to MDV's spatial converter.
-2. Build the smallest `generate_synthetic_spatial_project` command.
-3. Add a cleanup selector for `cleanup_group == "synth-spatial"`.
-4. Add a Playwright performance smoke spec for one small generated project.
-5. Review `dummy-anndata` against `mock_anndata.py` and remove only the local
-   code it can replace cleanly.
+- add an explicit cleanup selector for `cleanup_group == "synth-spatial"`;
+- add a small Playwright performance smoke spec;
+- review whether `dummy-anndata` can replace part of
+  `python/mdvtools/tests/mock_anndata.py`.
