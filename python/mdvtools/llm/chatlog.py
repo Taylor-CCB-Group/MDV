@@ -190,8 +190,8 @@ class ChatSocketAPI:
             "message": message, "id": id, "progress": progress, "delta": delta
         }
         payload.update(extra)
-        # Keep readable progress logs while adding structured context for observability.
-        self.logger.info("chat_progress %s", payload)
+        # Keep structured observability without echoing payload internals into user chat logs.
+        self.logger.debug("chat_progress %s", payload)
         self.socketio.emit(
             self.progress_name,
             payload,
@@ -277,18 +277,20 @@ class LangchainLoggingHandler(BaseCallbackHandler):
     def on_chat_model_start(
         self, serialized: Dict[str, Any], messages: List[List[BaseMessage]], **kwargs
     ) -> None:
-        self.log("Chat model started")
+        self.logger.debug("Chat model started")
 
     def on_llm_end(self, response: LLMResult, **kwargs) -> None:
-        self.log(f"Chat model ended, response: {response}")
+        generations = getattr(response, "generations", None)
+        count = len(generations) if generations is not None else 0
+        self.logger.debug("Chat model ended (generation_batches=%s)", count)
 
     def on_chain_start(
         self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs
     ) -> None:
-        self.log(f"Chain {serialized.get('name')} started")
+        self.logger.debug("Chain started: %s", serialized.get("name"))
 
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
-        self.log(f"Chain ended, outputs: {outputs}")
+        self.logger.debug("Chain ended")
 
 def log_chat_item(
     project,

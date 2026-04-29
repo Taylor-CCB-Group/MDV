@@ -31,6 +31,7 @@ def test_infer_progress_rank_genes_groups():
     assert event.source == "inferred"
     assert event.stage == "marker_ranking"
     assert event.progress >= 70
+    assert "few minutes" in event.message
 
 
 def test_throttler_emits_stage_change_immediately():
@@ -47,14 +48,18 @@ def test_throttler_emits_stage_change_immediately():
 
 
 def test_heartbeat_event_and_payload_keep_legacy_fields():
-    event = build_heartbeat_event(12.7, stage="marker_ranking")
+    event = build_heartbeat_event(
+        12.7, stage="marker_ranking", step_index=4, step_total=6
+    )
     payload = event.to_payload("abc-123")
     assert payload["id"] == "abc-123"
-    assert payload["message"].startswith("Still computing")
+    assert payload["message"].startswith("Step 4/6")
     assert payload["progress"] == 0
     assert payload["delta"] == 0
     assert payload["stage"] == "marker_ranking"
     assert payload["source"] == "heartbeat"
+    assert payload["step_index"] == 4
+    assert payload["step_total"] == 6
 
 
 def test_marker_ranking_progress_sequence_has_continuous_feedback():
@@ -65,8 +70,9 @@ def test_marker_ranking_progress_sequence_has_continuous_feedback():
     ]
     events = [infer_progress_event_from_output(line) for line in lines]
     assert events[0] is not None
-    heartbeat = build_heartbeat_event(15.0, stage="marker_ranking")
+    heartbeat = build_heartbeat_event(15.0, stage="marker_ranking", step_index=4, step_total=6)
     assert heartbeat.elapsed_seconds == 15
+    assert "still running marker_ranking" in heartbeat.message
 
 
 def test_friendly_subprocess_failure_message_for_sigkill():

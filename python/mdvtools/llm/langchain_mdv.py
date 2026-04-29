@@ -475,6 +475,10 @@ class ProjectChat(ProjectChatProtocol):
             )
         
         progress = 0
+        total_steps = 6
+
+        def _step_message(step: int, text: str) -> str:
+            return f"Step {step}/{total_steps}: {text}"
         if mock_agent:
             ok, strdout, stderr = execute_code(
                 'import mdvtools\nprint("mdvtools import ok")'
@@ -491,7 +495,7 @@ class ProjectChat(ProjectChatProtocol):
         
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
             socket_api.update_chat_progress(
-                "Agent invoking", id, progress, 0
+                _step_message(1, "Understanding your request"), id, progress, 0, step_index=1, step_total=total_steps
             )
             log(f"Asking the LLM: '{question}'")
             if self.init_error:
@@ -503,7 +507,12 @@ class ProjectChat(ProjectChatProtocol):
         try:
             with time_block("b10b: Pandas agent invoking"):  # ~31.4% of time
                 socket_api.update_chat_progress(
-                    "Pandas agent invoking...", id, progress, 31
+                    _step_message(2, "Inspecting datasources and available fields"),
+                    id,
+                    progress,
+                    31,
+                    step_index=2,
+                    step_total=total_steps,
                 )
                 progress += 31
                 response = agent(question)
@@ -511,7 +520,12 @@ class ProjectChat(ProjectChatProtocol):
             
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 socket_api.update_chat_progress(
-                    "RAG prompt preparation...", id, progress, 1
+                    _step_message(3, "Preparing analysis context"),
+                    id,
+                    progress,
+                    1,
+                    step_index=3,
+                    step_total=total_steps,
                 )
                 # List all files in the directory
                 files_in_dir = os.listdir(self.project.dir)
@@ -552,7 +566,12 @@ class ProjectChat(ProjectChatProtocol):
 
             with time_block("b12: RAG chain"):  # ~60% of time
                 socket_api.update_chat_progress(
-                    "Invoking RAG chain...", id, progress, 60
+                    _step_message(3, "Generating runnable analysis code"),
+                    id,
+                    progress,
+                    60,
+                    step_index=3,
+                    step_total=total_steps,
                 )
                 progress += 60
 
@@ -658,7 +677,12 @@ class ProjectChat(ProjectChatProtocol):
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
             with time_block("b14: Execute code"):  # ~9% of time
                 socket_api.update_chat_progress(
-                    "Executing code...", id, progress, 9
+                    _step_message(4, "Running analysis on your data"),
+                    id,
+                    progress,
+                    9,
+                    step_index=4,
+                    step_total=total_steps,
                 )
                 progress += 9
                 progress_throttler = ProgressThrottler(min_interval_seconds=3.0)
@@ -709,13 +733,15 @@ class ProjectChat(ProjectChatProtocol):
                         build_heartbeat_event(
                             elapsed_seconds,
                             stage=current_stage,
+                            step_index=4,
+                            step_total=total_steps,
                         )
                     )
 
                 ok, stdout, stderr = execute_code(
                     final_code,
                     open_code=False,
-                    log=log,
+                    log=chat_debug_logger.info,
                     on_output_line=handle_output_line,
                     on_heartbeat=handle_heartbeat,
                 )
@@ -734,6 +760,14 @@ class ProjectChat(ProjectChatProtocol):
             data_preview_text = format_stdout_for_chat(stdout)
 
             with time_block("b15: Parse view name"):
+                socket_api.update_chat_progress(
+                    _step_message(5, "Validating and organizing results"),
+                    id,
+                    progress,
+                    0,
+                    step_index=5,
+                    step_total=total_steps,
+                )
                 # Parse view name from the code
                 view_name = parse_view_name(final_code)
                 if view_name is None:
@@ -833,7 +867,12 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
-                    "Finished processing query", id, 100, 0
+                    _step_message(6, "Done — results are ready"),
+                    id,
+                    100,
+                    0,
+                    step_index=6,
+                    step_total=total_steps,
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
                 return {
@@ -850,7 +889,12 @@ class ProjectChat(ProjectChatProtocol):
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
             print(f"{error_message}")
             socket_api.update_chat_progress(
-                f"Error: {error_message}", id, 100, 0
+                f"Analysis failed: {str(e)[:200]}",
+                id,
+                100,
+                0,
+                step_index=4,
+                step_total=total_steps,
             )
             handle_error(e)
             return {

@@ -44,11 +44,18 @@ class ProgressEvent:
 
 
 _SCANPY_PATTERNS: list[tuple[re.Pattern[str], tuple[str, int, str]]] = [
-    (re.compile(r"rank_genes_groups", re.IGNORECASE), ("marker_ranking", 72, "Running marker ranking across clusters (large dataset, may take several minutes)")),
-    (re.compile(r"\bneighbors?\b", re.IGNORECASE), ("neighbors", 60, "Computing neighbors")),
-    (re.compile(r"\bumap\b", re.IGNORECASE), ("umap", 70, "Running UMAP embedding")),
+    (
+        re.compile(r"rank_genes_groups", re.IGNORECASE),
+        (
+            "marker_ranking",
+            72,
+            "Running marker ranking across clusters (this can take a few minutes on large datasets)",
+        ),
+    ),
+    (re.compile(r"\bneighbors?\b", re.IGNORECASE), ("neighbors", 60, "Computing neighborhood graph")),
+    (re.compile(r"\bumap\b", re.IGNORECASE), ("umap", 70, "Computing UMAP embedding")),
     (re.compile(r"highly_variable_genes", re.IGNORECASE), ("highly_variable_genes", 50, "Selecting highly variable genes")),
-    (re.compile(r"normalize_total|log1p", re.IGNORECASE), ("preprocess", 45, "Preprocessing expression matrix")),
+    (re.compile(r"normalize_total|log1p", re.IGNORECASE), ("preprocess", 45, "Preprocessing expression values")),
 ]
 
 
@@ -112,14 +119,26 @@ class ProgressThrottler:
         return False
 
 
-def build_heartbeat_event(elapsed_seconds: float, *, stage: str | None) -> ProgressEvent:
+def build_heartbeat_event(
+    elapsed_seconds: float,
+    *,
+    stage: str | None,
+    step_index: int | None = None,
+    step_total: int | None = None,
+) -> ProgressEvent:
     elapsed_int = max(0, int(elapsed_seconds))
-    stage_text = stage or "execution"
+    if step_index is not None and step_total is not None:
+        prefix = f"Step {step_index}/{step_total}"
+    else:
+        prefix = "Analysis"
+    stage_text = stage or "analysis"
     return ProgressEvent(
-        message=f"Still computing {stage_text}... elapsed {elapsed_int}s",
+        message=f"{prefix}: still running {stage_text} ({elapsed_int}s elapsed)",
         progress=0,
         delta=0,
         stage=stage,
+        step_index=step_index,
+        step_total=step_total,
         elapsed_seconds=elapsed_int,
         source="heartbeat",
     )
