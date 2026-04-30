@@ -418,44 +418,17 @@ export default function ColumnRemovalImpactDialog({
             <DialogContent dividers>
                 <Stack spacing={2}>
                     <Alert severity={"error"}>
-                        <Typography fontWeight={700} variant="body1" sx={{ textTransform: isBlocked ? "none" : "uppercase" }}>
+                        <Typography fontWeight={700} variant="body1">
                             {isBlocked
-                                ? "This column cannot be deleted yet because it is still used by charts or saved views."
-                                : "This will remove the column from the project."}
+                                ? "Deletion is blocked."
+                                : "Are you sure you want to delete this column?"}
                         </Typography>
                         <Typography sx={{ mt: 0.75 }} variant="body1">
                             {isBlocked
-                                ? "Deletion is blocked for now. For each chart below, check the 'Used as' section to see exactly whether this column is used in param, color_by, tooltip, background_filter, or another chart setting."
-                                : "This is a soft delete. The column will no longer be shown in MDV, but in exported project files its definition may still appear marked as deleted rather than kept as an active column. The current view will be saved immediately after deletion."}
+                                ? "This column is still used by other charts or views. Use 'How to fix' below, then try deleting again."
+                                : "Note: This is a soft delete. The column won't be visible in MDV, but it will still appear in exported datasource files."}
                         </Typography>
                     </Alert>
-
-                    {isBlocked && (
-                        <Box
-                            sx={{
-                                border: "1px solid",
-                                borderColor: "divider",
-                                borderRadius: 1.5,
-                                px: 1.75,
-                                py: 1.5,
-                            }}
-                        >
-                            <Stack spacing={0.75}>
-                                <Typography fontWeight={700} variant="body2">
-                                    What you need to do
-                                </Typography>
-                                <Typography color="text.secondary" variant="body2">
-                                    1. Find the affected view and chart below.
-                                </Typography>
-                                <Typography color="text.secondary" variant="body2">
-                                    2. Read the 'How to fix' section to see exactly where the column is used and how to fix.
-                                </Typography>
-                                <Typography color="text.secondary" variant="body2">
-                                    3. Try deleting the column again.
-                                </Typography>
-                            </Stack>
-                        </Box>
-                    )}
 
                     <ChartImpactList charts={currentViewCharts} title="Current View" />
 
