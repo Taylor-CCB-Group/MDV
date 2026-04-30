@@ -97,7 +97,15 @@ redis = "^5.2.1"
 venvPath = ".."
 venv = "venv"
 pythonVersion = "3.12"
+include = [
+    "mdvtools",
+    "conftest.py",
+]
 exclude = [
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
     "manual_tests",
     "mdvtools/auth",
     "mdvtools/dbutils",

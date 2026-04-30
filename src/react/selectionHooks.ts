@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback, useId } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useChart, useDataStore } from "./context";
 
 type CategoryRows = {
     rows: ArrayLike<number>;
 };
+
+let nextHighlightedIndicesListenerId = 0;
 
 export type HighlightModifierInput = {
     shiftKey?: boolean;
@@ -98,7 +100,12 @@ export function useHighlightedIndices() {
     const [highlightedIndices, setHighlightedIndices] = useState<number[]>(
         dataStore.highightedData?.slice() || []
     );
-    const listenerId = useId();
+    const listenerKeyRef = useRef<string | null>(null);
+    let listenerKey = listenerKeyRef.current;
+    if (listenerKey === null) {
+        listenerKey = `highlighted-indices-${nextHighlightedIndicesListenerId++}`;
+        listenerKeyRef.current = listenerKey;
+    }
 
     useEffect(() => {
         const listener = (type: string, data: { indexes: number[] | Record<number, number> }) => {
@@ -111,12 +118,12 @@ export function useHighlightedIndices() {
             }
         };
 
-        dataStore.addListener(listenerId, listener);
+        dataStore.addListener(listenerKey, listener);
 
         return () => {
-            dataStore.removeListener(listenerId);
+            dataStore.removeListener(listenerKey);
         };
-    }, [dataStore, listenerId]);
+    }, [dataStore, listenerKey]);
 
     return highlightedIndices;
 }
