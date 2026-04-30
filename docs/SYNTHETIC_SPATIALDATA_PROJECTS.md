@@ -26,14 +26,14 @@ For scatter/table performance background, see
 Use flat, disposable paths:
 
 ```text
-~/mdv/synth-spatial--<profile>--<run-id>/
+~/mdv/synth-spatial--<profile>--<size>--<layout>/
 ```
 
 Examples:
 
 ```text
-~/mdv/synth-spatial--scatter-table--100k/
-~/mdv/synth-spatial--scatter-table--1m/
+~/mdv/synth-spatial--scatter-table--100k--single/
+~/mdv/synth-spatial--scatter-table--1m--single/
 ~/mdv/synth-spatial--scatter-table--staggered-regions/
 ```
 
@@ -41,7 +41,7 @@ The generated MDV project should live at that final path. SpatialData source
 stores may live inside the project, for example:
 
 ```text
-~/mdv/synth-spatial--scatter-table--100k/spatial/source.zarr/
+~/mdv/synth-spatial--scatter-table--100k--single/spatial/source.zarr/
 ```
 
 That keeps the project portable and lets cleanup remove one subtree.
@@ -77,7 +77,7 @@ direct/manual serving, use the project path directly.
 Cleanup rules:
 
 - filesystem cleanup: remove the exact generated project directory, such as
-  `rm -rf ~/mdv/synth-spatial--scatter-table--100k`;
+  `rm -rf ~/mdv/synth-spatial--scatter-table--100k--single`;
 - DB-backed cleanup: prefer `/delete_project/<id>` or the existing local
   cleanup utilities rather than direct database edits;
 - future improvement: add a selector for
@@ -92,7 +92,7 @@ Run from `python/` using the local venv:
   --profile scatter-table \
   --n-cells 100000 \
   --seed 42 \
-  --output ~/mdv/synth-spatial--scatter-table--100k \
+  --output ~/mdv/synth-spatial--scatter-table--100k--single \
   --force
 ```
 
@@ -106,7 +106,9 @@ Important options:
   `1k,5k,10k,25k,50k,100k,250k,500k,1m,2m`; when supplied, `--n-cells` and
   `--n-coordinate-systems` are inferred;
 - `--image-size`: generated image extent in pixels;
-- `--output`: flat `~/mdv` project path;
+- `--output`: flat `~/mdv` project path. When omitted, the default path
+  includes both total size and coordinate-system layout to avoid collisions
+  between single-region and staggered projects;
 - `--force`: replace the exact output path.
 
 For small single-region projects, the generator uses `dummy-spatialdata` shapes.

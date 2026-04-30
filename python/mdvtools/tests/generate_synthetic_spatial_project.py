@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import os
 import shutil
 import tempfile
@@ -93,12 +94,22 @@ def _default_coordinate_system_cell_counts(n_cells: int, n_coordinate_systems: i
         weights = np.asarray(counts, dtype=np.float64)
         scaled = np.maximum(1, np.floor(weights / weights.sum() * n_cells).astype(np.int64))
         diff = n_cells - int(scaled.sum())
-        for index in range(abs(diff)):
-            target = index % n_coordinate_systems
-            if diff > 0:
-                scaled[target] += 1
-            elif scaled[target] > 1:
-                scaled[target] -= 1
+        order = np.argsort(-weights)
+        while diff != 0:
+            changed = False
+            for target in order:
+                if diff > 0:
+                    scaled[target] += 1
+                    diff -= 1
+                    changed = True
+                elif scaled[target] > 1:
+                    scaled[target] -= 1
+                    diff += 1
+                    changed = True
+                if diff == 0:
+                    break
+            if not changed:
+                raise RuntimeError("failed to rebalance coordinate-system counts")
         return scaled.astype(int).tolist()
 
     max_per_coordinate_system = max(2_000_000, int(np.ceil(n_cells / n_coordinate_systems)))
@@ -115,8 +126,21 @@ def _default_coordinate_system_cell_counts(n_cells: int, n_coordinate_systems: i
     return counts
 
 
-def _default_output(profile: str, n_cells: int) -> Path:
-    return Path.home() / "mdv" / f"synth-spatial--{profile}--{_size_label(n_cells)}"
+def _layout_label(coordinate_system_cell_counts: list[int]) -> str:
+    if len(coordinate_system_cell_counts) == 1:
+        return "single"
+    labels = "-".join(_size_label(count) for count in coordinate_system_cell_counts)
+    if len(labels) > 80:
+        serialized = ",".join(str(count) for count in coordinate_system_cell_counts).encode()
+        digest = hashlib.sha1(serialized).hexdigest()[:8]
+        total_label = _size_label(sum(coordinate_system_cell_counts))
+        return f"cs{len(coordinate_system_cell_counts)}-{total_label}-{digest}"
+    return f"cs{len(coordinate_system_cell_counts)}-{labels}"
+
+
+def _default_output(profile: str, n_cells: int, coordinate_system_cell_counts: list[int]) -> Path:
+    layout = _layout_label(coordinate_system_cell_counts)
+    return Path.home() / "mdv" / f"synth-spatial--{profile}--{_size_label(n_cells)}--{layout}"
 
 
 def _configure_cache_dirs() -> None:
@@ -622,6 +646,7 @@ def parse_args() -> argparse.Namespace:
     for flag, value in (
         ("--n-cells", args.n_cells),
         ("--n-genes", args.n_genes),
+        ("--n-coordinate-systems", args.n_coordinate_systems),
         ("--image-size", args.image_size),
     ):
         if value <= 0:
@@ -643,7 +668,11 @@ def main() -> None:
             n_coordinate_systems,
         )
 
-    output = args.output or _default_output(args.profile, n_cells)
+    output = args.output or _default_output(
+        args.profile,
+        n_cells,
+        coordinate_system_cell_counts,
+    )
     generate_project(
         output=output.expanduser(),
         profile=args.profile,
