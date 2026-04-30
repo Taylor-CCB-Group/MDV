@@ -240,8 +240,8 @@ function ChartImpactCard({
                                     </Typography>
                                     <Button
                                         onClick={() => onOpenView(viewName)}
-                                        size="small"
-                                        sx={{ minWidth: 0, textTransform: "none", textDecoration: "underline" }}
+                                        size="medium"
+                                        sx={{ minWidth: 0, textTransform: "none", p: 0 }}
                                         variant="text"
                                     >
                                         {viewName}
@@ -321,23 +321,35 @@ function SavedViewImpactSection({
                     justifyContent="space-between"
                     spacing={1}
                 >
-                    <Typography fontWeight={700}>{savedView.viewName}</Typography>
-                    <Box
-                        sx={{
-                            minWidth: 20,
-                            height: 20,
-                            borderRadius: "999px",
-                            bgcolor: "action.selected",
-                            color: "text.primary",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            px: 1,
-                            fontWeight: 700,
-                        }}
-                    >
-                        {savedView.charts.length}
-                    </Box>
+                    <Stack alignItems="center" direction="row" spacing={1}>
+                        <Typography fontWeight={700}>{savedView.viewName}</Typography>
+                        <Box
+                            sx={{
+                                minWidth: 20,
+                                height: 20,
+                                borderRadius: "999px",
+                                bgcolor: "action.selected",
+                                color: "text.primary",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                px: 1,
+                                fontWeight: 700,
+                            }}
+                        >
+                            {savedView.charts.length}
+                        </Box>
+                    </Stack>
+                    <Stack alignItems="center" direction="row" spacing={1}>
+                        <Button
+                            onClick={() => onOpenView(savedView.viewName)}
+                            size="small"
+                            sx={{ minWidth: 0, textTransform: "none" }}
+                            variant="outlined"
+                        >
+                            Open View
+                        </Button>
+                    </Stack>
                 </Stack>
                 <Divider />
                 <Stack spacing={1}>
