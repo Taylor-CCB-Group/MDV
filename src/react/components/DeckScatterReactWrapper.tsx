@@ -14,15 +14,18 @@ import DeckScatterComponent from "./DeckScatterComponent";
 import type { OrbitViewState } from "deck.gl";
 import { g } from "@/lib/utils";
 import type DataStore from "@/datastore/DataStore";
-import { getDensitySettings } from "../contour_state";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
-import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
+import { getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;
 });
 
 export type DeckScatterConfig = ScatterPlotConfig2D | ScatterPlotConfig3D;
+export type DeckScatterConfigWithRegion = DeckScatterConfig & { region?: string };
+export const DECK_CONTOUR_SCATTER_TYPE = "DeckContourScatter";
+const deckContourScatterTypes = new Set([DECK_CONTOUR_SCATTER_TYPE, "DeckDensity"]);
+
 const defaultViewState = {
     viewState: {
         target: [0, 0, 0],
@@ -31,6 +34,12 @@ const defaultViewState = {
         minZoom: -50,
     },
 };
+
+function shouldMigrateLegacyContourParameter(originalConfig: DeckScatterConfig) {
+    if (originalConfig.dimension === "3d") return false;
+    if (!deckContourScatterTypes.has(originalConfig.type)) return false;
+    return "category1" in originalConfig || "category2" in originalConfig;
+}
 
 function adaptConfig(originalConfig: DeckScatterConfig) {
     if (originalConfig.type === "wgl_3d_scatter_plot") {
@@ -46,8 +55,14 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
     const defaults = originalConfig.dimension !== "3d" ? { axis: scatterAxisDefaults } : {};
     const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
-    if (!config.contourParameter) {
-        config.contourParameter = config.param[2];
+    const legacyContourParameter = originalConfig.param?.[2];
+    if (
+        !config.contourParameter &&
+        shouldMigrateLegacyContourParameter(originalConfig) &&
+        legacyContourParameter &&
+        !Array.isArray(legacyContourParameter)
+    ) {
+        config.contourParameter = legacyContourParameter;
     }
     return config;
 }
@@ -108,76 +123,15 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const c = this.config;
         const settings = super.getSettings();
 
-        // is this how we decide? maybe?
-        // had been thinking we'd revisit abstract version of density with a new shape for chart config
-        if (c.type.includes("Density")) {
-            // weird things happening with parameter & category settings?
-            settings.push(getDensitySettings(c, this));
-        }
         if (c.dimension === "2d") {
             const axisSettings = getAxisGuiSpec(c);
             settings.push(axisSettings);
         }
         return settings.concat([
-            getTooltipSettings(c),
-            // this should probably also be common with VivMDVReact.
-            g({
-                type: "radiobuttons",
-                label: "course radius",
-                //@ts-expect-error - maybe we should allow numbers in radiobuttons? what actually happens internally?
-                current_value: c.course_radius || 1,
-                choices: [
-                    ["0.1", "0.1"],
-                    ["1", "1"],
-                    ["10", "10"],
-                    ["100", "100"],
-                ],
-                func: (x) => {
-                    c.course_radius = Number.parseFloat(x);
-                },
-            }),
-            g({
-                type: "slider",
-                label: "radius",
-                current_value: c.radius || 5,
-                min: 0,
-                max: 20,
-                continuous: true,
-                func: (x) => {
-                    c.radius = x;
-                },
-            }),
-            g({
-                type: "slider",
-                label: "opacity",
-                current_value: Math.sqrt(c.opacity || scatterDefaults.opacity),
-                min: 0,
-                max: 1,
-                continuous: true,
-                func: (x) => {
-                    c.opacity = x * x;
-                },
-            }),
-            g({
-                type: "radiobuttons",
-                label: "Action on Filter",
-                choices: [
-                    ["Hide Points", "hide"],
-                    ["Gray Out Points", "grey"],
-                ],
-                current_value: c.on_filter,
-                func: (x) => {
-                    //@ts-ignore x is a string, but we have a narrow "hide" | "grey" type
-                    c.on_filter = x;
-                },
-            }),
-            g({
-                type: "check",
-                label: "zoom on filter",
-                current_value: c.zoom_on_filter || false,
-                func: (x) => {
-                    c.zoom_on_filter = x;
-                },
+            ...getSharedScatterSettings(c, {
+                chart: this,
+                includeDensitySettings: deckContourScatterTypes.has(c.type),
+                includePointShape: true,
             }),
             g({
                 type: "button",
@@ -216,7 +170,7 @@ BaseChart.types["DeckScatter"] = {
     ],
 };
 BaseChart.types["DeckDensity"] = {
-    name: "Density Plot (new)",
+    name: "Scatter Plot + Density",
     class: DeckScatterReact,
     allow_user_add: false,
     params: [
@@ -228,16 +182,11 @@ BaseChart.types["DeckDensity"] = {
             type: "number",
             name: "y axis",
         },
-        {
-            type: "_multi_column:number",
-            name: "density fields",
-        },
     ],
-    // todo
-    // extra_controls: (ds) => (g({
-    //     type: "multicolumn",
-    //     label: "density fields",
-    // }))
+};
+BaseChart.types[DECK_CONTOUR_SCATTER_TYPE] = {
+    ...BaseChart.types["DeckDensity"],
+    allow_user_add: true,
 };
 BaseChart.types["DeckScatter3D"] = {
     name: "3D Scatter Plot (new)",
@@ -263,7 +212,7 @@ BaseChart.types["DeckScatter3D"] = {
     },
 };
 BaseChart.types["wgl_scatter_plot_dev"] = {
-    name: "2D Scatter Plot (experimental)",
+    name: "2D Scatter Plot",
     class: DeckScatterReact,
     allow_user_add: true,
     params: [

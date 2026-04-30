@@ -7,10 +7,18 @@ import type BaseChart from "../../charts/BaseChart";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 const DebugChart = observer(
-    ({ chart, header }: { chart: any; header?: string }) => {
+    ({
+        chart,
+        header,
+        showValidationSection = false,
+    }: {
+        chart: any;
+        header?: string;
+        showValidationSection?: boolean;
+    }) => {
         return (
             <>
-                <Gui json={chart} header={header} />
+                <Gui json={chart} header={header} showValidationSection={showValidationSection} />
                 <ReactQueryDevtools initialIsOpen={false}  />
             </>
         );
@@ -45,7 +53,16 @@ class DebugChartReactWrapper extends BaseDialog {
     }
     init(parent: any) {
         const div = createEl("div", {}, this.dialog);
-        this.root = createMdvPortal(<DebugChart chart={parent} />, div, this);
+        const showValidationSection = Boolean(
+            parent &&
+            typeof parent === "object" &&
+            "validationFindings" in parent,
+        );
+        this.root = createMdvPortal(
+            <DebugChart chart={parent} showValidationSection={showValidationSection} />,
+            div,
+            this,
+        );
     }
     close() {
         super.close();

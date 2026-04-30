@@ -1,0 +1,7 @@
+- only run `npx tsgo` when TypeScript files or TS-facing configs changed
+- for Python checks in worktrees, prefer the local `venv`:
+- tests: `./venv/bin/python -m pytest python/mdvtools/tests -m "not performance"`
+- pyright: from `python/`, run `../venv/bin/pyright`
+- avoid `as` casts where possible
+- prefer follow-up PRs for wider type-system cleanups
+- when composing commit messages, avoid words like "enhance" and favour conciseness and clarity

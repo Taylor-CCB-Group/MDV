@@ -3,12 +3,15 @@ import JsonView from "react18-json-view";
 import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
 import "react18-json-view/src/dark.css";
+import { observer } from "mobx-react-lite";
 import { useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { vivLoaderCacheTelemetryObservable } from "../viv_loader_cache";
 import "../../utilities/css/JsonDialogStyles.css";
-import { Accordion, AccordionDetails, AccordionSummary, Divider, Link, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Link, Typography } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
+import { useChartManager } from "../hooks";
 
 type JSONObject = { [key: string]: any };
 
@@ -62,13 +65,31 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
     return recursiveFilter(obj, []) || {};
 }
 
-export default function ({ json, header }: { json: any; header?: string }) {
+const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
+    json,
+    header,
+    showValidationSection = false,
+}: {
+    json: any;
+    header?: string;
+    showValidationSection?: boolean;
+}) {
     const [filter, setFilter] = useState("");
     const [debouncedFilter] = useDebounce(filter, 300); //why is this returning a tuple?
-    const filteredJson = useMemo(
-        () => filterJSON(json, debouncedFilter),
-        [json, debouncedFilter]
+    const { validationFindings } = useChartManager();
+    const jsonWithVivTelemetry = useMemo(
+        () => ({
+            ...json,
+            vivLoaderCacheTelemetry: vivLoaderCacheTelemetryObservable.snapshot,
+        }),
+        [json, vivLoaderCacheTelemetryObservable.snapshot],
     );
+    const filteredJson = useMemo(
+        () => filterJSON(jsonWithVivTelemetry, debouncedFilter),
+        [jsonWithVivTelemetry, debouncedFilter],
+    );
+    const chartTypeCounts = validationFindings?.chartTypeCounts ?? {};
+    const hasAnyFindings = Boolean(validationFindings?.hasAny);
 
     return (
         <div className="overflow-auto p-4" style={{ userSelect: "text" }}>
@@ -105,6 +126,60 @@ export default function ({ json, header }: { json: any; header?: string }) {
                     </Typography>
                 </AccordionDetails>
             </Accordion>
+
+            {showValidationSection && (
+                <Accordion
+                    defaultExpanded={hasAnyFindings}
+                    sx={{
+                        border: "1px solid var(--border_menu_bar_color)",
+                        mb: 2,
+                    }}
+                >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="h6">
+                            Validation issues
+                        </Typography>
+                    </AccordionSummary>
+                    <Divider />
+                    <AccordionDetails sx={{ mt: 1 }}>
+                        {hasAnyFindings ? (
+                            <>
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, mb: 1 }}>
+                                    <Typography>
+                                        Total: <strong>{validationFindings.totalCount}</strong>
+                                    </Typography>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => validationFindings.clearAll()}
+                                    >
+                                        Clear
+                                    </Button>
+                                </Box>
+                                <Box sx={{ mb: 1 }}>
+                                    {Object.entries(chartTypeCounts).length > 0 ? (
+                                        Object.entries(chartTypeCounts)
+                                            .sort((a, b) => b[1] - a[1])
+                                            .map(([chartType, count]) => (
+                                                <Typography key={chartType} sx={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+                                                    {chartType}: {count}
+                                                </Typography>
+                                            ))
+                                    ) : (
+                                        <Typography>No chart validation issues recorded yet.</Typography>
+                                    )}
+                                </Box>
+                                <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
+                                    Aggregated details are also available in the JSON below under <code>validationFindings</code>.
+                                </Typography>
+                            </>
+                        ) : (
+                            <Typography>No validation issues recorded.</Typography>
+                        )}
+                    </AccordionDetails>
+                </Accordion>
+            )}
+
             <input
                 type="text"
                 value={filter}
@@ -123,4 +198,6 @@ export default function ({ json, header }: { json: any; header?: string }) {
             />
         </div>
     );
-}
+});
+
+export default DebugJsonDialogComponent;

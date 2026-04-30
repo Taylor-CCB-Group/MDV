@@ -8,6 +8,7 @@ import type { SlickgridReactInstance } from "slickgrid-react";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
 import { createEl } from "@/utilities/ElementsTyped";
 import { DataModel } from "@/table/DataModel";
+import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -47,9 +48,11 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
     return config;
 }
 
-class TableChartReact extends BaseReactChart<TableChartReactConfig> {
-    gridRef?: { current: SlickgridReactInstance | null };
+export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
+    private gridRef?: { current: SlickgridReactInstance | null };
+    private addColumnDialogOpener?: () => void;
     private downloadIconSpan: HTMLSpanElement | null = null;
+    private addColumnIconSpan: HTMLSpanElement | null = null;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
         // Adapt config before calling super constructor, which will make the config observable
@@ -63,6 +66,28 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                 this.downloadData();
             },
         }) as HTMLSpanElement;
+
+        const isEditMode = window.mdv?.chartManager?.config?.permission === "edit";
+
+        if (isEditMode) {
+            this.addColumnIconSpan = this.addMenuIcon("fas fa-plus", "Add Column", {
+                func: () => {
+                    this.openAddColumnDialog();
+                },
+            }) as HTMLSpanElement;
+        }
+    }
+
+    setGridRef(gridRef: { current: SlickgridReactInstance | null }) {
+        this.gridRef = gridRef;
+    }
+
+    setAddColumnDialogOpener(opener?: () => void) {
+        this.addColumnDialogOpener = opener;
+    }
+
+    openAddColumnDialog() {
+        this.addColumnDialogOpener?.();
     }
 
     private setDownloadIcon(downloading: boolean) {
@@ -127,6 +152,52 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         }
     }
 
+    // Overriding the onColumnRemoved to update table config and avoid removing the whole table
+    onColumnRemoved(column: string) {
+        if (!Array.isArray(this.config.param)) {
+            return false;
+        }
+        // `config.param` can contain either plain field names or query-backed FieldSpec objects
+        // flatten each spec to concrete field names so removals work for both
+        const containsRemovedColumn = (fieldSpec: FieldSpec) =>
+            flattenFields(fieldSpec).includes(column);
+        if (!this.config.param.some(containsRemovedColumn)) {
+            return false;
+        }
+
+        action(() => {
+            // Remove column from config.param, config.order
+            this.config.param = this.config.param.filter(
+                (fieldSpec) => !containsRemovedColumn(fieldSpec),
+            );
+            const nextOrder = { ...(this.config.order ?? {}) };
+            const removedOrder = nextOrder[column];
+            delete nextOrder[column];
+
+            // Shift the index of the columns back after the removed column by 1
+            if (removedOrder !== undefined) {
+                for (const field in nextOrder) {
+                    if (nextOrder[field] > removedOrder) {
+                        nextOrder[field] -= 1;
+                    }
+                }
+            }
+            this.config.order = nextOrder;
+
+            // Reset sort if sorted by removed column
+            if (this.config.sort?.columnId === column) {
+                this.config.sort = null;
+            }
+
+            // Remove the column width of removed column
+            if (this.config.column_widths?.[column] != null) {
+                delete this.config.column_widths[column];
+            }
+        })();
+
+        return false;
+    }
+
     getConfig() {
         const config = super.getConfig();
         
@@ -172,7 +243,7 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
 }
 
 BaseChart.types["table_chart_react"] = {
-    name: "Table Chart (React)",
+    name: "Table",
     class: TableChartReact,
     allow_user_add: true,
     params: [

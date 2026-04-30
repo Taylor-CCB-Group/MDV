@@ -31,6 +31,17 @@ def upload_log(msg: str):
     date_str = now.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[[[ socketio-upload ]]] [{date_str}] - {msg}")
 
+
+def _is_tabular_datasource_upload(content_type: str, filename: str) -> bool:
+    """True when upload should use CSV/TSV datasource validation and processing."""
+    ct = (content_type or "").lower()
+    fn = (filename or "").lower()
+    if ct in ("text/csv", "text/tab-separated-values"):
+        return True
+    if ct == "text/plain" and fn.endswith(".txt"):
+        return True
+    return fn.endswith((".csv", ".tsv", ".tab", ".txt"))
+
 class FileUploadManager:
     """
     Manages file uploads, including chunked uploads, resumable states,
@@ -320,18 +331,14 @@ class FileUploadManager:
                 try:
                     response_data = {}
                     content_type = state.get('content_type')
-                    
-                    if content_type == "text/csv":
+                    original_fn = state.get('original_filename', "")
+
+                    if _is_tabular_datasource_upload(content_type, original_fn):
                         # Get project from global projects map
                         project = _upload_projects_map.get(project_id)
                         if not project:
                             raise Exception(f"Project {project_id} not found")
-                        
-                        # Copy the CSV file to the project directory before processing
-                        project_csv_path = os.path.join(project.dir, state['original_filename'])
-                        shutil.copy2(state['data_filepath'], project_csv_path)
-                        upload_log(f"Copied CSV file to project directory: {project_csv_path}")
-                            
+
                         with self.app.app_context():
                             result = datasource_processing(
                                 project, 
@@ -341,6 +348,12 @@ class FileUploadManager:
                                 state.get('replace', False),
                                 state.get('supplied_only', False)
                             )
+
+                        # Only persist the original uploaded tabular file into the
+                        # project directory after validation + datasource creation succeed.
+                        project_csv_path = os.path.join(project.dir, state['original_filename'])
+                        shutil.copy2(state['data_filepath'], project_csv_path)
+                        upload_log(f"Copied CSV file to project directory: {project_csv_path}")
                         response_data = {'result': result}
                     elif content_type == "application/x-hdf" or state['original_filename'].endswith('.h5ad'):
                         # Process AnnData file
@@ -377,7 +390,7 @@ class FileUploadManager:
                             )
                         response_data = {'result': result}
                     else:
-                        response_data = {'warning': f'No processor for {content_type} with project_id {project_id}'}
+                        raise Exception(f"No processor for {content_type} with project_id {project_id}")
                     
                     self.socketio.emit('upload_success', {
                         'file_id': file_id,
@@ -712,7 +725,7 @@ class UploadSocketAPI:
                 extra_data = {}
                 
                 # Validation based on content type
-                if content_type == "text/csv":
+                if _is_tabular_datasource_upload(content_type, filename):
                     try:
                         validation_params = {k: data.get(k) for k in ["name", "view", "replace", "supplied_only"]}
                         validation_params = {k: v for k, v in validation_params.items() if v is not None}

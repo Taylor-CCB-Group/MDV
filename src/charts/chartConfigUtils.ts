@@ -9,8 +9,8 @@ import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "./BaseChart";
 import type { TooltipConfig } from "@/react/scatter_state";
 import { getChartConfigSchema } from "./schemas/ChartConfigRegistry";
-import { BaseConfigSchema } from "./schemas/ChartConfigSchema";
-import { logValidationError } from "@/lib/validationLogging";
+import { BaseConfigSchema, type ChartConfig } from "./schemas/ChartConfigSchema";
+import { logChartValidationError } from "@/lib/validationLogging";
 
 /**
  * This is a utility module for handling the serialisation and deserialisation of chart configurations.
@@ -173,7 +173,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     const validate = schema ?? BaseConfigSchema;
     const result = validate.safeParse(originalConfig);
     if (!result.success) {
-        logValidationError({ context: "chart", rawConfig: originalConfig, error: result.error });
+        logChartValidationError(originalConfig as unknown as ChartConfig, result.error);
     }
     
     let config: C = JSON.parse(JSON.stringify(originalConfig));

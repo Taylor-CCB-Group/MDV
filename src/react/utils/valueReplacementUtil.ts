@@ -1,4 +1,10 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
+import {
+    getMultitextCapacity,
+    getMultitextDelimiter,
+    getMultitextJoinDelimiter,
+    splitMultitextItems,
+} from "@/lib/multitext";
 
 /**
  * Replaces all occurrences of find value with replace value in the given cell value.
@@ -56,7 +62,7 @@ const getOrAddValueIndex = (replaceValue: string, values: string[], maxValues: n
  * @returns Cell value of the column in the table
  * @throws Error if column data is invalid or missing
  */
-const getCurrentCellValue = (column: LoadedDataColumn<DataType>, dataIndex: number): string => {
+export const getCellValueAsString = (column: LoadedDataColumn<DataType>, dataIndex: number): string => {
     if (!column.data) {
         throw new Error(`No data found in column: ${column.field}`);
     }
@@ -89,12 +95,13 @@ const getCurrentCellValue = (column: LoadedDataColumn<DataType>, dataIndex: numb
 
     // multitext
     if (datatype === "multitext") {
-        if (!values || !stringLength) {
+        if (!values) {
             throw new Error(`Missing values or stringLength for multitext column: ${column.field}`);
         }
 
-        const baseIndex = dataIndex * stringLength;
-        const cellData = data.slice(baseIndex, baseIndex + stringLength);
+        const capacity = getMultitextCapacity(column);
+        const baseIndex = dataIndex * capacity;
+        const cellData = data.slice(baseIndex, baseIndex + capacity);
 
         return Array.from(cellData)
             .filter((x) => x !== 65535) // 65535 = empty
@@ -106,7 +113,7 @@ const getCurrentCellValue = (column: LoadedDataColumn<DataType>, dataIndex: numb
                 }
                 return values[index];
             })
-            .join(", ");
+            .join(getMultitextJoinDelimiter(getMultitextDelimiter(column)));
     }
 
     // unique
@@ -175,31 +182,29 @@ export const setCellValueFromString = (
 
     // multitext
     if (datatype === "multitext") {
-        if (!values || !stringLength) {
+        if (!values) {
             throw new Error(`Missing values or stringLength for multitext column: ${column.field}`);
         }
 
-        const baseIndex = dataIndex * stringLength;
+        const capacity = getMultitextCapacity(column);
+        const baseIndex = dataIndex * capacity;
 
-        if (baseIndex + stringLength > data.length) {
+        if (baseIndex + capacity > data.length) {
             throw new Error(`Index out of bounds for multitext column: "${column.field}"`);
         }
 
         const maxValues = 65536;
+        const delimiter = getMultitextDelimiter(column);
 
-        // Split by comma and trim each value
-        const parts = newValue
-            .split(",")
-            .map((p) => p.trim())
-            .filter((p) => p.length > 0);
+        const parts = splitMultitextItems(newValue, delimiter);
 
         // Clear existing values
-        for (let i = 0; i < stringLength; i++) {
+        for (let i = 0; i < capacity; i++) {
             data[baseIndex + i] = 65535; // Empty marker
         }
 
         // Set new values
-        for (let i = 0; i < Math.min(parts.length, stringLength); i++) {
+        for (let i = 0; i < Math.min(parts.length, capacity); i++) {
             const valueIndex = getOrAddValueIndex(parts[i], values, maxValues);
             data[baseIndex + i] = valueIndex;
         }
@@ -271,7 +276,7 @@ export const replaceMatches = (
 
     let currentValue: string;
     try {
-        currentValue = getCurrentCellValue(column, dataIndex);
+        currentValue = getCellValueAsString(column, dataIndex);
     } catch (error) {
         console.error(`Failed to get current cell value in column "${searchColumn}": ${error instanceof Error ? error.message : String(error)}`);
         throw new Error(

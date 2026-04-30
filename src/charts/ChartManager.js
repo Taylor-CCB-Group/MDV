@@ -15,7 +15,7 @@ import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
-import ColorChooser from "./dialogs/ColorChooser";
+import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
@@ -27,7 +27,7 @@ import "./TableChart.js";
 import "./WGL3DScatterPlot.js";
 import "./WGLScatterPlot.js";
 import "./RingChart.js";
-import "./TextBoxChart.js";
+import "../react/components/TextBoxChartReactWrapper";
 import "./HeatMap.js";
 import "./ViolinPlot.js";
 import "./BoxPlot.js";
@@ -56,7 +56,7 @@ import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action } from "mobx";
+import { makeObservable, observable, action, makeAutoObservable } from "mobx";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -64,6 +64,8 @@ import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
+import { getOrCreateGateManager } from "@/react/gates/useGateManager";
+import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 
 
 //order of column data in an array buffer
@@ -120,6 +122,7 @@ function listenPreferredColorScheme(callback) {
 * 
 */
 export class ChartManager {
+    validationFindings = new ValidationFindingsStore();
     /**
      * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
      * @param {import("@/charts/charts").DataSource[]} dataSources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
@@ -188,6 +191,9 @@ export class ChartManager {
         /** @type {{[k: string]: DataSource | undefined}} */
         this.dsIndex = {};
         this.columnsLoading = {};
+        // Aggregated validation/schema findings for UI + reporting.
+        // Created before React mounts the menu bar so observers track it from first render.
+        this.validationFindings = new ValidationFindingsStore();
         for (const d of dataSources) {
             const ds = {
                 name: d.name,
@@ -307,8 +313,16 @@ export class ChartManager {
             this._loadView(config, dataLoader, true);
         }
 
-        //add links
+        //add links and create gate manager for each datasource
         for (const ds of this.dataSources) {
+
+            // Gate manager is created after initialising the config
+            try {
+                getOrCreateGateManager(ds.dataStore);
+            } catch (err) {
+                console.error(`Failed to initialise gates for datasource "${ds.name}"`, err);
+            }
+
             const links = ds.dataStore.links;
             if (links) {
                 for (const ods in links) {
@@ -544,7 +558,7 @@ export class ChartManager {
 
     _setUpChangeLayoutMenu(ds) {
         this.layoutMenus[ds.name] = new ContextMenu(() => {
-            const lo = this.viewData.dataSources[ds.name].layout || "absolute";
+            const lo = this.viewData.dataSources[ds.name]?.layout || "absolute";
             return [
                 {
                     text: "Absolute",
@@ -562,6 +576,7 @@ export class ChartManager {
 
     changeLayout(type, ds) {
         const view = this.viewData.dataSources[ds.name];
+        if (!view) return;
         const current = view.layout || "absolute";
         if (type === current) {
             return;
@@ -1103,8 +1118,14 @@ export class ChartManager {
             removed: [],
             colors_changed: [],
         };
+        // Although, removed columns are deleted from the dirtyColumns in DataStore
+        // If a stale entry is still present, some checks are added to skip them
         for (const c in dc.added) {
             const td = getMd(c);
+            // Skip stale entries
+            if (!td) {
+                continue;
+            }
             rv.columns.push(td);
             rv.added.push(c);
         }
@@ -1115,14 +1136,23 @@ export class ChartManager {
         for (const c in dc.data_changed) {
             if (!rv.columns[c]) {
                 const td = getMd(c);
+                // Skip stale entries
+                if (!td) {
+                    continue;
+                }
                 rv.columns.push(td);
             }
         }
 
         for (const cc in dc.colors_changed) {
+            const column = dataStore.columnIndex[cc];
+            // Skip if the removed column is still present
+            if (!column) {
+                continue;
+            }
             rv.colors_changed.push({
                 column: cc,
-                colors: dataStore.columnIndex[cc].colors,
+                colors: column.colors,
             });
         }
 
@@ -1130,18 +1160,29 @@ export class ChartManager {
 
         function getMd(c) {
             const cl = dataStore.columnIndex[c];
+            // Skip stale entries if present
+            if (!cl) {
+                return null;
+            }
             const md = {
                 values: cl.values,
                 datatype: cl.datatype,
                 name: cl.name,
-                editable: true,
+                // Use the existing editable field value if it exists, default to true
+                editable: cl.editable ?? true,
                 field: cl.field,
             };
             const numRows = dataStore.size;
             
-            // Add stringLength to metadata for unique columns (required by server)
-            if (cl.datatype === "unique" && cl.stringLength) {
+            // Add datatype-specific metadata required to reconstruct client-created columns on reload.
+            if (
+                (cl.datatype === "unique" || cl.datatype === "multitext") &&
+                cl.stringLength
+            ) {
                 md.stringLength = cl.stringLength;
+            }
+            if (cl.datatype === "multitext" && cl.delimiter) {
+                md.delimiter = cl.delimiter;
             }
             
             let arr;
@@ -1170,7 +1211,8 @@ export class ChartManager {
                     }
 
                     const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
-                    const decoded = textDecoder.decode(rowBytes);
+                    // TextDecoder cannot decode a SharedArrayBuffer-backed view in some browsers.
+                    const decoded = textDecoder.decode(Uint8Array.from(rowBytes));
                     // Remove null padding characters
                     arr[i] = decoded.replace(/\0+$/, "");
                 }
@@ -1225,7 +1267,7 @@ export class ChartManager {
                 const config = chart.getConfig();
                 const div = chart.getDiv();
                 const d = this.viewData.dataSources[chInfo.dataSource.name];
-                if (d.layout === "gridstack") {
+                if (d?.layout === "gridstack") {
                    //this is handled by gridstack now
                 } else {
                     config.position = [div.offsetLeft, div.offsetTop];
@@ -1570,10 +1612,10 @@ export class ChartManager {
                 },
                 func: () => {
                     try {
-                        new ColorChooser(this, ds);
+                        new ColorPaletteWrapper(this, ds);
                     } catch (error) {
-                        console.error("error making ColorChooser", error);
-                        this.createInfoAlert("Error making color chooser", {
+                        console.error("error making ColorPalette", error);
+                        this.createInfoAlert("Error making Color Palette", {
                             type: "warning",
                             duration: 2000,
                         });
@@ -2388,7 +2430,7 @@ export class ChartManager {
         if (
             ds &&
             this.gridStack &&
-            this.viewData.dataSources[ds.name].layout === "gridstack"
+            this.viewData.dataSources[ds.name]?.layout === "gridstack"
         ) {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;

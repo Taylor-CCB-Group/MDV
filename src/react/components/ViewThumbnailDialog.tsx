@@ -45,7 +45,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const cm = useChartManager();
     const viewManager = cm.viewManager;
     const config = cm.config;
-    const isEditMode = config.permission === "edit" || config.permission === "owner";
+    const isEditMode = config.permission === "edit";
 
     const [viewList, setViewList] = useState<ViewEntry[]>([]);
     const [filteredViewList, setFilteredViewList] = useState<ViewEntry[]>([]);

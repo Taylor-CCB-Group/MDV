@@ -111,6 +111,24 @@ describe("valueReplacementUtils", () => {
                 }
             });
 
+            test("uses the column delimiter when parsing replacements", () => {
+                column = {
+                    field: "Col1",
+                    data: [0, 1, 2],
+                    values: ["val1", "val2", "val3"],
+                    stringLength: 3,
+                    delimiter: ";",
+                    datatype: "multitext",
+                } as any;
+
+                dataIndex = 0;
+                replaceValue = "val4; val5; val6";
+
+                setCellValueFromString(column, dataIndex, replaceValue);
+
+                expect(column.values.slice(-3)).toEqual(["val4", "val5", "val6"]);
+            });
+
             test("throw error for empty values array", () => {
                 column = {
                     field: "Col1",

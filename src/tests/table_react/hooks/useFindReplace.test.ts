@@ -1,6 +1,7 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import useFindReplace from "@/react/hooks/useFindReplace";
+import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
@@ -13,7 +14,7 @@ describe("useFindReplace", () => {
     let config: { include_index?: boolean };
     let gridRef: React.MutableRefObject<any>;
     let selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>;
-    let setFeedbackAlert: ReturnType<typeof vi.fn>;
+    let setFeedbackAlert: (alert: FeedbackAlert) => void;
     let mockGridInstance: ReturnType<typeof createSlickGridMock>;
 
     beforeEach(() => {
@@ -56,7 +57,7 @@ describe("useFindReplace", () => {
         } as any;
 
         selectionSourceRef = { current: null };
-        setFeedbackAlert = vi.fn();
+        setFeedbackAlert = vi.fn() as (alert: FeedbackAlert) => void;
     });
 
     describe("handleFind", () => {
@@ -71,6 +72,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -95,6 +97,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
         
@@ -117,6 +120,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -140,6 +144,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -163,6 +168,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -191,6 +197,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -215,6 +222,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -243,6 +251,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -273,6 +282,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -304,6 +314,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -334,6 +345,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -354,6 +366,36 @@ describe("useFindReplace", () => {
             );
         });
 
+        test("should show error if permission not editable", () => {
+
+            const { result } = renderHook(() =>
+                useFindReplace(
+                    orderedParamColumns,
+                    sortedIndices,
+                    dataStore,
+                    searchColumn,
+                    config,
+                    gridRef,
+                    selectionSourceRef,
+                    setFeedbackAlert,
+                    false,
+                ),
+            );
+
+            act(() => {
+                result.current.handleFind("cells");
+                result.current.handleReplace("cells", "new");
+            });
+
+            expect(setFeedbackAlert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Replace Error",
+                    message: expect.stringContaining("Replace is only available in edit mode"),
+                }),
+            );
+        });
+
         test("should show error if column not editable", () => {
             orderedParamColumns[1].editable = false;
 
@@ -367,6 +409,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -395,6 +438,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -425,6 +469,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -445,6 +490,34 @@ describe("useFindReplace", () => {
             );
         });
 
+        test("should show error if permission is not editable", () => {
+            const { result } = renderHook(() =>
+                useFindReplace(
+                    orderedParamColumns,
+                    sortedIndices,
+                    dataStore,
+                    searchColumn,
+                    config,
+                    gridRef,
+                    selectionSourceRef,
+                    setFeedbackAlert,
+                    false,
+                ),
+            );
+
+            act(() => {
+                result.current.handleReplaceAll("nonexistent", "new");
+            });
+
+            expect(setFeedbackAlert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Replace All Error",
+                    message: expect.stringContaining("Replace is only available in edit mode"),
+                }),
+            );
+        });
+
         test("should show error if no matches found", () => {
             const { result } = renderHook(() =>
                 useFindReplace(
@@ -456,6 +529,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -485,6 +559,7 @@ describe("useFindReplace", () => {
                     gridRef,
                     selectionSourceRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 

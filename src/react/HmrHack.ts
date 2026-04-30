@@ -1,5 +1,6 @@
 import "../react/components/VivMDVReact";
 import "../react/components/DeckScatterReactWrapper";
+import "../react/components/SplatterPlotReactWrapper";
 import "../charts/dialogs/AnnotationDialogReact";
 // import addChart from "../charts/dialogs/AddChartDialogReact";
 // arr.push(addChart);

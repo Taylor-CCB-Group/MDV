@@ -540,7 +540,7 @@ export default TableChart;
 
 BaseChart.types["table_chart"] = {
     class: TableChart,
-    name: "Table",
+    name: "Table (Classic)",
     params: [
         {
             type: "_multi_column:all",

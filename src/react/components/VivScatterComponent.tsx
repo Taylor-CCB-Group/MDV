@@ -1,6 +1,6 @@
 import { getDefaultInitialViewState, ColorPaletteExtension, DetailView } from "@hms-dbmi/viv";
 import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
@@ -17,9 +17,11 @@ import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
-import { trace } from "mobx";
 import { useOuterContainer } from "../screen_state";
-import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
+import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
+import useGateLayers from "../hooks/useGateLayers";
+import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -82,13 +84,20 @@ const Main = observer(
         const id = useChartID();
         const detailId = `${id}detail-react`;
         const outerContainer = useOuterContainer();
+        const deckContainerRef = useRef<HTMLDivElement | null>(null);
 
         // this isn't updating when we tweak the config...
         const { scatterProps, selectionLayer } = useSpatialLayers();
-        const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
+        const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
         const { showJson } = useConfig<VivRoiConfig>();
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
+
+        const {
+            gateLabelLayer,
+            gateDisplayLayer,
+            controllerOptions,
+        } = useGateLayers();
 
         // Get field contour legend data
         const config = useConfig<DualContourLegacyConfig>();
@@ -163,19 +172,52 @@ const Main = observer(
                 brightness,
                 contrast,
             }),
-            [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast],
+                [
+                ome,
+                selections,
+                contrastLimits,
+                extensions,
+                colors,
+                channelsVisible,
+                brightness,
+                contrast,
+            ],
         );
+
+        const getTooltipContent = useCallback(
+            (info: PickingInfo) => {
+                return getCombinedScatterTooltip(
+                    info,
+                    {
+                        gateDisplayLayerId: gateDisplayLayer?.id,
+                        gateLabelLayerId: gateLabelLayer?.id,
+                        getPointTooltip: getTooltip,
+                    },
+                );
+            },
+            [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
+        );
+        const {
+            clearTooltip,
+            getTooltip: getPortalTooltip,
+            suppressTooltipUntilPointerUp,
+            tooltipPortal,
+        } = useOuterContainerDeckTooltip(getTooltipContent, deckContainerRef);
+
         const deckProps: Partial<DeckGLProps> = useMemo(
             () => ({
-                getTooltip,
-                style: {
-                    zIndex: "-1",
-                },
-                //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-                layers: [jsonLayer, scatterplotLayer, selectionLayer],
+                getTooltip: getPortalTooltip,
+                layers: [
+                    jsonLayer,
+                    greyScatterplotLayer,
+                    scatterplotLayer,
+                    gateDisplayLayer,
+                    selectionLayer,
+                    gateLabelLayer,
+                ].filter(l => l !== null),
                 id: `${id}deck`,
                 // deviceProps: {
-                //     webgl: {
+                //     webgl: {                    
                 //         depth: true,
                 //         preserveDrawingBuffer: true,
                 //         antialias: true,
@@ -183,13 +225,24 @@ const Main = observer(
                 // },
                 controller: {
                     doubleClickZoom: false,
+                    dragPan: controllerOptions.dragPan,
                 },
                 // deviceProps: {
                 //     // todo - get this working more usefully.
                 //     debugSpectorJS: true,
                 // }
             }),
-            [scatterplotLayer, selectionLayer, jsonLayer, id, getTooltip],
+            [
+                gateLabelLayer,
+                gateDisplayLayer,
+                scatterplotLayer,
+                greyScatterplotLayer,
+                selectionLayer,
+                jsonLayer,
+                id,
+                getPortalTooltip,
+                controllerOptions,
+            ],
         );
         if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
         // if (import.meta.env.DEV) trace();
@@ -197,20 +250,25 @@ const Main = observer(
             <>
                 <SelectionOverlay />
                 {showLegend && legendFields.length > 0 && (
-                    <FieldContourLegend
-                        fields={legendFields}
+                    <FieldContourLegend 
+                        fields={legendFields} 
                         position={legendPosition}
                         onFieldHover={handleFieldHover}
                     />
                 )}
                 <div
+                    ref={deckContainerRef}
                     aria-label="Spatial scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none" }}
+                    onPointerDown={suppressTooltipUntilPointerUp}
                     onMouseDown={() => {
                         setScatterKeyboardActive(true);
                     }}
                     onMouseEnter={() => setScatterKeyboardActive(true)}
-                    onMouseLeave={() => setScatterKeyboardActive(false)}
+                    onMouseLeave={() => {
+                        clearTooltip();
+                        setScatterKeyboardActive(false);
+                    }}
                 >
                     <MDVivViewer
                         outerContainer={outerContainer}
@@ -219,17 +277,21 @@ const Main = observer(
                         layerProps={[layerConfig]}
                         viewStates={[{ ...viewState, id: detailId }]}
                         // not really expecting OrbitViewState... yet... but we will for 3D.
-                        onViewStateChange={(e: { viewState: OrthographicViewState | OrbitViewState }) => {
+                        onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
                             viewerStore.setState({
                                 viewState: { ...e.viewState, id: detailId },
                             });
                             if (vsDebugDivRef.current)
-                                vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
+                                vsDebugDivRef.current.innerText = JSON.stringify(
+                                    e.viewState,
+                                    null,
+                                    2,
+                                );
                         }}
                         deckProps={deckProps}
                     />
                 </div>
+                {tooltipPortal}
             </>
         );
-    },
-);
+});

@@ -37,6 +37,11 @@ ColumnName = str  # NewType("ColumnName", str)
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
 datatype_mappings = {
+    "int8": "integer",
+    "int16": "integer",
+    "uint8": "integer",
+    "uint16": "integer",
+    "uint32": "integer",
     "int64": "integer",
     "float64": "double",
     "float32": "double",
@@ -1223,8 +1228,9 @@ class MDVProject:
         supplied_columns_only=False,
         replace_data=False,
         add_to_view: Optional[str] = "default",
-        separator="\t"
-    ) -> list[dict[str, str]]:
+        separator="\t",
+        preserve_views_on_replace: bool = False,
+    ) -> tuple[list[str], Optional[str]]:
         """Adds a polars dataframe to the project. Each column's datatype will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
@@ -1237,6 +1243,7 @@ class MDVProject:
             replace_data (bool, optional): If True, the existing datasource will be overwritten, Default is False,
             add_to_view (string, optional): The datasource will be added to the specified view.
             separator (str, optional): If a path to text file is supplied, then this should be the file's delimiter.
+            preserve_views_on_replace (bool, optional): If True and replace_data is True, existing views are preserved when replacing datasource.
         """
         dodgy_columns = []  # To hold any columns that can't be added
         gr = None  # Initialize the group variable
@@ -1261,6 +1268,8 @@ class MDVProject:
             # Get columns to add using polars-compatible function.
             # Pass num_rows to avoid recalculating it for LazyFrames.
             columns = get_column_info_polars(columns, dataframe, supplied_columns_only, num_rows)
+
+            has_existing_datasources = len(self.datasources) > 0
             
             # Check if the datasource already exists
             try:
@@ -1273,7 +1282,7 @@ class MDVProject:
             if ds:
                 # Delete the existing datasource if replace_data is True
                 if replace_data:
-                    self.delete_datasource(name)
+                    self.delete_datasource(name, delete_views=not preserve_views_on_replace)
                 else:
                     raise FileExistsError(
                         f"Attempt to create datasource '{name}' failed because it already exists."
@@ -1334,6 +1343,7 @@ class MDVProject:
             
             print("Updated datasource metadata")
             
+            created_view = None
             # Add to view if specified
             if add_to_view:
                 # TablePlot parameters
@@ -1365,6 +1375,10 @@ class MDVProject:
                     v["initialCharts"][name].append(table_plot_json)
                     
                 self.set_view(add_to_view, v)
+            elif has_existing_datasources:
+                created_view = self.create_view_with_all_datasources(
+                    view_name=f"View: {name}", make_default=False
+                )
             
             # Update the project's update timestamp using the dedicated method
             if self.backend_db:
@@ -1372,12 +1386,37 @@ class MDVProject:
                 ProjectService.set_project_update_timestamp(self.id)
             
             print(f"In MDVProject.add_datasource_polars: Added datasource successfully '{name}'")
-            return dodgy_columns
+            return (dodgy_columns, created_view)
 
         except Exception as e:
             print(f"Error in MDVProject.add_datasource_polars : Error adding datasource '{name}': {e}")
             raise  # Re-raise the exception to propagate it to the caller
 
+    def create_view_with_all_datasources(self, view_name, make_default=False):
+        """
+        Create a new view containing all current datasources, each with a table plot.
+        Each datasource entry gets layout "gridstack" so the frontend does not crash on missing layout.
+        """
+        all_ds = self.datasources
+        base_name = view_name
+        suffix = 0
+
+        while self.get_view(view_name):
+            suffix += 1
+            view_name = f"{base_name} ({suffix})"
+
+        view_data = {"dataSources": {}, "initialCharts": {}}
+        for ds in all_ds:
+            ds_name = ds["name"]
+            view_data["dataSources"][ds_name] = {"layout": "gridstack"}
+            columns = [x["field"] for x in ds.get("columns", [])]
+            if columns:
+                table_plot = self.create_table_plot(ds_name, columns, [792, 472], [10, 10])
+                view_data["initialCharts"][ds_name] = [self.convert_plot_to_json(table_plot)]
+            else:
+                view_data["initialCharts"][ds_name] = []
+        self.set_view(view_name, view_data, make_default=make_default)
+        return view_name
 
     def create_table_plot(self, title, params, size, position):
         """Create and configure a TablePlot instance with the given parameters."""
@@ -2325,6 +2364,7 @@ def add_column_to_group(
     group (h5py.Group): The group to add the data to
     length (int): The length of the data
     """
+    col.setdefault("original_dtype", str(data.dtype))
 
     if (
         col["datatype"] == "text"
@@ -2397,7 +2437,7 @@ def add_column_to_group(
         for i in range(0, length):
             b = i * maxv
             try:
-                v = data[i]  # may raise KeyError if data is None at this index
+                v = data.iloc[i] if hasattr(data, "iloc") else data[i]
                 if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
@@ -2424,12 +2464,32 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
+        if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
+            try:
+                numeric = numpy.asarray(
+                    pandas.to_numeric(clean, errors="coerce"),
+                    dtype=numpy.float64,
+                )
+                finite_numeric = numeric[numpy.isfinite(numeric)]
+                out_of_range = finite_numeric[finite_numeric > 16_777_216]
+                if len(out_of_range) != 0:
+                    col.setdefault("storage_warnings", []).append(
+                        "uint32 -> float32 (integer): "
+                        f"{len(out_of_range)} value(s) exceed exact-integer range "
+                        f"(max={float(finite_numeric.max()):.0f}); precision loss possible."
+                    )
+            except Exception:
+                pass
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
+        if na.size == 0:
+            col["minMax"] = [0.0, 0.0]
+            col["quantiles"] = {}
+            return
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
@@ -2448,7 +2508,12 @@ def get_column_info(columns, dataframe, supplied_columns_only):
 
     if not supplied_columns_only:
         cols = [
-            {"datatype": datatype_mappings[d.name], "name": c, "field": c}
+            {
+                "datatype": datatype_mappings[d.name],
+                "name": c,
+                "field": c,
+                "original_dtype": d.name,
+            }
             for d, c in zip(dataframe.dtypes, dataframe.columns)
         ]
         # replace with user given column metadata
@@ -2511,6 +2576,7 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
     import numpy as np
     
     field = col_info["field"]
+    col_info.setdefault("original_dtype", str(polars_series.dtype))
     
     # Handle different column types
     if col_info["datatype"] in ["text", "text16", "multitext"]:
@@ -2582,6 +2648,21 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 # fillna is necessary because NaN cannot be cast to int
                 data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
 
+            if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
+                try:
+                    numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
+                    arr = numeric.to_numpy()
+                    finite = arr[np.isfinite(arr)]
+                    out_of_range = finite[finite > 16_777_216]
+                    if len(out_of_range) != 0:
+                        col_info.setdefault("storage_warnings", []).append(
+                            "uint32 -> float32 (integer): "
+                            f"{len(out_of_range)} value(s) exceed exact-integer range "
+                            f"(max={float(finite.max()):.0f}); precision loss possible."
+                        )
+                except Exception:
+                    pass
+
             # Create dataset
             h5_group.create_dataset(field, data=data)
 
@@ -2629,7 +2710,8 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
             cols.append({
                 "datatype": mdv_dtype,
                 "name": col_name,
-                "field": col_name
+                "field": col_name,
+                "original_dtype": str(polars_dtype),
             })
         
         # Replace with user given column metadata

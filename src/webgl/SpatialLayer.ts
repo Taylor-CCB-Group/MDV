@@ -101,30 +101,26 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
         //         ...p,
         //     });
         // });
+        const densityLayers = contourLayers.filter((l) => l).map(props => {
+            const { extensions, ...p } = this.getSubLayerProps(props);
+            return new HeatmapLayer({
+                ...p,
+                _subLayerProps: {
+                    triangle: {
+                        type: TriangleLayerContours,
+                    },
+                    "triangle-layer": {
+                        contourOpacity: p.contourOpacity,
+                        contourFill: p.contourFill,
+                        fillOpacity: p.fillOpacity,
+                    },
+                },
+            });
+        });
         return [
             // add 'grey-out' layer here... that implies a different type of data being passed.
             // it might want to know about background_filter...
 
-            // now we need more layers, using gaussian density.
-            // consider trying to render density map at lower resolution, then upscaling on debounce.
-            ...contourLayers
-                .filter((l) => l)
-                .map((props) => {
-                    const { extensions, ...p } = this.getSubLayerProps(props);
-                    return new HeatmapLayer({
-                        ...p,
-                        _subLayerProps: {
-                            triangle: {
-                                type: TriangleLayerContours,
-                            },
-                            "triangle-layer": {
-                                contourOpacity: p.contourOpacity,
-                                contourFill: p.contourFill,
-                                fillOpacity: p.fillOpacity,
-                            },
-                        },
-                    });
-                }),
             new ScatterplotLayer(
                 this.getSubLayerProps({
                     ...this.props,
@@ -153,7 +149,9 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                       }),
                   )
                 : null,
-            // ...densityLayers,
+            // now we need more layers, using gaussian density.
+            // consider trying to render density map at lower resolution, then upscaling on debounce.
+            ...densityLayers,
         ].filter(Boolean) as LayersList;
     }
     draw(opts: any) {

@@ -1,7 +1,8 @@
 import { observer } from "mobx-react-lite";
-import { useMemo, useId, useCallback, useState, useRef, useEffect } from "react";
+import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
-import { action, makeAutoObservable } from "mobx";
+import { action, autorun, makeAutoObservable, runInAction } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
     Accordion,
@@ -10,7 +11,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Box, Button, Chip, Divider, FormControl, FormControlLabel, Paper, type PaperProps, Radio, RadioGroup, Slider, Typography } from "@mui/material";
+import { Box, Button, Chip, Divider, FormControl, FormControlLabel, IconButton, InputAdornment, Paper, type PaperProps, Radio, RadioGroup, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -19,13 +20,23 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { isArray, notEmpty } from "@/lib/utils";
+import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type { SettingsDialogState as PersistedSettingsDialogState } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { useDataStore } from "../context";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+import { Clear } from "@mui/icons-material";
+import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
+import { useDataStore } from "../context";
+import {
+    getCategorySelectionDropdownKey,
+} from "./categorySelectionUtils";
+import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
+
+const SettingsSearchContext = createContext("");
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -159,6 +170,9 @@ const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 // nb this is not the same as `GuiSpec<"dropdown" | "multidropdown">`
 export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
+export type CategorySelectionSpec =
+    | GuiSpec<"category_selection">
+    | GuiSpec<"single_category_selection">;
 // type DropdownSpec = GuiSpec<"dropdown" | "multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
@@ -448,6 +462,126 @@ export const DropdownAutocompleteComponent = observer(({
         </>
     );
 });
+
+function areStringArraysEqual(a: string[], b: string[]) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function isMultiCategorySelection(
+    props: CategorySelectionSpec,
+): props is GuiSpec<"category_selection"> {
+    return props.type === "category_selection";
+}
+
+function normalizeCategorySelectionValue(
+    value: string | string[] | undefined,
+    multiple: boolean,
+) {
+    if (multiple) {
+        return isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    }
+    return typeof value === "string" ? value : "";
+}
+
+function cloneCategorySelectionValue(value: string | string[]) {
+    return isArray(value) ? [...value] : value;
+}
+
+const CategorySelectionSettingGui = observer(({ props }: { props: CategorySelectionSpec }) => {
+    const multiple = isMultiCategorySelection(props);
+    const [dropdownKey, setDropdownKey] = useState("");
+    const [dropdownSpec] = useState<DropdownSpec>(
+        () =>
+            makeAutoObservable(
+                g({
+                    type: multiple ? "multidropdown" : "dropdown",
+                    label: props.label,
+                    current_value: normalizeCategorySelectionValue(props.current_value, multiple),
+                    values: [[] as string[]],
+                    func: action((value: string | string[]) => {
+                        const nextValue = cloneCategorySelectionValue(value);
+                        dropdownSpec.current_value = nextValue;
+                        props.current_value = nextValue as never;
+                        props.func?.(nextValue as never);
+                    }),
+                }),
+            ) as DropdownSpec,
+    );
+    const liveSourceColumn = props.sourceColumn?.();
+    const availableValues = useLiveCategorySelectionValues(
+        typeof liveSourceColumn === "string" ? liveSourceColumn : undefined,
+    );
+
+    useEffect(() => {
+        return autorun(
+            () => {
+                const sourceColumn = props.sourceColumn?.();
+                const rawSelection = normalizeCategorySelectionValue(
+                    props.getCurrentValue?.() ?? props.current_value,
+                    multiple,
+                );
+                setDropdownKey((previousKey) => {
+                    const nextKey = getCategorySelectionDropdownKey(
+                        typeof sourceColumn === "string" ? sourceColumn : undefined,
+                        availableValues,
+                    );
+                    return previousKey === nextKey ? previousKey : nextKey;
+                });
+
+                runInAction(() => {
+                    dropdownSpec.values = [availableValues];
+                });
+
+                if (multiple) {
+                    const currentSelection = Array.isArray(rawSelection) ? rawSelection : [];
+                    const nextValue = currentSelection.filter((value) => availableValues.includes(value));
+                    if (!isArray(dropdownSpec.current_value)) {
+                        throw new Error("expected multidropdown spec for multi category selection");
+                    }
+                    const currentDropdownValue = dropdownSpec.current_value;
+                    const currentPropsValue = props.current_value;
+                    runInAction(() => {
+                        if (!areStringArraysEqual(currentDropdownValue, nextValue)) {
+                            dropdownSpec.current_value = nextValue;
+                        }
+                        if (!isArray(currentPropsValue) || !areStringArraysEqual(currentPropsValue, nextValue)) {
+                            props.current_value = nextValue;
+                        }
+                    });
+                    if (!areStringArraysEqual(currentSelection, nextValue)) {
+                        queueMicrotask(() => {
+                            props.func?.(nextValue);
+                        });
+                    }
+                    return;
+                }
+
+                const currentSelection = typeof rawSelection === "string" ? rawSelection : "";
+                const nextValue = availableValues.includes(currentSelection) ? currentSelection : "";
+                if (isArray(dropdownSpec.current_value)) {
+                    throw new Error("expected dropdown spec for single category selection");
+                }
+                runInAction(() => {
+                    if (dropdownSpec.current_value !== nextValue) {
+                        dropdownSpec.current_value = nextValue;
+                    }
+                    if (isArray(props.current_value) || props.current_value !== nextValue) {
+                        props.current_value = nextValue;
+                    }
+                });
+                if (currentSelection !== nextValue) {
+                    queueMicrotask(() => {
+                        props.func?.(nextValue);
+                    });
+                }
+            },
+        );
+    }, [availableValues, dropdownSpec, multiple, props]);
+
+    return (
+        <DropdownAutocompleteComponent key={dropdownKey} props={dropdownSpec} />
+    );
+});
 // removed unused DropdownComponent...
 
 const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
@@ -658,30 +792,230 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
     </>
 );
 
+type FolderOpenState = {
+    isOpen: boolean;
+    isOpenBeforeSearch: boolean;
+    appliedSearchTerm: string;
+};
+
+type FolderStateById = Record<string, FolderOpenState>;
+type SettingsDialogState = PersistedSettingsDialogState;
+
+type SettingsFolderStateContextValue = {
+    folderStates: FolderStateById;
+    setFolderStates: Dispatch<SetStateAction<FolderStateById>>;
+};
+
+const SettingsFolderStateContext = createContext<SettingsFolderStateContextValue | null>(null);
+
+function getInitialSettingsDialogState<T extends BaseConfig>(chart: BaseChart<T>): SettingsDialogState {
+    return chart.settingsDialogState || {
+        searchTerm: "",
+        folderStates: {},
+    };
+}
+
+export function createInitialFolderOpenState({
+    defaultOpen,
+    searchTerm,
+}: {
+    defaultOpen: boolean;
+    searchTerm: string;
+}): FolderOpenState {
+    const currentQuery = searchTerm.trim();
+    if (currentQuery.length > 0) {
+        return {
+            isOpen: true,
+            isOpenBeforeSearch: defaultOpen,
+            appliedSearchTerm: currentQuery,
+        };
+    }
+
+    return {
+        isOpen: defaultOpen,
+        isOpenBeforeSearch: defaultOpen,
+        appliedSearchTerm: "",
+    };
+}
+
+export function resolveFolderOpenState({
+    defaultOpen,
+    searchTerm,
+    folderState,
+}: {
+    defaultOpen: boolean;
+    searchTerm: string;
+    folderState?: FolderOpenState;
+}): FolderOpenState {
+    if (!folderState) {
+        return createInitialFolderOpenState({
+            defaultOpen,
+            searchTerm,
+        });
+    }
+
+    return getFolderOpenStateForSearchChange({
+        currentSearchTerm: searchTerm,
+        folderState,
+    });
+}
+
+export function getFolderOpenStateForSearchChange({
+    currentSearchTerm,
+    folderState,
+}: {
+    currentSearchTerm: string;
+    folderState: FolderOpenState;
+}): FolderOpenState {
+    const currentQuery = currentSearchTerm.trim();
+    const previousQuery = folderState.appliedSearchTerm;
+
+    if (currentQuery.length === 0) {
+        if (previousQuery.length === 0) {
+            return folderState;
+        }
+        return {
+            ...folderState,
+            isOpen: folderState.isOpenBeforeSearch,
+            appliedSearchTerm: "",
+        };
+    }
+
+    if (previousQuery.length === 0) {
+        return {
+            isOpen: true,
+            isOpenBeforeSearch: folderState.isOpen,
+            appliedSearchTerm: currentQuery,
+        };
+    }
+
+    if (currentQuery !== previousQuery) {
+        return {
+            ...folderState,
+            isOpen: true,
+            appliedSearchTerm: currentQuery,
+        };
+    }
+
+    return folderState;
+}
+
 const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
-    // add uuid to each setting to avoid key collisions
+    const searchTerm = useContext(SettingsSearchContext);
+    const folderStateContext = useContext(SettingsFolderStateContext);
+    if (!folderStateContext) {
+        throw new Error("FolderComponent must be used within SettingsFolderStateContext");
+    }
+
+    // When the dialog first opens (and search is empty), expand "General" so the user sees settings immediately.
+    const defaultOpen = props.label === "General";
+    const { folderStates, setFolderStates } = folderStateContext;
+    const folderId = (props as GuiSpec<"folder"> & { _stableId?: string })._stableId
+        || `${props.type}:${props.label}`;
+    const folderState = resolveFolderOpenState({
+        defaultOpen,
+        searchTerm,
+        folderState: folderStates[folderId],
+    });
     const settings = useMemo(
-        () => props.current_value.map((setting) => ({ setting, id: uuid() })),
-        [props.current_value],
+        () =>
+            props.current_value.map((setting) => ({
+                setting,
+                id: (setting as AnyGuiSpec & { _stableId?: string })._stableId ||
+                    `${props.label}:${setting.type}:${setting.label}`,
+            })),
+        [props.current_value, props.label],
     );
+
+    useEffect(() => {
+        setFolderStates((previousStates) => {
+            const nextState = resolveFolderOpenState({
+                defaultOpen,
+                searchTerm,
+                folderState: previousStates[folderId],
+            });
+            const previousState = previousStates[folderId];
+
+            if (
+                previousState
+                && nextState.isOpen === previousState.isOpen
+                && nextState.isOpenBeforeSearch === previousState.isOpenBeforeSearch
+                && nextState.appliedSearchTerm === previousState.appliedSearchTerm
+            ) {
+                return previousStates;
+            }
+
+            return {
+                ...previousStates,
+                [folderId]: nextState,
+            };
+        });
+    }, [defaultOpen, folderId, searchTerm, setFolderStates]);
+
     if (settings.length === 0) return null;
     return (
-        <Accordion
-            type="single"
-            collapsible
+        <Paper
+            variant="outlined"
             className="w-full col-span-2"
-            //uncomment to expand by default
-            // defaultValue={props.label}
+            sx={{
+                backgroundColor: (theme) =>
+                    theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.03)"
+                        : "rgba(0,0,0,0.02)",
+                borderColor: (theme) => theme.palette.divider,
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderRadius: 1,
+                overflow: "hidden",
+                paddingX: 2,
+                paddingBottom: 0,
+            }}
         >
-            <AccordionItem value={props.label}>
-                <AccordionTrigger>{props.label}</AccordionTrigger>
-                <AccordionContent>
-                    {settings.map(({ setting, id }) => (
-                        <AbstractComponent key={id} props={setting} />
-                    ))}
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+            <Accordion
+                type="single"
+                collapsible
+                className="w-full"
+                value={folderState.isOpen ? props.label : ""}
+                onValueChange={(value) => {
+                    setFolderStates((previousStates) => {
+                        const previousState = resolveFolderOpenState({
+                            defaultOpen,
+                            searchTerm,
+                            folderState: previousStates[folderId],
+                        });
+                        const nextState = {
+                            ...previousState,
+                            isOpen: value === props.label,
+                        };
+
+                        if (
+                            previousStates[folderId]
+                            && nextState.isOpen === previousState.isOpen
+                            && nextState.isOpenBeforeSearch === previousState.isOpenBeforeSearch
+                            && nextState.appliedSearchTerm === previousState.appliedSearchTerm
+                        ) {
+                            return previousStates;
+                        }
+
+                        return {
+                            ...previousStates,
+                            [folderId]: nextState,
+                        };
+                    });
+                }}
+                //uncomment to expand by default
+                // defaultValue={props.label}
+            >
+                <AccordionItem value={props.label} className="border-b-0">
+                    <AccordionTrigger>{props.label}</AccordionTrigger>
+                    <AccordionContent>
+                        {settings.map(({ setting, id }) => (
+                            <AbstractComponent key={id} props={setting} />
+                        ))}
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        </Paper>
     );
 };
 
@@ -716,6 +1050,8 @@ const Components: {
     slider: observer(SliderComponent),
     spinner: observer(SpinnerComponent),
     dropdown: DropdownAutocompleteComponent,
+    category_selection: CategorySelectionSettingGui,
+    single_category_selection: CategorySelectionSettingGui,
     // consider having component specifically for column/category selection <<<<
     // the column selection can make use of column groups
     // category selection can have some logic for multitext / tags
@@ -775,20 +1111,40 @@ export const AbstractComponent = observer(
 );
 
 export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
+    const [dialogState, setDialogState] = useState<SettingsDialogState>(() =>
+        getInitialSettingsDialogState(chart),
+    );
+    const { searchTerm, folderStates } = dialogState;
+    const setSearchTerm = useCallback((value: string) => {
+        setDialogState((previousState) => {
+            if (previousState.searchTerm === value) {
+                return previousState;
+            }
+            return {
+                ...previousState,
+                searchTerm: value,
+            };
+        });
+    }, []);
+    const setFolderStates = useCallback<Dispatch<SetStateAction<FolderStateById>>>((value) => {
+        setDialogState((previousState) => {
+            const nextFolderStates = typeof value === "function"
+                ? value(previousState.folderStates)
+                : value;
+            if (nextFolderStates === previousState.folderStates) {
+                return previousState;
+            }
+            return {
+                ...previousState,
+                folderStates: nextFolderStates,
+            };
+        });
+    }, []);
     // Get the raw settings first so we can collect disposers from the same objects
     const rawSettings = useMemo(() => {
         return chart.getSettings();
     }, [chart]);
-    
-    const settings = useMemo(() => {
-        // is the id just for a key in this component, or should the type passed to the component recognise it?
-        // for now, I don't think there's a benefit to including it in the type.
-        // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
-        const settings = rawSettings.map((setting) => ({ setting, id: uuid() }));
-        const wrap = { settings };
-        makeAutoObservable(wrap);
-        return wrap.settings;
-    }, [rawSettings]);
+    const settings = useFilteredGroupedSettings(rawSettings, searchTerm);
     
     // Collect and dispose all disposers when the component unmounts
     // Use the same rawSettings that are used for rendering
@@ -806,14 +1162,56 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
             });
         };
     }, [rawSettings]);
+
+    useEffect(() => {
+        chart.settingsDialogState = dialogState;
+    }, [chart, dialogState]);
     
     return (
         <ChartProvider chart={chart}>
-            <div className="w-full max-h-[80vh]">
-                {settings.map(({ setting, id }) => (
-                    <AbstractComponent key={id} props={setting} />
-                ))}
-            </div>
+            <SettingsSearchContext.Provider value={searchTerm}>
+                <SettingsFolderStateContext.Provider value={{ folderStates, setFolderStates }}>
+                    <div className="w-full max-h-[80vh]">
+                        <Box sx={{ p: 1 }}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                variant="outlined"
+                                label="Search Settings by Folder or Name"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                sx={{ backgroundColor: "transparent" }}
+                                slotProps={{
+                                    input: {
+                                        endAdornment: searchTerm.trim().length > 0 ? (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label="clear search"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => setSearchTerm("")}
+                                                >
+                                                    <Clear />
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ) : null,
+                                    },
+                                }}
+                            />
+                        </Box>
+                        {settings.length === 0 && (
+                            <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
+                                {searchTerm.trim().length > 0
+                                    ? "No settings match your search."
+                                    : "No settings available."}
+                            </Typography>
+                        )}
+                        <Divider sx={{ marginY: 0.75, opacity: 0.6 }} />
+                        {settings.map(({ setting, id }) => (
+                            <AbstractComponent key={id} props={setting} />
+                        ))}
+                    </div>
+                </SettingsFolderStateContext.Provider>
+            </SettingsSearchContext.Provider>
         </ChartProvider>
     );
 });

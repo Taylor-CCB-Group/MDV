@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import warnings
 import tempfile
 import concurrent.futures
@@ -60,7 +61,7 @@ def execute_code(final_code: str, open_code=False, log = print):
         #     log(f"Error: {str(e)}")    
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            stdout, stderr = run_subprocess(["python", temp.name])
+            stdout, stderr = run_subprocess([sys.executable, temp.name])
             if stderr:
                 log(f"Standard Error: {stderr}")
             for warning in w:

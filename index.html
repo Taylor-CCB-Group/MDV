@@ -40,15 +40,8 @@
 </head>
 
 <body>
-    <!-- todo get vite flask build working with this etc -->
-    <!--sw-->
     <div id="holder" class="all"></div>
-    <!-- vite version... -->
-    <script src="./src/modules/static_index.ts" type="module"></script>
-    <script>
-        // consider routing... allowing main index to route to MDV vs other pages for managing projects etc.
-        if (window._mdvInit) _mdvInit('{{route}}')
-    </script>
+    <script src="./src/index.ts" type="module"></script>
 </body>
 
 </html>

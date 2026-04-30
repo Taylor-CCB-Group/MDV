@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
+import { apiFetch, getDashboardApiRoot } from "@/utils/mdvRouting";
 
 export function useApiRoot() {
-    const [mdvApiRoot, setMdvApiRoot] = useState<string>("/");
+    const [mdvApiRoot, setMdvApiRoot] = useState<string>(getDashboardApiRoot());
 
-    // Get the API root environment variable
     useEffect(() => {
-        //! This is a relative route, we need to change it at some point to avoid issues when in a nested route
-        fetch("api_root")
-            .then(res => res.json())
-            .then(data => setMdvApiRoot(data.mdv_api_root || "/"))
-            .catch(() => setMdvApiRoot("/"));
+        apiFetch("api_root")
+            .then((res) => res.json())
+            .then((data) => setMdvApiRoot(data.mdv_api_root || getDashboardApiRoot()))
+            .catch(() => setMdvApiRoot(getDashboardApiRoot()));
     }, []);
 
     return mdvApiRoot;

@@ -1,6 +1,7 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import useEditCell from "@/react/hooks/useEditCell";
+import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
 import { renderHook, act } from "@testing-library/react";
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs } from "slickgrid-react";
@@ -11,7 +12,7 @@ describe("useEditCell", () => {
     let sortedIndices: Uint32Array;
     let dataStore: DataStore;
     let gridRef: React.MutableRefObject<any>;
-    let setFeedbackAlert: ReturnType<typeof vi.fn>;
+    let setFeedbackAlert: (alert: FeedbackAlert) => void;
     let mockGridInstance: ReturnType<typeof createSlickGridMock>;
     let orderedParamColumnsRef: React.MutableRefObject<LoadedDataColumn<DataType>[]>;
     let sortedIndicesRef: React.MutableRefObject<Uint32Array>;
@@ -54,7 +55,7 @@ describe("useEditCell", () => {
 
         orderedParamColumnsRef = { current: orderedParamColumns };
         sortedIndicesRef = { current: sortedIndices };
-        setFeedbackAlert = vi.fn();
+        setFeedbackAlert = vi.fn() as (alert: FeedbackAlert) => void;
     });
 
     test("should handle null grid reference gracefully", () => {
@@ -67,6 +68,7 @@ describe("useEditCell", () => {
                 dataStore,
                 gridRefWithNull,
                 setFeedbackAlert,
+                true,
             ),
         );
     
@@ -84,6 +86,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -112,6 +115,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -158,6 +162,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -185,6 +190,42 @@ describe("useEditCell", () => {
             );
         });
 
+        test("should show error when permission is not editable", () => {
+            const { result } = renderHook(() =>
+                useEditCell(
+                    orderedParamColumnsRef,
+                    sortedIndicesRef,
+                    dataStore,
+                    gridRef,
+                    setFeedbackAlert,
+                    false,
+                ),
+            );
+
+            const changeEvent = new CustomEvent("cellChange", {
+                detail: {
+                    eventData: {},
+                    args: {
+                        row: 0,
+                        column: { field: "readonly" },
+                        item: { readonly: "" },
+                    } as OnCellChangeEventArgs,
+                },
+            }) as any;
+
+            act(() => {
+                result.current.handleCellChange(changeEvent);
+            });
+
+            expect(setFeedbackAlert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Edit Error",
+                    message: "Permission is not editable",
+                }),
+            );
+        });
+
         test("should show error when column is not editable", () => {
             const { result } = renderHook(() =>
                 useEditCell(
@@ -193,6 +234,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 

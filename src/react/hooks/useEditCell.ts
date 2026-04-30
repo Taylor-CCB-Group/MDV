@@ -25,6 +25,7 @@ const useEditCell = (
     dataStore: DataStore,
     gridRef: React.MutableRefObject<SlickgridReactInstance | null>,
     setFeedbackAlert: (alert: FeedbackAlert) => void,
+    isEditMode: boolean,
 ) => {
     const oldCellValueRef = useRef<string | null>(null);
 
@@ -36,6 +37,10 @@ const useEditCell = (
                 args: OnBeforeEditCellEventArgs;
             }>,
         ) => {
+            if (!isEditMode) {
+                oldCellValueRef.current = null;
+                return;
+            }
             const { item, column } = e.detail.args;
 
             const currentOrderedColumns = orderedParamColumnsRef.current;
@@ -58,7 +63,7 @@ const useEditCell = (
                 oldCellValueRef.current = null;
             }
         },
-        [orderedParamColumnsRef],
+        [orderedParamColumnsRef, isEditMode],
     );
 
     const handleCellChange = useCallback(
@@ -68,6 +73,15 @@ const useEditCell = (
                 args: OnCellChangeEventArgs;
             }>,
         ) => {
+            if (!isEditMode) {
+                console.error("Permission is not editable");
+                setFeedbackAlert({
+                    type: "error",
+                    message: "Permission is not editable",
+                    title: "Edit Error",
+                });
+                return;
+            }
             const { args } = e.detail;
             const { row, column, item } = args;
 
@@ -138,7 +152,7 @@ const useEditCell = (
                 });
             }
         },
-        [dataStore, gridRef, orderedParamColumnsRef, sortedFilteredIndicesRef, setFeedbackAlert],
+        [dataStore, gridRef, orderedParamColumnsRef, sortedFilteredIndicesRef, setFeedbackAlert, isEditMode],
     );
 
     return {

@@ -7,6 +7,7 @@
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+import type { Gate } from "@/react/gates/types";
 
 /**
  * A cleanup function that can be called to dispose of resources.
@@ -176,6 +177,7 @@ export type DataSource = {
     images?: Record<string, any>;
     regions?: Record<string, any>;
     links?: DataSourceLinks;
+    gates?: Gate[];
     size: number;
     columns: DataColumn<DataType>[];
 };// | ExperimentalZarrStore; ? something something spatialdata.js ...
@@ -202,6 +204,8 @@ export type GuiValueTypes = {
     dropdown: string;
     multidropdown: string[];
     category_filter: { column: string; categories: string[] };
+    single_category_selection: string;
+    category_selection: string[];
     check: boolean;
     text: string;
     textbox: string;
@@ -260,6 +264,12 @@ export type GuiSpec<T extends GuiSpecType> = {
     func?: GuiFunc<T>;
     //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
+    sourceColumn?: T extends "category_selection" | "single_category_selection" ? (() => FieldSpec | undefined) : never;
+    getCurrentValue?: T extends "category_selection"
+        ? (() => string[])
+        : T extends "single_category_selection"
+          ? (() => string)
+          : never;
     /**
      * Used by `"radiobuttons"` to specify the choices available.
      * This is a tuple of `[string, string][]` where the first element of each tuple is the label to display,
