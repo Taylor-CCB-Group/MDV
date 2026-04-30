@@ -1,6 +1,5 @@
 import type { BaseConfig } from "../BaseChart";
 
-export type ColumnRemovalAction = "remove_chart" | "block_delete";
 export type ColumnRemovalUsage = "param" | "settings";
 export type ColumnRemovalUsagePath =
     | "param"
@@ -14,7 +13,6 @@ export type ChartColumnImpact = {
     chartTitle: string;
     chartType: string;
     chartTypeLabel: string;
-    action: ColumnRemovalAction;
     usage: ColumnRemovalUsage;
     usagePaths: ColumnRemovalUsagePath[];
 };

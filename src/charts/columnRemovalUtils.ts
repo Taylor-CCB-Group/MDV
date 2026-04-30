@@ -108,7 +108,6 @@ export function analyzeChartColumnImpact(
             chartTitle: getChartTitle(config),
             chartType: config.type,
             chartTypeLabel: chartType?.name ?? config.type,
-            action: "remove_chart",
             usage: "param",
             usagePaths,
         };
@@ -123,7 +122,6 @@ export function analyzeChartColumnImpact(
         chartTitle: getChartTitle(config),
         chartType: config.type,
         chartTypeLabel: chartType?.name ?? config.type,
-        action: "block_delete",
         usage: "settings",
         usagePaths: settingUsagePaths,
     };

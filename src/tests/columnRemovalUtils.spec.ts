@@ -21,7 +21,7 @@ function createChartConfig(overrides: Partial<TestChartConfig> = {}): TestChartC
 }
 
 describe("columnRemovalUtils", () => {
-    test("classifies param usage as chart removal", () => {
+    test("classifies param usage as a blocking impact", () => {
         const impact = analyzeChartColumnImpact(
             createChartConfig({
                 title: "Scatter",
@@ -33,7 +33,6 @@ describe("columnRemovalUtils", () => {
 
         expect(impact).toEqual(
             expect.objectContaining({
-                action: "remove_chart",
                 usage: "param",
                 chartTitle: "Scatter",
                 usagePaths: ["param"],
@@ -53,7 +52,6 @@ describe("columnRemovalUtils", () => {
 
         expect(impact).toEqual(
             expect.objectContaining({
-                action: "block_delete",
                 usage: "settings",
                 usagePaths: ["color_by"],
             }),
@@ -82,13 +80,11 @@ describe("columnRemovalUtils", () => {
 
         expect(tooltipImpact).toEqual(
             expect.objectContaining({
-                action: "block_delete",
                 usagePaths: ["tooltip"],
             }),
         );
         expect(backgroundImpact).toEqual(
             expect.objectContaining({
-                action: "block_delete",
                 usagePaths: ["background_filter"],
             }),
         );
@@ -107,7 +103,6 @@ describe("columnRemovalUtils", () => {
 
         expect(impact).toEqual(
             expect.objectContaining({
-                action: "block_delete",
                 usage: "settings",
                 usagePaths: ["tooltip_columns"],
             }),
@@ -148,7 +143,6 @@ describe("columnRemovalUtils", () => {
 
         expect(impact).toEqual(
             expect.objectContaining({
-                action: "block_delete",
                 usage: "settings",
                 usagePaths: ["nested_config"],
             }),

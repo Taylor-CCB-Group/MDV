@@ -289,7 +289,7 @@ function ChartImpactList({
             <SectionHeader count={charts.length} title={title} />
             {charts.map((chart) => (
                 <ChartImpactCard
-                    key={`${chart.chartId ?? chart.chartTitle}-${chart.chartType}-${chart.action}`}
+                    key={`${chart.chartId ?? chart.chartTitle}-${chart.chartType}`}
                     chart={chart}
                 />
             ))}
@@ -355,7 +355,7 @@ function SavedViewImpactSection({
                 <Stack spacing={1}>
                     {savedView.charts.map((chart) => (
                         <ChartImpactCard
-                            key={`${savedView.viewName}-${chart.chartId ?? chart.chartTitle}-${chart.chartType}-${chart.action}`}
+                            key={`${savedView.viewName}-${chart.chartId ?? chart.chartTitle}-${chart.chartType}`}
                             chart={chart}
                             onOpenView={onOpenView}
                             viewName={savedView.viewName}

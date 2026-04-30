@@ -468,6 +468,7 @@ class DataStore {
         delete metadata.data;
         delete metadata.buffer;
         delete metadata.getValue;
+        delete metadata.originalData;
         const isDeleted = this._isSoftDeletedColumn(metadata);
         if (isDeleted) {
             metadata.deleted = true;
@@ -1991,12 +1992,10 @@ class DataStore {
         delete this.dirtyColumns.data_changed[column];
         delete this.dirtyColumns.colors_changed[column];
         this._removeColumnMetadata(column);
-        if (dirty) {
-            if (this.dirtyColumns.added[column]) {
-                delete this.dirtyColumns.added[column];
-            } else {
-                this.dirtyColumns.removed[column] = true;
-            }
+        if (this.dirtyColumns.added[column]) {
+            delete this.dirtyColumns.added[column];
+        } else if (dirty) {
+            this.dirtyColumns.removed[column] = true;
         }
         this._removeVisibleColumn(column, notify);
     }
