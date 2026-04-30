@@ -65,6 +65,7 @@ logs/
 /test-results/
 /playwright-report/
 /blob-report/
+/output/
 /playwright/.cache/
 /playwright/.auth/
 
