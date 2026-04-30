@@ -29,14 +29,16 @@ const port = 5170;
 function getRollupOptions(): RollupOptions {
     const build = process.env.build || "desktop_pt" as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
+        const version =process.env.mdv_version ? "-" + process.env.mdv_version : "";
+
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
-                entryFileNames: 'mdv.js',
+                entryFileNames: `mdv${version}.js`,
                 assetFileNames: (assetInfo) => {
                     //todo: match webpack behaviour with assetsDir / css-loader.
-                    if (assetInfo?.name?.includes('index.css')) return 'assets/mdv.css';
+                    if (assetInfo?.name?.includes('index.css')) return `assets/mdv${version}.css`;
                     return 'img/[name][extname]';
                 },
             }

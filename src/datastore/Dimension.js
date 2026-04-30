@@ -223,7 +223,10 @@ class Dimension {
         this.filterArray = newArr;
         if (this.bgfArray) {
             const bd = this.bgfData;
-            this.setBackgroundFilter(b.column.b.cat);
+            this.setBackgroundFilter(
+                bd.column,
+                bd.cats?.length ? bd.cats : bd.cat,
+            );
         }
         if (this.filterMethod) {
             this.filter(
@@ -238,19 +241,30 @@ class Dimension {
     /**
      * sets a permenant filter on the chart
      * @param {string} column - The column of the filter
-     * @param {string} cat - the category in the column to filter on
+     * @param {string|string[]} cat - category/category list in the column to filter on
      */
     setBackgroundFilter(column, cat) {
         const col = this.parent.columnIndex[column];
-        const ci = col.values.indexOf(cat);
+        if (!col?.values) {
+            return;
+        }
+        const cats = Array.isArray(cat) ? cat.slice(0) : [cat];
+        const indices = new Set();
+        for (const c of cats) {
+            const ci = col.values.indexOf(c);
+            if (ci !== -1) {
+                indices.add(ci);
+            }
+        }
         const data = col.data;
         this.bgfData = {
             column: column,
-            cat: cat,
+            cat: Array.isArray(cat) ? cat[0] : cat,
+            cats: cats,
         };
         this.bgfArray = new Uint8Array(this.parent.size);
         for (let i = 0; i < this.parent.size; i++) {
-            if (data[i] === ci) {
+            if (indices.has(data[i])) {
                 this.bgfArray[i] = 1;
             } else {
                 this.filterArray[i] = 2;

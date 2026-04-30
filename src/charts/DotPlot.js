@@ -6,6 +6,7 @@ import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -22,11 +23,22 @@ class DotPlot extends SVGChart {
         this.dim = this.dataStore.getDimension("catcol_dimension");
         this.colorScheme = schemeReds[8];
         console.log('setting fields for dot plot', c.param.slice(1));
+        
         //this works ok because the method is decorated... which I think means if there's a query object,
         //`setFields` won't actually be called until the link is properly initialised
         // this.setParams(c.param);
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
+        if (!c.background_filter) {
+            c.background_filter = {
+                column: "__none__",
+                categories: [],
+            };
+        } else if (!c.background_filter.categories) {
+            c.background_filter.categories = c.background_filter.category
+                ? [c.background_filter.category]
+                : [];
+        }
         if (!c.color_legend) {
             c.color_legend = { display: true };
         }
@@ -37,6 +49,7 @@ class DotPlot extends SVGChart {
         this.mobxAutorun(() => {
             this._setFields(this.config.param.slice(1));
         });
+        this.setBackgroundFilter();
     }
     
     // removing this decorator as it muddies the waters with setParams.
@@ -72,6 +85,22 @@ class DotPlot extends SVGChart {
         this.filter = [];
         this.drawChart();
     }
+
+   
+    async setBackgroundFilter(){
+        const bf = this.config.background_filter;
+        if (!bf || !bf.column || bf.column === "__none__") {
+            this.dim.clearBackGroundFilter();
+        }
+        else{
+            await loadColumn(this.dataStore.name, bf.column);
+            const categories = bf.categories;
+            this.dim.setBackgroundFilter(bf.column, categories);
+        }
+        this.onDataFiltered();
+    }
+
+    
 
     setColorFunction() {
         const f = this.fieldNames[0];
@@ -284,7 +313,25 @@ class DotPlot extends SVGChart {
     getSettings() {
         const c = this.config;
         const settings = super.getSettings();
+        const bfColumn = c.background_filter.column || "__none__";
+        const bgCurrentCats = c.background_filter?.categories
+            || (c.background_filter?.category ? [c.background_filter.category] : []);
+
         return settings.concat([
+            {
+                type: "category_filter",
+                label: "Background Filter",
+                current_value: {
+                    column: bfColumn,
+                    categories: bgCurrentCats,
+                },
+                func: (x) => {
+                    c.background_filter.column = x.column;
+                    c.background_filter.categories = x.categories;
+                    c.background_filter.category = x.categories?.[0];
+                    this.setBackgroundFilter();
+                },
+            },
             {
                 type: "check",
                 label: "Cluster Rows",

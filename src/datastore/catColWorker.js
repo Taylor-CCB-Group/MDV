@@ -45,7 +45,7 @@ onmessage = (e) => {
             catTotals,
             valLen,
             scaleVals,
-        );
+            );
     } else {
         addMedians(
             result,
@@ -57,7 +57,7 @@ onmessage = (e) => {
             cat,
             catTotals,
             valLen,
-            scaleVals,
+            scaleVals
         );
     }
 
@@ -101,16 +101,11 @@ function addMedians(
     cat,
     catTotals,
     valLen,
-    scaleVals,
+    scaleVals
 ) {
     const t = performance.now();
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         catTotals[c]++;
         for (let n = 0; n < dLen; n++) {
@@ -129,12 +124,7 @@ function addMedians(
         }
     }
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         for (let n = 0; n < dLen; n++) {
             if (Number.isNaN(data[n][i])) {
@@ -177,12 +167,7 @@ function addMedianst(
 ) {
     const t = performance.now();
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         catTotals[c]++;
         for (let n = 0; n < dLen; n++) {
@@ -219,15 +204,10 @@ function addAverages(
     cat,
     catTotals,
     valLen,
-    scaleVals,
+    scaleVals
 ) {
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         catTotals[c]++;
         for (let n = 0; n < dLen; n++) {
@@ -267,12 +247,7 @@ function addSimpleMean(data, gFilter, lFilter, catData, conf) {
         values: conf.columns.map((x, i) => ({ id: x, total: 0, count: 0 })),
     }));
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = catData[i];
         const a = r[c].values;
         r[c].count++;
@@ -300,4 +275,16 @@ function addSimpleMean(data, gFilter, lFilter, catData, conf) {
         }
     }
     return { data: r, mean_range: [amin, amax] };
+}
+
+function shouldIncludeRow(i, gFilter, lFilter) {
+    //never include background filtered rows
+    if (lFilter[i] === 2) {
+        return false;
+    }
+   
+    if (gFilter[i] !== 0 && gFilter[i] !== lFilter[i]) {
+        return false;
+    }
+    return true;
 }

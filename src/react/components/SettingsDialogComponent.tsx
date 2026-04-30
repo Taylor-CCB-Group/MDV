@@ -24,6 +24,7 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
+import { useDataStore } from "../context";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
@@ -464,6 +465,109 @@ const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
     </>
 );
 
+const CategoryPickerComponent = observer(({
+    props,
+}: { props: GuiSpec<"category_filter"> }) => {
+    const dataStore = useDataStore();
+    const [dsVersion, setDsVersion] = useState(0);
+    useEffect(() => {
+        const id = `category-filter-${uuid()}`;
+        dataStore.addListener(id, (type) => {
+            if (type === "data_changed" || type === "data_added") {
+                setDsVersion((v) => v + 1);
+            }
+        });
+        return () => dataStore.removeListener(id);
+    }, [dataStore]);
+
+    const textColumns: { name: string; field: string }[] = [
+        { name: "None", field: "__none__" },
+        ...dataStore.getColumnList("string").map((c) => ({
+            name: c.name,
+            field: c.field,
+        })),
+    ];
+
+    const currentColumn = props.current_value?.column || "__none__";
+    const categoryOptions = currentColumn === "__none__"
+        ? []
+        : (dataStore.getColumnValues(currentColumn) || []);
+
+    const selected = useMemo(() => {
+        const selectedSet = new Set(props.current_value?.categories || []);
+        return categoryOptions.filter((x) => selectedSet.has(x));
+    }, [props.current_value?.categories, categoryOptions]);
+
+    return (
+        <>
+            <MLabel props={props} />
+            <div className="w-full flex flex-col gap-2">
+                <Autocomplete<{ name: string; field: string }, false, false, false>
+                    size="small"
+                    options={textColumns}
+                    getOptionLabel={(x) => x.name}
+                    value={
+                        textColumns.find((x) => x.field === currentColumn) ||
+                        textColumns[0]
+                    }
+                    isOptionEqualToValue={(o, v) => o.field === v.field}
+                    onChange={action((_, v: { name: string; field: string } | null) => {
+                        const column = v?.field || "__none__";
+                        const value = { column, categories: [] };
+                        props.current_value = value;
+                        props.func?.(value);
+                    })}
+                    renderInput={(params) => (
+                        <TextField {...params} placeholder="Choose column" />
+                    )}
+                />
+                <Autocomplete<string, true, false, false>
+                    multiple
+                    size="small"
+                    options={categoryOptions}
+                    disableCloseOnSelect
+                    getOptionLabel={(option) => option}
+                    value={selected}
+                    onChange={action((_, values: string[]) => {
+                        const value = {
+                            column: currentColumn,
+                            categories: values,
+                        };
+                        props.current_value = value;
+                        props.func?.(value);
+                    })}
+                    renderOption={(rProps, option, { selected }) => {
+                        const { key, ...optionProps } = rProps as typeof rProps & {
+                            key: string;
+                        };
+                        return (
+                            <li key={key} {...optionProps}>
+                                <Checkbox
+                                    icon={icon}
+                                    checkedIcon={checkedIcon}
+                                    style={{ marginRight: 8 }}
+                                    checked={selected}
+                                />
+                                {option}
+                            </li>
+                        );
+                    }}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            placeholder={
+                                currentColumn === "__none__"
+                                    ? "Select a column first"
+                                    : "Select categories"
+                            }
+                        />
+                    )}
+                />
+            </div>
+        </>
+    );
+});
+
 const RadioButtonComponent = ({
     props,
 }: { props: GuiSpec<"radiobuttons"> }) => {
@@ -618,6 +722,7 @@ const Components: {
     // both can have the ability to reactively update their options based on the current data
     // 'multidropdown': observer(DropdownComponent),
     multidropdown: DropdownAutocompleteComponent,
+    category_filter: CategoryPickerComponent,
     check: observer(CheckboxComponent),
     radiobuttons: observer(RadioButtonComponent),
     doubleslider: observer(DoubleSliderComponent),
