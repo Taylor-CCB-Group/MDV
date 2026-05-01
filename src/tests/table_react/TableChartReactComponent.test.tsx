@@ -26,7 +26,8 @@ vi.mock("@/react/components/BulkEditColumnDialog", () => ({
 }));
 
 vi.mock("@/react/components/RenameTableColumnDialog", () => ({
-    default: () => <div data-testid="mock-rename-column-dialog" />,
+    default: ({ open }: { open: boolean }) =>
+        open ? <div data-testid="mock-rename-column-dialog" /> : null,
 }));
 
 vi.mock("@/react/components/ColumnRemovalImpactDialog", () => ({
@@ -137,7 +138,17 @@ describe("TableChartReactComponent", () => {
         expect(dialogWrapper).toBeDefined();
     });
 
-    test("should render rename column dialog", () => {
+    test("should not render rename column dialog by default", () => {
+        render(<TableChartReactComponent />);
+
+        expect(screen.queryByTestId("mock-rename-column-dialog")).toBeNull();
+    });
+
+    test("should render rename column dialog when rename is active", () => {
+        mockSlickGridReactReturn.renameColumnState = {
+            field: "age",
+            initialName: "Age",
+        };
         render(<TableChartReactComponent />);
 
         expect(screen.getByTestId("mock-rename-column-dialog")).toBeDefined();

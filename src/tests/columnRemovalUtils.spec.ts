@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type { MultiColumnQuery } from "@/links/link_utils";
 import {
     analyzeChartColumnImpact,
     analyzeColumnRemoval,
@@ -150,6 +151,11 @@ describe("columnRemovalUtils", () => {
     });
 
     test("collects impacts from current and saved views", async () => {
+        const linkedQuery: MultiColumnQuery = {
+            columns: [],
+            fields: ["age"],
+            initialize: async () => undefined,
+        };
         const impact = await analyzeColumnRemoval({
             dataSourceName: "cells",
             columnName: "age",
@@ -176,6 +182,15 @@ describe("columnRemovalUtils", () => {
                         color_by: "age",
                     }),
                 },
+                {
+                    dataSourceName: "linked-ds",
+                    config: createChartConfig({
+                        id: "linked-1",
+                        title: "Linked Scatter",
+                        type: "wgl_scatter_plot_dev",
+                        param: [linkedQuery, "y"],
+                    }),
+                },
             ],
             viewLoader: vi.fn(async () => ({
                 initialCharts: {
@@ -185,6 +200,14 @@ describe("columnRemovalUtils", () => {
                             title: "",
                             type: "selection_dialog",
                             param: ["age"],
+                        }),
+                    ],
+                    linked: [
+                        createChartConfig({
+                            id: "saved-linked-1",
+                            title: "Saved Linked",
+                            type: "wgl_scatter_plot_dev",
+                            param: [linkedQuery, "y"],
                         }),
                     ],
                 },
@@ -200,6 +223,11 @@ describe("columnRemovalUtils", () => {
                     usage: "settings",
                     usagePaths: ["color_by"],
                 }),
+                expect.objectContaining({
+                    chartId: "linked-1",
+                    usage: "param",
+                    usagePaths: ["param"],
+                }),
             ],
             savedViews: [
                 {
@@ -207,6 +235,11 @@ describe("columnRemovalUtils", () => {
                     charts: [
                         expect.objectContaining({
                             chartId: "saved-1",
+                            usage: "param",
+                            usagePaths: ["param"],
+                        }),
+                        expect.objectContaining({
+                            chartId: "saved-linked-1",
                             usage: "param",
                             usagePaths: ["param"],
                         }),

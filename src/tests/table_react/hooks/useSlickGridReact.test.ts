@@ -589,9 +589,52 @@ describe("useSlickGridReact", () => {
             });
 
             expect(mockDataStore.softDeleteColumn).toHaveBeenCalledWith("age", true, true);
+            expect(mockChart.setParams).toHaveBeenCalledWith(["name", "id"]);
+            expect(mockConfig.param).toEqual(["name", "id"]);
+            expect(mockConfig.order).toEqual({
+                name: 0,
+                id: 1,
+            });
             expect(mockChartManager.viewManager.saveView).toHaveBeenCalledTimes(1);
             expect(mockChartManager.saveState).not.toHaveBeenCalled();
             expect(result.current.pendingColumnRemoval).toBeNull();
+        });
+
+        test("should preserve query-backed params while removing the deleted plain column", async () => {
+            const linkedParam = {
+                fields: ["gene_a", "gene_b"],
+            };
+            mockConfig.param = ["age", linkedParam, "name"] as typeof mockConfig.param;
+            mockChart.activeQueries.activeParams.mockReturnValue(["age", linkedParam, "name"]);
+
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                vi.mocked(analyzeColumnRemoval).mockResolvedValueOnce({
+                    dataSourceName: "test-ds",
+                    columnName: "age",
+                    currentViewCharts: [],
+                    savedViews: [],
+                });
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+                await Promise.resolve();
+            });
+
+            await act(async () => {
+                await result.current.confirmColumnRemoval();
+            });
+
+            expect(mockChart.setParams).toHaveBeenCalledWith([linkedParam, "name"]);
+            expect(mockConfig.param).toEqual([linkedParam, "name"]);
+            expect(mockConfig.order).toEqual({
+                gene_a: 0,
+                gene_b: 1,
+                name: 2,
+            });
         });
 
         test("should surface an error if column deletion fails before saving", async () => {

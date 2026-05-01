@@ -724,6 +724,22 @@ const useSlickGridReact = () => {
         }
 
         try {
+            const currentParam = chart.activeQueries.activeParams();
+            const nextParam = currentParam.filter(
+                (entry) => !(typeof entry === "string" && entry === columnName),
+            );
+            if (nextParam.length !== currentParam.length) {
+                chart.setParams(nextParam);
+                runInAction(() => {
+                    const nextRenderedFields = nextParam.flatMap((entry) => flattenFields(entry));
+                    config.order = Object.fromEntries(
+                        nextRenderedFields.map((field, index) => [field, index]),
+                    );
+                    if (config.sort?.columnId === columnName) {
+                        config.sort = undefined;
+                    }
+                });
+            }
             if (chartManager?.viewManager?.saveView) {
                 await chartManager.viewManager.saveView();
                 if (chartManager.viewManager.hasUnsavedChanges?.()) {
@@ -748,7 +764,7 @@ const useSlickGridReact = () => {
                 },
             });
         }
-    }, [chartManager, dataModel, pendingColumnRemoval]);
+    }, [chart, chartManager, config, dataModel, pendingColumnRemoval]);
 
     const openColumnRemovalView = useCallback((viewName: string) => {
         setPendingColumnRemoval(null);

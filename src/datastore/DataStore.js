@@ -160,10 +160,11 @@ class DataStore {
         this.tree_diagram = config.tree_diagram;
 
         if (config.columns) {
-            config.columns = config.columns.map((column) =>
+            const originalColumns = config.columns;
+            config.columns = originalColumns.map((column) =>
                 this._toColumnMetadata(column),
             );
-            for (const c of config.columns) {
+            for (const c of originalColumns) {
                 if (this._isSoftDeletedColumn(c)) {
                     continue;
                 }

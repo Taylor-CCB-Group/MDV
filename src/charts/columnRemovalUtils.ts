@@ -137,7 +137,6 @@ export async function analyzeColumnRemoval({
     viewLoader,
 }: AnalyzeColumnRemovalArgs): Promise<ColumnRemovalImpact> {
     const currentViewCharts = currentCharts
-        .filter((chart) => chart.dataSourceName === dataSourceName)
         .filter((chart) => chart.config.id !== sourceChartId)
         .map((chart) =>
             analyzeChartColumnImpact(
@@ -154,7 +153,7 @@ export async function analyzeColumnRemoval({
         const results = await Promise.allSettled(
             otherViews.map(async (viewName) => {
                 const viewData = await viewLoader(viewName);
-                const chartConfigs = viewData?.initialCharts?.[dataSourceName] ?? [];
+                const chartConfigs = Object.values(viewData?.initialCharts ?? {}).flat();
                 const charts = chartConfigs
                     .map((config) =>
                         analyzeChartColumnImpact(
