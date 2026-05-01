@@ -551,6 +551,7 @@ class DataStore {
         }
         c.data = null;
         c.buffer = null;
+        c.originalData = null;
         this.columns = this.columns.filter((item) => item.field !== column);
         delete this.columnIndex[column];
         delete this.indexes[column];
