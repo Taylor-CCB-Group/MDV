@@ -42,6 +42,30 @@ function createStore() {
 }
 
 describe("DataStore soft delete", () => {
+    test("renames only the visible column name and persists it in datasource metadata", () => {
+        const store = createStore();
+
+        const didRename = store.renameColumnDisplayName("temp", "Temperature");
+
+        expect(didRename).toBe(true);
+        expect(store.columnIndex.temp.field).toBe("temp");
+        expect(store.columnIndex.temp.name).toBe("Temperature");
+        expect(store.dirtyMetadata.has("columns")).toBe(true);
+        expect(store.getAllColumnsMetadata()).toEqual([
+            {
+                field: "temp",
+                name: "Temperature",
+                datatype: "integer",
+            },
+            {
+                field: "already_deleted",
+                name: "Already Deleted",
+                datatype: "integer",
+                deleted: true,
+            },
+        ]);
+    });
+
     test("excludes soft-deleted columns from the visible runtime store", () => {
         const store = createStore();
 

@@ -25,6 +25,10 @@ vi.mock("@/react/components/BulkEditColumnDialog", () => ({
     default: () => <div data-testid="mock-bulk-edit-dialog" />,
 }));
 
+vi.mock("@/react/components/RenameTableColumnDialog", () => ({
+    default: () => <div data-testid="mock-rename-column-dialog" />,
+}));
+
 vi.mock("@/react/components/ColumnRemovalImpactDialog", () => ({
     default: () => <div data-testid="mock-column-removal-dialog" />,
 }));
@@ -80,6 +84,9 @@ describe("TableChartReactComponent", () => {
             bulkEditColumn: null,
             closeBulkEditDialog: vi.fn(),
             handleBulkEdit: vi.fn(),
+            renameColumnState: null,
+            closeRenameColumnDialog: vi.fn(),
+            handleRenameColumn: vi.fn(),
             pendingColumnRemoval: null,
             closeColumnRemovalDialog: vi.fn(),
             confirmColumnRemoval: vi.fn(),
@@ -123,6 +130,12 @@ describe("TableChartReactComponent", () => {
 
         const dialogWrapper = screen.getByTestId("find-replace-dialog-wrapper");
         expect(dialogWrapper).toBeDefined();
+    });
+
+    test("should render rename column dialog", () => {
+        render(<TableChartReactComponent />);
+
+        expect(screen.getByTestId("mock-rename-column-dialog")).toBeDefined();
     });
 
     test("should not show feedback alert by default", () => {

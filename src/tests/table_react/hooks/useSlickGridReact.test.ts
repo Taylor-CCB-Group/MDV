@@ -147,7 +147,14 @@ describe("useSlickGridReact", () => {
             softDeleteColumn: vi.fn(),
             removeColumn: vi.fn(),
             hasColumnMetadata: vi.fn(() => false),
-            getAllColumnsMetadata: vi.fn(() => []),
+            getAllColumnsMetadata: vi.fn(() =>
+                mockOrderedParamColumns.map((column) => ({
+                    field: column.field,
+                    name: column.name,
+                    datatype: column.datatype,
+                })),
+            ),
+            renameColumnDisplayName: vi.fn(() => true),
             addListener: vi.fn(),
             columns: mockOrderedParamColumns,
             size: 3,
@@ -214,6 +221,11 @@ describe("useSlickGridReact", () => {
                     iconCssClass: "mdi mdi-magnify",
                 },
                 {
+                    command: "rename-column",
+                    title: "Rename Column",
+                    iconCssClass: "mdi mdi-rename-box",
+                },
+                {
                     command: "bulk-edit",
                     title: "Bulk Edit",
                     iconCssClass: "mdi mdi-table-edit",
@@ -235,6 +247,37 @@ describe("useSlickGridReact", () => {
                     command: "find-replace",
                     title: "Find",
                     iconCssClass: "mdi mdi-magnify",
+                },
+            ]);
+        });
+
+        test("should not include rename for query-backed editable columns", () => {
+            mockOrderedParamColumns = [
+                {
+                    ...mockOrderedParamColumns[0],
+                    sgindex: 0,
+                } as any,
+                ...mockOrderedParamColumns.slice(1),
+            ];
+
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
+            expect(ageColumn?.header?.menu?.commandItems).toEqual([
+                {
+                    command: "find-replace",
+                    title: "Find & Replace",
+                    iconCssClass: "mdi mdi-magnify",
+                },
+                {
+                    command: "bulk-edit",
+                    title: "Bulk Edit",
+                    iconCssClass: "mdi mdi-table-edit",
+                },
+                {
+                    command: "remove-column",
+                    title: "Delete Column",
+                    iconCssClass: "mdi mdi-delete",
                 },
             ]);
         });
@@ -366,6 +409,133 @@ describe("useSlickGridReact", () => {
             expect(mockDataStore.softDeleteColumn).not.toHaveBeenCalled();
             expect(analyzeColumnRemoval).not.toHaveBeenCalled();
             expect(result.current.pendingColumnRemoval).toBeNull();
+        });
+
+        test("should open the rename dialog for editable real columns", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "rename-column",
+                });
+                await Promise.resolve();
+            });
+
+            expect(result.current.renameColumnState).toEqual({
+                field: "age",
+                initialName: "Age",
+            });
+        });
+
+        test("should block rename for query-backed columns", async () => {
+            mockOrderedParamColumns[0] = {
+                ...mockOrderedParamColumns[0],
+                sgtype: "query",
+            } as any;
+            mockDataStore.columnIndex.age = mockOrderedParamColumns[0];
+
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "rename-column",
+                });
+                await Promise.resolve();
+            });
+
+            expect(result.current.renameColumnState).toBeNull();
+            expect(result.current.feedbackAlert).toEqual({
+                type: "warning",
+                title: "Rename Column Warning",
+                message: "This column cannot be renamed.",
+            });
+        });
+    });
+
+    describe("rename column", () => {
+        test("should rename an editable column without changing the param config", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+            const liveColumns = [{ field: "age", name: "Age" }];
+            gridInstance.slickGrid.getColumns = vi.fn(() => liveColumns as any);
+
+            act(() => {
+                result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Age label",
+                });
+            });
+
+            expect(mockDataStore.renameColumnDisplayName).toHaveBeenCalledWith("age", "Age label");
+            expect(gridInstance.slickGrid.updateColumnHeader).toHaveBeenCalledWith(
+                "age",
+                expect.stringContaining("Age label"),
+            );
+            expect(liveColumns[0].name).toContain("Age label");
+            expect(mockConfig.param).toEqual(["age", "name", "id"]);
+            expect(result.current.renameColumnState).toBeNull();
+        });
+
+        test("should escape html when updating the column header", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+            const liveColumns = [{ field: "age", name: "Age" }];
+            gridInstance.slickGrid.getColumns = vi.fn(() => liveColumns as any);
+
+            act(() => {
+                result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: `<img src=x onerror=alert('xss')>`,
+                });
+            });
+
+            expect(gridInstance.slickGrid.updateColumnHeader).toHaveBeenCalledWith(
+                "age",
+                expect.stringContaining("&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;"),
+            );
+            expect(liveColumns[0].name).toContain(
+                "&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;",
+            );
+        });
+
+        test("should reject duplicate display names", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Name",
+                });
+            });
+
+            expect(mockDataStore.renameColumnDisplayName).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual({
+                type: "error",
+                title: "Rename Column Error",
+                message: "Column Name already exists",
+            });
+        });
+
+        test("should reject an empty display name", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            act(() => {
+                result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "   ",
+                });
+            });
+
+            expect(mockDataStore.renameColumnDisplayName).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual({
+                type: "warning",
+                title: "Rename Column Warning",
+                message: "Column name is required.",
+            });
         });
     });
 

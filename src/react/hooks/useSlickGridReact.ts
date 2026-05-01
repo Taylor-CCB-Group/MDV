@@ -16,6 +16,7 @@ import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
 import type { ColumnRemovalImpact } from "@/charts/types/columnRemoval";
 import { flattenFields } from "@/lib/columnTypeHelpers";
+import { escapeHtml } from "@/utilities/Utilities";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -32,6 +33,48 @@ export class TextEditorWithMaxLength extends InputEditor {
         }
     }
 }
+
+function isRenameableDataColumn(column: {
+    editable?: boolean;
+    sgindex?: unknown;
+    sgtype?: unknown;
+    deleted?: boolean;
+} | null | undefined) {
+    if (!column) {
+        return false;
+    }
+    return Boolean(column.editable) && column.sgindex == null && column.sgtype == null && column.deleted !== true;
+}
+
+function formatColumnHeaderName(name: string, isEditable: boolean) {
+    const safeName = escapeHtml(name);
+    return isEditable
+        ? `<span class="mdv-col-editable-icon mdi mdi-square-edit-outline" title="This column is editable, click on cell to edit" aria-hidden="true"></span><span class="mdv-col-name-text">${safeName}</span>`
+        : safeName;
+}
+
+function updateGridColumnHeader(
+    gridInstance: SlickgridReactInstance | null,
+    columnField: string,
+    columnName: string,
+    isEditable: boolean,
+) {
+    const grid = gridInstance?.slickGrid;
+    if (!grid) {
+        return;
+    }
+    const formattedName = formatColumnHeaderName(columnName, isEditable);
+    const liveColumn = grid.getColumns().find((column) => column.field === columnField);
+    if (liveColumn) {
+        liveColumn.name = formattedName;
+    }
+    if ("updateColumnHeader" in grid && typeof grid.updateColumnHeader === "function") {
+        grid.updateColumnHeader(columnField, formattedName);
+        return;
+    }
+    grid.invalidate();
+}
+// todo: this file is getting more and more dense, a separate PR for refactoring this file is required
 /**
  * Hook for managing SlickGrid React component state.
  * 
@@ -79,6 +122,10 @@ const useSlickGridReact = () => {
     const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [bulkEditColumn, setBulkEditColumn] = useState<string | null>(null);
+    const [renameColumnState, setRenameColumnState] = useState<{
+        field: string;
+        initialName: string;
+    } | null>(null);
     const [pendingColumnRemoval, setPendingColumnRemoval] = useState<{
         columnName: string;
         impact: ColumnRemovalImpact;
@@ -206,9 +253,7 @@ const useSlickGridReact = () => {
             cols.push({
                 id: col.field,
                 field: col.field,
-                name: isColumnEditable
-                ? `<span class="mdv-col-editable-icon mdi mdi-square-edit-outline" title="This column is editable, click on cell to edit" aria-hidden="true"></span><span class="mdv-col-name-text">${col.name}</span>`
-                : col.name,
+                name: formatColumnHeaderName(col.name, isColumnEditable),
                 sortable: true,
                 width: colWidth,
                 editor: isColumnEditable
@@ -229,6 +274,15 @@ const useSlickGridReact = () => {
                             },
                             ...(isColumnEditable && isEditMode
                                 ? [
+                                    ...(isRenameableDataColumn(col)
+                                        ? [
+                                            {
+                                                command: "rename-column",
+                                                title: "Rename Column",
+                                                iconCssClass: "mdi mdi-rename-box",
+                                            },
+                                        ]
+                                        : []),
                                     {
                                         command: "bulk-edit",
                                         title: "Bulk Edit",
@@ -429,6 +483,23 @@ const useSlickGridReact = () => {
                     }
                     setBulkEditColumn(column.field);
                     setIsBulkEditDialogOpen(true);
+                } else if (command === "rename-column") {
+                    if (!isEditModeRef.current || typeof column.field !== "string") {
+                        return;
+                    }
+                    const targetColumn = dataStore.columnIndex[column.field];
+                    if (!targetColumn || !isRenameableDataColumn(targetColumn)) {
+                        setFeedbackAlert({
+                            type: "warning",
+                            title: "Rename Column Warning",
+                            message: "This column cannot be renamed.",
+                        });
+                        return;
+                    }
+                    setRenameColumnState({
+                        field: targetColumn.field,
+                        initialName: targetColumn.name,
+                    });
                 } else if (command === "remove-column") {
                     if (!isEditModeRef.current) {
                         return;
@@ -618,6 +689,10 @@ const useSlickGridReact = () => {
     const closeBulkEditDialog = useCallback(() => {
         setIsBulkEditDialogOpen(false);
         setBulkEditColumn(null);
+    }, []);
+
+    const closeRenameColumnDialog = useCallback(() => {
+        setRenameColumnState(null);
     }, []);
 
     const closeColumnRemovalDialog = useCallback(() => {
@@ -896,6 +971,70 @@ const useSlickGridReact = () => {
         }
     }, [closeBulkEditDialog, dataModel, isEditMode]);
 
+    const handleRenameColumn = useCallback(({
+        columnField,
+        newName,
+    }: {
+        columnField: string;
+        newName: string;
+    }) => {
+        if (!isEditMode) {
+            return;
+        }
+        const column = dataStore.columnIndex[columnField];
+        if (!column || !isRenameableDataColumn(column)) {
+            setFeedbackAlert({
+                type: "warning",
+                title: "Rename Column Warning",
+                message: "This column cannot be renamed.",
+            });
+            return;
+        }
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            setFeedbackAlert({
+                type: "warning",
+                title: "Rename Column Warning",
+                message: "Column name is required.",
+            });
+            return;
+        }
+        const normalizedNewName = trimmedName.toLocaleLowerCase();
+        const hasDuplicateName = (dataStore.getAllColumnsMetadata?.() ?? []).some((entry) => {
+            if (entry.deleted || entry.field === columnField) {
+                return false;
+            }
+            return entry.name.trim().toLocaleLowerCase() === normalizedNewName;
+        });
+        if (hasDuplicateName) {
+            setFeedbackAlert({
+                type: "error",
+                title: "Rename Column Error",
+                message: `Column ${trimmedName} already exists`,
+            });
+            return;
+        }
+        try {
+            const didRename = dataStore.renameColumnDisplayName(columnField, trimmedName);
+            if (didRename) {
+                updateGridColumnHeader(gridRef.current, columnField, trimmedName, Boolean(column.editable));
+            }
+            setRenameColumnState(null);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to rename the column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Rename Column Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    columnName: columnField,
+                },
+            });
+        }
+    }, [dataStore, isEditMode]);
+
     return {
         config,
         dataStore,
@@ -927,6 +1066,9 @@ const useSlickGridReact = () => {
         bulkEditColumn,
         closeBulkEditDialog,
         handleBulkEdit,
+        renameColumnState,
+        closeRenameColumnDialog,
+        handleRenameColumn,
         pendingColumnRemoval,
         closeColumnRemovalDialog,
         confirmColumnRemoval,

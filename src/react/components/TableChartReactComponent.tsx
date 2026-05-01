@@ -10,6 +10,7 @@ import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./Feed
 import AddTableColumnDialog from "./AddTableColumnDialog";
 import BulkEditColumnDialog from "./BulkEditColumnDialog";
 import ColumnRemovalImpactDialog from "./ColumnRemovalImpactDialog";
+import RenameTableColumnDialog from "./RenameTableColumnDialog";
 
 /**
  * Main component for the react table chart
@@ -54,6 +55,9 @@ const TableChartReactComponent = observer(() => {
         bulkEditColumn,
         closeBulkEditDialog,
         handleBulkEdit,
+        renameColumnState,
+        closeRenameColumnDialog,
+        handleRenameColumn,
         pendingColumnRemoval,
         closeColumnRemovalDialog,
         confirmColumnRemoval,
@@ -155,6 +159,14 @@ const TableChartReactComponent = observer(() => {
                 columnName={bulkEditColumn}
                 onClose={closeBulkEditDialog}
                 onSubmit={handleBulkEdit}
+            />
+
+            <RenameTableColumnDialog
+                open={Boolean(renameColumnState)}
+                columnField={renameColumnState?.field ?? null}
+                initialName={renameColumnState?.initialName ?? ""}
+                onClose={closeRenameColumnDialog}
+                onSubmit={handleRenameColumn}
             />
 
             <ColumnRemovalImpactDialog

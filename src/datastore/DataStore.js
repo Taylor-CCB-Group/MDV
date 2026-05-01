@@ -2034,6 +2034,34 @@ class DataStore {
     }
 
     /**
+     * Rename the user-visible column name without changing the field identifier.
+     * Persists through datasource columns metadata and the normal save flow.
+     * @param {string} column
+     * @param {string} newName
+     * @param {boolean} [dirty=true]
+     * @returns {boolean}
+     */
+    renameColumnDisplayName(column, newName, dirty = true) {
+        const c = this.columnIndex[column];
+        if (!c) {
+            throw new Error(`column '${column}' not found in ds '${this.name}'`);
+        }
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            throw new Error("Column name is required");
+        }
+        if (c.name === trimmedName) {
+            return false;
+        }
+        c.name = trimmedName;
+        this._updateColumnMetadata(c);
+        if (dirty) {
+            this.dirtyMetadata.add("columns");
+        }
+        return true;
+    }
+
+    /**
      * Soft-delete a column by marking metadata as deleted.
      * Also removes the column from runtime-visible collections.
      * @param {string} column
