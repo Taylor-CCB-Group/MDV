@@ -37,6 +37,11 @@ vi.mock("@/charts/dialogs/ReusableAlertDialog", () => ({
     default: () => <div data-testid="mock-alert-dialog" />,
 }));
 
+vi.mock("@/react/components/FeedbackAlertComponent", () => ({
+    default: () => <div data-testid="mock-feedback-alert-component" />,
+    isDebugError: () => false,
+}));
+
 // Mock the hooks
 let mockSlickGridReactReturn: any;
 let mockFindReplaceReturn: any;
