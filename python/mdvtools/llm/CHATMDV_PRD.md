@@ -52,6 +52,22 @@ Responsibilities:
 - Encode high-level constraints for analysis vs visualization behavior
 - Ensure model defaults favor safe, bounded outputs in chat when chart persistence is not valid
 
+#### RAG code corpus
+
+Prompt text lives in `templates.py`; **retrieval** additionally indexes a **local code corpus** of sample MDV scripts so embeddings can surface chart-construction patterns consistent with AnnData-style projects.
+
+- **Location:** `python/mdvtools/test_projects/RAG_examples/`
+  - `ANNDATA_examples/` — default indexed corpus (chart recipes for `.h5ad` / AnnData workflows).
+  - `PBMC3K_examples/`, `TABULAR_examples/`, `TAURUS_examples/` — extra runnable demos; excluded from default ChatMDV indexing unless callers pass another `directory_path` into the crawler.
+
+- **Indexing:** `python/mdvtools/llm/local_files_utils.py` — `crawl_local_repo()` defaults to `python/mdvtools/test_projects/RAG_examples/ANNDATA_examples/`.
+
+- **When loaded:** Importing `langchain_mdv.py` triggers crawling, chunking, and FAISS index construction on startup.
+
+- **Automation:** `python/mdvtools/test_projects/llm_automated_testing.py` uses the same default `crawl_local_repo()`. `llm_automated_testing_command_line.py` points at the same `ANNDATA_examples` folder but duplicates crawl logic with a different ignore list, so indexed files may not match orchestration exactly.
+
+- **Operational impact:** Adding or changing scripts under `ANNDATA_examples/` alters retrieval behavior after process restart / re-embed. Sphinx API generation excludes `**/RAG_examples/**` (`docs/maindocs/conf.py`).
+
 ### 3. Datasource and Field Policy
 
 **Primary file:** `python/mdvtools/llm/datasource_roles.py`
@@ -168,6 +184,7 @@ Policy and regression tests should be concentrated in:
 - `python/mdvtools/tests/test_datasource_roles.py`
 - `python/mdvtools/tests/test_column_field_resolve.py`
 - `python/mdvtools/tests/test_code_execution.py`
+- `python/mdvtools/test_projects/llm_automated_testing.py` — end-to-end LLM harness using the same default RAG corpus as orchestration (`RAG_examples/ANNDATA_examples/`).
 
 Add new ChatMDV policy tests in these suites rather than unrelated runtime test areas.
 

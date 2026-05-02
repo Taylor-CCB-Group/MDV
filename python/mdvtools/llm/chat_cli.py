@@ -84,6 +84,20 @@ def _parse_block_timings(text: str) -> dict[str, float]:
     return timings
 
 
+def _count_charts_in_view(view: Any) -> int:
+    """Count chart configs under MDV view[\"initialCharts\"]."""
+    if not view or not isinstance(view, dict):
+        return 0
+    charts_by_ds = view.get("initialCharts")
+    if not isinstance(charts_by_ds, dict):
+        return 0
+    n = 0
+    for _ds, charts in charts_by_ds.items():
+        if isinstance(charts, list):
+            n += len(charts)
+    return n
+
+
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
     return slug[:40] or "prompt"
@@ -228,6 +242,11 @@ def run_chat_once(
         normalized["block_timings"] = _parse_block_timings(captured_output)
         normalized["captured_output"] = captured_output
         normalized["duration_seconds"] = round(time.perf_counter() - timing_capture_start, 6)
+        normalized["view_snapshot_present"] = view_snapshot is not None
+        normalized["chart_count"] = _count_charts_in_view(view_snapshot)
+        _ver = ask_result.get("verification")
+        normalized["verification"] = _ver if isinstance(_ver, str) else ""
+        normalized["needs_refresh"] = bool(ask_result.get("needs_refresh", False))
 
         if output_dir:
             debug_output_dir = _write_debug_artifacts(
@@ -251,6 +270,10 @@ def run_chat_once(
             "block_timings": {},
             "captured_output": "",
             "duration_seconds": 0.0,
+            "view_snapshot_present": False,
+            "chart_count": 0,
+            "verification": "",
+            "needs_refresh": False,
         }
         if output_dir:
             try:
