@@ -99,6 +99,19 @@ Responsibilities:
 - Utility transformations and resolver logic
 - Optional post-save validation, such as dropping charts whose unresolved `param` tokens do not map to datasource field IDs
 
+### 7. Runnable CLI Module
+
+**Primary file:** `python/mdvtools/llm/chat_cli.py`
+
+Responsibilities:
+
+- Provide one-shot ChatMDV execution via module invocation (`python -m mdvtools.llm.chat_cli`)
+- Accept required request inputs (`--project`, `--sentence`)
+- Support optional operational controls (`--json`, `--verbose`, `--output-dir`, `--view-name`)
+- Return a stable result contract for terminal and automation use
+- Persist debug artifacts (`generated_code.py`, `result.json`, `view_snapshot.json`) when `--output-dir` is provided
+- Support standalone CLI execution by installing a no-op SocketIO shim when app SocketIO is not initialized
+
 ## End-to-End Request Flow
 
 1. User asks a question in chat.
@@ -108,6 +121,21 @@ Responsibilities:
 5. Chat response includes text/tables and optional persisted chart instructions.
 6. Verification layer summarizes what to check for correctness and consistency.
 7. Optional field/token resolution logic validates persisted chart parameters.
+
+### Runnable Module Flow (`python -m`)
+
+1. User runs `python -m mdvtools.llm.chat_cli --project <path> --sentence "<prompt>"`.
+2. CLI validates project path and datasource availability.
+3. CLI invokes `ProjectChat.ask_question(...)` and receives `AskQuestionResult`.
+4. If `--view-name` is provided, CLI renames the generated view to the requested name.
+5. CLI returns success/failure with:
+   - `success`
+   - `project_path`
+   - `views_file`
+   - `view_name`
+   - `message`
+   - `debug_output_dir`
+6. If `--output-dir` is provided, CLI writes debug artifacts for inspection.
 
 ## Critical Policy Rules
 
@@ -174,3 +202,43 @@ A non-zero exit indicates files changed outside approved ChatMDV boundaries.
 - Relevant policy/regression tests are added or updated.
 - Generated behavior follows datasource-field constraints and marker workflow policy.
 - Verification text accurately reflects what was executed and persisted.
+
+## Runnable Module Specification
+
+### Invocation
+
+```bash
+python -m mdvtools.llm.chat_cli --project <project_path> --sentence "<prompt>"
+```
+
+### Arguments
+
+- Required:
+  - `--project`: MDV project directory
+  - `--sentence`: one-shot natural-language request
+- Optional:
+  - `--output-dir`: write debug artifacts to directory
+  - `--json`: print machine-readable output
+  - `--verbose`: print additional human-readable details
+  - `--view-name`: force final persisted view name
+
+### `--view-name` Semantics
+
+- If provided and different from the auto-generated view name:
+  - copy generated view payload to the requested name
+  - delete original auto-generated view entry
+  - return requested name in output `view_name`
+- Empty/whitespace-only value is invalid.
+
+### Output Contract
+
+```json
+{
+  "success": true,
+  "project_path": "/abs/path/to/project",
+  "views_file": "/abs/path/to/project/views.json",
+  "view_name": "custom_or_generated_view_name",
+  "message": "Success",
+  "debug_output_dir": "/tmp/chatmdv-debug-run1"
+}
+```
