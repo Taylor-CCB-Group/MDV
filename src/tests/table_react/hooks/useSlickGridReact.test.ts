@@ -223,7 +223,7 @@ describe("useSlickGridReact", () => {
                 {
                     command: "rename-column",
                     title: "Rename Column",
-                    iconCssClass: "mdi mdi-rename-box",
+                    iconCssClass: "mdi mdi-pencil",
                 },
                 {
                     command: "bulk-edit",
