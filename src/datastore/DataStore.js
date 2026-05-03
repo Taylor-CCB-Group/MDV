@@ -545,10 +545,10 @@ class DataStore {
     _removeVisibleColumn(column, notify = false) {
         const c = this.columnIndex[column];
         if (!c) {
-            if (notify) {
-                this._callListeners("column_removed", column);
-            }
             return false;
+        }
+        if (notify) {
+            this._callListeners("column_removed", column);
         }
         c.data = null;
         c.buffer = null;
@@ -558,9 +558,6 @@ class DataStore {
         const i = this.columnsWithData.indexOf(column);
         if (i !== -1) {
             this.columnsWithData.splice(i, 1);
-        }
-        if (notify) {
-            this._callListeners("column_removed", column);
         }
         return true;
     }
@@ -648,13 +645,13 @@ class DataStore {
         this.columns.push(c);
         this.columnIndex[c.field] = c;
         if (data) {
-            this.setColumnData(column.field, data);
+            this.setColumnData(c.field, data);
         }
         // Delete column from dirtyColumns.removed if it exists (this could happen when a column is removed and the state is not saved)
         // This avoids the new column from getting deleted
         delete this.dirtyColumns.removed[c.field];
         if (dirty) {
-            this.dirtyColumns.added[column.field] = true;
+            this.dirtyColumns.added[c.field] = true;
         }
         // can we infer/check the type of column here?
         return c;

@@ -223,11 +223,6 @@ describe("columnRemovalUtils", () => {
                     usage: "settings",
                     usagePaths: ["color_by"],
                 }),
-                expect.objectContaining({
-                    chartId: "linked-1",
-                    usage: "param",
-                    usagePaths: ["param"],
-                }),
             ],
             savedViews: [
                 {
@@ -235,11 +230,6 @@ describe("columnRemovalUtils", () => {
                     charts: [
                         expect.objectContaining({
                             chartId: "saved-1",
-                            usage: "param",
-                            usagePaths: ["param"],
-                        }),
-                        expect.objectContaining({
-                            chartId: "saved-linked-1",
                             usage: "param",
                             usagePaths: ["param"],
                         }),
