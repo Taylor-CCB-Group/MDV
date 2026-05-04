@@ -38,8 +38,8 @@
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
     "test": "vitest",
-    "playwright-test": "cd tests_playwright && npx playwright test",
-    "playwright-test-ui": "cd tests_playwright && npx playwright test --ui"
+    "playwright-test": "node node_modules/playwright/cli.js test",
+    "playwright-test-ui": "node node_modules/playwright/cli.js test --ui"
   },
   "repository": {
     "type": "git",

@@ -1,141 +1,84 @@
 # Playwright Tests
 
+Run Playwright from the repository root so it uses `playwright.config.ts`.
+
 ## Quick Start
 
 ```bash
-# 1. Install dependencies (if not already done)
 npm install
-
-# 2. Install Playwright browsers (one-time setup)
 npx playwright install --with-deps
-
-# 3. Start devcontainer app (if not already running)
 docker compose -f docker-secrets.yml up -d
-
-# 4. Run tests
 npm run playwright-test
 ```
 
-That's it! Tests run from your host machine and connect to the devcontainer app via `localhost:5055`.
+The default target is the devcontainer app on `http://localhost:5055`. Override
+it with `TEST_BASE_URL`.
 
-## Common Workflows
+For local Vite-only catalog tests:
 
-### Run Tests with UI
 ```bash
+npm run dev -- --host 127.0.0.1 --port 5173
+TEST_BASE_URL=http://127.0.0.1:5173 npm run playwright-test -- tests_playwright/catalog/catalog_view.spec.ts --project=chromium --reporter=list
+```
+
+The npm scripts call the local Playwright dependency directly. Prefer them over
+plain `npx playwright` for test execution, especially in restricted agent
+environments.
+
+## Common Commands
+
+```bash
+npm run playwright-test -- --list
+npm run playwright-test -- tests_playwright/catalog/
+npm run playwright-test -- tests_playwright/project/
+npm run playwright-test -- --headed
 npm run playwright-test-ui
 ```
 
-### Run Specific Tests
-```bash
-cd tests_playwright
-npx playwright test catalog/
-npx playwright test project/
-```
+## Test Areas
 
-### Run Tests in Debug Mode
-```bash
-cd tests_playwright
-npx playwright test --debug
-```
+- `catalog/`: catalog view tests with mocked backend APIs.
+- `project/`: project view tests that need a real backend.
+- `utils/`: shared routes, fixtures, and helpers.
+- `test-data/`: small checked-in test inputs.
 
-## Prerequisites
+Project tests cover chart creation and view-management flows. They require a
+backend that can create projects and process uploads.
 
-- **Node.js** installed on your host machine (frontend developers already have this)
-- **Devcontainer app** running on `localhost:5055`
+For agent-driven project tests, prefer the shared helper in
+`tests_playwright/utils/tempProject.ts`. It creates a temporary project for the
+test, imports it through the backend, and cleans it up afterward. The preferred
+path uses the Python mock-project generator; if that environment is not
+available locally, the helper can fall back to a temporary inline CSV seed so
+tests can still exercise the real project page without checked-in one-off test
+fixtures.
 
-## Folder Structure
+## Generated Data
 
-- `catalog/` - Tests for catalog view (mocked backend)
-- `project/` - Tests for project view (real backend)
-- `utils/` - Test utility functions
-- `test-data/` - Test data files
-- `playwright.config.ts` - Playwright configuration
-
-## Generating Test Data
-
-Test MDV projects can be generated programmatically:
+Test MDV projects can be generated from Python:
 
 ```bash
-# Create project from mock data
-# (requires mdv python environment to be activated - automatically the case inside container)
 python -m mdvtools.tests.generate_test_data ~/mdv/test_mock --mock
-
-# Create project from scanpy dataset
 python -m mdvtools.tests.generate_test_data ~/mdv/test_pbmc3k --scanpy pbmc3k_processed
-
-# Create large mock project
 python -m mdvtools.tests.generate_test_data ~/mdv/test_large --mock --n-cells 1000000 --n-genes 5000
 ```
 
-For programmatic use, import from `mdvtools.tests.test_project_factory`.
-
-## How It Works
-
-- **Local Execution**: Tests run on your host machine (not in a container)
-- **Connect to App**: Tests connect to the devcontainer app via `localhost:5055` (exposed port)
-- **Simple Setup**: Just install Playwright locally - no container configuration needed
-- **UI Mode**: Works natively on your host machine
-
-## Configuration
-
-The `playwright.config.ts` file is located in this directory. Key settings:
-
-- **baseURL**: Defaults to `http://localhost:5055` (devcontainer exposed port)
-- **Override**: Set `TEST_BASE_URL` environment variable to use a different URL
+For programmatic use, import from
+`mdvtools.tests.test_project_factory`. For SpatialData-backed performance
+projects, see `docs/SYNTHETIC_SPATIALDATA_PROJECTS.md`.
 
 ## Troubleshooting
 
-### Tests can't connect to app
 ```bash
-# Check if app service is running
 docker compose -f docker-secrets.yml ps mdv_app
-
-# Check app logs
 docker compose -f docker-secrets.yml logs mdv_app
-
-# Verify app is accessible
 curl http://localhost:5055
+npm run playwright-test -- --reporter=list
 ```
 
-### Playwright not found
+To reset the local Docker database:
+
 ```bash
-# Make sure you've installed dependencies
-npm install
-
-# Install browsers
-npx playwright install --with-deps
-```
-
-### Tests are failing unexpectedly
-```bash
-# Run with more verbose output
-cd tests_playwright
-npx playwright test --reporter=list
-
-# Run in headed mode to see what's happening
-npx playwright test --headed
-```
-
-### Need to reset database
-```bash
-# Stop and remove volumes (WARNING: deletes all data)
 docker compose -f docker-secrets.yml down -v
 docker compose -f docker-secrets.yml up -d
 ```
-
-## CI/CD
-
-Tests run in CI using Docker services (different from local development). See `.github/workflows/playwright.yml` for the workflow configuration.
-
-## Current Test Coverage
-
-- **Catalog tests** (`catalog/`): Test catalog view operations with mocked backend APIs
-- **Project tests** (`project/`): Test project view with real backend APIs
-  - Chart creation for all chart types
-  - View management operations
-
-## Future Improvements
-
-- Run tests in parallel (currently some run serially)
-- Expand test coverage for project view
-- Add more mock project generation utilities

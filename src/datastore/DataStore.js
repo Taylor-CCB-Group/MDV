@@ -19,6 +19,14 @@ import {
     getMultitextDelimiter,
     getMultitextJoinDelimiter,
 } from "@/lib/multitext";
+import {
+    findColumnMetadataIndex,
+    isSoftDeletedColumn,
+    normalizeColumnsMetadata,
+    removeColumnMetadata,
+    toColumnMetadata,
+    updateColumnMetadata,
+} from "./columnMetadataUtils";
 import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
 import { logValidationError } from "@/lib/validationLogging";
 
@@ -161,11 +169,9 @@ class DataStore {
 
         if (config.columns) {
             const originalColumns = config.columns;
-            config.columns = originalColumns.map((column) =>
-                this._toColumnMetadata(column),
-            );
+            config.columns = normalizeColumnsMetadata(config.columns);
             for (const c of originalColumns) {
-                if (this._isSoftDeletedColumn(c)) {
+                if (isSoftDeletedColumn(c)) {
                     continue;
                 }
                 this.addColumn(c, c.data, false, false);
@@ -459,84 +465,6 @@ class DataStore {
     }
 
     /**
-     * Build a metadata-only column object for persistence.
-     * Removes runtime-only fields like data/buffer/getValue.
-     * @param {Column} column
-     * @returns {Column}
-     */
-    _toColumnMetadata(column) {
-        const metadata = { ...column };
-        delete metadata.data;
-        delete metadata.buffer;
-        delete metadata.getValue;
-        delete metadata.originalData;
-        const isDeleted = this._isSoftDeletedColumn(metadata);
-        if (isDeleted) {
-            metadata.deleted = true;
-        } else {
-            delete metadata.deleted;
-        }
-        return metadata;
-    }
-
-    _isSoftDeletedColumn(column) {
-        return Boolean(column?.deleted);
-    }
-
-    /**
-     * Replace the persisted columns metadata list.
-     * @param {Column[]} columns
-     * @returns {void}
-     */
-    _setColumnsMetadata(columns) {
-        this.config.columns = columns.map((column) => this._toColumnMetadata(column));
-    }
-
-    /**
-     * Find a column metadata entry by field id.
-     * @param {string} field
-     * @returns {number}
-     */
-    _findColumnMetadataIndex(field) {
-        return (this.config.columns ?? []).findIndex((item) => item.field === field);
-    }
-
-    /**
-     * Insert or update one column in persisted metadata.
-     * If the column already exists, it is restored as not deleted.
-     * @param {Column} column
-     * @returns {void}
-     */
-    _updateColumnMetadata(column) {
-        const metadata = this._toColumnMetadata(column);
-        const nextColumns = [...(this.config.columns ?? [])];
-        const index = this._findColumnMetadataIndex(metadata.field);
-        if (index === -1) {
-            nextColumns.push(metadata);
-        } else {
-            // A user can delete a column and later add a new column with the same name/field.
-            // In that case we should revive the deleted slot but treat it like a fresh column,
-            // so stale metadata from the old deleted column does not leak back into the new one.
-            nextColumns[index] = {
-                ...metadata,
-                deleted: false,
-            };
-        }
-        this._setColumnsMetadata(nextColumns);
-    }
-
-    /**
-     * Remove one column from persisted metadata by field id.
-     * @param {string} field
-     * @returns {void}
-     */
-    _removeColumnMetadata(field) {
-        this._setColumnsMetadata(
-            (this.config.columns ?? []).filter((column) => column.field !== field),
-        );
-    }
-
-    /**
      * Remove a column from runtime-visible collections only.
      * @param {string} column
      * @param {boolean} [notify=false]
@@ -552,6 +480,7 @@ class DataStore {
         }
         c.data = null;
         c.buffer = null;
+        c.originalData = null;
         this.columns = this.columns.filter((item) => item.field !== column);
         delete this.columnIndex[column];
         delete this.indexes[column];
@@ -640,7 +569,7 @@ class DataStore {
         }
 
         if (trackMetadata) {
-            this._updateColumnMetadata(c);
+            this.config.columns = updateColumnMetadata(this.config.columns, c);
         }
         this.columns.push(c);
         this.columnIndex[c.field] = c;
@@ -1989,7 +1918,7 @@ class DataStore {
     removeColumn(column, dirty = false, notify = false) {
         delete this.dirtyColumns.data_changed[column];
         delete this.dirtyColumns.colors_changed[column];
-        this._removeColumnMetadata(column);
+        this.config.columns = removeColumnMetadata(this.config.columns, column);
         if (this.dirtyColumns.added[column]) {
             delete this.dirtyColumns.added[column];
         } else if (dirty) {
@@ -2052,7 +1981,7 @@ class DataStore {
             return false;
         }
         c.name = trimmedName;
-        this._updateColumnMetadata(c);
+        this.config.columns = updateColumnMetadata(this.config.columns, c);
         if (dirty) {
             this.dirtyMetadata.add("columns");
         }
@@ -2074,12 +2003,12 @@ class DataStore {
         // New unsaved columns should disappear completely rather than be tombstoned.
         if (this.dirtyColumns.added[column]) {
             delete this.dirtyColumns.added[column];
-            this._removeColumnMetadata(column);
+            this.config.columns = removeColumnMetadata(this.config.columns, column);
             this._removeVisibleColumn(column, notify);
             return;
         }
 
-        const index = this._findColumnMetadataIndex(column);
+        const index = findColumnMetadataIndex(this.config.columns, column);
         if (index === -1) {
             const visibleColumn = this.columnIndex[column];
             if (!visibleColumn) {
@@ -2092,8 +2021,8 @@ class DataStore {
             // Soft delete can race with metadata state (for example after local add/remove cycles).
             // If runtime still knows the column but metadata does not, recover a full metadata
             // entry from the live column so the delete persists as a valid tombstone.
-            const fallbackMetadata = this._toColumnMetadata(visibleColumn);
-            this._setColumnsMetadata([
+            const fallbackMetadata = toColumnMetadata(visibleColumn);
+            this.config.columns = normalizeColumnsMetadata([
                 ...(this.config.columns ?? []),
                 {
                     ...fallbackMetadata,
@@ -2112,7 +2041,7 @@ class DataStore {
             ...nextColumns[index],
             deleted: true,
         };
-        this._setColumnsMetadata(nextColumns);
+        this.config.columns = normalizeColumnsMetadata(nextColumns);
         if (dirty) {
             this.dirtyMetadata.add("columns");
         }
