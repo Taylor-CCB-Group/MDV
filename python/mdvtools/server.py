@@ -126,11 +126,24 @@ def create_app(
     @project_bp.route("/")
     def project_index():
         log("recieved request to project_index")
+        # Backend project pages include a CSP upgrade directive. Only enable that on
+        # secure requests, otherwise local HTTP (for example Docker on localhost) can
+        # have assets rewritten to https:// and fail with TLS errors in Safari.
+        # Check both Flask scheme and X-Forwarded-Proto for proxied HTTPS deployments.
+        forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "").lower()
+        should_upgrade_insecure_requests = bool(options.backend_db) and (
+            request.scheme == "https" or forwarded_proto == "https"
+        )
         # the backend page currently needs to be different to workaround a server config issue
         # some requests were being downgraded to http, which caused problems with the backend
         # but if we always add the header it messes up localhost development.
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
-        return render_template("page.html", route=route, backend=options.backend_db)
+        return render_template(
+            "page.html",
+            route=route,
+            backend=options.backend_db,
+            should_upgrade_insecure_requests=should_upgrade_insecure_requests,
+        )
 
     @project_bp.route("/spatial/<path:file>")
     def get_spatialdata(file):
