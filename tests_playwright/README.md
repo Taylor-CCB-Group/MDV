@@ -45,6 +45,14 @@ npm run playwright-test-ui
 Project tests cover chart creation and view-management flows. They require a
 backend that can create projects and process uploads.
 
+For agent-driven project tests, prefer the shared helper in
+`tests_playwright/utils/tempProject.ts`. It creates a temporary project for the
+test, imports it through the backend, and cleans it up afterward. The preferred
+path uses the Python mock-project generator; if that environment is not
+available locally, the helper can fall back to a temporary inline CSV seed so
+tests can still exercise the real project page without checked-in one-off test
+fixtures.
+
 ## Generated Data
 
 Test MDV projects can be generated from Python:

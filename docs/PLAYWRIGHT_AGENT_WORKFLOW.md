@@ -43,6 +43,28 @@ Use the smallest meaningful check first. Catalog tests mock the project API in
 the browser with `page.route`; project tests create or upload real projects and
 need a live backend.
 
+## Agentic Project Testing
+
+For project-view features, prefer the shared helper in
+`tests_playwright/utils/tempProject.ts` instead of checking in ad hoc project
+fixtures.
+
+Recommended pattern:
+
+1. generate a temporary mock MDV project with the Python test factory;
+2. import it through the backend;
+3. run the Playwright flow against the real project page;
+4. delete the backend project and remove local temp files in teardown.
+
+The helper already follows that pattern and falls back to a temporary inline CSV
+seed only when the local Python environment cannot generate a mock MDV archive.
+That fallback is there to keep agent runs moving in imperfect local setups; the
+preferred path is still the generated mock project.
+
+Use browser-only route mocks for `catalog/` work. Use the temp-project helper
+for `project/` work that depends on datasource state, chart manager state, save
+behaviour, or reload persistence.
+
 ## Human Setup
 
 For the Docker/devcontainer path:
