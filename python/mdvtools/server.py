@@ -130,7 +130,8 @@ def create_app(
         # secure requests, otherwise local HTTP (for example Docker on localhost) can
         # have assets rewritten to https:// and fail with TLS errors in Safari.
         # Check both Flask scheme and X-Forwarded-Proto for proxied HTTPS deployments.
-        forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "").lower()
+        forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "")
+        forwarded_proto = forwarded_proto.split(",")[0].strip().lower()
         should_upgrade_insecure_requests = bool(options.backend_db) and (
             request.scheme == "https" or forwarded_proto == "https"
         )
