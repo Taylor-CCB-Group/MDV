@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)")
+_WRAPPER_RE = re.compile(r"^([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)$")
 _MARKER_ALIASES = {
     "group": "cluster",
     "cluster": "group",

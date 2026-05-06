@@ -143,7 +143,7 @@ def _extract_chart_classes(code: str) -> list[str]:
 def _is_text_table_only_code(code: str) -> bool:
     chart_classes = _extract_chart_classes(code)
     if not chart_classes:
-        return True
+        return False
     allowed = {"TextBox", "TablePlot", "SelectionDialogPlot", "RowSummaryBox"}
     return all(c in allowed for c in chart_classes)
 

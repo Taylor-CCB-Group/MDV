@@ -68,10 +68,10 @@ def parse_explicit_progress_line(line: str) -> ProgressEvent | None:
     except json.JSONDecodeError:
         return None
     msg = str(obj.get("msg") or obj.get("message") or "Progress update")
-    progress = int(obj.get("pct", obj.get("progress", 0)))
+    progress = _as_int_or_none(obj.get("pct", obj.get("progress", 0))) or 0
     progress = max(0, min(100, progress))
     stage = obj.get("stage")
-    delta = int(obj.get("delta", 0))
+    delta = _as_int_or_none(obj.get("delta")) or 0
     event = ProgressEvent(
         message=msg,
         progress=progress,
