@@ -1992,9 +1992,9 @@ export class ChartManager {
     }
 
     /**
-     * Map a chart param token to the DataStore column `field` id when it matches
-     * `field` or display `name` in metadata. Virtual expression columns use
-     * `subgroup|label(subgroup)|index` and are returned unchanged.
+     * Map a chart param token to a DataStore column `field` id.
+     * Field ids are canonical and stable; display names are mutable and are
+     * not used for runtime resolution.
      * @param {object} dStore DataStore instance
      * @param {string} token
      * @returns {string}
@@ -2006,10 +2006,11 @@ export class ChartManager {
         if (dStore.columnIndex[token]) {
             return token;
         }
-        const c = dStore.columns.find(
-            (col) => col.field === token || col.name === token,
-        );
-        return c ? c.field : token;
+        const fieldMatch = dStore.columns.find((col) => col.field === token);
+        if (fieldMatch) {
+            return fieldMatch.field;
+        }
+        return token;
     }
 
     async _getColumnsAsync(dataSource, columns) {
