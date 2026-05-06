@@ -19,7 +19,7 @@ Also, to add the JavaScript api, jsdoc needs to be in your PATH, so it is best t
 ```bash
 pnpm add -g jsdoc
 ```
- (this can be more of a faff than it should be, we may review this at some point, espcially given we want to reconfigure to build typescript documentation anyway)
+ (this can be more of a faff than it should be, we may review this at some point, especially given we want to reconfigure to build typescript documentation anyway)
 
 ## Building the docs
 
