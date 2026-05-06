@@ -6,7 +6,7 @@ The standalone build (`pnpm run build-standalone`) exposes the `mdv` object (inc
 ### How to Use
 
 1. **Build**: Run the standalone build script:
-    ```
+    ```bash
     pnpm run build-standalone
     ```
 2. **Deploy**: Place the resulting `dist/mdv` folder into the `/static/` directory of your web application.

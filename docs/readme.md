@@ -11,12 +11,12 @@ As of this writing, `sphinx-js` has a dependency on a conflicting version of `Ma
 
 On Unix-like systems, a pnpm script is provided to install the necessary packages in a virtual environment. To use it, run
 
-```
+```bash
 pnpm run docs-env-setup
 ```
 
 Also, to add the JavaScript api, jsdoc needs to be in your PATH, so it is best to install it globally:-
-```
+```bash
 pnpm add -g jsdoc
 ```
  (this can be more of a faff than it should be, we may review this at some point, espcially given we want to reconfigure to build typescript documentation anyway)
@@ -24,21 +24,21 @@ pnpm add -g jsdoc
 ## Building the docs
 
 To build all the docs, including the Python and JavaScript APIs, on Unix-like systems use
-```
+```bash
 pnpm run build-docs-nix
 ``` 
 This will activate the virtual environment and build the docs.
 
 
 or 
-```
+```bash
 sphinx-build -M html docs/maindocs docs/maindocs/_build
 
 ```
 Output will be generated in `docs/maindocs/_build/html`. This output can be viewed locally with `pnpm run serve-docs`.
 
 To build the JavaScript API docs alone use
-```
+```bash
 pnpm run build-jsdocs
 ```
 and they will be be placed in docs/jsdocs/build 

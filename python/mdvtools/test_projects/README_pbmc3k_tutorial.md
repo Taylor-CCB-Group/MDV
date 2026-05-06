@@ -11,12 +11,12 @@ From the MDV folder:
 
 1. Install front-end dependencies:
     `pnpm i`
-(If `pnpm` is not installed yet, follow the official installation guide: https://pnpm.io/installation. On recent Node.js versions, the quickest option is `corepack enable` then `corepack prepare pnpm@latest --activate`.)
+(If `pnpm` is not installed yet, follow the official installation guide: https://pnpm.io/installation. On recent Node.js versions, the quickest option is `corepack enable` then `corepack use pnpm@10.21.0`.)
 
 2. Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is a pnpm script that will do this automatically, provided that you have Python 3.12 installed and Poetry is available in your PATH:
     `pnpm run python-setup`
 
-This is equvalent to running the following commands, so in case it doesn't work run these:
+This is equivalent to running the following commands, so in case it doesn't work run these:
     `python -m venv venv`\
     `source venv/bin/activate`\
     `cd python`\
