@@ -51,6 +51,7 @@ export function createSlickGridMock(): SlickgridReactInstance {
         setSelectedRows: vi.fn(),
         scrollRowIntoView: vi.fn(),
         getColumns: vi.fn(() => []),
+        updateColumnHeader: vi.fn(),
         getPubSubService: vi.fn(() => mockPubSub),
         onSelectedRowsChanged: createMockSlickEvent(),
         onSort: createMockSlickEvent(),
@@ -74,4 +75,3 @@ export function createSlickGridMock(): SlickgridReactInstance {
         treeDataService: {} as TreeDataService,
     } satisfies SlickgridReactInstance;
 }
-

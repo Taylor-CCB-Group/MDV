@@ -4,6 +4,7 @@ import { project } from '../utils/data';
 
 test.describe('Catalog view', () => {
   test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
     await mockApiRoot(page);
     await mockProjects(page, [project({ name: 'Alpha' }), project({ id: 'p2', name: 'Beta' })]);
     await gotoPath(page);
@@ -25,13 +26,11 @@ test.describe('Catalog view', () => {
     expect(gridCards).toHaveLength(2);
   });
 
- //* By default, the theme is light
+  //* The catalog starts from the emulated light preference for this suite.
   test('theme toggle', async ({ page }) => {
-    const currentTheme = await page.locator('html').getAttribute('class');
+    await expect(page.locator('html')).toHaveClass(/(?:^|\s)light(?:\s|$)/);
     await page.getByTestId('theme_toggle_catalog').click();
-    const updatedClassName = await page.locator('html').getAttribute('class');
-    expect(updatedClassName).toBe(currentTheme === 'light' ? 'dark' : 'light');
+    await expect(page.locator('html')).toHaveClass(/(?:^|\s)dark(?:\s|$)/);
   });
 });
-
 

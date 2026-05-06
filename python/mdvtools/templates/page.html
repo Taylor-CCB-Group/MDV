@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html>
     <head>
-        {% if backend %}
+        {# Keep upgrade-insecure-requests for HTTPS/proxied HTTPS only.
+           On local HTTP dev this would force static assets to https://localhost
+           and can break Safari with TLS errors. #}
+        {% if should_upgrade_insecure_requests %}
         <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
         {% endif %}
         <meta charset="utf-8">

@@ -67,7 +67,6 @@ import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 
-
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
 // followed by multitext/text16 (uint16) then text/unique (uint8)
@@ -1254,7 +1253,10 @@ export class ChartManager {
             if (dstore.dirtyMetadata.size !== 0) {
                 metadata[ds.name] = {};
                 for (const param of dstore.dirtyMetadata) {
-                    metadata[ds.name][param] = dstore[param];
+                    metadata[ds.name][param] =
+                        param === "columns"
+                            ? dstore.getAllColumnsMetadata()
+                            : dstore[param];
                 }
             }
         }
@@ -2069,40 +2071,43 @@ export class ChartManager {
                 }
             }
         }
-        const reqCols = [];
-        for (const x of columns) {
-            if (typeof x !== "string") {
-                const col = dStore.columnIndex[x];
-                if (!col) {
-                    continue;
-                }
-                if (!col.data) {
-                    reqCols.push(x);
-                }
-                continue;
+        const reqCols = columns.filter((x) => {
+            //column already loading - but what if something went wrong earlier?
+            if (this.columnsLoading[dataSource][x]) {
+                return false;
             }
-            const fieldKey = this._resolveToDataStoreFieldKey(dStore, x);
-            if (this.columnsLoading[dataSource][fieldKey]) {
-                continue;
-            }
-            let col = dStore.columnIndex[fieldKey];
+            const col = dStore.columnIndex[x];
+            //no record of column- need to load it (plus metadata)
             if (!col) {
-                if (fieldKey.includes("|")) {
-                    dStore.addColumnFromField(fieldKey);
-                    reqCols.push(fieldKey);
+                // what if x is something like a MulticolumnQuery?
+                if (typeof x !== "string") {
+                    // we could make dataStore understand it as a 'field'...
+                    // or if we return false to filter it out, chart deserialise can handle it?
+                    return false;
                 } else {
-                    throw new Error(
-                        `Unknown column '${x}' in datasource '${dataSource}'. ` +
-                            `If you added or replaced a datasource in this session, refresh the page. ` +
-                            `Chart param tokens must match column field ids in project metadata.`,
-                    );
+                    const metadata = dStore
+                        .getAllColumnsMetadata?.()
+                        .find((column) => column.field === x);
+                    // Soft-deleted table columns can temporarily disappear from columnIndex while
+                    // stale chart reactions still ask for them. Restore real datasource columns
+                    // from metadata first, and only use addColumnFromField() for true virtual
+                    // fields like subgroup|name|index. Plain stale names should be skipped.
+                    if (metadata && !metadata.deleted) {
+                        dStore.addColumn(metadata, metadata.data, false, false);
+                        return true;
+                    }
+                    if (x.includes("|")) {
+                        dStore.addColumnFromField(x);
+                        return true;
+                    }
+                    return false;
                 }
-                continue;
             }
             if (!col.data) {
-                reqCols.push(fieldKey);
+                return true;
             }
-        }
+            return false;
+        });
 
         //No columns needed
         //but columns requested by other actions may still be loading
