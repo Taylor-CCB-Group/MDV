@@ -1,6 +1,6 @@
 [build]
-    command = "corepack enable && pnpm install --frozen-lockfile && pnpm run build-standalone"
-    publish = "dist/mdv"
+    command = "corepack enable && pnpm install --frozen-lockfile && pnpm run vite-build"
+    publish = "vite-dist/"
 
 [build.environment]
     NODE_VERSION = "22"
