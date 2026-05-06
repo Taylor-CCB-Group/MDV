@@ -45,6 +45,8 @@ class EditableLayer {
 */
 
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
+    declare _onanyclick: (event: any) => void;
+
     override _addEventHandlers() {
         super._addEventHandlers();
         // @ts-expect-error accessing protected props

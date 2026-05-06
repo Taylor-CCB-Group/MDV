@@ -148,6 +148,7 @@ const Main = observer(
             () =>
                 new DetailView({
                     id: detailId,
+                    // @ts-expect-error viv runtime supports this, types do not
                     snapScaleBar: true,
                     width,
                     height,
