@@ -56,7 +56,7 @@ jobs:
           done
 
       - name: Run Playwright tests
-        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml exec -T playwright_test sh -c "cd /app/tests_playwright && TEST_BASE_URL=http://mdv_app:5055 npx playwright test"
+        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml exec -T playwright_test sh -c "cd /app/tests_playwright && TEST_BASE_URL=http://mdv_app:5055 pnpm exec playwright test"
 
       - name: Upload test results
         if: always()

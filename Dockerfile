@@ -1,8 +1,8 @@
-# Build the frontend with npm
-# warning - we had an obscure npm error with cross-env not found, and it seems like using an earlier nodejs version fixed it
-# for some reason node_modules/.bin wasn't populated after `RUN npm install` - but manually running it in the container worked
+# Build the frontend with pnpm
+# warning - we had an obscure package-manager error with cross-env not found, and it seems like using an earlier nodejs version fixed it
+# for some reason node_modules/.bin wasn't populated after initial install - but manually running it in the container worked
 # not sure if there's a way of pinning a more specific build of the base image. May want to see if we can reproduce this issue outside of docker.
-# revisiting in 2026: node20 is reaching EOL, and we have a "npm warn EBADENGINE Unsupported engine" related to "vite-plugin-glsl" in npm install
+# revisiting in 2026: node20 is reaching EOL, and we had an "EBADENGINE Unsupported engine" warning related to "vite-plugin-glsl" during install
 # changing to node22 again.
 FROM nikolaik/python-nodejs:python3.12-nodejs22 AS frontend-builder
 
@@ -105,10 +105,10 @@ WORKDIR /app/python
 RUN poetry install --with dev,backend,auth --no-root
 
 WORKDIR /app
-# copy the package.json and package-lock.json as a separate step so npm install can be cached (with correct ownership)
-COPY --chown=pn:pn package*.json ./
-## Install npm dependencies
-RUN npm install
+# copy package manager metadata as a separate step so dependency install can be cached (with correct ownership)
+COPY --chown=pn:pn package.json pnpm-lock.yaml ./
+## Install JS dependencies
+RUN corepack enable && pnpm install --frozen-lockfile
 
 # Copy only frontend-related files needed for the build
 # This ensures the frontend build cache only invalidates when frontend files change
@@ -122,9 +122,9 @@ COPY --chown=pn:pn postcss.config.js ./
 COPY --chown=pn:pn biome.jsonc ./
 
 RUN mkdir -p dist
-## Run the npm build script for Flask and Vite
+## Run the JS build script for Flask and Vite
 # This step will be cached unless frontend-related files change
-RUN npm run build-flask-dockerjs
+RUN pnpm run build-flask-dockerjs
 
 # Copy the complete project again to ensure all directories exist in final container
 COPY --chown=pn:pn . .
@@ -138,8 +138,8 @@ RUN poetry install --with dev,backend,auth
 # Expose the port that Flask will run on
 EXPOSE 5055 
 
-# something changed causing npm to need this in order for `source` to work in npm scripts
-RUN npm config set script-shell "/bin/bash"
+# something changed requiring this for `source` to work in package scripts
+RUN pnpm config set script-shell "/bin/bash"
 
 # Add automatic poetry shell activation for terminal use
 RUN echo 'cd /app/python && $(poetry env activate)' >> ~/.bashrc && \

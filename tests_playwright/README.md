@@ -5,10 +5,10 @@ Run Playwright from the repository root so it uses `playwright.config.ts`.
 ## Quick Start
 
 ```bash
-npm install
-npx playwright install --with-deps
+pnpm install
+pnpm exec playwright install --with-deps
 docker compose -f docker-secrets.yml up -d
-npm run playwright-test
+pnpm run playwright-test
 ```
 
 The default target is the devcontainer app on `http://localhost:5055`. Override
@@ -17,22 +17,22 @@ it with `TEST_BASE_URL`.
 For local Vite-only catalog tests:
 
 ```bash
-npm run dev -- --host 127.0.0.1 --port 5173
-TEST_BASE_URL=http://127.0.0.1:5173 npm run playwright-test -- tests_playwright/catalog/catalog_view.spec.ts --project=chromium --reporter=list
+pnpm run dev -- --host 127.0.0.1 --port 5173
+TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test -- tests_playwright/catalog/catalog_view.spec.ts --project=chromium --reporter=list
 ```
 
-The npm scripts call the local Playwright dependency directly. Prefer them over
-plain `npx playwright` for test execution, especially in restricted agent
+The pnpm scripts call the local Playwright dependency directly. Prefer them over
+plain `pnpm exec playwright` for test execution, especially in restricted agent
 environments.
 
 ## Common Commands
 
 ```bash
-npm run playwright-test -- --list
-npm run playwright-test -- tests_playwright/catalog/
-npm run playwright-test -- tests_playwright/project/
-npm run playwright-test -- --headed
-npm run playwright-test-ui
+pnpm run playwright-test -- --list
+pnpm run playwright-test -- tests_playwright/catalog/
+pnpm run playwright-test -- tests_playwright/project/
+pnpm run playwright-test -- --headed
+pnpm run playwright-test-ui
 ```
 
 ## Test Areas
@@ -73,7 +73,7 @@ projects, see `docs/SYNTHETIC_SPATIALDATA_PROJECTS.md`.
 docker compose -f docker-secrets.yml ps mdv_app
 docker compose -f docker-secrets.yml logs mdv_app
 curl http://localhost:5055
-npm run playwright-test -- --reporter=list
+pnpm run playwright-test -- --reporter=list
 ```
 
 To reset the local Docker database:
