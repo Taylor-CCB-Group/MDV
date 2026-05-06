@@ -1,3 +1,11 @@
+[build]
+    command = "corepack enable && pnpm install --frozen-lockfile && pnpm run build-standalone"
+    publish = "dist/mdv"
+
+[build.environment]
+    NODE_VERSION = "22"
+    PNPM_VERSION = "10.21.0"
+
 [[headers]]
     for = "/*"
     [headers.values]
