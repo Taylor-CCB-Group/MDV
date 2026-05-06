@@ -87,7 +87,7 @@ function getRollupOptions() {
     if (process.env.VITE_ENTRYPOINT) {
         // If you want a custom entrypoint - in particular, in order to have a custom DataLoader for interfacing
         // with another backend, you can specify it with VITE_ENTRYPOINT environment variable, e.g.
-        // `VITE_ENTRYPOINT=path/to/my_index.js npx vite build --outDir path/to/output`
+        // `VITE_ENTRYPOINT=path/to/my_index.js pnpm exec vite build --outDir path/to/output`
         // (nb, we may change the logic in this config...)
         return {
             input: process.env.VITE_ENTRYPOINT,

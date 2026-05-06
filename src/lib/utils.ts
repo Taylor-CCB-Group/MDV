@@ -22,7 +22,7 @@ export function notEmpty<TValue>(value: TValue | null | undefined): value is TVa
     return value !== null && value !== undefined;
 }
 export type Entries<T> = {
-    [K in keyof T]: [K, T[K]];
+    [K in keyof T]-?: [K, T[K]];
 }[keyof T][];
 export function getEntries<T extends object>(o: T) {
     return Object.entries(o) as Entries<T>;

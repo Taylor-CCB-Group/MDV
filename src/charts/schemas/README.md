@@ -34,7 +34,7 @@ They serve two main purposes:
     - `validate*/safeValidate*` helpers.
 
 - `scripts/generate-schemas.ts`
-  - Used by `npm run build-schemas`.
+  - Used by `pnpm run build-schemas`.
   - Converts the Zod schemas to JSON Schema and writes:
     - `schemas/chart-config-schema.json`
     - `scripts/schemas/chart-config-schema.json`
@@ -62,7 +62,7 @@ They serve two main purposes:
 To regenerate JSON Schema files from the Zod definitions:
 
 ```bash
-npm run build-schemas
+pnpm run build-schemas
 ```
 
 This:

@@ -9,25 +9,25 @@ repository root so that config is loaded.
 List tests:
 
 ```bash
-npm run playwright-test -- --list
+pnpm run playwright-test -- --list
 ```
 
 Run browser-only catalog tests against a local Vite server:
 
 ```bash
-npm run dev -- --host 127.0.0.1 --port 5173
-TEST_BASE_URL=http://127.0.0.1:5173 npm run playwright-test -- tests_playwright/catalog/ --project=chromium --reporter=list
+pnpm run dev -- --host 127.0.0.1 --port 5173
+TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test -- tests_playwright/catalog/ --project=chromium --reporter=list
 ```
 
 Run project tests against a backend that can create projects and process
 uploads:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 npm run playwright-test -- tests_playwright/project/ --project=chromium --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test -- tests_playwright/project/ --project=chromium --reporter=list
 ```
 
-The npm scripts call the local Playwright install. In restricted agent sessions,
-avoid plain `npx playwright` for test execution because it may try the npm
+The pnpm scripts call the local Playwright install. In restricted agent sessions,
+avoid plain `pnpm exec playwright` for test execution because it may try the npm
 registry even when dependencies are installed.
 
 ## Sandboxed Agent Notes
@@ -70,10 +70,10 @@ behaviour, or reload persistence.
 For the Docker/devcontainer path:
 
 ```bash
-npm install
-npx playwright install --with-deps
+pnpm install
+pnpm exec playwright install --with-deps
 docker compose -f docker-secrets.yml up -d
-npm run playwright-test
+pnpm run playwright-test
 ```
 
 For local Vite-only catalog work, use the Vite command above and set

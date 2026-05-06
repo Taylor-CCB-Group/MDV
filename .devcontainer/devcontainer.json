@@ -38,6 +38,6 @@
         }
     },
     // running this is a bit redundant, but it makes sure that the git info is set correctly when rebuilding.
-    "postCreateCommand": "cd /app && npm run build-flask-dockerjs",
+    "postCreateCommand": "cd /app && pnpm run build-flask-dockerjs",
     "postStartCommand": "git config --global --add safe.directory /app"
 }
