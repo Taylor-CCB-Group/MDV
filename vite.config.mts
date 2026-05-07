@@ -189,16 +189,6 @@ export default defineConfig(async (): Promise<UserConfig> => {
         }),
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
-            babel: {
-                plugins: [
-                    [
-                        "@babel/plugin-proposal-decorators",
-                        {
-                            version: "2023-05"
-                        }
-                    ]
-                ]
-            }
         })
     ],
     worker: {
