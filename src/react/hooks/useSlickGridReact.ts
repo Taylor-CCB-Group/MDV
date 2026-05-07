@@ -668,7 +668,6 @@ const useSlickGridReact = () => {
                 multiSelect: true,
                 enableSelection: true,
                 selectionOptions: {
-                    selectionType: "row",
                     selectActiveRow: true,
                 },
                 headerMenu: {
