@@ -39,8 +39,8 @@
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
     "test": "vitest",
-    "playwright-test": "node node_modules/playwright/cli.js test",
-    "playwright-test-ui": "node node_modules/playwright/cli.js test --ui"
+    "playwright-test": "node node_modules/@playwright/test/cli.js test",
+    "playwright-test-ui": "node node_modules/@playwright/test/cli.js test --ui"
   },
   "repository": {
     "type": "git",
@@ -168,6 +168,7 @@
     "@babel/preset-typescript": "^7.28.5",
     "@biomejs/biome": "1.9.4",
     "@playwright/test": "^1.57.0",
+    "@rolldown/plugin-babel": "^0.2.3",
     "@rollup/plugin-babel": "^6.1.0",
     "@tanstack/react-query-devtools": "^5.80.0",
     "@testing-library/dom": "^10.4.1",
@@ -190,6 +191,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@welldone-software/why-did-you-render": "^8.0.3",
     "autoprefixer": "^10.4.19",
+    "babel-plugin-react-compiler": "^1.0.0",
     "cross-env": "^7.0.3",
     "jsdoc": "^4.0.5",
     "jsdom": "^26.1.0",

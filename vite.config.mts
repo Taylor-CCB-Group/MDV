@@ -1,7 +1,8 @@
 import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
-import react from '@vitejs/plugin-react';
-import { babel } from '@rollup/plugin-babel';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import { babel as rollupBabel } from '@rollup/plugin-babel';
+import rolldownBabel from '@rolldown/plugin-babel';
 import glsl from 'vite-plugin-glsl';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +23,10 @@ const build = (process.env.build || "desktop_pt") as 'production' | 'dev_pt' | '
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 // maybe also the various build configurations at some point.
+
+const reactCompiler = reactCompilerPreset();
+reactCompiler.rolldown.filter ??= {};
+reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
 
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
@@ -176,7 +181,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
     },
     plugins: [
         glsl(),
-        babel({
+        rollupBabel({
             babelHelpers: 'bundled',
             extensions: ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'],
             include: ['src/**/*'],
@@ -189,7 +194,10 @@ export default defineConfig(async (): Promise<UserConfig> => {
         }),
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
-        })
+        }),
+        rolldownBabel({
+            presets: [reactCompiler],
+        }),
     ],
     worker: {
         format: (process.env.worker_format || 'iife') as 'es' | 'iife',
