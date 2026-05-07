@@ -235,7 +235,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     
     const outerContainer = useOuterContainer();
     const deckContainerRef = useRef<HTMLDivElement | null>(null);
-    const deckRef = useRef<any>();
+    const deckRef = useRef<any>(null);
     const getTooltipContent = useCallback(
         (info: PickingInfo) => {
             const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
