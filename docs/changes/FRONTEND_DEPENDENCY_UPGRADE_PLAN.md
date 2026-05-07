@@ -31,6 +31,8 @@ This document tracks dependency upgrade work that may be split across multiple P
   - `protocol-buffers-schema` -> `3.6.1`
   - `postcss` -> `8.5.14`
   - `yaml` -> `2.8.4`
+- Notes:
+  - Keep `react-syntax-highlighter` on `16.x` for newer transitive dependencies/security posture; continue using `@types/react-syntax-highlighter` even though it's out of date until upstream ships bundled types.
 
 ### Known remaining risk after this phase
 
