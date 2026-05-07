@@ -60,6 +60,11 @@ This document tracks dependency upgrade work that may be split across multiple P
   - document known chart-specific regressions if discovered
 - Notes:
   - Prior attempt removed visx and broke axis rendering; this should be explicitly avoided.
+  - Execution notes (May 2026):
+    - React and React DOM were moved to `19.2.6`, with `@types/react`/`@types/react-dom` updated to current `19.x`.
+    - `slickgrid-react` and `@slickgrid-universal/common` were migrated from PR snapshot URLs to stable `10.6.0` releases.
+    - `@visx/*` latest remains `3.12.0` and currently declares peers up to React 18, so package-manager peer warnings are expected on React 19 even though build/test checks pass.
+    - Additional React 19 peer-range warnings are also present for `mobx-react-lite`, `@react-spring/*` (via visx), `use-sync-external-store`, and `@welldone-software/why-did-you-render`.
 
 ### PR C: Viv/deck/luma alignment after new Viv release
 

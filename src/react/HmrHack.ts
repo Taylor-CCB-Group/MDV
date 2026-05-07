@@ -7,7 +7,6 @@ import "../charts/dialogs/AnnotationDialogReact";
 import "./components/HighlightedFeatureChart";
 import "./components/GeneNetworkChart";
 import "./components/SelectionDialogReact";
-import "../charts/dialogs/AddColumnsFromRowsDialogReact";
 import "../react/components/TableChartReactWrapper";
 
 /**
