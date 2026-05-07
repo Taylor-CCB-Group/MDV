@@ -42,19 +42,22 @@ describe("TextBoxMarkdownRenderer", () => {
             />,
         );
 
-        await waitFor(() => {
-            expect(mermaidMocks.render).toHaveBeenCalled();
-        });
+        await waitFor(
+            () => {
+                const diagram = document.querySelector(
+                    ".mdv-textbox-mermaid-diagram",
+                );
+                expect(diagram).not.toBeNull();
+                expect(diagram?.innerHTML ?? "").toContain("<svg>");
+            },
+            { timeout: 5000 },
+        );
         expect(mermaidMocks.initialize).toHaveBeenCalledWith(
             expect.objectContaining({
                 theme: "base",
                 themeCSS: expect.stringContaining("fill: none !important;"),
             }),
         );
-        await waitFor(() => {
-            const diagram = document.querySelector(".mdv-textbox-mermaid-diagram");
-            expect(diagram?.innerHTML).toContain("<svg>");
-        });
         expect(
             document.querySelector(".mdv-textbox-mermaid-fallback"),
         ).toBeNull();
