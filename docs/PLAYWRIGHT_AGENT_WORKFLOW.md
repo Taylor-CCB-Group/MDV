@@ -9,21 +9,21 @@ repository root so that config is loaded.
 List tests:
 
 ```bash
-pnpm run playwright-test -- --list
+pnpm run playwright-test --list
 ```
 
 Run browser-only catalog tests against a local Vite server:
 
 ```bash
 pnpm run dev -- --host 127.0.0.1 --port 5173
-TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test -- tests_playwright/catalog/ --project=chromium --reporter=list
+TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test tests_playwright/catalog/ --project=chromium --reporter=list
 ```
 
 Run project tests against a backend that can create projects and process
 uploads:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test -- tests_playwright/project/ --project=chromium --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test tests_playwright/project/ --project=chromium --reporter=list
 ```
 
 The pnpm scripts call the local Playwright install. In restricted agent sessions,

@@ -5,7 +5,7 @@
 - avoid `as` casts where possible
 - prefer follow-up PRs for wider type-system cleanups
 - when composing commit messages, avoid words like "enhance" and favour conciseness and clarity
-- for Playwright checks, run from the repo root with the local script (`pnpm run playwright-test -- ...`) so `playwright.config.ts` is loaded; in sandboxed agent sessions, expect local server startup and browser launch to require approval, and avoid plain `pnpm exec playwright` for test execution because it may try the npm registry even when dependencies are installed
+- for Playwright checks, run from the repo root with the local script (`pnpm run playwright-test ...`) so `playwright.config.ts` is loaded; in sandboxed agent sessions, expect local server startup and browser launch to require approval, and avoid plain `pnpm exec playwright` for test execution because it may try the npm registry even when dependencies are installed
 
 ## Agent skills
 

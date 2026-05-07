@@ -72,6 +72,17 @@ This document tracks dependency upgrade work that may be split across multiple P
   - evaluate React Compiler compatibility and rollout strategy
   - profile React rendering hot paths in chart-heavy screens
   - capture win/loss metrics before broad enablement
+- Initial React Compiler enablement notes:
+  - `@vitejs/plugin-react` v6 exposes React Compiler through `reactCompilerPreset()` and `@rolldown/plugin-babel`.
+  - The compiler preset is currently filtered to `.tsx` files. The default preset filter also caught vanilla chart modules with decorators, which made the compiler Babel pass fail while parsing decorated chart classes.
+  - Direct Vite production build validation passes with the `.tsx` filter:
+    `pnpm exec cross-env NODE_OPTIONS="--max-old-space-size=4096" build=dev_pt vite build --outDir ./vite-dist`
+  - `pnpm run vite-build` is still blocked earlier by the known React 19 TypeScript cleanup backlog, not by React Compiler configuration.
+  - First runtime gotcha found: vanilla code (e.g. `ChartManager.js`, `static_index.ts`, `DataLoaderUtil.ts`) calling TSX wrapper components as plain functions (`MenuBarWrapper()`, `ErrorComponentReactWrapper({...})`, `ProjectStateHandlerWrapper({...})`) triggers `Invalid hook call` because the compiler injects `useMemoCache` into compiled functions. Fix is to render via `React.createElement(Comp, props)` (or JSX) so the function runs inside React's render pipeline. Other similar invocations should be audited as part of broader rollout.
+- Local smoke-test direction:
+  - Use the catalog Playwright tests against a Vite dev server for React shell and route-mocked catalog workflows.
+  - Use the project Playwright tests against a live backend for chart-manager, datastore, vanilla-event, MobX, and Zustand interaction coverage.
+  - `docs/PLAYWRIGHT_AGENT_WORKFLOW.md` documents the current commands; add a named PR C smoke subset there if this track becomes a regular local validation step.
 
 
 ### PR D: Viv/deck/luma alignment after new Viv release
