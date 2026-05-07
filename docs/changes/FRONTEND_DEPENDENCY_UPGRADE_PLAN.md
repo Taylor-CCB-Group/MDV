@@ -66,7 +66,15 @@ This document tracks dependency upgrade work that may be split across multiple P
     - `@visx/*` latest remains `3.12.0` and currently declares peers up to React 18, so package-manager peer warnings are expected on React 19 even though build/test checks pass.
     - Additional React 19 peer-range warnings are also present for `mobx-react-lite`, `@react-spring/*` (via visx), `use-sync-external-store`, and `@welldone-software/why-did-you-render`.
 
-### PR C: Viv/deck/luma alignment after new Viv release
+### PR C: React performance track (optional, follow-up)
+
+- Scope:
+  - evaluate React Compiler compatibility and rollout strategy
+  - profile React rendering hot paths in chart-heavy screens
+  - capture win/loss metrics before broad enablement
+
+
+### PR D: Viv/deck/luma alignment after new Viv release
 
 - Scope:
   - update `@hms-dbmi/viv` to the new published version
@@ -78,31 +86,7 @@ This document tracks dependency upgrade work that may be split across multiple P
   - adjust variable Viv channels integration
   - validate no duplicate luma versions at runtime
 
-### PR D: React performance track (optional, follow-up)
 
-- Scope:
-  - profile React rendering hot paths in chart-heavy screens
-  - evaluate React Compiler compatibility and rollout strategy
-  - capture win/loss metrics before broad enablement
-
-### PR E: Vite 8 readiness and rollout
-
-- Context:
-  - The earlier `RefreshRuntime is not defined` issue was caused by a version mismatch (`vite@8` with `@vitejs/plugin-react@5.x`, whose peer range only supports Vite 4-7).
-  - Updating to `@vitejs/plugin-react@6.x` resolves the Vite 8 compatibility gap.
-  - There is also prior memory of `vitest` compatibility issues around decorator-heavy codepaths (for example `src/links/link_utils.ts`), which should be treated as a first-class migration risk.
-- Goal:
-  - Keep Vite 8 if dev and test behavior remain stable, and capture potential build-time/tooling improvements.
-- Scope:
-  - validate `@vitejs/plugin-react` + `vite` + `vitest` version matrix for Vite 8
-  - reproduce and fix decorator-related test/runtime incompatibilities
-  - re-run dev server + HMR smoke tests for dialog/chart-heavy paths
-  - compare build times (`pnpm run vite-build`) between the last Vite 7 baseline and Vite 8.x
-- Exit criteria:
-  - no React refresh runtime errors in dev
-  - `vitest` suite passes without decorator regressions
-  - no new `pnpm audit` findings introduced
-  - measured build-time improvement or a clear justification to defer
 
 ## Validation checklist for each dependency PR
 
