@@ -26,6 +26,8 @@ const build = (process.env.build || "desktop_pt") as 'production' | 'dev_pt' | '
 
 const reactCompiler = reactCompilerPreset();
 reactCompiler.rolldown.filter ??= {};
+// this doesn't like decorators it seems, for now if we only point it at tsx files then it doesn't have a problem
+// (as far as we've noticed)
 reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
 
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
