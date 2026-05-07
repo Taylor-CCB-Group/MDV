@@ -1,0 +1,151 @@
+import BaseChart  from "../BaseChart";
+import { g } from "../../lib/utils";
+import type { BaseConfig } from "../BaseChart";
+import UCSCBrowserComponent from "./UCSCBrowserComponent";
+import { BaseReactChart } from "../../react/components/BaseReactChart";
+import type DataStore from "../../datastore/DataStore";
+
+
+interface UCSCBrowserLocation {
+    chr: string;
+    start: number;
+    end: number;
+}
+interface UCSCBrowserViewMargins{
+    type:"fixed_length" | "absolute" | "percentage";
+    value:number;
+}
+
+//all should be required but have default values
+//will zod take care of this
+interface UCSCBrowserConfig extends BaseConfig {
+    src?: string;
+    location?: UCSCBrowserLocation;
+    view_margins?: UCSCBrowserViewMargins;
+    highlight_selected_region?: boolean;
+
+}
+
+function getLocation(location:UCSCBrowserLocation, vm:UCSCBrowserViewMargins) : UCSCBrowserLocation  {
+    const chr = location.chr;
+    let start = location.start;
+    let end = location.end;
+    if (start>end){
+        const temp = start;
+        start = end;
+        end = temp;
+    }
+    if (vm){
+        switch(vm.type){
+            case "absolute":
+                start = start - vm.value;
+                end = end + vm.value;
+                break;
+            case "percentage":
+                const length = end - start;
+                const margin = Math.round(length * vm.value / 100);
+                start = Math.max(0,start - margin);
+                end = end + margin;
+                break;
+            case "fixed_length":
+                start = Math.round(start - vm.value);
+                end = Math.round(end + vm.value);
+        }
+    }
+    start = Math.max(0,start);
+    return {chr, start, end};
+}
+
+
+class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
+    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: UCSCBrowserConfig) {
+        //set defaults - needed to be done before super call
+        //is there a better way to this - can you set defaults in Zod schema?
+        config.view_margins = config.view_margins || {type:"fixed_length", value:1000};
+        config.src = config.src || "https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg38";
+        config.location = config.location || {chr:"chr1", start:1000000, end:1001000};
+        config.highlight_selected_region = config.highlight_selected_region ?? false;
+        super(dataStore, div, config, UCSCBrowserComponent);
+        this.contentDiv.style.overflowY = "scroll";
+    }
+
+    getSettings() {
+        const settings = super.getSettings();
+        const c = this.config;
+        const vm = c.view_margins || {type:"fixed_length", value:1000}; 
+        return [
+            ...settings,
+            g({
+                type: "text",
+                current_value: c.src || "",
+                label: "Session URL",
+                func: (x: string) => {
+                    c.src = x;
+                }
+            }),
+            g({
+                label: "Highlight selected region",
+                type: "check",
+                current_value: c.highlight_selected_region || false,
+                func: (x) => {
+                    c.highlight_selected_region = x;
+                },
+            }),
+        g(
+            {
+            label: "View margin length",
+            type: "text",
+            current_value: vm.value.toString(),
+            func: (x) => {
+                let n = Number.parseInt(x);
+                n = Number.isNaN(n)
+                    ? vm.type === "percentage"
+                        ? 20
+                        : 1000
+                    : n;
+                c.view_margins = { type: vm.type, value: n };
+            },
+        }
+       
+        ),
+        g({
+            label: "View margin type",
+            type: "radiobuttons",
+            choices: [
+                ["% of feature length", "percentage"],
+                ["absolute (bp)", "absolute"],
+                ["Fixed Length (bp)", "fixed_length"],
+            ],
+            current_value: vm.type,
+            func: (x) => {
+                c.view_margins = { type: x as "percentage" | "absolute" | "fixed_length", value: vm.value };
+            },
+        })
+        ];
+    }
+
+}
+
+BaseChart.types["ucsc_browser"] = {
+    name: "UCSC Browser",
+    class: UCSCBrowser,
+    //params are defined by the genome's genomic_location columns
+    params: [],
+    required:(ds)=>ds.genome?.genomic_location && ds.genome?.ucsc_proxy_url,
+    extra_controls: (ds) => {
+        return [
+            {
+                type: "text",
+                name: "url",
+                label: "URL",
+            },
+        ];
+    },
+    init(config, ds, extraControls) {
+        config.src = extraControls.url;
+        const cols = ds.genome?.genomic_location?.columns;
+        config.param = [cols["chr"], cols["start"], cols["end"]];
+    }
+};
+export {getLocation, UCSCBrowserConfig, UCSCBrowserLocation, UCSCBrowserViewMargins};
+export default UCSCBrowser;
