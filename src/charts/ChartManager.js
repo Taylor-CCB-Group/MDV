@@ -57,6 +57,7 @@ import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action, makeAutoObservable } from "mobx";
+import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -235,7 +236,7 @@ export class ChartManager {
         // classes: ["ciview-main-menu-bar"],
         this.menuBar = createEl("div", {}, this.containerDiv);
 
-        createMdvPortal(MenuBarWrapper(), this.menuBar);
+        createMdvPortal(createElement(MenuBarWrapper), this.menuBar);
 
         this._setupThemeContextMenu();
 
@@ -1901,7 +1902,7 @@ export class ChartManager {
                     { message: error }
                     :
                     { message: "An error occurred while creating the chart" };
-            createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
+            createMdvPortal(createElement(ErrorComponentReactWrapper, { error: errorObj, height, width, extraMetaData: { config } }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {

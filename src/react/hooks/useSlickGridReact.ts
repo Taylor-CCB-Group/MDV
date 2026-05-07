@@ -666,8 +666,9 @@ const useSlickGridReact = () => {
                 enableCellNavigation: true,
                 enableExcelCopyBuffer: true,
                 multiSelect: true,
-                enableRowSelection: true,
-                rowSelectionOptions: {
+                enableSelection: true,
+                selectionOptions: {
+                    selectionType: "row",
                     selectActiveRow: true,
                 },
                 headerMenu: {

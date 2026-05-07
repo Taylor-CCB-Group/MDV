@@ -14,6 +14,7 @@ import BaseChart from "../charts/BaseChart";
 import type { DataSource } from "@/charts/charts";
 import { getProjectName } from "./ProjectContext";
 import { getApiRootFromDir, getProjectDirFromLocation } from "@/utils/mdvRouting";
+import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ProjectStateHandlerWrapper from "@/react/ProjectStateHandler";
 import type { Root } from "react-dom/client";
@@ -129,7 +130,7 @@ async function loadData() {
                 stateHandlerContainer.id = "mdv_state_handler";
                 document.body.appendChild(stateHandlerContainer);
             }
-            stateHandlerRoot = createMdvPortal(ProjectStateHandlerWrapper({root, data, staticFolder, permission}), stateHandlerContainer);
+            stateHandlerRoot = createMdvPortal(createElement(ProjectStateHandlerWrapper, {root, data, staticFolder, permission}), stateHandlerContainer);
         }
         if (type === "view_loaded") {
             changeURLParam("view", cm.viewManager.current_view);

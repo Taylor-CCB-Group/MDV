@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import { type PropsWithChildren, StrictMode, useMemo } from "react";
+import { type PropsWithChildren, type ReactElement, StrictMode, useMemo } from "react";
 import { ProjectProvider } from "@/modules/ProjectContext";
 import { observer } from "mobx-react-lite";
 import type BaseChart from "@/charts/BaseChart";
@@ -92,7 +92,7 @@ const queryClient = new QueryClient({
  * If not provided, the default is document.body.
  * @returns the root element that was created
  */
-const createMdvPortal = (component: JSX.Element, container: HTMLElement, parent?: BaseChart<any> | BaseDialog) => {
+const createMdvPortal = (component: ReactElement, container: HTMLElement, parent?: BaseChart<any> | BaseDialog) => {
     const root = createRoot(container);
     root.render(
         <StrictMode>
