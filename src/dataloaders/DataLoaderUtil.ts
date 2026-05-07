@@ -4,6 +4,7 @@ import {
 } from "./DataLoaders";
 import type { DataSource, DataColumn, DataType, LoadedDataColumn } from "@/charts/charts";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
+import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import { decompressData } from "./DataLoaders";
@@ -27,7 +28,7 @@ export async function fetchJsonConfig(url: string, root: string, createErrorComp
             document.body.style.display = "flex";
             document.body.style.justifyContent = "center";
             document.body.style.alignItems = "center";
-            createMdvPortal(ErrorComponentReactWrapper({ error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
+            createMdvPortal(createElement(ErrorComponentReactWrapper, { error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
         }
         console.error(`Error fetching ${url}: ${error}`);
         throw error;
