@@ -6,6 +6,7 @@ for serving project data, images, configurations, and handling file operations
 with support for HTTP range requests and security headers.
 """
 import json
+import requests
 import os
 import sys
 import zlib
@@ -157,6 +158,40 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
         except Exception:
             success = False
         return jsonify({"success": success})
+
+    @app.route("/ucsc_proxy")
+    def ucsc_image():
+        """
+        Get a static image from UCSC Genome Browser.
+        Returns a PNG image of the browser view.
+        """
+        try:
+            params = request.args.to_dict()
+            
+            # Use hgRenderTracks for image generation
+            base_url = "https://genome.ucsc.edu/cgi-bin/hgRenderTracks"
+            ucsc_url = f"{base_url}?{urlencode(params)}"
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (compatible; MDV-Proxy/1.0)',
+            }
+            
+            response = requests.get(ucsc_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            # Return the image
+            image_response = make_response(response.content)
+            image_response.headers['Content-Type'] = 'image/png'
+            image_response.headers['Cache-Control'] = 'public, max-age=3600'
+            print(f"Fetched UCSC image from: {ucsc_url}")
+            return image_response
+            
+        except requests.exceptions.RequestException as e:
+            return f"Error fetching image from UCSC: {str(e)}", 502
+        except Exception as e:
+            return f"Image fetch error: {str(e)}", 500
+        
+    return app
     
     return app
 

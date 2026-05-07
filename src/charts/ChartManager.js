@@ -53,6 +53,8 @@ import "./CustomBoxPlot";
 import "./SingleSeriesChart";
 import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
+import "./SVCircosPlot/SVCircosPlot"
+import "./UCSCBrowser/UCSCBrowser";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
