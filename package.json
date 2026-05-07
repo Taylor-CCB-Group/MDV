@@ -89,7 +89,7 @@
     "@visx/scale": "3.12.0",
     "@visx/visx": "^3.12.0",
     "@zip.js/zip.js": "^2.8.23",
-    "axios": "^1.10.0",
+    "axios": "^1.16.0",
     "canvas-to-svg": "^1.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
