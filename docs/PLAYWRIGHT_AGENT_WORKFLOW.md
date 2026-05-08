@@ -9,26 +9,51 @@ repository root so that config is loaded.
 List tests:
 
 ```bash
-pnpm run playwright-test -- --list
+pnpm run playwright-test --list
 ```
 
 Run browser-only catalog tests against a local Vite server:
 
 ```bash
 pnpm run dev -- --host 127.0.0.1 --port 5173
-TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test -- tests_playwright/catalog/ --project=chromium --reporter=list
+TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test tests_playwright/catalog/ --project=chromium --reporter=list
 ```
 
 Run project tests against a backend that can create projects and process
 uploads:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test -- tests_playwright/project/ --project=chromium --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test tests_playwright/project/ --project=chromium --reporter=list
 ```
 
 The pnpm scripts call the local Playwright install. In restricted agent sessions,
 avoid plain `pnpm exec playwright` for test execution because it may try the npm
 registry even when dependencies are installed.
+
+## React Compiler Smoke Check (PR C)
+
+Use this when validating React Compiler rollout safety without enabling it
+globally. Keep `VITE_USE_REACT_COMPILER` opt-in and compare off/on runs against
+the same project URL.
+
+```bash
+# compiler off
+VITE_USE_REACT_COMPILER=0 pnpm run build-flask-vite
+node scripts/playwright_compiler_probe.mjs http://127.0.0.1:5055/project/191
+
+# compiler on
+VITE_USE_REACT_COMPILER=1 pnpm run build-flask-vite
+node scripts/playwright_compiler_probe.mjs http://127.0.0.1:5055/project/191
+```
+
+Compare probe output for:
+
+- `issues` (console warnings/errors, page errors)
+- `chartManagerReadyMs`, `firstChartsMs`, and `chartsSettledMs`
+- `summary` payload parity (`chartTypes`, `chartCount`, `rowCount`)
+
+If payload composition differs between runs, treat the timing comparison as
+smoke-only and not a strict performance benchmark.
 
 ## Sandboxed Agent Notes
 

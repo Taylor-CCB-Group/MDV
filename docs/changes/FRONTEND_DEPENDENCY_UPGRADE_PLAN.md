@@ -66,7 +66,33 @@ This document tracks dependency upgrade work that may be split across multiple P
     - `@visx/*` latest remains `3.12.0` and currently declares peers up to React 18, so package-manager peer warnings are expected on React 19 even though build/test checks pass.
     - Additional React 19 peer-range warnings are also present for `mobx-react-lite`, `@react-spring/*` (via visx), `use-sync-external-store`, and `@welldone-software/why-did-you-render`.
 
-### PR C: Viv/deck/luma alignment after new Viv release
+### PR C: React performance track (optional, follow-up)
+
+- Scope:
+  - evaluate React Compiler compatibility and rollout strategy (single focused tooling PR)
+  - profile React rendering hot paths in chart-heavy screens
+  - capture win/loss metrics before broad enablement
+- Current intent (May 2026):
+  - Keep runtime/app changes outside this track; those were already cherry-picked and do not require a separate PR in this worktree.
+  - Keep React Compiler gated behind `VITE_USE_REACT_COMPILER` so default builds remain unaffected.
+  - Merge compiler/tooling changes only after local off/on validation looks clean; otherwise keep compiler opt-in.
+- Initial React Compiler enablement notes:
+  - `@vitejs/plugin-react` v6 exposes React Compiler through `reactCompilerPreset()` and `@rolldown/plugin-babel`.
+  - The compiler preset is currently filtered to `.tsx` files. The default preset filter also caught vanilla chart modules with decorators, which made the compiler Babel pass fail while parsing decorated chart classes.
+  - Direct Vite production build validation passes with the `.tsx` filter:
+    `pnpm exec cross-env NODE_OPTIONS="--max-old-space-size=4096" build=dev_pt vite build --outDir ./vite-dist`
+  - `pnpm run vite-build` is still blocked earlier by the known React 19 TypeScript cleanup backlog, not by React Compiler configuration.
+  - First runtime gotcha found: vanilla code (e.g. `ChartManager.js`, `static_index.ts`, `DataLoaderUtil.ts`) calling TSX wrapper components as plain functions (`MenuBarWrapper()`, `ErrorComponentReactWrapper({...})`, `ProjectStateHandlerWrapper({...})`) triggers `Invalid hook call` because the compiler injects `useMemoCache` into compiled functions. Fix is to render via `React.createElement(Comp, props)` (or JSX) so the function runs inside React's render pipeline. Other similar invocations should be audited as part of broader rollout.
+- Local smoke-test direction:
+  - Use the catalog Playwright tests against a Vite dev server for React shell and route-mocked catalog workflows.
+  - Use the project Playwright tests against a live backend for chart-manager, datastore, vanilla-event, MobX, and Zustand interaction coverage.
+  - `docs/PLAYWRIGHT_AGENT_WORKFLOW.md` documents the current commands; add a named PR C smoke subset there if this track becomes a regular local validation step.
+- Latest local validation note (8th May 2026):
+  - Off/on probe runs against `scripts/playwright_compiler_probe.mjs` completed in both modes without hard runtime failures.
+  - Timing and payload composition varied between runs (different chart/data composition observed), so current measurements are treated as smoke validation, not a strict performance benchmark.
+
+
+### PR D: Viv/deck/luma alignment after new Viv release
 
 - Scope:
   - update `@hms-dbmi/viv` to the new published version
@@ -78,31 +104,7 @@ This document tracks dependency upgrade work that may be split across multiple P
   - adjust variable Viv channels integration
   - validate no duplicate luma versions at runtime
 
-### PR D: React performance track (optional, follow-up)
 
-- Scope:
-  - profile React rendering hot paths in chart-heavy screens
-  - evaluate React Compiler compatibility and rollout strategy
-  - capture win/loss metrics before broad enablement
-
-### PR E: Vite 8 readiness and rollout
-
-- Context:
-  - The earlier `RefreshRuntime is not defined` issue was caused by a version mismatch (`vite@8` with `@vitejs/plugin-react@5.x`, whose peer range only supports Vite 4-7).
-  - Updating to `@vitejs/plugin-react@6.x` resolves the Vite 8 compatibility gap.
-  - There is also prior memory of `vitest` compatibility issues around decorator-heavy codepaths (for example `src/links/link_utils.ts`), which should be treated as a first-class migration risk.
-- Goal:
-  - Keep Vite 8 if dev and test behavior remain stable, and capture potential build-time/tooling improvements.
-- Scope:
-  - validate `@vitejs/plugin-react` + `vite` + `vitest` version matrix for Vite 8
-  - reproduce and fix decorator-related test/runtime incompatibilities
-  - re-run dev server + HMR smoke tests for dialog/chart-heavy paths
-  - compare build times (`pnpm run vite-build`) between the last Vite 7 baseline and Vite 8.x
-- Exit criteria:
-  - no React refresh runtime errors in dev
-  - `vitest` suite passes without decorator regressions
-  - no new `pnpm audit` findings introduced
-  - measured build-time improvement or a clear justification to defer
 
 ## Validation checklist for each dependency PR
 
