@@ -67,3 +67,59 @@ For front-end development, a vite dev-server can be started with `pnpm run dev` 
 ### Alternative steps for running locally
 
 If you prefer to manage tools differently - for a lighter-weight environment, non VSCode-based editors, or integration into other workflows etc, this is also possible. Further documentation can be found on the [MDV documentation website](https://mdv.ndm.ox.ac.uk/)
+
+## Deployment Scripts (Local Docker)
+
+The repository includes three deployment entrypoints:
+
+- `deploy.sh`
+- `deploy.bat`
+- `deploy_gui.sh`
+
+All three support:
+
+- database backend selection (`sqlite` default, `postgres` optional)
+- deployment mode (`new` or `replace`)
+- deployment name (Compose project name)
+- custom app host port
+- automatic suggested host port (next free from `5055`)
+
+### Backend behavior
+
+- **sqlite (default)**:
+  - runs `mdv_app` without `mdv_db`
+  - uses `SQLITE_DB_PATH` (default `/app/mdv/mdv.sqlite3`)
+- **postgres**:
+  - runs `mdv_app` + `mdv_db`
+  - postgres container is pinned to `mdv-db` for easier reuse detection across deployments
+  - uses `DB_USER`, `DB_PASSWORD`, `DB_HOST`
+  - uses a shared database name `mdv` by default
+  - sets `DB_SCHEMA` to the deployment name by default
+  - can also run in **reuse** mode (app only), where `mdv_db` is not started and `DB_HOST` points to an existing Postgres instance
+  - deploy scripts auto-detect running Postgres containers and default to `reuse` mode when found
+
+At startup, application logs will include the selected backend (for example `Database backend selected: sqlite (...)`).
+
+### Running multiple deployments side-by-side
+
+To keep multiple instances without replacing an existing one, use:
+
+- mode: `new`
+- a unique deployment name (for example `mdv_a`, `mdv_b`)
+- different host ports (for example `5055`, `5056`)
+
+Each deployment writes its own env file (`.env.<deployment_name>`) and runs under its own Compose project name.
+
+### Local image vs Docker Hub image
+
+Deploy scripts now prefer a local `mdvadmin/mdv:stable` image if it already exists, and skip pulling `mdv_app` in that case.
+
+If no local image is available, scripts pull from Docker Hub as before.
+
+To test local code changes:
+
+```sh
+docker compose -f docker-local.yml build mdv_app
+```
+
+Then run your deploy script and choose backend/settings as needed.
