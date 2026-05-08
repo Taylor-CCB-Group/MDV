@@ -46,7 +46,7 @@ export async function loadProjectRuntime(
     setProjectRoot(root);
 
     const [datasources, config, views] = await Promise.all([
-        fetchJsonConfig(`${root}/datasources.json`, root, false) as Promise<DataSource[]>,
+        fetchJsonConfig<DataSource[]>(`${root}/datasources.json`, root, false),
         fetchJsonConfig(`${root}/state.json`, root, false),
         fetchJsonConfig(`${root}/views.json`, root, false),
     ]);
@@ -67,7 +67,7 @@ export async function loadProjectRuntime(
         views,
         dataLoader,
         permission,
-        staticFolder,
+        staticFolder: isStatic,
         root,
         dir,
     };

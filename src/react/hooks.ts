@@ -91,7 +91,8 @@ export function useConfig<T>() {
 }
 export function useChartManager() {
     const chartManager = useChartManagerContext();
-    return chartManager ?? window.mdv.chartManager;
+    const globalChartManager = typeof window !== "undefined" ? window.mdv?.chartManager : undefined;
+    return (chartManager ?? globalChartManager ?? null) as any;
 }
 export function useViewManager() {
     return useChartManager().viewManager;
@@ -408,7 +409,7 @@ export function useChartScopeFilterPredicate() {
             .then(() => {
                 if (!cancelled) setLoadedFilterKey(filterKey);
             })
-            .catch((error) => {
+            .catch((error: unknown) => {
                 console.warn("failed to load chart-scope filter columns", error);
                 if (!cancelled) setLoadedFilterKey("");
             });

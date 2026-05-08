@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import "./wdyr";
 import "./all_css";
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, type TransitionEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { getProjectName } from "./ProjectContext";
 import { getProjectBootstrapContext, loadProjectRuntime, type LoadedProjectRuntime } from "./projectRuntime";
@@ -69,7 +69,7 @@ function LoadState({
     status: BootstrapStatus;
     detail: string;
     isClosing: boolean;
-    onTransitionEnd: () => void;
+    onTransitionEnd: (event: TransitionEvent<HTMLDivElement>) => void;
 }) {
     const appTheme = window.mdv?.chartManager?.theme;
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -199,7 +199,7 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
                         chartTypes,
                     };
 
-                    const listener = async (type: string, cm: ChartManager, data: any) => {
+                    const listener = (type: string, cm: ChartManager, data: any) => {
                         if (type === "state_saved") {
                             if (stateHandlerRoot) {
                                 stateHandlerRoot.unmount();
@@ -234,7 +234,7 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
                         runtime.datasources as DataSource[],
                         runtime.dataLoader,
                         runtime.config,
-                        listener as any,
+                        listener,
                     );
                     setInitialised(true);
                 },
@@ -269,7 +269,10 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
         };
     }, [isClosing, onComplete]);
 
-    const handleTransitionEnd = () => {
+    const handleTransitionEnd = (event: TransitionEvent<HTMLDivElement>) => {
+        if (event.target !== event.currentTarget || event.propertyName !== "opacity") {
+            return;
+        }
         if (isClosing && !completeCalledRef.current) {
             completeCalledRef.current = true;
             onComplete();
