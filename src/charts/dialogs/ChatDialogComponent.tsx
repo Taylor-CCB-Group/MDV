@@ -1,10 +1,12 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
 import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
-import RobotPandaSVG from './PandaSVG';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+// import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
 import { Box, Button, Divider, IconButton, InputAdornment, Skeleton, TextField } from '@mui/material';
 import _ from 'lodash';
@@ -12,66 +14,6 @@ import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
-
-type SyntaxHighlighterComponentType = (typeof import('react-syntax-highlighter'))['default'];
-type SyntaxHighlighterStyleType = (typeof import('react-syntax-highlighter/dist/esm/styles/hljs'))['dracula'];
-
-let syntaxHighlighterLoader: Promise<{
-    SyntaxHighlighter: SyntaxHighlighterComponentType;
-    style: SyntaxHighlighterStyleType;
-}> | null = null;
-
-function loadSyntaxHighlighter() {
-    if (!syntaxHighlighterLoader) {
-        // TODO: follow-up: tree-shake syntax-highlighter languages to keep this chunk minimal.
-        syntaxHighlighterLoader = Promise.all([
-            import('react-syntax-highlighter'),
-            import('react-syntax-highlighter/dist/esm/styles/hljs'),
-        ]).then(([highlighterModule, stylesModule]) => ({
-            SyntaxHighlighter: highlighterModule.default,
-            style: stylesModule.dracula,
-        }));
-    }
-    return syntaxHighlighterLoader;
-}
-
-const LazySyntaxHighlighter = ({
-    language,
-    children,
-    ...props
-}: {
-    language?: string;
-    children: string;
-    [key: string]: unknown;
-}) => {
-    const [loaded, setLoaded] = useState<{
-        SyntaxHighlighter: SyntaxHighlighterComponentType;
-        style: SyntaxHighlighterStyleType;
-    } | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-        void loadSyntaxHighlighter().then((module) => {
-            if (!cancelled) {
-                setLoaded(module);
-            }
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    if (!loaded) {
-        return <pre className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto">{children}</pre>;
-    }
-
-    const { SyntaxHighlighter, style } = loaded;
-    return (
-        <SyntaxHighlighter language={language} style={style} {...props}>
-            {children}
-        </SyntaxHighlighter>
-    );
-};
 
 
 export type MessageType = {
@@ -278,9 +220,9 @@ const PythonCode = ({ code }: { code: string }) => {
         <div className="p-4 bg-gray-200 dark:bg-gray-800 w-fit mb-4 rounded-lg">
             <SquareTerminal />
             {/* <pre className="text-sm font-mono text-gray-800 dark:text-gray-200">{code}</pre> */}
-            <LazySyntaxHighlighter language="python">
+            <SyntaxHighlighter language="python" style={dracula}>
                 {code}
-            </LazySyntaxHighlighter>
+            </SyntaxHighlighter>
         </div>
     );
 }
@@ -302,10 +244,13 @@ const MessageMarkdown = ({ text }: { text: string }) => {
                     return match ? (
                         <>
                         <SquareTerminal onClick={() => alert(children)} /> {match[1]}:
-                        <LazySyntaxHighlighter
+                        <SyntaxHighlighter
                             className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto"
                             // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-syntax-highlighter, not our code
                             children={String(children).replace(/\n$/, '')}
+                            // TODO: follow-up: tree-shake syntax-highlighter languages to keep this chunk minimal.
+                            //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
+                            style={dracula}
                             language={match[1]}
                             PreTag="div"
                             {...props}
