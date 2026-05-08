@@ -11,10 +11,6 @@ import type ChartManager from "@/charts/ChartManager";
 type CreateMdvPortalFn = typeof import("@/react/react_utils").createMdvPortal;
 type ProjectStateHandlerWrapperType = typeof import("@/react/ProjectStateHandler").default;
 
-if (import.meta.env.DEV) {
-    void import("../react/HmrHack");
-}
-
 declare global {
     interface Window {
         mdv: {
@@ -40,11 +36,12 @@ function loadBootstrapDeps(): Promise<BootstrapDeps> {
         bootstrapDepsPromise = Promise.all([
             import("../charts/ChartManager.js"),
             import("../charts/BaseChart"),
+            import("../react/HmrHack"),
             import("./desktop_index"),
             import("@/react/react_utils"),
             import("@/react/ProjectStateHandler"),
         ]).then(
-            ([chartManagerModule, baseChartModule, desktopIndexModule, reactUtilsModule, projectStateModule]) => ({
+            ([chartManagerModule, baseChartModule, _hmrHackModule, desktopIndexModule, reactUtilsModule, projectStateModule]) => ({
                 ChartManager: chartManagerModule.default,
                 chartTypes: baseChartModule.default.types,
                 changeURLParam: desktopIndexModule.changeURLParam,
