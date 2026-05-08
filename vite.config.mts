@@ -29,6 +29,9 @@ reactCompiler.rolldown.filter ??= {};
 // this doesn't like decorators it seems, for now if we only point it at tsx files then it doesn't have a problem
 // (as far as we've noticed)
 reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
+const useReactCompiler =
+    process.env.VITE_USE_REACT_COMPILER === "1" ||
+    process.env.VITE_USE_REACT_COMPILER === "true";
 
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
@@ -197,9 +200,13 @@ export default defineConfig(async (): Promise<UserConfig> => {
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
         }),
-        rolldownBabel({
-            presets: [reactCompiler],
-        }),
+        ...(useReactCompiler
+            ? [
+                rolldownBabel({
+                    presets: [reactCompiler],
+                }),
+            ]
+            : []),
     ],
     worker: {
         format: (process.env.worker_format || 'iife') as 'es' | 'iife',

@@ -69,9 +69,13 @@ This document tracks dependency upgrade work that may be split across multiple P
 ### PR C: React performance track (optional, follow-up)
 
 - Scope:
-  - evaluate React Compiler compatibility and rollout strategy
+  - evaluate React Compiler compatibility and rollout strategy (single focused tooling PR)
   - profile React rendering hot paths in chart-heavy screens
   - capture win/loss metrics before broad enablement
+- Current intent (May 2026):
+  - Keep runtime/app changes outside this track; those were already cherry-picked and do not require a separate PR in this worktree.
+  - Keep React Compiler gated behind `VITE_USE_REACT_COMPILER` so default builds remain unaffected.
+  - Merge compiler/tooling changes only after local off/on validation looks clean; otherwise keep compiler opt-in.
 - Initial React Compiler enablement notes:
   - `@vitejs/plugin-react` v6 exposes React Compiler through `reactCompilerPreset()` and `@rolldown/plugin-babel`.
   - The compiler preset is currently filtered to `.tsx` files. The default preset filter also caught vanilla chart modules with decorators, which made the compiler Babel pass fail while parsing decorated chart classes.
@@ -83,6 +87,9 @@ This document tracks dependency upgrade work that may be split across multiple P
   - Use the catalog Playwright tests against a Vite dev server for React shell and route-mocked catalog workflows.
   - Use the project Playwright tests against a live backend for chart-manager, datastore, vanilla-event, MobX, and Zustand interaction coverage.
   - `docs/PLAYWRIGHT_AGENT_WORKFLOW.md` documents the current commands; add a named PR C smoke subset there if this track becomes a regular local validation step.
+- Latest local validation note (8th May 2026):
+  - Off/on probe runs against `scripts/playwright_compiler_probe.mjs` completed in both modes without hard runtime failures.
+  - Timing and payload composition varied between runs (different chart/data composition observed), so current measurements are treated as smoke validation, not a strict performance benchmark.
 
 
 ### PR D: Viv/deck/luma alignment after new Viv release
