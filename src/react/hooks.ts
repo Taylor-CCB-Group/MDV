@@ -21,6 +21,7 @@ import {
     type FilterArrayLike,
     type RowScopePredicate,
 } from "@/lib/filterOwnership";
+import { useChartManagerContext } from "./chartManagerContext";
 
 /** Region constraint for `filterPoly` — restricts the polygon filter to rows in a specific region. */
 export type FilterPolyRegionOpts = { regionField: string; regionValue: string };
@@ -89,7 +90,8 @@ export function useConfig<T>() {
     return config as T & BaseConfig; //todo: strict/inferred typing
 }
 export function useChartManager() {
-    return window.mdv.chartManager;
+    const chartManager = useChartManagerContext();
+    return chartManager ?? window.mdv.chartManager;
 }
 export function useViewManager() {
     return useChartManager().viewManager;
@@ -212,6 +214,7 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
  */
 export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
     const chart = useChart();
+    const chartManager = useChartManager();
     // consider different loading strategies, lazy vs eager column data
     //todo generic type with corresponding check when loaded
     const [columns, setColumns] = useState<DataColumn<any>[]>([]);
@@ -227,18 +230,17 @@ export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
                 setColumns([]);
                 return;
             }
-            const cm = window.mdv.chartManager;
             // if this is less efficient than it could be with already loaded columns,
             // we could fix it upstream - although there'll always be some async...
             // but then that's generally the case with setState etc
             // console.log("loading columns", fieldNames);
-            cm.loadColumnSet(fieldNames, chart.dataStore.name, () => {
+            chartManager.loadColumnSet(fieldNames, chart.dataStore.name, () => {
                 const { columnIndex } = chart.dataStore;
                 const columns = fieldNames.map((f) => columnIndex[f]).filter(notEmpty);
                 setColumns(columns);
             });
         });
-    }, [specs, chart.dataStore]);
+    }, [specs, chart.dataStore, chartManager]);
     return columns;
 }
 export function useFieldSpec(spec?: FieldSpec) {
@@ -252,6 +254,7 @@ export function useFieldSpec(spec?: FieldSpec) {
 /** version of {@link useParamColumns} that only returns columns once they've been loaded */
 export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
+    const chartManager = useChartManager();
     const { columnIndex } = chart.dataStore;
     const [columns, setColumns] = useState<LoadedDataColumn<DataType>[]>([]);
     // const columns = useMemo(() => {
@@ -259,21 +262,20 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
         return autorun(() => {
             const param = chart.config.param;
             if (!isArray(param)) throw "config.param should always be an array";
-            const cm = window.mdv.chartManager;
             const dsName = chart.dataStore.name;
             if (!param || param.length === 0) {
                 setColumns([]);
                 return;
             }
             const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
-            cm.loadColumnSet(renderedParam, dsName, () => {
+            chartManager.loadColumnSet(renderedParam, dsName, () => {
                 const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
                 if (!allColumnsLoaded(cols)) throw "bad column state";
                 setColumns(cols);
             });
             return;
         });
-    }, [chart.config.param, columnIndex, chart.dataStore]);
+    }, [chart.config.param, columnIndex, chart.dataStore, chartManager]);
     return columns;
 }
 
@@ -282,6 +284,7 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
  */
 export function useOrderedParamColumns<T extends { order?: Record<string, number> } = SelectionDialogConfig>(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
+    const chartManager = useChartManager();
     const { columnIndex } = chart.dataStore;
     const config = useConfig<T>();
     const [orderedParams, setOrderedParams] = useState<LoadedDataColumn<DataType>[]>([]);
@@ -290,14 +293,13 @@ export function useOrderedParamColumns<T extends { order?: Record<string, number
         const disposer = autorun(() => {
             const param = config.param;
             if (!isArray(param)) throw "config.param should always be an array";
-            const cm = window.mdv.chartManager;
             const dsName = chart.dataStore.name;
             if (!param || param.length === 0) {
                 setOrderedParams([]);
                 return;
             }
             const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
-            cm.loadColumnSet(renderedParam, dsName, () => {
+            chartManager.loadColumnSet(renderedParam, dsName, () => {
                 // Get the loaded columns
                 const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
                 if (!allColumnsLoaded(cols)) throw "bad column state";
@@ -322,7 +324,7 @@ export function useOrderedParamColumns<T extends { order?: Record<string, number
 
         // Cleanup the disposer
         return () => disposer();
-    }, [config.param, config.order, columnIndex, chart.dataStore]);
+    }, [config.param, config.order, columnIndex, chart.dataStore, chartManager]);
 
     return orderedParams;
 }
@@ -378,6 +380,7 @@ function useFilteredIndicesRefreshVersion() {
 
 export function useChartScopeFilterPredicate() {
     const dataStore = useDataStore();
+    const chartManager = useChartManager();
     const config = useConfig<ChartScopeConfig>();
     const activeFilters = getActiveChartScopeFilters(config);
     const filterKey = getChartScopeFilterKey(activeFilters);
@@ -391,7 +394,7 @@ export function useChartScopeFilterPredicate() {
 
         let cancelled = false;
         const filterColumns = activeFilters.map(({ column }) => column);
-        const columnPromise = window.mdv.chartManager?._getColumnsAsync(
+        const columnPromise = chartManager._getColumnsAsync(
             dataStore.name,
             filterColumns,
         );
@@ -413,7 +416,7 @@ export function useChartScopeFilterPredicate() {
         return () => {
             cancelled = true;
         };
-    }, [dataStore.name, filterKey]);
+    }, [chartManager, dataStore.name, filterKey]);
 
     const predicate = useMemo<RowScopePredicate | null>(() => {
         if (activeFilters.length === 0) {
@@ -603,7 +606,7 @@ export function useImgUrl(): string {
  * which will require more careful consideration (as of this writing it's mostly ChartManager._init() that mutates dataSources).
  */
 export function useDataSources() {
-    return window.mdv.chartManager?.dataSources;
+    return useChartManager().dataSources;
 }
 
 /**

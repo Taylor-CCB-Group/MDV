@@ -10,6 +10,8 @@ import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 import { createFilterOptions } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AUTOCOMPLETE_OPTIONS_LIMIT } from "@/lib/constants";
+import type ChartManager from "@/charts/ChartManager";
+import { ChartManagerProvider, useChartManagerContext } from "./chartManagerContext";
 
 // todo - think about whether this might lead to unexpected future issues
 
@@ -23,7 +25,8 @@ const filterOptions = createFilterOptions<any>({ limit: AUTOCOMPLETE_OPTIONS_LIM
 const MaterialWrapper = observer(function MaterialWrapper({
     children,
 }: PropsWithChildren) {
-    const prefersDarkMode = window.mdv?.chartManager?.theme === "dark";
+    const chartManager = useChartManagerContext();
+    const prefersDarkMode = chartManager?.theme === "dark";
     const container = useOuterContainer();
     const defaultProps = useMemo(() => ({ container }), [container]);
 
@@ -92,16 +95,26 @@ const queryClient = new QueryClient({
  * If not provided, the default is document.body.
  * @returns the root element that was created
  */
-const createMdvPortal = (component: ReactElement, container: HTMLElement, parent?: BaseChart<any> | BaseDialog) => {
+const createMdvPortal = (
+    component: ReactElement,
+    container: HTMLElement,
+    parent?: BaseChart<any> | BaseDialog,
+    chartManager?: ChartManager,
+) => {
+    const resolvedChartManager = chartManager ?? window.mdv?.chartManager;
     const root = createRoot(container);
     root.render(
         <StrictMode>
             <QueryClientProvider client={queryClient}>
-                <OuterContainerProvider parent={parent}>
-                    <MaterialWrapper>
-                        <ProjectProvider>{component}</ProjectProvider>
-                    </MaterialWrapper>
-                </OuterContainerProvider>
+                <ChartManagerProvider chartManager={resolvedChartManager}>
+                    <OuterContainerProvider parent={parent}>
+                        <MaterialWrapper>
+                            <ProjectProvider chartManager={resolvedChartManager}>
+                                {component}
+                            </ProjectProvider>
+                        </MaterialWrapper>
+                    </OuterContainerProvider>
+                </ChartManagerProvider>
             </QueryClientProvider>
         </StrictMode>,
     );

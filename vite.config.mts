@@ -72,7 +72,7 @@ function getRollupOptions() {
         // used for Flask...
         return {
             input: {
-                'mdv': 'src/modules/static_index.ts',
+                'mdv': 'src/modules/project_bootstrap.tsx',
                 'catalog': 'src/catalog/catalog_index.tsx',
                 'login': 'src/login/login_index.tsx',
             },
