@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import "./wdyr";
 import "./all_css";
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { getProjectName } from "./ProjectContext";
 import { getProjectBootstrapContext, loadProjectRuntime, type LoadedProjectRuntime } from "./projectRuntime";
@@ -75,6 +75,24 @@ function LoadState({
     isClosing: boolean;
     onTransitionEnd: () => void;
 }) {
+    const appTheme = window.mdv?.chartManager?.theme;
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = appTheme ? appTheme === "dark" : prefersDark;
+    const colors = isDark
+        ? {
+              bg: "rgba(15, 23, 42, 0.94)",
+              panel: "rgba(30, 41, 59, 0.86)",
+              text: "#e2e8f0",
+              subtext: "#94a3b8",
+              accent: "#60a5fa",
+          }
+        : {
+              bg: "rgba(248, 250, 252, 0.96)",
+              panel: "rgba(255, 255, 255, 0.9)",
+              text: "#0f172a",
+              subtext: "#475569",
+              accent: "#2563eb",
+          };
     const progressText =
         status.kind === "loading"
             ? "Fetching datasources, state, and views."
@@ -92,26 +110,79 @@ function LoadState({
                 padding: "24px",
                 fontFamily: "sans-serif",
                 textAlign: "center",
-                background: "rgba(248, 250, 252, 0.96)",
+                background: colors.bg,
                 transition: "opacity 220ms ease",
                 opacity: isClosing ? 0 : 1,
                 pointerEvents: isClosing ? "none" : "auto",
                 zIndex: 4000,
             }}
         >
-            <div>
+            <style>{`
+                @keyframes mdvBootstrapSpin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                @keyframes mdvBootstrapShimmer {
+                    0% { transform: translateX(-120%); }
+                    100% { transform: translateX(320%); }
+                }
+            `}</style>
+            <div
+                style={{
+                    minWidth: "320px",
+                    maxWidth: "520px",
+                    padding: "22px 24px",
+                    borderRadius: "12px",
+                    background: colors.panel,
+                    border: isDark ? "1px solid rgba(148,163,184,0.24)" : "1px solid rgba(15,23,42,0.1)",
+                    boxShadow: isDark
+                        ? "0 10px 30px rgba(2,6,23,0.35)"
+                        : "0 10px 30px rgba(15,23,42,0.12)",
+                }}
+            >
                 {status.kind === "error" ? (
                     <>
-                        <h2>Error loading project</h2>
-                        <p>{detail}</p>
+                        <h2 style={{ color: colors.text, margin: "0 0 10px" }}>Error loading project</h2>
+                        <p style={{ color: colors.subtext, margin: "0 0 12px" }}>{detail}</p>
                         <button type="button" onClick={() => window.location.reload()}>
                             Retry
                         </button>
                     </>
                 ) : (
                     <>
-                        <h2>Loading project...</h2>
-                        <p>{progressText}</p>
+                        <div
+                            style={{
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "50%",
+                                border: `2px solid ${isDark ? "rgba(148,163,184,0.35)" : "rgba(148,163,184,0.45)"}`,
+                                borderTopColor: colors.accent,
+                                animation: "mdvBootstrapSpin 0.9s linear infinite",
+                                margin: "0 auto 12px",
+                            }}
+                        />
+                        <h2 style={{ color: colors.text, margin: "0 0 8px" }}>Loading project...</h2>
+                        <p style={{ color: colors.subtext, margin: "0 0 10px" }}>{progressText}</p>
+                        <div
+                            style={{
+                                position: "relative",
+                                height: "6px",
+                                borderRadius: "999px",
+                                overflow: "hidden",
+                                background: isDark ? "rgba(51,65,85,0.7)" : "rgba(203,213,225,0.8)",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    width: "40%",
+                                    borderRadius: "999px",
+                                    background: colors.accent,
+                                    animation: "mdvBootstrapShimmer 1.2s ease-in-out infinite",
+                                }}
+                            />
+                        </div>
                     </>
                 )}
             </div>
@@ -125,6 +196,7 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
     const [initialised, setInitialised] = useState(false);
     const [initialViewLoaded, setInitialViewLoaded] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
+    const completeCalledRef = useRef(false);
     const detail = useMemo(() => {
         if (status.kind !== "error") return "";
         if (status.error instanceof Error) return status.error.message;
@@ -237,8 +309,22 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
         }
     }, [status, initialised, initialViewLoaded]);
 
+    useEffect(() => {
+        if (!isClosing) return;
+        const timeout = window.setTimeout(() => {
+            if (!completeCalledRef.current) {
+                completeCalledRef.current = true;
+                onComplete();
+            }
+        }, 320);
+        return () => {
+            window.clearTimeout(timeout);
+        };
+    }, [isClosing, onComplete]);
+
     const handleTransitionEnd = () => {
-        if (isClosing) {
+        if (isClosing && !completeCalledRef.current) {
+            completeCalledRef.current = true;
             onComplete();
         }
     };
