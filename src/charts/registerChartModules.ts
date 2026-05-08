@@ -1,0 +1,41 @@
+// Core chart registrations (side-effect imports).
+import "./HistogramChart.js";
+import "./RowChart.js";
+import "./TableChart.js";
+import "./WGL3DScatterPlot.js";
+import "./WGLScatterPlot.js";
+import "./RingChart.js";
+import "../react/components/TextBoxChartReactWrapper";
+import "./HeatMap.js";
+import "./ViolinPlot.js";
+import "./BoxPlot.js";
+import "./SankeyChart.js";
+import "./MultiLineChart.js";
+import "./DensityScatterPlot";
+import "./StackedRowChart";
+import "./TreeDiagram";
+import "./CellNetworkChart";
+import "./FlexibleNetworkChart";
+import "./SingleHeatMap";
+import "./VivScatterPlot";
+import "./DotPlot";
+import "./ImageTableChart";
+import "./CellRadialChart";
+import "./RowSummaryBox";
+import "./VivScatterPlot";
+import "./ImageTableChart";
+import "./ImageScatterChart";
+import "./CustomBoxPlot";
+import "./SingleSeriesChart";
+import "./GenomeBrowser";
+import "./DeepToolsHeatMap";
+
+// React-driven chart/dialog registrations.
+import "../react/components/VivMDVReact";
+import "../react/components/DeckScatterReactWrapper";
+import "../react/components/SplatterPlotReactWrapper";
+import "../charts/dialogs/AnnotationDialogReact";
+import "../react/components/HighlightedFeatureChart";
+import "../react/components/GeneNetworkChart";
+import "../react/components/SelectionDialogReact";
+import "../react/components/TableChartReactWrapper";

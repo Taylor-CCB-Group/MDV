@@ -36,12 +36,11 @@ function loadBootstrapDeps(): Promise<BootstrapDeps> {
         bootstrapDepsPromise = Promise.all([
             import("../charts/ChartManager.js"),
             import("../charts/BaseChart"),
-            import("../react/HmrHack"),
             import("./desktop_index"),
             import("@/react/react_utils"),
             import("@/react/ProjectStateHandler"),
         ]).then(
-            ([chartManagerModule, baseChartModule, _hmrHackModule, desktopIndexModule, reactUtilsModule, projectStateModule]) => ({
+            ([chartManagerModule, baseChartModule, desktopIndexModule, reactUtilsModule, projectStateModule]) => ({
                 ChartManager: chartManagerModule.default,
                 chartTypes: baseChartModule.default.types,
                 changeURLParam: desktopIndexModule.changeURLParam,

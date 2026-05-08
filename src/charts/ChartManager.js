@@ -17,42 +17,12 @@ import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
 import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
-// this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
+// this is added as a side-effect of importing registerChartModules,
+// then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
 
-//default charts
-import "./HistogramChart.js";
-import "./RowChart.js";
-import "./TableChart.js";
-import "./WGL3DScatterPlot.js";
-import "./WGLScatterPlot.js";
-import "./RingChart.js";
-import "../react/components/TextBoxChartReactWrapper";
-import "./HeatMap.js";
-import "./ViolinPlot.js";
-import "./BoxPlot.js";
-import "./SankeyChart.js";
-import "./MultiLineChart.js";
-import "./DensityScatterPlot";
-// import "./SelectionDialog.js"; //now replaced with SelectionDialogReact (currently imported as a side-effect of import HmrHack)
-import "./StackedRowChart";
-import "./TreeDiagram";
-import "./CellNetworkChart";
-import "./FlexibleNetworkChart";
-import "./SingleHeatMap";
-import "./VivScatterPlot";
-import "./DotPlot";
-import "./ImageTableChart";
-import "./CellRadialChart";
-import "./RowSummaryBox";
-import "./VivScatterPlot";
-import "./ImageTableChart";
-import "./ImageScatterChart";
-// import "./WordCloudChart"; //todo: this only works in vite build, not webpack
-import "./CustomBoxPlot";
-import "./SingleSeriesChart";
-import "./GenomeBrowser";
-import "./DeepToolsHeatMap";
+// Chart and dialog type registrations via side-effect imports.
+import "./registerChartModules";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
