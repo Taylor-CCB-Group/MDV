@@ -38,4 +38,3 @@ import "../charts/dialogs/AnnotationDialogReact";
 import "../react/components/HighlightedFeatureChart";
 import "../react/components/GeneNetworkChart";
 import "../react/components/SelectionDialogReact";
-import "../react/components/TableChartReactWrapper";

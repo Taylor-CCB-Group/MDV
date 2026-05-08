@@ -26,7 +26,7 @@ import "./registerChartModules";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action, makeAutoObservable } from "mobx";
+import { makeObservable, observable, action } from "mobx";
 import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
@@ -37,6 +37,7 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1756,6 +1757,9 @@ export class ChartManager {
      * a chart has been loaded
      */
     async addChart(dataSource, config, notify = false) {
+        if (!BaseChart.types[config.type]) {
+            await ensureLazyChartTypeRegistered(config.type);
+        }
         if (!BaseChart.types[config.type]) {
             this.createInfoAlert(
                 `Tried to add unknown chart type '${config.type}'`,
