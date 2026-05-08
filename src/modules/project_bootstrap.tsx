@@ -78,110 +78,61 @@ function LoadState({
     const appTheme = window.mdv?.chartManager?.theme;
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const isDark = appTheme ? appTheme === "dark" : prefersDark;
-    const colors = isDark
-        ? {
-              bg: "rgba(15, 23, 42, 0.94)",
-              panel: "rgba(30, 41, 59, 0.86)",
-              text: "#e2e8f0",
-              subtext: "#94a3b8",
-              accent: "#60a5fa",
-          }
-        : {
-              bg: "rgba(248, 250, 252, 0.96)",
-              panel: "rgba(255, 255, 255, 0.9)",
-              text: "#0f172a",
-              subtext: "#475569",
-              accent: "#2563eb",
-          };
     const progressText =
         status.kind === "loading"
             ? "Fetching datasources, state, and views."
             : "Preparing chart runtime and rendering initial view.";
+    const overlayClassName = [
+        "fixed inset-0 z-[4000] flex items-center justify-center p-6 text-center transition-opacity duration-200",
+        isDark ? "bg-slate-900/95" : "bg-slate-50/95",
+        isClosing ? "opacity-0 pointer-events-none" : "opacity-100",
+    ].join(" ");
+    const panelClassName = [
+        "w-full max-w-[520px] rounded-xl border px-6 py-5 shadow-2xl",
+        isDark ? "border-slate-400/25 bg-slate-800/85 text-slate-200" : "border-slate-900/10 bg-white/90 text-slate-900",
+    ].join(" ");
+    const bodyTextClassName = isDark ? "mb-3 text-slate-400" : "mb-3 text-slate-600";
+    const trackClassName = [
+        "relative h-1.5 overflow-hidden rounded-full",
+        isDark ? "bg-slate-700/80" : "bg-slate-300/80",
+    ].join(" ");
+    const indicatorClassName = [
+        "absolute left-0 top-0 h-full w-2/5 rounded-full animate-pulse",
+        isDark ? "bg-blue-400" : "bg-blue-600",
+    ].join(" ");
+    const spinnerClassName = [
+        "mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-slate-400/40",
+        isDark ? "border-t-blue-400" : "border-t-blue-600",
+    ].join(" ");
+    const titleClassName = "mb-2 text-[20px] font-semibold leading-6 tracking-[-0.01em]";
+    const progressClassName = `${bodyTextClassName} min-h-[24px] text-[14px] leading-6`;
 
     return (
         <div
             onTransitionEnd={onTransitionEnd}
-            style={{
-                position: "fixed",
-                inset: 0,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                padding: "24px",
-                fontFamily: "sans-serif",
-                textAlign: "center",
-                background: colors.bg,
-                transition: "opacity 220ms ease",
-                opacity: isClosing ? 0 : 1,
-                pointerEvents: isClosing ? "none" : "auto",
-                zIndex: 4000,
-            }}
+            className={overlayClassName}
+            style={{ fontFamily: "Roboto, 'Helvetica Neue', Arial, sans-serif" }}
         >
-            <style>{`
-                @keyframes mdvBootstrapSpin {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
-                }
-                @keyframes mdvBootstrapShimmer {
-                    0% { transform: translateX(-120%); }
-                    100% { transform: translateX(320%); }
-                }
-            `}</style>
-            <div
-                style={{
-                    minWidth: "320px",
-                    maxWidth: "520px",
-                    padding: "22px 24px",
-                    borderRadius: "12px",
-                    background: colors.panel,
-                    border: isDark ? "1px solid rgba(148,163,184,0.24)" : "1px solid rgba(15,23,42,0.1)",
-                    boxShadow: isDark
-                        ? "0 10px 30px rgba(2,6,23,0.35)"
-                        : "0 10px 30px rgba(15,23,42,0.12)",
-                }}
-            >
+            <div className={panelClassName}>
                 {status.kind === "error" ? (
                     <>
-                        <h2 style={{ color: colors.text, margin: "0 0 10px" }}>Error loading project</h2>
-                        <p style={{ color: colors.subtext, margin: "0 0 12px" }}>{detail}</p>
-                        <button type="button" onClick={() => window.location.reload()}>
+                        <h2 className={titleClassName}>Error loading project</h2>
+                        <p className={progressClassName}>{detail}</p>
+                        <button
+                            type="button"
+                            onClick={() => window.location.reload()}
+                            className="rounded-md border border-slate-400/50 px-3 py-1.5 text-sm font-medium hover:bg-slate-500/15"
+                        >
                             Retry
                         </button>
                     </>
                 ) : (
                     <>
-                        <div
-                            style={{
-                                width: "24px",
-                                height: "24px",
-                                borderRadius: "50%",
-                                border: `2px solid ${isDark ? "rgba(148,163,184,0.35)" : "rgba(148,163,184,0.45)"}`,
-                                borderTopColor: colors.accent,
-                                animation: "mdvBootstrapSpin 0.9s linear infinite",
-                                margin: "0 auto 12px",
-                            }}
-                        />
-                        <h2 style={{ color: colors.text, margin: "0 0 8px" }}>Loading project...</h2>
-                        <p style={{ color: colors.subtext, margin: "0 0 10px" }}>{progressText}</p>
-                        <div
-                            style={{
-                                position: "relative",
-                                height: "6px",
-                                borderRadius: "999px",
-                                overflow: "hidden",
-                                background: isDark ? "rgba(51,65,85,0.7)" : "rgba(203,213,225,0.8)",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    position: "absolute",
-                                    inset: 0,
-                                    width: "40%",
-                                    borderRadius: "999px",
-                                    background: colors.accent,
-                                    animation: "mdvBootstrapShimmer 1.2s ease-in-out infinite",
-                                }}
-                            />
+                        <div className={spinnerClassName} />
+                        <h2 className={titleClassName}>Loading project...</h2>
+                        <p className={progressClassName}>{progressText}</p>
+                        <div className={trackClassName}>
+                            <div className={indicatorClassName} />
                         </div>
                     </>
                 )}
