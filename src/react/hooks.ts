@@ -92,7 +92,11 @@ export function useConfig<T>() {
 export function useChartManager() {
     const chartManager = useChartManagerContext();
     const globalChartManager = typeof window !== "undefined" ? window.mdv?.chartManager : undefined;
-    return (chartManager ?? globalChartManager ?? null) as any;
+    const resolvedChartManager = chartManager ?? globalChartManager;
+    if (!resolvedChartManager) {
+        throw new Error("ChartManager is not available yet.");
+    }
+    return resolvedChartManager;
 }
 export function useViewManager() {
     return useChartManager().viewManager;
