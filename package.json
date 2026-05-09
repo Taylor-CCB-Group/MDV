@@ -39,7 +39,9 @@
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
     "test": "vitest",
+    "playwright-preflight-project": "node scripts/playwright_project_preflight.mjs",
     "playwright-test": "node node_modules/@playwright/test/cli.js test",
+    "playwright-test-project": "node scripts/playwright_project_runner.mjs",
     "playwright-test-ui": "node node_modules/@playwright/test/cli.js test --ui"
   },
   "repository": {

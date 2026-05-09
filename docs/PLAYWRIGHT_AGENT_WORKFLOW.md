@@ -4,12 +4,22 @@ This repository's Playwright tests live in `tests_playwright/` and are
 configured by the root `playwright.config.ts`. Run Playwright commands from the
 repository root so that config is loaded.
 
+For phase-one stabilization scope and suite status tracking, use
+`docs/PLAYWRIGHT_STABILIZATION_GUIDE.md` as the primary living reference.
+
 ## Commands
 
 List tests:
 
 ```bash
 pnpm run playwright-test --list
+```
+
+Project-test preflight:
+
+```bash
+pnpm run playwright-preflight-project
+pnpm run playwright-preflight-project --diagnostic
 ```
 
 Run browser-only catalog tests against a local Vite server:
@@ -23,12 +33,17 @@ Run project tests against a backend that can create projects and process
 uploads:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test tests_playwright/project/ --project=chromium --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project tests_playwright/project/chart_creation.spec.ts --reporter=list
 ```
 
 The pnpm scripts call the local Playwright install. In restricted agent sessions,
 avoid plain `pnpm exec playwright` for test execution because it may try the npm
 registry even when dependencies are installed.
+
+`playwright-test-project` runs light preflight first, then defaults to
+`tests_playwright/project/`, `--project=chromium`, and `--workers=1` unless you
+override them.
 
 ## React Compiler Smoke Check (PR C)
 
@@ -68,26 +83,47 @@ Use the smallest meaningful check first. Catalog tests mock the project API in
 the browser with `page.route`; project tests create or upload real projects and
 need a live backend.
 
+Agents should validate the prepared repo `venv` and backend first. Do not try
+to install or repair Python dependencies during a normal Playwright run.
+
 ## Agentic Project Testing
 
 For project-view features, prefer the shared helper in
-`tests_playwright/utils/tempProject.ts` instead of checking in ad hoc project
+`tests_playwright/utils/projectFixtures` instead of checking in ad hoc project
 fixtures.
 
 Recommended pattern:
 
-1. generate a temporary mock MDV project with the Python test factory;
-2. import it through the backend;
+1. generate a temporary project with the canonical `projectFixtures` adapter;
+2. register it with the backend if needed;
 3. run the Playwright flow against the real project page;
-4. delete the backend project and remove local temp files in teardown.
+4. delete both the backend project row and generated files in teardown.
 
-The helper already follows that pattern and falls back to a temporary inline CSV
-seed only when the local Python environment cannot generate a mock MDV archive.
-That fallback is there to keep agent runs moving in imperfect local setups; the
-preferred path is still the generated mock project.
+Phase-one fixture hierarchy:
 
-Use browser-only route mocks for `catalog/` work. Use the temp-project helper
-for `project/` work that depends on datasource state, chart manager state, save
+- `syntheticAnndata.ts` is the default backend-backed project fixture
+- `syntheticSpatial.ts` is for spatial-specific behavior
+- `importZip.ts` is for import-flow coverage only
+
+Preflight for project tests (recommended before any debugging):
+
+```bash
+pnpm run playwright-preflight-project
+pnpm run playwright-preflight-project --diagnostic
+```
+
+If Poetry cannot recreate `python/.venv` with `Permission denied` on macOS,
+check for ACL deny-delete entries and clear them:
+
+```bash
+ls -le python/.venv
+chmod -N python/.venv
+cd python
+poetry install --with dev
+```
+
+Use browser-only route mocks for `catalog/` work. Use `projectFixtures` for
+`project/` work that depends on datasource state, chart manager state, save
 behaviour, or reload persistence.
 
 ## Human Setup

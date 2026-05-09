@@ -3,7 +3,7 @@ import {
     createTemporaryProject,
     type TemporaryProjectHandle,
     waitForProjectReady,
-} from "../utils/tempProject";
+} from "../utils/projectFixtures";
 
 const GENERATED_MOCK_PROJECT = {
     nCells: 8,
@@ -351,7 +351,7 @@ test.describe("Soft Delete", () => {
         context = await browser.newContext();
         page = await context.newPage();
         projectHandle = await createTemporaryProject(page, {
-            allowCsvFallback: true,
+            allowCsvFallback: false,
             mockConfig: GENERATED_MOCK_PROJECT,
             projectName: "Soft Delete Fixture",
         });

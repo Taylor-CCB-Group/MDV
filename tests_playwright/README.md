@@ -1,6 +1,8 @@
 # Playwright Tests
 
 Run Playwright from the repository root so it uses `playwright.config.ts`.
+For the current phase-one stabilization model and suite status table, see
+`docs/PLAYWRIGHT_STABILIZATION_GUIDE.md`.
 
 ## Quick Start
 
@@ -8,7 +10,7 @@ Run Playwright from the repository root so it uses `playwright.config.ts`.
 pnpm install
 pnpm exec playwright install --with-deps
 docker compose -f docker-secrets.yml up -d
-pnpm run playwright-test
+pnpm run playwright-test-project
 ```
 
 The default target is the devcontainer app on `http://localhost:5055`. Override
@@ -18,7 +20,7 @@ For local Vite-only catalog tests:
 
 ```bash
 pnpm run dev -- --host 127.0.0.1 --port 5173
-TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test -- tests_playwright/catalog/catalog_view.spec.ts --project=chromium --reporter=list
+TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test tests_playwright/catalog/catalog_view.spec.ts --project=chromium --reporter=list
 ```
 
 The pnpm scripts call the local Playwright dependency directly. Prefer them over
@@ -28,10 +30,11 @@ environments.
 ## Common Commands
 
 ```bash
-pnpm run playwright-test -- --list
-pnpm run playwright-test -- tests_playwright/catalog/
-pnpm run playwright-test -- tests_playwright/project/
-pnpm run playwright-test -- --headed
+pnpm run playwright-test --list
+pnpm run playwright-preflight-project
+pnpm run playwright-test-project
+pnpm run playwright-test tests_playwright/catalog/
+pnpm run playwright-test --headed
 pnpm run playwright-test-ui
 ```
 
@@ -45,13 +48,28 @@ pnpm run playwright-test-ui
 Project tests cover chart creation and view-management flows. They require a
 backend that can create projects and process uploads.
 
-For agent-driven project tests, prefer the shared helper in
-`tests_playwright/utils/tempProject.ts`. It creates a temporary project for the
-test, imports it through the backend, and cleans it up afterward. The preferred
-path uses the Python mock-project generator; if that environment is not
-available locally, the helper can fall back to a temporary inline CSV seed so
-tests can still exercise the real project page without checked-in one-off test
-fixtures.
+Three setup flows live under **`tests_playwright/utils/projectFixtures/`** (import
+from `projectFixtures` or from `importZip.ts` / `syntheticAnndata.ts` /
+`syntheticSpatial.ts` directly). `tests_playwright/utils/tempProject.ts` re-exports
+the barrel for older imports.
+
+- **`syntheticAnndata.ts`** — **default backend-backed project fixture**.
+  **`createTemporaryProjectViaSyntheticAnndata`**:
+  runs `python -m mdvtools.tests.generate_synthetic_anndata_project`, then
+  `GET /rescan_projects` and `/projects` id diff. Cleanup removes the generated
+  folder under `~/mdv`.
+- **`syntheticSpatial.ts`** — **spatial-specific backend-backed fixture**.
+  **`createTemporaryProjectViaSyntheticSpatial`**:
+  runs `python -m mdvtools.tests.generate_synthetic_spatial_project`, then the
+  same rescan/id-diff flow. Matches `docs/SYNTHETIC_SPATIALDATA_PROJECTS.md`.
+- **`importZip.ts`** — **import-flow fixture only**. **`createTemporaryProject`**:
+  mock `.mdv.zip` via Python `create_test_project_zip`, then `POST /import_project`
+  (optional CSV fallback). Issues `PUT /projects/<id>/access` for DB editable mode
+  only; disk `state.json` is **not** rewritten by that route.
+
+Cleanup is enabled by default. Playwright-created backend projects delete both
+the backend project row and generated files unless the operator explicitly sets
+`PLAYWRIGHT_KEEP_PROJECTS=1`.
 
 ## Generated Data
 
@@ -73,8 +91,28 @@ projects, see `docs/SYNTHETIC_SPATIALDATA_PROJECTS.md`.
 docker compose -f docker-secrets.yml ps mdv_app
 docker compose -f docker-secrets.yml logs mdv_app
 curl http://localhost:5055
-pnpm run playwright-test -- --reporter=list
+pnpm run playwright-test --reporter=list
 ```
+
+For backend-backed project tests, run this preflight first:
+
+```bash
+pnpm run playwright-preflight-project
+pnpm run playwright-preflight-project --diagnostic
+```
+
+If Poetry reports `.venv` is broken with `Permission denied` on macOS, check for
+an ACL deny-delete entry and clear it:
+
+```bash
+ls -le python/.venv
+chmod -N python/.venv
+cd python
+poetry install --with dev
+```
+
+`chmod -N` here only updates local filesystem ACL metadata. It is not git-tracked
+and does not change application code.
 
 To reset the local Docker database:
 
