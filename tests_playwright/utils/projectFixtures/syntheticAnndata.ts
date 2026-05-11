@@ -2,7 +2,7 @@
  * `generate_synthetic_anndata_project.py` → folder under `~/mdv` → `/rescan_projects` → `/projects` id diff.
  */
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Browser, type Page } from "@playwright/test";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -56,6 +56,10 @@ export type SyntheticAnndataTemporaryProjectHandle = {
     projectUrl: string;
     projectPath: string;
     sourceUsed: "synthetic-anndata-filesystem-rescan";
+};
+
+export type SharedSyntheticAnndataSuiteHandle = SyntheticAnndataTemporaryProjectHandle & {
+    openProjectPage: (page: Page) => Promise<void>;
 };
 
 /** @deprecated Use {@link SyntheticAnndataTemporaryProjectHandle}. */
@@ -201,6 +205,42 @@ export async function createTemporaryProjectViaSyntheticAnndata(
         if (cleanupError) {
             throw cleanupError;
         }
+        throw error;
+    }
+}
+
+export async function createSharedSyntheticAnndataSuite(
+    browser: Browser,
+    options: SyntheticAnndataTemporaryProjectOptions = {},
+): Promise<SharedSyntheticAnndataSuiteHandle> {
+    const bootstrapPage = await browser.newPage();
+    let projectHandle: SyntheticAnndataTemporaryProjectHandle | undefined;
+
+    try {
+        projectHandle = await createTemporaryProjectViaSyntheticAnndata(bootstrapPage, options);
+        const handle = projectHandle;
+
+        return {
+            ...handle,
+            cleanup: async () => {
+                let cleanupError: unknown;
+                try {
+                    await handle.cleanup();
+                } catch (error) {
+                    cleanupError = error;
+                }
+                await bootstrapPage.close();
+                if (cleanupError) {
+                    throw cleanupError;
+                }
+            },
+            openProjectPage: async (page: Page) => {
+                await page.goto(handle.projectUrl, { waitUntil: "domcontentloaded" });
+                await waitForProjectReady(page);
+            },
+        };
+    } catch (error) {
+        await bootstrapPage.close().catch(() => {});
         throw error;
     }
 }

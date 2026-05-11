@@ -1,5 +1,8 @@
 import test, { expect } from "@playwright/test";
-import { createTemporaryProjectViaSyntheticAnndata } from "../utils/projectFixtures";
+import {
+    createSharedSyntheticAnndataSuite,
+    type SharedSyntheticAnndataSuiteHandle,
+} from "../utils/projectFixtures";
 import {
     addChartViaUi,
     getChartSummaries,
@@ -29,42 +32,53 @@ const CHART_CASES: ChartCreationCase[] = [
 ];
 
 test.describe("Chart Creation", () => {
+    test.describe.configure({ mode: "serial" });
     test.setTimeout(180_000);
 
+    let sharedProjectHandle: SharedSyntheticAnndataSuiteHandle | undefined;
+
+    test.beforeAll(async ({ browser }) => {
+        sharedProjectHandle = await createSharedSyntheticAnndataSuite(browser, {
+            nameSegment: `chart-creation--shared--synth-anndata--${Date.now()}`,
+            synthetic: {
+                profile: "minimal",
+                nCells: 200,
+                nGenes: 12,
+                force: true,
+            },
+        });
+        expect(sharedProjectHandle.sourceUsed).toBe("synthetic-anndata-filesystem-rescan");
+    });
+
+    test.afterAll(async () => {
+        await sharedProjectHandle?.cleanup();
+    });
+
     for (const chartCase of CHART_CASES) {
-        test(`creates ${chartCase.chartName} in an isolated synthetic AnnData project`, async ({ page }) => {
-            const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
-                nameSegment: `chart-creation--synth-anndata--${Date.now()}`,
-                synthetic: {
-                    profile: "minimal",
-                    nCells: 200,
-                    nGenes: 12,
-                    force: true,
-                },
-            });
-
-            try {
-                expect(projectHandle.sourceUsed).toBe("synthetic-anndata-filesystem-rescan");
-
-                const title = `${chartCase.chartName} ${Date.now()}`;
-                const chartsBefore = await getChartSummaries(page);
-
-                await addChartViaUi(page, chartCase.chartName, title);
-                await waitForViewUnsavedState(page, true);
-                await waitForChartByTitle(page, title);
-
-                const chartsAfter = await getChartSummaries(page);
-                const createdChart = chartsAfter.find(
-                    (chart) =>
-                        chart.title === title &&
-                        chartCase.expectedTypes.includes(chart.type) &&
-                        !chartsBefore.some((before) => before.id === chart.id),
-                );
-
-                expect(createdChart).toBeTruthy();
-            } finally {
-                await projectHandle.cleanup();
+        test(`creates ${chartCase.chartName} in a shared synthetic AnnData project`, async ({ page }) => {
+            expect(sharedProjectHandle).toBeTruthy();
+            if (!sharedProjectHandle) {
+                throw new Error("Shared synthetic AnnData project was not initialized.");
             }
+
+            await sharedProjectHandle.openProjectPage(page);
+
+            const title = `${chartCase.chartName} ${Date.now()}`;
+            const chartsBefore = await getChartSummaries(page);
+
+            await addChartViaUi(page, chartCase.chartName, title);
+            await waitForViewUnsavedState(page, true);
+            await waitForChartByTitle(page, title);
+
+            const chartsAfter = await getChartSummaries(page);
+            const createdChart = chartsAfter.find(
+                (chart) =>
+                    chart.title === title &&
+                    chartCase.expectedTypes.includes(chart.type) &&
+                    !chartsBefore.some((before) => before.id === chart.id),
+            );
+
+            expect(createdChart).toBeTruthy();
         });
     }
 });

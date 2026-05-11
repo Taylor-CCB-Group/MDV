@@ -41,7 +41,10 @@
     "test": "vitest",
     "playwright-preflight-project": "node scripts/playwright_project_preflight.mjs",
     "playwright-test": "node node_modules/@playwright/test/cli.js test",
+    "playwright-test-catalog": "node scripts/playwright_catalog_runner.mjs",
+    "playwright-test-catalog-dev": "node scripts/playwright_catalog_dev_runner.mjs",
     "playwright-test-project": "node scripts/playwright_project_runner.mjs",
+    "playwright-test-all": "node scripts/playwright_all_runner.mjs",
     "playwright-test-ui": "node node_modules/@playwright/test/cli.js test --ui"
   },
   "repository": {
