@@ -215,6 +215,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
         alias: {
             "@": path.resolve(configDir, "./src"),
         }
-    }
+    },
+    // Vite 7 crawls all **/*.html for dep pre-bundling. Python/Flask templates and
+    // public/index.html reference static/js/mdv.js (built output), which is not a
+    // resolvable package — limit scanning to real Vite entry HTML files.
+    optimizeDeps: {
+        entries: [
+            path.resolve(configDir, 'index.html'),
+            path.resolve(configDir, 'src/static.html'),
+            path.resolve(configDir, 'src/obvios.html'),
+            path.resolve(configDir, 'login_dev.html'),
+            path.resolve(configDir, 'catalog_dev.html'),
+        ],
+    },
     } as UserConfig;
 });

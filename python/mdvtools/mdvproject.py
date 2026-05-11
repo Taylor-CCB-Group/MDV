@@ -31,6 +31,7 @@ from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
@@ -172,14 +173,136 @@ class MDVProject:
         ds["columns"][col_index[0]][parameter] = value
         self.set_datasource_metadata(ds)
 
-    def get_datasource_as_dataframe(self, datasource: str) -> pandas.DataFrame:
+    def get_datasource_as_dataframe(
+        self, datasource: str, columns: Optional[List[str]] = None
+    ) -> pandas.DataFrame:
         ## nb, I'd quite like to have some 'DataSourceName' type alias so we know it's not just any string...
+        from mdvtools.llm.column_field_resolve import _WRAPPER_RE
+
         ds = self.get_datasource_metadata(datasource)
-        df = pandas.DataFrame()
-        for c in ds["columns"]:
-            data = self.get_column(datasource, c["field"])
-            df[c["field"]] = data
-        return df
+        fields = [c["field"] for c in ds["columns"]]
+        field_set = set(fields)
+
+        if columns is None:
+            out: dict[str, Any] = {}
+            for field in fields:
+                out[field] = self.get_column(datasource, field)
+            return pandas.DataFrame(out)
+
+        requested_keys: list[str] = []
+        for col in columns:
+            key = col.strip() if isinstance(col, str) else col
+            if not isinstance(key, str):
+                raise AttributeError(f"invalid column key: {col!r}")
+            requested_keys.append(key)
+
+        # Chart "wrapper" tokens (e.g. gs|GENE(gs)|0) are not metadata field ids; they address
+        # rows-as-columns matrix columns. Handle those alongside normal field ids.
+        out: dict[str, Any] = {}
+        n_rows = int(ds.get("size", 0))
+        if "size" not in ds and fields:
+            # Preserve old fallback behavior without eagerly reading all columns.
+            n_rows = len(self.get_column(datasource, fields[0]))
+        for key in requested_keys:
+            if _WRAPPER_RE.match(key):
+                out[key] = self._read_wrapper_expression_column(
+                    datasource, key, n_rows
+                )
+            elif key in field_set:
+                out[key] = self.get_column(datasource, key)
+            else:
+                raise AttributeError(
+                    f"column {key!r} not found in {datasource} datasource "
+                    f"(have metadata fields: {fields})"
+                )
+        return pandas.DataFrame(out)
+
+    def _resolve_rows_as_columns_subgroup(
+        self, row_datasource: str, subgroup_key: str
+    ) -> tuple[str, bool]:
+        """
+        Return (h5 matrix group name under the row datasource, is_sparse).
+        Tries exact subgroup key, then `{key}_expr`, then the sole subgroup if unambiguous.
+        """
+        lnks = self.get_links(row_datasource, "rows_as_columns") or []
+        candidates = [subgroup_key, f"{subgroup_key}_expr", f"{subgroup_key}_EXPR"]
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            for cand in candidates:
+                if cand in subgroups:
+                    info = subgroups[cand]
+                    name = str(info.get("name", cand))
+                    sparse = info.get("type") == "sparse"
+                    return name, sparse
+            if len(subgroups) == 1:
+                _k, info = next(iter(subgroups.items()))
+                name = str(info.get("name", _k))
+                sparse = info.get("type") == "sparse"
+                return name, sparse
+        avail: list[str] = []
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            avail.extend(list(subgroups.keys()))
+        raise AttributeError(
+            f"rows-as-columns subgroup {subgroup_key!r} not found on {row_datasource!r}. "
+            f"Available subgroup keys: {avail}"
+        )
+
+    def _read_subgroup_matrix_column(
+        self, grp: Any, col_index: int, sparse: bool, n_rows: int
+    ) -> numpy.ndarray:
+        """One matrix column (genes x cells): cells are rows, col_index selects a gene column."""
+        if not sparse:
+            rows_per_col = int(grp["length"][0])
+            n_cols = len(grp["x"]) // rows_per_col
+            if not (0 <= col_index < n_cols):
+                raise IndexError(
+                    f"col_index {col_index} out of range for dense subgroup matrix "
+                    f"(valid range: [0, {n_cols - 1}])"
+                )
+            offset = col_index * rows_per_col
+            return numpy.asarray(
+                grp["x"][offset : offset + rows_per_col], dtype=numpy.float32
+            )
+        p = grp["p"]
+        n_cols = len(p) - 1
+        if not (0 <= col_index < n_cols):
+            raise IndexError(
+                f"col_index {col_index} out of range for sparse subgroup matrix "
+                f"(valid range: [0, {n_cols - 1}])"
+            )
+        offset = p[col_index : col_index + 2]
+        start, end = int(offset[0]), int(offset[1])
+        _indexes = numpy.array(grp["i"][start:end], dtype=numpy.int64)
+        _values = numpy.array(grp["x"][start:end], dtype=numpy.float32)
+        dense = numpy.zeros(n_rows, dtype=numpy.float32)
+        if _indexes.size:
+            dense[_indexes] = _values
+        return dense
+
+    def _read_wrapper_expression_column(
+        self, row_datasource: str, wrapper: str, n_rows: int
+    ) -> list[float]:
+        from mdvtools.llm.column_field_resolve import _WRAPPER_RE
+
+        m = _WRAPPER_RE.match(wrapper.strip())
+        if not m:
+            raise AttributeError(f"invalid expression wrapper: {wrapper!r}")
+        subgroup_key = m.group(1).strip()
+        col_index = int(m.group(3))
+        group_name, sparse = self._resolve_rows_as_columns_subgroup(
+            row_datasource, subgroup_key
+        )
+        h5 = self._get_h5_handle(read_only=True)
+        try:
+            gr = h5[row_datasource]
+            if not isinstance(gr, h5py.Group):
+                raise AttributeError(f"datasource {row_datasource!r} is not an h5 group")
+            sgrp = gr[group_name]
+            arr = self._read_subgroup_matrix_column(sgrp, col_index, sparse, n_rows)
+            return [float(x) for x in arr]
+        finally:
+            h5.close()
 
     def check_columns_exist(self, datasource, columns):
         md = self.get_datasource_metadata(datasource)
@@ -593,20 +716,29 @@ class MDVProject:
         elif not read_only:
             mode = "a"
         try:
-            return h5py.File(self.h5file, mode)
-        except Exception:
+            handle = h5py.File(self.h5file, mode)
+            return handle
+        except Exception as e:
             # certain environments seem to have issues with the handle not being closed instantly
             # if there is a better way to do this, please change it
             # if there are multiple processes trying to access the file, this may also help
             # (although if they're trying to write, who knows what bad things may happen to the project in general)
             time.sleep(0.1)
             attempt += 1
-            logger.error(f"error opening h5 file, attempt {attempt}...")
+            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            if lock_error:
+                logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
+            else:
+                logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
+            if attempt >= 20:
+                raise RuntimeError(
+                    f"unable to open h5 file after {attempt} attempts: {self.h5file}"
+                ) from e
             return self._get_h5_handle(read_only, attempt)
 
     def get_column(self, datasource: str, column, raw=False):
         cm = self.get_column_metadata(datasource, column)
-        h5 = self._get_h5_handle()
+        h5 = self._get_h5_handle(read_only=True)
         gr = h5[datasource]
         if not isinstance(gr, h5py.Group):
             h5.close()
