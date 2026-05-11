@@ -5,7 +5,7 @@ import {
     getChartSummaries,
     waitForChartByTitle,
     waitForViewUnsavedState,
-} from "./helpers";
+} from "../utils/helpers";
 
 test.describe("Chart Creation Single", () => {
     test.setTimeout(180_000);

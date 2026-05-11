@@ -1,21 +1,23 @@
 import test, { expect } from "@playwright/test";
-import { createTemporaryProject, waitForProjectReady } from "../utils/projectFixtures";
 import {
-    createViewViaUi,
-    GENERATED_MOCK_PROJECT,
-    getAllViews,
-    getCurrentView,
-    selectViewViaUi,
-} from "./helpers";
+    createTemporaryProjectViaSyntheticAnndata,
+    waitForProjectReady,
+} from "../utils/projectFixtures";
+import {
+    createViewViaUi, getAllViews, getCurrentView, selectViewViaUi,
+} from "../utils/helpers";
 
 test.describe("View Management", () => {
     test.setTimeout(180_000);
 
-    test("loads the default view in a temp project", async ({ page }) => {
-        const projectHandle = await createTemporaryProject(page, {
-            allowCsvFallback: false,
-            mockConfig: GENERATED_MOCK_PROJECT,
-            projectName: "View Management Default Fixture",
+    test("loads the default view in a synthetic AnnData project", async ({ page }) => {
+        const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
+            synthetic: {
+                profile: "minimal",
+                nCells: 200,
+                nGenes: 12,
+                force: true,
+            },
         });
 
         try {
@@ -27,10 +29,13 @@ test.describe("View Management", () => {
     });
 
     test("creates a new view and switches between it and default", async ({ page }) => {
-        const projectHandle = await createTemporaryProject(page, {
-            allowCsvFallback: false,
-            mockConfig: GENERATED_MOCK_PROJECT,
-            projectName: "View Management Switch Fixture",
+        const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
+            synthetic: {
+                profile: "minimal",
+                nCells: 200,
+                nGenes: 12,
+                force: true,
+            },
         });
 
         try {
@@ -51,10 +56,13 @@ test.describe("View Management", () => {
     });
 
     test("deletes a created view and keeps the default view after reload", async ({ page }) => {
-        const projectHandle = await createTemporaryProject(page, {
-            allowCsvFallback: false,
-            mockConfig: GENERATED_MOCK_PROJECT,
-            projectName: "View Management Delete Fixture",
+        const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
+            synthetic: {
+                profile: "minimal",
+                nCells: 200,
+                nGenes: 12,
+                force: true,
+            },
         });
 
         try {
