@@ -3,7 +3,11 @@
 This file preserves the important background behind the current Playwright
 setup, fixture architecture, and migration path. It is not the day-to-day guide.
 
-For current setup and execution, use `docs/PLAYWRIGHT_GUIDE.md`.
+For current usage, use:
+
+- `docs/PLAYWRIGHT_SETUP_AND_RUN.md`
+- `docs/PLAYWRIGHT_ARCHITECTURE.md`
+- `docs/PLAYWRIGHT_WRITING_TESTS.md`
 
 ## Why The Current Architecture Exists
 
@@ -111,7 +115,7 @@ The main backend-backed project specs were moved toward the new fixture model:
 - `chart_creation.spec.ts`
 - `view_management.spec.ts`
 - `scatter_view_persistence.spec.ts`
-- `soft_delete.spec.ts`
+- `soft_delete_column.spec.ts`
 
 The direction of travel was:
 
@@ -137,7 +141,7 @@ reference for the current setup.
 - sandbox/browser/backend constraints
 - stale helper pitfalls
 
-Those practical lessons are now represented in `docs/PLAYWRIGHT_GUIDE.md`.
+Those practical lessons are now represented in the current Playwright docs.
 
 ## Historical Decisions Worth Remembering
 

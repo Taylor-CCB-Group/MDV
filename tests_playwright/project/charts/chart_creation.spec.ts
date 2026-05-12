@@ -2,13 +2,13 @@ import test, { expect } from "@playwright/test";
 import {
     createSharedSyntheticAnndataSuite,
     type SharedSyntheticAnndataSuiteHandle,
-} from "../utils/projectFixtures";
+} from "../../utils/projectFixtures";
 import {
     addChartViaUi,
     getChartSummaries,
     waitForChartByTitle,
     waitForViewUnsavedState,
-} from "../utils/helpers";
+} from "../../utils/helpers";
 
 type ChartCreationCase = {
     chartName: string;

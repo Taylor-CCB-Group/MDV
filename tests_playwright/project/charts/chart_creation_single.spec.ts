@@ -1,11 +1,11 @@
 import test, { expect } from "@playwright/test";
-import { createTemporaryProjectViaSyntheticAnndata } from "../utils/projectFixtures";
+import { createTemporaryProjectViaSyntheticAnndata } from "../../utils/projectFixtures";
 import {
     addChartViaUi,
     getChartSummaries,
     waitForChartByTitle,
     waitForViewUnsavedState,
-} from "../utils/helpers";
+} from "../../utils/helpers";
 
 test.describe("Chart Creation Single", () => {
     test.setTimeout(180_000);

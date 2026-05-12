@@ -3,7 +3,7 @@ import {
     createTemporaryProjectViaSyntheticAnndata,
     type TemporaryProjectHandle,
     waitForProjectReady,
-} from "../utils/projectFixtures";
+} from "../../utils/projectFixtures";
 
 type ProjectSetupInfo = {
     cloneSourceName: string;

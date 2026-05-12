@@ -2,10 +2,10 @@ import test, { expect } from "@playwright/test";
 import {
     createTemporaryProjectViaSyntheticAnndata,
     waitForProjectReady,
-} from "../utils/projectFixtures";
+} from "../../utils/projectFixtures";
 import {
     createViewViaUi, getAllViews, getCurrentView, selectViewViaUi,
-} from "../utils/helpers";
+} from "../../utils/helpers";
 
 test.describe("View Management", () => {
     test.setTimeout(180_000);
