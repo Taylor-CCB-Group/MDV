@@ -1966,6 +1966,28 @@ export class ChartManager {
         });
     }
 
+    /**
+     * Map a chart param token to a DataStore column `field` id.
+     * Field ids are canonical and stable; display names are mutable and are
+     * not used for runtime resolution.
+     * @param {object} dStore DataStore instance
+     * @param {string} token
+     * @returns {string}
+     */
+    _resolveToDataStoreFieldKey(dStore, token) {
+        if (typeof token !== "string") {
+            return token;
+        }
+        if (dStore.columnIndex[token]) {
+            return token;
+        }
+        const fieldMatch = dStore.columns.find((col) => col.field === token);
+        if (fieldMatch) {
+            return fieldMatch.field;
+        }
+        return token;
+    }
+
     async _getColumnsAsync(dataSource, columns) {
         // there could be links as well as column `fields` in columns.
         // let's make a mechanism for awaiting the link - and initial linked cols.
@@ -2057,8 +2079,10 @@ export class ChartManager {
                     return false;
                 }
             }
-            //only load if has no data
-            return !col.data;
+            if (!col.data) {
+                return true;
+            }
+            return false;
         });
 
         //No columns needed
@@ -2095,8 +2119,13 @@ export class ChartManager {
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols, dataSource, func) {
+        const dStore = this.dsIndex[dataSource].dataStore;
         for (const col of neededCols) {
-            if (this.columnsLoading[dataSource][col]) {
+            const key =
+                typeof col === "string"
+                    ? this._resolveToDataStoreFieldKey(dStore, col)
+                    : col;
+            if (this.columnsLoading[dataSource][key]) {
                 setTimeout(() => {
                     this._haveColumnsLoaded(neededCols, dataSource, func);
                 }, 500);
