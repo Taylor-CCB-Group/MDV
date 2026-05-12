@@ -363,6 +363,32 @@ class TestConversionWithEdgeCases:
             assert "X_umap_2" in columns
             assert columns["leiden"]["datatype"] in ["text", "text16"]
 
+    def test_cell_id_key_survives_concat_and_export(self):
+        """SpatialData instance_key values should be exported instead of synthetic concat indices.
+        
+        This is now a dumbed-down version of the test that just checks the cell_id case that we know was broken before.
+        We may in future have more things based on analysis of instance_key from get_table_keys in spatialdata.
+        """
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(5, 3)
+        xenium_ids = [f"aaaaaaa{i}-1" for i in range(5)]
+        adata.obs["cell_id"] = xenium_ids
+        adata.obs["region"] = "cell_circles"
+        adata.uns["spatialdata_attrs"] = {
+            "region": "cell_circles",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+
+        merged = _concat_spatial_tables([adata])
+
+        with temp_mdv_project() as test_dir:
+            with suppress_anndata_warnings():
+                mdv = convert_scanpy_to_mdv(test_dir, merged, delete_existing=True)
+
+            assert mdv.get_column("cells", "cell_id") == xenium_ids
+            assert mdv.get_column("cells", "mdv_cell_id") == list(merged.obs_names.astype(str))
+
 
 class TestConversionErrorHandling:
     """Test class for error handling during conversion."""
