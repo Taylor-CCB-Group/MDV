@@ -113,6 +113,7 @@ const proxy = [
     '/export_project',
     '/delete_project',
     '/extension_config',
+    "/ucsc_proxy",
     '/enable_auth',
     '/api_root',
     '/rescan_projects',

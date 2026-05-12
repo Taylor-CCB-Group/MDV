@@ -110,6 +110,40 @@ export function useChartSize() {
     return size;
 }
 
+//this method works in popout windows and has debouncing 
+// to avoid excessive updates when resizing is expensive
+export function useDebouncedChartSize(delay: number = 300) {
+    const chart = useChart();
+    const div = chart.contentDiv;
+    const [size, setSize] = useState([div.clientWidth, div.clientHeight]);
+    const timeoutRef = useRef<number | null>(null);
+    
+    useLayoutEffect(() => {
+        const win = chart.__doc__.defaultView;
+        if (!win) return;
+        const resize = () => {   
+            if (timeoutRef.current !== null) {
+                win.clearTimeout(timeoutRef.current);
+            }
+            timeoutRef.current = win.setTimeout(() => {
+                setSize([div.clientWidth, div.clientHeight]);
+                timeoutRef.current = null;
+            }, delay);
+        };
+        const observer = new ResizeObserver(resize);
+        observer.observe(div);
+        win.addEventListener('resize', resize);
+        return () => {
+            if (timeoutRef.current !== null) {
+                win.clearTimeout(timeoutRef.current);
+            }
+            observer.unobserve(div);
+            win.removeEventListener('resize', resize);
+        };
+    }, [div, chart.observable.container, delay]);
+    return size;
+}
+
 /**
  * Get the chart's ID.
  *

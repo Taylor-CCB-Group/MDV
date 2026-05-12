@@ -131,7 +131,9 @@ BaseChart.types["ucsc_browser"] = {
     class: UCSCBrowser,
     //params are defined by the genome's genomic_location columns
     params: [],
-    required:(ds)=>ds.genome?.genomic_location && ds.genome?.ucsc_proxy_url,
+    required:(ds)=>{
+        return (ds.genome?.genomic_location || ds.genome?.svs) ;
+    },
     extra_controls: (ds) => {
         return [
             {
@@ -143,8 +145,14 @@ BaseChart.types["ucsc_browser"] = {
     },
     init(config, ds, extraControls) {
         config.src = extraControls.url;
-        const cols = ds.genome?.genomic_location?.columns;
-        config.param = [cols["chr"], cols["start"], cols["end"]];
+        if (ds.genome?.genomic_location){
+            const cols = ds.genome?.genomic_location?.columns;
+            config.param = [cols["chr"], cols["start"], cols["end"]];
+        //svs start and end may be on different chromosome
+        } else if (ds.genome?.svs){
+            const cols = ds.genome?.svs?.sv_columns;
+            config.param = [cols["chr1"], cols["pos1"], cols["pos2"], cols["chr2"]];
+        }
     }
 };
 export {getLocation, UCSCBrowserConfig, UCSCBrowserLocation, UCSCBrowserViewMargins};

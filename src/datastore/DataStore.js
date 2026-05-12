@@ -166,6 +166,7 @@ class DataStore {
         this.images = config.images;
         this.genome_browser = config.genome_browser;
         this.tree_diagram = config.tree_diagram;
+        this.genome=config.genome;
 
         if (config.columns) {
             const originalColumns = config.columns;

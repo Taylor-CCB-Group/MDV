@@ -16,13 +16,31 @@ const UCSCBrowserComponent = observer(() => {
     const [coordInput, setCoordInput] = useState("");
     const fieldSpecs = useFieldSpecs(chart.config.param);
     const highlightedIndex = useHighlightedIndex();
+    const genome = chart.dataStore?.genome;
     const url_proxy = chart.dataStore?.genome?.genomic?.ucsc_proxy_url || "ucsc_proxy";
 
     function getHighlightedRegion(): UCSCBrowserLocation | null {
-        if (highlightedIndex == -1) return null;
-        const chr = fieldSpecs[0].getValue(highlightedIndex) as string;
-        const start = fieldSpecs[1].getValue(highlightedIndex) as number;
-        const end = fieldSpecs[2].getValue(highlightedIndex) as number;
+        if (highlightedIndex < 0 || fieldSpecs.length < 3) return null;
+        const chrSpec = fieldSpecs[0];
+        const startSpec = fieldSpecs[1];
+        const endSpec = fieldSpecs[2];
+        if (!chrSpec || !startSpec || !endSpec) return null;
+
+        const chr = chrSpec.getValue(highlightedIndex);
+        const start = startSpec.getValue(highlightedIndex);
+        const rawEnd = endSpec.getValue(highlightedIndex);
+        if (typeof chr !== "string" || typeof start !== "number" || typeof rawEnd !== "number") {
+            return null;
+        }
+
+        let end = rawEnd;
+        if (genome?.svs){
+            const chr2Spec = fieldSpecs[3];
+            const chr2 = chr2Spec?.getValue(highlightedIndex);
+            if (typeof chr2 !== "string" || chr !== chr2 || start - end > 30000){
+                end = start + 1000; // if on different chromosomes or very far apart, show a small region around the first position
+            }
+        }
         return { chr, start, end };
     }
 
@@ -94,9 +112,12 @@ const UCSCBrowserComponent = observer(() => {
                 }
             }
         }
+        // Keep render requests on the same UCSC host as the session URL.
+        url.searchParams.set("ucscHost", url.host);
+
         // Build the proxy URL with all params
         return `${url_proxy}?${url.searchParams.toString()}`;
-    }, [config.src,config.location, size[0],config.highlight_selected_region]);
+    }, [config.src, config.location, size, config.highlight_selected_region, highlightedIndex, fieldSpecs, genome?.svs, url_proxy]);
 
     // Set loading to true when src changes
     useEffect(() => {
@@ -104,12 +125,12 @@ const UCSCBrowserComponent = observer(() => {
     }, [src]);
     //update the location of the browser
     useEffect(() =>{
-        if (highlightedIndex !=-1){
+        if (highlightedIndex !== -1){
             const region = getHighlightedRegion();  
             if (!region) return;
             config.location = getLocation(region, config.view_margins!);    
         }
-    }, [config.view_margins,highlightedIndex]);
+    }, [config.view_margins, highlightedIndex, fieldSpecs, genome?.svs]);
 
     return (
         <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>

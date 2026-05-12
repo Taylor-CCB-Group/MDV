@@ -10,6 +10,7 @@ import requests
 import os
 import sys
 import zlib
+from urllib.parse import urlencode
 from flask import (
     Flask,
     render_template,
@@ -26,6 +27,12 @@ from mdvtools.server_utils import (
     get_range,
     add_safe_headers,
 )
+
+ALLOWED_UCSC_HOSTS = {
+    "genome.ucsc.edu",
+    "genome-euro.ucsc.edu",
+    "genome-asia.ucsc.edu",
+}
 
 def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     """
@@ -167,9 +174,12 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
         """
         try:
             params = request.args.to_dict()
-            
-            # Use hgRenderTracks for image generation
-            base_url = "https://genome.ucsc.edu/cgi-bin/hgRenderTracks"
+            ucsc_host = params.pop("ucscHost", "genome.ucsc.edu")
+            if ucsc_host not in ALLOWED_UCSC_HOSTS:
+                return f"Invalid UCSC host: {ucsc_host}", 400
+
+            # Use hgRenderTracks for image generation on the selected UCSC mirror.
+            base_url = f"https://{ucsc_host}/cgi-bin/hgRenderTracks"
             ucsc_url = f"{base_url}?{urlencode(params)}"
             
             headers = {
@@ -182,7 +192,7 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
             # Return the image
             image_response = make_response(response.content)
             image_response.headers['Content-Type'] = 'image/png'
-            image_response.headers['Cache-Control'] = 'public, max-age=3600'
+            #image_response.headers['Cache-Control'] = 'public, max-age=3600'
             print(f"Fetched UCSC image from: {ucsc_url}")
             return image_response
             
