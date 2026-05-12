@@ -4,6 +4,7 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { babel as rollupBabel } from '@rollup/plugin-babel';
 import rolldownBabel from '@rolldown/plugin-babel';
 import glsl from 'vite-plugin-glsl';
+import { visualizer } from 'rollup-plugin-visualizer';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -32,6 +33,9 @@ reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
 const useReactCompiler =
     process.env.VITE_USE_REACT_COMPILER === "1" ||
     process.env.VITE_USE_REACT_COMPILER === "true";
+const enableBundleAnalysis =
+    process.env.VITE_BUNDLE_ANALYZE === "1" ||
+    process.env.VITE_BUNDLE_ANALYZE === "true";
 
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
@@ -72,7 +76,7 @@ function getRollupOptions() {
         // used for Flask...
         return {
             input: {
-                'mdv': 'src/modules/static_index.ts',
+                'mdv': 'src/modules/project_bootstrap.tsx',
                 'catalog': 'src/catalog/catalog_index.tsx',
                 'login': 'src/login/login_index.tsx',
             },
@@ -204,6 +208,16 @@ export default defineConfig(async (): Promise<UserConfig> => {
             ? [
                 rolldownBabel({
                     presets: [reactCompiler],
+                }),
+            ]
+            : []),
+        ...(enableBundleAnalysis
+            ? [
+                visualizer({
+                    filename: process.env.VITE_BUNDLE_ANALYZE_OUTPUT || "dist/bundle-analysis.html",
+                    template: "treemap",
+                    gzipSize: true,
+                    brotliSize: true,
                 }),
             ]
             : []),

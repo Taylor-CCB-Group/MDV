@@ -13,7 +13,6 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import Chatbot from "./ChatDialogComponent";
 import type { ChatMessage, ChatProgress, ConversationMap } from "./ChatAPI";
 import {
     Close as CloseIcon,
@@ -21,10 +20,12 @@ import {
     Search as SearchIcon,
     ViewSidebar as ViewSidebarIcon,
 } from "@mui/icons-material";
-import { useMemo, useState, useRef, useCallback } from "react";
+import { lazy, Suspense, useMemo, useState, useRef } from "react";
 import IconWithTooltip from "@/react/components/IconWithTooltip";
 import { useResizeDrawer } from "@/react/hooks";
 import { Loader } from "@/react/components/ImportProjectDialog";
+
+const Chatbot = lazy(() => import("./ChatDialogComponent"));
 
 export type ChatDialogProps = {
     open: boolean;
@@ -245,18 +246,21 @@ const ChatDialog = ({
                         </>
                     )}
                     <Box sx={{ flexGrow: 1, overflow: "hidden", pb: 2 }}>
-                        {isLoadingInit ? 
-                            (<Loader />) : 
-                            (<Chatbot
-                                messages={messages}
-                                isSending={isSending}
-                                requestProgress={requestProgress}
-                                sendAPI={sendAPI}
-                                verboseProgress={verboseProgress}
-                                onClose={onClose}
-                                suggestedQuestions={suggestedQuestions}
-                            />)
-                            }
+                        {isLoadingInit ? (
+                            <Loader />
+                        ) : (
+                            <Suspense fallback={<Loader />}>
+                                <Chatbot
+                                    messages={messages}
+                                    isSending={isSending}
+                                    requestProgress={requestProgress}
+                                    sendAPI={sendAPI}
+                                    verboseProgress={verboseProgress}
+                                    onClose={onClose}
+                                    suggestedQuestions={suggestedQuestions}
+                                />
+                            </Suspense>
+                        )}
                     </Box>
                 </Box>
             </DialogContent>

@@ -6,7 +6,7 @@ import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import RobotPandaSVG from './PandaSVG';
+// import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
 import {
     Accordion,
@@ -363,6 +363,7 @@ const MessageMarkdown = ({ text }: { text: string }) => {
                             className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto"
                             // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-syntax-highlighter, not our code
                             children={String(children).replace(/\n$/, '')}
+                            // TODO: follow-up: tree-shake syntax-highlighter languages to keep this chunk minimal.
                             //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
                             style={dracula}
                             language={match[1]}

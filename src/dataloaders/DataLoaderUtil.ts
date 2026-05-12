@@ -13,7 +13,7 @@ let projectRoot = "";
 /**
  * This could potentially also have some more awareness of what type of json it is fetching, and e.g. do some zod validation
  */
-export async function fetchJsonConfig(url: string, root: string, createErrorComponent = false)  {
+export async function fetchJsonConfig<T = any>(url: string, root: string, createErrorComponent = false): Promise<T> {
     try {
         const resp = await fetch(url);
         const config = await resp.json();
@@ -21,7 +21,7 @@ export async function fetchJsonConfig(url: string, root: string, createErrorComp
             throw new Error(JSON.stringify(config, null, 2));
         }
         //rewriteBaseUrlRecursive(config, root); //removed.
-        return config;
+        return config as T;
     } catch (error: any) {
         if (createErrorComponent) {
             //todo less hacky CSS - also consider making the dialog open by default

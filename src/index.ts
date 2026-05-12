@@ -7,7 +7,7 @@ async function bootstrap() {
         return;
     }
 
-    await import("./modules/static_index");
+    await import("./modules/project_bootstrap");
 }
 
 void bootstrap();
