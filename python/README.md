@@ -211,7 +211,7 @@ To run all core tests including performance tests:
 poetry run pytest mdvtools/tests
 ```
 
-Auth and backend tests depend on optional Poetry groups that are not installed by `npm run python-setup`.
+Auth and backend tests depend on optional Poetry groups that are not installed by `pnpm run python-setup`.
 Install those groups first if you want to run the separated suites:
 
 ```bash

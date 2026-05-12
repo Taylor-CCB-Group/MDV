@@ -206,18 +206,31 @@ describe("DataModel bulk edit helpers", () => {
         expect(dataChanged).toHaveBeenCalledWith(["label"]);
     });
 
-    test("removes a column through the datastore", () => {
-        const removeColumn = vi.fn();
+    test("soft-deletes a column through the datastore", () => {
+        const softDeleteColumn = vi.fn();
         const dataStore = {
             size: 1,
             columnIndex: {},
-            removeColumn,
+            softDeleteColumn,
         } as any;
 
         const dataModel = new DataModel(dataStore, { autoupdate: false });
         dataModel.removeColumn("label");
 
-        expect(removeColumn).toHaveBeenCalledWith("label", true, true);
+        expect(softDeleteColumn).toHaveBeenCalledWith("label", true, true);
+    });
+
+    test("throws when softDeleteColumn is unavailable", () => {
+        const dataStore = {
+            size: 1,
+            columnIndex: {},
+        } as any;
+
+        const dataModel = new DataModel(dataStore, { autoupdate: false });
+
+        expect(() => dataModel.removeColumn("label")).toThrow(
+            "DataStore.softDeleteColumn is required for column deletion",
+        );
     });
 
     test("throws for invalid row indices during bulk fill", () => {

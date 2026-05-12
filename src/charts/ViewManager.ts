@@ -187,17 +187,21 @@ class ViewManager {
         const t = performance.now();
         try {
             const imageUrl = await this.createImageofView();
-            const state = this.cm.getState();
-            if (state.chartErrors.length > 0) {
+            const state: State = this.cm.getState();
+            if (!state) {
+                return;
+            }
+            const chartErrors = state.chartErrors ?? [];
+            if (chartErrors.length > 0) {
                 // handling the errors differently if errorHandler is supplied
                 if (errorHandler) {
                     const handled = errorHandler(state);
                     // handle it differently if required
                     if (!handled) {
-                        throw state.chartErrors;
+                        throw chartErrors;
                     }
                 } else {
-                    throw state.chartErrors;
+                    throw chartErrors;
                 }
             }
             state.view.viewImage = imageUrl;

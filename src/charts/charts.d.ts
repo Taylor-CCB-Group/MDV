@@ -88,6 +88,8 @@ export type DataColumn<T extends DataType> = {
     datatype: T;
     /** whether the column's data can be changed */
     editable?: boolean;
+    /** whether the column has been soft-deleted and removed from user-facing column lists */
+    deleted?: boolean;
     /**In the case of a double/integer (number) column, the array
      * buffer should be the appropriate size to contain float32s. For text it should be Uint8
      * and contain numbers corresponding to the indexes in the values parameter. For a column of

@@ -1,13 +1,13 @@
 
 ## Standalone Build Guide
 
-The standalone build (`npm run standalone`) exposes the `mdv` object (including `ChartManager` and `DataLoaders`) on the `window`. It is up to you, the developer, to create dataloaders and listeners as needed.
+The standalone build (`pnpm run build-standalone`) exposes the `mdv` object (including `ChartManager` and `DataLoaders`) on the `window`. It is up to you, the developer, to create dataloaders and listeners as needed.
 
 ### How to Use
 
 1. **Build**: Run the standalone build script:
-    ```
-    npm run build-standalone
+    ```bash
+    pnpm run build-standalone
     ```
 2. **Deploy**: Place the resulting `dist/mdv` folder into the `/static/` directory of your web application.
 3. **Include in HTML**: Add the following to your HTML page:
