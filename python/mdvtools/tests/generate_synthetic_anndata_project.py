@@ -204,6 +204,8 @@ def parse_args() -> argparse.Namespace:
     ):
         if value <= 0:
             parser.error(f"{flag} must be greater than zero")
+        if flag == "--sparse-density" and value > 1:
+            parser.error("--sparse-density must be between 0 and 1")
 
     return args
 

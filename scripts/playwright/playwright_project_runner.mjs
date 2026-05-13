@@ -5,13 +5,36 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../..");
 const args = process.argv.slice(2);
+const FLAGS_WITH_VALUES = new Set([
+    "--project",
+    "-p",
+    "--workers",
+    "-j",
+    "--grep",
+    "-g",
+    "--grep-invert",
+    "--reporter",
+    "--config",
+]);
 
 function hasFlag(prefix) {
     return args.some((arg, index) => arg === prefix || arg.startsWith(`${prefix}=`) || (arg === prefix && index < args.length - 1));
 }
 
 function hasPositionalArgs() {
-    return args.some((arg) => !arg.startsWith("-"));
+    for (let index = 0; index < args.length; index += 1) {
+        const arg = args[index];
+        if (arg === "--") {
+            return index < args.length - 1;
+        }
+        if (!arg.startsWith("-")) {
+            return true;
+        }
+        if (FLAGS_WITH_VALUES.has(arg)) {
+            index += 1;
+        }
+    }
+    return false;
 }
 
 async function run(command, commandArgs) {

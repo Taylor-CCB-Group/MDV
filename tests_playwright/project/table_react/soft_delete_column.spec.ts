@@ -1,7 +1,7 @@
 import test, { expect, type Page } from "@playwright/test";
 import {
     createTemporaryProjectViaSyntheticAnndata,
-    type TemporaryProjectHandle,
+    type SyntheticAnndataTemporaryProjectHandle,
     waitForProjectReady,
 } from "../../utils/projectFixtures";
 
@@ -332,7 +332,10 @@ async function injectSavedViewAnalysisFailure(page: Page, brokenViewName: string
     }, brokenViewName);
 }
 
-async function setupSoftDeleteFixture(page: Page) {
+async function setupSoftDeleteFixture(page: Page): Promise<{
+    projectHandle: SyntheticAnndataTemporaryProjectHandle;
+    setupInfo: ProjectSetupInfo;
+}> {
     const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
         synthetic: {
             profile: "minimal",
@@ -341,7 +344,13 @@ async function setupSoftDeleteFixture(page: Page) {
             force: true,
         },
     });
-    const setupInfo = await setupReactTableProject(page);
+    let setupInfo: ProjectSetupInfo;
+    try {
+        setupInfo = await setupReactTableProject(page);
+    } catch (error) {
+        await projectHandle.cleanup();
+        throw error;
+    }
     return { projectHandle, setupInfo };
 }
 

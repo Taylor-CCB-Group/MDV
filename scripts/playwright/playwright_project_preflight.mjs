@@ -10,7 +10,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../..");
 const TEST_BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5055";
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
-let pythonBin;
 
 function fail(message) {
     console.error(`[playwright project preflight] ${message}`);
@@ -53,11 +52,24 @@ async function ensureMdvRoot() {
 
 async function ensureBackendReachable() {
     let response;
+    const controller = new AbortController();
+    const timeoutMs = 5_000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        response = await fetch(TEST_BASE_URL, { method: "GET" });
+        response = await fetch(TEST_BASE_URL, {
+            method: "GET",
+            signal: controller.signal,
+        });
     } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+            fail(
+                `Backend check timed out after ${timeoutMs}ms at ${TEST_BASE_URL}. Verify TEST_BASE_URL points to a running backend.`,
+            );
+        }
         const message = error instanceof Error ? error.message : String(error);
         fail(`Backend is unreachable at ${TEST_BASE_URL}. ${message}`);
+    } finally {
+        clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
@@ -65,7 +77,7 @@ async function ensureBackendReachable() {
     }
 }
 
-async function runDiagnosticPythonImports() {
+async function runDiagnosticPythonImports(pythonBin) {
     const command = [
         "-c",
         [
@@ -94,12 +106,12 @@ async function runDiagnosticPythonImports() {
 }
 
 await ensurePlaywrightInstalled();
-pythonBin = await resolvePythonVenv();
+const pythonBin = await resolvePythonVenv();
 await ensureMdvRoot();
 await ensureBackendReachable();
 
 if (DIAGNOSTIC) {
-    await runDiagnosticPythonImports();
+    await runDiagnosticPythonImports(pythonBin);
 }
 
 console.log(
