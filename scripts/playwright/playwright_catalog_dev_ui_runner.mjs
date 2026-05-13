@@ -3,8 +3,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, "..");
+const REPO_ROOT = path.resolve(HERE, "../..");
 const args = process.argv.slice(2);
+const DEFAULT_DEV_CATALOG_SPECS = [
+    "tests_playwright/catalog/create_project.spec.ts",
+    "tests_playwright/catalog/import_project.spec.ts",
+];
+
+function hasPositionalArgs() {
+    return args.some((arg) => !arg.startsWith("-"));
+}
 
 async function run(command, commandArgs) {
     await new Promise((resolve, reject) => {
@@ -24,5 +32,9 @@ async function run(command, commandArgs) {
     });
 }
 
-await run("node", ["scripts/playwright_catalog_runner.mjs", ...args]);
-await run("node", ["scripts/playwright_project_runner.mjs", ...args]);
+const forwardedArgs = [...args];
+if (!hasPositionalArgs()) {
+    forwardedArgs.unshift(...DEFAULT_DEV_CATALOG_SPECS);
+}
+
+await run("node", ["scripts/playwright/run_playwright_cli.mjs", "test", ...forwardedArgs, "--project=chromium", "--ui"]);

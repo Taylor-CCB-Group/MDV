@@ -42,12 +42,6 @@ They do not install or repair Python dependencies during a test run.
 
 These are the supported commands.
 
-List tests with the low-level runner:
-
-```bash
-pnpm run playwright-test --list
-```
-
 Run the supported catalog pack:
 
 ```bash
@@ -59,6 +53,19 @@ Run the dev-only catalog pack:
 ```bash
 pnpm run dev -- --host 127.0.0.1 --port 5173
 TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test-catalog-dev --reporter=list
+```
+
+Open the supported catalog pack in UI mode:
+
+```bash
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-catalog-ui
+```
+
+Open the dev-only catalog pack in UI mode:
+
+```bash
+pnpm run dev -- --host 127.0.0.1 --port 5173
+TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test-catalog-dev-ui
 ```
 
 Run backend-backed project preflight:
@@ -74,10 +81,16 @@ Run the backend-backed project suite:
 TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project --reporter=list
 ```
 
+Open the backend-backed project suite in UI mode:
+
+```bash
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project-ui
+```
+
 Run one backend-backed project spec:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project tests_playwright/project/chart_creation.spec.ts --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project tests_playwright/project/charts/chart_creation.spec.ts --reporter=list
 ```
 
 Run the supported mixed suite:
@@ -86,33 +99,30 @@ Run the supported mixed suite:
 TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-all --reporter=list
 ```
 
-## Commands You Should Not Treat As Default
-
-`pnpm run playwright-test` is the low-level runner.
-
-It is useful for:
-
-- listing tests
-- targeted manual runs
-- debugging specific files
-
-It is not the recommended default for the mixed suite because it does not
-enforce the backend-backed worker policy. If you point it at everything, some
-project tests may fail because they run with the wrong execution model.
+Do not use the raw low-level Playwright command as the normal entrypoint for
+this repo. It does not enforce the backend-backed worker policy, and if you run
+everything through it, project test failures are expected.
 
 ## What Each Runner Does
 
 - `playwright-test-catalog`
   - runs the supported catalog pack
   - defaults to Chromium
+- `playwright-test-catalog-ui`
+  - opens the supported catalog pack in Playwright UI
 - `playwright-test-catalog-dev`
   - runs the dev-only catalog pack
   - defaults to Chromium
+- `playwright-test-catalog-dev-ui`
+  - opens the dev-only catalog pack in Playwright UI
 - `playwright-test-project`
   - runs project preflight first
   - defaults to `tests_playwright/project/`
   - defaults to Chromium
   - defaults to one worker
+- `playwright-test-project-ui`
+  - runs project preflight first
+  - opens the backend-backed project suite in Playwright UI
 - `playwright-test-all`
   - runs the catalog runner first
   - runs the backend-backed project runner second

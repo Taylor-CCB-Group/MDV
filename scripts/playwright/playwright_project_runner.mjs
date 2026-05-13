@@ -3,15 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, "..");
+const REPO_ROOT = path.resolve(HERE, "../..");
 const args = process.argv.slice(2);
-const DEFAULT_DEV_CATALOG_SPECS = [
-    "tests_playwright/catalog/create_project.spec.ts",
-    "tests_playwright/catalog/import_project.spec.ts",
-];
 
 function hasFlag(prefix) {
-    return args.some((arg) => arg === prefix || arg.startsWith(`${prefix}=`));
+    return args.some((arg, index) => arg === prefix || arg.startsWith(`${prefix}=`) || (arg === prefix && index < args.length - 1));
 }
 
 function hasPositionalArgs() {
@@ -38,10 +34,14 @@ async function run(command, commandArgs) {
 
 const forwardedArgs = [...args];
 if (!hasPositionalArgs()) {
-    forwardedArgs.unshift(...DEFAULT_DEV_CATALOG_SPECS);
+    forwardedArgs.unshift("tests_playwright/project/");
 }
 if (!hasFlag("--project")) {
     forwardedArgs.push("--project=chromium");
 }
+if (!hasFlag("--workers")) {
+    forwardedArgs.push("--workers=1");
+}
 
-await run("node", ["node_modules/@playwright/test/cli.js", "test", ...forwardedArgs]);
+await run("node", ["scripts/playwright/playwright_project_preflight.mjs"]);
+await run("node", ["scripts/playwright/run_playwright_cli.mjs", "test", ...forwardedArgs]);

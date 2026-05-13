@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, "..");
+const REPO_ROOT = path.resolve(HERE, "../..");
 const TEST_BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5055";
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
 let pythonBin;

@@ -99,7 +99,7 @@ When using an LLM to write tests:
 - give one file or one feature area at a time
 - provide explicit test cases
 - prefer extending existing helpers over duplicating setup logic
-- prefer the documented runners, not raw `pnpm exec playwright`
+- prefer the documented wrapper scripts, not raw Playwright CLI commands
 - do not ask the model to repair Python environments during normal test execution
 
 ## Anti-Patterns
@@ -109,18 +109,18 @@ Avoid:
 - using `tests_playwright/utils/testUtils.ts` for new backend-backed project specs
 - mixing smoke checks and destructive flows in one file
 - sharing one backend project across mutation-heavy tests
-- treating the low-level `playwright-test` runner as the default mixed-suite command
+- treating the raw low-level Playwright runner as the default mixed-suite command
 - adding broad speculative coverage before verifying the previous file
 
 ## When To Update Other Docs
 
-Update `PLAYWRIGHT_ARCHITECTURE.md` when:
+Update `docs/playwright/PLAYWRIGHT_ARCHITECTURE.md` when:
 
 - a new fixture seam is added
 - execution policy changes
 - spec classification changes
 
-Update `PLAYWRIGHT_SETUP_AND_RUN.md` when:
+Update `docs/playwright/PLAYWRIGHT_SETUP_AND_RUN.md` when:
 
 - a supported command changes
 - setup prerequisites change

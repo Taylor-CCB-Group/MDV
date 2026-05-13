@@ -5,9 +5,9 @@ setup, fixture architecture, and migration path. It is not the day-to-day guide.
 
 For current usage, use:
 
-- `docs/PLAYWRIGHT_SETUP_AND_RUN.md`
-- `docs/PLAYWRIGHT_ARCHITECTURE.md`
-- `docs/PLAYWRIGHT_WRITING_TESTS.md`
+- `docs/playwright/PLAYWRIGHT_SETUP_AND_RUN.md`
+- `docs/playwright/PLAYWRIGHT_ARCHITECTURE.md`
+- `docs/playwright/PLAYWRIGHT_WRITING_TESTS.md`
 
 ## Why The Current Architecture Exists
 

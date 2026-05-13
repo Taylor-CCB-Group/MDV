@@ -18,11 +18,15 @@ main fixtures work.
 
 Runner layer:
 
-- `scripts/playwright_catalog_runner.mjs`
-- `scripts/playwright_catalog_dev_runner.mjs`
-- `scripts/playwright_project_runner.mjs`
-- `scripts/playwright_all_runner.mjs`
-- `scripts/playwright_project_preflight.mjs`
+- `scripts/playwright/run_playwright_cli.mjs`
+- `scripts/playwright/playwright_catalog_runner.mjs`
+- `scripts/playwright/playwright_catalog_ui_runner.mjs`
+- `scripts/playwright/playwright_catalog_dev_runner.mjs`
+- `scripts/playwright/playwright_catalog_dev_ui_runner.mjs`
+- `scripts/playwright/playwright_project_runner.mjs`
+- `scripts/playwright/playwright_project_ui_runner.mjs`
+- `scripts/playwright/playwright_all_runner.mjs`
+- `scripts/playwright/playwright_project_preflight.mjs`
 
 Fixture layer:
 
@@ -105,7 +109,7 @@ Use it only when all of these are true:
 
 Current shared-project example:
 
-- `tests_playwright/project/chart_creation.spec.ts`
+- `tests_playwright/project/charts/chart_creation.spec.ts`
 
 ## Test Type Meanings
 
