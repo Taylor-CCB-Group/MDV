@@ -35,9 +35,10 @@ async function getColumnNameFromDatasourcesJson(
     const response = await page.request.get(url);
     expect(response.ok(), `GET ${url} → ${response.status()}`).toBeTruthy();
     const datasources = (await response.json()) as DatasourceJsonEntry[];
-    const ds =
-        datasources.find((entry) => entry.name === dataSourceName) ??
-        (datasources.length > 0 ? datasources[0] : undefined);
+    const ds = datasources.find((entry) => entry.name === dataSourceName);
+    if (!ds) {
+        throw new Error(`Datasource "${dataSourceName}" was not found in ${url}`);
+    }
     const col = ds?.columns?.find((c) => c.field === columnField);
     return col?.name !== undefined && col?.name !== null ? String(col.name) : undefined;
 }
@@ -151,6 +152,13 @@ async function addClonedEditableColumn(
 }
 
 async function requestRenameColumnDialog(page: Page, chartId: string, columnField: string) {
+    await page.waitForFunction((targetChartId) => {
+        const chart = Object.values((window as any).mdv.chartManager.charts)
+            .map((entry: any) => entry.chart)
+            .find((entry: any) => entry.config.id === targetChartId);
+        return Boolean(chart?.gridRef?.current?.slickGrid);
+    }, chartId);
+
     await page.evaluate(({ targetChartId, targetColumnField }) => {
         const chart = Object.values((window as any).mdv.chartManager.charts)
             .map((entry: any) => entry.chart)
@@ -195,7 +203,13 @@ async function setupRenameFixture(page: Page): Promise<{
             force: true,
         },
     });
-    const setupInfo = await setupReactTableProject(page);
+    let setupInfo: ProjectSetupInfo;
+    try {
+        setupInfo = await setupReactTableProject(page);
+    } catch (error) {
+        await projectHandle.cleanup();
+        throw error;
+    }
     return { projectHandle, setupInfo };
 }
 
