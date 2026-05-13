@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { hasPositionalArgs } from "./arg_utils.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../..");
@@ -12,10 +13,6 @@ const DEFAULT_CATALOG_SPECS = [
 
 function hasFlag(prefix) {
     return args.some((arg) => arg === prefix || arg.startsWith(`${prefix}=`));
-}
-
-function hasPositionalArgs() {
-    return args.some((arg) => !arg.startsWith("-"));
 }
 
 async function run(command, commandArgs) {
@@ -37,7 +34,7 @@ async function run(command, commandArgs) {
 }
 
 const forwardedArgs = [...args];
-if (!hasPositionalArgs()) {
+if (!hasPositionalArgs(args)) {
     forwardedArgs.unshift(...DEFAULT_CATALOG_SPECS);
 }
 if (!hasFlag("--project")) {

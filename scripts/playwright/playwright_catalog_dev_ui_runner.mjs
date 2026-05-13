@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { hasPositionalArgs } from "./arg_utils.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../..");
@@ -9,10 +10,6 @@ const DEFAULT_DEV_CATALOG_SPECS = [
     "tests_playwright/catalog/create_project.spec.ts",
     "tests_playwright/catalog/import_project.spec.ts",
 ];
-
-function hasPositionalArgs() {
-    return args.some((arg) => !arg.startsWith("-"));
-}
 
 async function run(command, commandArgs) {
     await new Promise((resolve, reject) => {
@@ -33,7 +30,7 @@ async function run(command, commandArgs) {
 }
 
 const forwardedArgs = [...args];
-if (!hasPositionalArgs()) {
+if (!hasPositionalArgs(args)) {
     forwardedArgs.unshift(...DEFAULT_DEV_CATALOG_SPECS);
 }
 
