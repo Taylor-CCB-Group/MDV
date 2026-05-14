@@ -15,6 +15,7 @@ import inspect
 
 import scanpy as sc
 from mdvtools.tests.mock_anndata import create_minimal_anndata
+from mdvtools.tests.mock_expression_layers import add_synth_expression_layers
 from mdvtools.conversions import convert_scanpy_to_mdv
 
 
@@ -48,6 +49,9 @@ Examples:
 
   # Create project with a unique column for manual integration testing (edit from frontend)
   python -m mdvtools.tests.generate_test_data ~/mdv/test_unique --mock --with-unique-column
+
+  # Small mock project with multiple expression layers (rows_as_columns subgroups gs + synth_*)
+  python -m mdvtools.tests.generate_test_data ~/mdv/mock-multilayer-interactive --mock --n-cells 80 --n-genes 40 --extra-expression-layers
 
   # Create project from scanpy dataset
   python -m mdvtools.tests.generate_test_data ~/mdv/test_pbmc3k --scanpy pbmc3k_processed
@@ -101,7 +105,15 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
         action='store_true',
         help='Add a unique-typed column (e.g. cell_id) to the first datasource for manual testing of unique column edit/round-trip'
     )
-    
+    parser.add_argument(
+        '--extra-expression-layers',
+        action='store_true',
+        help=(
+            "Add AnnData.layers synth_layer_a and synth_layer_b (mock/scanpy) so the project has "
+            "multiple rows_as_columns subgroups after conversion."
+        ),
+    )
+
     args = parser.parse_args()
     
     # Expand user path
@@ -138,8 +150,12 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
             sys.exit(1)
         
         adata = dataset_loaders[dataset]()
-        assert(isinstance(adata, sc.AnnData))
-    
+        assert isinstance(adata, sc.AnnData)
+
+    if args.extra_expression_layers:
+        add_synth_expression_layers(adata)
+        print("  Added AnnData.layers: synth_layer_a, synth_layer_b")
+
     print(f"AnnData: {adata.n_obs:,} cells x {adata.n_vars:,} genes")
     
     # Convert to MDV project
@@ -171,7 +187,11 @@ See https://scanpy.readthedocs.io/en/1.11.x/api/datasets.html for available scan
         # Also include actual dimensions from the loaded data
         provenance["parameters"]["n_cells"] = adata.n_obs
         provenance["parameters"]["n_genes"] = adata.n_vars
-    
+
+    if args.extra_expression_layers:
+        provenance["parameters"]["extra_expression_layers"] = True
+        provenance["cleanup_group"] = "interactive-mock-multilayer"
+
     # Add provenance to state
     state["provenance"] = provenance
     project.state = state
