@@ -1,7 +1,7 @@
 // Quick ad-hoc probe to compare project page load between two URLs.
-// Usage: node scripts/playwright_compiler_probe.mjs <url1> <url2>
+// Usage: node scripts/playwright/playwright_compiler_probe.mjs <url1> <url2>
 // Example:
-//   node scripts/playwright_compiler_probe.mjs \
+//   node scripts/playwright/playwright_compiler_probe.mjs \
 //     http://127.0.0.1:5055/project/191 \
 //     http://127.0.0.1:5170/project/191
 
@@ -9,7 +9,7 @@ import { chromium } from "@playwright/test";
 
 const targets = process.argv.slice(2);
 if (targets.length === 0) {
-    console.error("Usage: node playwright_compiler_probe.mjs <url> [<url> ...]");
+    console.error("Usage: node scripts/playwright/playwright_compiler_probe.mjs <url> [<url> ...]");
     process.exit(2);
 }
 

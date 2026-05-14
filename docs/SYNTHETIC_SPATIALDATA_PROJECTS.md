@@ -76,6 +76,25 @@ Example provenance:
 See [Serving Generated Projects](#serving-generated-projects) for how to make
 a generated project visible to the running backend or to the local Python venv.
 
+## Playwright (filesystem + rescan)
+
+Backend-backed Playwright specs can create disposable projects the same way as a
+human workflow: generate under `~/mdv`, hit `GET /rescan_projects`, then select the
+new project id from `GET /projects`.
+
+Use `createTemporaryProjectViaSyntheticSpatial` from
+`tests_playwright/utils/projectFixtures/syntheticSpatial.ts` (also re-exported from
+`tests_playwright/utils/projectFixtures` and `tests_playwright/utils/tempProject.ts`) instead of duplicating that orchestration in each spec. Default folder names include
+the `synth-spatial--playwright-rescan--...` prefix so they are easy to match in SQL
+filters.
+
+Cleaning up:
+
+- Each handle `cleanup()` removes the generated folder under `~/mdv`.
+- Rows left in the shared dev database can be purged with
+  `python/mdvtools/dbutils/cleanup_projects.py --filter-name` (see
+  `docs/PLAYWRIGHT_STABILIZATION_GUIDE.md`).
+
 ## Identifying Existing Synthetic Projects
 
 The directory naming convention is the quickest filter:
