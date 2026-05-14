@@ -62,6 +62,9 @@ function getActiveMode<T extends CTypes, M extends boolean>(props: ColumnSelecti
  * (e.g. if we're in a more global dialog etc rather than a chart context, this would be ambiguous).
  */
 const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+    // nb, there may be an issue here related to 'active link degradation'
+    // also: we should be able to allow to have combinations like `['col1', {linkA:sg2}, 'col2', {linkB:sg1}]`
+    // which implies that there needs to be some wider way of changing this (no single activeTab can represent this).
     const [activeTab, setActiveTab] = useState<ColumnMode>(getActiveMode(props));
 
     //todo check for the type of current value and set active tab
@@ -73,6 +76,8 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
     }, [initialActiveTab]);
 
 
+    const chartModeFromValue = useMemo(() => getActiveMode(props), [props]);
+
     const iIsLinkCompatible = useIsLinkCompatible(props);
     if (!iIsLinkCompatible) return <ColumnDropdownComponent {...props} />;
 
@@ -80,11 +85,12 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
         <>
             {iIsLinkCompatible ? (
                 <Paper className="mx-auto w-full" variant="outlined" sx={{ backgroundColor: "transparent" }}>
-                    <TabHeader
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        tabs={["column", "link", "active link"]}
-                    />
+                <TabHeader
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    tabs={["column", "link", "active link"]}
+                    indicatorTab={chartModeFromValue}
+                />
                     <ErrorBoundary FallbackComponent={({error}) => <ErrorComponentReactWrapper error={error} title={error.toString()} />}>
                         <div className="p-4">
                             {activeTab === "column" && (

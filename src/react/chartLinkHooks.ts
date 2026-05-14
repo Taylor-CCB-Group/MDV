@@ -1,6 +1,6 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
-import { useChartID, useDataSources } from "./hooks";
+import { useChartID } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
 import type { DataColumn, DataType } from "@/charts/charts";
@@ -111,7 +111,6 @@ export function useRowsAsColumnsLinks() {
  * @returns the text values and indices of the highlighted/filtered rows in a linked dataSource
  */
 export function useHighlightedForeignRows(linkIndex = 0) {
-    const id = useId();
     const racLink = useRowsAsColumnsLinks()[linkIndex];
     const values = racLink?.link.observableFields || [];
     return values; //maybe don't useState version of this but return the mobx observable directly
@@ -131,7 +130,12 @@ export function useHighlightedForeignRows(linkIndex = 0) {
  * @returns an array of DataColumn objects, with loaded data, for virtual columns 
  * corresponding to the highlighted/filtered rows in the linked dataSource.
  */
-export function useHighlightedForeignRowsAsColumns(max = 10, filter = "", linkIndex = 0) {
+export function useHighlightedForeignRowsAsColumns(
+    max = 10,
+    filter = "",
+    linkIndex = 0,
+    subgroupName?: string,
+) {
     const cols = useHighlightedForeignRows(linkIndex); //not actual cols
     //would like not to have this here - might have some more logic in above hook
     //in particular want to redesign the fieldName being what determines the column
@@ -151,13 +155,19 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "", linkIn
             return;
         }
         const cm = window.mdv.chartManager;
-        // c.value & c.index are from the DataStore listener event, now in cols
-        // this needs to change for multiple subgroups
-        const sg = Object.keys(link.subgroups)[0];
+        // Resolve virtual columns for the requested rows_as_columns subgroup (defaults to first key).
+        const sgKeys = Object.keys(link.subgroups);
+        const sg =
+            subgroupName && link.subgroups[subgroupName]
+                ? subgroupName
+                : (sgKeys[0] ?? "");
         const f = filter.toLowerCase();
         // todo: consider pagination... pass in a page number, return information about total number of columns etc.
         // moving ds.addColumnsFromFields() up the stack...
-        const c = cols.filter(({name}) => name.toLowerCase().includes(f)).slice(0, max).map(({column}) => column);
+        const c = cols
+            .filter(({ name }) => name.toLowerCase().includes(f))
+            .slice(0, max)
+            .map((row) => row.columnForSubgroup(sg));
         // don't setColumns until we have the data...
         // alternatively, they could be lazy-loaded by consuming components.
         // that could be implemented relatively easily, but would lack some batching of requests,
@@ -167,6 +177,6 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "", linkIn
             setColumns(c);
         });
         return; //could consider cancelling any pending requests...
-    }, [cols, max, link, ds, filter]);
+    }, [cols, max, link, ds, filter, subgroupName]);
     return columns;
 }

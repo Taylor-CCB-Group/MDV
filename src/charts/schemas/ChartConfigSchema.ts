@@ -26,8 +26,10 @@ export const ParamTypeSchema = z.enum([
 export const RowsAsColsQuerySerializedSchema = z.object({
     type: z.literal("RowsAsColsQuery").describe("Identifies this as a rows-as-columns query"),
     linkedDsName: z.string().describe("Name of the linked datasource that contains the row data"),
-    // TODO - should have subgroup name
-    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource")
+    subgroupName: z.string().optional().describe(
+        "Canonical rows-as-columns subgroup key (see link `subgroups`). New `RowsAsColsQuery.toJSON` output always includes this; omit = first subgroup. Zod: keep optional until legacy configs are migrated, then make required.",
+    ),
+    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource"),
 }).describe("Configuration for queries that treat rows from another datasource as columns in the current chart");
 
 // Field specification can be a string (FieldName) or a serialized query
