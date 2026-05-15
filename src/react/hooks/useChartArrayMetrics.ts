@@ -23,13 +23,18 @@ export function useChartArrayMetrics(
     const [metrics, setMetrics] = useState<ChartArrayMetrics>(EMPTY_METRICS);
 
     useLayoutEffect(() => {
-        const root = layoutRef.current?.root;
-        if (!root || cellCount === 0) {
+        if (cellCount === 0) {
             setMetrics(EMPTY_METRICS);
             return;
         }
 
+        let cancelled = false;
+        let resizeObserver: ResizeObserver | null = null;
+
         const measure = () => {
+            if (cancelled) return;
+            const root = layoutRef.current?.root;
+            if (!root) return;
             const cells = layoutRef.current?.cells ?? [];
             setMetrics({
                 rootSize: measureRootSize(root),
@@ -37,17 +42,35 @@ export function useChartArrayMetrics(
             });
         };
 
-        measure();
-        const observer = new ResizeObserver(measure);
-        observer.observe(root);
-        const cells = layoutRef.current?.cells ?? [];
-        for (let i = 0; i < cellCount; i++) {
-            const cell = cells[i];
-            if (cell) observer.observe(cell);
-        }
+        let setupAttempts = 0;
+        const setup = () => {
+            if (cancelled) return;
+            const root = layoutRef.current?.root;
+            if (!root) {
+                if (setupAttempts < 20) {
+                    setupAttempts += 1;
+                    requestAnimationFrame(setup);
+                }
+                return;
+            }
+
+            resizeObserver?.disconnect();
+            measure();
+            resizeObserver = new ResizeObserver(measure);
+            resizeObserver.observe(root);
+            const cells = layoutRef.current?.cells ?? [];
+            for (let i = 0; i < cellCount; i++) {
+                const cell = cells[i];
+                if (cell) resizeObserver.observe(cell);
+            }
+        };
+
+        setup();
         window.addEventListener("resize", measure);
+
         return () => {
-            observer.disconnect();
+            cancelled = true;
+            resizeObserver?.disconnect();
             window.removeEventListener("resize", measure);
         };
     }, [layoutRef, cellCount]);

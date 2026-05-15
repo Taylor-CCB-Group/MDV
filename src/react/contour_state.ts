@@ -172,6 +172,9 @@ function createBaseContourLayerProps(params: {
         debounce: 1000,
         weightsTextureSize: 256, // Intermediate value for balanced performance and quality
         pickable: false,
+        updateTriggers: {
+            getPosition: [cx, cy],
+        },
     };
 }
 
@@ -321,6 +324,7 @@ function buildFieldContourLayerProps(params: {
             },
         },
         updateTriggers: {
+            ...baseProps.updateTriggers,
             getWeight: [fieldData],
         },
     };
@@ -407,6 +411,8 @@ export function useFieldContour(props: FieldContourProps) {
         intensity,
         cx,
         cy,
+        cx.field,
+        cy.field,
         debounceZoom,
         bandwidth,
         fill,

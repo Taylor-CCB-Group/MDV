@@ -1,19 +1,29 @@
 import DeckGL from "@deck.gl/react";
 import { OrthographicView, type Layer, type OrthographicViewState } from "@deck.gl/core";
+import type { Matrix4 } from "@math.gl/core";
 import { action } from "mobx";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { getFieldColor } from "../fieldColorManager";
 import useGateLayers from "../hooks/useGateLayers";
 import { useChartArrayMetrics } from "../hooks/useChartArrayMetrics";
 import { useChartArrayVisibleIndices } from "../hooks/useChartArrayVisibleIndices";
-import { useChartID, useConfig, useFieldSpecs, useFilteredIndices } from "../hooks";
+import {
+    useChartID,
+    useChartSize,
+    useConfig,
+    useFieldSpecs,
+    useFilteredIndices,
+    useParamColumns,
+} from "../hooks";
 import { isLoadedNumericContourField, useFieldContour, type DualContourLegacyConfig } from "../contour_state";
 import type { ScatterPlotConfig2D } from "../scatter_state";
-import { useSpatialLayers } from "../spatial_context";
+import { useRange, useSpatialLayers } from "../spatial_context";
 import ChartArrayLayout, { type ChartArrayLayoutHandle } from "./ChartArrayLayout";
+import { useChart } from "../context";
 import {
     getDensityGridViewId,
     getDensityGridViewStates,
+    hasUsableOrthographicViewState,
     matchesDensityGridView,
 } from "./densityGridUtils";
 
@@ -35,16 +45,83 @@ function getSerializableViewState(viewState: OrthographicViewState): Orthographi
     };
 }
 
+const BBOX_PERCENTILE_LOW = 0.01;
+const BBOX_PERCENTILE_HIGH = 0.99;
+
+function percentile(sorted: number[], p: number) {
+    if (sorted.length === 0) return Number.NaN;
+    const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
+    return sorted[index];
+}
+
+function fitViewStateToFilteredRows(
+    rows: Uint32Array,
+    cx: { data: ArrayLike<number> },
+    cy: { data: ArrayLike<number> },
+    modelMatrix: Matrix4,
+    viewportWidth: number,
+    viewportHeight: number,
+): Pick<OrthographicViewState, "target" | "zoom"> | null {
+    if (rows.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) return null;
+
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const x = cx.data[row];
+        const y = cy.data[row];
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        xs.push(x);
+        ys.push(y);
+    }
+    if (xs.length === 0 || ys.length === 0) return null;
+
+    xs.sort((a, b) => a - b);
+    ys.sort((a, b) => a - b);
+    let minX = percentile(xs, BBOX_PERCENTILE_LOW);
+    let maxX = percentile(xs, BBOX_PERCENTILE_HIGH);
+    let minY = percentile(ys, BBOX_PERCENTILE_LOW);
+    let maxY = percentile(ys, BBOX_PERCENTILE_HIGH);
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+        return null;
+    }
+
+    const minWorld = modelMatrix.transformAsPoint([minX, minY, 0]);
+    const maxWorld = modelMatrix.transformAsPoint([maxX, maxY, 0]);
+    minX = minWorld[0];
+    minY = minWorld[1];
+    maxX = maxWorld[0];
+    maxY = maxWorld[1];
+
+    const dx = maxX - minX;
+    const dy = maxY - minY;
+    const epsilon = Math.max(1e-9, Math.min(Math.abs(minX), Math.abs(maxX)) * 1e-6);
+    const safeDx = Math.max(epsilon, dx);
+    const safeDy = Math.max(epsilon, dy);
+    let zoom = Math.log2(Math.min(viewportWidth / safeDx, viewportHeight / safeDy)) - 0.6;
+    if (!Number.isFinite(zoom)) zoom = 0;
+
+    return {
+        target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
+        zoom,
+    };
+}
+
 export default function DeckDensityGridComponent() {
     const chartId = useChartID();
-    const initializedViewRef = useRef(false);
+    const chart = useChart() as { pendingRecenter?: boolean };
+    const lastParamKeyRef = useRef("");
+    const lastFilteredRowCountRef = useRef(-1);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const layoutRef = useRef<ChartArrayLayoutHandle>(null);
     const config = useConfig<DensityGridConfig>();
+    const [chartWidth, chartHeight] = useChartSize();
     const rows = useFilteredIndices();
     const {
         scatterProps: { scatterplotLayer, greyScatterplotLayer, setScatterKeyboardActive },
     } = useSpatialLayers();
+    const [cx, cy] = useParamColumns();
+    const { modelMatrix } = useRange();
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
     const loadedFields = useFieldSpecs(config.densityFields);
     const densityFields = loadedFields.filter(isLoadedNumericContourField);
@@ -59,8 +136,9 @@ export default function DeckDensityGridComponent() {
         [visibleFieldIndicesKey],
     );
 
+    const coordKey = `${cx.field}--${cy.field}`.replace(/[^A-Za-z0-9_-]/g, "_");
     const contourLayers = useFieldContour({
-        id: "density-grid",
+        id: `density-grid-${coordKey}`,
         fields: densityFields,
         visibleFieldIndices,
         fill: config.contour_fill,
@@ -99,25 +177,58 @@ export default function DeckDensityGridComponent() {
         [visibleViewIds, config.viewState],
     );
 
+    const paramKey = `${cx.field}\u0000${cy.field}`;
     const referenceCellWidth = metrics.cellBounds[0]?.width ?? 0;
-    useEffect(() => {
-        if (initializedViewRef.current) return;
-        if (densityFields.length === 0 || referenceCellWidth <= 0) return;
-        initializedViewRef.current = true;
-        action(() => {
-            config.viewState = {
-                ...config.viewState,
-                zoom:
-                    Number(config.viewState.zoom ?? 0) +
-                    Math.log2(
-                        Math.max(
-                            Number.MIN_VALUE,
-                            referenceCellWidth / Math.max(metrics.rootSize.width, 1),
-                        ),
-                    ),
-            };
-        })();
-    }, [config, densityFields.length, referenceCellWidth, metrics.rootSize.width]);
+    const referenceCellHeight = metrics.cellBounds[0]?.height ?? 0;
+
+    useLayoutEffect(() => {
+        const paramChanged = lastParamKeyRef.current !== "" && lastParamKeyRef.current !== paramKey;
+        lastParamKeyRef.current = paramKey;
+
+        const filterChanged = lastFilteredRowCountRef.current !== rows.length;
+        lastFilteredRowCountRef.current = rows.length;
+
+        const viewportWidth = referenceCellWidth > 0 ? referenceCellWidth : chartWidth;
+        const viewportHeight = referenceCellHeight > 0 ? referenceCellHeight : chartHeight;
+        const pendingRecenter = !!chart.pendingRecenter;
+        const needsFullFit =
+            pendingRecenter ||
+            paramChanged ||
+            !hasUsableOrthographicViewState(config.viewState) ||
+            (config.zoom_on_filter && filterChanged);
+
+        if (needsFullFit && viewportWidth > 0 && viewportHeight > 0) {
+            const fitted = fitViewStateToFilteredRows(
+                rows,
+                cx,
+                cy,
+                modelMatrix,
+                viewportWidth,
+                viewportHeight,
+            );
+            if (!fitted) return;
+            action(() => {
+                chart.pendingRecenter = false;
+                config.viewState = {
+                    ...config.viewState,
+                    target: fitted.target,
+                    zoom: fitted.zoom,
+                };
+            })();
+        }
+    }, [
+        paramKey,
+        rows.length,
+        cx,
+        cy,
+        modelMatrix,
+        referenceCellWidth,
+        referenceCellHeight,
+        chartWidth,
+        chartHeight,
+        config,
+        chart,
+    ]);
 
     const radiusPixels = useMemo(
         () => Math.max(1, 30 * (config.contour_bandwidth ?? 0.1) * 2 ** Number(config.viewState.zoom ?? 0)),
@@ -141,7 +252,7 @@ export default function DeckDensityGridComponent() {
                             ...contourLayer,
                             radiusPixels,
                             debounce: 250,
-                            weightsTextureSize: 128,
+                            weightsTextureSize: 256,
                         },
                     ],
                 });
@@ -170,6 +281,7 @@ export default function DeckDensityGridComponent() {
             greyScatterplotLayer,
             gateDisplayLayer,
             gateLabelLayer,
+            coordKey,
         ],
     );
 
@@ -194,7 +306,24 @@ export default function DeckDensityGridComponent() {
         [densityFields],
     );
 
-    const hasCanvas = metrics.rootSize.width > 0 && metrics.rootSize.height > 0;
+    const hasValidViews =
+        visibleCellIndices.length > 0 &&
+        visibleCellIndices.every((index) => {
+            const bounds = metrics.cellBounds[index];
+            return (
+                bounds !== undefined &&
+                bounds.width > 0 &&
+                bounds.height > 0 &&
+                Number.isFinite(bounds.width) &&
+                Number.isFinite(bounds.height)
+            );
+        });
+    const hasCanvas =
+        metrics.rootSize.width > 0 &&
+        metrics.rootSize.height > 0 &&
+        hasValidViews &&
+        Number.isFinite(radiusPixels) &&
+        radiusPixels > 0;
 
     const deckOverlay = useMemo(
         () =>
