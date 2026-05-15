@@ -32,17 +32,22 @@ const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1
  * there should be hooks getting the range of a filtered column
  * so that multiple charts can re-use the computation (but if not used, it's not computed)
  */
-function useZoomOnFilter(data: Uint32Array) {
+function useZoomOnFilter(data: Uint32Array, enabled: boolean) {
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns();
     // const data = useFilteredIndices(); //<< does calling this multiple times mean wasting space?
     const config = useConfig<DeckScatterConfig>();
     const chart = useChart() as any;
     const { pendingRecenter } = chart;
+    const paramKey = `${cx.field}\u0000${cy.field}`;
+    const lastParamKeyRef = useRef("");
     useEffect(() => {
+        if (!enabled) return;
         if (chart.ignoreStateUpdate) return;
         if (data.length === 0) return; // [0, 0, 1, 1];
-        if (!pendingRecenter && !config.zoom_on_filter) return;
+        const paramChanged = lastParamKeyRef.current !== paramKey;
+        lastParamKeyRef.current = paramKey;
+        if (!pendingRecenter && !config.zoom_on_filter && !paramChanged) return;
         //there is also cx.minMax, cy.minMax - but not for filtered indices
         let minX = Number.POSITIVE_INFINITY;
         let maxX = Number.NEGATIVE_INFINITY;
@@ -108,7 +113,7 @@ function useZoomOnFilter(data: Uint32Array) {
 
             chart.ignoreStateUpdate = false;
         })();
-    }, [data, cx, cy, cz, width, height, config, pendingRecenter, chart]);
+    }, [data, cx, cy, cz, width, height, config, pendingRecenter, chart, paramKey, enabled]);
 }
 
 /**
@@ -174,7 +179,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     //if we don't fully understand reasons for `- 3.5` here.
     //prevents overlapping with x-axis.
     const chartHeight = height - margin.top - margin.bottom - 3.5;
-    useZoomOnFilter(data);
+    useZoomOnFilter(data, !showDensityGrid);
 
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks

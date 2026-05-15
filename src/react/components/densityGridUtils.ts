@@ -30,3 +30,12 @@ export function getDensityGridViewStates(
         ]),
     );
 }
+
+export function hasUsableOrthographicViewState(viewState: OrthographicViewState | undefined): boolean {
+    if (!viewState?.target || viewState.target.length < 2) return false;
+    const x = Number(viewState.target[0]);
+    const y = Number(viewState.target[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    return Number.isFinite(Number(viewState.zoom));
+}
+

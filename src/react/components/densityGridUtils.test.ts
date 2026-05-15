@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
     getDensityGridViewId,
     getDensityGridViewStates,
+    hasUsableOrthographicViewState,
     matchesDensityGridView,
     supportsDensityGridMode,
 } from "./densityGridUtils";
@@ -21,6 +22,12 @@ describe("densityGridUtils", () => {
         expect(supportsDensityGridMode("DeckDensity")).toBe(true);
         expect(supportsDensityGridMode("wgl_scatter_plot")).toBe(false);
         expect(supportsDensityGridMode(undefined)).toBe(false);
+    });
+
+    test("detects usable orthographic view state", () => {
+        expect(hasUsableOrthographicViewState(undefined)).toBe(false);
+        expect(hasUsableOrthographicViewState({ target: [1, 2, 0], zoom: 3 })).toBe(true);
+        expect(hasUsableOrthographicViewState({ target: [Number.NaN, 2, 0], zoom: 3 })).toBe(false);
     });
 
     test("maps shared view state onto each view id", () => {
