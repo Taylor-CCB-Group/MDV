@@ -13,6 +13,8 @@
  */
 declare module "pako";
 
+declare module "*.css";
+
 // Minimal surface used by this repo; intentionally not a full Turf typing model.
 declare module "@turf/helpers" {
     export type Position = number[];
