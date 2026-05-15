@@ -1,5 +1,6 @@
 import DeckGL from "@deck.gl/react";
 import { OrthographicView, type OrthographicViewState } from "@deck.gl/core";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { action } from "mobx";
 import { useEffect, useMemo, useRef } from "react";
 import { getFieldColor } from "../fieldColorManager";
@@ -13,6 +14,7 @@ import {
     getDensityGridLayout,
     getDensityGridViewId,
     getDensityGridViewStates,
+    getDensityGridVisibleCellIndices,
     matchesDensityGridView,
 } from "./densityGridUtils";
 
@@ -34,9 +36,12 @@ function getSerializableViewState(viewState: OrthographicViewState): Orthographi
     };
 }
 
+const DENSITY_GRID_VIRTUAL_OVERSCAN = 1;
+
 export default function DeckDensityGridComponent() {
     const chartId = useChartID();
     const initializedViewRef = useRef(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [viewportWidth, viewportHeight] = useChartSize();
     const config = useConfig<DensityGridConfig>();
     const rows = useFilteredIndices();
@@ -47,27 +52,56 @@ export default function DeckDensityGridComponent() {
     const loadedFields = useFieldSpecs(config.densityFields);
     const densityFields = loadedFields.filter(isLoadedNumericContourField);
     const configuredFieldCount = Array.isArray(config.densityFields) ? config.densityFields.length : 0;
+
+    const layout = useMemo(
+        () => getDensityGridLayout(viewportWidth, viewportHeight, Math.max(densityFields.length, 1)),
+        [viewportWidth, viewportHeight, densityFields.length],
+    );
+    const rowVirtualizer = useVirtualizer({
+        count: layout.rows,
+        getScrollElement: () => scrollContainerRef.current,
+        estimateSize: () => layout.cellHeight,
+        overscan: DENSITY_GRID_VIRTUAL_OVERSCAN,
+    });
+    const columnVirtualizer = useVirtualizer({
+        count: layout.columns,
+        getScrollElement: () => scrollContainerRef.current,
+        estimateSize: () => layout.cellWidth,
+        horizontal: true,
+        overscan: DENSITY_GRID_VIRTUAL_OVERSCAN,
+    });
+    const visibleCellIndices = getDensityGridVisibleCellIndices(
+        layout,
+        densityFields.length,
+        rowVirtualizer.getVirtualItems(),
+        columnVirtualizer.getVirtualItems(),
+    );
+    const visibleFieldIndicesKey = visibleCellIndices.join("\u0000");
+    const visibleFieldIndices = useMemo(
+        () => visibleCellIndices,
+        [visibleFieldIndicesKey],
+    );
     const contourLayers = useFieldContour({
         id: "density-grid",
         fields: densityFields,
+        visibleFieldIndices,
         fill: config.contour_fill,
         bandwidth: config.contour_bandwidth ?? 0.1,
         intensity: config.contour_intensity ?? 0.1,
         opacity: config.contour_opacity ?? 0.2,
         fillThreshold: config.contour_fillThreshold ?? 2,
     });
-
-    const layout = useMemo(
-        () => getDensityGridLayout(viewportWidth, viewportHeight, Math.max(densityFields.length, 1)),
-        [viewportWidth, viewportHeight, densityFields.length],
-    );
     const viewIds = useMemo(
         () => densityFields.map((field, index) => getDensityGridViewId(chartId, field.field, index)),
         [chartId, densityFields],
     );
+    const visibleViewIds = useMemo(
+        () => visibleCellIndices.map((index) => viewIds[index]).filter((viewId): viewId is string => Boolean(viewId)),
+        [visibleCellIndices, viewIds],
+    );
     const views = useMemo(
         () =>
-            densityFields.map((_field, index) => {
+            visibleCellIndices.map((index) => {
                 const bounds = getDensityGridCellBounds(layout, index);
                 return new OrthographicView({
                     id: viewIds[index],
@@ -79,11 +113,11 @@ export default function DeckDensityGridComponent() {
                     controller: { dragPan: controllerOptions.dragPan },
                 });
             }),
-        [densityFields, layout, viewIds, controllerOptions.dragPan],
+        [visibleCellIndices, layout, viewIds, controllerOptions.dragPan],
     );
     const viewState = useMemo(
-        () => getDensityGridViewStates(viewIds, config.viewState),
-        [viewIds, config.viewState],
+        () => getDensityGridViewStates(visibleViewIds, config.viewState),
+        [visibleViewIds, config.viewState],
     );
     useEffect(() => {
         if (initializedViewRef.current) return;
@@ -109,9 +143,10 @@ export default function DeckDensityGridComponent() {
     );
     const layers = useMemo(
         () =>
-            contourLayers.flatMap((contourLayer, index) => {
+            visibleCellIndices.flatMap((index) => {
+                const contourLayer = contourLayers[index];
                 const viewId = viewIds[index];
-                if (!viewId) return [];
+                if (!contourLayer || !viewId) return [];
                 const greyLayer = cloneDeckLayer(greyScatterplotLayer, {
                     id: `${viewId}-grey`,
                     viewId,
@@ -145,6 +180,7 @@ export default function DeckDensityGridComponent() {
                 return [greyLayer, scatterLayer, ...gateLayers];
             }),
         [
+            visibleCellIndices,
             contourLayers,
             viewIds,
             radiusPixels,
@@ -168,6 +204,7 @@ export default function DeckDensityGridComponent() {
     return (
         <div className="relative flex h-full w-full flex-col">
             <div
+                ref={scrollContainerRef}
                 className="min-h-0 flex-1 overflow-auto"
                 onMouseDown={() => setScatterKeyboardActive(true)}
                 onMouseEnter={() => setScatterKeyboardActive(true)}
@@ -197,7 +234,9 @@ export default function DeckDensityGridComponent() {
                         className="pointer-events-none absolute inset-0"
                         style={{ width: layout.contentWidth, height: layout.contentHeight }}
                     >
-                        {densityFields.map((field, index) => {
+                        {visibleCellIndices.map((index) => {
+                            const field = densityFields[index];
+                            if (!field) return null;
                             const bounds = getDensityGridCellBounds(layout, index);
                             const color = getFieldColor(field.field);
                             return (

@@ -4,6 +4,7 @@ import {
     getDensityGridLayout,
     getDensityGridViewId,
     getDensityGridViewStates,
+    getDensityGridVisibleCellIndices,
     matchesDensityGridView,
     supportsDensityGridMode,
 } from "./densityGridUtils";
@@ -26,6 +27,35 @@ describe("densityGridUtils", () => {
 
         expect(layout.contentHeight).toBe(520);
         expect(layout.contentHeight).toBeGreaterThan(400);
+    });
+
+    test("collects visible cell indices from virtualized row and column ranges", () => {
+        const layout = getDensityGridLayout(900, 600, 5, 260);
+
+        expect(
+            getDensityGridVisibleCellIndices(
+                layout,
+                5,
+                [{ index: 0 }],
+                [{ index: 0 }, { index: 1 }],
+            ),
+        ).toEqual([0, 1]);
+        expect(
+            getDensityGridVisibleCellIndices(
+                layout,
+                5,
+                [{ index: 1 }],
+                [{ index: 0 }, { index: 1 }],
+            ),
+        ).toEqual([3, 4]);
+        expect(
+            getDensityGridVisibleCellIndices(
+                layout,
+                4,
+                [{ index: 1 }],
+                [{ index: 0 }, { index: 1 }, { index: 2 }],
+            ),
+        ).toEqual([3]);
     });
 
     test("computes cell bounds from row and column position", () => {
