@@ -1,3 +1,8 @@
+/**
+ * Multi-chart layout shell (density grid and similar). Layout modes, flex/grid CSS, and
+ * resize measurement are an initial prototype — not a stable API; expect rework for
+ * user-configurable layouts and context-specific arrangements.
+ */
 import {
     useCallback,
     useImperativeHandle,
@@ -6,6 +11,12 @@ import {
     type ReactNode,
     type Ref,
 } from "react";
+import "./chartArrayLayout.css";
+import {
+    getChartArrayLayoutMode,
+    type ChartArrayLayoutMode,
+} from "./chartArrayLayoutUtils";
+import { useChartArrayLayoutGeometry } from "../hooks/useChartArrayLayoutGeometry";
 
 export type ChartArrayLayoutHandle = {
     root: HTMLDivElement | null;
@@ -15,6 +26,8 @@ export type ChartArrayLayoutHandle = {
 type ChartArrayLayoutProps = {
     cellCount: number;
     cellKeys?: readonly string[];
+    /** Defaults from {@link getChartArrayLayoutMode}; override for future user layout prefs. */
+    layout?: ChartArrayLayoutMode;
     layoutRef?: Ref<ChartArrayLayoutHandle>;
     className?: string;
     style?: CSSProperties;
@@ -26,13 +39,20 @@ type ChartArrayLayoutProps = {
 export default function ChartArrayLayout({
     cellCount,
     cellKeys,
+    layout,
     layoutRef,
     className,
     style,
     canvasOverlay,
     renderCell,
 }: ChartArrayLayoutProps) {
+    const layoutMode = layout ?? getChartArrayLayoutMode(cellCount);
     const rootRef = useRef<HTMLDivElement>(null);
+    const { gridFillsViewport, gridColumns } = useChartArrayLayoutGeometry(
+        rootRef,
+        cellCount,
+        layoutMode,
+    );
     const cellRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     const setCellRef = useCallback((index: number, element: HTMLDivElement | null) => {
@@ -56,7 +76,16 @@ export default function ChartArrayLayout({
         <div
             ref={rootRef}
             className={["mdv-chart-array", className].filter(Boolean).join(" ")}
-            style={style}
+            data-layout={layoutMode}
+            data-grid-fill={layoutMode === "grid" && gridFillsViewport ? "true" : undefined}
+            style={
+                layoutMode === "grid"
+                    ? {
+                          ...style,
+                          ["--mdv-chart-array-columns" as string]: String(gridColumns),
+                      }
+                    : style
+            }
         >
             {canvasOverlay ? <div className="mdv-chart-array__canvas">{canvasOverlay}</div> : null}
             {Array.from({ length: cellCount }, (_, index) => (
