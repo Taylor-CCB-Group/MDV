@@ -51,6 +51,29 @@ export function getDensityGridLayout(
     };
 }
 
+export type DensityGridVirtualAxisItem = {
+    index: number;
+};
+
+/** Cell indices intersecting the currently virtualized row/column ranges. */
+export function getDensityGridVisibleCellIndices(
+    layout: DensityGridLayout,
+    fieldCount: number,
+    visibleRows: DensityGridVirtualAxisItem[],
+    visibleColumns: DensityGridVirtualAxisItem[],
+): number[] {
+    const indices: number[] = [];
+    for (const row of visibleRows) {
+        for (const column of visibleColumns) {
+            const index = row.index * layout.columns + column.index;
+            if (index < fieldCount) {
+                indices.push(index);
+            }
+        }
+    }
+    return indices;
+}
+
 export function getDensityGridCellBounds(layout: DensityGridLayout, index: number): DensityGridCellBounds {
     const row = Math.floor(index / layout.columns);
     const column = index % layout.columns;
