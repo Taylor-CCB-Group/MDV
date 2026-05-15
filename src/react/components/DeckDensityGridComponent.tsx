@@ -74,6 +74,8 @@ export default function DeckDensityGridComponent() {
                     width: bounds.width,
                     height: bounds.height,
                     flipY: false,
+                    // Top-level DeckGL `controller` only applies to the first view.
+                    controller: { dragPan: true },
                 });
             }),
         [densityFields, layout, viewIds],
@@ -143,7 +145,7 @@ export default function DeckDensityGridComponent() {
     return (
         <div className="relative h-full w-full">
             <DeckGL
-                controller={{ dragPan: true }}
+                controller={false}
                 layerFilter={({ layer, viewport }) => matchesDensityGridView(layer.id, viewport.id)}
                 layers={layers}
                 views={views}
