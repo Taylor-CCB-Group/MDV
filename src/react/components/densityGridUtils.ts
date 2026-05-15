@@ -1,16 +1,26 @@
-import type { OrthographicViewState } from "@deck.gl/core";
+import type { Layer, OrthographicViewState } from "@deck.gl/core";
+import {
+    getChartArrayViewId,
+    getChartArrayViewStates,
+    hasUsableOrthographicViewState,
+    getVivGridDetailViewId,
+} from "./chartArrayGridUtils";
+
+export { getChartArrayViewStates, hasUsableOrthographicViewState, getVivGridDetailViewId };
 
 /** Chart types that expose the density grid setting (see `includeDensityModeToggle`). */
-export const DENSITY_GRID_CHART_TYPES = new Set(["DeckContourScatter", "DeckDensity"]);
+export const DENSITY_GRID_CHART_TYPES = new Set([
+    "DeckContourScatter",
+    "DeckDensity",
+    "VivMdvRegionReact",
+]);
 
 export function supportsDensityGridMode(chartType: string | undefined) {
     return typeof chartType === "string" && DENSITY_GRID_CHART_TYPES.has(chartType);
 }
 
 export function getDensityGridViewId(chartId: string, fieldId: string, index: number) {
-    const safeChartId = chartId.replace(/[^A-Za-z0-9_-]/g, "_");
-    const safeFieldId = fieldId.replace(/[^A-Za-z0-9_-]/g, "_");
-    return `density-grid-${safeChartId}-${index}-${safeFieldId}`;
+    return getChartArrayViewId(chartId, fieldId, index, "density-grid");
 }
 
 export function matchesDensityGridView(layerId: string, viewId: string) {
@@ -21,21 +31,22 @@ export function getDensityGridViewStates(
     viewIds: string[],
     sharedViewState: OrthographicViewState,
 ): Record<string, OrthographicViewState> {
-    return Object.fromEntries(
-        viewIds.map((viewId) => [
-            viewId,
-            {
-                ...sharedViewState,
-            },
-        ]),
-    );
+    return getChartArrayViewStates(viewIds, sharedViewState);
 }
 
-export function hasUsableOrthographicViewState(viewState: OrthographicViewState | undefined): boolean {
-    if (!viewState?.target || viewState.target.length < 2) return false;
-    const x = Number(viewState.target[0]);
-    const y = Number(viewState.target[1]);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-    return Number.isFinite(Number(viewState.zoom));
+type CloneableDeckLayer = Layer & {
+    clone: (props: Record<string, unknown>) => Layer;
+};
+
+export function cloneDeckLayer(layer: CloneableDeckLayer, props: Record<string, unknown>): Layer {
+    return layer.clone(props);
 }
 
+export function getSerializableViewState(viewState: OrthographicViewState): OrthographicViewState {
+    return {
+        target: viewState.target,
+        zoom: viewState.zoom,
+        minZoom: viewState.minZoom,
+        maxZoom: viewState.maxZoom,
+    };
+}

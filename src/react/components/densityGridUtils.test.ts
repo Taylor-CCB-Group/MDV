@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { getVivGridDetailViewId } from "./chartArrayGridUtils";
 import {
     getDensityGridViewId,
     getDensityGridViewStates,
@@ -17,11 +18,19 @@ describe("densityGridUtils", () => {
         expect(matchesDensityGridView(`${viewId}-weights`, "other-view")).toBe(false);
     });
 
-    test("supports density grid only for contour deck chart types", () => {
+    test("supports density grid for deck and viv spatial chart types", () => {
         expect(supportsDensityGridMode("DeckContourScatter")).toBe(true);
         expect(supportsDensityGridMode("DeckDensity")).toBe(true);
+        expect(supportsDensityGridMode("VivMdvRegionReact")).toBe(true);
+        expect(supportsDensityGridMode("viv_scatter_plot")).toBe(false);
         expect(supportsDensityGridMode("wgl_scatter_plot")).toBe(false);
         expect(supportsDensityGridMode(undefined)).toBe(false);
+    });
+
+    test("creates viv detail view ids from grid view ids", () => {
+        const detailId = getVivGridDetailViewId("chart:#1", "marker/a", 2);
+        expect(detailId).toBe("density-grid-chart__1-2-marker_adetail-react");
+        expect(matchesDensityGridView(`${detailId}-gate`, detailId)).toBe(true);
     });
 
     test("detects usable orthographic view state", () => {
