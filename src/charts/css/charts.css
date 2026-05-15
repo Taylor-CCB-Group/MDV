@@ -943,3 +943,31 @@ select, input, textarea {
         height: 1em;
     }
 }
+
+/* Reusable grid for chart arrays (density grid and future multi-chart layouts). */
+.mdv-chart-array {
+    --mdv-chart-array-gap: 8px;
+    --mdv-chart-array-padding: 12px;
+    --mdv-chart-array-min-cell: 260px;
+
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fill,
+        minmax(min(var(--mdv-chart-array-min-cell), 100%), 1fr)
+    );
+    gap: var(--mdv-chart-array-gap);
+    padding: var(--mdv-chart-array-padding);
+    position: relative;
+}
+
+.mdv-chart-array__cell {
+    aspect-ratio: 1;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+}
