@@ -9,6 +9,7 @@ import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } 
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
+import { matchesDensityGridView } from "../densityGridUtils";
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
@@ -127,8 +128,19 @@ class MDVivViewerWrapper extends React.PureComponent<
      */
     // eslint-disable-next-line class-methods-use-this
     layerFilter({ layer, viewport }: any) {
-        //return true; // for testing whether viv id matching is an issue
-        return layer.id.includes(getVivId(viewport.id));
+        const viewportId = viewport.id as string;
+        if (layer.id.includes(getVivId(viewportId))) {
+            return true;
+        }
+        const layerViewId = layer.props?.viewId;
+        if (typeof layerViewId === "string") {
+            return (
+                matchesDensityGridView(layer.id, layerViewId) ||
+                matchesDensityGridView(layer.id, viewportId) ||
+                layerViewId === viewportId
+            );
+        }
+        return matchesDensityGridView(layer.id, viewportId);
     }
 
     /**
@@ -385,7 +397,8 @@ class MDVivViewerWrapper extends React.PureComponent<
         }
         // MDV: make sure the scalebar is on top of other layers
         // perhaps this should be in _renderLayers(), yolo.
-        const vivLayers = this._renderLayers()[0];
+        const vivLayerGroups = this._renderLayers();
+        const vivLayers = vivLayerGroups.flat();
         const scaleBarLayer = vivLayers.find((layer: any) => layer instanceof ScaleBarLayer);
         const otherLayers = vivLayers.filter((layer: any) => layer !== scaleBarLayer);
         const layers = deckProps?.layers === undefined
