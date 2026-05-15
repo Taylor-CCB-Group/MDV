@@ -18,6 +18,32 @@ export function roundRect(rect: ChartArrayRect): ChartArrayRect {
     };
 }
 
+/** Align CSS-pixel bounds to the device-pixel grid so Deck sub-viewports stay sharp. */
+export function snapRectToDevicePixels(
+    rect: ChartArrayRect,
+    devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio : 1,
+): ChartArrayRect {
+    const dpr = Math.max(1, devicePixelRatio);
+    const snap = (value: number) => Math.round(value * dpr) / dpr;
+    const x = snap(rect.x);
+    const y = snap(rect.y);
+    const right = snap(rect.x + rect.width);
+    const bottom = snap(rect.y + rect.height);
+    return {
+        x,
+        y,
+        width: Math.max(0, right - x),
+        height: Math.max(0, bottom - y),
+    };
+}
+
+export function snapRectsToDevicePixels(
+    rects: ChartArrayRect[],
+    devicePixelRatio?: number,
+): ChartArrayRect[] {
+    return rects.map((rect) => snapRectToDevicePixels(rect, devicePixelRatio));
+}
+
 export function measureCellRectsRelativeToRoot(
     root: HTMLElement,
     cells: readonly (HTMLElement | null)[],
@@ -28,7 +54,7 @@ export function measureCellRectsRelativeToRoot(
             return { x: 0, y: 0, width: 0, height: 0 };
         }
         const cellRect = cell.getBoundingClientRect();
-        return roundRect({
+        return snapRectToDevicePixels({
             x: cellRect.left - rootRect.left,
             y: cellRect.top - rootRect.top,
             width: cellRect.width,
@@ -38,11 +64,12 @@ export function measureCellRectsRelativeToRoot(
 }
 
 export function measureRootSize(root: HTMLElement): ChartArrayRect {
-    return roundRect({
+    const rect = root.getBoundingClientRect();
+    return snapRectToDevicePixels({
         x: 0,
         y: 0,
-        width: root.offsetWidth,
-        height: root.offsetHeight,
+        width: rect.width,
+        height: rect.height,
     });
 }
 

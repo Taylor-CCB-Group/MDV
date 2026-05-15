@@ -194,8 +194,28 @@ export default function DeckDensityGridComponent() {
         [densityFields],
     );
 
-    const { width: canvasWidth, height: canvasHeight } = metrics.rootSize;
-    const hasCanvas = canvasWidth > 0 && canvasHeight > 0;
+    const hasCanvas = metrics.rootSize.width > 0 && metrics.rootSize.height > 0;
+
+    const deckOverlay = useMemo(
+        () =>
+            hasCanvas ? (
+                <DeckGL
+                    controller={false}
+                    layerFilter={({ layer, viewport }) => matchesDensityGridView(layer.id, viewport.id)}
+                    layers={layers}
+                    views={views}
+                    viewState={viewState}
+                    useDevicePixels={true}
+                    onViewStateChange={({ viewState: nextViewState }: { viewState: OrthographicViewState }) => {
+                        action(() => {
+                            config.viewState = getSerializableViewState(nextViewState);
+                        })();
+                    }}
+                    getCursor={({ isDragging }) => (isDragging ? "grabbing" : "crosshair")}
+                />
+            ) : null,
+        [hasCanvas, layers, views, viewState, config],
+    );
 
     if (configuredFieldCount === 0) {
         return <div className="flex h-full items-center justify-center text-sm">Choose density fields to build the grid.</div>;
@@ -216,38 +236,13 @@ export default function DeckDensityGridComponent() {
                 onMouseEnter={() => setScatterKeyboardActive(true)}
                 onMouseLeave={() => setScatterKeyboardActive(false)}
             >
-                <div className="relative">
-                    {hasCanvas && (
-                        <div
-                            className="pointer-events-auto absolute left-0 top-0"
-                            style={{ width: canvasWidth, height: canvasHeight }}
-                        >
-                            <DeckGL
-                                controller={false}
-                                width={canvasWidth}
-                                height={canvasHeight}
-                                layerFilter={({ layer, viewport }) => matchesDensityGridView(layer.id, viewport.id)}
-                                layers={layers}
-                                views={views}
-                                viewState={viewState}
-                                useDevicePixels={true}
-                                onViewStateChange={({ viewState: nextViewState }: { viewState: OrthographicViewState }) => {
-                                    action(() => {
-                                        config.viewState = getSerializableViewState(nextViewState);
-                                    })();
-                                }}
-                                getCursor={({ isDragging }) => (isDragging ? "grabbing" : "crosshair")}
-                            />
-                        </div>
-                    )}
-                    <ChartArrayLayout
-                        cellCount={cellCount}
-                        cellKeys={densityFields.map((field) => field.field)}
-                        layoutRef={layoutRef}
-                        className="pointer-events-none relative z-10"
-                        renderCell={renderCell}
-                    />
-                </div>
+                <ChartArrayLayout
+                    cellCount={cellCount}
+                    cellKeys={densityFields.map((field) => field.field)}
+                    layoutRef={layoutRef}
+                    canvasOverlay={deckOverlay}
+                    renderCell={renderCell}
+                />
             </div>
         </div>
     );

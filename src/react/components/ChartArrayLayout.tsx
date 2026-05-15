@@ -18,6 +18,8 @@ type ChartArrayLayoutProps = {
     layoutRef?: Ref<ChartArrayLayoutHandle>;
     className?: string;
     style?: CSSProperties;
+    /** Shared-canvas layer (e.g. DeckGL) sized to the grid root via CSS. */
+    canvasOverlay?: ReactNode;
     renderCell: (index: number) => ReactNode;
 };
 
@@ -27,6 +29,7 @@ export default function ChartArrayLayout({
     layoutRef,
     className,
     style,
+    canvasOverlay,
     renderCell,
 }: ChartArrayLayoutProps) {
     const rootRef = useRef<HTMLDivElement>(null);
@@ -55,6 +58,7 @@ export default function ChartArrayLayout({
             className={["mdv-chart-array", className].filter(Boolean).join(" ")}
             style={style}
         >
+            {canvasOverlay ? <div className="mdv-chart-array__canvas">{canvasOverlay}</div> : null}
             {Array.from({ length: cellCount }, (_, index) => (
                 <div
                     key={cellKeys?.[index] ?? index}
