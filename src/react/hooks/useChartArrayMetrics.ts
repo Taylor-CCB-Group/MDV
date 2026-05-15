@@ -45,7 +45,11 @@ export function useChartArrayMetrics(
             const cell = cells[i];
             if (cell) observer.observe(cell);
         }
-        return () => observer.disconnect();
+        window.addEventListener("resize", measure);
+        return () => {
+            observer.disconnect();
+            window.removeEventListener("resize", measure);
+        };
     }, [layoutRef, cellCount]);
 
     return metrics;
