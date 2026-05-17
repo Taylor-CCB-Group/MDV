@@ -1,11 +1,12 @@
 import { observer } from "mobx-react-lite";
-import { useChart } from "../../react/context";
+import { useChart } from "@/react/context";
 import { useEffect, useState, useMemo } from "react";
 import { useDebouncedChartSize } from "@/react/hooks";
 import type UCSCBrowser from "./UCSCBrowser";
 import { getLocation,UCSCBrowserConfig,UCSCBrowserLocation,UCSCBrowserViewMargins } from "./UCSCBrowser";
 import { useFieldSpecs } from "@/react/hooks";
 import { useHighlightedIndex } from "@/react/selectionHooks";
+import { highlightedIndexToLocation } from "../genomicLocationUtils";
 
 
 const UCSCBrowserComponent = observer(() => {
@@ -20,28 +21,7 @@ const UCSCBrowserComponent = observer(() => {
     const url_proxy = chart.dataStore?.genome?.genomic?.ucsc_proxy_url || "ucsc_proxy";
 
     function getHighlightedRegion(): UCSCBrowserLocation | null {
-        if (highlightedIndex < 0 || fieldSpecs.length < 3) return null;
-        const chrSpec = fieldSpecs[0];
-        const startSpec = fieldSpecs[1];
-        const endSpec = fieldSpecs[2];
-        if (!chrSpec || !startSpec || !endSpec) return null;
-
-        const chr = chrSpec.getValue(highlightedIndex);
-        const start = startSpec.getValue(highlightedIndex);
-        const rawEnd = endSpec.getValue(highlightedIndex);
-        if (typeof chr !== "string" || typeof start !== "number" || typeof rawEnd !== "number") {
-            return null;
-        }
-
-        let end = rawEnd;
-        if (genome?.svs){
-            const chr2Spec = fieldSpecs[3];
-            const chr2 = chr2Spec?.getValue(highlightedIndex);
-            if (typeof chr2 !== "string" || chr !== chr2 || start - end > 30000){
-                end = start + 1000; // if on different chromosomes or very far apart, show a small region around the first position
-            }
-        }
-        return { chr, start, end };
+        return highlightedIndexToLocation(highlightedIndex, fieldSpecs, Boolean(genome?.svs));
     }
 
     const handleZoom = (factor: number) => {

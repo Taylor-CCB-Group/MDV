@@ -217,6 +217,9 @@ importers:
       html-to-image:
         specifier: ^1.11.11
         version: 1.11.11
+      igv:
+        specifier: ^3.5.0
+        version: 3.8.0
       jquery:
         specifier: ^3.6.1
         version: 3.7.1
@@ -3962,6 +3965,9 @@ packages:
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
+
+  igv@3.8.0:
+    resolution: {integrity: sha512-ttCnqbiIjTQsZYcz66ALvLOhsWe4tf93Xhavf59KepgtrVfizTooCHmZNkdG8H/+32NA9MAM/tkkwwpX5kV5iw==}
 
   image-size@0.7.5:
     resolution: {integrity: sha512-Hiyv+mXHfFEP7LzUL/llg9RwFxxY+o9N3JVLIeG5E7iFIFAalxvRU9UZthBdYDEVnzHMgjnKJPPpay5BWf1g9g==}
@@ -10039,6 +10045,8 @@ snapshots:
       safer-buffer: 2.1.2
 
   ieee754@1.2.1: {}
+
+  igv@3.8.0: {}
 
   image-size@0.7.5: {}
 

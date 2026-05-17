@@ -213,8 +213,8 @@ export type GuiValueTypes = {
     radiobuttons: string;
     slider: number;
     spinner: number;
-    /** buttons don't have a `current_value` - just the `func()` to call back */
-    button: never;
+    /** button specs use a label-like payload in some charts, but the runtime ignores it */
+    button: string | null;
     doubleslider: [number, number];
     folder: GuiSpec[];
     // color: string; //not a bad idea, copilot... soon...
@@ -263,6 +263,7 @@ export type GuiSpec<T extends GuiSpecType> = {
     current_value: GV<T>;
     // is this optional or not? depends slightly how much we lean on mobx current_value mutation for reactivity...
     func?: GuiFunc<T>;
+    only_update_on_enter?: boolean;
     //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
     sourceColumn?: T extends "category_selection" | "single_category_selection" ? (() => FieldSpec | undefined) : never;

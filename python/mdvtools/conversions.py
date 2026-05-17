@@ -536,6 +536,8 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
     # however pysam seems to convert this to a stop field in the record
     # so we will use that
     import pysam
+    BND_REMOTE_RE = re.compile(r"[\[\]]([^:\[\]]+):(\d+)[\[\]]")
+
     draft_chrom_pattern = re.compile(
         r"(random|chrUn|fix|alt|decoy)", re.IGNORECASE
     )
@@ -575,12 +577,30 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
         chr2= rec.info.get("CHR2",chr1)
         if not chr1 in chromosomes or not chr2 in chromosomes:
             continue
+        svtype = rec.info.get("SVTYPE","UKN")
+        length = abs(rec.info.get("SVLEN",0))
+        pos2  = rec.stop
+        if svtype in ["TRA","BND"] and rec.pos == rec.stop:
+            if rec.pos != pos2:
+                print("malformed VCF record with SVTYPE TRA/BND and non-zero SVLEN, using POS and END as positions")
+            if len(rec.alts) > 1:
+                print (f"More than 1 ALT allele found for record {rec}, using the first one")
+            m = BND_REMOTE_RE.search(rec.alts[0])
+            if m:
+                chr2_t  = m.group(1)
+                chr2 = chr2_t
+                pos2 = int(m.group(2))
+                if not chr2 in chromosomes:
+                    continue
+            else:
+                print(f"Could not parse ALT field for BND/TRA record {rec}, using CHR2 and POS2 from INFO")
+                continue
         column_dict["chr1"].append(chr1)
         column_dict["pos1"].append(rec.pos)
-        column_dict["chr2"].append(rec.info.get("CHR2",chr2))
-        column_dict["pos2"].append(rec.stop)
-        column_dict["svtype"].append(rec.info.get("SVTYPE","?"))
-        column_dict["length"].append(abs(rec.info.get("SVLEN",0)))
+        column_dict["chr2"].append(chr2)
+        column_dict["pos2"].append(pos2)
+        column_dict["svtype"].append(svtype)
+        column_dict["length"].append(length)
         column_dict["quality"].append(rec.qual if rec.qual else 0)
         for field in extra_info:
             column_dict[field].append(rec.info.get(field,"NA"))

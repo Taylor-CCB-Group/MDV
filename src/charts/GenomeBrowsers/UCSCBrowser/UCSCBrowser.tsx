@@ -1,9 +1,10 @@
-import BaseChart  from "../BaseChart";
-import { g } from "../../lib/utils";
-import type { BaseConfig } from "../BaseChart";
+import BaseChart  from "../../BaseChart";
+import { g } from "../../../lib/utils";
+import type { BaseConfig } from "../../BaseChart";
 import UCSCBrowserComponent from "./UCSCBrowserComponent";
-import { BaseReactChart } from "../../react/components/BaseReactChart";
-import type DataStore from "../../datastore/DataStore";
+import { BaseReactChart } from "../../../react/components/BaseReactChart";
+import type DataStore from "../../../datastore/DataStore";
+import { applyViewMargins } from "../genomicLocationUtils";
 
 
 interface UCSCBrowserLocation {
@@ -27,33 +28,7 @@ interface UCSCBrowserConfig extends BaseConfig {
 }
 
 function getLocation(location:UCSCBrowserLocation, vm:UCSCBrowserViewMargins) : UCSCBrowserLocation  {
-    const chr = location.chr;
-    let start = location.start;
-    let end = location.end;
-    if (start>end){
-        const temp = start;
-        start = end;
-        end = temp;
-    }
-    if (vm){
-        switch(vm.type){
-            case "absolute":
-                start = start - vm.value;
-                end = end + vm.value;
-                break;
-            case "percentage":
-                const length = end - start;
-                const margin = Math.round(length * vm.value / 100);
-                start = Math.max(0,start - margin);
-                end = end + margin;
-                break;
-            case "fixed_length":
-                start = Math.round(start - vm.value);
-                end = Math.round(end + vm.value);
-        }
-    }
-    start = Math.max(0,start);
-    return {chr, start, end};
+    return applyViewMargins(location, vm);
 }
 
 

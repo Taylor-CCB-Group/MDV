@@ -54,7 +54,8 @@ import "./SingleSeriesChart";
 import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import "./SVCircosPlot/SVCircosPlot"
-import "./UCSCBrowser/UCSCBrowser";
+import "./GenomeBrowsers/UCSCBrowser/UCSCBrowser";
+import "./GenomeBrowsers/IGVBrowser/IGVBrowser";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
@@ -1801,7 +1802,13 @@ export class ChartManager {
         //check if columns need loading
         const neededCols = this._getColumnsRequiredForChart(config);
         //check which columns need loading
-        if (config.location) {
+        if (
+            config.location &&
+            typeof config.location.x === "number" &&
+            typeof config.location.y === "number" &&
+            typeof config.location.width === "number" &&
+            typeof config.location.height === "number"
+        ) {
             const l = config.location;
             const b = 5;
             config.size = [

@@ -137,7 +137,9 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
         //the data is any arraybuffer containing each individual
         //column's raw data
         let data: ArrayBufferLike = await response.arrayBuffer();
-        data = decompress ? await decompressData(new Uint8Array(data)) : data;
+        const arr  = new Uint8Array(data);
+        decompress = decompress || (arr.length >3 && arr[0] === 120 && arr[1] === 156)
+        data = decompress ? await decompressData(arr) : data;
         return processArrayBuffer(data, columns, size);
     };
 }

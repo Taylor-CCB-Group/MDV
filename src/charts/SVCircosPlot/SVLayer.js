@@ -89,7 +89,6 @@ class SVLayer extends Layer {
     this.getAttributeManager().addInstanced({
       instancePosition: {
         size: 3,
-        type: "uint32",
         accessor: 'getSV'
       },
       instanceFilter:{

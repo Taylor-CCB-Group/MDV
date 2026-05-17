@@ -80,7 +80,7 @@ function calculateSVs(params,dataStore){
     const chr1Vals= dataStore.getColumnValues(p[1]);
     const chr2Vals= dataStore.getColumnValues(p[3]);
     const svtypeVals= dataStore.getColumnValues(p[4]);
-    const svBuff = new Uint32Array(dataStore.size*3);
+    const svBuff = new Float32Array(dataStore.size*3);
     for (let i = 0; i < dataStore.size; i++) {
         const idx= i*3;
         const sv_start = pos1[i] + chrCumLen[chr1Vals[chr1[i]]];
@@ -90,6 +90,7 @@ function calculateSVs(params,dataStore){
             t=5;
         }
         svBuff[idx] = sv_start;
+        // Keep signed delta so links where end is before start are rendered correctly.
         svBuff[idx+1] = sv_end -sv_start;
         svBuff[idx+2] = t;
     }
