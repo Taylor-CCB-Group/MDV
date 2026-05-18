@@ -406,9 +406,9 @@ export async function setDotPlotXAxisLinkField(
     await expect
         .poll(async () => {
             const fields = await getDotPlotXAxisFields(page, chartTitle);
-            return fields[0] ?? "";
+            return (fields[0] ?? "").startsWith(`{subgroupKey}|`);
         })
-        .toMatch(new RegExp(`^${subgroupKey}\\|`));
+        .toBe(true);
     await waitForViewUnsavedState(page, true);
 }
 
