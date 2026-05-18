@@ -158,6 +158,7 @@ export async function openChartSettingsDialog(page: Page, title: string) {
     await expect(panel).toBeVisible();
     await panel.locator(".ciview-chart-menuspace > span").nth(2).click();
     await expect(page.locator(".ciview-dlg-header-text", { hasText: `Settings: ${title}` })).toBeVisible();
+    await expect(page.getByLabel("Search Settings by Folder or Name")).toBeVisible();
 }
 
 export async function openChartDebugDialog(page: Page, title: string) {
@@ -220,4 +221,196 @@ export async function selectViewViaUi(page: Page, viewName: string) {
     await page.getByRole("combobox", { name: "Select View" }).click();
     await page.getByRole("option", { name: viewName, exact: true }).click();
     await expect.poll(async () => await getCurrentView(page)).toBe(viewName);
+}
+
+export type RowsAsColumnsSubgroupInfo = {
+    key: string;
+    label: string;
+};
+
+/** Subgroup keys on the cells→genes rows_as_columns link (requires extra-expression-layers project). */
+export async function getRowsAsColumnsSubgroupKeys(page: Page): Promise<RowsAsColumnsSubgroupInfo[]> {
+    return await page.evaluate(() => {
+        const chartManager = (window as any).mdv?.chartManager;
+        const cellsStore =
+            chartManager?.dsIndex?.cells?.dataStore ??
+            Object.values(chartManager?.dsIndex ?? {}).find(
+                (entry: { dataStore?: { links?: Record<string, unknown> } }) => entry?.dataStore?.links,
+            )?.dataStore;
+        if (!cellsStore?.links) {
+            return [];
+        }
+        for (const linkedDsName of Object.keys(cellsStore.links)) {
+            const subgroups = cellsStore.links[linkedDsName]?.rows_as_columns?.subgroups;
+            if (!subgroups) {
+                continue;
+            }
+            return Object.entries(subgroups).map(([key, info]) => ({
+                key,
+                label: String((info as { label?: string })?.label ?? key),
+            }));
+        }
+        return [];
+    });
+}
+
+export async function getFirstLinkedGeneLabel(page: Page): Promise<string> {
+    return await page.evaluate(async () => {
+        const chartManager = (window as any).mdv?.chartManager;
+        const cellsStore =
+            chartManager?.dsIndex?.cells?.dataStore ??
+            chartManager.dsIndex[Object.keys(chartManager.dsIndex)[0]]?.dataStore;
+        if (!cellsStore?.links) {
+            throw new Error("No rows_as_columns links on cells datasource");
+        }
+        for (const linkedDsName of Object.keys(cellsStore.links)) {
+            const rac = cellsStore.links[linkedDsName]?.rows_as_columns as { name_column?: string } | undefined;
+            if (!rac?.name_column) {
+                continue;
+            }
+            const linkedDs = chartManager.dataSources.find((ds: { name: string }) => ds.name === linkedDsName);
+            const nameColumn = linkedDs?.dataStore?.columnIndex?.[rac.name_column];
+            if (!nameColumn) {
+                continue;
+            }
+            if (!nameColumn.values && linkedDs?.dataStore?.loadColumn) {
+                await linkedDs.dataStore.loadColumn(nameColumn.field);
+            }
+            const values = nameColumn.values ?? linkedDs?.dataStore?.getColumnValues?.(rac.name_column);
+            if (Array.isArray(values) && values.length > 0) {
+                return String(values[0]);
+            }
+        }
+        throw new Error("No linked gene labels available");
+    });
+}
+
+export async function addDotPlotChartViaApi(page: Page, title: string): Promise<string> {
+    return await page.evaluate(async (chartTitle) => {
+        const chartManager = (window as any).mdv.chartManager;
+        const dataSourceName = chartManager.dsIndex.cells ? "cells" : Object.keys(chartManager.dsIndex)[0];
+        const dataStore = chartManager.dsIndex[dataSourceName].dataStore;
+        const categoryColumn =
+            dataStore.columns.find(
+                (column: { datatype?: string; subgroup?: unknown; field?: string }) =>
+                    column.datatype === "text" && !column.subgroup && column.field !== "__index__",
+            )?.field ?? "cell_type";
+        const chartId = `pw-dot-plot-${Date.now()}`;
+        await chartManager.addChart(
+            dataSourceName,
+            {
+                id: chartId,
+                title: chartTitle,
+                legend: "",
+                type: "dot_plot",
+                param: [categoryColumn],
+                size: [700, 420],
+                position: [20, 20],
+            },
+            true,
+        );
+        return chartId;
+    }, title);
+}
+
+export async function searchChartSettings(page: Page, query: string) {
+    const search = page.getByLabel("Search Settings by Folder or Name");
+    await expect(search).toBeVisible();
+    await search.fill(query);
+    await expect(page.getByText(query, { exact: true }).first()).toBeVisible();
+}
+
+function getSettingRow(page: Page, paramLabel: string) {
+    return page
+        .locator(".grid")
+        .filter({ has: page.getByText(paramLabel, { exact: true }) })
+        .first();
+}
+
+export function getLinkColumnSettingRow(page: Page, paramLabel: string) {
+    const row = getSettingRow(page, paramLabel);
+    return { row, subgroupTablist: row.getByRole("tablist").nth(1) };
+}
+
+/** Open the column-selection "link" tab and pick one gene from a rows_as_columns subgroup. */
+export async function selectLinkedGeneInChartSettings(
+    page: Page,
+    options: {
+        paramLabel: string;
+        subgroupTabLabel: string;
+        geneLabel: string;
+    },
+) {
+    await searchChartSettings(page, options.paramLabel);
+    const { row, subgroupTablist } = getLinkColumnSettingRow(page, options.paramLabel);
+    await expect(row).toBeVisible();
+    await row.getByRole("tab", { name: "link", exact: true }).click();
+    await subgroupTablist.getByRole("tab", { name: options.subgroupTabLabel, exact: true }).click();
+
+    const combobox = row.getByRole("combobox").first();
+    await combobox.click();
+    await combobox.fill(options.geneLabel);
+    const listbox = page.getByRole("listbox");
+    await expect(listbox).toBeVisible();
+    const option = listbox
+        .getByRole("option")
+        .filter({ hasText: options.geneLabel })
+        .first();
+    await expect(option).toBeVisible();
+    await option.click();
+}
+
+/** True when Playwright targets a worktree Vite dev server (subgroup tab UI is not on the 5055 image build). */
+export function isWorktreeFrontendForPlaywright(): boolean {
+    const baseUrl = process.env.TEST_BASE_URL ?? "http://localhost:5055/";
+    return /5170|5173/.test(baseUrl);
+}
+
+export async function setDotPlotXAxisLinkField(
+    page: Page,
+    chartTitle: string,
+    subgroupKey: string,
+    geneLabel: string,
+    geneIndex: number,
+) {
+    await page.evaluate(
+        ({ chartTitle: title, subgroupKey: sg, geneLabel: label, geneIndex: index }) => {
+            const fieldName = `${sg}|${label} (${sg})|${index}`;
+            const chartEntries = Object.values((window as any).mdv.chartManager.charts) as Array<{
+                chart?: {
+                    config?: { title?: string; param?: unknown[] };
+                    _setFields?: (fields: string[]) => void;
+                };
+            }>;
+            const entry = chartEntries.find((item) => item.chart?.config?.title === title);
+            const chart = entry?.chart;
+            const category = chart?.config?.param?.[0];
+            if (!chart || typeof category !== "string") {
+                throw new Error(`Dot plot chart not found or missing category: ${title}`);
+            }
+            chart.config.param = [category, fieldName];
+        },
+        { chartTitle, subgroupKey, geneLabel, geneIndex },
+    );
+    await expect
+        .poll(async () => {
+            const fields = await getDotPlotXAxisFields(page, chartTitle);
+            return fields[0] ?? "";
+        })
+        .toMatch(new RegExp(`^${subgroupKey}\\|`));
+    await waitForViewUnsavedState(page, true);
+}
+
+export async function getDotPlotXAxisFields(page: Page, chartTitle: string): Promise<string[]> {
+    return await page.evaluate((title) => {
+        const chartEntries = Object.values((window as any).mdv.chartManager.charts) as Array<{
+            chart?: { config?: { title?: string; param?: unknown[] } };
+        }>;
+        const entry = chartEntries.find((item) => item.chart?.config?.title === title);
+        const param = entry?.chart?.config?.param;
+        if (!Array.isArray(param)) {
+            return [];
+        }
+        return param.slice(1).filter((value): value is string => typeof value === "string");
+    }, chartTitle);
 }

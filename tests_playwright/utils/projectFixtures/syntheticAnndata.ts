@@ -34,6 +34,8 @@ export type SyntheticAnndataGeneratorCliArgs = {
     sparseDensity?: number;
     chunkData?: boolean;
     computeXUmap?: boolean;
+    /** Adds synth_layer_a / synth_layer_b AnnData.layers → multiple rows_as_columns subgroups. */
+    extraExpressionLayers?: boolean;
     force?: boolean;
 };
 
@@ -101,6 +103,9 @@ async function runSyntheticAnndataProjectCli(
     }
     if (synthetic.computeXUmap) {
         args.push("--compute-x-umap");
+    }
+    if (synthetic.extraExpressionLayers) {
+        args.push("--extra-expression-layers");
     }
     if (force) {
         args.push("--force");
