@@ -38,6 +38,7 @@
     "docker_stack_prune": "docker stack rm mdv_stack && docker container prune -f && docker image prune -a -f && docker volume prune -f",
     "fix_pnpm_win": "pnpm config set script-shell \"cmd\"",
     "jslint": "biome lint --write ./src",
+    "jscheck": "biome lint ./src",
     "jsformat": "biome format --write ./src",
     "test": "vitest",
     "playwright-setup": "pnpm install && pnpm exec playwright install --with-deps",
