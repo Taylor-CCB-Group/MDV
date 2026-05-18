@@ -228,15 +228,25 @@ export type RowsAsColumnsSubgroupInfo = {
     label: string;
 };
 
+type PlaywrightDsIndexEntry = {
+    dataStore?: {
+        links?: Record<
+            string,
+            {
+                rows_as_columns?: { subgroups?: Record<string, { label?: string }> };
+            }
+        >;
+    };
+};
+
 /** Subgroup keys on the cells→genes rows_as_columns link (requires extra-expression-layers project). */
 export async function getRowsAsColumnsSubgroupKeys(page: Page): Promise<RowsAsColumnsSubgroupInfo[]> {
     return await page.evaluate(() => {
         const chartManager = (window as any).mdv?.chartManager;
+        const dsIndex = (chartManager?.dsIndex ?? {}) as Record<string, PlaywrightDsIndexEntry>;
         const cellsStore =
             chartManager?.dsIndex?.cells?.dataStore ??
-            Object.values(chartManager?.dsIndex ?? {}).find(
-                (entry: { dataStore?: { links?: Record<string, unknown> } }) => entry?.dataStore?.links,
-            )?.dataStore;
+            Object.values(dsIndex).find((entry) => entry?.dataStore?.links)?.dataStore;
         if (!cellsStore?.links) {
             return [];
         }
@@ -384,11 +394,12 @@ export async function setDotPlotXAxisLinkField(
             }>;
             const entry = chartEntries.find((item) => item.chart?.config?.title === title);
             const chart = entry?.chart;
-            const category = chart?.config?.param?.[0];
-            if (!chart || typeof category !== "string") {
+            const config = chart?.config;
+            const category = config?.param?.[0];
+            if (!chart || !config || typeof category !== "string") {
                 throw new Error(`Dot plot chart not found or missing category: ${title}`);
             }
-            chart.config.param = [category, fieldName];
+            config.param = [category, fieldName];
         },
         { chartTitle, subgroupKey, geneLabel, geneIndex },
     );
