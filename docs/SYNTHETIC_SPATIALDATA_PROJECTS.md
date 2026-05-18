@@ -20,6 +20,9 @@ For scatter/table performance background, see
   provenance metadata so later cleanup can be automated safely.
 - For new React-backed chart configs, prefer creating the view through the UI
   and then inspecting `views.json` before encoding the shape in Python.
+- Two serving modes are useful for performance work: the running container
+  (main-branch frontend) and the local Python venv (current-branch frontend).
+  See [Serving Generated Projects](#serving-generated-projects).
 
 ## Project Convention
 
@@ -70,18 +73,132 @@ Example provenance:
 }
 ```
 
-For a DB-backed app, generate the project and then use `/rescan_projects` or
-restart the app so `serve_projects_from_filesystem()` can register it. For
-direct/manual serving, use the project path directly.
+See [Serving Generated Projects](#serving-generated-projects) for how to make
+a generated project visible to the running backend or to the local Python venv.
 
-Cleanup rules:
+## Playwright (filesystem + rescan)
 
-- filesystem cleanup: remove the exact generated project directory, such as
-  `rm -rf ~/mdv/synth-spatial--scatter-table--100k--single`;
-- DB-backed cleanup: prefer `/delete_project/<id>` or the existing local
-  cleanup utilities rather than direct database edits;
-- future improvement: add a selector for
-  `state.json.provenance.cleanup_group == "synth-spatial"`.
+Backend-backed Playwright specs can create disposable projects the same way as a
+human workflow: generate under `~/mdv`, hit `GET /rescan_projects`, then select the
+new project id from `GET /projects`.
+
+Use `createTemporaryProjectViaSyntheticSpatial` from
+`tests_playwright/utils/projectFixtures/syntheticSpatial.ts` (also re-exported from
+`tests_playwright/utils/projectFixtures` and `tests_playwright/utils/tempProject.ts`) instead of duplicating that orchestration in each spec. Default folder names include
+the `synth-spatial--playwright-rescan--...` prefix so they are easy to match in SQL
+filters.
+
+Cleaning up:
+
+- Each handle `cleanup()` removes the generated folder under `~/mdv`.
+- Rows left in the shared dev database can be purged with
+  `python/mdvtools/dbutils/cleanup_projects.py --filter-name` (see
+  `docs/PLAYWRIGHT_STABILIZATION_GUIDE.md`).
+
+## Identifying Existing Synthetic Projects
+
+The directory naming convention is the quickest filter:
+
+```bash
+ls -d ~/mdv/synth-spatial--*/ 2>/dev/null
+```
+
+The provenance metadata is the authoritative filter and also catches projects
+generated with a custom `--output` path:
+
+```bash
+for f in ~/mdv/*/state.json; do
+    if jq -e '.provenance.cleanup_group == "synth-spatial"' "$f" >/dev/null 2>&1; then
+        dirname "$f"
+    fi
+done
+```
+
+Relevant `state.json` fields are documented above and include `profile`,
+`n_cells`, `n_genes`, `n_coordinate_systems`, and
+`coordinate_system_cell_counts`, so a one-liner can list size/shape per
+project.
+
+## Serving Generated Projects
+
+There are two useful modes; pick deliberately when measuring performance.
+
+### 1. Through the running container (main-branch frontend)
+
+The local docker compose stack defined in `docker-secrets.yml` bind-mounts
+host `~/mdv` to the container's `/app/mdv`, so any direct child of `~/mdv`
+becomes visible to the running backend on `localhost:5055`. The frontend the
+container serves is whatever is built into its image, i.e. the **main**
+branch, not the current worktree. The Vite dev server on `localhost:5170`
+proxies its API calls to `localhost:5055`, so it pairs naturally with the
+container backend when iterating on frontend code.
+
+After generating a project, register it without restarting the container:
+
+```bash
+curl -fsS http://127.0.0.1:5055/rescan_projects -o /dev/null
+```
+
+That route is `GET` and responds with a `302` redirect to `/`; the backend log
+line `RESCAN PROJECTS` confirms it ran. Once registered, the project is
+available at `http://localhost:5055/project/<id>` (and the same path through
+`localhost:5170` via the proxy).
+
+### 2. Through the local Python venv (current-branch frontend)
+
+Use this mode to verify the **current branch's** frontend against a generated
+project (apples-to-apples performance comparisons, build-vs-dev checks, etc.).
+
+```bash
+pnpm run build-flask-vite
+venv/bin/mdvtools serve ~/mdv/synth-spatial--scatter-table--100k--single --port 5057
+```
+
+`build-flask-vite` writes the bundle to `python/mdvtools/static/`, which the
+local `mdvtools serve` CLI (using `serverlite.py` and `templates/page.html`)
+serves directly. Use a port that does not clash with the container (5055) or
+Vite (5170). Multiple concurrent instances on different ports are fine.
+
+`python/mdvtools/mdv_desktop.py`, which would otherwise scan `~/mdv` and serve
+every project, currently hardcodes `project_dir = "/app/mdv"` for the Docker
+deployment and is not usable as-is for local multi-project serving. Until that
+is parameterised, prefer per-project `mdvtools serve` invocations locally.
+
+## Cleanup
+
+Filesystem-only cleanup of synthetic projects (use this when the project was
+never registered with the DB-backed backend, or you also intend to run the DB
+purge step below):
+
+```bash
+rm -rf ~/mdv/synth-spatial--*
+```
+
+DB-backed cleanup goes through `cleanup_projects.py`, which removes both the
+filesystem directory and the related rows in `projects`, `files`, and
+`user_projects`. The `test-generated` selector matches any project whose
+`state.json` has `provenance` (which includes synthetic spatial projects).
+Combine it with `--filter-name` to restrict the purge:
+
+```bash
+# Preview
+venv/bin/python -m mdvtools.dbutils.cleanup_projects \
+    --list test-generated --filter-name "synth-spatial--*"
+
+# Purge
+venv/bin/python -m mdvtools.dbutils.cleanup_projects \
+    --purge test-generated --filter-name "synth-spatial--*" --confirm
+```
+
+See `python/mdvtools/dbutils/CLEANUP_SCRIPT_README.md` for selector and
+filter semantics. Note that `cleanup_projects` connects to the database the
+same way `mdv_server_app` does, so it must be run with credentials that match
+the running backend (typically by executing it inside the running container,
+not from the host venv).
+
+Future improvement: add a dedicated cleanup selector keyed on
+`state.json.provenance.cleanup_group == "synth-spatial"` so cleanup is not
+conflated with other test-generated projects.
 
 ## Generator
 

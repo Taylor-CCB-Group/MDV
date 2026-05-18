@@ -1,4 +1,8 @@
+from typing import cast
+
 from mdvtools.llm.code_manipulation import parse_view_name
+from mdvtools.llm.code_manipulation import prepare_code, _defines_function_named_main
+from mdvtools.mdvproject import MDVProject
 
 
 class TestParseViewName:
@@ -51,3 +55,98 @@ def main():
     print(view_name)
 """
         assert parse_view_name(code) == "a view name in multiline code" 
+
+
+def test_prepare_code_does_not_append_else_when_llm_includes_else_main(tmp_path):
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+import os
+
+def main():
+    view_name = "v"
+    return
+
+if __name__ == "__main__":
+    main()
+else:
+    main()
+```"""
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=False)
+    # Must compile; regression for stray `else:` being appended.
+    compile(out, "<string>", "exec")
+
+
+def test_defines_function_named_main_helper():
+    assert _defines_function_named_main("def main():\n    pass\n")
+    assert _defines_function_named_main("async def main():\n    pass\n")
+    assert _defines_function_named_main("def foo():\n    pass\ndef main():\n    pass\n")
+    assert not _defines_function_named_main("x = 1\nprint(x)\n")
+    assert not _defines_function_named_main("def run():\n    pass\n")
+
+
+def test_prepare_code_appends_main_only_when_def_main_exists():
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+def main():
+    x = 1
+```"""
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=False)
+    assert 'if __name__ == "__main__":\n    main()' in out
+
+
+def test_prepare_code_multiline_add_datasource_compiles_with_modify_existing():
+    """Regression: naive commenting of project.add_datasource broke multiline calls (unmatched ')')."""
+
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+view_name = "v"
+project.add_datasource(
+    'chat_rank_genes_result',
+    df,
+    replace_data=True,
+    add_to_view=view_name,
+)
+```"""
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=True)
+    compile(out, "<string>", "exec")
+    assert "project.add_datasource(" in out
+    assert "# project.add_datasource" not in out
+
+
+def test_prepare_code_no_append_main_for_top_level_only():
+    class FakeProject:
+        def __init__(self):
+            self._views = {}
+
+        @property
+        def views(self):
+            return self._views
+
+    llm = """```python
+x = 1
+print(x)
+```"""
+    out = prepare_code(llm, data=None, project=cast(MDVProject, FakeProject()), modify_existing_project=False)
+    assert 'if __name__ == "__main__":\n    main()' not in out
+    compile(out, "<string>", "exec")

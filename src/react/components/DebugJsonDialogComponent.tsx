@@ -88,7 +88,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
         () => filterJSON(jsonWithVivTelemetry, debouncedFilter),
         [jsonWithVivTelemetry, debouncedFilter],
     );
-    const chartTypeCounts = validationFindings?.chartTypeCounts ?? {};
+    const chartTypeCounts: Record<string, number> = validationFindings?.chartTypeCounts ?? {};
     const hasAnyFindings = Boolean(validationFindings?.hasAny);
 
     return (

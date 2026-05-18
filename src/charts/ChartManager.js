@@ -17,46 +17,17 @@ import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
 import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
-// this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
+// this is added as a side-effect of importing registerChartModules,
+// then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
 
-//default charts
-import "./HistogramChart.js";
-import "./RowChart.js";
-import "./TableChart.js";
-import "./WGL3DScatterPlot.js";
-import "./WGLScatterPlot.js";
-import "./RingChart.js";
-import "../react/components/TextBoxChartReactWrapper";
-import "./HeatMap.js";
-import "./ViolinPlot.js";
-import "./BoxPlot.js";
-import "./SankeyChart.js";
-import "./MultiLineChart.js";
-import "./DensityScatterPlot";
-// import "./SelectionDialog.js"; //now replaced with SelectionDialogReact (currently imported as a side-effect of import HmrHack)
-import "./StackedRowChart";
-import "./TreeDiagram";
-import "./CellNetworkChart";
-import "./FlexibleNetworkChart";
-import "./SingleHeatMap";
-import "./VivScatterPlot";
-import "./DotPlot";
-import "./ImageTableChart";
-import "./CellRadialChart";
-import "./RowSummaryBox";
-import "./VivScatterPlot";
-import "./ImageTableChart";
-import "./ImageScatterChart";
-// import "./WordCloudChart"; //todo: this only works in vite build, not webpack
-import "./CustomBoxPlot";
-import "./SingleSeriesChart";
-import "./GenomeBrowser";
-import "./DeepToolsHeatMap";
+// Chart and dialog type registrations via side-effect imports.
+import "./registerChartModules";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action, makeAutoObservable } from "mobx";
+import { makeObservable, observable, action } from "mobx";
+import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -66,6 +37,7 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -235,7 +207,7 @@ export class ChartManager {
         // classes: ["ciview-main-menu-bar"],
         this.menuBar = createEl("div", {}, this.containerDiv);
 
-        createMdvPortal(MenuBarWrapper(), this.menuBar);
+        createMdvPortal(createElement(MenuBarWrapper), this.menuBar);
 
         this._setupThemeContextMenu();
 
@@ -1791,6 +1763,9 @@ export class ChartManager {
      */
     async addChart(dataSource, config, notify = false) {
         if (!BaseChart.types[config.type]) {
+            await ensureLazyChartTypeRegistered(config.type);
+        }
+        if (!BaseChart.types[config.type]) {
             this.createInfoAlert(
                 `Tried to add unknown chart type '${config.type}'`,
                 { type: "danger", duration: 2000 },
@@ -1906,7 +1881,7 @@ export class ChartManager {
                     { message: error }
                     :
                     { message: "An error occurred while creating the chart" };
-            createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
+            createMdvPortal(createElement(ErrorComponentReactWrapper, { error: errorObj, height, width, extraMetaData: { config } }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {
@@ -1994,6 +1969,28 @@ export class ChartManager {
             }
             func();
         });
+    }
+
+    /**
+     * Map a chart param token to a DataStore column `field` id.
+     * Field ids are canonical and stable; display names are mutable and are
+     * not used for runtime resolution.
+     * @param {object} dStore DataStore instance
+     * @param {string} token
+     * @returns {string}
+     */
+    _resolveToDataStoreFieldKey(dStore, token) {
+        if (typeof token !== "string") {
+            return token;
+        }
+        if (dStore.columnIndex[token]) {
+            return token;
+        }
+        const fieldMatch = dStore.columns.find((col) => col.field === token);
+        if (fieldMatch) {
+            return fieldMatch.field;
+        }
+        return token;
     }
 
     async _getColumnsAsync(dataSource, columns) {
@@ -2087,8 +2084,10 @@ export class ChartManager {
                     return false;
                 }
             }
-            //only load if has no data
-            return !col.data;
+            if (!col.data) {
+                return true;
+            }
+            return false;
         });
 
         //No columns needed
@@ -2125,8 +2124,13 @@ export class ChartManager {
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols, dataSource, func) {
+        const dStore = this.dsIndex[dataSource].dataStore;
         for (const col of neededCols) {
-            if (this.columnsLoading[dataSource][col]) {
+            const key =
+                typeof col === "string"
+                    ? this._resolveToDataStoreFieldKey(dStore, col)
+                    : col;
+            if (this.columnsLoading[dataSource][key]) {
                 setTimeout(() => {
                     this._haveColumnsLoaded(neededCols, dataSource, func);
                 }, 500);
