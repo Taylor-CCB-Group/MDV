@@ -12,7 +12,7 @@ import {
 test.describe("Density grid selection overlay", () => {
     test.setTimeout(180_000);
 
-    test("hides shape-drawing tools in grid mode and restores them in overlay mode", async ({ page }) => {
+    test("keeps shape-drawing tools in grid mode and restores them in overlay mode", async ({ page }) => {
         const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
             synthetic: {
                 profile: "minimal",
@@ -44,13 +44,13 @@ test.describe("Density grid selection overlay", () => {
 
             await toolbar.getByRole("button", { name: "Density grid view", exact: true }).click();
 
-            await expect(toolbar.getByRole("button", { name: "Rectangle", exact: true })).toHaveCount(0);
-            await expect(toolbar.getByRole("button", { name: "Polygon", exact: true })).toHaveCount(0);
-            await expect(toolbar.getByRole("button", { name: "Freehand", exact: true })).toHaveCount(0);
-            await expect(toolbar.getByRole("button", { name: "Modify", exact: true })).toHaveCount(0);
+            await expect(toolbar.getByRole("button", { name: "Rectangle", exact: true })).toBeVisible();
+            await expect(toolbar.getByRole("button", { name: "Polygon", exact: true })).toBeVisible();
+            await expect(toolbar.getByRole("button", { name: "Freehand", exact: true })).toBeVisible();
+            await expect(toolbar.getByRole("button", { name: "Modify", exact: true })).toBeVisible();
             await expect(toolbar.getByRole("button", { name: "Pan", exact: true })).toBeVisible();
             await expect(toolbar.getByRole("button", { name: "Single scatter view", exact: true })).toBeVisible();
-            await expect(toolbar.getByRole("button", { name: "Manage Gates", exact: true })).toHaveCount(0);
+            await expect(toolbar.getByRole("button", { name: "Manage Gates", exact: true })).toBeVisible();
 
             const panel = page.locator(".ciview-chart-panel").filter({ hasText: title }).first();
             await expect(panel.getByText("Choose density fields to build the grid.")).toHaveCount(0);

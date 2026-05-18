@@ -3,11 +3,15 @@ import { getVivGridDetailViewId } from "./chartArrayGridUtils";
 import {
     getDensityGridViewId,
     getDensityGridViewStates,
+    getViewportAtCanvasPoint,
     hasUsableOrthographicViewState,
     isDensityGridViewport,
+    isEditableSelectionLayerId,
     matchesDensityGridView,
+    shouldDrawLayerInDeckDensityGrid,
     shouldDrawLayerInViewport,
     supportsDensityGridMode,
+    unprojectCanvasPoint,
 } from "./densityGridUtils";
 
 describe("densityGridUtils", () => {
@@ -64,6 +68,45 @@ describe("densityGridUtils", () => {
                 `-#${getDensityGridViewId("chart-1", "field_a", 0)}#`,
             ),
         ).toBe(true);
+    });
+
+    test("identifies editable selection layers", () => {
+        expect(isEditableSelectionLayerId("selection_-#chartdetail-react#")).toBe(true);
+        expect(isEditableSelectionLayerId("gate_-#chartdetail-react#")).toBe(false);
+    });
+
+    test("draws selection in every density grid viewport", () => {
+        const selection = { id: "selection_-#chartdetail-react#", props: {} };
+        const gridView = getDensityGridViewId("chart-1", "field_a", 0);
+
+        expect(shouldDrawLayerInDeckDensityGrid(selection, gridView)).toBe(true);
+        expect(shouldDrawLayerInViewport(selection, gridView, "-#ignored#")).toBe(true);
+        expect(shouldDrawLayerInDeckDensityGrid(selection, "chart-1detail-react")).toBe(false);
+    });
+
+    test("unprojects through the sub-viewport under the pointer", () => {
+        const viewports = [
+            {
+                id: "density-grid-a-0-x",
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+                unproject: ([px, py]: number[]) => [px, py, 0],
+            },
+            {
+                id: "density-grid-a-1-y",
+                x: 100,
+                y: 0,
+                width: 100,
+                height: 100,
+                unproject: ([px, py]: number[]) => [px + 1000, py, 0],
+            },
+        ];
+
+        expect(getViewportAtCanvasPoint(viewports, 10, 10)?.id).toBe("density-grid-a-0-x");
+        expect(getViewportAtCanvasPoint(viewports, 150, 10)?.id).toBe("density-grid-a-1-y");
+        expect(unprojectCanvasPoint(viewports, 150, 20)).toEqual([1050, 20, 0]);
     });
 
     test("maps shared view state onto each view id", () => {

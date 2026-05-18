@@ -110,7 +110,6 @@ type ToolIcon = typeof Tools[keyof typeof Tools]["ToolIcon"];
 export type Tool = (typeof Tools)[keyof typeof Tools]["name"];
 const ToolArray = Object.values(Tools);
 const EDIT_MODE_TOOL_NAMES: Tool[] = ["Pan", "Modify"];
-const GRID_VIEW_TOOL_NAMES: Tool[] = ["Pan"];
 
 type ToolButtonProps = {
     name: Tool;
@@ -192,14 +191,11 @@ export default observer(function SelectionOverlay() {
       }, [chartId]);
 
     const toolsToShow = useMemo(() => {
-        if (isDensityGrid) {
-            return ToolArray.filter((t) => GRID_VIEW_TOOL_NAMES.includes(t.name));
-        }
         if (editingGateId) {
             return ToolArray.filter((t) => EDIT_MODE_TOOL_NAMES.includes(t.name));
         }
         return ToolArray;
-    }, [editingGateId, isDensityGrid]);
+    }, [editingGateId]);
 
     const setSelectedTool = useCallback(
         (tool: Tool) => {
@@ -216,18 +212,10 @@ export default observer(function SelectionOverlay() {
 
     const wasDensityGridRef = useRef(isDensityGrid);
     useEffect(() => {
-        if (!isDensityGrid) return;
-        if (editingGateId) {
-            onCancelEditGate();
-        }
-        if (selectedTool !== "Pan") {
-            setSelectedTool("Pan");
-        }
-    }, [isDensityGrid, editingGateId, onCancelEditGate, selectedTool, setSelectedTool]);
-
-    useEffect(() => {
-        if (wasDensityGridRef.current && !isDensityGrid) {
-            // Re-bind the editable layer mode after leaving grid (view-only) mode.
+        const enteredGrid = isDensityGrid && !wasDensityGridRef.current;
+        const leftGrid = wasDensityGridRef.current && !isDensityGrid;
+        if (enteredGrid || leftGrid) {
+            // Deck remounts between overlay and grid; recreate the active edit mode and handlers.
             setSelectedTool(selectedTool);
         }
         wasDensityGridRef.current = isDensityGrid;
@@ -317,8 +305,8 @@ export default observer(function SelectionOverlay() {
                     <IconWithTooltip
                         tooltipText={
                             isDensityGrid
-                                ? "Switch to single view with layers to draw and edit gates"
-                                : "Show density fields as grid (view only)"
+                                ? "Switch to single scatter view"
+                                : "Show density fields as grid"
                         }
                         onClick={toggleDensityGrid}
                         iconButtonProps={{
@@ -343,24 +331,22 @@ export default observer(function SelectionOverlay() {
                         padding: "2px",
                     }} 
                 />
-                {!isDensityGrid && (
-                    <IconWithTooltip
-                        tooltipText={"Manage Gates"}
-                        onClick={onManageGatesClick}
-                        iconButtonProps={{
-                            sx: {
-                                color: "var(--text_color)",
-                                borderRadius: 10,
-                                zIndex: 2,
-                                ml: 1,
-                            },
-                            "aria-label": "Manage Gates",
-                        }}
-                    >
-                        <TuneOutlined />
-                    </IconWithTooltip>
-                )}
-                {hasSelection && !editingGateId && !isDensityGrid && (
+                <IconWithTooltip
+                    tooltipText={"Manage Gates"}
+                    onClick={onManageGatesClick}
+                    iconButtonProps={{
+                        sx: {
+                            color: "var(--text_color)",
+                            borderRadius: 10,
+                            zIndex: 2,
+                            ml: 1,
+                        },
+                        "aria-label": "Manage Gates",
+                    }}
+                >
+                    <TuneOutlined />
+                </IconWithTooltip>
+                {hasSelection && !editingGateId && (
                     <IconWithTooltip
                         tooltipText={"Save selection as Gate"}
                         onClick={() => setGateDialogOpen(true)}

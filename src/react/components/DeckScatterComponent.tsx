@@ -14,7 +14,7 @@ import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
-import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import { useDeckSelectionMouseRebind } from "../hooks/useDeckSelectionMouseRebind";
 import useGateLayers from "../hooks/useGateLayers";
 import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
@@ -280,21 +280,10 @@ const DeckScatter = observer(function DeckScatterComponent({
         // Unproject from screen coordinates to world coordinates
         return viewport.unproject([coords[0], coords[1]]);
     }, []);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
-    useEffect(() => {
-        outerContainer; // make sure the hook runs when this changes
-        if (deckRef.current) {
-            try {
-                const deck = deckRef.current.deck;
-                return rebindMouseEvents(deck, selectionLayer);
-            } catch (e) {
-                console.error(
-                    "attempt to reset deck eventManager element failed - could be related to brittle deck monkeypatch",
-                    e,
-                );
-            }
-        }
-    }, [outerContainer]);
+    useDeckSelectionMouseRebind(outerContainer, selectionLayer, deckRef, {
+        enabled: !showDensityGrid,
+        canvasKey: "overlay",
+    });
 
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.

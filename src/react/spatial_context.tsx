@@ -189,7 +189,15 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         }
     }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
-    
+
+    useEffect(() => {
+        if (editingGateId && selectionFeatureCollection.features.length > 0) {
+            setSelectedFeatureIndexes([0]);
+        } else if (!editingGateId) {
+            setSelectedFeatureIndexes([]);
+        }
+    }, [editingGateId, selectionFeatureCollection.features.length, densityMode]);
+
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
 

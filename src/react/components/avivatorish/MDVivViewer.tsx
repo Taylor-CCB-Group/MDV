@@ -168,28 +168,38 @@ class MDVivViewerWrapper extends React.PureComponent<
      * as of anything related to that, this is dubious and liable to need attention in the future.
      */
     _cleanupMouseEvents?: () => void;
+    _rebindSelectionMouseEvents() {
+        if (!this.state.deckRef?.current) return;
+        try {
+            const deck = this.state.deckRef.current.deck;
+            this._cleanupMouseEvents?.();
+            this._cleanupMouseEvents = rebindMouseEvents(deck, this.props.selectionLayer);
+        } catch (e) {
+            console.error(
+                "attempt to reset deck eventManager element failed",
+                e,
+            );
+        }
+    }
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
         const { views, outerContainer, selectionLayer } = props;
 
-        if (
-            outerContainer !== this.state.outerContainer &&
-            this.state.deckRef?.current
-        ) {
-            try {
-                this.setState({ outerContainer });
-                const deck = this.state.deckRef.current.deck;
-                this._cleanupMouseEvents?.();
-                //this should be common with DeckScatterComponent - make a helper/hook...
-                this._cleanupMouseEvents = rebindMouseEvents(deck, selectionLayer);
-            } catch (e) {
-                console.error(
-                    "attempt to reset deck eventManager element failed",
-                    e,
-                );
-            }
+        const outerContainerChanged = outerContainer !== this.state.outerContainer;
+        const selectionLayerChanged = prevProps.selectionLayer !== selectionLayer;
+        const viewsIdentityChanged =
+            prevProps.views.length !== views.length ||
+            views.some((view, index) => view.id !== prevProps.views[index]?.id);
+
+        if (outerContainerChanged) {
+            this.setState({ outerContainer });
         }
-        
+        if (
+            this.state.deckRef?.current &&
+            (outerContainerChanged || selectionLayerChanged || viewsIdentityChanged)
+        ) {
+            this._rebindSelectionMouseEvents();
+        }
 
         // Only update state if the previous viewState prop does not match the current one
         // so that people can update viewState
