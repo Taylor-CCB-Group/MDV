@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -109,6 +110,60 @@ def infer_datasource_roles(project: Any) -> InferredDatasourceRoles:
             continue
 
     return InferredDatasourceRoles(obs_datasource=obs, expressions=expressions)
+
+
+def collect_wrapper_subgroup_keys_for_project(project: Any) -> set[str]:
+    """All rows-as-columns subgroup keys declared on the observation datasource."""
+    roles = infer_datasource_roles(project)
+    keys: set[str] = {e.subgroup_key for e in roles.expressions}
+    try:
+        from mdvtools.llm.column_field_resolve import rows_as_columns_subgroup_keys_from_metadata
+
+        md = project.get_datasource_metadata(roles.obs_datasource)
+        keys |= rows_as_columns_subgroup_keys_from_metadata(md)
+    except Exception:
+        pass
+    return keys
+
+
+def build_chatmdv_roles_constants_block(project: Any) -> str:
+    """
+    Python source injected into ChatMDV-generated scripts so the LLM does not
+    rediscover rows-as-columns metadata at runtime.
+    """
+    roles = infer_datasource_roles(project)
+    expr = roles.preferred_expression()
+    lines = [
+        "# --- ChatMDV project roles (derived from project metadata; do not edit) ---",
+        f"CHATMDV_OBS_DATASOURCE = {json.dumps(roles.obs_datasource)}",
+    ]
+    if expr is None:
+        lines.extend(
+            [
+                "CHATMDV_EXPR_DATASOURCE = None",
+                "CHATMDV_EXPR_NAME_COLUMN = None",
+                "CHATMDV_EXPR_SUBGROUP_KEY = None",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                f"CHATMDV_EXPR_DATASOURCE = {json.dumps(expr.datasource_name)}",
+                f"CHATMDV_EXPR_NAME_COLUMN = {json.dumps(expr.name_column)}",
+                f"CHATMDV_EXPR_SUBGROUP_KEY = {json.dumps(expr.subgroup_key)}",
+            ]
+        )
+    expr_entries = [
+        {
+            "datasource": e.datasource_name,
+            "name_column": e.name_column,
+            "subgroup_key": e.subgroup_key,
+        }
+        for e in roles.expressions
+    ]
+    lines.append(f"CHATMDV_EXPRESSIONS = {json.dumps(expr_entries)}")
+    lines.append("# --- end ChatMDV roles ---")
+    return "\n".join(lines)
 
 
 def format_no_hallucination_chart_policy() -> str:

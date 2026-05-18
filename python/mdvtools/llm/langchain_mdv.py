@@ -36,7 +36,7 @@ from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
 from .column_field_resolve import normalize_view_chart_params, prune_view_charts_with_invalid_params
 from .verification import build_verification_summary
-from .datasource_roles import infer_datasource_roles
+from .datasource_roles import collect_wrapper_subgroup_keys_for_project, infer_datasource_roles
 from .code_execution import execute_code
 from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
@@ -146,6 +146,15 @@ def _is_text_table_only_code(code: str) -> bool:
         return True
     allowed = {"TextBox", "TablePlot", "SelectionDialogPlot", "RowSummaryBox"}
     return all(c in allowed for c in chart_classes)
+
+
+def _build_rag_retrieval_query(user_question: str, charts_part: str) -> str:
+    """Combine the user question with agent-suggested chart types for RAG retrieval."""
+    question = (user_question or "").strip()
+    charts = (charts_part or "").strip()
+    if question and charts:
+        return f"User question: {question}\nSuggested chart types: {charts}"
+    return question or charts
 
 
 class SuggestedQuestions(BaseModel):
@@ -586,6 +595,7 @@ class ProjectChat(ProjectChatProtocol):
 
                 match = re.search(r'charts\s+(.*)', response['output'])
                 charts_part = match.group(1) if match else response['output']
+                rag_retrieval_query = _build_rag_retrieval_query(question, charts_part)
 
                 qa_chain = RetrievalQA.from_llm(
                     llm=code_llm, 
@@ -593,11 +603,13 @@ class ProjectChat(ProjectChatProtocol):
                     retriever=retriever,
                     return_source_documents=True,
                 )
-                output_qa = qa_chain.invoke({"query": charts_part})
+                output_qa = qa_chain.invoke({"query": rag_retrieval_query})
                 # Log the complete prompt after context injection
                 if "source_documents" in output_qa:
                     retrieved_context = "\n".join(doc.page_content for doc in output_qa["source_documents"])
-                    complete_prompt = prompt_RAG_template.format(context=retrieved_context, question=charts_part)
+                    complete_prompt = prompt_RAG_template.format(
+                        context=retrieved_context, question=rag_retrieval_query
+                    )
                     chat_debug_logger.info(f"=== Complete RAG Prompt (with injected context) ===\n{complete_prompt}\n=== End Complete Prompt ===")
                 result = output_qa["result"]
 
@@ -616,7 +628,7 @@ class ProjectChat(ProjectChatProtocol):
                         "Detected text/table-first intent with chart-only output; regenerating with chat-first instruction."
                     )
                     chat_first_query = (
-                        f"{charts_part}\n\n"
+                        f"{rag_retrieval_query}\n\n"
                         "IMPORTANT: This request is text/table-first. "
                         "Prefer chat explanation and concise bounded stdout (`print(...)`) instead of creating "
                         "TextBox/TablePlot/SelectionDialog-only outputs unless the user explicitly requested a chart."
@@ -659,7 +671,7 @@ class ProjectChat(ProjectChatProtocol):
 
                 def _regenerate_for_preflight(issue_text: str) -> str:
                     retry_query = (
-                        f"{charts_part}\n\n"
+                        f"{rag_retrieval_query}\n\n"
                         "Fix this code preflight validation failure and return corrected runnable code only.\n"
                         f"Preflight issues:\n{issue_text}"
                     )
@@ -674,11 +686,15 @@ class ProjectChat(ProjectChatProtocol):
                         view_name=question,
                     )
 
+                allowed_wrapper_subgroup_keys = collect_wrapper_subgroup_keys_for_project(
+                    self.project
+                )
                 final_code, preflight_meta = preflight_with_single_retry(
                     initial_code=final_code,
                     regenerate_once=_regenerate_for_preflight,
                     log=chat_debug_logger.info,
                     datasource_fields=datasource_fields,
+                    allowed_wrapper_subgroup_keys=allowed_wrapper_subgroup_keys,
                 )
                 chat_debug_logger.info("Preflight metadata: %s", preflight_meta)
 
@@ -863,7 +879,7 @@ class ProjectChat(ProjectChatProtocol):
                     f"{final_code}\n"
                     "```\n\n"
                     "<br><br>"
-                    f"{html.escape(explanation)}"
+                    f"{explanation}"
                     "\n\n"
                     f"{context_files}"
                 )

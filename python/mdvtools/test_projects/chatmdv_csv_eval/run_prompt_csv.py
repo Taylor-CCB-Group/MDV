@@ -21,7 +21,7 @@ Environment: same as Chat MDV (e.g. ``OPENAI_API_KEY`` in ``.env`` if used).
 
 Default report directory for outputs: ``$TMPDIR/chatmdv_csv_eval`` (on Linux usually
 under ``/tmp``). Override with ``--output-dir /path``, env ``CHATMDV_CSV_EVAL_OUTPUT_DIR``,
-or an explicit ``--results`` / ``--failure-log`` path.
+or an explicit ``--results`` / ``--failure-log`` / ``--details-log`` path.
 
 Input CSV columns (flexible names)
 ----------------------------------
@@ -29,60 +29,31 @@ Input CSV columns (flexible names)
 - **Path** (or ``path``, ``project_path``): MDV project directory.
 - **Question** (or ``Question for evaluation``, ``prompt``): natural-language prompt.
 - Optional: **Dataset**, **Complexity score** (or ``complexity``)—copied through and
-  included in failure records.
+  included in detail/failure records.
 
 Outputs
 -------
 
-- **Results CSV** (default ``results_<stem>_<utc_timestamp>.csv`` under the report directory,
-  **outside the repo**, typically ``$TMPDIR/chatmdv_csv_eval/`` — override with ``--output-dir``
-  or env ``CHATMDV_CSV_EVAL_OUTPUT_DIR``): original columns plus run metrics:
+- **Results CSV** (default ``results_<stem>_<utc_timestamp>.csv``): original columns plus
+  compact per-row metrics only:
 
-  - ``exec_success`` — Chat MDV pipeline completed without ``error`` (same as
-    ``chat_cli`` ``success``).
-  - ``exit_code``, ``duration_seconds``, ``failure_reason`` (empty on success),
-    ``captured_output_excerpt`` (tail of captured stdout/stderr on failure).
-  - ``view_name`` — name returned after ``ask_question`` (may be empty).
-  - ``view_snapshot_present`` — in-memory MDV ``get_view`` returned a snapshot.
-  - ``chart_count`` — charts counted under ``view[\"initialCharts\"]``.
-  - ``view_has_charts`` — ``exec_success`` and ``chart_count > 0`` (structural
-    “built a plotted view”; text-only successes stay False).
-  - ``verification``, ``needs_refresh`` — copied from Chat MDV (see
-    ``AskQuestionResult``).
+  - ``exec_success``, ``exit_code``, ``duration_seconds``
+  - ``view_name``, ``view_snapshot_present``, ``chart_count``, ``view_has_charts``,
+    ``needs_refresh``
+  - ``details_jsonl_path`` — path to the sidecar details file for this run
 
-  **Replicated run summary (same on every result row):** ``run_id``,
-  ``run_completed_at_utc``, ``run_wall_seconds_total``, ``run_cli_limit``,
-  ``run_artifacts_base_dir``, paths to this run’s input/results/summary/failure
-  logs, row and failure counts, exec and ``view_has_charts`` rates (0–1 and
-  percent), compact JSON columns ``run_benchmark_by_complexity_json``,
-  ``run_benchmark_totals_json``, and ``run_benchmark_summary_json_mirror`` (full
-  aggregate payload matching the JSON file, minified).
-- **`benchmark_summary_<stem>_<timestamp>.json`** (always written, same folder as results):
+  Verbose fields are **not** in the results CSV (see details JSONL below).
 
-  .. code-block:: json
+- **Details JSONL** (``details_<stem>_<timestamp>.jsonl``): one JSON object per processed
+  row with ``failure_reason``, ``captured_output_excerpt``, ``captured_output``,
+  ``verification``, ``debug_output_dir``, and row identity fields.
 
-    {
-      "benchmark_summary": "<path to this file>",
-      "by_complexity": {"1": {"exec_success_count": N, "rows": N, "view_has_charts_count": N}},
-      "failure_log": "<path or null>",
-      "input_csv": "<path>",
-      "results_csv": "<path>",
-      "totals": {
-        "exec_success_count": N,
-        "exec_success_rate": 0.0,
-        "rows": N,
-        "view_has_charts_count": N,
-        "view_has_charts_rate": 0.0
-      }
-    }
+- **Benchmark summary JSON** (``benchmark_summary_<stem>_<timestamp>.json``): run metadata
+  (``run_id``, ``run_completed_at_utc``, ``run_wall_seconds_total``, ``run_cli_limit``,
+  ``run_artifacts_base_dir``), artifact paths, ``totals``, and ``by_complexity``.
 
-- **`failures_<stem>_<timestamp>.jsonl`**: written only if at least one row failed;
-  one JSON object per failed row (includes full ``captured_output`` plus the view
-  fields above).
-- **Stderr**: one block per failure as it occurs.
-- **Stdout**: summary counts, then a consolidated **Output directory / Files written**
-  listing (results CSV, benchmark summary JSON, failures JSONL or why skipped,
-  artifacts dir status), complexity breakdown ``exec … / charts …``.
+- **Failures JSONL** (``failures_<stem>_<timestamp>.jsonl``): written only if at least one
+  row failed; same schema as a failed row in the details JSONL (quick filter).
 
 Use ``--artifacts-dir`` to persist per-row ``generated_code.py`` / ``result.json``
 (see ``mdvtools.llm.chat_cli``).
@@ -112,6 +83,18 @@ if str(_PY_ROOT) not in sys.path:
 
 
 EXCERPT_MAX_LEN = 4000
+
+SLIM_RESULT_FIELDS = [
+    "exec_success",
+    "exit_code",
+    "duration_seconds",
+    "view_name",
+    "view_snapshot_present",
+    "chart_count",
+    "view_has_charts",
+    "needs_refresh",
+    "details_jsonl_path",
+]
 
 
 def _default_report_root() -> Path:
@@ -153,6 +136,49 @@ def _excerpt_tail(text: str, max_len: int = EXCERPT_MAX_LEN) -> str:
     return f"<{len(text) - max_len} chars omitted>\n{text[-max_len:]}"
 
 
+def _row_detail_payload(
+    *,
+    row_index: int,
+    path: str,
+    dataset: str,
+    question: str,
+    complexity_score: str,
+    exec_success: bool,
+    exit_code: int,
+    duration_seconds: float,
+    failure_reason: str,
+    captured_output: str,
+    captured_output_excerpt: str,
+    view_name: str,
+    view_snapshot_present: bool,
+    chart_count: int,
+    view_has_charts: bool,
+    verification: str,
+    needs_refresh: bool,
+    debug_output_dir: str,
+) -> dict[str, object]:
+    return {
+        "row_index": row_index,
+        "path": path,
+        "dataset": dataset,
+        "question": question,
+        "complexity_score": complexity_score,
+        "exec_success": exec_success,
+        "exit_code": exit_code,
+        "duration_seconds": duration_seconds,
+        "failure_reason": failure_reason,
+        "captured_output_excerpt": captured_output_excerpt,
+        "captured_output": captured_output,
+        "view_name": view_name,
+        "view_snapshot_present": view_snapshot_present,
+        "chart_count": chart_count,
+        "view_has_charts": view_has_charts,
+        "verification": verification,
+        "needs_refresh": needs_refresh,
+        "debug_output_dir": debug_output_dir,
+    }
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--csv", "-c", required=True, type=Path, help="Benchmark CSV path.")
@@ -160,7 +186,7 @@ def _parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for results, benchmark summary JSON, and failure JSONL (default: "
+        help="Directory for results, benchmark summary JSON, details/failure JSONL (default: "
         "$TMPDIR/chatmdv_csv_eval, or CHATMDV_CSV_EVAL_OUTPUT_DIR). Ignored if --results is set.",
     )
     parser.add_argument(
@@ -169,6 +195,12 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="Results CSV output path (default: under output-dir/report root with timestamp).",
+    )
+    parser.add_argument(
+        "--details-log",
+        type=Path,
+        default=None,
+        help="JSONL path for per-row verbose details (default: details_* next to results CSV).",
     )
     parser.add_argument(
         "--failure-log",
@@ -232,6 +264,14 @@ def main() -> int:
     results_path.parent.mkdir(parents=True, exist_ok=True)
     benchmark_summary_path = results_path.parent / f"benchmark_summary_{stem}_{utc_now}.json"
 
+    details_log_path = args.details_log
+    if details_log_path is None:
+        details_log_path = results_path.parent / f"details_{stem}_{utc_now}.jsonl"
+    else:
+        details_log_path = details_log_path.expanduser().resolve()
+    details_log_path.parent.mkdir(parents=True, exist_ok=True)
+    details_log_path_str = str(details_log_path)
+
     failure_log_path = args.failure_log
     if failure_log_path is None:
         failure_log_path = results_path.parent / f"failures_{stem}_{utc_now}.jsonl"
@@ -258,6 +298,7 @@ def main() -> int:
     wall_start = time.perf_counter()
 
     result_rows: list[dict[str, object]] = []
+    detail_records: list[dict[str, object]] = []
     complexity_pairs: dict[str, list[tuple[bool, bool]]] = defaultdict(list)
     failure_count = 0
     failure_payloads: list[dict[str, object]] = []
@@ -273,44 +314,44 @@ def main() -> int:
         if not path or not question:
             msg = f"Row {idx}: missing Path or Question (path={path!r}, question={question!r})"
             print(msg, file=sys.stderr)
+            detail = _row_detail_payload(
+                row_index=idx,
+                path=path or "",
+                dataset=dataset,
+                question=question or "",
+                complexity_score=complexity_val,
+                exec_success=False,
+                exit_code=2,
+                duration_seconds=0.0,
+                failure_reason=msg,
+                captured_output="",
+                captured_output_excerpt="",
+                view_name="",
+                view_snapshot_present=False,
+                chart_count=0,
+                view_has_charts=False,
+                verification="",
+                needs_refresh=False,
+                debug_output_dir="",
+            )
+            detail_records.append(detail)
             out_row = {
                 **{k: row.get(k, "") for k in raw_fieldnames},
                 "exec_success": False,
                 "exit_code": 2,
                 "duration_seconds": 0.0,
-                "failure_reason": msg,
-                "captured_output_excerpt": "",
                 "view_name": "",
                 "view_snapshot_present": False,
                 "chart_count": 0,
                 "view_has_charts": False,
-                "verification": "",
                 "needs_refresh": False,
+                "details_jsonl_path": details_log_path_str,
             }
             result_rows.append(out_row)
             failure_count += 1
             if complexity_val:
                 complexity_pairs[complexity_val].append((False, False))
-            failure_payloads.append(
-                {
-                    "row_index": idx,
-                    "path": path or "",
-                    "dataset": dataset,
-                    "question": question or "",
-                    "complexity_score": complexity_val,
-                    "exit_code": 2,
-                    "failure_reason": msg,
-                    "duration_seconds": 0.0,
-                    "captured_output": "",
-                    "view_name": "",
-                    "view_snapshot_present": False,
-                    "chart_count": 0,
-                    "view_has_charts": False,
-                    "verification": "",
-                    "needs_refresh": False,
-                    "debug_output_dir": "",
-                }
-            )
+            failure_payloads.append(detail)
             continue
 
         run_out = None
@@ -339,19 +380,39 @@ def main() -> int:
         failure_reason = "" if success else message
         excerpt = "" if success else _excerpt_tail(cap)
 
+        detail = _row_detail_payload(
+            row_index=idx,
+            path=path,
+            dataset=dataset,
+            question=question,
+            complexity_score=complexity_val,
+            exec_success=success,
+            exit_code=exit_code,
+            duration_seconds=duration,
+            failure_reason=failure_reason,
+            captured_output=cap,
+            captured_output_excerpt=excerpt,
+            view_name=view_name,
+            view_snapshot_present=view_snapshot_present,
+            chart_count=chart_count,
+            view_has_charts=view_has_charts,
+            verification=verification,
+            needs_refresh=needs_refresh,
+            debug_output_dir=str(debug_dir) if debug_dir else "",
+        )
+        detail_records.append(detail)
+
         out_row = {
             **{k: row.get(k, "") for k in raw_fieldnames},
             "exec_success": success,
             "exit_code": exit_code,
             "duration_seconds": duration,
-            "failure_reason": failure_reason,
-            "captured_output_excerpt": excerpt,
             "view_name": view_name,
             "view_snapshot_present": view_snapshot_present,
             "chart_count": chart_count,
             "view_has_charts": view_has_charts,
-            "verification": verification,
             "needs_refresh": needs_refresh,
+            "details_jsonl_path": details_log_path_str,
         }
         result_rows.append(out_row)
 
@@ -366,26 +427,11 @@ def main() -> int:
                 f"       reason: {failure_reason}",
                 file=sys.stderr,
             )
-            failure_payloads.append(
-                {
-                    "row_index": idx,
-                    "path": path,
-                    "dataset": dataset,
-                    "question": question,
-                    "complexity_score": complexity_val,
-                    "exit_code": exit_code,
-                    "failure_reason": failure_reason,
-                    "duration_seconds": duration,
-                    "captured_output": cap,
-                    "view_name": view_name,
-                    "view_snapshot_present": view_snapshot_present,
-                    "chart_count": chart_count,
-                    "view_has_charts": view_has_charts,
-                    "verification": verification,
-                    "needs_refresh": needs_refresh,
-                    "debug_output_dir": str(debug_dir) if debug_dir else "",
-                }
-            )
+            failure_payloads.append(detail)
+
+    with details_log_path.open("w", encoding="utf-8") as dlog:
+        for record in detail_records:
+            dlog.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     if failure_payloads:
         with failure_log_path.open("w", encoding="utf-8") as flog:
@@ -410,9 +456,18 @@ def main() -> int:
             "view_has_charts_count": vch_ok,
         }
 
+    completion_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    wall_seconds = round(time.perf_counter() - wall_start, 6)
+
     summary_payload = {
+        "run_id": utc_now,
+        "run_completed_at_utc": completion_iso,
+        "run_wall_seconds_total": wall_seconds,
+        "run_cli_limit": args.limit,
+        "run_artifacts_base_dir": str(base_artifacts) if base_artifacts else None,
         "input_csv": str(csv_path),
         "results_csv": str(results_path),
+        "details_jsonl": str(details_log_path),
         "failure_log": str(failure_log_path) if failure_count > 0 else None,
         "benchmark_summary": str(benchmark_summary_path),
         "totals": {
@@ -425,56 +480,8 @@ def main() -> int:
         "by_complexity": by_complexity,
     }
 
-    completion_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    wall_seconds = round(time.perf_counter() - wall_start, 6)
-
-    run_fields = {
-        "run_id": utc_now,
-        "run_completed_at_utc": completion_iso,
-        "run_wall_seconds_total": wall_seconds,
-        "run_cli_limit": args.limit if args.limit is not None else "",
-        "run_artifacts_base_dir": str(base_artifacts) if base_artifacts else "",
-        "run_input_csv_path": str(csv_path),
-        "run_results_csv_path": str(results_path),
-        "run_benchmark_summary_json_path": str(benchmark_summary_path),
-        "run_failure_jsonl_path": str(failure_log_path) if failure_count > 0 else "",
-        "run_benchmark_rows_total": n,
-        "run_benchmark_failure_count": failure_count,
-        "run_benchmark_exec_success_count": ok,
-        "run_benchmark_exec_success_rate": round(ok / n, 6) if n else 0.0,
-        "run_benchmark_exec_success_pct": round(ok / n * 100.0, 4) if n else 0.0,
-        "run_benchmark_view_has_charts_count": view_charts_ok,
-        "run_benchmark_view_has_charts_rate": round(view_charts_ok / n, 6) if n else 0.0,
-        "run_benchmark_view_has_charts_pct": round(view_charts_ok / n * 100.0, 4) if n else 0.0,
-        "run_benchmark_by_complexity_json": json.dumps(
-            by_complexity, separators=(",", ":"), sort_keys=True
-        ),
-        "run_benchmark_totals_json": json.dumps(
-            summary_payload["totals"], separators=(",", ":"), sort_keys=True
-        ),
-        "run_benchmark_summary_json_mirror": json.dumps(
-            summary_payload, separators=(",", ":"), sort_keys=True
-        ),
-    }
-    run_aggregate_fields = list(run_fields.keys())
-    for row in result_rows:
-        row.update(run_fields)
-
-    extra_fields = [
-        "exec_success",
-        "exit_code",
-        "duration_seconds",
-        "failure_reason",
-        "captured_output_excerpt",
-        "view_name",
-        "view_snapshot_present",
-        "chart_count",
-        "view_has_charts",
-        "verification",
-        "needs_refresh",
-    ]
     out_fieldnames = list(raw_fieldnames)
-    for f in extra_fields + run_aggregate_fields:
+    for f in SLIM_RESULT_FIELDS:
         if f not in out_fieldnames:
             out_fieldnames.append(f)
 
@@ -497,6 +504,7 @@ def main() -> int:
     print(f"  {report_dir}")
     print("Files written:")
     print(f"  results_csv               {results_path}")
+    print(f"  details_jsonl             {details_log_path}")
     print(f"  benchmark_summary_json    {benchmark_summary_path}")
     if failure_count:
         print(f"  failures_jsonl            {failure_log_path}")
@@ -510,9 +518,10 @@ def main() -> int:
     print(
         "During the run: brief [FAIL] lines on stderr."
         + (
-            f' Full payloads (captured_output, view fields): see failures_jsonl above ("{failure_log_path.name}").'
+            f' Verbose per-row fields: see details_jsonl ("{details_log_path.name}").'
+            f' Failed-row payloads also in failures_jsonl ("{failure_log_path.name}").'
             if failure_count
-            else " No failures_jsonl written (nothing failed)."
+            else f' Verbose per-row fields: see details_jsonl ("{details_log_path.name}").'
         )
     )
 

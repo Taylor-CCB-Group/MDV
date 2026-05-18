@@ -9,9 +9,20 @@ from __future__ import annotations
 import ast
 import importlib
 import inspect
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
+
+from mdvtools.llm.column_field_resolve import expression_wrapper_subgroup_key
+
+_WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)")
+
+_FORBIDDEN_EXPR_ATTRS = frozenset({"feature_table", "feature_datasource"})
+
+_NAMES_REQUIRING_IMPORT = frozenset(
+    {"infer_datasource_roles", "build_expression_wrapper_token"}
+)
 
 
 CHART_CLASS_MODULES: dict[str, str] = {
@@ -277,10 +288,103 @@ def _check_keyword_args(class_name: str, call: ast.Call) -> list[PreflightIssue]
     return issues
 
 
+def _check_wrapper_and_roles_api(tree: ast.AST, defined_names: set[str]) -> list[PreflightIssue]:
+    issues: list[PreflightIssue] = []
+    imported = _collect_defined_names(tree)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "get_datasource_roles"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "project"
+            ):
+                issues.append(
+                    PreflightIssue(
+                        code="hallucinated_project_api",
+                        message=(
+                            "`project.get_datasource_roles()` does not exist. "
+                            "Use injected `CHATMDV_*` constants or `infer_datasource_roles(project)`."
+                        ),
+                        line=getattr(node, "lineno", None),
+                        column=getattr(node, "col_offset", None),
+                        symbol="get_datasource_roles",
+                    )
+                )
+
+        if isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_EXPR_ATTRS:
+            issues.append(
+                PreflightIssue(
+                    code="invalid_expression_role_attr",
+                    message=(
+                        f"`{node.attr}` is not a field on RowsAsColumnsExpression; "
+                        "use `datasource_name`, `name_column`, or `CHATMDV_EXPR_DATASOURCE`."
+                    ),
+                    line=getattr(node, "lineno", None),
+                    column=getattr(node, "col_offset", None),
+                    symbol=node.attr,
+                )
+            )
+
+        if isinstance(node, ast.Name) and node.id in _NAMES_REQUIRING_IMPORT:
+            if node.id not in imported and node.id not in defined_names:
+                ctx = getattr(node, "ctx", None)
+                if isinstance(ctx, ast.Load):
+                    issues.append(
+                        PreflightIssue(
+                            code="missing_roles_import",
+                            message=(
+                                f"`{node.id}` is used but not imported. "
+                                "It is available from mdvtools.llm.datasource_roles / column_field_resolve "
+                                "(also in the script preamble)."
+                            ),
+                            line=getattr(node, "lineno", None),
+                            column=getattr(node, "col_offset", None),
+                            symbol=node.id,
+                        )
+                    )
+
+    return issues
+
+
+def _check_wrapper_subgroup_literals(
+    tree: ast.AST,
+    allowed_subgroup_keys: set[str] | None,
+) -> list[PreflightIssue]:
+    if not allowed_subgroup_keys:
+        return []
+    issues: list[PreflightIssue] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            continue
+        token = node.value
+        if not _WRAPPER_RE.match(token):
+            continue
+        sg = expression_wrapper_subgroup_key(token)
+        if sg is not None and sg not in allowed_subgroup_keys:
+            issues.append(
+                PreflightIssue(
+                    code="invalid_wrapper_subgroup",
+                    message=(
+                        f"Wrapper token uses subgroup `{sg}` which is not in project metadata "
+                        f"(allowed: {sorted(allowed_subgroup_keys)}). "
+                        "Use `CHATMDV_EXPR_SUBGROUP_KEY` or `build_expression_wrapper_token`."
+                    ),
+                    line=getattr(node, "lineno", None),
+                    column=getattr(node, "col_offset", None),
+                    symbol=sg,
+                )
+            )
+    return issues
+
+
 def validate_generated_code_preflight(
     code: str,
     *,
     datasource_fields: dict[str, set[str]] | None = None,
+    allowed_wrapper_subgroup_keys: set[str] | None = None,
 ) -> PreflightResult:
     issues: list[PreflightIssue] = []
     try:
@@ -351,6 +455,9 @@ def validate_generated_code_preflight(
                     symbol=name,
                 )
             )
+
+    issues.extend(_check_wrapper_and_roles_api(tree, defined_names))
+    issues.extend(_check_wrapper_subgroup_literals(tree, allowed_wrapper_subgroup_keys))
 
     if datasource_fields:
         for datasource_name, columns, call in dataframe_requests:

@@ -65,6 +65,9 @@ def test_prompt_includes_chat_first_text_table_policy(monkeypatch):
     assert "rna_expr" in prompt.lower()
     assert "Metadata-first chart params" in prompt
     assert "Never** invent" in prompt or "invent a datasource" in prompt
+    assert "to_markdown" in prompt
+    assert "Chart type selection" in prompt
+    assert "relationship" in prompt.lower()
 
 
 def test_prompt_includes_marker_gene_policy_with_h5ad(monkeypatch):

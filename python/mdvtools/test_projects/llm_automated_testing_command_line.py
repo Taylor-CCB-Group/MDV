@@ -256,15 +256,16 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
             match = re.search(r'charts\s+(.*)', response['output'])
             charts_part = match.group(1) if match else response['output']
+            from mdvtools.llm.langchain_mdv import _build_rag_retrieval_query
+            rag_retrieval_query = _build_rag_retrieval_query(question, charts_part)
 
-            
             prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'], response['input'])
             #logger.info(f"RAG prompt being sent:\n{prompt_RAG}")
 
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
-            output = qa_chain.invoke({"query": charts_part})#({"query": response['input'] + response['output']}) #"context": retriever,
+            output = qa_chain.invoke({"query": rag_retrieval_query})
             logger.info(f"Raw output:\n{output}")
 
             result_code = prepare_code(output["result"], df_list[0], project, logger.info, modify_existing_project=True, view_name=question)

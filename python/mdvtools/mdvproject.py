@@ -306,6 +306,41 @@ class MDVProject:
             list[str]: A list of datasource names
         """
         return [ds["name"] for ds in self.datasources]
+
+    def get_datasource_roles(self):
+        """Infer observation vs expression datasource roles (ChatMDV / wrapper charts)."""
+        from mdvtools.llm.datasource_roles import infer_datasource_roles
+
+        return infer_datasource_roles(self)
+
+    def build_gene_wrapper(
+        self,
+        gene: str,
+        *,
+        subgroup_key: str | None = None,
+        expression_datasource: str | None = None,
+        name_column: str | None = None,
+    ) -> str:
+        """
+        Resolve a gene label to a canonical rows-as-columns wrapper token on the obs datasource.
+        """
+        from mdvtools.llm.column_field_resolve import build_expression_wrapper_token
+        from mdvtools.llm.datasource_roles import infer_datasource_roles
+
+        roles = infer_datasource_roles(self)
+        expr = roles.preferred_expression()
+        if expr is None:
+            raise RuntimeError("No rows-as-columns expression link; cannot build gene wrappers.")
+        ds = expression_datasource or expr.datasource_name
+        ncol = name_column or expr.name_column
+        sk = subgroup_key or expr.subgroup_key
+        df_var = self.get_datasource_as_dataframe(ds, columns=[ncol])
+        names = df_var[ncol].astype(str).tolist()
+        try:
+            idx = names.index(str(gene))
+        except ValueError as exc:
+            raise ValueError(f"Gene {gene!r} not found in feature table {ds!r} column {ncol!r}.") from exc
+        return build_expression_wrapper_token(sk, str(gene), idx)
     
     def set_interactions(
         self,
