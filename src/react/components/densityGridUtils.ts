@@ -31,9 +31,54 @@ export function isDensityGridViewport(viewportId: string) {
     return viewportId.startsWith("density-grid-");
 }
 
+export function isEditableSelectionLayerId(layerId: string) {
+    return layerId.startsWith("selection_");
+}
+
+export type DeckCanvasViewport = {
+    id: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    unproject: (coords: number[]) => number[];
+};
+
+/** Viewport whose bounds contain the canvas point, or the topmost match when cells overlap in z-order. */
+export function getViewportAtCanvasPoint(
+    viewports: readonly DeckCanvasViewport[],
+    canvasX: number,
+    canvasY: number,
+): DeckCanvasViewport | undefined {
+    for (let i = viewports.length - 1; i >= 0; i--) {
+        const vp = viewports[i];
+        const x = vp.x ?? 0;
+        const y = vp.y ?? 0;
+        const width = vp.width ?? 0;
+        const height = vp.height ?? 0;
+        if (canvasX >= x && canvasX < x + width && canvasY >= y && canvasY < y + height) {
+            return vp;
+        }
+    }
+    return viewports[0];
+}
+
+/** Unproject canvas pixels through the sub-viewport under the pointer (multi-view grids). */
+export function unprojectCanvasPoint(
+    viewports: readonly DeckCanvasViewport[],
+    canvasX: number,
+    canvasY: number,
+): number[] {
+    const viewport = getViewportAtCanvasPoint(viewports, canvasX, canvasY);
+    if (!viewport) return [0, 0, 0];
+    const localX = canvasX - (viewport.x ?? 0);
+    const localY = canvasY - (viewport.y ?? 0);
+    return viewport.unproject([localX, localY]);
+}
+
 type LayerViewportFilterInput = {
     id: string;
-    props?: { viewId?: string };
+    props?: { viewId?: string } | null;
 };
 
 /**
@@ -45,6 +90,12 @@ export function shouldDrawLayerInViewport(
     viewportId: string,
     vivIdForViewport: string,
 ) {
+    if (isEditableSelectionLayerId(layer.id)) {
+        if (layer.id.includes(vivIdForViewport)) {
+            return true;
+        }
+        return isDensityGridViewport(viewportId);
+    }
     if (layer.id.includes(vivIdForViewport)) {
         return true;
     }
@@ -58,6 +109,17 @@ export function shouldDrawLayerInViewport(
             matchesDensityGridView(layer.id, viewportId) ||
             layerViewId === viewportId
         );
+    }
+    return matchesDensityGridView(layer.id, viewportId);
+}
+
+/** layerFilter for Deck-only density grid (no viv id suffix on viewports). */
+export function shouldDrawLayerInDeckDensityGrid(
+    layer: { id: string; props?: { viewId?: string } | null },
+    viewportId: string,
+) {
+    if (isEditableSelectionLayerId(layer.id)) {
+        return isDensityGridViewport(viewportId);
     }
     return matchesDensityGridView(layer.id, viewportId);
 }

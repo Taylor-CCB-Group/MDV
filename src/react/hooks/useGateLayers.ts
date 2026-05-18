@@ -212,8 +212,8 @@ const useGateLayers = () => {
         });
     }, [relevantGates, chartId, editingGateId, gateManager, cx, cy, densityMode]);
 
-    // To disable drag pan for the deck controller when label is being dragged or hovered
-    const dragPan = !(draggingId || isHoveringLabel);
+    // Disable deck pan while dragging labels or editing gate geometry (editable layer owns drags).
+    const dragPan = !(draggingId || isHoveringLabel || editingGateId);
 
     return {
         gateLabelLayer,

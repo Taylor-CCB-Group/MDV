@@ -32,6 +32,7 @@ export default function VivDensityGridComponent() {
 
     const {
         scatterProps: { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive },
+        selectionLayer,
     } = useSpatialLayers();
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
     const { cells, densityFields, configuredFieldCount } = useDensityGridCells();
@@ -155,6 +156,11 @@ export default function VivDensityGridComponent() {
         ],
     );
 
+    const allDeckLayers = useMemo(
+        () => (selectionLayer ? [...deckLayers, selectionLayer] : deckLayers),
+        [deckLayers, selectionLayer],
+    );
+
     const getTooltipContent = useCallback(
         (info: PickingInfo) =>
             getCombinedScatterTooltip(info, {
@@ -175,13 +181,13 @@ export default function VivDensityGridComponent() {
     const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
             getTooltip: getPortalTooltip,
-            layers: deckLayers,
+            layers: allDeckLayers,
             controller: {
                 doubleClickZoom: false,
                 dragPan: controllerOptions.dragPan,
             },
         }),
-        [deckLayers, getPortalTooltip, controllerOptions.dragPan],
+        [allDeckLayers, getPortalTooltip, controllerOptions.dragPan],
     );
 
     const renderCell = useCallback(
@@ -218,6 +224,7 @@ export default function VivDensityGridComponent() {
             hasCanvas ? (
                 <MDVivViewer
                     outerContainer={outerContainer}
+                    selectionLayer={selectionLayer}
                     views={detailViews}
                     layerProps={detailViews.map(() => layerConfig)}
                     viewStates={viewStates}
@@ -233,7 +240,7 @@ export default function VivDensityGridComponent() {
                     deckProps={deckProps}
                 />
             ) : null,
-        [hasCanvas, outerContainer, detailViews, layerConfig, viewStates, viewerStore, deckProps],
+        [hasCanvas, outerContainer, selectionLayer, detailViews, layerConfig, viewStates, viewerStore, deckProps],
     );
 
     if (!viewState) {

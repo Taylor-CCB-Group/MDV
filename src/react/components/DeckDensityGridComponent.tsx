@@ -1,7 +1,7 @@
 import DeckGL from "@deck.gl/react";
 import { OrthographicView, type OrthographicViewState } from "@deck.gl/core";
 import { action } from "mobx";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { getFieldColor } from "../fieldColorManager";
 import useGateLayers from "../hooks/useGateLayers";
 import { useChartArrayGrid } from "../hooks/useChartArrayGrid";
@@ -11,6 +11,8 @@ import {
     useDensityGridViewState,
 } from "../hooks/useDensityGridCells";
 import { useChartID, useConfig, useFilteredIndices } from "../hooks";
+import { useDeckSelectionMouseRebind } from "../hooks/useDeckSelectionMouseRebind";
+import { useOuterContainer } from "../screen_state";
 import type { DualContourLegacyConfig } from "../contour_state";
 import type { ScatterPlotConfig2D } from "../scatter_state";
 import { useSpatialLayers } from "../spatial_context";
@@ -20,7 +22,7 @@ import {
     getDensityGridViewId,
     getDensityGridViewStates,
     getSerializableViewState,
-    matchesDensityGridView,
+    shouldDrawLayerInDeckDensityGrid,
 } from "./densityGridUtils";
 
 type DensityGridConfig = ScatterPlotConfig2D & DualContourLegacyConfig;
@@ -29,9 +31,15 @@ export default function DeckDensityGridComponent() {
     const chartId = useChartID();
     const config = useConfig<DensityGridConfig>();
     const rows = useFilteredIndices();
+    const outerContainer = useOuterContainer();
+    const deckRef = useRef<any>(null);
     const {
         scatterProps: { scatterplotLayer, greyScatterplotLayer, setScatterKeyboardActive },
+        selectionLayer,
     } = useSpatialLayers();
+    useDeckSelectionMouseRebind(outerContainer, selectionLayer, deckRef, {
+        canvasKey: "grid",
+    });
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
     const { cells, densityFields, configuredFieldCount } = useDensityGridCells();
 
@@ -122,6 +130,11 @@ export default function DeckDensityGridComponent() {
         ],
     );
 
+    const allLayers = useMemo(
+        () => (selectionLayer ? [...layers, selectionLayer] : layers),
+        [layers, selectionLayer],
+    );
+
     const renderCell = useCallback(
         (index: number) => {
             const field = densityFields[index];
@@ -150,9 +163,19 @@ export default function DeckDensityGridComponent() {
         () =>
             hasCanvas ? (
                 <DeckGL
+                    ref={deckRef}
                     controller={false}
-                    layerFilter={({ layer, viewport }) => matchesDensityGridView(layer.id, viewport.id)}
-                    layers={layers}
+                    layerFilter={({ layer, viewport }) => {
+                        const viewId =
+                            layer.props && "viewId" in layer.props && typeof layer.props.viewId === "string"
+                                ? layer.props.viewId
+                                : undefined;
+                        return shouldDrawLayerInDeckDensityGrid(
+                            { id: layer.id, props: viewId === undefined ? undefined : { viewId } },
+                            viewport.id,
+                        );
+                    }}
+                    layers={allLayers}
                     views={views}
                     viewState={viewState}
                     useDevicePixels={true}
@@ -164,7 +187,7 @@ export default function DeckDensityGridComponent() {
                     getCursor={({ isDragging }) => (isDragging ? "grabbing" : "crosshair")}
                 />
             ) : null,
-        [hasCanvas, layers, views, viewState, config],
+        [hasCanvas, allLayers, views, viewState, config],
     );
 
     if (configuredFieldCount === 0) {
