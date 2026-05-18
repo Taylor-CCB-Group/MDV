@@ -350,6 +350,11 @@ class DotPlot extends SVGChart {
         });
         this.y_scale.domain(orderedData.map((x) => vals[x.id]));
         this.updateAxis();
+        if (orderedDataWithColumns.length === 0) {
+            this.graph_area.selectAll(".dotplot-row").remove();
+            this.showFractionLegend();
+            return;
+        }
         const cHeight = dim.height / orderedDataWithColumns.length;
         let r = (cWidth > cHeight ? cHeight : cWidth) / 2;
         r = r > 25 ? 25 : r;
