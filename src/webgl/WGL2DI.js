@@ -390,17 +390,28 @@ class WGL2DI {
             this.highlightPoints = null;
             return;
         }
+        const localFilter = this.circles.localFilter;
+        const visibleIndexes = localFilter
+            ? indexes.filter((index) => {
+                  const s = localFilter[index];
+                  return s !== 2 && s !== 3;
+              })
+            : indexes;
+        if (visibleIndexes.length === 0) {
+            this.highlightPoints = null;
+            return;
+        }
         const hlp = {
             x_pos: [],
             y_pos: [],
             color: [],
-            length: indexes.length,
-            indexes: indexes,
+            length: visibleIndexes.length,
+            indexes: visibleIndexes,
         };
         if (this.mode === "3d") {
             hlp.z_pos = [];
         }
-        for (const index of indexes) {
+        for (const index of visibleIndexes) {
             hlp.x_pos.push(this.circles.x_pos[index]);
             hlp.y_pos.push(this.circles.y_pos[index]);
             if (this.mode === "3d") {

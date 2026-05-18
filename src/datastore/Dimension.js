@@ -13,13 +13,34 @@ class Dimension {
         this.filterMethod = null;
     }
 
+ 
+
+    _applyStateTransition(index, nextState) {
+        const prevState = this.filterArray[index];
+        if (prevState === nextState) {
+            return;
+        }
+        const wasFiltered = prevState === 1 || prevState === 3;
+        const isFiltered = nextState === 1 || nextState === 3;
+        this.filterArray[index] = nextState;
+        if (wasFiltered === isFiltered) {
+            return;
+        }
+        const parentFilter = this.parent.filterArray;
+        if (isFiltered) {
+            if (++parentFilter[index] === 1) {
+                this.parent.filterSize--;
+            }
+        } else if (--parentFilter[index] === 0) {
+            this.parent.filterSize++;
+        }
+    }
+
     /**
      * Filters the data based on a predicate function.
      * The function should return false if the row should be filtered out.
      */
     filterPredicate(args, columns) {
-        const filter = this.parent.filterArray;
-        const parent = this.parent;
         const predicate = args.predicate;
         // could we pass in optional filteredIndices and use those rather than processing entire array?
         // it's not as simple as resetting the localFilter because of parent.filterSize mutation
@@ -37,21 +58,26 @@ class Dimension {
             // } catch (e) {
             //     // console.error('Error in evaluating filterPredicate', e);
             // }
-            const value = !predicate(i); //not much faster than try...catch
-            if (value) {
-                if (localFilter[i] === 0) {
-                    if (++filter[i] === 1) {
-                        parent.filterSize--;
-                    }
+            //not interested in rows already in background filter
+          
+            const shouldExclude = !predicate(i);
+            const prevState = localFilter[i];
+            // When a local filter is active, background-hidden rows must also
+            // contribute to exclusion scope (promote 2 -> 3 once).
+            if (prevState === 2) {
+                this._applyStateTransition(i, 3);
+                continue;
+            }
+            // local brush should only mutate visible points
+            if (prevState === 3) {
+                continue;
+            }
+            if (shouldExclude) {
+                if (prevState === 0) {
+                    this._applyStateTransition(i, 1);
                 }
-                localFilter[i] = 1;
-            } else {
-                if (localFilter[i] === 1) {
-                    if (--filter[i] === 0) {
-                        parent.filterSize++;
-                    }
-                }
-                localFilter[i] = 0;
+            } else if (prevState === 1) {
+                this._applyStateTransition(i, 0);
             }
         }
         // xxx: why would we not notify listeners?
@@ -72,32 +98,20 @@ class Dimension {
         if (!this.filterMethod) {
             return;
         }
-        const filter = this.parent.filterArray;
         const localFilter = this.filterArray;
-        const parent = this.parent;
         const len = this.parent.size;
         this.filterArguments = undefined;
         this.filterColumns = undefined;
         this.filterMethod = undefined;
         for (let i = 0; i < len; i++) {
+            // clear local contribution only: 1->0 and 3->2
             if (localFilter[i] === 1) {
-                if (--filter[i] === 0) {
-                    parent.filterSize++;
-                }
-                localFilter[i] = 0;
+                this._applyStateTransition(i, 0);
+            } else if (localFilter[i] === 3) {
+                this._applyStateTransition(i, 2);
             }
         }
-        if (this.bgfArray) {
-            for (let i = 0; i < len; i++) {
-                if (this.bgfArray[i] === 0) {
-                    //need to filter in
-                    if (--filter[i] === 0) {
-                        parent.filterSize++;
-                    }
-                    localFilter[i] = 2;
-                }
-            }
-        }
+   
         if (notify) {
             this.parent._callListeners("filtered", this);
         }
@@ -147,20 +161,6 @@ class Dimension {
         this.filterArguments = args;
         this.filterMethod = method;
         this[method](args, columns);
-        if (this.bgfArray) {
-            const filter = this.parent.filterArray;
-            const len = this.parent.size;
-            const localFilter = this.filterArray;
-            const parent = this.parent;
-            for (let i = 0; i < len; i++) {
-                if (this.bgfArray[i] === 0) {
-                    if (++filter[i] === 1) {
-                        parent.filterSize--;
-                    }
-                    localFilter[i] = 2;
-                }
-            }
-        }
         if (notify) {
             this.parent._callListeners("filtered", this);
         }
@@ -221,9 +221,12 @@ class Dimension {
         newArr.set(this.filterArray);
         this.filterBuffer = newBuff;
         this.filterArray = newArr;
-        if (this.bgfArray) {
+        if (this.bgfData) {
             const bd = this.bgfData;
-            this.setBackgroundFilter(b.column.b.cat);
+            this.setBackgroundFilter(
+                bd.column,
+                bd.cats?.length ? bd.cats : bd.cat,
+            );
         }
         if (this.filterMethod) {
             this.filter(
@@ -236,31 +239,64 @@ class Dimension {
     }
 
     /**
-     * sets a permenant filter on the chart
+     * sets a permanent filter on the chart
      * @param {string} column - The column of the filter
-     * @param {string} cat - the category in the column to filter on
+     * @param {string|string[]} cat - category/category list in the column to filter on
      */
     setBackgroundFilter(column, cat) {
         const col = this.parent.columnIndex[column];
-        const ci = col.values.indexOf(cat);
+        if (!col?.values) {
+            return;
+        }
+        const cats = (Array.isArray(cat) ? cat.slice(0) : [cat]).filter(
+            (x) => x !== undefined && x !== null,
+        );
+        if (cats.length === 0) {
+            this.clearBackGroundFilter();
+            return;
+        }
+        const indices = new Set();
+        for (const c of cats) {
+            const ci = col.values.indexOf(c);
+            if (ci !== -1) {
+                indices.add(ci);
+            }
+        }
         const data = col.data;
         this.bgfData = {
             column: column,
-            cat: cat,
+            cat: Array.isArray(cat) ? cat[0] : cat,
+            cats: cats,
         };
-        this.bgfArray = new Uint8Array(this.parent.size);
         for (let i = 0; i < this.parent.size; i++) {
-            if (data[i] === ci) {
-                this.bgfArray[i] = 1;
+            const prevState = this.filterArray[i];
+            let nextState = prevState;
+            const hasLocalFilter = Boolean(this.filterMethod);
+            if (indices.has(data[i])) {
+                if (prevState === 2 || prevState === 3) {
+                    nextState -= 2;
+                }
             } else {
-                this.filterArray[i] = 2;
+                if (prevState === 0) {
+                    nextState = hasLocalFilter ? 3 : 2;
+                } else if (prevState === 1) {
+                    nextState = 3;
+                }
             }
+            this._applyStateTransition(i, nextState);
         }
     }
 
     clearBackGroundFilter() {
-        this.bgfArray = null;
+        if (!this.bgfData) {
+            return;
+        }
         this.bgfData = null;
+        for (let i = 0; i < this.parent.size; i++) {
+            if (this.filterArray[i] > 1) {
+                this._applyStateTransition(i, this.filterArray[i] - 2);
+            }
+        }
     }
 
     destroy(notify = true) {

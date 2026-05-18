@@ -205,6 +205,7 @@ export type GuiValueTypes = {
     //is the premise of this correct? technically, could we have a dropdown of numbers?
     dropdown: string;
     multidropdown: string[];
+    category_filter: { column: string; categories: string[] };
     single_category_selection: string;
     category_selection: string[];
     check: boolean;
