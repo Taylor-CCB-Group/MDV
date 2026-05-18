@@ -301,7 +301,7 @@ export const setCellValueFromString = (
             throw new Error(`Index out of bounds for multitext column: "${column.field}"`);
         }
 
-        const maxValues = 65536;
+        const maxValues = MULTITEXT_EMPTY_VALUE;
         const delimiter = getMultitextDelimiter(column);
 
         const parts = splitMultitextItems(newValue, delimiter);

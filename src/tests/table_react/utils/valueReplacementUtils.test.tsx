@@ -148,6 +148,26 @@ describe("valueReplacementUtils", () => {
                 expect(column.values).toEqual(["val4", "val5", "val6"]);
             });
 
+            test("reserves the multitext empty-slot sentinel as unavailable for labels", () => {
+                const values = Array.from({ length: 65535 }, (_, index) => `value-${index}`);
+                const data = new Uint16Array(65536);
+                for (let index = 0; index < values.length; index++) {
+                    data[index] = index;
+                }
+                data[65535] = 65535;
+                column = {
+                    field: "Col1",
+                    data,
+                    values,
+                    stringLength: 1,
+                    datatype: "multitext",
+                } as any;
+
+                expect(() => setCellValueFromString(column, 65535, "new value")).toThrowError(
+                    `Column exceeded 65535 values while setting: ${column.field}`,
+                );
+            });
+
             test("throw error for empty values array", () => {
                 column = {
                     field: "Col1",
