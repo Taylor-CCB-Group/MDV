@@ -22,6 +22,7 @@ import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import DeckDensityGridComponent from "./DeckDensityGridComponent";
+import { supportsDensityGridMode } from "./densityGridUtils";
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -141,7 +142,8 @@ const DeckScatter = observer(function DeckScatterComponent({
     const contourConfig = useConfig<DualContourLegacyConfig>();
     const { viewState, dimension } = config;
     const is2d = dimension === "2d";
-    const showDensityGrid = is2d && contourConfig.density_mode === "grid";
+    const showDensityGrid =
+        supportsDensityGridMode(config.type) && is2d && contourConfig.density_mode === "grid";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)

@@ -3,6 +3,7 @@ import { OrthographicView, type OrthographicViewState } from "@deck.gl/core";
 import { action } from "mobx";
 import { useEffect, useMemo, useRef } from "react";
 import { getFieldColor } from "../fieldColorManager";
+import useGateLayers from "../hooks/useGateLayers";
 import { useChartID, useChartSize, useConfig, useFieldSpecs, useFilteredIndices } from "../hooks";
 import { isLoadedNumericContourField, useFieldContour, type DualContourLegacyConfig } from "../contour_state";
 import type { ScatterPlotConfig2D } from "../scatter_state";
@@ -36,12 +37,13 @@ function getSerializableViewState(viewState: OrthographicViewState): Orthographi
 export default function DeckDensityGridComponent() {
     const chartId = useChartID();
     const initializedViewRef = useRef(false);
-    const [width, height] = useChartSize();
+    const [viewportWidth, viewportHeight] = useChartSize();
     const config = useConfig<DensityGridConfig>();
     const rows = useFilteredIndices();
     const {
-        scatterProps: { scatterplotLayer, greyScatterplotLayer },
+        scatterProps: { scatterplotLayer, greyScatterplotLayer, setScatterKeyboardActive },
     } = useSpatialLayers();
+    const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
     const loadedFields = useFieldSpecs(config.densityFields);
     const densityFields = loadedFields.filter(isLoadedNumericContourField);
     const configuredFieldCount = Array.isArray(config.densityFields) ? config.densityFields.length : 0;
@@ -56,8 +58,8 @@ export default function DeckDensityGridComponent() {
     });
 
     const layout = useMemo(
-        () => getDensityGridLayout(width, height, Math.max(densityFields.length, 1)),
-        [width, height, densityFields.length],
+        () => getDensityGridLayout(viewportWidth, viewportHeight, Math.max(densityFields.length, 1)),
+        [viewportWidth, viewportHeight, densityFields.length],
     );
     const viewIds = useMemo(
         () => densityFields.map((field, index) => getDensityGridViewId(chartId, field.field, index)),
@@ -65,7 +67,7 @@ export default function DeckDensityGridComponent() {
     );
     const views = useMemo(
         () =>
-            densityFields.map((field, index) => {
+            densityFields.map((_field, index) => {
                 const bounds = getDensityGridCellBounds(layout, index);
                 return new OrthographicView({
                     id: viewIds[index],
@@ -74,11 +76,10 @@ export default function DeckDensityGridComponent() {
                     width: bounds.width,
                     height: bounds.height,
                     flipY: false,
-                    // Top-level DeckGL `controller` only applies to the first view.
-                    controller: { dragPan: true },
+                    controller: { dragPan: controllerOptions.dragPan },
                 });
             }),
-        [densityFields, layout, viewIds],
+        [densityFields, layout, viewIds, controllerOptions.dragPan],
     );
     const viewState = useMemo(
         () => getDensityGridViewStates(viewIds, config.viewState),
@@ -96,12 +97,12 @@ export default function DeckDensityGridComponent() {
                     Math.log2(
                         Math.max(
                             Number.MIN_VALUE,
-                            Math.min(layout.cellWidth / Math.max(width, 1), layout.cellHeight / Math.max(height, 1)),
+                            layout.cellSize / Math.max(viewportWidth, 1),
                         ),
                     ),
             };
         })();
-    }, [config, densityFields.length, height, layout.cellHeight, layout.cellWidth, width]);
+    }, [config, densityFields.length, layout.cellSize, viewportWidth]);
     const radiusPixels = useMemo(
         () => Math.max(1, 30 * (config.contour_bandwidth ?? 0.1) * 2 ** Number(config.viewState.zoom ?? 0)),
         [config.contour_bandwidth, config.viewState.zoom],
@@ -127,9 +128,31 @@ export default function DeckDensityGridComponent() {
                         },
                     ],
                 });
-                return [greyLayer, scatterLayer];
+                const gateLayers = [
+                    gateDisplayLayer
+                        ? cloneDeckLayer(gateDisplayLayer, {
+                              id: `${viewId}-gate`,
+                              viewId,
+                          })
+                        : null,
+                    gateLabelLayer
+                        ? cloneDeckLayer(gateLabelLayer, {
+                              id: `${viewId}-gate-label`,
+                              viewId,
+                          })
+                        : null,
+                ].filter((layer) => layer !== null);
+                return [greyLayer, scatterLayer, ...gateLayers];
             }),
-        [contourLayers, viewIds, radiusPixels, scatterplotLayer, greyScatterplotLayer],
+        [
+            contourLayers,
+            viewIds,
+            radiusPixels,
+            scatterplotLayer,
+            greyScatterplotLayer,
+            gateDisplayLayer,
+            gateLabelLayer,
+        ],
     );
 
     if (configuredFieldCount === 0) {
@@ -143,49 +166,66 @@ export default function DeckDensityGridComponent() {
     }
 
     return (
-        <div className="relative h-full w-full">
-            <DeckGL
-                controller={false}
-                layerFilter={({ layer, viewport }) => matchesDensityGridView(layer.id, viewport.id)}
-                layers={layers}
-                views={views}
-                viewState={viewState}
-                useDevicePixels={true}
-                onViewStateChange={({ viewState: nextViewState }: { viewState: OrthographicViewState }) => {
-                    action(() => {
-                        config.viewState = getSerializableViewState(nextViewState);
-                    })();
-                }}
-                getCursor={({ isDragging }) => (isDragging ? "grabbing" : "crosshair")}
-            />
-            <div className="pointer-events-none absolute inset-0">
-                {densityFields.map((field, index) => {
-                    const bounds = getDensityGridCellBounds(layout, index);
-                    const color = getFieldColor(field.field);
-                    return (
-                        <div
-                            key={field.field}
-                            className="absolute border border-slate-400/25"
-                            style={{
-                                left: `${bounds.x}px`,
-                                top: `${bounds.y}px`,
-                                width: `${bounds.width}px`,
-                                height: `${bounds.height}px`,
-                            }}
-                        >
-                            <div
-                                className="absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded-sm px-2 py-1 text-xs"
-                                style={{
-                                    backgroundColor: "rgba(15, 23, 42, 0.76)",
-                                    color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
-                                }}
-                                title={field.name}
-                            >
-                                {field.name || field.field}
-                            </div>
-                        </div>
-                    );
-                })}
+        <div className="relative flex h-full w-full flex-col">
+            <div
+                className="min-h-0 flex-1 overflow-auto"
+                onMouseDown={() => setScatterKeyboardActive(true)}
+                onMouseEnter={() => setScatterKeyboardActive(true)}
+                onMouseLeave={() => setScatterKeyboardActive(false)}
+            >
+                <div
+                    className="relative"
+                    style={{ width: layout.contentWidth, height: layout.contentHeight }}
+                >
+                    <DeckGL
+                        controller={false}
+                        width={layout.contentWidth}
+                        height={layout.contentHeight}
+                        layerFilter={({ layer, viewport }) => matchesDensityGridView(layer.id, viewport.id)}
+                        layers={layers}
+                        views={views}
+                        viewState={viewState}
+                        useDevicePixels={true}
+                        onViewStateChange={({ viewState: nextViewState }: { viewState: OrthographicViewState }) => {
+                            action(() => {
+                                config.viewState = getSerializableViewState(nextViewState);
+                            })();
+                        }}
+                        getCursor={({ isDragging }) => (isDragging ? "grabbing" : "crosshair")}
+                    />
+                    <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{ width: layout.contentWidth, height: layout.contentHeight }}
+                    >
+                        {densityFields.map((field, index) => {
+                            const bounds = getDensityGridCellBounds(layout, index);
+                            const color = getFieldColor(field.field);
+                            return (
+                                <div
+                                    key={field.field}
+                                    className="absolute border border-slate-400/25"
+                                    style={{
+                                        left: `${bounds.x}px`,
+                                        top: `${bounds.y}px`,
+                                        width: `${bounds.width}px`,
+                                        height: `${bounds.height}px`,
+                                    }}
+                                >
+                                    <div
+                                        className="absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded-sm px-2 py-1 text-xs"
+                                        style={{
+                                            backgroundColor: "rgba(15, 23, 42, 0.76)",
+                                            color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
+                                        }}
+                                        title={field.name}
+                                    >
+                                        {field.name || field.field}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     );

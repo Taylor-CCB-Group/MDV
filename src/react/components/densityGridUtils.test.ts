@@ -5,26 +5,37 @@ import {
     getDensityGridViewId,
     getDensityGridViewStates,
     matchesDensityGridView,
+    supportsDensityGridMode,
 } from "./densityGridUtils";
 
 describe("densityGridUtils", () => {
-    test("lays out fields across responsive columns", () => {
+    test("lays out fields across responsive columns with square cells", () => {
         const layout = getDensityGridLayout(900, 600, 5, 260);
 
         expect(layout.columns).toBe(3);
         expect(layout.rows).toBe(2);
-        expect(layout.cellWidth).toBe(300);
-        expect(layout.cellHeight).toBe(300);
+        expect(layout.cellSize).toBe(260);
+        expect(layout.cellWidth).toBe(260);
+        expect(layout.cellHeight).toBe(260);
+        expect(layout.contentWidth).toBe(780);
+        expect(layout.contentHeight).toBe(520);
+    });
+
+    test("content can exceed viewport height for scrolling", () => {
+        const layout = getDensityGridLayout(900, 400, 5, 260);
+
+        expect(layout.contentHeight).toBe(520);
+        expect(layout.contentHeight).toBeGreaterThan(400);
     });
 
     test("computes cell bounds from row and column position", () => {
         const layout = getDensityGridLayout(900, 600, 5, 260);
 
         expect(getDensityGridCellBounds(layout, 4)).toEqual({
-            x: 300,
-            y: 300,
-            width: 300,
-            height: 300,
+            x: 260,
+            y: 260,
+            width: 260,
+            height: 260,
         });
     });
 
@@ -33,7 +44,15 @@ describe("densityGridUtils", () => {
 
         expect(viewId).toBe("density-grid-chart__1-2-marker_a");
         expect(matchesDensityGridView(`${viewId}-weights`, viewId)).toBe(true);
+        expect(matchesDensityGridView(`${viewId}-selection`, viewId)).toBe(true);
         expect(matchesDensityGridView(`${viewId}-weights`, "other-view")).toBe(false);
+    });
+
+    test("supports density grid only for contour deck chart types", () => {
+        expect(supportsDensityGridMode("DeckContourScatter")).toBe(true);
+        expect(supportsDensityGridMode("DeckDensity")).toBe(true);
+        expect(supportsDensityGridMode("wgl_scatter_plot")).toBe(false);
+        expect(supportsDensityGridMode(undefined)).toBe(false);
     });
 
     test("maps shared view state onto each view id", () => {
