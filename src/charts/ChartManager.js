@@ -52,6 +52,18 @@ const column_orders = {
     unique: 2,
 };
 
+class MissingColumnDataError extends Error {
+    constructor(dataSource, missingColumns, requestedColumns) {
+        super(
+            `Failed to load required column data for datasource "${dataSource}": ${missingColumns.join(", ")}`,
+        );
+        this.name = "MissingColumnDataError";
+        this.dataSource = dataSource;
+        this.missingColumns = missingColumns;
+        this.requestedColumns = requestedColumns;
+    }
+}
+
 const themes = {
     dark: {
         title_bar_color: "#222",
@@ -1490,17 +1502,33 @@ export class ChartManager {
         //"this.dataLoader is not a function" with e.g. "cell_types"
         this.dataLoader(columns, dataSource, dataStore.size)
             .then((resp) => {
+                const loadedFields = new Set(resp.map((col) => col.field));
                 for (const col of resp) {
                     dataStore.setColumnData(col.field, col.data);
+                }
+                const missingColumns = columns.filter(
+                    (column) => !loadedFields.has(column.field),
+                );
+                if (missingColumns.length) {
+                    console.error("Column data loader omitted requested columns", {
+                        dataSource,
+                        requestedColumns: columns.map((column) => column.field),
+                        missingColumns: missingColumns.map((column) => column.field),
+                    });
+                    trans.failedColumns.push(...missingColumns);
                 }
                 trans.columnsLoaded++;
             })
             .catch((error) => {
                 //! this is an error that is not being handled properly... what happens to trans.failedColumns?
                 //! they do get passed to a callback... what does that callback do?
-                console.log(error);
+                console.error("Column data loader failed", {
+                    dataSource,
+                    requestedColumns: columns.map((column) => column.field),
+                    error,
+                });
                 trans.columnsLoaded++;
-                trans.failedColumns.push(columns);
+                trans.failedColumns.push(...columns);
             })
             .finally(() => {
                 const total = trans.columns.length;
@@ -1850,6 +1878,13 @@ export class ChartManager {
             await this._getColumnsAsync(dataSource, neededCols);
             await this._addChart(dataSource, config, div, notify);
         } catch (error) {
+            console.error("Failed to add chart", {
+                chartId: config.id,
+                chartType: config.type,
+                dataSource,
+                neededColumns: neededCols,
+                error,
+            });
             this.clearInfoAlerts();
             spinner.remove();
             ellipsis.remove();
@@ -1876,7 +1911,20 @@ export class ChartManager {
                     { message: error }
                     :
                     { message: "An error occurred while creating the chart" };
-            createMdvPortal(createElement(ErrorComponentReactWrapper, { error: errorObj, height, width, extraMetaData: { config } }), debugNode);
+            createMdvPortal(createElement(ErrorComponentReactWrapper, {
+                error: errorObj,
+                height,
+                width,
+                extraMetaData: {
+                    config,
+                    dataSource,
+                    neededColumns: neededCols,
+                    ...(error instanceof MissingColumnDataError && {
+                        missingColumns: error.missingColumns,
+                        requestedColumns: error.requestedColumns,
+                    }),
+                },
+            }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {
@@ -1911,6 +1959,8 @@ export class ChartManager {
             )
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
+        } finally {
+            this._markInitialChartLoadComplete(config);
         }
     }
 
@@ -2003,7 +2053,32 @@ export class ChartManager {
         const result = await new Promise((resolve) => {
             this._getColumnsThen(dataSource, allColumns, resolve);
         });
+        const missingColumns = this._getMissingColumnData(dataSource, allColumns);
+        if (missingColumns.length) {
+            console.error("Column loading completed with missing data", {
+                dataSource,
+                requestedColumns: allColumns,
+                missingColumns,
+            });
+            throw new MissingColumnDataError(dataSource, missingColumns, allColumns);
+        }
         return result;
+    }
+
+    _getMissingColumnData(dataSource, columns) {
+        const dStore = this.dsIndex[dataSource].dataStore;
+        const missing = [];
+        for (const col of columns) {
+            if (typeof col !== "string") {
+                continue;
+            }
+            const key = this._resolveToDataStoreFieldKey(dStore, col);
+            const column = dStore.columnIndex[key];
+            if (!column?.data) {
+                missing.push(key);
+            }
+        }
+        return missing;
     }
 
     _getColumnsThen(dataSource, columns, func) {
@@ -2092,7 +2167,7 @@ export class ChartManager {
         }
         //load required columns, then check all requested are loaded
         else {
-            this.loadColumnSet(reqCols, dataSource, (failedColumns) => {
+            this.loadColumnSet(reqCols, dataSource, (failedColumns = []) => {
                 if (failedColumns.length) {
                     console.warn(
                         "got columns with some failures",
@@ -2229,20 +2304,24 @@ export class ChartManager {
         if (notify) {
             this._callListeners("chart_added", chart);
         }
-        //check to see if all inital charted loaded , then can call any listeners
-        if (this._toLoadCharts) {
-            this._toLoadCharts.delete(config);
-            if (this._toLoadCharts.size === 0) {
-                this._toLoadCharts = undefined;
-                if (this.viewData.links) {
-                    for (const l of this.viewData.links) {
-                        this._setUpLink(l);
-                    }
-                }
-                this._callListeners("view_loaded", this.viewManager.current_view);
+        return chart;
+    }
+
+    _markInitialChartLoadComplete(config) {
+        if (!this._toLoadCharts) {
+            return;
+        }
+        this._toLoadCharts.delete(config);
+        if (this._toLoadCharts.size !== 0) {
+            return;
+        }
+        this._toLoadCharts = undefined;
+        if (this.viewData.links) {
+            for (const l of this.viewData.links) {
+                this._setUpLink(l);
             }
         }
-        return chart;
+        this._callListeners("view_loaded", this.viewManager.current_view);
     }
 
     //gives a chart access to another datasource
