@@ -177,6 +177,7 @@
     "@babel/plugin-transform-typescript": "^7.28.6",
     "@babel/preset-typescript": "^7.28.5",
     "@biomejs/biome": "1.9.4",
+    "@playwright/cli": "^0.1.13",
     "@playwright/test": "^1.57.0",
     "@rolldown/plugin-babel": "^0.2.3",
     "@rollup/plugin-babel": "^6.1.0",
