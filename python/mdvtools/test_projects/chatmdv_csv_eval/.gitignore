@@ -1,0 +1,4 @@
+# Local benchmark outputs (defaults go to $TMPDIR/chatmdv_csv_eval; keep repo clean).
+results_*.csv
+failures_*.jsonl
+benchmark_summary_*.json
