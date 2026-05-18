@@ -69,6 +69,12 @@ logs/
 /output/
 /playwright/.cache/
 /playwright/.auth/
+.playwright-cli/
+
+# Claude
+CLAUDE.md
+.claude/
+.cocoindex_code/
 
 # Generated test data
 tests_playwright/test-data/temp/
