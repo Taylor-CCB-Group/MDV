@@ -34,6 +34,7 @@ const TabHeader = <T extends string>({
                     indicatorTab !== undefined && tabs.includes(indicatorTab);
                 const showCommitMark = indicatorInList && indicatorTab === tab;
                 const labelText = tabLabels?.[i] ?? tab;
+                const tabAccessibleName = showCommitMark ? `${labelText}, in active state` : labelText;
                 return (
                     <button
                         key={tab}
@@ -41,7 +42,7 @@ const TabHeader = <T extends string>({
                         type="button"
                         role="tab"
                         aria-selected={selected}
-                        title={showCommitMark ? "In active state" : undefined}
+                        aria-label={tabAccessibleName}
                         className={clsx(
                             "p-2 text-center border-b-2 transition-colors w-full",
                             selected ? "font-bold" : "font-light",

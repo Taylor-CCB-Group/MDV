@@ -1,9 +1,9 @@
 import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { observer } from "mobx-react-lite";
-import type { DropdownMappedValues, GuiSpec } from "@/charts/charts";
+import type { DropdownMappedValues } from "@/charts/charts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { action, makeAutoObservable, observe, runInAction } from "mobx";
-import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
+import { DropdownAutocompleteComponent, type DropdownSpec } from "./SettingsDialogComponent";
 import { g, isArray } from "@/lib/utils";
 import { getFieldName, subgroupKeyFromFieldName, RowsAsColsQuery, type RowsAsColslink } from "@/links/link_utils";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks";
@@ -31,6 +31,19 @@ function pickInitialSubgroupKey(
         return prefix;
     }
     return first;
+}
+
+/** Resolves link name from a saved `FieldName` only when exactly one link owns that subgroup prefix. */
+function resolveLinkNameFromFieldName(
+    field: string,
+    links: ReturnType<typeof useRowsAsColumnsLinks>,
+): string | undefined {
+    const prefix = subgroupKeyFromFieldName(field);
+    if (!prefix) {
+        return undefined;
+    }
+    const matches = links.filter((entry) => Boolean(entry.link.subgroups[prefix]));
+    return matches.length === 1 ? matches[0].link.name : undefined;
 }
 
 /**
@@ -185,21 +198,22 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M
     /// we don't want a new spec every time the value changes... we want to give it an observable value
     // (I think)- definition of this spec may want to be in the hook, with an observable value that isn't
     // the real props.current_value???
-    const [spec] = useState(() =>
-        makeAutoObservable(
-            g<"multidropdown" | "dropdown">({
-                type: isMultiType ? "multidropdown" : "dropdown",
-                label: `specific '${name}'`, //don't really want to have this label here, would take a bigger change to remove
-                values,
-                current_value: initialValue,
-                func: action((_v) => {
-                    // something about having setValue as a dependency makes it end up re-running this...
-                    // & we really want the spec to be stable.
-                    //! for some reason if we call this in here we get glitchy behaviour, not really sure
-                    // setValue(v);
+    const [spec] = useState<DropdownSpec>(
+        () =>
+            makeAutoObservable(
+                g({
+                    type: isMultiType ? "multidropdown" : "dropdown",
+                    label: `specific '${name}'`, //don't really want to have this label here, would take a bigger change to remove
+                    values,
+                    current_value: initialValue,
+                    func: action((_v) => {
+                        // something about having setValue as a dependency makes it end up re-running this...
+                        // & we really want the spec to be stable.
+                        //! for some reason if we call this in here we get glitchy behaviour, not really sure
+                        // setValue(v);
+                    }),
                 }),
-            }),
-        ),
+            ) as DropdownSpec,
     );
 
     useEffect(() => {
@@ -207,6 +221,12 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M
             spec.values = values;
         });
     }, [spec, values]);
+
+    useEffect(() => {
+        runInAction(() => {
+            spec.current_value = getSafeInternalValue(props.current_value);
+        });
+    }, [spec, props.current_value, getSafeInternalValue]);
 
     useEffect(() => {
         // do you swim with the mobx stream? or against it?
@@ -264,9 +284,7 @@ const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(pro
                     indicatorTab={boundSubgroupKey ?? undefined}
                 />
             ) : null}
-            <DropdownAutocompleteComponent
-                props={spec as GuiSpec<"dropdown"> | GuiSpec<"multidropdown">}
-            />
+            <DropdownAutocompleteComponent props={spec} />
         </div>
     );
 });
@@ -299,11 +317,7 @@ const LinkMulti = observer(<T extends CTypes, M extends boolean>(props: ColumnSe
             return cur.link.name;
         }
         if (typeof cur === "string") {
-            const prefix = subgroupKeyFromFieldName(cur);
-            if (!prefix) {
-                return undefined;
-            }
-            return links.find((entry) => Boolean(entry.link.subgroups[prefix]))?.link.name;
+            return resolveLinkNameFromFieldName(cur, links);
         }
         return undefined;
     }, [props.current_value, links]);
@@ -315,14 +329,7 @@ const LinkMulti = observer(<T extends CTypes, M extends boolean>(props: ColumnSe
         const v = props.current_value;
         const currentFieldName = isArray(v) ? v[0] : v;
         if (typeof currentFieldName === "string") {
-            const prefix = subgroupKeyFromFieldName(currentFieldName);
-            const matchingLink = links.find((entry) => {
-                if (!prefix) {
-                    return false;
-                }
-                return Boolean(entry.link.subgroups[prefix]);
-            });
-            return matchingLink?.link.name || links[0].link.name;
+            return resolveLinkNameFromFieldName(currentFieldName, links) ?? links[0].link.name;
         }
         return links[0].link.name;
     });
