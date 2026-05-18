@@ -69,6 +69,8 @@ logs/
 /output/
 /playwright/.cache/
 /playwright/.auth/
+/.playwright-cli/
+/artifacts/playwright-cli/
 
 # Generated test data
 tests_playwright/test-data/temp/

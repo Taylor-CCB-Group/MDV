@@ -25,6 +25,12 @@ pnpm install
 pnpm exec playwright install --with-deps
 ```
 
+Optional browser-exploration tooling for humans and LLMs:
+
+```bash
+pnpm exec playwright-cli --help
+```
+
 ## Python Environment
 
 Backend-backed project tests require the local Python environment.
@@ -103,6 +109,58 @@ Do not use the raw low-level Playwright command as the normal entrypoint for
 this repo. It does not enforce the backend-backed worker policy, and if you run
 everything through it, project test failures are expected.
 
+## Optional `playwright-cli`
+
+`playwright-cli` is available in this repo as an optional browser exploration
+and debugging tool. It is not the canonical test runner.
+
+Use it when you want to:
+
+- inspect a local page interactively
+- discover stable locators
+- reproduce a flow before writing a real test
+- debug a paused Playwright test session
+
+Run it through the local dependency:
+
+```bash
+pnpm exec playwright-cli open http://localhost:5055 --headed
+pnpm exec playwright-cli snapshot
+pnpm exec playwright-cli click e12
+pnpm exec playwright-cli eval "document.title"
+pnpm exec playwright-cli close
+```
+
+This repo configures `playwright-cli` to write its session artifacts under:
+
+```text
+artifacts/playwright-cli/
+```
+
+That keeps YAML snapshots and session logs out of the repo root.
+
+When you want to keep a screenshot or snapshot, give it an explicit filename in
+that directory:
+
+```bash
+pnpm exec playwright-cli screenshot --filename=artifacts/playwright-cli/screenshots/example.png
+pnpm exec playwright-cli snapshot --filename=artifacts/playwright-cli/snapshots/example.yaml
+```
+
+When debugging a Playwright test paused with `--debug=cli`, attach to the named
+session:
+
+```bash
+pnpm exec playwright-cli attach tw-abcdef
+```
+
+Keep using the repo wrapper scripts for actual suite execution:
+
+- `pnpm run playwright-test-catalog`
+- `pnpm run playwright-test-catalog-dev`
+- `pnpm run playwright-test-project`
+- `pnpm run playwright-test-all`
+
 ## What Each Runner Does
 
 - `playwright-test-catalog`
@@ -175,3 +233,6 @@ default because they depend on:
 - reliable access to `localhost:5055`
 - real browser launch
 - real backend project lifecycle
+
+The same rule usually applies to `playwright-cli` when you point it at the
+local backend.
