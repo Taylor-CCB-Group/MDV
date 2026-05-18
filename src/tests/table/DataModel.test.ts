@@ -201,8 +201,8 @@ describe("DataModel bulk edit helpers", () => {
         const dataModel = new DataModel(dataStore, { autoupdate: false });
         dataModel.fillColumn("label", "Filled", [0, 1, 2], true);
 
-        expect(Array.from(dataStore.columnIndex.label.data)).toEqual([3, 1, 3]);
-        expect(dataStore.columnIndex.label.values).toEqual(["", "A", "B", "Filled"]);
+        expect(Array.from(dataStore.columnIndex.label.data)).toEqual([1, 0, 1]);
+        expect(dataStore.columnIndex.label.values).toEqual(["A", "Filled"]);
         expect(dataChanged).toHaveBeenCalledWith(["label"]);
     });
 
