@@ -223,6 +223,68 @@ export async function selectViewViaUi(page: Page, viewName: string) {
     await expect.poll(async () => await getCurrentView(page)).toBe(viewName);
 }
 
+export type ScatterDensityMode = "grid" | "overlay";
+
+export async function patchScatterChartConfig(
+    page: Page,
+    title: string,
+    patch: { density_mode?: ScatterDensityMode; densityFields?: string[]; type?: string },
+) {
+    await page.evaluate(
+        ({ chartTitle, configPatch }) => {
+            const chartEntries = Object.values((window as any).mdv.chartManager.charts) as Array<{
+                chart?: { config?: Record<string, unknown> };
+            }>;
+            const entry = chartEntries.find((item) => item.chart?.config?.title === chartTitle);
+            const config = entry?.chart?.config;
+            if (!config) {
+                throw new Error(`Chart not found: ${chartTitle}`);
+            }
+            if (configPatch.type) {
+                config.type = configPatch.type;
+            }
+            if (configPatch.density_mode) {
+                config.density_mode = configPatch.density_mode;
+                if (configPatch.density_mode === "grid") {
+                    config.contour_fill = true;
+                }
+            }
+            if (configPatch.densityFields) {
+                config.densityFields = configPatch.densityFields;
+            }
+        },
+        { chartTitle: title, configPatch: patch },
+    );
+}
+
+export async function getNumericColumnNamesForChart(page: Page, title: string, limit = 2): Promise<string[]> {
+    return await page.evaluate(
+        ({ chartTitle, maxCount }) => {
+            const chartEntries = Object.values((window as any).mdv.chartManager.charts) as Array<{
+                chart?: {
+                    config?: { title?: string };
+                    dataStore?: { columnIndex?: Record<string, { datatype?: string }> };
+                };
+            }>;
+            const entry = chartEntries.find((item) => item.chart?.config?.title === chartTitle);
+            const columnIndex = entry?.chart?.dataStore?.columnIndex;
+            if (!columnIndex) {
+                return [];
+            }
+            return Object.entries(columnIndex)
+                .filter(([, column]) => column.datatype === "double" || column.datatype === "integer")
+                .map(([name]) => name)
+                .slice(0, maxCount);
+        },
+        { chartTitle: title, maxCount: limit },
+    );
+}
+
+export function getSelectionToolbar(page: Page, chartTitle: string) {
+    const panel = getChartPanelByTitle(page, chartTitle);
+    return panel.getByRole("group", { name: "choose tool for manipulating view or selection" });
+}
+
 export type RowsAsColumnsSubgroupInfo = {
     key: string;
     label: string;

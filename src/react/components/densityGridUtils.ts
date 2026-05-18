@@ -3,8 +3,12 @@ import type { OrthographicViewState } from "@deck.gl/core";
 export type DensityGridLayout = {
     columns: number;
     rows: number;
+    /** Square cell edge length in pixels. */
+    cellSize: number;
     cellWidth: number;
     cellHeight: number;
+    contentWidth: number;
+    contentHeight: number;
 };
 
 export type DensityGridCellBounds = {
@@ -14,26 +18,36 @@ export type DensityGridCellBounds = {
     height: number;
 };
 
-const DEFAULT_MIN_CELL_WIDTH = 260;
+export const DEFAULT_MIN_CELL_WIDTH = 260;
+
+/** Chart types that expose the density grid setting (see `includeDensityModeToggle`). */
+export const DENSITY_GRID_CHART_TYPES = new Set(["DeckContourScatter", "DeckDensity"]);
+
+export function supportsDensityGridMode(chartType: string | undefined) {
+    return typeof chartType === "string" && DENSITY_GRID_CHART_TYPES.has(chartType);
+}
 
 export function getDensityGridLayout(
-    width: number,
-    height: number,
+    viewportWidth: number,
+    _viewportHeight: number,
     fieldCount: number,
-    minCellWidth = DEFAULT_MIN_CELL_WIDTH,
+    cellSize = DEFAULT_MIN_CELL_WIDTH,
 ): DensityGridLayout {
     const safeFieldCount = Math.max(1, fieldCount);
-    const safeWidth = Math.max(1, width);
-    const safeHeight = Math.max(1, height);
-    const preferredColumns = Math.max(1, Math.floor(safeWidth / Math.max(1, minCellWidth)));
+    const safeViewportWidth = Math.max(1, viewportWidth);
+    const safeCellSize = Math.max(1, cellSize);
+    const preferredColumns = Math.max(1, Math.floor(safeViewportWidth / safeCellSize));
     const columns = Math.min(safeFieldCount, preferredColumns);
     const rows = Math.ceil(safeFieldCount / columns);
 
     return {
         columns,
         rows,
-        cellWidth: safeWidth / columns,
-        cellHeight: safeHeight / rows,
+        cellSize: safeCellSize,
+        cellWidth: safeCellSize,
+        cellHeight: safeCellSize,
+        contentWidth: columns * safeCellSize,
+        contentHeight: rows * safeCellSize,
     };
 }
 
