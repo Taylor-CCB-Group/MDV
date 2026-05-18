@@ -27,6 +27,41 @@ export function matchesDensityGridView(layerId: string, viewId: string) {
     return layerId === viewId || layerId.startsWith(`${viewId}-`);
 }
 
+export function isDensityGridViewport(viewportId: string) {
+    return viewportId.startsWith("density-grid-");
+}
+
+type LayerViewportFilterInput = {
+    id: string;
+    props?: { viewId?: string };
+};
+
+/**
+ * Deck layerFilter for MDVivViewer: single detail viewports use viv id suffixes;
+ * density-grid cells route layers by viewId / grid id prefix instead.
+ */
+export function shouldDrawLayerInViewport(
+    layer: LayerViewportFilterInput,
+    viewportId: string,
+    vivIdForViewport: string,
+) {
+    if (layer.id.includes(vivIdForViewport)) {
+        return true;
+    }
+    if (!isDensityGridViewport(viewportId)) {
+        return false;
+    }
+    const layerViewId = layer.props?.viewId;
+    if (typeof layerViewId === "string") {
+        return (
+            matchesDensityGridView(layer.id, layerViewId) ||
+            matchesDensityGridView(layer.id, viewportId) ||
+            layerViewId === viewportId
+        );
+    }
+    return matchesDensityGridView(layer.id, viewportId);
+}
+
 export function getDensityGridViewStates(
     viewIds: string[],
     sharedViewState: OrthographicViewState,

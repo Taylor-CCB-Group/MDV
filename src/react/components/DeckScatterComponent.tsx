@@ -285,8 +285,7 @@ const DeckScatter = observer(function DeckScatterComponent({
         outerContainer; // make sure the hook runs when this changes
         if (deckRef.current) {
             try {
-                // const deck: Deck<any> = deckRef.current.deck;
-                const deck = deckRef.current.deck; // as Deck<any>;
+                const deck = deckRef.current.deck;
                 return rebindMouseEvents(deck, selectionLayer);
             } catch (e) {
                 console.error(

@@ -4,7 +4,9 @@ import {
     getDensityGridViewId,
     getDensityGridViewStates,
     hasUsableOrthographicViewState,
+    isDensityGridViewport,
     matchesDensityGridView,
+    shouldDrawLayerInViewport,
     supportsDensityGridMode,
 } from "./densityGridUtils";
 
@@ -37,6 +39,31 @@ describe("densityGridUtils", () => {
         expect(hasUsableOrthographicViewState(undefined)).toBe(false);
         expect(hasUsableOrthographicViewState({ target: [1, 2, 0], zoom: 3 })).toBe(true);
         expect(hasUsableOrthographicViewState({ target: [Number.NaN, 2, 0], zoom: 3 })).toBe(false);
+    });
+
+    test("identifies density grid viewports", () => {
+        expect(isDensityGridViewport("density-grid-chart__1-0-field")).toBe(true);
+        expect(isDensityGridViewport("my-chartdetail-react")).toBe(false);
+    });
+
+    test("draws overlay gates on detail viewports after density grid mode", () => {
+        const detailId = "chart-1detail-react";
+        const vivSuffix = `-#${detailId}#`;
+        const gateLayer = { id: `gate_${vivSuffix}`, props: {} };
+        const staleGridGate = {
+            id: `${getDensityGridViewId("chart-1", "field_a", 0)}-gate`,
+            props: { viewId: getDensityGridViewId("chart-1", "field_a", 0) },
+        };
+
+        expect(shouldDrawLayerInViewport(gateLayer, detailId, vivSuffix)).toBe(true);
+        expect(shouldDrawLayerInViewport(staleGridGate, detailId, vivSuffix)).toBe(false);
+        expect(
+            shouldDrawLayerInViewport(
+                staleGridGate,
+                getDensityGridViewId("chart-1", "field_a", 0),
+                `-#${getDensityGridViewId("chart-1", "field_a", 0)}#`,
+            ),
+        ).toBe(true);
     });
 
     test("maps shared view state onto each view id", () => {
