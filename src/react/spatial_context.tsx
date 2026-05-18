@@ -223,7 +223,6 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             selectedFeatureIndexes,
             // adding `action` here gets rid of warnings but doesn't help with performance.
             onEdit: action(({ updatedData }) => {
-                // console.log("onEdit", editType, updatedData);
                 const feature = updatedData.features.at(-1);
                 // updatedData.features = [feature];
                 setSelectionFeatureCollection({
