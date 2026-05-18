@@ -1,9 +1,8 @@
-Background Filters apply at the chart level and are permanent filters i.e. are independent of the charts's local filter and global filters
+Background Filters apply at the chart level and are permanent filters, i.e. they are independent of a chart's local filter and global filters.
 
 They were used initially only in scatter plots to show specific regions in spatial data, but there was no way for a user to add/modify them.
 
-Before, a dimension would have a separate array to store the background filter but now it is integrated into the local filter. This way no extra data has to be passed to the worker. Local filters can how have fourth state (local filter + background filter)
-
+Before, a dimension had a separate array to store the background filter, but now it is integrated into the local filter. This way no extra data has to be passed to the worker. Local filters can now have a fourth state (local filter + background filter).
 0 - no filter
 1 - local filter
 2 - background filter
