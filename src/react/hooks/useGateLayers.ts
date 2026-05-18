@@ -4,6 +4,7 @@ import { useChartID, useConfig, useParamColumns } from "../hooks";
 import type { LoadedDataColumn } from "@/charts/charts";
 import { computeCentroid, DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
 import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
+import type { DualContourLegacyConfig } from "../contour_state";
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
@@ -18,6 +19,8 @@ const useGateLayers = () => {
     const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const config = useConfig<DeckScatterConfigWithRegion>();
+    const contourConfig = useConfig<DualContourLegacyConfig>();
+    const densityMode = contourConfig.density_mode ?? "overlay";
     const { selectionProps } = useSpatialLayers();
     const { onEditGate } = useGateActions();
     const { dimension } = config;
@@ -164,6 +167,7 @@ const useGateLayers = () => {
         relevantGates,
         onEditGate,
         selectionFeatureCollection,
+        densityMode,
     ]);
 
     const gateDisplayLayer = useMemo(() => {
@@ -206,7 +210,7 @@ const useGateLayers = () => {
             lineWidthMinPixels: 2.5,
             pickable: true,
         });
-    }, [relevantGates, chartId, editingGateId, gateManager, cx, cy]);
+    }, [relevantGates, chartId, editingGateId, gateManager, cx, cy, densityMode]);
 
     // To disable drag pan for the deck controller when label is being dragged or hovered
     const dragPan = !(draggingId || isHoveringLabel);

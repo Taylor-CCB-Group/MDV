@@ -214,6 +214,7 @@ export default observer(function SelectionOverlay() {
         [setSelectionMode, setSelectedToolX],
     );
 
+    const wasDensityGridRef = useRef(isDensityGrid);
     useEffect(() => {
         if (!isDensityGrid) return;
         if (editingGateId) {
@@ -223,6 +224,14 @@ export default observer(function SelectionOverlay() {
             setSelectedTool("Pan");
         }
     }, [isDensityGrid, editingGateId, onCancelEditGate, selectedTool, setSelectedTool]);
+
+    useEffect(() => {
+        if (wasDensityGridRef.current && !isDensityGrid) {
+            // Re-bind the editable layer mode after leaving grid (view-only) mode.
+            setSelectedTool(selectedTool);
+        }
+        wasDensityGridRef.current = isDensityGrid;
+    }, [isDensityGrid, selectedTool, setSelectedTool]);
 
     const toggleDensityGrid = useCallback(() => {
         action(() => {

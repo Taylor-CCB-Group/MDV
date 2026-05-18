@@ -15,6 +15,7 @@ import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type { FieldName } from "@/charts/charts";
 import type { Tool } from "./components/SelectionOverlay";
+import type { DualContourLegacyConfig } from "./contour_state";
 import { useGateManager } from "./gates/useGateManager";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
 
@@ -95,6 +96,8 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
     const gateManager = useGateManager();
+    const contourConfig = chart.config as ScatterPlotConfig & BaseConfig & DualContourLegacyConfig;
+    const densityMode = contourConfig.density_mode ?? "overlay";
     // making selectionFeatureCollection part of config, so it can be persisted
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
@@ -234,7 +237,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             }
         })
     }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
-        setSelectionFeatureCollection, getFillColor, getLineColor,
+        setSelectionFeatureCollection, getFillColor, getLineColor, densityMode,
     ]);
 
     return {
