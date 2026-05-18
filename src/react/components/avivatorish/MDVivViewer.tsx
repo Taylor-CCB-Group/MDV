@@ -183,10 +183,9 @@ class MDVivViewerWrapper extends React.PureComponent<
     }
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
-        const { views, outerContainer, selectionLayer } = props;
+        const { views, outerContainer } = props;
 
         const outerContainerChanged = outerContainer !== this.state.outerContainer;
-        const selectionLayerChanged = prevProps.selectionLayer !== selectionLayer;
         const viewsIdentityChanged =
             prevProps.views.length !== views.length ||
             views.some((view, index) => view.id !== prevProps.views[index]?.id);
@@ -196,7 +195,7 @@ class MDVivViewerWrapper extends React.PureComponent<
         }
         if (
             this.state.deckRef?.current &&
-            (outerContainerChanged || selectionLayerChanged || viewsIdentityChanged)
+            (outerContainerChanged || viewsIdentityChanged)
         ) {
             this._rebindSelectionMouseEvents();
         }
