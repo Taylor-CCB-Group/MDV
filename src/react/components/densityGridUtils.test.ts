@@ -7,7 +7,6 @@ import {
     hasUsableOrthographicViewState,
     isDensityGridViewport,
     isEditableSelectionLayerId,
-    isGateLayerId,
     matchesDensityGridView,
     shouldDrawLayerInDeckDensityGrid,
     shouldDrawLayerInViewport,
@@ -51,30 +50,27 @@ describe("densityGridUtils", () => {
         expect(isDensityGridViewport("my-chartdetail-react")).toBe(false);
     });
 
-    test("draws chart-wide gate layers on overlay and every density grid viewport", () => {
+    test("routes layers by viewport scope through shouldDrawLayerInViewport", () => {
         const detailId = "chart-1detail-react";
         const vivSuffix = `-#${detailId}#`;
-        const gateLayer = { id: `gate_${vivSuffix}`, props: {} };
-        const gateLabelLayer = { id: `text-layer-${vivSuffix}`, props: {} };
         const gridView = getDensityGridViewId("chart-1", "field_a", 0);
-        const stalePerCellGate = {
-            id: `${gridView}-gate`,
-            props: { viewId: gridView },
+        const chartShared = {
+            id: `gate_${vivSuffix}`,
+            props: { mdvDeckLayerViewportScope: "chart-shared" },
+        };
+        const perViewport = {
+            id: `${gridView}-density`,
+            props: { mdvDeckLayerViewportScope: "per-viewport", viewId: gridView },
         };
 
-        expect(isGateLayerId(gateLayer.id)).toBe(true);
-        expect(isGateLayerId(gateLabelLayer.id)).toBe(true);
-        expect(shouldDrawLayerInViewport(gateLayer, detailId, vivSuffix)).toBe(true);
-        expect(shouldDrawLayerInViewport(gateLabelLayer, detailId, vivSuffix)).toBe(true);
-        expect(shouldDrawLayerInViewport(gateLayer, gridView, `-#${gridView}#`)).toBe(true);
-        expect(shouldDrawLayerInViewport(gateLabelLayer, gridView, `-#${gridView}#`)).toBe(true);
-        expect(shouldDrawLayerInDeckDensityGrid(gateLayer, gridView)).toBe(true);
-        expect(shouldDrawLayerInDeckDensityGrid(gateLabelLayer, gridView)).toBe(true);
-        expect(shouldDrawLayerInViewport(stalePerCellGate, detailId, vivSuffix)).toBe(false);
-        expect(shouldDrawLayerInDeckDensityGrid(stalePerCellGate, gridView)).toBe(true);
+        expect(shouldDrawLayerInViewport(chartShared, detailId, vivSuffix)).toBe(true);
+        expect(shouldDrawLayerInViewport(chartShared, gridView, vivSuffix)).toBe(true);
+        expect(shouldDrawLayerInDeckDensityGrid(chartShared, gridView)).toBe(true);
+        expect(shouldDrawLayerInViewport(perViewport, gridView, vivSuffix)).toBe(true);
+        expect(shouldDrawLayerInDeckDensityGrid(perViewport, gridView)).toBe(true);
         expect(
             shouldDrawLayerInDeckDensityGrid(
-                stalePerCellGate,
+                perViewport,
                 getDensityGridViewId("chart-1", "field_b", 1),
             ),
         ).toBe(false);

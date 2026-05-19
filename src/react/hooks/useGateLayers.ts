@@ -10,6 +10,7 @@ import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
 import { truncateWithEllipsis } from "@/utilities/Utilities";
+import { tagDeckLayerViewportScope } from "../components/deckLayerViewportScope";
 
 const MAX_LABEL_LENGTH = 18;
 
@@ -79,7 +80,7 @@ const useGateLayers = () => {
             };
         });
 
-        return new TextLayer({
+        const layer = new TextLayer({
             id: `text-layer-${getVivId(`${chartId}detail-react`)}`,
             data: layerData,
             getPosition: (d: { position: [number, number, number] }) => d.position,
@@ -153,6 +154,7 @@ const useGateLayers = () => {
                 setDragPos(null);
             },
         });
+        return tagDeckLayerViewportScope(layer, "chart-shared");
     }, [
         cx,
         cy,
@@ -191,7 +193,7 @@ const useGateLayers = () => {
             })),
         );
 
-        return new GeoJsonLayer({
+        const layer = new GeoJsonLayer({
             id: `gate_${getVivId(`${chartId}detail-react`)}`,
             data: {
                 type: "FeatureCollection",
@@ -210,6 +212,7 @@ const useGateLayers = () => {
             lineWidthMinPixels: 2.5,
             pickable: true,
         });
+        return tagDeckLayerViewportScope(layer, "chart-shared");
     }, [relevantGates, chartId, editingGateId, gateManager, cx, cy, densityMode]);
 
     // Disable deck pan while dragging labels or editing gate geometry (editable layer owns drags).

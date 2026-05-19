@@ -9,10 +9,14 @@ import {
     useDensityGridContours,
 } from "../hooks/useDensityGridCells";
 import { useVivDensityGridViewState } from "../hooks/useVivDensityGridViewState";
-import { useChartID, useFilteredIndices } from "../hooks";
+import { useChartID, useConfig, useFilteredIndices } from "../hooks";
 import { useSpatialLayers } from "../spatial_context";
 import ChartArrayLayout from "./ChartArrayLayout";
+import { createHeatmapContourLayer } from "@/webgl/SpatialLayer";
+import { tagDeckLayerViewportScope } from "./deckLayerViewportScope";
 import { cloneDeckLayer, getVivGridDetailViewId } from "./densityGridUtils";
+import { useJsonLayer } from "./VivScatterComponent";
+import type { VivRoiConfig } from "./VivMDVReact";
 import { useLoader, type OME_TIFF, useChannelsStore, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
@@ -35,6 +39,8 @@ export default function VivDensityGridComponent() {
         selectionLayer,
     } = useSpatialLayers();
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
+    const { showJson } = useConfig<VivRoiConfig>();
+    const jsonLayer = useJsonLayer(showJson);
     const { cells, densityFields, configuredFieldCount } = useDensityGridCells();
 
     const grid = useChartArrayGrid({
@@ -105,52 +111,51 @@ export default function VivDensityGridComponent() {
         }).filter((vs): vs is NonNullable<typeof vs> => vs !== null);
     }, [grid.visibleCellIndices, grid.viewIds, viewState]);
 
-    const deckLayers = useMemo(
+    const sharedGeometryLayers = useMemo(
+        () => [
+            tagDeckLayerViewportScope(greyScatterplotLayer, "chart-shared"),
+            tagDeckLayerViewportScope(
+                cloneDeckLayer(scatterplotLayer, { contourLayers: [] }),
+                "chart-shared",
+            ),
+        ],
+        [greyScatterplotLayer, scatterplotLayer],
+    );
+
+    const perViewportLayers = useMemo(
         () =>
             grid.visibleCellIndices.flatMap((index) => {
                 const contourLayer = contourLayers[index];
                 const detailId = grid.viewIds[index];
                 if (!contourLayer || !detailId) return [];
-
-                const greyLayer = cloneDeckLayer(greyScatterplotLayer, {
-                    id: `scatter-grey_${getVivId(detailId)}`,
-                    viewId: detailId,
-                });
-                const scatterLayer = cloneDeckLayer(scatterplotLayer, {
-                    id: `scatter_${getVivId(detailId)}`,
-                    viewId: detailId,
-                    contourLayers: [
-                        {
+                return [
+                    tagDeckLayerViewportScope(
+                        createHeatmapContourLayer({
                             ...contourLayer,
                             radiusPixels,
                             debounce: 250,
                             weightsTextureSize: 256,
-                        },
-                    ],
-                });
-                return [greyLayer, scatterLayer];
+                            id: `density_${getVivId(detailId)}`,
+                        }),
+                        "per-viewport",
+                        { viewId: detailId },
+                    ),
+                ];
             }),
-        [
-            grid.visibleCellIndices,
-            grid.viewIds,
-            contourLayers,
-            radiusPixels,
-            scatterplotLayer,
-            greyScatterplotLayer,
-        ],
+        [grid.visibleCellIndices, grid.viewIds, contourLayers, radiusPixels],
     );
 
-    const gateLayers = useMemo(
-        () => [gateDisplayLayer, gateLabelLayer].filter((layer) => layer !== null),
-        [gateDisplayLayer, gateLabelLayer],
+    const chartSharedLayers = useMemo(
+        () =>
+            [jsonLayer, gateDisplayLayer, gateLabelLayer, selectionLayer].filter(
+                (layer): layer is NonNullable<typeof layer> => layer !== null,
+            ),
+        [jsonLayer, gateDisplayLayer, gateLabelLayer, selectionLayer],
     );
 
     const allDeckLayers = useMemo(
-        () =>
-            selectionLayer
-                ? [...deckLayers, ...gateLayers, selectionLayer]
-                : [...deckLayers, ...gateLayers],
-        [deckLayers, gateLayers, selectionLayer],
+        () => [...sharedGeometryLayers, ...perViewportLayers, ...chartSharedLayers],
+        [sharedGeometryLayers, perViewportLayers, chartSharedLayers],
     );
 
     const getTooltipContent = useCallback(
