@@ -24,6 +24,7 @@ import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } 
 import useGateLayers from "../hooks/useGateLayers";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { tagDeckLayerViewportScope } from "./deckLayerViewportScope";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -39,33 +40,33 @@ export const VivScatter = () => {
     );
 };
 
-const useJsonLayer = (showJson: boolean) => {
+export const useJsonLayer = (showJson: boolean) => {
     const id = useChartID();
     const { root } = useProject();
     const { json } = useRegion(); // return type is 'any' and we assume 'json' will be a string - but want that to be different in future.
     const layer_id = `json_${getVivId(`${id}detail-react`)}`;
     const layer = useMemo(() => {
-        return json
-            ? new GeoJsonLayer({
-                  id: layer_id,
-                  data: `${root}/${json}`,
-                  opacity: 1,
-                  filled: true,
-                  getFillColor: (f) => [255, 255, 255, 150],
-                  getLineColor: (f) => [255, 255, 255, 150],
-                  getLineWidth: 2,
-                  lineWidthMinPixels: 1,
-                  getPointRadius: 10,
-                  pickable: true,
-                  autoHighlight: true,
-                  //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
-                  getText: (f) => f.properties.DN,
-                  getTextColor: [255, 255, 255, 255],
-                  getTextSize: 12,
-                  textBackground: true,
-                  visible: showJson,
-              })
-            : null;
+        if (!json) return null;
+        const geoJsonLayer = new GeoJsonLayer({
+            id: layer_id,
+            data: `${root}/${json}`,
+            opacity: 1,
+            filled: true,
+            getFillColor: (f) => [255, 255, 255, 150],
+            getLineColor: (f) => [255, 255, 255, 150],
+            getLineWidth: 2,
+            lineWidthMinPixels: 1,
+            getPointRadius: 10,
+            pickable: true,
+            autoHighlight: true,
+            //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
+            getText: (f) => f.properties.DN,
+            getTextColor: [255, 255, 255, 255],
+            getTextSize: 12,
+            textBackground: true,
+            visible: showJson,
+        });
+        return tagDeckLayerViewportScope(geoJsonLayer, "chart-shared");
     }, [json, showJson, layer_id, root]);
     return layer;
 };

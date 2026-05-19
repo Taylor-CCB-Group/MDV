@@ -15,9 +15,9 @@ import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type { FieldName } from "@/charts/charts";
 import type { Tool } from "./components/SelectionOverlay";
-import type { DualContourLegacyConfig } from "./contour_state";
 import { useGateManager } from "./gates/useGateManager";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
+import { tagDeckLayerViewportScope } from "./components/deckLayerViewportScope";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -96,8 +96,6 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
     const gateManager = useGateManager();
-    const contourConfig = chart.config as ScatterPlotConfig & BaseConfig & DualContourLegacyConfig;
-    const densityMode = contourConfig.density_mode ?? "overlay";
     // making selectionFeatureCollection part of config, so it can be persisted
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
@@ -196,7 +194,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         } else if (!editingGateId) {
             setSelectedFeatureIndexes([]);
         }
-    }, [editingGateId, selectionFeatureCollection.features.length, densityMode]);
+    }, [editingGateId, selectionFeatureCollection.features.length]);
 
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
@@ -204,7 +202,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // todo: we need to do something about editing gate color
     //! When the dev tools are open, there is lagging while dragging this layer
     const editableLayer = useMemo(() => {
-        return new MonkeyPatchEditableGeoJsonLayer({
+        const layer = new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection as any,
             mode: selectionMode,
@@ -242,9 +240,16 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 // it looks as though editable-layer.js _addEventHandlers() isn't called again when eventManager has been changed.
                 // outerContainer
             }
-        })
-    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
-        setSelectionFeatureCollection, getFillColor, getLineColor, densityMode,
+        });
+        return tagDeckLayerViewportScope(layer, "chart-shared");
+    }, [
+        selectionFeatureCollection,
+        selectionMode,
+        id,
+        selectedFeatureIndexes,
+        setSelectionFeatureCollection,
+        getFillColor,
+        getLineColor,
     ]);
 
     return {

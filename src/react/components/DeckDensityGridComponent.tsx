@@ -17,6 +17,8 @@ import type { DualContourLegacyConfig } from "../contour_state";
 import type { ScatterPlotConfig2D } from "../scatter_state";
 import { useSpatialLayers } from "../spatial_context";
 import ChartArrayLayout from "./ChartArrayLayout";
+import { createHeatmapContourLayer } from "@/webgl/SpatialLayer";
+import { tagDeckLayerViewportScope } from "./deckLayerViewportScope";
 import {
     cloneDeckLayer,
     getDensityGridViewId,
@@ -80,51 +82,51 @@ export default function DeckDensityGridComponent() {
         [grid.visibleViewIds, config.viewState],
     );
 
-    const layers = useMemo(
+    const sharedGeometryLayers = useMemo(
+        () => [
+            tagDeckLayerViewportScope(greyScatterplotLayer, "chart-shared"),
+            tagDeckLayerViewportScope(
+                cloneDeckLayer(scatterplotLayer, { contourLayers: [] }),
+                "chart-shared",
+            ),
+        ],
+        [greyScatterplotLayer, scatterplotLayer],
+    );
+
+    const perViewportLayers = useMemo(
         () =>
             grid.visibleCellIndices.flatMap((index) => {
                 const contourLayer = contourLayers[index];
                 const viewId = grid.viewIds[index];
                 if (!contourLayer || !viewId) return [];
-                const greyLayer = cloneDeckLayer(greyScatterplotLayer, {
-                    id: `${viewId}-grey`,
-                    viewId,
-                });
-                const scatterLayer = cloneDeckLayer(scatterplotLayer, {
-                    id: viewId,
-                    viewId,
-                    contourLayers: [
-                        {
+                return [
+                    tagDeckLayerViewportScope(
+                        createHeatmapContourLayer({
                             ...contourLayer,
                             radiusPixels,
                             debounce: 250,
                             weightsTextureSize: 256,
-                        },
-                    ],
-                });
-                return [greyLayer, scatterLayer];
+                            id: `${viewId}-density`,
+                        }),
+                        "per-viewport",
+                        { viewId },
+                    ),
+                ];
             }),
-        [
-            grid.visibleCellIndices,
-            grid.viewIds,
-            contourLayers,
-            radiusPixels,
-            scatterplotLayer,
-            greyScatterplotLayer,
-        ],
+        [grid.visibleCellIndices, grid.viewIds, contourLayers, radiusPixels],
     );
 
-    const gateLayers = useMemo(
-        () => [gateDisplayLayer, gateLabelLayer].filter((layer) => layer !== null),
-        [gateDisplayLayer, gateLabelLayer],
+    const chartSharedLayers = useMemo(
+        () =>
+            [gateDisplayLayer, gateLabelLayer, selectionLayer].filter(
+                (layer): layer is NonNullable<typeof layer> => layer !== null,
+            ),
+        [gateDisplayLayer, gateLabelLayer, selectionLayer],
     );
 
     const allLayers = useMemo(
-        () =>
-            selectionLayer
-                ? [...layers, ...gateLayers, selectionLayer]
-                : [...layers, ...gateLayers],
-        [layers, gateLayers, selectionLayer],
+        () => [...sharedGeometryLayers, ...perViewportLayers, ...chartSharedLayers],
+        [sharedGeometryLayers, perViewportLayers, chartSharedLayers],
     );
 
     const renderCell = useCallback(
@@ -157,16 +159,12 @@ export default function DeckDensityGridComponent() {
                 <DeckGL
                     ref={deckRef}
                     controller={false}
-                    layerFilter={({ layer, viewport }) => {
-                        const viewId =
-                            layer.props && "viewId" in layer.props && typeof layer.props.viewId === "string"
-                                ? layer.props.viewId
-                                : undefined;
-                        return shouldDrawLayerInDeckDensityGrid(
-                            { id: layer.id, props: viewId === undefined ? undefined : { viewId } },
+                    layerFilter={({ layer, viewport }) =>
+                        shouldDrawLayerInDeckDensityGrid(
+                            { id: layer.id, props: layer.props as Record<string, unknown> },
                             viewport.id,
-                        );
-                    }}
+                        )
+                    }
                     layers={allLayers}
                     views={views}
                     viewState={viewState}

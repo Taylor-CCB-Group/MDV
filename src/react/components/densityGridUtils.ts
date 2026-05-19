@@ -5,6 +5,7 @@ import {
     hasUsableOrthographicViewState,
     getVivGridDetailViewId,
 } from "./chartArrayGridUtils";
+import { shouldDrawDeckLayerInViewport, type DeckLayerScopeInput } from "./deckLayerViewportScope";
 
 export { getChartArrayViewStates, hasUsableOrthographicViewState, getVivGridDetailViewId };
 
@@ -33,11 +34,6 @@ export function isDensityGridViewport(viewportId: string) {
 
 export function isEditableSelectionLayerId(layerId: string) {
     return layerId.startsWith("selection_");
-}
-
-/** Gate display/label layers are chart-wide; in density grid they draw in every cell viewport. */
-export function isGateLayerId(layerId: string) {
-    return layerId.startsWith("gate_") || layerId.startsWith("text-layer-");
 }
 
 export type DeckCanvasViewport = {
@@ -81,61 +77,25 @@ export function unprojectCanvasPoint(
     return viewport.unproject([localX, localY]);
 }
 
-type LayerViewportFilterInput = {
-    id: string;
-    props?: { viewId?: string } | null;
-};
+export type LayerViewportFilterInput = DeckLayerScopeInput;
 
 /**
  * Deck layerFilter for MDVivViewer: single detail viewports use viv id suffixes;
- * density-grid cells route layers by viewId / grid id prefix instead.
+ * density-grid cells route layers by {@link DeckLayerViewportScope} and optional viewId.
  */
 export function shouldDrawLayerInViewport(
     layer: LayerViewportFilterInput,
     viewportId: string,
     vivIdForViewport: string,
 ) {
-    if (isEditableSelectionLayerId(layer.id)) {
-        if (layer.id.includes(vivIdForViewport)) {
-            return true;
-        }
-        return isDensityGridViewport(viewportId);
-    }
-    if (isGateLayerId(layer.id)) {
-        if (layer.id.includes(vivIdForViewport)) {
-            return true;
-        }
-        return isDensityGridViewport(viewportId);
-    }
-    if (layer.id.includes(vivIdForViewport)) {
-        return true;
-    }
-    if (!isDensityGridViewport(viewportId)) {
-        return false;
-    }
-    const layerViewId = layer.props?.viewId;
-    if (typeof layerViewId === "string") {
-        return (
-            matchesDensityGridView(layer.id, layerViewId) ||
-            matchesDensityGridView(layer.id, viewportId) ||
-            layerViewId === viewportId
-        );
-    }
-    return matchesDensityGridView(layer.id, viewportId);
+    return shouldDrawDeckLayerInViewport(layer, viewportId, {
+        overlayDetailVivId: vivIdForViewport,
+    });
 }
 
 /** layerFilter for Deck-only density grid (no viv id suffix on viewports). */
-export function shouldDrawLayerInDeckDensityGrid(
-    layer: { id: string; props?: { viewId?: string } | null },
-    viewportId: string,
-) {
-    if (isEditableSelectionLayerId(layer.id)) {
-        return isDensityGridViewport(viewportId);
-    }
-    if (isGateLayerId(layer.id)) {
-        return isDensityGridViewport(viewportId);
-    }
-    return matchesDensityGridView(layer.id, viewportId);
+export function shouldDrawLayerInDeckDensityGrid(layer: LayerViewportFilterInput, viewportId: string) {
+    return shouldDrawDeckLayerInViewport(layer, viewportId);
 }
 
 export function getDensityGridViewStates(
