@@ -35,6 +35,11 @@ export function isEditableSelectionLayerId(layerId: string) {
     return layerId.startsWith("selection_");
 }
 
+/** Gate display/label layers are chart-wide; in density grid they draw in every cell viewport. */
+export function isGateLayerId(layerId: string) {
+    return layerId.startsWith("gate_") || layerId.startsWith("text-layer-");
+}
+
 export type DeckCanvasViewport = {
     id: string;
     x?: number;
@@ -96,6 +101,12 @@ export function shouldDrawLayerInViewport(
         }
         return isDensityGridViewport(viewportId);
     }
+    if (isGateLayerId(layer.id)) {
+        if (layer.id.includes(vivIdForViewport)) {
+            return true;
+        }
+        return isDensityGridViewport(viewportId);
+    }
     if (layer.id.includes(vivIdForViewport)) {
         return true;
     }
@@ -119,6 +130,9 @@ export function shouldDrawLayerInDeckDensityGrid(
     viewportId: string,
 ) {
     if (isEditableSelectionLayerId(layer.id)) {
+        return isDensityGridViewport(viewportId);
+    }
+    if (isGateLayerId(layer.id)) {
         return isDensityGridViewport(viewportId);
     }
     return matchesDensityGridView(layer.id, viewportId);

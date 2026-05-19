@@ -102,21 +102,7 @@ export default function DeckDensityGridComponent() {
                         },
                     ],
                 });
-                const gateLayers = [
-                    gateDisplayLayer
-                        ? cloneDeckLayer(gateDisplayLayer, {
-                              id: `${viewId}-gate`,
-                              viewId,
-                          })
-                        : null,
-                    gateLabelLayer
-                        ? cloneDeckLayer(gateLabelLayer, {
-                              id: `${viewId}-gate-label`,
-                              viewId,
-                          })
-                        : null,
-                ].filter((layer) => layer !== null);
-                return [greyLayer, scatterLayer, ...gateLayers];
+                return [greyLayer, scatterLayer];
             }),
         [
             grid.visibleCellIndices,
@@ -125,14 +111,20 @@ export default function DeckDensityGridComponent() {
             radiusPixels,
             scatterplotLayer,
             greyScatterplotLayer,
-            gateDisplayLayer,
-            gateLabelLayer,
         ],
     );
 
+    const gateLayers = useMemo(
+        () => [gateDisplayLayer, gateLabelLayer].filter((layer) => layer !== null),
+        [gateDisplayLayer, gateLabelLayer],
+    );
+
     const allLayers = useMemo(
-        () => (selectionLayer ? [...layers, selectionLayer] : layers),
-        [layers, selectionLayer],
+        () =>
+            selectionLayer
+                ? [...layers, ...gateLayers, selectionLayer]
+                : [...layers, ...gateLayers],
+        [layers, gateLayers, selectionLayer],
     );
 
     const renderCell = useCallback(

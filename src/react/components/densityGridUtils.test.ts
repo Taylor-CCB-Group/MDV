@@ -7,6 +7,7 @@ import {
     hasUsableOrthographicViewState,
     isDensityGridViewport,
     isEditableSelectionLayerId,
+    isGateLayerId,
     matchesDensityGridView,
     shouldDrawLayerInDeckDensityGrid,
     shouldDrawLayerInViewport,
@@ -50,24 +51,33 @@ describe("densityGridUtils", () => {
         expect(isDensityGridViewport("my-chartdetail-react")).toBe(false);
     });
 
-    test("draws overlay gates on detail viewports after density grid mode", () => {
+    test("draws chart-wide gate layers on overlay and every density grid viewport", () => {
         const detailId = "chart-1detail-react";
         const vivSuffix = `-#${detailId}#`;
         const gateLayer = { id: `gate_${vivSuffix}`, props: {} };
-        const staleGridGate = {
-            id: `${getDensityGridViewId("chart-1", "field_a", 0)}-gate`,
-            props: { viewId: getDensityGridViewId("chart-1", "field_a", 0) },
+        const gateLabelLayer = { id: `text-layer-${vivSuffix}`, props: {} };
+        const gridView = getDensityGridViewId("chart-1", "field_a", 0);
+        const stalePerCellGate = {
+            id: `${gridView}-gate`,
+            props: { viewId: gridView },
         };
 
+        expect(isGateLayerId(gateLayer.id)).toBe(true);
+        expect(isGateLayerId(gateLabelLayer.id)).toBe(true);
         expect(shouldDrawLayerInViewport(gateLayer, detailId, vivSuffix)).toBe(true);
-        expect(shouldDrawLayerInViewport(staleGridGate, detailId, vivSuffix)).toBe(false);
+        expect(shouldDrawLayerInViewport(gateLabelLayer, detailId, vivSuffix)).toBe(true);
+        expect(shouldDrawLayerInViewport(gateLayer, gridView, `-#${gridView}#`)).toBe(true);
+        expect(shouldDrawLayerInViewport(gateLabelLayer, gridView, `-#${gridView}#`)).toBe(true);
+        expect(shouldDrawLayerInDeckDensityGrid(gateLayer, gridView)).toBe(true);
+        expect(shouldDrawLayerInDeckDensityGrid(gateLabelLayer, gridView)).toBe(true);
+        expect(shouldDrawLayerInViewport(stalePerCellGate, detailId, vivSuffix)).toBe(false);
+        expect(shouldDrawLayerInDeckDensityGrid(stalePerCellGate, gridView)).toBe(true);
         expect(
-            shouldDrawLayerInViewport(
-                staleGridGate,
-                getDensityGridViewId("chart-1", "field_a", 0),
-                `-#${getDensityGridViewId("chart-1", "field_a", 0)}#`,
+            shouldDrawLayerInDeckDensityGrid(
+                stalePerCellGate,
+                getDensityGridViewId("chart-1", "field_b", 1),
             ),
-        ).toBe(true);
+        ).toBe(false);
     });
 
     test("identifies editable selection layers", () => {
