@@ -18,6 +18,7 @@ import {
     getMultitextCapacity,
     getMultitextDelimiter,
     getMultitextJoinDelimiter,
+    inferMultitextEmptyItem,
 } from "@/lib/multitext";
 import {
     findColumnMetadataIndex,
@@ -1538,12 +1539,39 @@ class DataStore {
             return !Number.isFinite(v) || (ov.fallbackOnZero && v === 0);
         }
         //simply return the color associated with the value
-        if (
-            c.datatype === "text" ||
-            c.datatype === "text16" ||
-            c.datatype === "multitext"
-        ) {
+        if (c.datatype === "text" || c.datatype === "text16") {
             return (x) => colors[data[x]];
+        }
+        if (c.datatype === "multitext") {
+            const capacity = getMultitextCapacity(c);
+            if (capacity <= 1) {
+                return (x) => colors[data[x]];
+            }
+
+            const emptyItem = inferMultitextEmptyItem(c);
+            const emptyIndex = emptyItem == null ? -1 : c.values.indexOf(emptyItem);
+
+            return (rowIndex) => {
+                const start = rowIndex * capacity;
+                let fallbackColor;
+
+                for (let offset = 0; offset < capacity; offset++) {
+                    const valueIndex = data[start + offset];
+                    if (valueIndex == null || valueIndex === 65535) {
+                        break;
+                    }
+                    if (valueIndex === emptyIndex) {
+                        fallbackColor = colors[valueIndex];
+                        continue;
+                    }
+                    // Packed multitext rows can contain multiple values.
+                    // Until charts support multi-value categorical coloring directly,
+                    // use the first semantic row item deterministically.
+                    return colors[valueIndex];
+                }
+
+                return fallbackColor;
+            };
         }
         if (
             c.datatype === "integer" ||
