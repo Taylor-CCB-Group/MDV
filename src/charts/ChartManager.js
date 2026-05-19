@@ -1445,6 +1445,7 @@ export class ChartManager {
         const lc = this.config.dataloading || {};
         split = lc.split || 10;
         threads = lc.threads || 2;
+        const retries = lc.retries ?? lc.maxRetries ?? 2;
         this.transactions[id] = {
             callback: callback,
             columns: [],
@@ -1452,6 +1453,8 @@ export class ChartManager {
             failedColumns: [],
             nextColumn: 0,
             columnsLoaded: 0,
+            retryAttempts: {},
+            retries,
             id: id,
         };
         let col_list = [];
@@ -1499,6 +1502,8 @@ export class ChartManager {
             return column_orders[a.datatype] - column_orders[b.datatype];
         });
 
+        let retryColumnFields = [];
+
         //"this.dataLoader is not a function" with e.g. "cell_types"
         this.dataLoader(columns, dataSource, dataStore.size)
             .then((resp) => {
@@ -1515,7 +1520,7 @@ export class ChartManager {
                         requestedColumns: columns.map((column) => column.field),
                         missingColumns: missingColumns.map((column) => column.field),
                     });
-                    trans.failedColumns.push(...missingColumns);
+                    retryColumnFields = missingColumns.map((column) => column.field);
                 }
                 trans.columnsLoaded++;
             })
@@ -1528,15 +1533,42 @@ export class ChartManager {
                     error,
                 });
                 trans.columnsLoaded++;
-                trans.failedColumns.push(...columns);
+                retryColumnFields = columns.map((column) => column.field);
             })
             .finally(() => {
+                const retrySet = new Set();
+                const finalFailedColumns = [];
+                for (const field of retryColumnFields) {
+                    const attempts = trans.retryAttempts[field] || 0;
+                    if (attempts < trans.retries) {
+                        trans.retryAttempts[field] = attempts + 1;
+                        retrySet.add(field);
+                    } else {
+                        finalFailedColumns.push(dataStore.getColumnInfo(field));
+                    }
+                }
+                if (retrySet.size > 0) {
+                    const retryFields = [...retrySet];
+                    trans.columns.push(retryFields);
+                    console.warn("Retrying column data load", {
+                        dataSource,
+                        columns: retryFields,
+                        attempts: retryFields.map((field) => ({
+                            field,
+                            attempt: trans.retryAttempts[field],
+                            maxRetries: trans.retries,
+                        })),
+                    });
+                }
+                trans.failedColumns.push(...finalFailedColumns);
+                for (const col of col_list) {
+                    if (!retrySet.has(col)) {
+                        delete this.columnsLoading[dataSource][col];
+                    }
+                }
                 const total = trans.columns.length;
                 const loaded = trans.columnsLoaded;
                 let all_loaded = loaded * col_list.length;
-                for (const col of col_list) {
-                    delete this.columnsLoading[dataSource][col];
-                }
                 all_loaded =
                     all_loaded > trans.totalColumns
                         ? trans.totalColumns
