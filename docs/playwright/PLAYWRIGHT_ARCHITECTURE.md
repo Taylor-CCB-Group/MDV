@@ -28,6 +28,13 @@ Runner layer:
 - `scripts/playwright/playwright_all_runner.mjs`
 - `scripts/playwright/playwright_project_preflight.mjs`
 
+Optional browser exploration/debugging tool:
+
+- local `playwright-cli` via `pnpm exec playwright-cli`
+- installed skill in `.agents/skills/playwright-cli/`
+- useful for authoring and debugging
+- not part of the canonical suite execution contract
+
 Fixture layer:
 
 - `tests_playwright/utils/projectFixtures/core.ts`
@@ -127,13 +134,3 @@ Use these terms consistently when classifying project specs:
   - removes or invalidates state
 - `error-path`
   - verifies failure handling and recovery
-
-Current supported catalog pack:
-
-- `tests_playwright/catalog/catalog_view.spec.ts`
-- `tests_playwright/catalog/project_operations.spec.ts`
-
-Current supported dev-only catalog pack:
-
-- `tests_playwright/catalog/create_project.spec.ts`
-- `tests_playwright/catalog/import_project.spec.ts`
