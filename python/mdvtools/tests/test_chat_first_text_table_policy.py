@@ -123,6 +123,6 @@ def test_verification_uses_response_wording_not_view_wording():
         view_name="v",
     )
 
-    assert "not used in this response" in summary
+    assert "Wrapper expression" not in summary
     assert "### Columns / outputs (from code)" in summary
     assert "### Chart types (if any, from code)" in summary
