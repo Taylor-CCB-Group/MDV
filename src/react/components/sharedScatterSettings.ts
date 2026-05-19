@@ -7,6 +7,7 @@ import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 type SharedScatterSettingsOptions<C extends ScatterPlotConfig> = {
     chart?: BaseChart<C>;
     includeDensitySettings?: boolean;
+    includeDensityModeToggle?: boolean;
     includePointShape?: boolean;
     includeTooltip?: boolean;
     includeZoomOnFilter?: boolean;
@@ -17,6 +18,7 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
     {
         chart,
         includeDensitySettings = false,
+        includeDensityModeToggle = false,
         includePointShape = false,
         includeTooltip = true,
         includeZoomOnFilter = true,
@@ -109,7 +111,7 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
     }
 
     if (includeDensitySettings && chart) {
-        settings.push(getDensitySettings(config));
+        settings.push(getDensitySettings(config, { includeDensityModeToggle }));
     }
 
     return settings;

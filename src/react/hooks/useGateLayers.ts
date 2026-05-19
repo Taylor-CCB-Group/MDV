@@ -4,11 +4,13 @@ import { useChartID, useConfig, useParamColumns } from "../hooks";
 import type { LoadedDataColumn } from "@/charts/charts";
 import { computeCentroid, DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
 import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
+import type { DualContourLegacyConfig } from "../contour_state";
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
 import { truncateWithEllipsis } from "@/utilities/Utilities";
+import { tagDeckLayerViewportScope } from "../components/deckLayerViewportScope";
 
 const MAX_LABEL_LENGTH = 18;
 
@@ -18,6 +20,8 @@ const useGateLayers = () => {
     const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const config = useConfig<DeckScatterConfigWithRegion>();
+    const contourConfig = useConfig<DualContourLegacyConfig>();
+    const densityMode = contourConfig.density_mode ?? "overlay";
     const { selectionProps } = useSpatialLayers();
     const { onEditGate } = useGateActions();
     const { dimension } = config;
@@ -76,7 +80,7 @@ const useGateLayers = () => {
             };
         });
 
-        return new TextLayer({
+        const layer = new TextLayer({
             id: `text-layer-${getVivId(`${chartId}detail-react`)}`,
             data: layerData,
             getPosition: (d: { position: [number, number, number] }) => d.position,
@@ -150,6 +154,7 @@ const useGateLayers = () => {
                 setDragPos(null);
             },
         });
+        return tagDeckLayerViewportScope(layer, "chart-shared");
     }, [
         cx,
         cy,
@@ -164,6 +169,7 @@ const useGateLayers = () => {
         relevantGates,
         onEditGate,
         selectionFeatureCollection,
+        densityMode,
     ]);
 
     const gateDisplayLayer = useMemo(() => {
@@ -187,7 +193,7 @@ const useGateLayers = () => {
             })),
         );
 
-        return new GeoJsonLayer({
+        const layer = new GeoJsonLayer({
             id: `gate_${getVivId(`${chartId}detail-react`)}`,
             data: {
                 type: "FeatureCollection",
@@ -206,10 +212,11 @@ const useGateLayers = () => {
             lineWidthMinPixels: 2.5,
             pickable: true,
         });
-    }, [relevantGates, chartId, editingGateId, gateManager, cx, cy]);
+        return tagDeckLayerViewportScope(layer, "chart-shared");
+    }, [relevantGates, chartId, editingGateId, gateManager, cx, cy, densityMode]);
 
-    // To disable drag pan for the deck controller when label is being dragged or hovered
-    const dragPan = !(draggingId || isHoveringLabel);
+    // Disable deck pan while dragging labels or editing gate geometry (editable layer owns drags).
+    const dragPan = !(draggingId || isHoveringLabel || editingGateId);
 
     return {
         gateLabelLayer,

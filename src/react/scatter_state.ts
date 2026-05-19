@@ -118,6 +118,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_opacity: 0.5,
     contour_fillThreshold: 2,
     densityFields: [],
+    density_mode: "overlay",
     dimension: "2d",
     on_filter: "grey",
     // todo omit this so we can have better HMR...

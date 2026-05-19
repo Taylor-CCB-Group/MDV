@@ -224,6 +224,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             ...getSharedScatterSettings(c, {
                 chart: this,
                 includeDensitySettings: true,
+                includeDensityModeToggle: true,
                 includePointShape: true,
             }),
             g({

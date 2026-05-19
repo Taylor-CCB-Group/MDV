@@ -4,6 +4,7 @@ import type { CategoricalDataType } from '@/charts/charts';
 import { autorun, makeAutoObservable, runInAction } from 'mobx';
 import {
     useCategoryContour,
+    useFieldContour,
     getDensitySettings,
     getContourVisualSettings,
     type DualContourLegacyConfig,
@@ -17,6 +18,7 @@ vi.mock('./hooks', () => ({
     useFieldSpec: vi.fn(),
     useCategoryFilterIndices: vi.fn(),
     useParamColumns: vi.fn(),
+    useFilteredIndices: vi.fn(),
 }));
 
 vi.mock('./context', () => ({
@@ -35,7 +37,7 @@ vi.mock('use-debounce', () => ({
     useDebounce: vi.fn((value) => [value]),
 }));
 
-import { useFieldSpec, useCategoryFilterIndices, useParamColumns } from './hooks';
+import { useFieldSpec, useCategoryFilterIndices, useParamColumns, useFilteredIndices } from './hooks';
 import { useDataStore } from './context';
 import { useViewState } from './deck_state';
 
@@ -59,6 +61,7 @@ describe('useCategoryContour', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         (useParamColumns as any).mockReturnValue([mockCx, mockCy]);
+        (useFilteredIndices as any).mockReturnValue(new Uint32Array([0, 1, 2, 3, 4]));
         (useViewState as any).mockReturnValue({ zoom: 1 });
         (useDataStore as any).mockReturnValue({
             getColumnColors: vi.fn(() => [[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
@@ -258,6 +261,65 @@ describe('useCategoryContour', () => {
     });
 });
 
+describe('useFieldContour', () => {
+    const mockCx = {
+        data: new Float32Array([0, 1, 2]),
+    };
+    const mockCy = {
+        data: new Float32Array([0, 1, 2]),
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        (useParamColumns as any).mockReturnValue([mockCx, mockCy]);
+        (useFilteredIndices as any).mockReturnValue(new Uint32Array([0, 1, 2]));
+        (useViewState as any).mockReturnValue({ zoom: 1 });
+    });
+
+    test('builds contours only for visible field indices when provided', () => {
+        const mockFields = [
+            {
+                name: 'field-a',
+                field: 'field-a',
+                data: new Float32Array([0, 0.5, 1]),
+                minMax: [0, 1] as const,
+                datatype: 'double' as const,
+            },
+            {
+                name: 'field-b',
+                field: 'field-b',
+                data: new Float32Array([0, 0.5, 1]),
+                minMax: [0, 1] as const,
+                datatype: 'double' as const,
+            },
+            {
+                name: 'field-c',
+                field: 'field-c',
+                data: new Float32Array([0, 0.5, 1]),
+                minMax: [0, 1] as const,
+                datatype: 'double' as const,
+            },
+        ];
+
+        const { result } = renderHook(() =>
+            useFieldContour({
+                id: 'density-grid',
+                fill: true,
+                bandwidth: 0.1,
+                intensity: 0.1,
+                opacity: 0.2,
+                fillThreshold: 2,
+                fields: mockFields as any,
+                visibleFieldIndices: [1],
+            }),
+        );
+
+        expect(result.current[0]).toBeUndefined();
+        expect(result.current[1]?.id).toBe('density-grid_field-b');
+        expect(result.current[2]).toBeUndefined();
+    });
+});
+
 describe('getDensitySettings category selection wiring', () => {
     test('scatter defaults seed density settings keys so later edits stay observable', () => {
         const config = makeAutoObservable({
@@ -287,6 +349,7 @@ describe('getDensitySettings category selection wiring', () => {
             { contourParameter: undefined, category1: [] },
             { contourParameter: 'test-field', category1: ['tag-a'] },
         ]);
+        expect(config.density_mode).toBe('overlay');
     });
 
     test('builds category selection controls that read from live config state', () => {
@@ -324,6 +387,33 @@ describe('getDensitySettings category selection wiring', () => {
         expect(category2.getCurrentValue?.()).toEqual(['cat2']);
         expect(category1.sourceColumn?.()).toBe('test-field');
         expect(category2.sourceColumn?.()).toBe('test-field');
+    });
+
+    test('builds a density grid mode toggle', () => {
+        const mockConfig: DualContourLegacyConfig & BaseConfig = {
+            ...scatterDefaults,
+            id: 'test-chart',
+            size: [800, 600],
+            title: 'Test Chart',
+            legend: '',
+            type: 'scatter',
+            param: ['x', 'y'],
+            density_mode: 'overlay',
+        };
+
+        const spec = getDensitySettings(mockConfig, { includeDensityModeToggle: true });
+        const densityModeToggle = spec.current_value[1];
+        if (densityModeToggle.type !== 'check') {
+            throw new Error('expected density mode check setting');
+        }
+
+        expect(densityModeToggle.label).toBe('Show density fields as grid');
+        expect(densityModeToggle.current_value).toBe(false);
+        densityModeToggle.func?.(true);
+        expect(mockConfig.density_mode).toBe('grid');
+        expect(mockConfig.contour_fill).toBe(true);
+        densityModeToggle.func?.(false);
+        expect(mockConfig.density_mode).toBe('overlay');
     });
 
     test('category selection getters follow source column and category changes', () => {

@@ -14,13 +14,15 @@ import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
-import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import { useDeckSelectionMouseRebind } from "../hooks/useDeckSelectionMouseRebind";
 import useGateLayers from "../hooks/useGateLayers";
 import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import DeckDensityGridComponent from "./DeckDensityGridComponent";
+import { supportsDensityGridMode } from "./densityGridUtils";
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -30,17 +32,22 @@ const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1
  * there should be hooks getting the range of a filtered column
  * so that multiple charts can re-use the computation (but if not used, it's not computed)
  */
-function useZoomOnFilter(data: Uint32Array) {
+function useZoomOnFilter(data: Uint32Array, enabled: boolean) {
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns();
     // const data = useFilteredIndices(); //<< does calling this multiple times mean wasting space?
     const config = useConfig<DeckScatterConfig>();
     const chart = useChart() as any;
     const { pendingRecenter } = chart;
+    const paramKey = `${cx.field}\u0000${cy.field}`;
+    const lastParamKeyRef = useRef("");
     useEffect(() => {
+        if (!enabled) return;
         if (chart.ignoreStateUpdate) return;
         if (data.length === 0) return; // [0, 0, 1, 1];
-        if (!pendingRecenter && !config.zoom_on_filter) return;
+        const paramChanged = lastParamKeyRef.current !== paramKey;
+        lastParamKeyRef.current = paramKey;
+        if (!pendingRecenter && !config.zoom_on_filter && !paramChanged) return;
         //there is also cx.minMax, cy.minMax - but not for filtered indices
         let minX = Number.POSITIVE_INFINITY;
         let maxX = Number.NEGATIVE_INFINITY;
@@ -106,7 +113,7 @@ function useZoomOnFilter(data: Uint32Array) {
 
             chart.ignoreStateUpdate = false;
         })();
-    }, [data, cx, cy, cz, width, height, config, pendingRecenter, chart]);
+    }, [data, cx, cy, cz, width, height, config, pendingRecenter, chart, paramKey, enabled]);
 }
 
 /**
@@ -140,6 +147,8 @@ const DeckScatter = observer(function DeckScatterComponent({
     const contourConfig = useConfig<DualContourLegacyConfig>();
     const { viewState, dimension } = config;
     const is2d = dimension === "2d";
+    const showDensityGrid =
+        supportsDensityGridMode(config.type) && is2d && contourConfig.density_mode === "grid";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
@@ -170,7 +179,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     //if we don't fully understand reasons for `- 3.5` here.
     //prevents overlapping with x-axis.
     const chartHeight = height - margin.top - margin.bottom - 3.5;
-    useZoomOnFilter(data);
+    useZoomOnFilter(data, !showDensityGrid);
 
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
@@ -184,7 +193,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     } = useGateLayers();
 
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
-    const showLegend = contourConfig.field_legend.display;
+    const showLegend = contourConfig.field_legend.display && !showDensityGrid;
     const legendPosition = { x: 10, y: 10 };
 
     const axisLinesLayer = useMemo(() => {
@@ -271,27 +280,19 @@ const DeckScatter = observer(function DeckScatterComponent({
         // Unproject from screen coordinates to world coordinates
         return viewport.unproject([coords[0], coords[1]]);
     }, []);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
-    useEffect(() => {
-        outerContainer; // make sure the hook runs when this changes
-        if (deckRef.current) {
-            try {
-                // const deck: Deck<any> = deckRef.current.deck;
-                const deck = deckRef.current.deck; // as Deck<any>;
-                return rebindMouseEvents(deck, selectionLayer);
-            } catch (e) {
-                console.error(
-                    "attempt to reset deck eventManager element failed - could be related to brittle deck monkeypatch",
-                    e,
-                );
-            }
-        }
-    }, [outerContainer]);
+    useDeckSelectionMouseRebind(outerContainer, selectionLayer, deckRef, {
+        enabled: !showDensityGrid,
+        canvasKey: "overlay",
+    });
 
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.
     // const controller = useMemo(() => ({inertia: 10+Math.random()}), [outerContainer])
 
+
+    if (showDensityGrid) {
+        return <DeckDensityGridComponent />;
+    }
 
     return (
         <>
