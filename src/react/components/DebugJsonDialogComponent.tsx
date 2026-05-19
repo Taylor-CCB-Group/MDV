@@ -23,19 +23,20 @@ function setDataLoaderFaultMode(mode: DataLoaderFaultMode | null) {
     try {
         if (!mode) {
             window.sessionStorage.removeItem(DATA_LOADER_FAULT_STORAGE_KEY);
-            return;
+            return true;
         }
         window.sessionStorage.setItem(
             DATA_LOADER_FAULT_STORAGE_KEY,
             JSON.stringify({
                 mode,
-                once: true,
                 delayMs: 10_000,
                 createdAt: Date.now(),
             }),
         );
+        return true;
     } catch (error) {
         console.warn("Failed to write data loader fault config", error);
+        return false;
     }
 }
 
@@ -115,8 +116,9 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     const chartTypeCounts: Record<string, number> = validationFindings?.chartTypeCounts ?? {};
     const hasAnyFindings = Boolean(validationFindings?.hasAny);
     const injectFaultAndReload = (mode: DataLoaderFaultMode) => {
-        setDataLoaderFaultMode(mode);
-        window.location.reload();
+        if (setDataLoaderFaultMode(mode)) {
+            window.location.reload();
+        }
     };
 
     return (

@@ -19,7 +19,6 @@ type Columns = DataColumn<DataType>[];
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
 type DataLoaderFaultConfig = {
     mode: DataLoaderFaultMode;
-    once?: boolean;
     delayMs?: number;
     createdAt?: number;
 };
@@ -43,12 +42,13 @@ function readDataLoaderFaultConfig(): DataLoaderFaultConfig | null {
         ) {
             return null;
         }
-        return {
+        const faultConfig = {
             mode: config.mode,
-            once: config.once !== false,
             delayMs: typeof config.delayMs === "number" ? config.delayMs : 10_000,
             createdAt: config.createdAt,
         };
+        window.sessionStorage.removeItem(DATA_LOADER_FAULT_STORAGE_KEY);
+        return faultConfig;
     } catch (error) {
         console.warn("Ignoring invalid data loader fault config", error);
         return null;
@@ -56,7 +56,7 @@ function readDataLoaderFaultConfig(): DataLoaderFaultConfig | null {
 }
 
 function consumeDataLoaderFaultConfig(config: DataLoaderFaultConfig | null) {
-    if (!config?.once || typeof window === "undefined") {
+    if (!config || typeof window === "undefined") {
         return;
     }
     try {
@@ -86,7 +86,7 @@ function applyDataLoaderFaultAfterFetch(
     }
     consumeDataLoaderFaultConfig(config);
     if (config.mode === "corrupt") {
-        return new ArrayBuffer(Math.max(1, data.byteLength - 1));
+        return data.slice(0, Math.max(0, data.byteLength - 1));
     }
     return data;
 }
