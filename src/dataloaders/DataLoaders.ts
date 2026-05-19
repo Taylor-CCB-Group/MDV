@@ -16,6 +16,80 @@ import type {
 import type { TypedArrayConstructor } from "@luma.gl/core";
 
 type Columns = DataColumn<DataType>[];
+type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
+type DataLoaderFaultConfig = {
+    mode: DataLoaderFaultMode;
+    once?: boolean;
+    delayMs?: number;
+    createdAt?: number;
+};
+
+const DATA_LOADER_FAULT_STORAGE_KEY = "mdvDataLoaderFault";
+
+function readDataLoaderFaultConfig(): DataLoaderFaultConfig | null {
+    if (typeof window === "undefined") {
+        return null;
+    }
+    try {
+        const value = window.sessionStorage.getItem(DATA_LOADER_FAULT_STORAGE_KEY);
+        if (!value) {
+            return null;
+        }
+        const config = JSON.parse(value) as Partial<DataLoaderFaultConfig>;
+        if (
+            config.mode !== "empty" &&
+            config.mode !== "corrupt" &&
+            config.mode !== "timeout"
+        ) {
+            return null;
+        }
+        return {
+            mode: config.mode,
+            once: config.once !== false,
+            delayMs: typeof config.delayMs === "number" ? config.delayMs : 10_000,
+            createdAt: config.createdAt,
+        };
+    } catch (error) {
+        console.warn("Ignoring invalid data loader fault config", error);
+        return null;
+    }
+}
+
+function consumeDataLoaderFaultConfig(config: DataLoaderFaultConfig | null) {
+    if (!config?.once || typeof window === "undefined") {
+        return;
+    }
+    try {
+        window.sessionStorage.removeItem(DATA_LOADER_FAULT_STORAGE_KEY);
+    } catch (error) {
+        console.warn("Failed to clear data loader fault config", error);
+    }
+}
+
+async function applyDataLoaderFaultBeforeFetch(config: DataLoaderFaultConfig | null) {
+    if (!config) {
+        return;
+    }
+    if (config.mode === "timeout") {
+        consumeDataLoaderFaultConfig(config);
+        await new Promise((resolve) => setTimeout(resolve, config.delayMs));
+        throw new Error(`Injected /get_data timeout after ${config.delayMs}ms.`);
+    }
+}
+
+function applyDataLoaderFaultAfterFetch(
+    config: DataLoaderFaultConfig | null,
+    data: ArrayBufferLike,
+) {
+    if (!config) {
+        return data;
+    }
+    consumeDataLoaderFaultConfig(config);
+    if (config.mode === "corrupt") {
+        return new ArrayBuffer(Math.max(1, data.byteLength - 1));
+    }
+    return data;
+}
 
 /**
  * @memberof module:DataLoaders
@@ -126,6 +200,8 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
         dataSource: DataSourceName,
         size: number,
     ) => {
+        const faultConfig = readDataLoaderFaultConfig();
+        await applyDataLoaderFaultBeforeFetch(faultConfig);
         //get the data
         const response = await fetch(url, {
             method: "POST",
@@ -137,6 +213,11 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
         //the data is any arraybuffer containing each individual
         //column's raw data
         let data: ArrayBufferLike = await response.arrayBuffer();
+        if (faultConfig?.mode === "empty") {
+            consumeDataLoaderFaultConfig(faultConfig);
+            return [];
+        }
+        data = applyDataLoaderFaultAfterFetch(faultConfig, data);
         data = decompress ? await decompressData(new Uint8Array(data)) : data;
         return processArrayBuffer(data, columns, size);
     };

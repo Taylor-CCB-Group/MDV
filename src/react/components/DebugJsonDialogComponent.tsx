@@ -12,8 +12,32 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Li
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 import { useChartManager } from "../hooks";
+import CustomTooltip from "./CustomTooltip";
 
 type JSONObject = { [key: string]: any };
+type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
+
+const DATA_LOADER_FAULT_STORAGE_KEY = "mdvDataLoaderFault";
+
+function setDataLoaderFaultMode(mode: DataLoaderFaultMode | null) {
+    try {
+        if (!mode) {
+            window.sessionStorage.removeItem(DATA_LOADER_FAULT_STORAGE_KEY);
+            return;
+        }
+        window.sessionStorage.setItem(
+            DATA_LOADER_FAULT_STORAGE_KEY,
+            JSON.stringify({
+                mode,
+                once: true,
+                delayMs: 10_000,
+                createdAt: Date.now(),
+            }),
+        );
+    } catch (error) {
+        console.warn("Failed to write data loader fault config", error);
+    }
+}
 
 /**
  * given a filter string and a json object, return a new json object that is a subset of the input json
@@ -90,6 +114,10 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     );
     const chartTypeCounts: Record<string, number> = validationFindings?.chartTypeCounts ?? {};
     const hasAnyFindings = Boolean(validationFindings?.hasAny);
+    const injectFaultAndReload = (mode: DataLoaderFaultMode) => {
+        setDataLoaderFaultMode(mode);
+        window.location.reload();
+    };
 
     return (
         <div className="overflow-auto p-4" style={{ userSelect: "text" }}>
@@ -124,6 +152,40 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                     <Typography sx={{mt: 1}}>
                         {DEBUG_JSON_REPORT_MESSAGE[2]}
                     </Typography>
+                </AccordionDetails>
+            </Accordion>
+
+            <Accordion sx={{
+                border: "1px solid var(--border_menu_bar_color)",
+                mb: 2,
+            }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">
+                        Fault Injection
+                    </Typography>
+                </AccordionSummary>
+                <Divider />
+                <AccordionDetails sx={{ mt: 1 }}>
+                    <Typography sx={{ mb: 1 }}>
+                        Select a one-shot fault to apply to the next <code>/get_data</code> request. The project reloads automatically.
+                    </Typography>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                        <CustomTooltip tooltipText="The frontend discards one loaded column batch and returns no data.">
+                            <Button variant="outlined" size="small" onClick={() => injectFaultAndReload("empty")}>
+                                Return empty data
+                            </Button>
+                        </CustomTooltip>
+                        <CustomTooltip tooltipText="The frontend replaces one response body with invalid bytes.">
+                            <Button variant="outlined" size="small" onClick={() => injectFaultAndReload("corrupt")}>
+                                Corrupt data
+                            </Button>
+                        </CustomTooltip>
+                        <CustomTooltip tooltipText="Client-side one-shot delay, then failure.">
+                            <Button variant="outlined" size="small" onClick={() => injectFaultAndReload("timeout")}>
+                                Timeout
+                            </Button>
+                        </CustomTooltip>
+                    </Box>
                 </AccordionDetails>
             </Accordion>
 
