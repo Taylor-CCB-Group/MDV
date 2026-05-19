@@ -128,21 +128,7 @@ export default function VivDensityGridComponent() {
                         },
                     ],
                 });
-                const gateLayers = [
-                    gateDisplayLayer
-                        ? cloneDeckLayer(gateDisplayLayer, {
-                              id: `${detailId}-gate`,
-                              viewId: detailId,
-                          })
-                        : null,
-                    gateLabelLayer
-                        ? cloneDeckLayer(gateLabelLayer, {
-                              id: `${detailId}-gate-label`,
-                              viewId: detailId,
-                          })
-                        : null,
-                ].filter((layer) => layer !== null);
-                return [greyLayer, scatterLayer, ...gateLayers];
+                return [greyLayer, scatterLayer];
             }),
         [
             grid.visibleCellIndices,
@@ -151,14 +137,20 @@ export default function VivDensityGridComponent() {
             radiusPixels,
             scatterplotLayer,
             greyScatterplotLayer,
-            gateDisplayLayer,
-            gateLabelLayer,
         ],
     );
 
+    const gateLayers = useMemo(
+        () => [gateDisplayLayer, gateLabelLayer].filter((layer) => layer !== null),
+        [gateDisplayLayer, gateLabelLayer],
+    );
+
     const allDeckLayers = useMemo(
-        () => (selectionLayer ? [...deckLayers, selectionLayer] : deckLayers),
-        [deckLayers, selectionLayer],
+        () =>
+            selectionLayer
+                ? [...deckLayers, ...gateLayers, selectionLayer]
+                : [...deckLayers, ...gateLayers],
+        [deckLayers, gateLayers, selectionLayer],
     );
 
     const getTooltipContent = useCallback(
