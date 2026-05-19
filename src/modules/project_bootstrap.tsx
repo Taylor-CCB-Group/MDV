@@ -60,6 +60,14 @@ type BootstrapStatus =
 let stateHandlerContainer: HTMLElement | null = null;
 let stateHandlerRoot: Root | null = null;
 
+function expectsInitialViewLoadedEvent(config: any) {
+    const allViews = config?.all_views;
+    if (Array.isArray(allViews)) {
+        return allViews.length > 0;
+    }
+    return Boolean(config?.only_view);
+}
+
 function LoadState({
     status,
     detail,
@@ -236,6 +244,9 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
                         runtime.config,
                         listener,
                     );
+                    if (!expectsInitialViewLoadedEvent(runtime.config)) {
+                        setInitialViewLoaded(true);
+                    }
                     setInitialised(true);
                 },
             )

@@ -19,6 +19,15 @@ test("create project navigates to project view", async ({ page }) => {
     await page.route("**/create_project", (route) =>
         route.fulfill({ json: { id: "123", name: "New Project" } }),
     );
+    await page.route("**/project/123/datasources.json", (route) =>
+        route.fulfill({ json: [] }),
+    );
+    await page.route("**/project/123/state.json", (route) =>
+        route.fulfill({ json: { all_views: [] } }),
+    );
+    await page.route("**/project/123/views.json", (route) =>
+        route.fulfill({ json: {} }),
+    );
 
     await gotoPath(page);
 
@@ -27,4 +36,6 @@ test("create project navigates to project view", async ({ page }) => {
 
     await page.waitForURL("**/project/123");
     expect(page.url()).toContain("/project/123");
+    await page.waitForFunction(() => Boolean(Reflect.get(window, "mdv")?.chartManager));
+    await expect(page.getByText("Loading project...")).toBeHidden();
 });
