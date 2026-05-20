@@ -1,5 +1,5 @@
 /**
- * `generate_synthetic_anndata_project.py` → folder under `~/mdv` → `/rescan_projects` → `/projects` id diff.
+ * `generate_synthetic_anndata_project.py` → folder under `~/mdv` → `/rescan_projects` → registered project id.
  */
 
 import { expect, type Browser, type Page } from "@playwright/test";
@@ -156,9 +156,10 @@ export async function createTemporaryProjectViaSyntheticAnndata(
         await triggerRescanProjects(page.request);
 
         const projectsAfter = await listProjectsViaApi(page.request);
-        const createdProject = projectsAfter.find(
-            (project) => !projectIdsBefore.has(String(project.id)),
-        );
+        const createdProject =
+            projectsAfter.find((project) => project.name === nameSegment) ??
+            projectsAfter.find((project) => project.path === projectPath) ??
+            projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
         expect(createdProject).toBeTruthy();
         if (!createdProject) {
             throw new Error(

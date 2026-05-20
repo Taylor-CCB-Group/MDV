@@ -48,33 +48,32 @@ They do not install or repair Python dependencies during a test run.
 
 These are the supported commands.
 
-Run the supported catalog pack:
+Run all the tests:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-catalog --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-all
+```
+
+Run the catalog test suite:
+
+```bash
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-catalog
 ```
 
 Run the dev-only catalog pack:
 
 ```bash
 pnpm run dev -- --host 127.0.0.1 --port 5173
-TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test-catalog-dev --reporter=list
+TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test-catalog-dev
 ```
 
-Open the supported catalog pack in UI mode:
+Open the catalog test suite in UI mode:
 
 ```bash
 TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-catalog-ui
 ```
 
-Open the dev-only catalog pack in UI mode:
-
-```bash
-pnpm run dev -- --host 127.0.0.1 --port 5173
-TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test-catalog-dev-ui
-```
-
-Run backend-backed project preflight:
+Run the backend-backed project preflight:
 
 ```bash
 pnpm run playwright-preflight-project
@@ -84,7 +83,7 @@ pnpm run playwright-preflight-project --diagnostic
 Run the backend-backed project suite:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project
 ```
 
 Open the backend-backed project suite in UI mode:
@@ -96,18 +95,46 @@ TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project-ui
 Run one backend-backed project spec:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project tests_playwright/project/charts/chart_creation.spec.ts --reporter=list
+TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-project tests_playwright/project/charts/chart_creation.spec.ts
 ```
 
-Run the supported mixed suite:
+`playwright-test` now delegates to `playwright-test-all` and is safe to use as
+the default mixed-suite command. Do not use `run_playwright_cli.mjs` directly
+as the normal entrypoint; it does not enforce the backend-backed worker policy.
+
+## Suppressing the HTML Report
+
+By default Playwright opens an HTML report after a run. To suppress it:
 
 ```bash
-TEST_BASE_URL=http://localhost:5055 pnpm run playwright-test-all --reporter=list
+PLAYWRIGHT_HTML_OPEN=never pnpm run playwright-test
+PLAYWRIGHT_HTML_OPEN=never pnpm run playwright-test-project --reporter=list
 ```
 
-Do not use the raw low-level Playwright command as the normal entrypoint for
-this repo. It does not enforce the backend-backed worker policy, and if you run
-everything through it, project test failures are expected.
+This is useful in CI and LLM-driven runs where opening a browser tab is
+unwanted.
+
+## Debugging a Failing Test
+
+Run the failing spec with `--debug=cli`. The test pauses at the start and
+prints a session name:
+
+```bash
+PLAYWRIGHT_HTML_OPEN=never pnpm run playwright-test-project tests_playwright/project/charts/chart_creation.spec.ts --project=chromium --reporter=list -- --debug=cli
+```
+
+Wait until output includes `Debugging Instructions` and a session name like
+`tw-abcdef`, then in a second terminal attach `playwright-cli` to that session:
+
+```bash
+pnpm exec playwright-cli attach tw-abcdef
+```
+
+From there you can take snapshots, inspect elements, and step through the test.
+Every action you perform generates the equivalent Playwright TypeScript code in
+the output, which you can copy directly into the spec.
+
+After fixing the test, stop the background runner and rerun to verify.
 
 ## Optional `playwright-cli`
 
@@ -119,7 +146,7 @@ Use it when you want to:
 - inspect a local page interactively
 - discover stable locators
 - reproduce a flow before writing a real test
-- debug a paused Playwright test session
+- debug a paused Playwright test session (see above)
 
 Run it through the local dependency:
 
@@ -147,19 +174,12 @@ pnpm exec playwright-cli screenshot --filename=artifacts/playwright-cli/screensh
 pnpm exec playwright-cli snapshot --filename=artifacts/playwright-cli/snapshots/example.yaml
 ```
 
-When debugging a Playwright test paused with `--debug=cli`, attach to the named
-session:
-
-```bash
-pnpm exec playwright-cli attach tw-abcdef
-```
-
 Keep using the repo wrapper scripts for actual suite execution:
 
+- `pnpm run playwright-test`
 - `pnpm run playwright-test-catalog`
 - `pnpm run playwright-test-catalog-dev`
 - `pnpm run playwright-test-project`
-- `pnpm run playwright-test-all`
 
 ## What Each Runner Does
 
@@ -181,9 +201,14 @@ Keep using the repo wrapper scripts for actual suite execution:
 - `playwright-test-project-ui`
   - runs project preflight first
   - opens the backend-backed project suite in Playwright UI
-- `playwright-test-all`
+- `playwright-test` / `playwright-test-all`
+  - equivalent: both delegate to `playwright_all_runner.mjs`
   - runs the catalog runner first
-  - runs the backend-backed project runner second
+  - runs the backend-backed project runner second (one worker, Chromium)
+- `playwright-test-ui`
+  - raw pass-through to Playwright UI mode (`--ui`) with no worker or spec
+    constraints; intended only for interactive exploration, not as a
+    substitute for the structured runners above
 
 ## Quick Troubleshooting
 

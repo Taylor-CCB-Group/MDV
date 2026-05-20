@@ -41,7 +41,7 @@
     "jsformat": "biome format --write ./src",
     "test": "vitest",
     "playwright-preflight-project": "node scripts/playwright/playwright_project_preflight.mjs",
-    "playwright-test": "node scripts/playwright/run_playwright_cli.mjs test",
+    "playwright-test": "node scripts/playwright/playwright_all_runner.mjs",
     "playwright-test-catalog": "node scripts/playwright/playwright_catalog_runner.mjs",
     "playwright-test-catalog-ui": "node scripts/playwright/playwright_catalog_ui_runner.mjs",
     "playwright-test-catalog-dev": "node scripts/playwright/playwright_catalog_dev_runner.mjs",

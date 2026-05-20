@@ -72,6 +72,56 @@ Guidelines:
 4. Always make cleanup explicit through the fixture handle
 5. Do not use the old catalog-driven setup helpers
 
+### Minimal isolated project spec
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { createTemporaryProjectViaSyntheticAnndata } from "../../utils/projectFixtures";
+
+test("my feature works", async ({ page }) => {
+    const handle = await createTemporaryProjectViaSyntheticAnndata(page);
+    try {
+        // project page is already open and ready at this point
+        await expect(page.getByText("My Feature")).toBeVisible();
+    } finally {
+        await handle.cleanup();
+    }
+});
+```
+
+### Minimal shared-project spec (read-mostly, serial)
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { createSharedSyntheticAnndataSuite } from "../../utils/projectFixtures";
+import type { SharedSyntheticAnndataSuiteHandle } from "../../utils/projectFixtures";
+
+let suite: SharedSyntheticAnndataSuiteHandle;
+
+test.describe.serial("my read-only feature", () => {
+    test.beforeAll(async ({ browser }) => {
+        suite = await createSharedSyntheticAnndataSuite(browser);
+    });
+
+    test.afterAll(async () => {
+        await suite.cleanup();
+    });
+
+    test("first assertion", async ({ page }) => {
+        await suite.openProjectPage(page);
+        await expect(page.getByText("Something")).toBeVisible();
+    });
+
+    test("second assertion", async ({ page }) => {
+        await suite.openProjectPage(page);
+        await expect(page.getByText("Something Else")).toBeVisible();
+    });
+});
+```
+
+Import paths are relative to a spec under `tests_playwright/project/`. Adjust
+`../../` if your spec sits at a different depth.
+
 ## Choosing The Lifecycle Model
 
 Use these rules:
@@ -151,7 +201,7 @@ Avoid:
 - using `tests_playwright/utils/testUtils.ts` for new backend-backed project specs
 - mixing smoke checks and destructive flows in one file
 - sharing one backend project across mutation-heavy tests
-- treating the raw low-level Playwright runner as the default mixed-suite command
+- calling `run_playwright_cli.mjs` directly as the default mixed-suite command (use `pnpm run playwright-test` instead)
 - treating `playwright-cli` as the suite runner
 - adding broad speculative coverage before verifying the previous file
 

@@ -71,7 +71,7 @@ Use `tests_playwright/utils/projectFixtures`.
 Legacy:
 
 - `tests_playwright/utils/testUtils.ts` is not the canonical setup path for new
-  backend-backed project specs
+backend-backed project specs
 - `tests_playwright/utils/tempProject.ts` is compatibility re-export only
 
 ## Synthetic Project Lifecycle
@@ -99,7 +99,7 @@ PLAYWRIGHT_KEEP_PROJECTS=1
 
 - default lifecycle: one synthetic project per test
 - supported optimization: explicit shared-project setup only for a small number
-  of serial, read-mostly specs
+of serial, read-mostly specs
 - destructive or mutation-heavy specs should stay per-test
 - backend-backed project runs stay Chromium-first and one-worker by default
 
@@ -118,19 +118,3 @@ Current shared-project example:
 
 - `tests_playwright/project/charts/chart_creation.spec.ts`
 
-## Test Type Meanings
-
-Use these terms consistently when classifying project specs:
-
-- `smoke`
-  - minimal confidence that a core flow works at all
-- `workflow`
-  - normal multi-step user behavior
-- `persistence`
-  - verifies state after reload or reopen
-- `mutation`
-  - changes meaningful project state
-- `destructive`
-  - removes or invalidates state
-- `error-path`
-  - verifies failure handling and recovery

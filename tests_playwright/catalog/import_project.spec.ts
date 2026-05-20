@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { isWorktreeFrontendForPlaywright } from "../utils/helpers";
 import {
     gotoPath,
     mockApiRoot,
@@ -8,7 +9,7 @@ import {
 
 test("import dialog opens when import permissions are enabled", async ({ page }) => {
     test.skip(
-        (process.env.TEST_BASE_URL || "").includes("5055"),
+        !isWorktreeFrontendForPlaywright(),
         "Import-project card is hidden in production-style builds; run this spec against local Vite where import.meta.env.PROD is false.",
     );
 
