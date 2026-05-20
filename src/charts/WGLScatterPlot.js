@@ -337,7 +337,6 @@ class WGLScatterPlot extends WGLChart {
         this.x = this.config.param[0];
         this.y = this.config.param[1];
         this.dim = this.getDimension();
-        void this.setBackgroundFilter();
         this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
         this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
         const colorFunc = this.afterAppCreation();
@@ -369,7 +368,7 @@ class WGLScatterPlot extends WGLChart {
             bf.column === "__none__" ||
             categories.length === 0
         ) {
-            this.dim.clearBackGroundFilter();
+            this.dim.clearBackgroundFilter();
         } else {
             await loadColumn(this.dataStore.name, bf.column);
             this.dim.setBackgroundFilter(bf.column, categories);

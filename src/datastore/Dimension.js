@@ -252,7 +252,7 @@ class Dimension {
             (x) => x !== undefined && x !== null,
         );
         if (cats.length === 0) {
-            this.clearBackGroundFilter();
+            this.clearBackgroundFilter();
             return;
         }
         const indices = new Set();
@@ -287,7 +287,7 @@ class Dimension {
         }
     }
 
-    clearBackGroundFilter() {
+    clearBackgroundFilter() {
         if (!this.bgfData) {
             return;
         }

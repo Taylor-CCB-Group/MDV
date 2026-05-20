@@ -27,6 +27,7 @@ class DotPlot extends SVGChart {
                 ? [cf.background_filter.category]
                 : [];
         }
+       
         super(dataStore, div, config, {
             x: { type: "band" },
             y: { type: "band" },
@@ -105,6 +106,21 @@ class DotPlot extends SVGChart {
         this.x_scale.domain(yLabels);
         this.onDataFiltered();
     }
+
+    @loadColumnData
+    setParams(params) {
+        const oldTitle = this.config.title;
+        const oldCategoryName = this.dataStore.getColumnName(this.config.param[0]);
+        const newCategoryName = this.dataStore.getColumnName(params[0]);
+
+        // Preserve user-customized titles; update only when title is still auto-derived.
+        if (!oldTitle || oldTitle === oldCategoryName) {
+            this.config.title = newCategoryName;
+        }
+
+        this.config.param = params;
+    }
+
     // prefering to setFields in an autorun so there's less potential for confusion
     // @loadColumnData
     // setParams(params) {
@@ -130,7 +146,7 @@ class DotPlot extends SVGChart {
             ? bf.categories.filter((x) => x !== undefined && x !== null)
             : [];
         if (!bf || !bf.column || bf.column === "__none__" || categories.length === 0) {
-            this.dim.clearBackGroundFilter();
+            this.dim.clearBackgroundFilter();
         }
         else{
             await loadColumn(this.dataStore.name, bf.column);
@@ -142,6 +158,9 @@ class DotPlot extends SVGChart {
     
 
     setColorFunction() {
+        if (!this.data?.mean_range || !this.fieldNames?.length) {
+            return;
+        }
         this.updateColorScheme();
         const f = this.fieldNames[0];
         const mm = this.data.mean_range;
@@ -302,6 +321,9 @@ class DotPlot extends SVGChart {
     }
 
     drawChart(tTime = 400) {
+        if (!this.data?.data || !this.data?.mean_range || !this.fieldNames?.length) {
+            return;
+        }
         const trans = select(this.contentDiv)
             .transition()
             .duration(tTime)
@@ -463,10 +485,11 @@ class DotPlot extends SVGChart {
                 values: [textColumnsWithNone, "name", "field"],
                 func: (x) => {
                     c.background_filter.column = x;
-                    if (x == null) {
-                        c.background_filter.categories = [];
-                        c.background_filter.category = undefined;
-                    }
+                    //clear irrelevant category selections when changing column
+                    c.background_filter.categories = [];
+                    c.background_filter.category = undefined;
+                    
+                    this.setBackgroundFilter();
                 },
             },
             {
@@ -515,20 +538,6 @@ class DotPlot extends SVGChart {
                     c.cluster_columns = v;
                     this.clusterColumns();
                     this.drawChart();
-                },
-            },
-            {
-                type: "radiobuttons",
-                label: "Averaging Method",
-                current_value: c.method,
-                choices: [
-                    ["Mean", "mean"],
-                    ["Median", "median"],
-                ],
-
-                func: (v) => {
-                    c.method = v;
-                    this.onDataFiltered();
                 },
             },
             {

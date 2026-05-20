@@ -73,7 +73,7 @@ describe("Dimension 0/1/2/3 background-filter transitions", () => {
         expect(Array.from(dim.filterArray)).toEqual([2, 1, 2, 0]);
         assertInvariant(parent, dim);
 
-        dim.clearBackGroundFilter();
+        dim.clearBackgroundFilter();
         expect(Array.from(dim.filterArray)).toEqual([0, 1, 0, 0]);
         assertInvariant(parent, dim);
     });
