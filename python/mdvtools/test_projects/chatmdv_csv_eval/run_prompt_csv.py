@@ -530,6 +530,14 @@ def main() -> int:
     worker_sigkill_rows = 0
 
     comp_header = _find_header(raw_fieldnames, "complexity")
+    n_rows = len(rows_in)
+
+    print(
+        f"Processing {n_rows} row(s) from {csv_path.name} "
+        f"(row isolation subprocess={isolate_rows})",
+        file=sys.stderr,
+        flush=True,
+    )
 
     for idx, row in enumerate(rows_in, start=1):
         path = _resolve_row_field(row, "path")
@@ -537,9 +545,16 @@ def main() -> int:
         dataset = _resolve_row_field(row, "dataset") or ""
         complexity_val = ((row.get(comp_header) or "").strip() if comp_header else "") or ""
 
+        q_preview = (question or "")[:80] + ("..." if question and len(question) > 80 else "")
+        print(
+            f"[START] row={idx}/{n_rows} path={path or '(missing)'} q={q_preview!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+
         if not path or not question:
-            msg = f"Row {idx}: missing Path or Question (path={path!r}, question={question!r})"
-            print(msg, file=sys.stderr)
+            msg = f"missing Path or Question (path={path!r}, question={question!r})"
+            print(f"[FAIL] row={idx} {msg}", file=sys.stderr, flush=True)
             detail = _row_detail_payload(
                 row_index=idx,
                 path=path or "",
@@ -549,7 +564,7 @@ def main() -> int:
                 exec_success=False,
                 exit_code=2,
                 duration_seconds=0.0,
-                failure_reason=msg,
+                failure_reason=f"Row {idx}: {msg}",
                 captured_output="",
                 captured_output_excerpt="",
                 view_name="",
@@ -598,12 +613,14 @@ def main() -> int:
                     f"[OOM?] row={idx}: worker subprocess was SIGKILL'd (Linux OOM killer "
                     f"often uses SIGKILL). Recorded as exit_code=3; continuing.",
                     file=sys.stderr,
+                    flush=True,
                 )
             elif term_tag == "signal_other":
                 print(
                     f"[WORKER] row={idx}: worker subprocess was killed by a signal other than "
                     f"SIGKILL; recorded as exit_code=3; continuing.",
                     file=sys.stderr,
+                    flush=True,
                 )
         else:
             from mdvtools.llm.chat_cli import run_chat_once as run_chat_once_fn
@@ -669,13 +686,23 @@ def main() -> int:
         if complexity_val:
             complexity_pairs[complexity_val].append((success, view_has_charts))
 
-        if not success:
+        if success:
+            view_bit = f" view={view_name!r}" if view_name else ""
+            charts_bit = f" charts={chart_count}" if view_has_charts else ""
+            print(
+                f"[OK] row={idx}/{n_rows} exit={exit_code} duration={duration:.1f}s"
+                f"{view_bit}{charts_bit}",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
             failure_count += 1
             q_short = question[:120] + ("..." if len(question) > 120 else "")
             print(
-                f"[FAIL] row={idx} exit={exit_code} path={path} q={q_short!r}\n"
+                f"[FAIL] row={idx}/{n_rows} exit={exit_code} path={path} q={q_short!r}\n"
                 f"       reason: {failure_reason}",
                 file=sys.stderr,
+                flush=True,
             )
             failure_payloads.append(detail)
 
@@ -774,7 +801,7 @@ def main() -> int:
         print("  artifacts_dir             (none — pass --artifacts-dir for per-row debug dirs)")
     print("")
     print(
-        "During the run: brief [FAIL] lines on stderr."
+        "During the run: [START]/[OK]/[FAIL] lines on stderr (flushed per row)."
         + (
             f' Verbose per-row fields: see details_jsonl ("{details_log_path.name}").'
             f' Failed-row payloads also in failures_jsonl ("{failure_log_path.name}").'
