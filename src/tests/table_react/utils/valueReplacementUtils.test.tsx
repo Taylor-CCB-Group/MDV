@@ -1,5 +1,9 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
-import { replaceMatches, replaceValueInString, setCellValueFromString } from "@/react/utils/valueReplacementUtil";
+import {
+    replaceMatches,
+    replaceValueInString,
+    setCellValueFromString,
+} from "@/react/utils/valueReplacementUtil";
 import { describe, expect, test } from "vitest";
 
 describe("valueReplacementUtils", () => {
@@ -41,8 +45,26 @@ describe("valueReplacementUtils", () => {
                 replaceValue = "Ball";
 
                 setCellValueFromString(column, dataIndex, replaceValue);
-                expect(column.data[dataIndex]).toBe(1);
+                expect(column.data[dataIndex]).toBe(0);
+                expect(column.values).toEqual([replaceValue]);
                 expect(column.values[column.data[dataIndex]]).toBe(replaceValue);
+            });
+
+            test("removes unused old labels and remaps text row data", () => {
+                column = {
+                    field: "Col1",
+                    data: new Uint8Array([0, 1, 0]),
+                    values: ["Value A", "Other"],
+                    colors: ["#111111", "#222222"],
+                    datatype: "text",
+                } as any;
+
+                setCellValueFromString(column, 0, "Value B");
+                setCellValueFromString(column, 2, "Value B");
+
+                expect(column.values).toEqual(["Other", "Value B"]);
+                expect(Array.from(column.data)).toEqual([1, 0, 1]);
+                expect(column.colors).toEqual(["#222222"]);
             });
 
             test("throw error for no values array", () => {
@@ -104,11 +126,8 @@ describe("valueReplacementUtils", () => {
 
                 setCellValueFromString(column, dataIndex, replaceValue);
 
-                for (let i = 0; i < column.stringLength; i++) {
-                    expect(column.data[i]).toBe(column.stringLength + i);
-                    const value = replaceValue.split(",")[i].trim();
-                    expect(column.values[column.data[i]]).toBe(value);
-                }
+                expect(Array.from(column.data)).toEqual([0, 1, 2]);
+                expect(column.values).toEqual(["val4", "val5", "val6"]);
             });
 
             test("uses the column delimiter when parsing replacements", () => {
@@ -126,7 +145,27 @@ describe("valueReplacementUtils", () => {
 
                 setCellValueFromString(column, dataIndex, replaceValue);
 
-                expect(column.values.slice(-3)).toEqual(["val4", "val5", "val6"]);
+                expect(column.values).toEqual(["val4", "val5", "val6"]);
+            });
+
+            test("reserves the multitext empty-slot sentinel as unavailable for labels", () => {
+                const values = Array.from({ length: 65535 }, (_, index) => `value-${index}`);
+                const data = new Uint16Array(65536);
+                for (let index = 0; index < values.length; index++) {
+                    data[index] = index;
+                }
+                data[65535] = 65535;
+                column = {
+                    field: "Col1",
+                    data,
+                    values,
+                    stringLength: 1,
+                    datatype: "multitext",
+                } as any;
+
+                expect(() => setCellValueFromString(column, 65535, "new value")).toThrowError(
+                    `Column exceeded 65535 values while setting: ${column.field}`,
+                );
             });
 
             test("throw error for empty values array", () => {

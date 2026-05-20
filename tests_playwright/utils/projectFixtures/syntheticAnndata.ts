@@ -1,5 +1,5 @@
 /**
- * `generate_synthetic_anndata_project.py` → folder under `~/mdv` → `/rescan_projects` → `/projects` id diff.
+ * `generate_synthetic_anndata_project.py` → folder under `~/mdv` → `/rescan_projects` → registered project id.
  */
 
 import { expect, type Browser, type Page } from "@playwright/test";
@@ -34,6 +34,8 @@ export type SyntheticAnndataGeneratorCliArgs = {
     sparseDensity?: number;
     chunkData?: boolean;
     computeXUmap?: boolean;
+    /** Adds synth_layer_a / synth_layer_b AnnData.layers → multiple rows_as_columns subgroups. */
+    extraExpressionLayers?: boolean;
     force?: boolean;
 };
 
@@ -102,6 +104,9 @@ async function runSyntheticAnndataProjectCli(
     if (synthetic.computeXUmap) {
         args.push("--compute-x-umap");
     }
+    if (synthetic.extraExpressionLayers) {
+        args.push("--extra-expression-layers");
+    }
     if (force) {
         args.push("--force");
     }
@@ -151,9 +156,10 @@ export async function createTemporaryProjectViaSyntheticAnndata(
         await triggerRescanProjects(page.request);
 
         const projectsAfter = await listProjectsViaApi(page.request);
-        const createdProject = projectsAfter.find(
-            (project) => !projectIdsBefore.has(String(project.id)),
-        );
+        const createdProject =
+            projectsAfter.find((project) => project.path === projectPath) ??
+            projectsAfter.find((project) => project.name === nameSegment) ??
+            projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
         expect(createdProject).toBeTruthy();
         if (!createdProject) {
             throw new Error(

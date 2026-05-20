@@ -181,6 +181,7 @@ interface IRowAsColumn {
     /**
      * Unique identifier for the column, in the form of `"subgroup|name (subgroup)|index"`,
      * used internally for querying the associated column in the parent {@link DataStore}.
+     * Defaults to the link's first subgroup key (see {@link fieldNameForSubgroup} for other subgroups).
      */
     fieldName: FieldName;
     /**
@@ -189,6 +190,8 @@ interface IRowAsColumn {
      * for accessing the column (meta)data.
      */
     column: DataColumn<DataType>;
+    fieldNameForSubgroup(subgroupKey: string): FieldName;
+    columnForSubgroup(subgroupKey: string): DataColumn<DataType>;
 }
 
 export type RowsAsColslink = {
@@ -254,6 +257,12 @@ type RowsAsColsPrefs = {
 }
 export type RowsAsColsQuerySerialized = {
     linkedDsName: string;
+    /**
+     * Canonical subgroup key under the link’s `subgroups` (same as {@link RowsAsColsQuery.effectiveSubgroupKey}).
+     * Always written by {@link RowsAsColsQuery.toJSON}; older saved configs may omit this (treated as first subgroup).
+     * TODO: make required in ChartConfigSchema `RowsAsColsQuerySerializedSchema` once legacy configs are migrated.
+     */
+    subgroupName?: string;
     type: "RowsAsColsQuery";
 } & RowsAsColsPrefs;
 
@@ -288,8 +297,7 @@ class DeserializedQueryError extends Error {
  * 
  * @param link - the link configuration object, with observable properties
  * @param maxItems - the maximum number of columns to return
- * 
- * ! we should really have sg as well as linkedDsName
+ * @param subgroupName - optional subgroup key under `link.subgroups` (empty = first subgroup)
  */
 export class RowsAsColsQuery implements MultiColumnQuery {
     // it may be logical to make this class be the thing that encapsulates a listener,
@@ -297,28 +305,62 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     // perhaps if rather than just link.observableFields, we have two separate arrays (!or iterators!)
     // and the computed properties can choose between them based on config flags.
     // (i.e. for highlighted vs filtered data)
+    // Future: "pause" live updates (keep concrete column ids), pagination (firstIndex + maxItems), etc.
     @observable accessor maxItems: number;
-    constructor(public link: RowsAsColslink, public linkedDsName: string, maxItems = 1) {
+    /** Subgroup key under `link.subgroups`; empty string means "first available subgroup". */
+    @observable accessor subgroupName: string;
+    constructor(public link: RowsAsColslink, public linkedDsName: string, maxItems = 1, subgroupName = "") {
         this.maxItems = maxItems;
+        this.subgroupName = subgroupName;
+    }
+    /** Resolved subgroup key for column resolution and UI. */
+    @computed
+    get effectiveSubgroupKey(): string {
+        const keys = Object.keys(this.link.subgroups);
+        if (keys.length === 0) {
+            return "";
+        }
+        if (this.subgroupName && this.link.subgroups[this.subgroupName]) {
+            return this.subgroupName;
+        }
+        return keys[0];
     }
     @computed
     get columns() {
-        //how would we pause this?
-        return this.link.observableFields.slice(0, this.maxItems).map(f => f.column);
+        // how would we pause this? (see class comment — a paused query might freeze on concrete fields)
+        // could be kept in some optional `pausedFields` property?
+        const sg = this.effectiveSubgroupKey;
+        return this.link.observableFields
+            .slice(0, this.maxItems)
+            .map((f) => f.columnForSubgroup(sg));
     }
     @computed
     get fields() {
-        return this.columns.map(c => c.field);
+        const sg = this.effectiveSubgroupKey;
+        return this.link.observableFields
+            .slice(0, this.maxItems)
+            .map((f) => f.fieldNameForSubgroup(sg));
     }
     async initialize() {
         return this.link.initPromise;
     }
     /**
      * JSON serialisation that can be used to recreate the query object.
+     * Always includes `subgroupName` as the canonical subgroup key (see {@link effectiveSubgroupKey}).
      */
-    toJSON() {
-        // I was previously naively using toString() for serialization - now I know better.
-        return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
+    toJSON(): RowsAsColsQuerySerialized {
+        const canonical = this.effectiveSubgroupKey;
+        if (this.subgroupName && !this.link.subgroups[this.subgroupName]) {
+            console.warn(
+                `RowsAsColsQuery.toJSON: invalid subgroupName ${JSON.stringify(this.subgroupName)} on link; serializing canonical ${JSON.stringify(canonical)}`,
+            );
+        }
+        return {
+            linkedDsName: this.linkedDsName,
+            maxItems: this.maxItems,
+            type: "RowsAsColsQuery",
+            subgroupName: canonical,
+        };
     }
     /**
      * @internal This should only be called by the `deserialiseParam` factory method.
@@ -328,16 +370,38 @@ export class RowsAsColsQuery implements MultiColumnQuery {
         if (!link) {
             throw new DeserializedQueryError(serialized, ds, `Link not found for ${serialized.linkedDsName}`);
         }
-        return new RowsAsColsQuery(link, serialized.linkedDsName, serialized.maxItems);
+        const raw = serialized.subgroupName;
+        const requested = typeof raw === "string" ? raw.trim() : "";
+        if (requested === "") {
+            return new RowsAsColsQuery(link, serialized.linkedDsName, serialized.maxItems, "");
+        }
+        if (!link.subgroups[requested]) {
+            const avail = Object.keys(link.subgroups).join(", ");
+            throw new DeserializedQueryError(
+                serialized,
+                ds,
+                `subgroupName ${JSON.stringify(requested)} not found on link for ${serialized.linkedDsName}. Available: ${avail || "(none)"}`,
+            );
+        }
+        return new RowsAsColsQuery(link, serialized.linkedDsName, serialized.maxItems, requested);
     }
 }
+
 export function getFieldName(sg: string, value: string, index: number) {
     return `${sg}|${value} (${sg})|${index}`;
 }
-/** 
- * a given {@param link} will currently have a single listener associated with it,
- * instantiated by this function.
- * ! design needs review to account for multiple subgroups
+
+/** Subgroup key from a rows-as-columns `FieldName` (`subgroup|value (subgroup)|index`). */
+export function subgroupKeyFromFieldName(field: string): string | null {
+    if (!field.includes("|")) {
+        return null;
+    }
+    const prefix = field.split("|")[0];
+    return prefix.length > 0 ? prefix : null;
+}
+/**
+ * A given rows-as-columns `link` has a single listener; `observableFields` are subgroup-agnostic row picks.
+ * Which matrix/subgroup those rows resolve to is chosen per {@link RowsAsColsQuery} (or per `FieldName` prefix in manual link mode).
  */
 async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
     if (link.initPromise !== undefined) return link.initPromise;
@@ -377,26 +441,15 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
         valueToRowIndex.set(value, rowIndex);
     });
     link.valueToRowIndex = valueToRowIndex;
-    
-    
-    
-    //! we have an assumption here that there is only one subgroup
-    //(nb, I think this is the thing that there'd be a radio-button for in the UI)
-    //(whereas if there were multiple linked dataSources, they'd appear as different buttons for opening the dialog)
-    const sgKeys = Object.keys(link.subgroups);
-    const sg = Object.keys(link.subgroups)[0];
-    if (sgKeys.length > 1) {
-        //! this should be fixed!
-        console.warn("Multiple subgroups not supported", link);
-        console.warn("Using first subgroup", sg);
-        //return;
-    }
-    if (!sg) {
+    // `IRowAsColumn.fieldName` / `.column` default to the first subgroup for backward compatibility;
+    // consumers that care about another subgroup use `fieldNameForSubgroup` / `columnForSubgroup`.
+    const firstSubgroupKey = Object.keys(link.subgroups)[0] ?? "";
+    if (!firstSubgroupKey) {
         console.error("No subgroups found for link", link);
-        // return;
     }
-    /** ephemeral object representing a virtual column entry in a rows_as_columns link.
-     * accessing the `column` property will add the column to the parent DataStore.
+    /**
+     * Ephemeral object for one highlighted/filtered row in a rows-as-columns link.
+     * Accessing `column` / `fieldName` (first subgroup) or `*ForSubgroup(sg)` adds/resolves metadata on the parent {@link DataStore}.
      */
     class RAColumn implements IRowAsColumn {
         constructor(public index: number) {}
@@ -405,12 +458,10 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
             // if I don't have `as string` here, it's inferred as string | number
             return tds.getRowText(this.index, link.name_column) as string;
         }
-        @computed
-        get fieldName(): FieldName {
-            return getFieldName(sg, this.name, this.index);
+        fieldNameForSubgroup(subgroupKey: string): FieldName {
+            return getFieldName(subgroupKey, this.name, this.index);
         }
-        @computed
-        get column(): DataColumn<DataType> {
+        columnForSubgroup(subgroupKey: string): DataColumn<DataType> {
             //https://mobx.js.org/computeds.html
             //"They should not have side effects or update other observables."
             //this will have side effects - I think it's ok, subsequent calls will be idempotent
@@ -418,7 +469,15 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
             //and return the same DataColumn instance each time)
             //"Avoid creating and returning new observables." - ok
             //"They should not depend on non-observable values."
-            return ds.addColumnFromField(this.fieldName);
+            return ds.addColumnFromField(this.fieldNameForSubgroup(subgroupKey));
+        }
+        @computed
+        get fieldName(): FieldName {
+            return this.fieldNameForSubgroup(firstSubgroupKey);
+        }
+        @computed
+        get column(): DataColumn<DataType> {
+            return this.columnForSubgroup(firstSubgroupKey);
         }
     }
     const getField = (index: number) => {

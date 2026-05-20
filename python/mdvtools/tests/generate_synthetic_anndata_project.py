@@ -26,6 +26,7 @@ from mdvtools.tests.mock_anndata import (
     MockAnnDataFactory,
     create_minimal_anndata,
 )
+from mdvtools.tests.mock_expression_layers import add_synth_expression_layers
 
 PROFILE_CHOICES = ("minimal", "realistic", "large", "memory-efficient")
 
@@ -91,6 +92,7 @@ def generate_project(
     sparse_density: float,
     chunk_data: bool,
     compute_x_umap: bool,
+    extra_expression_layers: bool,
     force: bool,
 ) -> None:
     if output.exists():
@@ -109,6 +111,8 @@ def generate_project(
         add_missing=add_missing,
         sparse_density=sparse_density,
     )
+    if extra_expression_layers:
+        add_synth_expression_layers(adata)
     mdv = convert_scanpy_to_mdv(
         str(output),
         adata,
@@ -129,6 +133,7 @@ def generate_project(
         "sparse_density": sparse_density,
         "chunk_data": chunk_data,
         "compute_x_umap": compute_x_umap,
+        "extra_expression_layers": extra_expression_layers,
         "cleanup_group": "synth-anndata",
     }
     mdv.state = state
@@ -189,6 +194,14 @@ def parse_args() -> argparse.Namespace:
         help="Run neighbors/UMAP/Leiden from X inside convert_scanpy_to_mdv.",
     )
     parser.add_argument(
+        "--extra-expression-layers",
+        action="store_true",
+        help=(
+            "Add AnnData.layers synth_layer_a and synth_layer_b so the project has "
+            "multiple rows_as_columns subgroups after conversion."
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -223,6 +236,7 @@ def main() -> None:
         sparse_density=args.sparse_density,
         chunk_data=args.chunk_data,
         compute_x_umap=args.compute_x_umap,
+        extra_expression_layers=args.extra_expression_layers,
         force=args.force,
     )
 
