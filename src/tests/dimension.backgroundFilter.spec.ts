@@ -46,9 +46,8 @@ describe("Dimension 0/1/2/3 background-filter transitions", () => {
 
         const includeRows = new Set([0, 1]);
         dim.filterPredicate({ predicate: (i: number) => includeRows.has(i) }, []);
-
-        // include visible rows: 1->0, background-hidden rows unchanged
-        expect(Array.from(dim.filterArray)).toEqual([0, 0, 2, 3]);
+        // background-hidden rows promoted to state 3 when local filter active
+        expect(Array.from(dim.filterArray)).toEqual([0, 0, 3, 3]);
         assertInvariant(parent, dim);
 
         const includeOnlyFirst = new Set([0]);
@@ -58,7 +57,7 @@ describe("Dimension 0/1/2/3 background-filter transitions", () => {
         );
 
         // exclude row 1: 0->1
-        expect(Array.from(dim.filterArray)).toEqual([0, 1, 2, 3]);
+        expect(Array.from(dim.filterArray)).toEqual([0, 1, 3, 3]);
         assertInvariant(parent, dim);
     });
 
