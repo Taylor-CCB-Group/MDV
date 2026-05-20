@@ -31,31 +31,56 @@ void main(void) {
   float arcLength = instancePosition.y * 360.0 / totalLength;
   vec2 pos;
   float offset;
-  //any insertions or unknown svs (z=3 or 5) are drawn on the outer edge
-  if (instancePosition.z > 2.5){
-    offset = 0.0;
-  }
-  else {
-    offset = (3.0-instancePosition.z)*20.0;
-  }
-  // for translocation , inversions and deletions greater than 10 000 draw bezier curves
-  // linking start and end of sv
-  if (instancePosition.z < 3.0 && instancePosition.y > 10000.0) {
-    float endAngle = startAngle + arcLength;
-    // Endpoints on the circle
-    vec2 p0 = getCirclePoint(startAngle, radius-offset+20.0, center);
-    vec2 p2 = getCirclePoint(endAngle, radius-offset+20.0, center);
-    // Control point: inward from the midpoint
-    float midAngle = (startAngle + endAngle) / 2.0;
-    float controlRadius = radius * 0.7; // inward, adjust as needed
-    vec2 p1 = getCirclePoint(midAngle, controlRadius, center);
-    // Quadratic Bezier interpolation
-    pos = mix(mix(p0, p1, t), mix(p1, p2, t), t);
-  }
-
-  //draw as straight line if insertion or ends of SV are close together
-  else {
-      pos = getCirclePoint(startAngle, radius + (t*20.0)-offset, center);
+  // DEL (inner), DUP (middle), INS (outer) as separate non-overlapping concentric rings.
+  // DEL, DUP, INS, UNKNOWN/ND as concentric rings, all thick and spaced out
+  if (instancePosition.z >= 2.0 && instancePosition.z <= 5.0) {
+    float ringBase;
+    float thickness = 28.0;
+    if (abs(instancePosition.z - 2.0) < 0.1) {
+      ringBase = radius - 80.0; // DEL innermost
+    } else if (abs(instancePosition.z - 4.0) < 0.1) {
+      ringBase = radius - 54.0; // DUP
+    } else if (abs(instancePosition.z - 3.0) < 0.1) {
+      ringBase = radius - 28.0; // INS
+    } else {
+      ringBase = radius - 2.0; // UNKNOWN/ND outermost
+    }
+    pos = getCirclePoint(startAngle, ringBase + (t * thickness), center);
+  } else {
+    // Inversions (z=1) and TRA/BND (z=0) are now further inward to avoid overlap
+    float invBase, traBase;
+    float thickness = 20.0;
+    if (abs(instancePosition.z - 1.0) < 0.1) {
+      invBase = radius - 108.0;
+      float traBase = radius - 160.0;
+      if (abs(instancePosition.y) > 10000.0) {
+        float endAngle = startAngle + arcLength;
+        vec2 p0 = getCirclePoint(startAngle, invBase + 10.0, center);
+        vec2 p2 = getCirclePoint(endAngle, invBase + 10.0, center);
+        float midAngle = (startAngle + endAngle) / 2.0;
+        // Control point: not below TRA/BND ring, and slightly taller
+        float controlRadius = invBase - 48.0;
+        vec2 p1 = getCirclePoint(midAngle, controlRadius, center);
+        pos = mix(mix(p0, p1, t), mix(p1, p2, t), t);
+      } else {
+        pos = getCirclePoint(startAngle, invBase + (t * thickness), center);
+      }
+    } else if (abs(instancePosition.z - 0.0) < 0.1) {
+      traBase = radius - 140.0;
+      if (abs(instancePosition.y) > 10000.0) {
+        float endAngle = startAngle + arcLength;
+        vec2 p0 = getCirclePoint(startAngle, traBase + 10.0, center);
+        vec2 p2 = getCirclePoint(endAngle, traBase + 10.0, center);
+        float midAngle = (startAngle + endAngle) / 2.0;
+        float controlRadius = traBase * 0.7;
+        vec2 p1 = getCirclePoint(midAngle, controlRadius, center);
+        pos = mix(mix(p0, p1, t), mix(p1, p2, t), t);
+      } else {
+        pos = getCirclePoint(startAngle, traBase + (t * thickness), center);
+      }
+    } else {
+      pos = getCirclePoint(startAngle, radius, center);
+    }
   }
   
     //draw as an arc problem is that for short svs the arc is very small
@@ -144,7 +169,9 @@ class SVLayer extends Layer {
   }
 
   getNumInstances() {
-    return 400000;
+    const sv = this.props.data?.attributes?.getSV;
+    if (sv?.length) return sv.length / 3;
+    return 0;
   }
 
   _getModel() {

@@ -1,10 +1,7 @@
 // biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
 onmessage = (e) => {
     const config = e.data[3];
-    const dtype =
-        config.datatype === "text16" || config.datatype === "multitext"
-            ? Uint16Array
-            : Uint8Array;
+    const dtype = config.datatype === "text16" || config.datatype === "multitext" ? Uint16Array : Uint8Array;
     const data = new dtype(e.data[2]);
     const lFilter = new Uint8Array(e.data[0]);
     const gFilter = new Uint8Array(e.data[1]);
@@ -22,9 +19,9 @@ onmessage = (e) => {
         result = getStackedData(lFilter, gFilter, data, data2, config);
     } else if (config.method === "double_cat") {
         const data2 =
-            config.datatype2 === "multitext"
-                ? new Uint16Array(e.data(4))
-                : new Uint8Array(e.data(4));
+            config.datatype2 === "text16" || config.datatype2 === "multitext"
+                ? new Uint16Array(e.data[4])
+                : new Uint8Array(e.data[4]);
         result = getDoubleCategory(lFilter, gFilter, data, data2, config);
     } else {
         result = getNumberInCategory(lFilter, gFilter, data, config);
@@ -33,8 +30,11 @@ onmessage = (e) => {
 };
 
 function getDoubleCategory(lFilter, gFilter, data, data2, config) {
-    const len = data.length;
+    const mt1 = config.datatype === "multitext";
     const mt2 = config.datatype2 === "multitext";
+    const rowCount = mt1 ? data.length / config.stringLength : data.length;
+    const rowTotals = new Array(config.values.length).fill(0);
+    const colTotals = new Array(config.values2.length).fill(0);
     const matrix = Array.from(config.values, (x, i1) => {
         return Array.from(config.values2, (x, i2) => ({
             i1: i1,
@@ -42,25 +42,84 @@ function getDoubleCategory(lFilter, gFilter, data, data2, config) {
             c: 0,
         }));
     });
-    for (let i = 0; i < len; i++) {
+
+    for (let i = 0; i < rowCount; i++) {
         if (gFilter[i] !== 0) {
             if (gFilter[i] !== lFilter[i]) {
                 continue;
             }
         }
-        if (mt2) {
-            const st = i * config.stringLength2;
-            for (let n = st; n < config.stringLength2; n++) {
-                if (data[n] === 65535) {
+
+        const xValues = [];
+        if (mt1) {
+            const xStart = i * config.stringLength;
+            const xEnd = xStart + config.stringLength;
+            for (let n = xStart; n < xEnd; n++) {
+                const xVal = data[n];
+                if (xVal === 65535) {
                     break;
                 }
-                matrix[data[i]][data2[n]].c++;
+                xValues.push(xVal);
             }
         } else {
-            matrix[data[i]][data2[i]].c++;
+            xValues.push(data[i]);
+        }
+
+        const yValues = [];
+        if (mt2) {
+            const yStart = i * config.stringLength2;
+            const yEnd = yStart + config.stringLength2;
+            for (let n = yStart; n < yEnd; n++) {
+                const yVal = data2[n];
+                if (yVal === 65535) {
+                    break;
+                }
+                yValues.push(yVal);
+            }
+        } else {
+            yValues.push(data2[i]);
+        }
+
+        for (let x = 0; x < xValues.length; x++) {
+            const xVal = xValues[x];
+            if (xVal == null || !matrix[xVal]) {
+                continue;
+            }
+            for (let y = 0; y < yValues.length; y++) {
+                const yVal = yValues[y];
+                if (yVal == null || !matrix[xVal][yVal]) {
+                    continue;
+                }
+                matrix[xVal][yVal].c++;
+                rowTotals[xVal]++;
+                colTotals[yVal]++;
+            }
         }
     }
-    return matrix;
+
+    const rowIndexes = [];
+    for (let i = 0; i < rowTotals.length; i++) {
+        if (rowTotals[i] > 0) {
+            rowIndexes.push(i);
+        }
+    }
+
+    const colIndexes = [];
+    for (let i = 0; i < colTotals.length; i++) {
+        if (colTotals[i] > 0) {
+            colIndexes.push(i);
+        }
+    }
+
+    const reducedMatrix = rowIndexes.map((i1) =>
+        colIndexes.map((i2) => matrix[i1][i2]),
+    );
+
+    return {
+        matrix: reducedMatrix,
+        rowIndexes,
+        colIndexes,
+    };
 }
 
 //data the x category (groups)
@@ -102,9 +161,7 @@ function getProportionData(lFilter, gFilter, data, data2, config) {
             if (t[n] === 0) {
                 continue;
             }
-            const v = config.denominators
-                ? c[n] / config.denominators[n]
-                : (c[n] / t[n]) * 100;
+            const v = config.denominators ? c[n] / config.denominators[n] : (c[n] / t[n]) * 100;
             nc.push([v, i, n, Math.floor(Math.random() * 6)]);
             vls.push(v);
             total += v;
@@ -161,10 +218,7 @@ function calculateSets(lFilter, gFilter, data, config) {
 }
 
 function getNumberInCategory(lFilter, gFilter, data, config) {
-    const len =
-        config.datatype === "multitext"
-            ? data.length / config.stringLength
-            : data.length;
+    const len = config.datatype === "multitext" ? data.length / config.stringLength : data.length;
     const cats = new Array(config.values.length).fill(0);
 
     if (config.datatype === "multitext") {

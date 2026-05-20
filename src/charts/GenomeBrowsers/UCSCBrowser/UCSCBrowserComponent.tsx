@@ -21,7 +21,9 @@ const UCSCBrowserComponent = observer(() => {
     const url_proxy = chart.dataStore?.genome?.genomic?.ucsc_proxy_url || "ucsc_proxy";
 
     function getHighlightedRegion(): UCSCBrowserLocation | null {
-        return highlightedIndexToLocation(highlightedIndex, fieldSpecs, Boolean(genome?.svs));
+        const location = highlightedIndexToLocation(highlightedIndex, fieldSpecs, Boolean(genome?.svs));
+        if (!location) return null;
+        return Array.isArray(location) ? location[0] : location;
     }
 
     const handleZoom = (factor: number) => {

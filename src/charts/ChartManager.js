@@ -28,6 +28,7 @@ import "./WGL3DScatterPlot.js";
 import "./WGLScatterPlot.js";
 import "./RingChart.js";
 import "../react/components/TextBoxChartReactWrapper";
+import "./CategoryHeatMap/CategoryHeatmapReactWrapper";
 import "./HeatMap.js";
 import "./ViolinPlot.js";
 import "./BoxPlot.js";

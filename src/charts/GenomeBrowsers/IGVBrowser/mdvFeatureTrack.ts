@@ -125,6 +125,7 @@ class MdvFeatureTrack extends igv.TrackBase {
         renderEnd?: number,
     ) {
         const proxy = this.getFeature(feature);
+        const normalizedSvType = typeof proxy.svtype === "string" ? proxy.svtype.trim().toUpperCase() : "";
         const style = getStructuralVariantStyle(proxy.svtype);
         const color = proxy.color || style.fillStyle;
         const stroke = proxy.color || style.strokeStyle;
@@ -189,7 +190,11 @@ class MdvFeatureTrack extends igv.TrackBase {
                     this.drawDiamond(ctx, centerX, midY, Math.max(5, Math.min(10, spanWidth / 3)), color, stroke);
                     break;
                 case "triangle":
-                    this.drawTriangle(ctx, centerX, midY - halfH / 2, Math.max(5, Math.min(10, spanWidth / 3)), color, stroke);
+                    if (normalizedSvType === "INS") {
+                        this.drawThinInsertionTriangle(ctx, centerX, midY, 3, 9, color, stroke);
+                    } else {
+                        this.drawTriangle(ctx, centerX, midY - halfH / 2, Math.max(5, Math.min(10, spanWidth / 3)), color, stroke);
+                    }
                     break;
                 case "double_bar":
                     this.drawDoubleBar(ctx, centerX, midY, Math.max(6, Math.min(12, spanWidth / 2)), halfH, color, stroke);
@@ -226,6 +231,28 @@ class MdvFeatureTrack extends igv.TrackBase {
         ctx.moveTo(x, y - radius);
         ctx.lineTo(x + radius, y + radius);
         ctx.lineTo(x - radius, y + radius);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    private drawThinInsertionTriangle(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        halfWidth: number,
+        height: number,
+        fillStyle: string,
+        strokeStyle: string,
+    ) {
+        ctx.save();
+        ctx.fillStyle = fillStyle;
+        ctx.strokeStyle = strokeStyle;
+        ctx.beginPath();
+        ctx.moveTo(x, y - height / 2);
+        ctx.lineTo(x + halfWidth, y + height / 2);
+        ctx.lineTo(x - halfWidth, y + height / 2);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -368,11 +395,19 @@ class MdvFeatureTrack extends igv.TrackBase {
             });
         }
 
-        // 2. For each lane, sort and assign stack index for overlaps (max 3)
+        // 2. For each lane, sort and assign stack index for overlaps.
+        // INS and breakpoints (TRA/BND) stay on a single centered level.
         const stackingInfo = new WeakMap<IGVBaseFeature, number>();
         for (let laneIdx = 0; laneIdx < laneCount; ++laneIdx) {
             const laneFeatures = featuresByLane[laneIdx];
             laneFeatures.sort((a, b) => (a.renderStart - b.renderStart) || (a.renderEnd - b.renderEnd));
+            const singleLevelLane = laneIdx === 1 || laneIdx === 4 || laneIdx === 5; // INS, TRA, BND
+            if (singleLevelLane) {
+                for (const item of laneFeatures) {
+                    stackingInfo.set(item.feature, 1); // centered row in drawSvGlyph
+                }
+                continue;
+            }
             const active: { end: number, stack: number }[] = [];
             for (const item of laneFeatures) {
                 for (let i = active.length - 1; i >= 0; --i) {

@@ -107,4 +107,23 @@ describe("CategoryDimension multitext filtering", () => {
 
         expect(getIncludedRows(dimension, 3)).toEqual([1, 2]);
     });
+
+    test("can require an exact single-item multitext match", () => {
+        const column = {
+            field: "tags",
+            name: "tags",
+            datatype: "multitext" as const,
+            delimiter: ",",
+            stringLength: 1,
+            values: ["a", "b", "a, b"],
+            data: new Uint16Array([0, 1, 2]),
+        };
+        const parent = createParent(column, 3);
+        const dimension = new CategoryDimension(parent as never);
+
+        // Use a string filter instead of an object
+        dimension.filterCategories("a", ["tags"]);
+
+        expect(getIncludedRows(dimension, 3)).toEqual([0]);
+    });
 });

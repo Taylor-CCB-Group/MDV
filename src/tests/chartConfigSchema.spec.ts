@@ -137,4 +137,20 @@ describe("chart config schema registration", () => {
             contour_bandwidth: 1.5,
         });
     });
+
+    test("validates category heatmap config", () => {
+        const config = {
+            id: "category-heatmap-1",
+            title: "Category Heatmap",
+            type: "category_heatmap",
+            param: ["cluster", "sample_type"],
+            size: [640, 400],
+        };
+
+        expect(getChartConfigSchema("category_heatmap")).toBeDefined();
+        expect(safeValidateChartConfig(config)).toMatchObject({
+            type: "category_heatmap",
+            param: ["cluster", "sample_type"],
+        });
+    });
 });

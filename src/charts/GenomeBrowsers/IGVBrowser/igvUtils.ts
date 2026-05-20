@@ -1,12 +1,14 @@
 import {
     type GenomeLocation,
+    type GenomeLocationValue,
     type GenomeViewMargins,
     applyViewMargins,
     getLocationFieldsFromGenome,
     locationFromFieldValues,
 } from "../genomicLocationUtils";
 
-export type IGVBrowserLocation = GenomeLocation;
+export type IGVBrowserSingleLocation = GenomeLocation;
+export type IGVBrowserLocation = GenomeLocationValue;
 
 export type IGVBrowserViewMargins = GenomeViewMargins;
 
@@ -31,6 +33,10 @@ export interface IGVStructuralVariantStyle {
     glyph: "capped_line" | "diamond" | "triangle" | "double_bar" | "inversion" | "breakend";
 }
 
+export interface BuildBaseFeaturesResult {
+    features: IGVBaseFeature[];
+}
+
 export function getStructuralVariantStyle(svtype: unknown): IGVStructuralVariantStyle {
     const normalized = typeof svtype === "string" ? svtype.trim().toUpperCase() : "";
     switch (normalized) {
@@ -51,78 +57,95 @@ export function getStructuralVariantStyle(svtype: unknown): IGVStructuralVariant
 }
 
 export function buildBaseFeatures(
-    rows: any[],
-    columns: string[],
+    rows: Record<string, unknown>[],
+    locationFields: string[],
     isSvs: boolean,
     maxInitialFeatures: number,
-) {
-    const sampled = rows.length > maxInitialFeatures;
-    const selectedRows = sampled ? rows.slice(0, maxInitialFeatures) : rows;
+): BuildBaseFeaturesResult {
+    if (locationFields.length < 3) {
+        return { features: [] };
+    }
 
     const features: IGVBaseFeature[] = [];
-    selectedRows.forEach((row, index) => {
-        const chr = row?.[columns[0]];
-        const startValue = Number(row?.[columns[1]]);
-        const endValue = Number(row?.[columns[2]]);
+    const maxRows = Math.min(rows.length, maxInitialFeatures);
 
+    for (let i = 0; i < maxRows; i++) {
+        const row = rows[i];
+        if (!row) continue;
+
+        const chr = row[locationFields[0]];
+        const startValue = Number(row[locationFields[1]]);
+        const endValue = Number(row[locationFields[2]]);
+        const rowId = String((row.__index__ ?? i));
         if (typeof chr !== "string" || !Number.isFinite(startValue) || !Number.isFinite(endValue)) {
-            return;
+            continue;
         }
 
-        const start = Math.min(startValue, endValue);
-        const end = Math.max(startValue, endValue);
-
-        if (isSvs && columns.length >= 4) {
-            const chr2 = row?.[columns[3]];
-            const svtype = typeof row?.svtype === "string" ? row.svtype : undefined;
+        if (isSvs && locationFields.length >= 4) {
+            const chr2 = row[locationFields[3]];
+            const svtype = typeof row.svtype === "string" ? row.svtype : undefined;
+            const normalizedSvType = typeof svtype === "string" ? svtype.trim().toUpperCase() : "";
             const style = getStructuralVariantStyle(svtype);
-            const base = {
-                svtype,
-                length: Number.isFinite(Number(row?.length)) ? Number(row.length) : undefined,
-                name: svtype,
-                color: style.fillStyle,
+            
+            const baseFeature = {
+                id: rowId,
                 chr2: typeof chr2 === "string" ? chr2 : undefined,
                 pos1: startValue,
                 pos2: endValue,
-                id: String(row?.__index__ ?? index),
+                svtype,
+                length: Number.isFinite(Number(row.length)) ? Number(row.length) : undefined,
+                name: svtype,
+                color: style.fillStyle,
             };
-            if (svtype === "TRA" || svtype === "BND") {
-                // Emit two features: one for each breakend
+
+            if (normalizedSvType === "TRA" || normalizedSvType === "BND") {
                 features.push({
+                    ...baseFeature,
+                    id: rowId,
                     chr,
                     start: startValue,
-                    end: startValue + 1,
-                    ...base,
-                    id: String(row?.__index__ ?? index) + ":1",
-                } as IGVBaseFeature);
-                if (typeof chr2 === "string" && Number.isFinite(endValue)) {
+                    end: startValue,
+                });
+                if (typeof chr2 === "string") {
                     features.push({
+                        ...baseFeature,
+                        id: rowId,
                         chr: chr2,
                         start: endValue,
-                        end: endValue + 1,
-                        ...base,
-                        id: String(row?.__index__ ?? index) + ":2",
-                    } as IGVBaseFeature);
+                        end: endValue,
+                    });
                 }
-            } else {
-                features.push({
-                    chr,
-                    start,
-                    end,
-                    ...base,
-                } as IGVBaseFeature);
+                continue;
             }
-        } else {
-            features.push({
-                chr,
-                start,
-                end,
-                id: String(row?.__index__ ?? index),
-            } as IGVBaseFeature);
-        }
-    });
 
-    return { features, sampled };
+            if (normalizedSvType === "INS") {
+                features.push({
+                    ...baseFeature,
+                    chr,
+                    start: startValue,
+                    end: startValue,
+                });
+                continue;
+            }
+
+            features.push({
+                ...baseFeature,
+                chr,
+                start: Math.min(startValue, endValue),
+                end: Math.max(startValue, endValue),
+            });
+            continue;
+        }
+
+        features.push({
+            chr,
+            start: Math.min(startValue, endValue),
+            end: Math.max(startValue, endValue),
+            id: rowId,
+        });
+    }
+
+    return { features };
 }
 
 export { applyViewMargins, getLocationFieldsFromGenome, locationFromFieldValues };

@@ -638,7 +638,8 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
                 "chr2":"chr2",
                 "pos1":"pos1",
                 "pos2":"pos2",
-                "svtype":"svtype"
+                "svtype":"svtype",
+                "length":"length"
             }
         }
     }

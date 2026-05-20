@@ -68,6 +68,7 @@ function calculateSVs(params,dataStore){
             "INV":1,
             "DEL":2,
             "INS":3,
+            "DUP":4,
         " DUP":4,
     }
 
@@ -85,7 +86,8 @@ function calculateSVs(params,dataStore){
         const idx= i*3;
         const sv_start = pos1[i] + chrCumLen[chr1Vals[chr1[i]]];
         const sv_end   = pos2[i] + chrCumLen[chr2Vals[chr2[i]]];
-        let t = sv_map[svtypeVals[svtype[i]]];
+        const svType = String(svtypeVals[svtype[i]] ?? "").trim().toUpperCase();
+        let t = sv_map[svType];
         if (t===undefined){
             t=5;
         }

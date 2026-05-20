@@ -3,7 +3,6 @@ import BaseChart from "@/charts/BaseChart";
 import "@/charts/GenomeBrowsers/IGVBrowser/IGVBrowser";
 import {
     applyViewMargins,
-    buildBaseFeatures,
     getLocationFieldsFromGenome,
     locationFromFieldValues,
     getStructuralVariantStyle,
@@ -40,41 +39,13 @@ describe("igv utils", () => {
         });
     });
 
-    it("builds features and skips malformed rows", () => {
-        const rows = [
-            { chr: "chr1", start: 10, end: 20 },
-            { chr: "chr2", start: 50, end: 30 },
-            { chr: "chr3", start: "bad", end: 10 },
-        ] as any[];
-        const built = buildBaseFeatures(rows, ["chr", "start", "end"], false, 10);
-        expect(built.sampled).toBe(false);
-        expect(built.features).toEqual([
-            { chr: "chr1", start: 10, end: 20, id: "0" },
-            { chr: "chr2", start: 30, end: 50, id: "1" },
-        ]);
-    });
-
-    it("builds sv features with both breakpoints", () => {
-        const rows = [
-            { chr1: "chr1", pos1: 100, pos2: 220, chr2: "chr1", svtype: "DEL", length: 120 },
-            { chr1: "chr2", pos1: 500, pos2: 700, chr2: "chr3", svtype: "TRA", length: 0 },
-        ] as any[];
-        const built = buildBaseFeatures(rows, ["chr1", "pos1", "pos2", "chr2"], true, 10);
-        expect(built.sampled).toBe(false);
-        expect(built.features).toEqual([
-            { chr: "chr1", start: 100, end: 220, id: "0", chr2: "chr1", pos1: 100, pos2: 220, svtype: "DEL", length: 120, name: "DEL" },
-            { chr: "chr2", start: 500, end: 1500, id: "1", chr2: "chr3", pos1: 500, pos2: 700, svtype: "TRA", length: 0, name: "TRA" },
-        ]);
-    });
-
-    it("applies sv cross-chromosome fallback", () => {
+    it("returns paired loci for cross-chromosome svs", () => {
         expect(
             locationFromFieldValues({ chr: "chr1", start: 1000, end: 500000, chr2: "chr2" }, true),
-        ).toEqual({
-            chr: "chr1",
-            start: 1000,
-            end: 2000,
-        });
+        ).toEqual([
+            { chr: "chr1", start: 900, end: 1100 },
+            { chr: "chr2", start: 499900, end: 500100 },
+        ]);
     });
 
     it("maps sv types to distinct glyph styles", () => {

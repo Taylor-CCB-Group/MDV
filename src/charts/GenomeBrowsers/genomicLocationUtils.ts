@@ -4,6 +4,9 @@ export interface GenomeLocation {
     end: number;
 }
 
+export type GenomeLocationPair = [GenomeLocation] | [GenomeLocation, GenomeLocation];
+export type GenomeLocationValue = GenomeLocation | GenomeLocationPair;
+
 export interface GenomeViewMargins {
     type: "fixed_length" | "absolute" | "percentage";
     value: number;
@@ -20,7 +23,7 @@ export function getLocationFieldsFromGenome(genome: any): string[] | null {
     }
     if (genome?.svs?.sv_columns) {
         const cols = genome.svs.sv_columns;
-        return [cols.chr1, cols.pos1, cols.pos2, cols.chr2];
+        return [cols.chr1, cols.pos1, cols.pos2, cols.chr2, cols.svtype,cols.length];
     }
     return null;
 }
@@ -61,28 +64,35 @@ export function applyViewMargins(
 
 export function locationFromFieldValues(
     values: {
-        chr: unknown;
-        start: unknown;
-        end: unknown;
-        chr2?: unknown;
+        chr: string;
+        start: number;
+        end: number;
+        chr2?: string;
     },
     isSvs: boolean,
-): GenomeLocation | null {
+): GenomeLocationValue | null {
     const chr = values.chr;
     const start = values.start;
-    const endCandidate = values.end;
-    if (typeof chr !== "string" || typeof start !== "number" || typeof endCandidate !== "number") {
-        return null;
-    }
-
-    let end = endCandidate;
+    const end = values.end;
+  
     if (isSvs) {
-        const chr2 = values.chr2;
-        if (typeof chr2 !== "string" || chr2 !== chr || Math.abs(start - endCandidate) > 30000) {
-            end = start + 1000;
+    
+    const chr2 = values.chr2;
+       //need two locations
+       if (chr2 &&chr2 !== chr) {
+            const loc1: GenomeLocation = {
+                chr,
+                start,
+                end: start
+            };
+            const loc2: GenomeLocation = {
+                chr: chr2,
+                start: end,
+                end: end,
+            };
+            return [loc1, loc2];
         }
     }
-
     return { chr, start, end };
 }
 
@@ -90,7 +100,7 @@ export function highlightedIndexToLocation(
     highlightedIndex: number,
     fieldSpecs: ValueGetterSpec[],
     isSvs: boolean,
-): GenomeLocation | null {
+): GenomeLocationValue | null {
     if (highlightedIndex < 0 || fieldSpecs.length < 3) {
         return null;
     }
@@ -102,10 +112,10 @@ export function highlightedIndexToLocation(
     }
     return locationFromFieldValues(
         {
-            chr: chrSpec.getValue(highlightedIndex),
-            start: startSpec.getValue(highlightedIndex),
-            end: endSpec.getValue(highlightedIndex),
-            chr2: isSvs && fieldSpecs[3] ? fieldSpecs[3].getValue(highlightedIndex) : undefined,
+            chr: chrSpec.getValue(highlightedIndex) as string,
+            start: startSpec.getValue(highlightedIndex) as number,
+            end: endSpec.getValue(highlightedIndex) as number,
+            chr2: isSvs && fieldSpecs[3] ? fieldSpecs[3].getValue(highlightedIndex) as string : undefined,
         },
         isSvs,
     );

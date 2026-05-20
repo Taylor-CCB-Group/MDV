@@ -1,11 +1,14 @@
 import { observer } from "mobx-react-lite";
 import { useChart } from "@/react/context";
 import { useEffect, useRef, useState } from "react";
-import { useHighlightedIndex } from "@/react/selectionHooks";
 import type IGVBrowser from "./IGVBrowser";
 import { BASE_TRACK_ID } from "./IGVBrowser";
-import igv, { type Browser } from "igv";
+// @ts-expect-error igv typings are incomplete in this setup
+import igv from "igv/dist/igv.esm.js";
+import type { Browser } from "igv";
 import "./mdvFeatureTrack";
+
+
 
 const IGVBrowserComponent = observer(() => {
     const chart = useChart() as IGVBrowser;
@@ -13,8 +16,9 @@ const IGVBrowserComponent = observer(() => {
     const browserRef = useRef<Browser | null>(null);
     const lastLocusRef = useRef<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const highlightedIndex = useHighlightedIndex();
+
 
     useEffect(() => {
         let disposed = false;
@@ -31,7 +35,12 @@ const IGVBrowserComponent = observer(() => {
                 const config = await chart.getInitialBrowserConfig();
                 if (disposed) return;
                 //create the browser instance in the chart div
-                const browser = await igv.createBrowser(rootRef.current, config);
+                const browser = await Promise.race([
+                    igv.createBrowser(rootRef.current, config),
+                    new Promise<never>((_, reject) => {
+                        setTimeout(() => reject(new Error("Timed out while initializing IGV browser.")), 20000);
+                    }),
+                ]);
                 if (disposed) {
                     igv.removeBrowser(browser);
                     return;
@@ -83,21 +92,16 @@ const IGVBrowserComponent = observer(() => {
             }
             if (browserRef.current === b) browserRef.current = null;
         };
-    }, [chart]);
+    }, []);
 
     useEffect(() => {
-        const browser = browserRef.current;
-        const loc = chart.config.location;
-        if (!browser || !loc) {
-            return;
-        }
-        const locus = `${loc.chr}:${Math.floor(loc.start)}-${Math.floor(loc.end)}`;
-        if (lastLocusRef.current === locus) {
-            return;
-        }
-        lastLocusRef.current = locus;
-        void browser.search(locus);
-    }, [chart, chart.config.location]);
+        chart.setSearchPendingHandler(setSearching);
+        return () => {
+            chart.setSearchPendingHandler(null);
+        };
+    }, [chart]);
+
+ 
 
     /*useEffect(() => {
         if (highlightedIndex >= 0) {
@@ -112,6 +116,25 @@ const IGVBrowserComponent = observer(() => {
                     Loading IGV...
                 </div>
             ) : null}
+            {searching && browserRef.current ? (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, background: "rgba(255,255,255,0.35)", pointerEvents: "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.9)", border: "1px solid #d1d5db", borderRadius: "9999px", padding: "6px 12px", fontSize: "12px", color: "#1f2937" }}>
+                        <span
+                            style={{
+                                width: "12px",
+                                height: "12px",
+                                border: "2px solid #cbd5e1",
+                                borderTopColor: "#2563eb",
+                                borderRadius: "9999px",
+                                display: "inline-block",
+                                animation: "mdv-igv-spin 0.8s linear infinite",
+                            }}
+                        />
+                        Searching...
+                    </div>
+                </div>
+            ) : null}
+            <style>{`@keyframes mdv-igv-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             {error ? (
                 <div style={{ color: "#b91c1c", padding: "8px", fontSize: "12px" }}>{error}</div>
             ) : null}

@@ -28,6 +28,44 @@ const BASE_TRACK_ID = "_mdv_base_track";
 const DEFAULT_MAX_INITIAL_FEATURES = 500000;
 const DEFAULT_BASE_TRACK_VISIBILITY_WINDOW = 300000000;
 
+function parseCoordinate(value: unknown): number | null {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === "string") {
+        const normalized = value.replaceAll(",", "").trim();
+        if (!normalized) return null;
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+}
+
+function toSafeLocusString(location: IGVBrowserLocation | undefined): string | null {
+    const locations = Array.isArray(location) ? location : location ? [location] : [];
+    const loci: string[] = [];
+
+    for (const loc of locations) {
+        if (!loc || typeof loc.chr !== "string" || !loc.chr.trim()) {
+            continue;
+        }
+        const start = parseCoordinate(loc.start);
+        const end = parseCoordinate(loc.end);
+        if (start === null || end === null) {
+            continue;
+        }
+
+        const s = Math.max(1, Math.floor(Math.min(start, end)));
+        const e = Math.max(s, Math.floor(Math.max(start, end)));
+        if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) {
+            continue;
+        }
+        loci.push(`${loc.chr}:${s}-${e}`);
+    }
+
+    return loci.length ? loci.join(" ") : null;
+}
+
 function getPathWithoutQueryOrHash(url: string): string {
     return url.split(/[?#]/, 1)[0] ?? url;
 }
@@ -48,22 +86,7 @@ function appendSuffixBeforeQueryOrHash(url: string, suffix: string): string {
     return `${path}${suffix}${query}${hash}`;
 }
 
-function normalizeFeatureColor(value: unknown): string | undefined {
-    if (typeof value === "string") {
-        return value;
-    }
-    if (Array.isArray(value) && value.length >= 3) {
-        const [r, g, b] = value;
-        if (
-            typeof r === "number" &&
-            typeof g === "number" &&
-            typeof b === "number"
-        ) {
-            return `rgb(${r},${g},${b})`;
-        }
-    }
-    return undefined;
-}
+
 
 
 import { observable, runInAction } from "mobx";
@@ -83,6 +106,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     private _pendingNameSpec: { current_value: string } | null = null;
     private _pendingUrlSpec: { current_value: string } | null = null;
     private _trackStatusSpec: { current_value: string } | null = null;
+    private _setSearchPending: ((pending: boolean) => void) | null = null;
 
     constructor(dataStore: DataStore, div: string | HTMLDivElement, config: IGVBrowserConfig) {
         config.view_margins = config.view_margins || { type: "percentage", value: 20 };
@@ -140,20 +164,31 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
             if (this._trackStatusSpec) this._trackStatusSpec.current_value = "";
         });
     }
+
+    setSearchPendingHandler(handler: ((pending: boolean) => void) | null) {
+        this._setSearchPending = handler;
+    }
+
+    private setSearchPending(pending: boolean) {
+        this._setSearchPending?.(pending);
+    }
     //gets all the features in format igv understands chr,start and end
     //Also id which is the datastore index
     getAllFeatures(){
-        const rows = new Array(this.dataStore.size).fill(0).map((_, i) => {
-            const row = this.dataStore.getRowAsObject(i, this.dataStore.columnsWithData || this.locationFields);
-            return { ...row, __index__: i };
-        });
+        const rows: Record<string, unknown>[] = new Array(this.dataStore.size);
+        const columns = [...this.locationFields];
+   
+        for (let i = 0; i < this.dataStore.size; i++) {
+            rows[i] = this.dataStore.getRowAsObject(i, columns) as Record<string, unknown>;
+        }
         return buildBaseFeatures(rows, this.locationFields, this.isSvs, this.config.max_initial_features || DEFAULT_MAX_INITIAL_FEATURES).features;
     }
 
 
     getInitialBrowserConfig() {
-        this.baseFeatures = this.getAllFeatures();
-       
+        if (this.baseFeatures.length === 0) {
+            this.baseFeatures = this.getAllFeatures();
+        }
         const initialConfig = {
             genome: this.dataStore.genome?.name || this.dataStore.genome?.id || "hg38",
             ...(this.config.igv_config || {}),
@@ -177,8 +212,9 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
             ],
         } as any;
 
-        if (this.config.location) {
-            initialConfig.locus = `${this.config.location.chr}:${this.config.location.start}-${this.config.location.end}`;
+        const safeLocus = toSafeLocusString(this.config.location);
+        if (safeLocus) {
+            initialConfig.locus = safeLocus;
         }
         initialConfig.__mdvDataStore = this.dataStore;
         return initialConfig;
@@ -287,27 +323,63 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         void this.updateMDVFeatures();
     }
 
-    onDataHighlighted(data: any) {
+    async onDataHighlighted(data: any) {
         if (data.source === this || !this.locationFields.length || !data?.indexes?.length) {
             return;
         }
-        const row = this.dataStore.getRowAsObject(data.indexes[0], this.locationFields);
+        const row = this.dataStore.getRowAsObject(data.indexes[0], this.locationFields) as Record<string, unknown>;
+        const chrValue = row[this.locationFields[0]] as string;
+        const startValue = (row[this.locationFields[1]]) as number;
+        const endValue = (row[this.locationFields[2]]) as number;
+      
         const rawLocation = locationFromFieldValues(
             {
-                chr: row[this.locationFields[0]],
-                start: row[this.locationFields[1]],
-                end: row[this.locationFields[2]],
-                chr2: this.isSvs ? row[this.locationFields[3]] : undefined,
+                chr: chrValue,
+                start: startValue,
+                end: endValue,
+                chr2: this.isSvs ? row[this.locationFields[3]] as string: undefined,
             },
             this.isSvs,
         );
         if (!rawLocation) return;
-        const nextLocation = applyViewMargins(rawLocation, this.config.view_margins!);
+        const locations = Array.isArray(rawLocation) ? rawLocation : [rawLocation];
+        const nextLocations = locations.map((loc) => applyViewMargins(loc, this.config.view_margins!));
+        let nextLocation: IGVBrowserLocation;
+        if (nextLocations.length === 1) {
+            const first = nextLocations[0];
+            if (!first) return;
+            nextLocation = first;
+        } else {
+            const first = nextLocations[0];
+            const second = nextLocations[1];
+            if (!first || !second) return;
+            nextLocation = [first, second];
+        }
+        const searchLocus = toSafeLocusString(nextLocation);
+        const roiSource = locations[0];
         action(() => {
             this.config.location = nextLocation;
         })();
-        if (this.browser?.search) {
-            void this.browser.search(`${nextLocation.chr}:${nextLocation.start}-${nextLocation.end}`);
+
+        const features = [{...roiSource,name:"highlight1",color:"blue"}];
+        if (nextLocations.length === 2) {
+            features.push({chr:nextLocations[1].chr,start:endValue,end:endValue,name:"highlight",color:"blue"});
+        }
+        if (this.browser?.search && searchLocus) {
+            this.setSearchPending(true);
+            try {
+                await this.browser.search(searchLocus);
+                this.browser.clearROIs();
+                const highlight ={
+                    name:"highlight",
+                    type:"annotation",
+                    color: "rgba(68, 134, 247, 0.25)",
+                    features: features
+                };
+                this.browser.loadROI(highlight);
+            } finally {
+                this.setSearchPending(false);
+            }
         }
     }
 
