@@ -1,0 +1,11 @@
+﻿Path,Dataset,Question for evaluation,Complexity score
+/app/mdv/TAURUS_restored,TAURUS,Show a UMAP plot colored by patient ID.,2
+/app/mdv/TAURUS_restored,TAURUS,Look at the distribution of gene expression for RPS27 on the UMAP plot filtered by B cells.,5
+/app/mdv/TAURUS_restored,TAURUS,Create a heat map depicting TNFRSF13C MS4A1 and CD22 across different cell types.,2
+/app/mdv/TAURUS_restored,TAURUS,Compare inflammation severity scores across different patients filtered by disease and remission status.,3
+/app/mdv/TAURUS_restored,TAURUS,Does the IFN-response gene signature (ISG15 CXCL10) show enrichment in any Myeloid cell subsets after treatment in non remission patients?,5
+/app/mdv/TAURUS_restored,TAURUS,What changes in cell states occur between baseline and post-treatment?,2
+/app/mdv/TAURUS_restored,TAURUS,For each demographic category show the frequency of treatment responses.,3
+/app/mdv/TAURUS_restored,TAURUS,Show proportions of IFN-responsive fibroblast cells across inflamed and non-inflamed Crohn's disease samples.,4
+/app/mdv/TAURUS_restored,TAURUS,Compare the relative proportions of B cell subtypes before and after anti-TNF treatment in remission and nonremission patients.,4
+/app/mdv/TAURUS_restored,TAURUS,Track how plasmablast levels using expression markers such as CD19 and CD27 change from before to after treatment in Crohn's disease patients for patients in remission and non remission.,5

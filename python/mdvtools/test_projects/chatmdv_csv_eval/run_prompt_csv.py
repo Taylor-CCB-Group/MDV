@@ -50,17 +50,30 @@ Outputs
 
 - **Benchmark summary JSON** (``benchmark_summary_<stem>_<timestamp>.json``): run metadata
   (``run_id``, ``run_completed_at_utc``, ``run_wall_seconds_total``, ``run_cli_limit``,
-  ``run_artifacts_base_dir``), artifact paths, ``totals``, and ``by_complexity``.
+  ``run_artifacts_base_dir``), artifact paths, ``totals`` (including ``worker_sigkill_rows``
+  and ``row_isolation_subprocess``), and ``by_complexity``.
 
 - **Failures JSONL** (``failures_<stem>_<timestamp>.jsonl``): written only if at least one
   row failed; same schema as a failed row in the details JSONL (quick filter).
 
+Row isolation (OOM recovery)
+------------------------------
+
+By default each benchmark row runs in a **child Python process**. If the OS OOM killer
+stops that child with **SIGKILL**, the parent records ``exit_code`` **3** with a
+``failure_reason`` explaining likely OOM and **continues** with the next row. Use
+``--in-process-rows`` to run everything in one process (faster imports, but a single OOM
+kill ends the whole CSV run). Worker subprocess failures before returning JSON use
+``exit_code`` **4**.
+
 Use ``--artifacts-dir`` to persist per-row ``generated_code.py`` / ``result.json``
 (see ``mdvtools.llm.chat_cli``).
 
-Per-row ``exit_code`` matches ``chat_cli.run_chat_once`` (0 success, 1 logical failure,
-2 exception). Process exit: **0** if all rows succeeded, **1** if any row failed,
-**2** only for bad paths or empty CSV header.
+Per-row ``exit_code`` is ``chat_cli.run_chat_once`` semantics (**0** success, **1**
+logical failure, **2** exception) when the worker returns normally; **3** worker killed
+by signal (SIGKILL is the usual Linux OOM case), **4** worker handshake/bootstrap failure.
+Process exit: **0** if all rows succeeded, **1** if any row failed, **2** only for bad
+paths or empty CSV header.
 """
 
 from __future__ import annotations
@@ -70,16 +83,23 @@ import csv
 import json
 import os
 import re
+import signal
+import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 _PY_ROOT = Path(__file__).resolve().parents[3]
+_SCRIPT_PATH = Path(__file__).resolve()
 if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
+
+# SIGKILL is not always exposed on all platforms (e.g. some Windows builds).
+_SIGKILL = getattr(signal, "SIGKILL", 9)
 
 
 EXCERPT_MAX_LEN = 4000
@@ -220,6 +240,15 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Process at most N data rows after the header (for smoke tests).",
     )
+    parser.add_argument(
+        "--in-process-rows",
+        action="store_true",
+        help=(
+            "Run each CSV row in the main Python process (lower overhead). "
+            "If the OS OOM-kills the process, the entire CSV run stops; default is one "
+            "worker subprocess per row so SIGKILL is recorded and the run continues."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -243,9 +272,204 @@ def _complexity_sort_key(k: str) -> tuple[int, str]:
         return (1, k)
 
 
+def _synthetic_worker_failure(
+    *,
+    project_path: str,
+    message: str,
+    stderr_excerpt: str = "",
+) -> dict[str, object]:
+    cap = stderr_excerpt.strip()
+    return {
+        "success": False,
+        "project_path": project_path,
+        "views_file": str(Path(project_path).expanduser().resolve() / "views.json"),
+        "view_name": None,
+        "message": message,
+        "debug_output_dir": None,
+        "block_timings": {},
+        "captured_output": cap,
+        "duration_seconds": 0.0,
+        "view_snapshot_present": False,
+        "chart_count": 0,
+        "verification": "",
+        "needs_refresh": False,
+    }
+
+
+def _signal_label(sig_num: int) -> str:
+    if hasattr(signal, "strsignal"):
+        try:
+            label = signal.strsignal(sig_num)
+            if label:
+                return label
+        except Exception:
+            pass
+    return f"signal {sig_num}"
+
+
+def _csv_eval_worker_main() -> int:
+    """stdin: one JSON object with project_path, prompt, optional output_dir. stdout: one JSON line."""
+    try:
+        raw_in = sys.stdin.read()
+        payload = json.loads(raw_in)
+    except Exception as exc:
+        sys.stdout.write(
+            json.dumps({"worker_bootstrap_error": str(exc), "traceback": traceback.format_exc()})
+            + "\n"
+        )
+        sys.stdout.flush()
+        return 1
+
+    project_path = str(payload.get("project_path") or "")
+    prompt = str(payload.get("prompt") or "")
+    output_dir = payload.get("output_dir")
+    out_dir: str | None = str(output_dir) if output_dir else None
+
+    from mdvtools.llm.chat_cli import run_chat_once
+
+    try:
+        result, exit_code = run_chat_once(
+            project_path=project_path,
+            prompt=prompt,
+            output_dir=out_dir,
+            view_name=None,
+        )
+    except Exception as exc:
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "worker_error": str(exc),
+                    "traceback": traceback.format_exc(),
+                    "project_path": project_path,
+                }
+            )
+            + "\n"
+        )
+        sys.stdout.flush()
+        return 1
+
+    sys.stdout.write(json.dumps({"result": result, "exit_code": exit_code}, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+    return 0
+
+
+def _run_chat_row_subprocess(
+    *,
+    project_path: str,
+    prompt: str,
+    output_dir: str | None,
+) -> tuple[dict[str, object], int, str]:
+    """Run ``run_chat_once`` in a child process.
+
+    Returns ``(result_dict, row_exit_code, termination_tag)`` where ``termination_tag`` is
+    ``\"\"`` for a normal worker handshake, ``\"sigkill\"`` when the child was SIGKILL'd
+    (common for Linux OOM), or ``\"signal_other\"`` for another fatal signal.
+    """
+    payload = {"project_path": project_path, "prompt": prompt, "output_dir": output_dir}
+    cmd = [sys.executable, str(_SCRIPT_PATH), "--csv-eval-worker"]
+    try:
+        completed = subprocess.run(
+            cmd,
+            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            capture_output=True,
+            check=False,
+            cwd=str(_PY_ROOT),
+        )
+    except OSError as exc:
+        fail = _synthetic_worker_failure(
+            project_path=project_path,
+            message=f"Failed to spawn CSV eval worker subprocess: {exc}",
+        )
+        return fail, 4, ""
+
+    rc = completed.returncode
+    stderr_txt = (completed.stderr or b"").decode("utf-8", errors="replace")
+    stdout_txt = (completed.stdout or b"").decode("utf-8", errors="replace").strip()
+
+    if rc < 0:
+        sig = -rc
+        if sig == _SIGKILL:
+            msg = (
+                "Worker subprocess was killed with SIGKILL (signal 9). On Linux this "
+                "commonly indicates the OOM killer stopped the child after memory pressure; "
+                "the CSV runner continues with the next row."
+            )
+            tag = "sigkill"
+        else:
+            msg = f"Worker subprocess was killed ({_signal_label(sig)})."
+            tag = "signal_other"
+        if stderr_txt.strip():
+            msg += " Worker stderr excerpt:\n" + _excerpt_tail(stderr_txt, EXCERPT_MAX_LEN)
+        fail = _synthetic_worker_failure(project_path=project_path, message=msg, stderr_excerpt=stderr_txt)
+        return fail, 3, tag
+
+    def _parse_worker_stdout(text: str) -> dict[str, object] | None:
+        if not text:
+            return None
+        for line in reversed(text.splitlines()):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict):
+                return obj
+        return None
+
+    parsed = _parse_worker_stdout(stdout_txt)
+
+    if rc != 0:
+        hint = ""
+        if isinstance(parsed, dict):
+            if "worker_bootstrap_error" in parsed:
+                hint = str(parsed.get("worker_bootstrap_error") or "")
+            elif "worker_error" in parsed:
+                hint = str(parsed.get("worker_error") or "")
+        msg = f"Worker subprocess exited with code {rc} before returning a usable result."
+        if hint:
+            msg += f" Detail: {hint}"
+        if stderr_txt.strip():
+            msg += "\nWorker stderr excerpt:\n" + _excerpt_tail(stderr_txt, EXCERPT_MAX_LEN)
+        fail = _synthetic_worker_failure(project_path=project_path, message=msg, stderr_excerpt=stderr_txt)
+        return fail, 4, ""
+
+    if not isinstance(parsed, dict) or "result" not in parsed or "exit_code" not in parsed:
+        excerpt = _excerpt_tail(stdout_txt, 500)
+        msg = (
+            "Worker subprocess returned stdout that is not a valid result payload "
+            f"(stdout length {len(stdout_txt)}; excerpt): {excerpt!r}"
+        )
+        fail = _synthetic_worker_failure(project_path=project_path, message=msg, stderr_excerpt=stderr_txt)
+        return fail, 4, ""
+
+    result_obj = parsed["result"]
+    if not isinstance(result_obj, dict):
+        fail = _synthetic_worker_failure(
+            project_path=project_path,
+            message="Worker JSON payload field 'result' is not an object.",
+            stderr_excerpt=stderr_txt,
+        )
+        return fail, 4, ""
+
+    try:
+        row_exit = int(parsed["exit_code"])
+    except (TypeError, ValueError):
+        fail = _synthetic_worker_failure(
+            project_path=project_path,
+            message=f"Worker JSON payload has invalid exit_code: {parsed.get('exit_code')!r}",
+            stderr_excerpt=stderr_txt,
+        )
+        return fail, 4, ""
+
+    return result_obj, row_exit, ""
+
+
 def main() -> int:
     args = _parse_args()
-    from mdvtools.llm.chat_cli import run_chat_once
+    isolate_rows = not bool(args.in_process_rows)
+
     csv_path = args.csv.expanduser().resolve()
     if not csv_path.is_file():
         print(f"Not found: {csv_path}", file=sys.stderr)
@@ -284,7 +508,8 @@ def main() -> int:
         base_artifacts = base_artifacts.expanduser().resolve()
         base_artifacts.mkdir(parents=True, exist_ok=True)
 
-    with csv_path.open(newline="", encoding="utf-8") as f:
+    # utf-8-sig strips a leading UTF-8 BOM so the first column is "Path", not "\ufeffPath"
+    with csv_path.open(newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         if not reader.fieldnames:
             print("CSV has no header row.", file=sys.stderr)
@@ -302,6 +527,7 @@ def main() -> int:
     complexity_pairs: dict[str, list[tuple[bool, bool]]] = defaultdict(list)
     failure_count = 0
     failure_payloads: list[dict[str, object]] = []
+    worker_sigkill_rows = 0
 
     comp_header = _find_header(raw_fieldnames, "complexity")
 
@@ -358,12 +584,36 @@ def main() -> int:
         if base_artifacts is not None:
             run_out = base_artifacts / f"row_{idx:04d}_{_slug(question)}"
 
-        result, exit_code = run_chat_once(
-            project_path=path,
-            prompt=question,
-            output_dir=str(run_out) if run_out else None,
-            view_name=None,
-        )
+        out_dir_str = str(run_out) if run_out else None
+        term_tag = ""
+        if isolate_rows:
+            result, exit_code, term_tag = _run_chat_row_subprocess(
+                project_path=path,
+                prompt=question,
+                output_dir=out_dir_str,
+            )
+            if term_tag == "sigkill":
+                worker_sigkill_rows += 1
+                print(
+                    f"[OOM?] row={idx}: worker subprocess was SIGKILL'd (Linux OOM killer "
+                    f"often uses SIGKILL). Recorded as exit_code=3; continuing.",
+                    file=sys.stderr,
+                )
+            elif term_tag == "signal_other":
+                print(
+                    f"[WORKER] row={idx}: worker subprocess was killed by a signal other than "
+                    f"SIGKILL; recorded as exit_code=3; continuing.",
+                    file=sys.stderr,
+                )
+        else:
+            from mdvtools.llm.chat_cli import run_chat_once as run_chat_once_fn
+
+            result, exit_code = run_chat_once_fn(
+                project_path=path,
+                prompt=question,
+                output_dir=out_dir_str,
+                view_name=None,
+            )
         success = bool(result.get("success"))
         message = str(result.get("message", ""))
         cap = str(result.get("captured_output", ""))
@@ -476,6 +726,8 @@ def main() -> int:
             "exec_success_rate": round(ok / n, 6) if n else 0.0,
             "view_has_charts_count": view_charts_ok,
             "view_has_charts_rate": round(view_charts_ok / n, 6) if n else 0.0,
+            "worker_sigkill_rows": worker_sigkill_rows,
+            "row_isolation_subprocess": isolate_rows,
         },
         "by_complexity": by_complexity,
     }
@@ -499,6 +751,12 @@ def main() -> int:
     report_dir = results_path.parent.resolve()
     print(f"Processed {n} row(s): {ok} success, {failure_count} failure ({rate:.1f}% success rate)")
     print(f"View with charts (structural): {view_charts_ok}/{n} ({view_rate:.1f}%)")
+    if isolate_rows and worker_sigkill_rows:
+        print(
+            f"Worker SIGKILL rows (likely OOM; see per-row failure_reason / exit_code=3): "
+            f"{worker_sigkill_rows}",
+            file=sys.stderr,
+        )
 
     print("Output directory (persisted artifacts):")
     print(f"  {report_dir}")
@@ -538,4 +796,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--csv-eval-worker":
+        sys.exit(_csv_eval_worker_main())
     sys.exit(main())
