@@ -75,6 +75,8 @@ export async function deleteProjectViaApi(request: APIRequestContext, projectId:
 
 export type ProjectListSummary = {
     id: number | string;
+    name?: string;
+    path?: string;
 };
 
 export async function listProjectsViaApi(request: APIRequestContext): Promise<ProjectListSummary[]> {
