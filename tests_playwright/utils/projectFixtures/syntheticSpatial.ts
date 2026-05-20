@@ -126,7 +126,6 @@ export async function createTemporaryProjectViaSyntheticSpatial(
         const projectsAfter = await listProjectsViaApi(page.request);
         const createdProject =
             projectsAfter.find((project) => project.name === nameSegment) ??
-            projectsAfter.find((project) => project.path === projectPath) ??
             projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
         expect(createdProject).toBeTruthy();
         if (!createdProject) {

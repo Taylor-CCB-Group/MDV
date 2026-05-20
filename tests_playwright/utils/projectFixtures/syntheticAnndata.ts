@@ -157,9 +157,8 @@ export async function createTemporaryProjectViaSyntheticAnndata(
 
         const projectsAfter = await listProjectsViaApi(page.request);
         const createdProject =
-            projectsAfter.find((project) => project.name === nameSegment) ??
-            projectsAfter.find((project) => project.path === projectPath) ??
-            projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
+            projectsAfter.find((project) => !projectIdsBefore.has(String(project.id))) ??
+            projectsAfter.find((project) => project.name === nameSegment);
         expect(createdProject).toBeTruthy();
         if (!createdProject) {
             throw new Error(
