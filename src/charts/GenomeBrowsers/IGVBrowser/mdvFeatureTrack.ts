@@ -587,13 +587,15 @@ class MdvFeatureTrack extends igv.TrackBase {
     }
 
     async updateMDVFeatures() {
-        const viewport = this.trackView?.viewports?.[0];
-        if (!viewport) {
+        const viewports = this.trackView?.viewports;
+        if (!viewports || viewports.length === 0) {
             return;
         }
-        viewport.featureCache = undefined;
-        await viewport.loadFeatures();
-        viewport.repaint();
+        await Promise.all(viewports.map(async (viewport) => {
+            viewport.featureCache = undefined;
+            await viewport.loadFeatures();
+            viewport.repaint();
+        }));
     }
 
     /*refresh() {
@@ -619,7 +621,19 @@ class StandaloneCramTrack extends igv.TrackBase {
         this.config = config;
         this.browser = browser;
         this.config.format = "cram"; // Explicitly set format to CRAM
-        this.config.indexURL = config.indexURL || `${config.url}.crai`; // Auto-generate CRAI URL if not provided
+        if (!config.indexURL && config.url) {
+            // Auto-generate CRAI URL preserving query and hash
+            try {
+                const url = new URL(config.url, window.location.href);
+                url.pathname = url.pathname + '.crai';
+                this.config.indexURL = url.href;
+            } catch (e) {
+                // Fallback for relative URLs or parsing errors
+                this.config.indexURL = `${config.url}.crai`;
+            }
+        } else {
+            this.config.indexURL = config.indexURL;
+        }
     }
 
     async postInit() {

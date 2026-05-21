@@ -238,9 +238,10 @@ const SVCircosPlotComponent = observer(()=>{
     };
 
     const clicked = (info, event) => {
-      if (hoveredIndex !==-1){
-        chart.dataStore.dataHighlighted([hoveredIndex],chart);
-      } 
+      if (info && info.index !== undefined && info.index >= 0){
+        chart.dataStore.dataHighlighted([info.index],chart);
+        setHoveredIndex(info.index);
+      }
     }
     
         const zoomLevel = Array.isArray(viewState.zoom) ? viewState.zoom[0] : 0;

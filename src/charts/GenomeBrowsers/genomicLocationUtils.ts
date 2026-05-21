@@ -23,7 +23,14 @@ export function getLocationFieldsFromGenome(genome: any): string[] | null {
     }
     if (genome?.svs?.sv_columns) {
         const cols = genome.svs.sv_columns;
-        return [cols.chr1, cols.pos1, cols.pos2, cols.chr2, cols.svtype,cols.length];
+        const result = [cols.chr1, cols.pos1, cols.pos2, cols.chr2];
+        if (cols.svtype !== undefined) {
+            result.push(cols.svtype);
+        }
+        if (cols.length !== undefined) {
+            result.push(cols.length);
+        }
+        return result;
     }
     return null;
 }

@@ -121,7 +121,6 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                 ? config.base_track_visibility_window
                 : DEFAULT_BASE_TRACK_VISIBILITY_WINDOW;
         super(dataStore, div, config, IGVBrowserComponent);
-        console.log("IGVBrowser config:", toJS(this.config));
         this.locationFields = getLocationFieldsFromGenome(this.dataStore.genome) || [];
         this.isSvs = Boolean(this.dataStore.genome?.svs?.sv_columns);
        
@@ -175,13 +174,15 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     //gets all the features in format igv understands chr,start and end
     //Also id which is the datastore index
     getAllFeatures(){
-        const rows: Record<string, unknown>[] = new Array(this.dataStore.size);
+        const max = this.config.max_initial_features || DEFAULT_MAX_INITIAL_FEATURES;
+        const numRows = Math.min(this.dataStore.size, max);
+        const rows: Record<string, unknown>[] = new Array(numRows);
         const columns = [...this.locationFields];
-   
-        for (let i = 0; i < this.dataStore.size; i++) {
+
+        for (let i = 0; i < numRows; i++) {
             rows[i] = this.dataStore.getRowAsObject(i, columns) as Record<string, unknown>;
         }
-        return buildBaseFeatures(rows, this.locationFields, this.isSvs, this.config.max_initial_features || DEFAULT_MAX_INITIAL_FEATURES).features;
+        return buildBaseFeatures(rows, this.locationFields, this.isSvs, max).features;
     }
 
 
@@ -327,11 +328,14 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         if (data.source === this || !this.locationFields.length || !data?.indexes?.length) {
             return;
         }
+        if (!this.config.highlight_selected_region) {
+            return;
+        }
         const row = this.dataStore.getRowAsObject(data.indexes[0], this.locationFields) as Record<string, unknown>;
         const chrValue = row[this.locationFields[0]] as string;
         const startValue = (row[this.locationFields[1]]) as number;
         const endValue = (row[this.locationFields[2]]) as number;
-      
+
         const rawLocation = locationFromFieldValues(
             {
                 chr: chrValue,

@@ -47,7 +47,10 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
     getSettings() {
         const settings = super.getSettings();
         const c = this.config;
-        const vm = c.view_margins || {type:"fixed_length", value:1000}; 
+        // Initialize view_margins if not present
+        if (!c.view_margins) {
+            c.view_margins = {type:"fixed_length", value:1000};
+        }
         return [
             ...settings,
             g({
@@ -70,18 +73,18 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
             {
             label: "View margin length",
             type: "text",
-            current_value: vm.value.toString(),
+            current_value: c.view_margins.value.toString(),
             func: (x) => {
                 let n = Number.parseInt(x);
                 n = Number.isNaN(n)
-                    ? vm.type === "percentage"
+                    ? c.view_margins.type === "percentage"
                         ? 20
                         : 1000
                     : n;
-                c.view_margins = { type: vm.type, value: n };
+                c.view_margins = { type: c.view_margins.type, value: n };
             },
         }
-       
+
         ),
         g({
             label: "View margin type",
@@ -91,9 +94,9 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
                 ["absolute (bp)", "absolute"],
                 ["Fixed Length (bp)", "fixed_length"],
             ],
-            current_value: vm.type,
+            current_value: c.view_margins.type,
             func: (x) => {
-                c.view_margins = { type: x as "percentage" | "absolute" | "fixed_length", value: vm.value };
+                c.view_margins = { type: x as "percentage" | "absolute" | "fixed_length", value: c.view_margins.value };
             },
         })
         ];

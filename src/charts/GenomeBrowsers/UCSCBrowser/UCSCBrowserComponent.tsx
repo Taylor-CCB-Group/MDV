@@ -41,16 +41,17 @@ const UCSCBrowserComponent = observer(() => {
 
     const handlePan = (direction: "left" | "right") => {
         if (!config.location) return;
-       
+
         const loc = config.location;
         if (!loc) return;
-        const currentLength = loc.end - loc.start; 
+        const currentLength = loc.end - loc.start;
         const shift = Math.round(currentLength * 0.25); // Pan by 25% of current view
         if (direction === "left") {
-            config.location= {chr: loc.chr, start: Math.max(0, loc.start - shift), end: loc.end - shift};
-            loc.end = loc.end - shift;
+            const newStart = Math.max(0, loc.start - shift);
+            const newEnd = newStart + currentLength;
+            config.location = {chr: loc.chr, start: newStart, end: newEnd};
         } else {
-            config.location= {chr: loc.chr, start: loc.start + shift, end: loc.end + shift};
+            config.location = {chr: loc.chr, start: loc.start + shift, end: loc.end + shift};
         }
 
     };

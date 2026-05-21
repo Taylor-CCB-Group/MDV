@@ -10,6 +10,7 @@ import requests
 import os
 import sys
 import zlib
+import logging
 from urllib.parse import urlencode
 from flask import (
     Flask,
@@ -28,11 +29,15 @@ from mdvtools.server_utils import (
     add_safe_headers,
 )
 
+logger = logging.getLogger(__name__)
+
 ALLOWED_UCSC_HOSTS = {
     "genome.ucsc.edu",
     "genome-euro.ucsc.edu",
     "genome-asia.ucsc.edu",
 }
+
+MAX_UCSC_BYTES = 10 * 1024 * 1024  # 10MB max for UCSC image responses
 
 def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     """
@@ -176,30 +181,52 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
             params = request.args.to_dict()
             ucsc_host = params.pop("ucscHost", "genome.ucsc.edu")
             if ucsc_host not in ALLOWED_UCSC_HOSTS:
-                return f"Invalid UCSC host: {ucsc_host}", 400
+                logger.warning(f"Rejected invalid UCSC host: {ucsc_host}")
+                return "Invalid host", 400
 
             # Use hgRenderTracks for image generation on the selected UCSC mirror.
             base_url = f"https://{ucsc_host}/cgi-bin/hgRenderTracks"
             ucsc_url = f"{base_url}?{urlencode(params)}"
-            
+
             headers = {
                 'User-Agent': 'Mozilla/5.0 (compatible; MDV-Proxy/1.0)',
             }
-            
-            response = requests.get(ucsc_url, headers=headers, timeout=30)
+
+            response = requests.get(ucsc_url, headers=headers, timeout=30, stream=True)
             response.raise_for_status()
-            
+
+            # Check content type
+            content_type = response.headers.get("Content-Type", "")
+            if not content_type.startswith("image/"):
+                logger.warning(f"Non-image content type from UCSC: {content_type}")
+                response.close()
+                return "Unsupported media type", 415
+
+            # Read response with size limit
+            content_chunks = []
+            total_bytes = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UCSC_BYTES:
+                    logger.warning(f"UCSC response exceeded size limit: {total_bytes} bytes")
+                    response.close()
+                    return "Upstream response too large", 502
+                content_chunks.append(chunk)
+
+            content = b''.join(content_chunks)
+            logger.info(f"Fetched UCSC image from: {ucsc_host}, size: {total_bytes} bytes")
+
             # Return the image
-            image_response = make_response(response.content)
-            image_response.headers['Content-Type'] = 'image/png'
-            #image_response.headers['Cache-Control'] = 'public, max-age=3600'
-            print(f"Fetched UCSC image from: {ucsc_url}")
+            image_response = make_response(content)
+            image_response.headers['Content-Type'] = content_type
             return image_response
-            
+
         except requests.exceptions.RequestException as e:
-            return f"Error fetching image from UCSC: {str(e)}", 502
+            logger.error(f"Upstream fetch failed for UCSC: {e}")
+            return "Upstream fetch failed", 502
         except Exception as e:
-            return f"Image fetch error: {str(e)}", 500
+            logger.exception(f"Internal error in ucsc_image: {e}")
+            return "Internal server error", 500
         
     return app
     

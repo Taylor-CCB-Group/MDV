@@ -51,13 +51,17 @@ BaseChart.types["sv_circos_plot"] = {
     class: SVCircosPlot,
     //check the datasource can support svs
     required:(ds)=>{
-        return ds.genome?.svs
+        return ds.genome?.svs && ds.genome?.chromosomes
     },
     //add the core sv columns to params
     init:(config,dataSource)=>{
         const cols= dataSource.genome?.svs?.sv_columns;
         if (!cols){
             throw Error("Trying to add SVCircosPlot, but No SV columns found in datasource genome metadata")
+        }
+        const chromosomes = dataSource.genome?.chromosomes;
+        if (!chromosomes || Object.keys(chromosomes).length === 0){
+            throw Error("Trying to add SVCircosPlot, but No chromosome metadata found in datasource genome")
         }
         config.param=[cols["pos1"],cols["chr1"],cols["pos2"],cols["chr2"],cols["svtype"]];
     },

@@ -14,7 +14,7 @@ from math import ceil
 import h5py
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 from werkzeug.utils import secure_filename
 import numpy as np
 from .mdvproject import MDVProject,create_bed_gz_file
@@ -538,7 +538,7 @@ def get_matrix(matrix,main_names=None,mod_names=None) -> tuple[scipy.sparse.csc_
 
 
 
-def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genome: str ="hg38" ,extra_info: list = None,
+def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genome: str ="hg38" ,extra_info: Optional[List[str]] = None,
                              include_sample_names: bool = True, exclude_draft_chromosomes: bool = True):
     # SV VCF  files have an END field in the INFO column
     # however pysam seems to convert this to a stop field in the record

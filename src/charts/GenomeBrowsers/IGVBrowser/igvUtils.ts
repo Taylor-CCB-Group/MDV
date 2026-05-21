@@ -83,17 +83,20 @@ export function buildBaseFeatures(
 
         if (isSvs && locationFields.length >= 4) {
             const chr2 = row[locationFields[3]];
-            const svtype = typeof row.svtype === "string" ? row.svtype : undefined;
+            const svTypeField = locationFields[4];
+            const svLengthField = locationFields[5];
+            const svtype = svTypeField && typeof row[svTypeField] === "string" ? row[svTypeField] : undefined;
             const normalizedSvType = typeof svtype === "string" ? svtype.trim().toUpperCase() : "";
-            const style = getStructuralVariantStyle(svtype);
-            
+            const style = getStructuralVariantStyle(normalizedSvType);
+            const length = svLengthField && Number.isFinite(Number(row[svLengthField])) ? Number(row[svLengthField]) : undefined;
+
             const baseFeature = {
                 id: rowId,
                 chr2: typeof chr2 === "string" ? chr2 : undefined,
                 pos1: startValue,
                 pos2: endValue,
                 svtype,
-                length: Number.isFinite(Number(row.length)) ? Number(row.length) : undefined,
+                length,
                 name: svtype,
                 color: style.fillStyle,
             };
