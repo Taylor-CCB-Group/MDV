@@ -1208,8 +1208,8 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            expect(mockOrderedParamColumns[1].values).toContain("Filled");
-            expect(Array.from(mockOrderedParamColumns[1].data as ArrayLike<number>)).toEqual([3, 1, 3]);
+            expect(mockOrderedParamColumns[1].values).toEqual(["Bob", "Filled"]);
+            expect(Array.from(mockOrderedParamColumns[1].data as ArrayLike<number>)).toEqual([1, 0, 1]);
             expect(mockDataStore.dataChanged).toHaveBeenCalledWith(["name"]);
         });
     });
