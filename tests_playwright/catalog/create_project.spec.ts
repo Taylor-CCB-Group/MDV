@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { isWorktreeFrontendForPlaywright } from "../utils/helpers";
 import {
     gotoPath,
     mockApiRoot,
@@ -8,7 +9,7 @@ import {
 
 test("create project navigates to project view", async ({ page }) => {
     test.skip(
-        (process.env.TEST_BASE_URL || "").includes("5055"),
+        !isWorktreeFrontendForPlaywright(),
         "Create-project card is hidden in production-style builds; run this spec against local Vite where import.meta.env.PROD is false.",
     );
 
@@ -19,6 +20,15 @@ test("create project navigates to project view", async ({ page }) => {
     await page.route("**/create_project", (route) =>
         route.fulfill({ json: { id: "123", name: "New Project" } }),
     );
+    await page.route("**/project/123/datasources.json", (route) =>
+        route.fulfill({ json: [] }),
+    );
+    await page.route("**/project/123/state.json", (route) =>
+        route.fulfill({ json: { all_views: [] } }),
+    );
+    await page.route("**/project/123/views.json", (route) =>
+        route.fulfill({ json: {} }),
+    );
 
     await gotoPath(page);
 
@@ -27,4 +37,6 @@ test("create project navigates to project view", async ({ page }) => {
 
     await page.waitForURL("**/project/123");
     expect(page.url()).toContain("/project/123");
+    await page.waitForFunction(() => Boolean(Reflect.get(window, "mdv")?.chartManager));
+    await expect(page.getByText("Loading project...")).toBeHidden();
 });
