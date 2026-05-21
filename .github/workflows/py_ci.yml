@@ -33,7 +33,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.25"
+          version-file: "python/.uv-version"
           cache-dependency-glob: "**/uv.lock"
 
       - run: uv sync --group dev --group backend --group auth --frozen
@@ -57,7 +57,7 @@ jobs:
       
       - uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.25"
+          version-file: "python/.uv-version"
           cache-dependency-glob: "**/uv.lock"
 
       - run: uv sync --group dev --group backend --group auth --frozen

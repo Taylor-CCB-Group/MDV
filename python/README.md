@@ -20,11 +20,13 @@ c:\path\to\myenv\Scripts\activate.bat
 
 ### Install uv
 
-Install `uv` if it is not already installed. This can be done with:
+Install [uv](https://docs.astral.sh/uv/) if it is not already available (e.g. the dev Docker image includes it):
 
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+
+The version in `python/.uv-version` is what CI uses; match it if you need reproducible lockfile behaviour.
 
 ### Install MDV
 
