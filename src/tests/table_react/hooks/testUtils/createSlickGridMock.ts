@@ -37,6 +37,7 @@ export function createSlickGridMock(): SlickgridReactInstance {
             unsubscribe: vi.fn(),
         })),
         publish: vi.fn(),
+        unsubscribeAll: vi.fn(),
     };
 
     const mockSlickGrid = {

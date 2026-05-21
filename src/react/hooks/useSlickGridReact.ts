@@ -15,6 +15,7 @@ import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
 import type { ColumnRemovalImpact } from "@/charts/types/columnRemoval";
+import type { BaseConfig } from "@/charts/BaseChart";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 import { escapeHtml } from "@/utilities/Utilities";
 
@@ -167,10 +168,24 @@ const useSlickGridReact = () => {
                     sourceChartId: chartId,
                     currentViewName: chartManager.viewManager?.current_view ?? null,
                     allViewNames: chartManager.viewManager?.all_views ?? [],
-                    currentCharts: Object.values(chartManager.charts ?? {}).map((chartInfo) => ({
-                        dataSourceName: chartInfo.dataSource.name,
-                        config: chartInfo.chart.config,
-                    })),
+                    // not in love with this... upstream `chartManager.charts` type could be better.
+                    currentCharts: Object.values(chartManager.charts ?? {}).flatMap((chartInfo) => {
+                        if (!chartInfo || typeof chartInfo !== "object") {
+                            return [];
+                        }
+                        const typedChartInfo = chartInfo as {
+                            dataSource?: { name?: string };
+                            chart?: { config?: unknown };
+                        };
+                        const dataSourceName = typedChartInfo.dataSource?.name;
+                        if (!dataSourceName) {
+                            return [];
+                        }
+                        return [{
+                            dataSourceName,
+                            config: typedChartInfo.chart?.config as BaseConfig,
+                        }];
+                    }),
                     viewLoader: chartManager.viewLoader,
                 })
                 : {
@@ -666,8 +681,9 @@ const useSlickGridReact = () => {
                 enableCellNavigation: true,
                 enableExcelCopyBuffer: true,
                 multiSelect: true,
-                enableRowSelection: true,
-                rowSelectionOptions: {
+                enableSelection: true,
+                selectionOptions: {
+                    selectionType: "row",
                     selectActiveRow: true,
                 },
                 headerMenu: {

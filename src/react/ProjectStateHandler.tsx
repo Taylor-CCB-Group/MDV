@@ -3,6 +3,7 @@ import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import { getPostData } from "@/dataloaders/DataLoaderUtil";
 import { useCallback, useEffect, useState } from "react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import { useChartManager } from "./hooks";
 
 export type ProjectStateHandlerType = {
     root: string;
@@ -16,7 +17,7 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
     const [errorDialogOpen, setErrorDialogOpen] = useState(false);
     const [confirmSave, setConfirmSave] = useState(false);
     const [permissionDenied, setPermissionDenied] = useState(false);
-    const cm = window.mdv.chartManager;
+    const cm = useChartManager();
 
     const saveState = useCallback(async () => {
         if (staticFolder) return;

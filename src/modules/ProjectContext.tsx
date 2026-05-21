@@ -32,7 +32,9 @@ export type Project = {
  * 
  * This can be used to derive the initial state of the project, or called by non-React code to get similar information.
  */
-export function getProjectInfoBase(): ProjectInfoBase {
+function getProjectInfoBaseFromChartManager(
+    chartManagerOverride?: ChartManager,
+): ProjectInfoBase {
     // Derive initial state from window.location and URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const dir = getProjectDirFromLocation();
@@ -47,7 +49,10 @@ export function getProjectInfoBase(): ProjectInfoBase {
     const staticFolder = urlParams.get("static") !== null;
     // this is really projectID in the current implementation - would be good to have name as well (and be able to change it)
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
-    const { chartManager } = window.mdv;
+    const chartManager = chartManagerOverride ?? window.mdv?.chartManager;
+    if (!chartManager) {
+        throw new Error("ChartManager is not initialised.");
+    }
     //! might need to be a bit careful if we end up using this
     const mainApiRoute = normalizeApiRoot(
         chartManager.config.mdv_api_root || getApiRootFromDir(root),
@@ -63,6 +68,10 @@ export function getProjectInfoBase(): ProjectInfoBase {
         mainApiRoute,
         projectApiRoute,
     };   
+}
+
+export function getProjectInfoBase(): ProjectInfoBase {
+    return getProjectInfoBaseFromChartManager();
 }
 
 export function useProjectInfo(): ProjectInfo {
@@ -88,11 +97,15 @@ export async function getProjectName(projectId: number, apiRoot?: string) {
 
 const ProjectContext = createContext<ProjectInfo>(null as any);
 
-export const ProjectProvider = ({ children }: PropsWithChildren) => {
-    const projectConfig = useProjectInfo();
+export const ProjectProvider = ({
+    children,
+    chartManager,
+}: PropsWithChildren<{ chartManager?: ChartManager }>) => {
+    const { buildInfo } = useBuildInfo();
+    const base = getProjectInfoBaseFromChartManager(chartManager);
 
     return (
-        <ProjectContext.Provider value={{ ...projectConfig }}>
+        <ProjectContext.Provider value={{ ...base, buildInfo }}>
             {children}
         </ProjectContext.Provider>
     );

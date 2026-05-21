@@ -216,6 +216,27 @@ def _create_anndata(
     return adata
 
 
+def _add_extra_expression_layers(adata, rng: np.random.Generator) -> None:
+    """Add AnnData layers so MDV gets multiple rows_as_columns subgroups (see convert_scanpy_to_mdv)."""
+    from scipy import sparse as sp
+
+    if sp.issparse(adata.X):
+        adata.layers["synth_layer_a"] = adata.X.copy()
+        b = adata.X.copy()
+        b.data = np.log1p(np.asarray(b.data, dtype=np.float64) + 1e-6).astype(
+            np.float32, copy=False
+        )
+        adata.layers["synth_layer_b"] = b
+        return
+
+    x = np.asarray(adata.X, dtype=np.float32)
+    adata.layers["synth_layer_a"] = np.asarray(x, copy=True)
+    # Distinct from X / synth_layer_a so subgroup switching would be visible in the UI.
+    adata.layers["synth_layer_b"] = (
+        np.log1p(x + 1e-6) * 0.5 + rng.standard_normal(x.shape).astype(np.float32) * 0.01
+    )
+
+
 def _create_spatialdata(
     *,
     n_cells: int,
@@ -223,6 +244,7 @@ def _create_spatialdata(
     image_size: int,
     seed: int,
     coordinate_system_cell_counts: list[int],
+    extra_expression_layers: bool,
 ):
     try:
         import dummy_spatialdata as ds
@@ -240,6 +262,8 @@ def _create_spatialdata(
         seed,
         coordinate_system_cell_counts,
     )
+    if extra_expression_layers:
+        _add_extra_expression_layers(adata, rng=np.random.default_rng(seed))
     image_shape = {"x": image_size, "y": image_size}
     coordinate_system_names = [
         "global" if n_coordinate_systems == 1 else f"coordinate_system_{i}"
@@ -542,6 +566,7 @@ def generate_project(
     n_coordinate_systems: int,
     coordinate_system_cell_counts: list[int],
     force: bool,
+    extra_expression_layers: bool = False,
 ) -> None:
     if n_cells != sum(coordinate_system_cell_counts):
         raise SystemExit("n-cells must match the sum of coordinate-system cell counts")
@@ -567,6 +592,7 @@ def generate_project(
             image_size=image_size,
             seed=seed,
             coordinate_system_cell_counts=coordinate_system_cell_counts,
+            extra_expression_layers=extra_expression_layers,
         )
         sdata.write(str(source_path))
 
@@ -603,6 +629,7 @@ def generate_project(
             "seed": seed,
             "n_coordinate_systems": n_coordinate_systems,
             "coordinate_system_cell_counts": coordinate_system_cell_counts,
+            "extra_expression_layers": extra_expression_layers,
             "cleanup_group": "synth-spatial",
         }
         mdv.state = state
@@ -642,6 +669,14 @@ def parse_args() -> argparse.Namespace:
         help="Output MDV project path. Defaults to a flat ~/mdv/synth-spatial--... path.",
     )
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--extra-expression-layers",
+        action="store_true",
+        help=(
+            "Add two AnnData.layers matrices (synth_layer_a, synth_layer_b) in addition to X, "
+            "so the MDV project has multiple rows_as_columns subgroups for UI / integration testing."
+        ),
+    )
     args = parser.parse_args()
     for flag, value in (
         ("--n-cells", args.n_cells),
@@ -683,6 +718,7 @@ def main() -> None:
         n_coordinate_systems=n_coordinate_systems,
         coordinate_system_cell_counts=coordinate_system_cell_counts,
         force=args.force,
+        extra_expression_layers=args.extra_expression_layers,
     )
 
 

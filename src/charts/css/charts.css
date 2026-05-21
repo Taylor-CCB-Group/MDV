@@ -872,12 +872,11 @@ select, input, textarea {
         white-space: nowrap !important;
     }
 
-    .slick-header-column * {
+    .slick-header-column .slick-column-name,
+    .slick-header-column .mdv-col-name-text {
         height: auto;
-        /* max-width: 100% !important; */
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        flex-grow: 1;
     }
     
     .slick-column-name {
@@ -891,6 +890,11 @@ select, input, textarea {
         font-weight: 600 !important;
     }
 
+    .slick-column-name .mdv-col-name-text {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
     /* Editable icon: never shrink so it's always visible */
     .slick-column-name .mdv-col-editable-icon {
         flex-shrink: 0 !important;
@@ -898,13 +902,39 @@ select, input, textarea {
         margin-right: 2px;
     }
 
+    .slick-header-menu-button,
+    .slick-sort-indicator,
+    .slick-sort-indicator-numbered {
+        flex: 0 0 auto !important;
+        overflow: visible !important;
+    }
+
+    .slick-header-menu-button {
+        top: 50% !important;
+        bottom: auto !important;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        color: var(--text_color) !important;
+        transform: translateY(-50%);
+    }
+
+    .slick-header-menu-button .slick-header-menu-icon {
+        color: currentColor !important;
+        background-color: currentColor !important;
+    }
+
     .slick-header {
         width: 100% !important;
     }
 
     .slick-header-column,
+    .slick-header-columns,
+    .slick-headerrow,
+    .slick-headerrow-columns,
     .slick-header-menu,
-    .slick-pane-header {
+    .slick-pane-header,
+    .slick-pane-header .slick-header {
         background-color: var(--background_color) !important;
         color: var(--text_color) !important;
     }

@@ -17,50 +17,17 @@ import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
 import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
-// this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
+// this is added as a side-effect of importing registerChartModules,
+// then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
 
-//default charts
-import "./HistogramChart.js";
-import "./RowChart.js";
-import "./TableChart.js";
-import "./WGL3DScatterPlot.js";
-import "./WGLScatterPlot.js";
-import "./RingChart.js";
-import "../react/components/TextBoxChartReactWrapper";
-import "./CategoryHeatMap/CategoryHeatmapReactWrapper";
-import "./HeatMap.js";
-import "./ViolinPlot.js";
-import "./BoxPlot.js";
-import "./SankeyChart.js";
-import "./MultiLineChart.js";
-import "./DensityScatterPlot";
-// import "./SelectionDialog.js"; //now replaced with SelectionDialogReact (currently imported as a side-effect of import HmrHack)
-import "./StackedRowChart";
-import "./TreeDiagram";
-import "./CellNetworkChart";
-import "./FlexibleNetworkChart";
-import "./SingleHeatMap";
-import "./VivScatterPlot";
-import "./DotPlot";
-import "./ImageTableChart";
-import "./CellRadialChart";
-import "./RowSummaryBox";
-import "./VivScatterPlot";
-import "./ImageTableChart";
-import "./ImageScatterChart";
-// import "./WordCloudChart"; //todo: this only works in vite build, not webpack
-import "./CustomBoxPlot";
-import "./SingleSeriesChart";
-import "./GenomeBrowser";
-import "./DeepToolsHeatMap";
-import "./SVCircosPlot/SVCircosPlot"
-import "./GenomeBrowsers/UCSCBrowser/UCSCBrowser";
-import "./GenomeBrowsers/IGVBrowser/IGVBrowser";
+// Chart and dialog type registrations via side-effect imports.
+import "./registerChartModules";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action, makeAutoObservable } from "mobx";
+import { makeObservable, observable, action } from "mobx";
+import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -70,6 +37,7 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -83,6 +51,18 @@ const column_orders = {
     text: 2,
     unique: 2,
 };
+
+class MissingColumnDataError extends Error {
+    constructor(dataSource, missingColumns, requestedColumns) {
+        super(
+            `Failed to load required column data for datasource "${dataSource}": ${missingColumns.join(", ")}`,
+        );
+        this.name = "MissingColumnDataError";
+        this.dataSource = dataSource;
+        this.missingColumns = missingColumns;
+        this.requestedColumns = requestedColumns;
+    }
+}
 
 const themes = {
     dark: {
@@ -239,7 +219,7 @@ export class ChartManager {
         // classes: ["ciview-main-menu-bar"],
         this.menuBar = createEl("div", {}, this.containerDiv);
 
-        createMdvPortal(MenuBarWrapper(), this.menuBar);
+        createMdvPortal(createElement(MenuBarWrapper), this.menuBar);
 
         this._setupThemeContextMenu();
 
@@ -1465,6 +1445,7 @@ export class ChartManager {
         const lc = this.config.dataloading || {};
         split = lc.split || 10;
         threads = lc.threads || 2;
+        const retries = lc.retries ?? lc.maxRetries ?? 2;
         this.transactions[id] = {
             callback: callback,
             columns: [],
@@ -1472,6 +1453,8 @@ export class ChartManager {
             failedColumns: [],
             nextColumn: 0,
             columnsLoaded: 0,
+            retryAttempts: {},
+            retries,
             id: id,
         };
         let col_list = [];
@@ -1519,28 +1502,73 @@ export class ChartManager {
             return column_orders[a.datatype] - column_orders[b.datatype];
         });
 
+        let retryColumnFields = [];
+
         //"this.dataLoader is not a function" with e.g. "cell_types"
         this.dataLoader(columns, dataSource, dataStore.size)
             .then((resp) => {
+                const loadedFields = new Set(resp.map((col) => col.field));
                 for (const col of resp) {
                     dataStore.setColumnData(col.field, col.data);
+                }
+                const missingColumns = columns.filter(
+                    (column) => !loadedFields.has(column.field),
+                );
+                if (missingColumns.length) {
+                    console.error("Column data loader omitted requested columns", {
+                        dataSource,
+                        requestedColumns: columns.map((column) => column.field),
+                        missingColumns: missingColumns.map((column) => column.field),
+                    });
+                    retryColumnFields = missingColumns.map((column) => column.field);
                 }
                 trans.columnsLoaded++;
             })
             .catch((error) => {
                 //! this is an error that is not being handled properly... what happens to trans.failedColumns?
                 //! they do get passed to a callback... what does that callback do?
-                console.log(error);
+                console.error("Column data loader failed", {
+                    dataSource,
+                    requestedColumns: columns.map((column) => column.field),
+                    error,
+                });
                 trans.columnsLoaded++;
-                trans.failedColumns.push(columns);
+                retryColumnFields = columns.map((column) => column.field);
             })
             .finally(() => {
+                const retrySet = new Set();
+                const finalFailedColumns = [];
+                for (const field of retryColumnFields) {
+                    const attempts = trans.retryAttempts[field] || 0;
+                    if (attempts < trans.retries) {
+                        trans.retryAttempts[field] = attempts + 1;
+                        retrySet.add(field);
+                    } else {
+                        finalFailedColumns.push(dataStore.getColumnInfo(field));
+                    }
+                }
+                if (retrySet.size > 0) {
+                    const retryFields = [...retrySet];
+                    trans.columns.push(retryFields);
+                    console.warn("Retrying column data load", {
+                        dataSource,
+                        columns: retryFields,
+                        attempts: retryFields.map((field) => ({
+                            field,
+                            attempt: trans.retryAttempts[field],
+                            maxRetries: trans.retries,
+                        })),
+                    });
+                }
+                trans.failedColumns.push(...finalFailedColumns);
+                for (const col of col_list) {
+                    if (!retrySet.has(col)) {
+                        delete this.columnsLoading[dataSource][col];
+                    }
+                }
                 const total = trans.columns.length;
                 const loaded = trans.columnsLoaded;
                 let all_loaded = loaded * col_list.length;
-                for (const col of col_list) {
-                    delete this.columnsLoading[dataSource][col];
-                }
                 all_loaded =
                     all_loaded > trans.totalColumns
                         ? trans.totalColumns
@@ -1790,6 +1818,9 @@ export class ChartManager {
      */
     async addChart(dataSource, config, notify = false) {
         if (!BaseChart.types[config.type]) {
+            await ensureLazyChartTypeRegistered(config.type);
+        }
+        if (!BaseChart.types[config.type]) {
             this.createInfoAlert(
                 `Tried to add unknown chart type '${config.type}'`,
                 { type: "danger", duration: 2000 },
@@ -1885,6 +1916,13 @@ export class ChartManager {
             await this._getColumnsAsync(dataSource, neededCols);
             await this._addChart(dataSource, config, div, notify);
         } catch (error) {
+            console.error("Failed to add chart", {
+                chartId: config.id,
+                chartType: config.type,
+                dataSource,
+                neededColumns: neededCols,
+                error,
+            });
             this.clearInfoAlerts();
             spinner.remove();
             ellipsis.remove();
@@ -1911,7 +1949,20 @@ export class ChartManager {
                     { message: error }
                     :
                     { message: "An error occurred while creating the chart" };
-            createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
+            createMdvPortal(createElement(ErrorComponentReactWrapper, {
+                error: errorObj,
+                height,
+                width,
+                extraMetaData: {
+                    config,
+                    dataSource,
+                    neededColumns: neededCols,
+                    ...(error instanceof MissingColumnDataError && {
+                        missingColumns: error.missingColumns,
+                        requestedColumns: error.requestedColumns,
+                    }),
+                },
+            }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {
@@ -1946,6 +1997,8 @@ export class ChartManager {
             )
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
+        } finally {
+            this._markInitialChartLoadComplete(config);
         }
     }
 
@@ -2001,6 +2054,28 @@ export class ChartManager {
         });
     }
 
+    /**
+     * Map a chart param token to a DataStore column `field` id.
+     * Field ids are canonical and stable; display names are mutable and are
+     * not used for runtime resolution.
+     * @param {object} dStore DataStore instance
+     * @param {string} token
+     * @returns {string}
+     */
+    _resolveToDataStoreFieldKey(dStore, token) {
+        if (typeof token !== "string") {
+            return token;
+        }
+        if (dStore.columnIndex[token]) {
+            return token;
+        }
+        const fieldMatch = dStore.columns.find((col) => col.field === token);
+        if (fieldMatch) {
+            return fieldMatch.field;
+        }
+        return token;
+    }
+
     async _getColumnsAsync(dataSource, columns) {
         // there could be links as well as column `fields` in columns.
         // let's make a mechanism for awaiting the link - and initial linked cols.
@@ -2016,7 +2091,32 @@ export class ChartManager {
         const result = await new Promise((resolve) => {
             this._getColumnsThen(dataSource, allColumns, resolve);
         });
+        const missingColumns = this._getMissingColumnData(dataSource, allColumns);
+        if (missingColumns.length) {
+            console.error("Column loading completed with missing data", {
+                dataSource,
+                requestedColumns: allColumns,
+                missingColumns,
+            });
+            throw new MissingColumnDataError(dataSource, missingColumns, allColumns);
+        }
         return result;
+    }
+
+    _getMissingColumnData(dataSource, columns) {
+        const dStore = this.dsIndex[dataSource].dataStore;
+        const missing = [];
+        for (const col of columns) {
+            if (typeof col !== "string") {
+                continue;
+            }
+            const key = this._resolveToDataStoreFieldKey(dStore, col);
+            const column = dStore.columnIndex[key];
+            if (!column?.data) {
+                missing.push(key);
+            }
+        }
+        return missing;
     }
 
     _getColumnsThen(dataSource, columns, func) {
@@ -2092,8 +2192,10 @@ export class ChartManager {
                     return false;
                 }
             }
-            //only load if has no data
-            return !col.data;
+            if (!col.data) {
+                return true;
+            }
+            return false;
         });
 
         //No columns needed
@@ -2103,7 +2205,7 @@ export class ChartManager {
         }
         //load required columns, then check all requested are loaded
         else {
-            this.loadColumnSet(reqCols, dataSource, (failedColumns) => {
+            this.loadColumnSet(reqCols, dataSource, (failedColumns = []) => {
                 if (failedColumns.length) {
                     console.warn(
                         "got columns with some failures",
@@ -2130,8 +2232,13 @@ export class ChartManager {
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols, dataSource, func) {
+        const dStore = this.dsIndex[dataSource].dataStore;
         for (const col of neededCols) {
-            if (this.columnsLoading[dataSource][col]) {
+            const key =
+                typeof col === "string"
+                    ? this._resolveToDataStoreFieldKey(dStore, col)
+                    : col;
+            if (this.columnsLoading[dataSource][key]) {
                 setTimeout(() => {
                     this._haveColumnsLoaded(neededCols, dataSource, func);
                 }, 500);
@@ -2235,20 +2342,24 @@ export class ChartManager {
         if (notify) {
             this._callListeners("chart_added", chart);
         }
-        //check to see if all inital charted loaded , then can call any listeners
-        if (this._toLoadCharts) {
-            this._toLoadCharts.delete(config);
-            if (this._toLoadCharts.size === 0) {
-                this._toLoadCharts = undefined;
-                if (this.viewData.links) {
-                    for (const l of this.viewData.links) {
-                        this._setUpLink(l);
-                    }
-                }
-                this._callListeners("view_loaded", this.viewManager.current_view);
+        return chart;
+    }
+
+    _markInitialChartLoadComplete(config) {
+        if (!this._toLoadCharts) {
+            return;
+        }
+        this._toLoadCharts.delete(config);
+        if (this._toLoadCharts.size !== 0) {
+            return;
+        }
+        this._toLoadCharts = undefined;
+        if (this.viewData.links) {
+            for (const l of this.viewData.links) {
+                this._setUpLink(l);
             }
         }
-        return chart;
+        this._callListeners("view_loaded", this.viewManager.current_view);
     }
 
     //gives a chart access to another datasource

@@ -1,16 +1,9 @@
-import test, { expect, type BrowserContext, type Page } from "@playwright/test";
+import test, { expect, type Page } from "@playwright/test";
 import {
-    createTemporaryProject,
-    type TemporaryProjectHandle,
+    createTemporaryProjectViaSyntheticAnndata,
+    type SyntheticAnndataTemporaryProjectHandle,
     waitForProjectReady,
-} from "../utils/tempProject";
-
-const GENERATED_MOCK_PROJECT = {
-    nCells: 8,
-    nGenes: 12,
-} as const;
-
-test.describe.configure({ mode: "serial" });
+} from "../../utils/projectFixtures";
 
 type ProjectSetupInfo = {
     cloneSourceName: string;
@@ -339,296 +332,332 @@ async function injectSavedViewAnalysisFailure(page: Page, brokenViewName: string
     }, brokenViewName);
 }
 
+async function setupSoftDeleteFixture(page: Page): Promise<{
+    projectHandle: SyntheticAnndataTemporaryProjectHandle;
+    setupInfo: ProjectSetupInfo;
+}> {
+    const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
+        synthetic: {
+            profile: "minimal",
+            nCells: 200,
+            nGenes: 12,
+            force: true,
+        },
+    });
+    let setupInfo: ProjectSetupInfo;
+    try {
+        setupInfo = await setupReactTableProject(page);
+    } catch (error) {
+        await projectHandle.cleanup();
+        throw error;
+    }
+    return { projectHandle, setupInfo };
+}
+
 test.describe("Soft Delete", () => {
     test.setTimeout(180_000);
 
-    let context: BrowserContext;
-    let page: Page;
-    let projectHandle: TemporaryProjectHandle;
-    let setupInfo: ProjectSetupInfo;
-
-    test.beforeAll(async ({ browser }) => {
-        context = await browser.newContext();
-        page = await context.newPage();
-        projectHandle = await createTemporaryProject(page, {
-            allowCsvFallback: true,
-            mockConfig: GENERATED_MOCK_PROJECT,
-            projectName: "Soft Delete Fixture",
-        });
-        setupInfo = await setupReactTableProject(page);
-    });
-
-    test.afterAll(async () => {
-        await projectHandle?.cleanup();
-        await context?.close();
-    });
-
-    test("blocks deleting a column when another chart in the current view still uses it", async () => {
+    test("blocks deleting a column when another chart in the current view still uses it", async ({ page }) => {
+        const { projectHandle, setupInfo } = await setupSoftDeleteFixture(page);
         const columnName = "soft_delete_blocked";
 
-        await addClonedEditableColumn(
-            page,
-            setupInfo.tableChartId,
-            columnName,
-            setupInfo.cloneSourceName,
-        );
-        await addDependentRowChart(
-            page,
-            setupInfo.dataSourceName,
-            columnName,
-            "Soft Delete Dependency",
-        );
+        try {
+            await addClonedEditableColumn(
+                page,
+                setupInfo.tableChartId,
+                columnName,
+                setupInfo.cloneSourceName,
+            );
+            await addDependentRowChart(
+                page,
+                setupInfo.dataSourceName,
+                columnName,
+                "Soft Delete Dependency",
+            );
 
-        await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
+            await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
 
-        const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
-        await expect(dialog).toBeVisible();
-        await expect(dialog.getByText("Deletion is blocked.")).toBeVisible();
-        await expect(dialog.getByText("Current View", { exact: true })).toBeVisible();
-        await expect(dialog.getByText("Soft Delete Dependency")).toBeVisible();
-        await expect(
-            dialog.getByRole("button", { name: "Deletion Blocked", exact: true }),
-        ).toBeDisabled();
+            const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
+            await expect(dialog).toBeVisible();
+            await expect(dialog.getByText("Deletion is blocked.")).toBeVisible();
+            await expect(dialog.getByText("Current View", { exact: true })).toBeVisible();
+            await expect(dialog.getByText("Soft Delete Dependency")).toBeVisible();
+            await expect(
+                dialog.getByRole("button", { name: "Deletion Blocked", exact: true }),
+            ).toBeDisabled();
 
-        await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-        await expect(dialog).not.toBeVisible();
+            await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+            await expect(dialog).not.toBeVisible();
+        } finally {
+            await projectHandle.cleanup();
+        }
     });
 
-    test("soft-deletes the column, saves the view, and keeps it hidden after reload", async () => {
+    test("soft-deletes the column, saves the view, and keeps it hidden after reload", async ({ page }) => {
+        const { projectHandle, setupInfo } = await setupSoftDeleteFixture(page);
         const columnName = "soft_delete_persist";
 
-        await createSavedEditableColumn(
-            page,
-            setupInfo.tableChartId,
-            columnName,
-            setupInfo.cloneSourceName,
-        );
-        await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
+        try {
+            await createSavedEditableColumn(
+                page,
+                setupInfo.tableChartId,
+                columnName,
+                setupInfo.cloneSourceName,
+            );
+            await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
 
-        const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
-        await expect(dialog).toBeVisible();
-        await expect(
-            dialog.getByText(
-                "Note: This is a soft delete. The column won't be visible in MDV, but it will still appear in exported datasource files.",
-            ),
-        ).toBeVisible();
+            const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
+            await expect(dialog).toBeVisible();
+            await expect(
+                dialog.getByText(
+                    "Note: This is a soft delete. The column won't be visible in MDV, but it will still appear in exported datasource files.",
+                ),
+            ).toBeVisible();
 
-        await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
-        await expect(dialog).not.toBeVisible({ timeout: 60_000 });
+            await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
+            await expect(dialog).not.toBeVisible({ timeout: 60_000 });
 
-        const stateAfterDelete = await getColumnState(page, setupInfo.tableChartId, columnName);
+            const stateAfterDelete = await getColumnState(page, setupInfo.tableChartId, columnName);
 
-        expect(stateAfterDelete.hasUnsavedChanges).toBe(false);
-        expect(stateAfterDelete.metadata).toEqual(
-            expect.objectContaining({
-                field: columnName,
-                deleted: true,
-            }),
-        );
-        expect(stateAfterDelete.stillVisible).toBe(false);
-        expect(stateAfterDelete.tableStillUsesColumn).toBe(false);
+            expect(stateAfterDelete.hasUnsavedChanges).toBe(false);
+            expect(stateAfterDelete.metadata).toEqual(
+                expect.objectContaining({
+                    field: columnName,
+                    deleted: true,
+                }),
+            );
+            expect(stateAfterDelete.stillVisible).toBe(false);
+            expect(stateAfterDelete.tableStillUsesColumn).toBe(false);
 
-        await page.reload();
-        await waitForProjectReady(page);
+            await page.reload();
+            await waitForProjectReady(page);
 
-        const stateAfterReload = await getColumnState(page, setupInfo.tableChartId, columnName);
+            const stateAfterReload = await getColumnState(page, setupInfo.tableChartId, columnName);
 
-        expect(stateAfterReload.metadata).toEqual(
-            expect.objectContaining({
-                field: columnName,
-                deleted: true,
-            }),
-        );
-        expect(stateAfterReload.stillVisible).toBe(false);
-        expect(stateAfterReload.tableStillUsesColumn).toBe(false);
+            expect(stateAfterReload.metadata).toEqual(
+                expect.objectContaining({
+                    field: columnName,
+                    deleted: true,
+                }),
+            );
+            expect(stateAfterReload.stillVisible).toBe(false);
+            expect(stateAfterReload.tableStillUsesColumn).toBe(false);
+        } finally {
+            await projectHandle.cleanup();
+        }
     });
 
-    test("blocks deleting a column when another saved view still uses it", async () => {
+    test("blocks deleting a column when another saved view still uses it", async ({ page }) => {
+        const { projectHandle, setupInfo } = await setupSoftDeleteFixture(page);
         const columnName = "soft_delete_saved_view_blocked";
         const savedViewName = `soft-delete-view-${Date.now()}`;
         const dependencyChartTitle = "Saved View Dependency";
 
-        await createSavedEditableColumn(
-            page,
-            setupInfo.tableChartId,
-            columnName,
-            setupInfo.cloneSourceName,
-        );
-        await injectSavedViewImpact(
-            page,
-            setupInfo.dataSourceName,
-            columnName,
-            savedViewName,
-            dependencyChartTitle,
-        );
+        try {
+            await createSavedEditableColumn(
+                page,
+                setupInfo.tableChartId,
+                columnName,
+                setupInfo.cloneSourceName,
+            );
+            await injectSavedViewImpact(
+                page,
+                setupInfo.dataSourceName,
+                columnName,
+                savedViewName,
+                dependencyChartTitle,
+            );
 
-        await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
+            await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
 
-        const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
-        await expect(dialog).toBeVisible();
-        await expect(dialog.getByText("Deletion is blocked.")).toBeVisible();
-        await expect(dialog.getByText("Other Views", { exact: true })).toBeVisible();
-        await expect(dialog.getByText(savedViewName, { exact: true }).first()).toBeVisible();
-        await expect(dialog.getByText(dependencyChartTitle)).toBeVisible();
-        await expect(
-            dialog.getByRole("button", { name: "Open View", exact: true }).first(),
-        ).toBeVisible();
-        await expect(
-            dialog.getByRole("button", { name: "Deletion Blocked", exact: true }),
-        ).toBeDisabled();
-        await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-        await expect(dialog).not.toBeVisible();
+            const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
+            await expect(dialog).toBeVisible();
+            await expect(dialog.getByText("Deletion is blocked.")).toBeVisible();
+            await expect(dialog.getByText("Other Views", { exact: true })).toBeVisible();
+            await expect(dialog.getByText(savedViewName, { exact: true }).first()).toBeVisible();
+            await expect(dialog.getByText(dependencyChartTitle)).toBeVisible();
+            await expect(
+                dialog.getByRole("button", { name: "Open View", exact: true }).first(),
+            ).toBeVisible();
+            await expect(
+                dialog.getByRole("button", { name: "Deletion Blocked", exact: true }),
+            ).toBeDisabled();
+            await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+            await expect(dialog).not.toBeVisible();
+        } finally {
+            await projectHandle.cleanup();
+        }
     });
 
-    test("completely removes a newly added unsaved column instead of tombstoning it", async () => {
+    test("completely removes a newly added unsaved column instead of tombstoning it", async ({ page }) => {
+        const { projectHandle, setupInfo } = await setupSoftDeleteFixture(page);
         const columnName = "soft_delete_unsaved_new_column";
 
-        await addClonedEditableColumn(
-            page,
-            setupInfo.tableChartId,
-            columnName,
-            setupInfo.cloneSourceName,
-        );
-        await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
+        try {
+            await addClonedEditableColumn(
+                page,
+                setupInfo.tableChartId,
+                columnName,
+                setupInfo.cloneSourceName,
+            );
+            await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
 
-        const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
-        await expect(dialog).toBeVisible();
-        await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
-        await expect(dialog).not.toBeVisible({ timeout: 60_000 });
+            const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
+            await expect(dialog).toBeVisible();
+            await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
+            await expect(dialog).not.toBeVisible({ timeout: 60_000 });
 
-        const stateAfterDelete = await getColumnState(page, setupInfo.tableChartId, columnName);
-        expect(stateAfterDelete.hasUnsavedChanges).toBe(false);
-        expect(stateAfterDelete.metadata).toBeNull();
-        expect(stateAfterDelete.stillVisible).toBe(false);
-        expect(stateAfterDelete.tableStillUsesColumn).toBe(false);
+            const stateAfterDelete = await getColumnState(page, setupInfo.tableChartId, columnName);
+            expect(stateAfterDelete.hasUnsavedChanges).toBe(false);
+            expect(stateAfterDelete.metadata).toBeNull();
+            expect(stateAfterDelete.stillVisible).toBe(false);
+            expect(stateAfterDelete.tableStillUsesColumn).toBe(false);
 
-        await page.reload();
-        await waitForProjectReady(page);
+            await page.reload();
+            await waitForProjectReady(page);
 
-        const stateAfterReload = await getColumnState(page, setupInfo.tableChartId, columnName);
-        expect(stateAfterReload.metadata).toBeNull();
-        expect(stateAfterReload.stillVisible).toBe(false);
-        expect(stateAfterReload.tableStillUsesColumn).toBe(false);
+            const stateAfterReload = await getColumnState(page, setupInfo.tableChartId, columnName);
+            expect(stateAfterReload.metadata).toBeNull();
+            expect(stateAfterReload.stillVisible).toBe(false);
+            expect(stateAfterReload.tableStillUsesColumn).toBe(false);
+        } finally {
+            await projectHandle.cleanup();
+        }
     });
 
-    test("shows an error and leaves the column intact when soft delete fails", async () => {
+    test("shows an error and leaves the column intact when soft delete fails", async ({ page }) => {
+        const { projectHandle, setupInfo } = await setupSoftDeleteFixture(page);
         const columnName = "soft_delete_delete_error";
 
-        await createSavedEditableColumn(
-            page,
-            setupInfo.tableChartId,
-            columnName,
-            setupInfo.cloneSourceName,
-        );
-        await injectSoftDeleteFailure(page, columnName);
-        await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
+        try {
+            await createSavedEditableColumn(
+                page,
+                setupInfo.tableChartId,
+                columnName,
+                setupInfo.cloneSourceName,
+            );
+            await injectSoftDeleteFailure(page, columnName);
+            await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
 
-        const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
-        await expect(dialog).toBeVisible();
-        await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
+            const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
+            await expect(dialog).toBeVisible();
+            await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
 
-        await expectFeedbackAlert(
-            page,
-            "Delete Column Error",
-            `Column ${columnName} could not be deleted.`,
-        );
-        await expect(dialog).not.toBeVisible();
+            await expectFeedbackAlert(
+                page,
+                "Delete Column Error",
+                `Column ${columnName} could not be deleted.`,
+            );
+            await expect(dialog).not.toBeVisible();
 
-        const stateAfterFailure = await getColumnState(page, setupInfo.tableChartId, columnName);
-        expect(stateAfterFailure.metadata).toEqual(
-            expect.objectContaining({
-                field: columnName,
-            }),
-        );
-        expect(stateAfterFailure.metadata?.deleted).not.toBe(true);
-        expect(stateAfterFailure.stillVisible).toBe(true);
-        expect(stateAfterFailure.tableStillUsesColumn).toBe(true);
+            const stateAfterFailure = await getColumnState(page, setupInfo.tableChartId, columnName);
+            expect(stateAfterFailure.metadata).toEqual(
+                expect.objectContaining({
+                    field: columnName,
+                }),
+            );
+            expect(stateAfterFailure.metadata?.deleted).not.toBe(true);
+            expect(stateAfterFailure.stillVisible).toBe(true);
+            expect(stateAfterFailure.tableStillUsesColumn).toBe(true);
 
-        await closeFeedbackAlert(page);
-        await page.reload();
-        await waitForProjectReady(page);
+            await closeFeedbackAlert(page);
+            await page.reload();
+            await waitForProjectReady(page);
+        } finally {
+            await projectHandle.cleanup();
+        }
     });
 
-    test("shows an error when saved-view impact analysis fails and does not start deletion", async () => {
+    test("shows an error when saved-view impact analysis fails and does not start deletion", async ({ page }) => {
+        const { projectHandle, setupInfo } = await setupSoftDeleteFixture(page);
         const columnName = "soft_delete_analysis_error";
         const brokenViewName = "__soft_delete_broken_view__";
 
-        await addClonedEditableColumn(
-            page,
-            setupInfo.tableChartId,
-            columnName,
-            setupInfo.cloneSourceName,
-        );
-        await injectSavedViewAnalysisFailure(page, brokenViewName);
-        await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
+        try {
+            await addClonedEditableColumn(
+                page,
+                setupInfo.tableChartId,
+                columnName,
+                setupInfo.cloneSourceName,
+            );
+            await injectSavedViewAnalysisFailure(page, brokenViewName);
+            await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
 
-        await expectFeedbackAlert(
-            page,
-            "Delete Column Error",
-            `Failed to check column usage in saved views: ${brokenViewName}`,
-        );
-        await expect(
-            page.getByRole("dialog", { name: `Delete Column "${columnName}"` }),
-        ).not.toBeVisible();
+            await expectFeedbackAlert(
+                page,
+                "Delete Column Error",
+                `Failed to check column usage in saved views: ${brokenViewName}`,
+            );
+            await expect(
+                page.getByRole("dialog", { name: `Delete Column "${columnName}"` }),
+            ).not.toBeVisible();
 
-        const stateAfterFailure = await getColumnState(page, setupInfo.tableChartId, columnName);
-        expect(stateAfterFailure.metadata).toEqual(
-            expect.objectContaining({
-                field: columnName,
-            }),
-        );
-        expect(stateAfterFailure.stillVisible).toBe(true);
-        expect(stateAfterFailure.tableStillUsesColumn).toBe(true);
+            const stateAfterFailure = await getColumnState(page, setupInfo.tableChartId, columnName);
+            expect(stateAfterFailure.metadata).toEqual(
+                expect.objectContaining({
+                    field: columnName,
+                }),
+            );
+            expect(stateAfterFailure.stillVisible).toBe(true);
+            expect(stateAfterFailure.tableStillUsesColumn).toBe(true);
 
-        await closeFeedbackAlert(page);
-        await page.reload();
-        await waitForProjectReady(page);
+            await closeFeedbackAlert(page);
+            await page.reload();
+            await waitForProjectReady(page);
+        } finally {
+            await projectHandle.cleanup();
+        }
     });
 
-    test("shows an error when saving fails after a local soft delete and restores on reload", async () => {
+    test("shows an error when saving fails after a local soft delete and restores on reload", async ({ page }) => {
+        const { projectHandle, setupInfo } = await setupSoftDeleteFixture(page);
         const columnName = "soft_delete_save_error";
 
-        await createSavedEditableColumn(
-            page,
-            setupInfo.tableChartId,
-            columnName,
-            setupInfo.cloneSourceName,
-        );
-        await injectSaveFailure(page);
-        await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
+        try {
+            await createSavedEditableColumn(
+                page,
+                setupInfo.tableChartId,
+                columnName,
+                setupInfo.cloneSourceName,
+            );
+            await injectSaveFailure(page);
+            await requestColumnDeletion(page, setupInfo.tableChartId, columnName);
 
-        const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
-        await expect(dialog).toBeVisible();
-        await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
+            const dialog = page.getByRole("dialog", { name: `Delete Column "${columnName}"` });
+            await expect(dialog).toBeVisible();
+            await dialog.getByRole("button", { name: "Delete Column & Save", exact: true }).click();
 
-        await expectFeedbackAlert(
-            page,
-            "Delete Column Error",
-            `Column ${columnName} was deleted locally, but saving the updated view failed. Reloading the project may restore this column.`,
-        );
-        await expect(dialog).not.toBeVisible();
+            await expectFeedbackAlert(
+                page,
+                "Delete Column Error",
+                `Column ${columnName} was deleted locally, but saving the updated view failed. Reloading the project may restore this column.`,
+            );
+            await expect(dialog).not.toBeVisible();
 
-        const localStateAfterFailure = await getColumnState(page, setupInfo.tableChartId, columnName);
-        expect(localStateAfterFailure.metadata).toEqual(
-            expect.objectContaining({
-                field: columnName,
-                deleted: true,
-            }),
-        );
-        expect(localStateAfterFailure.stillVisible).toBe(false);
-        expect(localStateAfterFailure.tableStillUsesColumn).toBe(false);
+            const localStateAfterFailure = await getColumnState(page, setupInfo.tableChartId, columnName);
+            expect(localStateAfterFailure.metadata).toEqual(
+                expect.objectContaining({
+                    field: columnName,
+                    deleted: true,
+                }),
+            );
+            expect(localStateAfterFailure.stillVisible).toBe(false);
+            expect(localStateAfterFailure.tableStillUsesColumn).toBe(false);
 
-        await page.reload();
-        await waitForProjectReady(page);
+            await page.reload();
+            await waitForProjectReady(page);
 
-        const stateAfterReload = await getColumnState(page, setupInfo.tableChartId, columnName);
-        expect(stateAfterReload.metadata).toEqual(
-            expect.objectContaining({
-                field: columnName,
-            }),
-        );
-        expect(stateAfterReload.metadata?.deleted).not.toBe(true);
-        expect(stateAfterReload.stillVisible).toBe(true);
-        expect(stateAfterReload.tableStillUsesColumn).toBe(true);
+            const stateAfterReload = await getColumnState(page, setupInfo.tableChartId, columnName);
+            expect(stateAfterReload.metadata).toEqual(
+                expect.objectContaining({
+                    field: columnName,
+                }),
+            );
+            expect(stateAfterReload.metadata?.deleted).not.toBe(true);
+            expect(stateAfterReload.stillVisible).toBe(true);
+            expect(stateAfterReload.tableStillUsesColumn).toBe(true);
+        } finally {
+            await projectHandle.cleanup();
+        }
     });
 });

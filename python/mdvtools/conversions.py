@@ -232,7 +232,14 @@ def convert_scanpy_to_mdv(
         current_views = {}
     # create datasource 'cells'
     cell_table = scanpy_object.obs
-    cell_table["cell_id"] = cell_table.index
+    # we must not blindly overwrite cell_id in normal anndata, while we're here we try to be extra careful
+    cell_identifier_column = "mdv_cell_id"
+    i = 0
+    while cell_identifier_column in cell_table.columns:
+        # unlikely to happen and we don't like it much, but at least we should be safe
+        i = i + 1
+        cell_identifier_column = f"mdv_cell_id_{i}"
+    cell_table[cell_identifier_column] = cell_table.index
 
     # add any dimension reduction to the dataframe
     cell_table = _add_dims(cell_table, scanpy_object.obsm, max_dims)
@@ -241,7 +248,8 @@ def convert_scanpy_to_mdv(
     # (will be text16 by default if number of values are below 65536)
     # hopefully other columns will be of the correct format
     columns=[{
-        "name":"cell_id",
+        "name": cell_identifier_column,
+        "field": cell_identifier_column,
         "datatype":"unique"
     }]
     leiden_like_columns = sorted(

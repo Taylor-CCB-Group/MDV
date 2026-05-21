@@ -97,7 +97,18 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
 
                 markdown = create_error_markdown(error_message, traceback_str, extra_metadata)
                 logger.error(f"Chat error: {markdown}")
-                log_chat_item(project, message or '', None, '', markdown, conversation_id, None, None, error=True)
+                log_chat_item(
+                    project,
+                    message or "",
+                    None,
+                    "",
+                    markdown,
+                    conversation_id,
+                    None,
+                    None,
+                    error=True,
+                    verification=None,
+                )
                 socketio.emit(
                     "chat_error",
                     {"message": markdown},
@@ -134,10 +145,17 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     return
                 else:
                     socketio.emit(
-                        "chat_response", 
-                        {"message": result["code"], "view": result["view_name"], "id": id}, 
-                        namespace=f"/project/{project.id}", 
-                        to=room
+                        "chat_response",
+                        {
+                            "message": result["code"],
+                            "view": result["view_name"],
+                            "id": id,
+                            "verification": result.get("verification"),
+                            "data_preview": result.get("data_preview"),
+                            "needs_refresh": result.get("needs_refresh", False),
+                        },
+                        namespace=f"/project/{project.id}",
+                        to=room,
                     )
                     leave_room(room)
                     return
