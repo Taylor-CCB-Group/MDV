@@ -3,39 +3,46 @@
 
 ## Installation
 
-### Make virtual environment
+### Environment setup (recommended)
 
-It is recommended, but not essential to create a virtual environment so there are no conflicts with modules in the global python.
+From the repository root, use the `python-setup` script in `package.json`. It creates a [uv](https://docs.astral.sh/uv/)-managed virtual environment at `python/.venv`, installs Python dependencies, and builds the front-end assets that `mdvtools serve` serves from `python/mdvtools/static`:
 
-To create and activate an environment in a Unix-like system:-
-```
-python -m venv /path/to/myenv
-source /path/to/myenv/bin/activate
-````
-In windows:-
-```
-python -m venv c:\path\to\myenv
-c:\path\to\myenv\Scripts\activate.bat
+```bash
+pnpm i
+pnpm run python-setup
 ```
 
-### Install uv
+You need [pnpm](https://pnpm.io/installation) (see `packageManager` in the root `package.json`) and `uv` on your PATH. Install uv if it is not already available (e.g. the dev Docker image includes it):
 
-Install [uv](https://docs.astral.sh/uv/) if it is not already available (e.g. the dev Docker image includes it):
-
-```
+```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 CI installs uv from `tool.uv.required-version` in `pyproject.toml`; match that if you need reproducible lockfile behaviour.
 
-### Install MDV
+Run Python tools with `uv run` from `python/` (no manual activation required), for example:
 
-To install MDV, run:
-
+```bash
+cd python
+uv run -- mdvtools serve /path/to/project
 ```
-cd MDV/python
+
+On Windows, the environment lives at `python/.venv`; activate with `python\.venv\Scripts\activate.bat` only if you prefer a traditional shell session.
+
+Avoid creating a separate `venv` with `python -m venv` elsewhere in the tree — that diverges from the repo’s normal layout and tooling (Playwright preflight, pyright, and agent docs expect `python/.venv` or the root `python-setup` flow).
+
+### Manual install (equivalent to `python-setup`)
+
+If `python-setup` fails, run its steps directly (you still need pnpm for the front-end build):
+
+```bash
+cd python
 uv sync --group dev --frozen
+cd ..
+pnpm run build-flask-vite
 ```
+
+Syncing Python packages alone is not enough for `mdvtools serve` — the Vite build must run at least once.
 
 ## Quick Start
 
