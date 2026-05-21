@@ -125,7 +125,6 @@ authors = [
     { name = "Martin Sergeant", email = "m.j.sergeant1@googlemail.com" },
     { name = "PeterTodd", email = "peter.todd@well.ox.ac.uk" },
 ]
-dynamic = ["dependencies", "classifiers"]
 
 [project.urls]
 "Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
