@@ -81,7 +81,8 @@ WORKDIR /app
 # DECISION: Using virtual environments for security and permission isolation,
 # `.bashrc` is used to activate the virtual environment automatically.
 # uv sync uses `.venv` in the project directory by default.
-# We rely on the base image having `uv` installed (as per your note).
+# The base image (nikolaik/python-nodejs) installs uv via pip without a fixed version.
+# Project tooling pins uv in python/.uv-version; keep that aligned with the image when it changes.
 
 # Prefer binary wheels to avoid slow/fragile source builds (e.g., numcodecs on arm64)
 ENV PIP_PREFER_BINARY=1
