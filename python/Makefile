@@ -10,8 +10,9 @@ test-backend:
 test-auth:
 	uv run -- pytest mdvtools/auth/tests -v
 
+# Cursor/VS Code integrated terminals may set NODE_OPTIONS for js-debug; pyright invokes Node.
 type:
-	uv run -- pyright
+	env -u NODE_OPTIONS uv run -- pyright
 
 format:
 	uv run -- ruff format .
