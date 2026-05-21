@@ -1480,11 +1480,7 @@ class MDVProject:
             if add_to_view:
                 # TablePlot parameters
                 title = name
-                # Use collect_schema().names() for LazyFrame, .columns for DataFrame
-                if isinstance(dataframe, pl.LazyFrame):
-                    params = dataframe.collect_schema().names()
-                else:
-                    params = dataframe.columns
+                params = [x["field"] for x in columns]
                 size = [792, 472]
                 position = [10, 10]
             
