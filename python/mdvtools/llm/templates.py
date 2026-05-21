@@ -6,6 +6,7 @@ from mdvtools.llm.datasource_roles import (
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
+    format_metadata_column_schema_policy,
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
@@ -96,7 +97,10 @@ from mdvtools.charts.text_box_plot import TextBox
 from mdvtools.charts.row_summary_box_plot import RowSummaryBox
 from mdvtools.charts.selection_dialog_plot import SelectionDialogPlot
 from mdvtools.charts.sankey_plot import SankeyPlot
-from mdvtools.llm.datasource_roles import infer_datasource_roles
+from mdvtools.llm.datasource_roles import (
+    infer_datasource_roles,
+    categorical_field_ids_from_metadata,
+)
 from mdvtools.llm.column_field_resolve import build_expression_wrapper_token
 
 import json
@@ -132,6 +136,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     hybrid_routing_policy = format_scanpy_hybrid_routing_policy()
     viz_consistency_policy = format_visualization_consistency_policy()
     no_hallucination_policy = format_no_hallucination_chart_policy()
+    metadata_column_policy = format_metadata_column_schema_policy()
     expr_lines = ""
     if roles.expressions:
         expr_lines = "\n".join(
@@ -187,18 +192,32 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     4. Plot Construction:
         - No hallucinated datasources or columns (all chart types):
 """+no_hallucination_policy+"""
+        - Column metadata schema and multi-gene heatmaps (ChatMDV):
+"""+metadata_column_policy+"""
         - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected **field ids** (see Parameter Handling).
             - The suggested columns and chart type are given by """+final_answer+"""
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
         - **Before** `project.set_view(...)`, print a concise preview of any table, aggregate, or subset the charts depend on using **GitHub-flavored markdown tables** so the chat UI can render them (for example `print(df_result.head(40).to_markdown(index=False))` or `print(grouped.head(20).to_markdown())`). Do **not** use `DataFrame.to_string()` for chat previews. Keep rows/columns bounded so the output stays readable; this stdout is shown in the chat window.
         - **Before** `project.set_view(...)`, ensure saved charts use the **same data pipeline** as those printed previews (see "Visualization vs analysis consistency" below).
         - Set the view using `project.set_view(view_name, view_object)`
-        - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`.
+        - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`
+          or invented filter setters such as `set_background_filter(...)`. Only call `set_*` (and other public) methods
+          that exist on the chart class in `mdvtools.charts.*` (preflight validates this before execution).
           To show a subset, either:
             (a) create a filtered datasource when building a **new** project from raw data, or use the **narrow** ChatMDV
                 exception in section 3 (`chat_rank_genes_result` via `add_datasource` for long-format Scanpy marker tables
                 when editing a project), or
             (b) include a `SelectionDialogPlot` so the user can filter interactively in the UI.
+        - Expression on an embedding **within a group** (general pattern):
+            - Build a **full-dataset** `ScatterPlot` with embedding field ids in `params` and color via
+              `set_color_by` / `set_default_color` using a **wrapper token** from `build_expression_wrapper_token`
+              (see section 5).
+            - When the user asks to focus on a categorical group, add a `SelectionDialogPlot` whose `params` list the
+              relevant categorical **Field IDs** from Project Data Context (section 8); do **not** pass row indices into
+              the scatter chart.
+            - For numeric summaries of a subset (means, counts, distributions in chat), filter with
+              `project.get_datasource_as_dataframe(...)` and bounded `print(...to_markdown())`; keep the saved scatter
+              on the full dataset unless the user explicitly needs a persisted filtered datasource.
         - Visualization vs analysis consistency (ChatMDV):
 """+viz_consistency_policy+"""
 
@@ -225,7 +244,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
               “default_subgroup=...” lines, or injected `CHATMDV_EXPR_SUBGROUP_KEY`). Do **not** copy tutorial examples that use `rna_expr` unless that key is listed.
             - `<feature>` is a value from the feature table's label column (`name_column` from the link, e.g. `gene_ids` or `name` — match the project)
             - `<index>` is the row index of that feature in the feature table (0-based)
-        - **ChatMDV injected constants (always in generated scripts):** Use `CHATMDV_OBS_DATASOURCE`, `CHATMDV_EXPR_DATASOURCE`, `CHATMDV_EXPR_NAME_COLUMN`, `CHATMDV_EXPR_SUBGROUP_KEY`, and `CHATMDV_EXPRESSIONS` when present. Do **not** call `project.get_datasource_roles()` (does not exist). Prefer these constants over re-calling `infer_datasource_roles(project)` when editing an existing project.
+        - **ChatMDV injected constants (always in generated scripts):** Use `CHATMDV_OBS_DATASOURCE`, `CHATMDV_EXPR_DATASOURCE`, `CHATMDV_EXPR_NAME_COLUMN`, `CHATMDV_EXPR_SUBGROUP_KEY`, `CHATMDV_EXPRESSIONS`, and `CHATMDV_CATEGORICAL_FIELD_IDS` when present. Do **not** call `project.get_datasource_roles()` (does not exist). Prefer these constants over re-calling `infer_datasource_roles(project)` when editing an existing project. For categoricals, use `CHATMDV_CATEGORICAL_FIELD_IDS` or `categorical_field_ids_from_metadata(...)` — never `col['dtype']`.
         - **RowsAsColumnsExpression fields:** Use `expr.datasource_name` and `expr.name_column` / `expr.subgroup_key`. Never use `expr.feature_table`, `expr.feature_datasource`, or similar invented attributes.
         - Build wrappers with `build_expression_wrapper_token(subgroup_key, feature, index)`; do not hand-build f-strings unless necessary.
         - Example (wrapper expression):
@@ -262,8 +281,9 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - Do NOT create `TextBox` or `TablePlot` by default when the user intent is primarily textual/table output.
 
     8. Selection dialog usage:
-        - Add `SelectionDialogPlot` only when interactive filtering materially helps answer the question
-          (for example, when the user asks to explore subsets interactively).
+        - Add `SelectionDialogPlot` when interactive filtering materially helps answer the question—for example,
+          expression on an embedding **within** a categorical group, or when the user asks to explore subsets
+          interactively (pair with a full-dataset scatter colored by expression; see section 4).
         - Do not add a selection dialog unconditionally.
 
     9. Follow-up phrasing and intent routing:

@@ -112,6 +112,58 @@ def infer_datasource_roles(project: Any) -> InferredDatasourceRoles:
     return InferredDatasourceRoles(obs_datasource=obs, expressions=expressions)
 
 
+# MDV datasource column dict keys (see markdown_utils.create_column_markdown).
+CATEGORICAL_DATATYPES = frozenset({"text", "text16", "multitext", "unique"})
+NUMERIC_DATATYPES = frozenset({"integer", "double", "int32"})
+
+CHATMDV_CATEGORICAL_FIELD_IDS_CAP = 30
+
+
+def column_field_id(col: dict[str, Any]) -> str:
+    """Return the chart param field id for a metadata column entry."""
+    field = col.get("field")
+    if field is not None and str(field).strip():
+        return str(field)
+    name = col.get("name")
+    if name is not None and str(name).strip():
+        return str(name)
+    return ""
+
+
+def categorical_field_ids_from_metadata(ds_meta: dict[str, Any]) -> list[str]:
+    """Field ids for categorical columns from ``project.get_datasource_metadata(...)``."""
+    columns = ds_meta.get("columns") or []
+    if not isinstance(columns, list):
+        return []
+    out: list[str] = []
+    for col in columns:
+        if not isinstance(col, dict):
+            continue
+        if col.get("datatype") not in CATEGORICAL_DATATYPES:
+            continue
+        fid = column_field_id(col)
+        if fid:
+            out.append(fid)
+    return out
+
+
+def numeric_field_ids_from_metadata(ds_meta: dict[str, Any]) -> list[str]:
+    """Field ids for numeric columns from datasource metadata."""
+    columns = ds_meta.get("columns") or []
+    if not isinstance(columns, list):
+        return []
+    out: list[str] = []
+    for col in columns:
+        if not isinstance(col, dict):
+            continue
+        if col.get("datatype") not in NUMERIC_DATATYPES:
+            continue
+        fid = column_field_id(col)
+        if fid:
+            out.append(fid)
+    return out
+
+
 def collect_wrapper_subgroup_keys_for_project(project: Any) -> set[str]:
     """All rows-as-columns subgroup keys declared on the observation datasource."""
     roles = infer_datasource_roles(project)
@@ -162,6 +214,14 @@ def build_chatmdv_roles_constants_block(project: Any) -> str:
         for e in roles.expressions
     ]
     lines.append(f"CHATMDV_EXPRESSIONS = {json.dumps(expr_entries)}")
+    try:
+        obs_meta = project.get_datasource_metadata(roles.obs_datasource)
+        cat_ids = categorical_field_ids_from_metadata(obs_meta)
+        if len(cat_ids) > CHATMDV_CATEGORICAL_FIELD_IDS_CAP:
+            cat_ids = cat_ids[:CHATMDV_CATEGORICAL_FIELD_IDS_CAP]
+        lines.append(f"CHATMDV_CATEGORICAL_FIELD_IDS = {json.dumps(cat_ids)}")
+    except Exception:
+        lines.append("CHATMDV_CATEGORICAL_FIELD_IDS = []")
     lines.append("# --- end ChatMDV roles ---")
     return "\n".join(lines)
 
@@ -184,6 +244,25 @@ def format_no_hallucination_chart_policy() -> str:
         "`project.get_datasource_as_dataframe(obs_ds, columns=[...])` with the same field/wrapper strings as the chart "
         "(optional but recommended when using wrappers). If resolution fails, use bounded `print(...)` and omit broken "
         "charts.\n"
+        "- **Column metadata schema:** Each entry in `get_datasource_metadata(ds)['columns']` uses **`datatype`** "
+        "(e.g. `text`, `integer`, `double`), **`field`** (chart param id), and **`name`** (display). "
+        "**Never** use `col['dtype']` or pandas/AnnData-style keys. Use `CHATMDV_CATEGORICAL_FIELD_IDS` or "
+        "`categorical_field_ids_from_metadata(project.get_datasource_metadata(CHATMDV_OBS_DATASOURCE))`.\n"
+    )
+
+
+def format_metadata_column_schema_policy() -> str:
+    """Prompt text: MDV column dict schema and multi-gene heatmap param pattern."""
+    return (
+        "- **Datasource column dicts:** Keys are `field`, `name`, `datatype` (and optionally `values`) — not `dtype`. "
+        "Do not build categoricals with `col['dtype'] == 'text'`.\n"
+        "- **Categorical discovery:** Prefer injected `CHATMDV_CATEGORICAL_FIELD_IDS` or "
+        "`categorical_field_ids_from_metadata(project.get_datasource_metadata(CHATMDV_OBS_DATASOURCE))` "
+        "from `mdvtools.llm.datasource_roles`.\n"
+        "- **Multi-feature heatmap (e.g. several genes by cell type):** On the observation datasource, "
+        "`HeatmapPlot(params=[<categorical_field_id>, <wrapper1>, <wrapper2>, ...])` where the first param groups "
+        "rows (cell type / cluster field id from context) and remaining params are expression wrappers built with "
+        "`build_expression_wrapper_token` after resolving each feature index from `CHATMDV_EXPR_DATASOURCE`.\n"
     )
 
 

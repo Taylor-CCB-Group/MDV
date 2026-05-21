@@ -20,9 +20,19 @@ _WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)")
 
 _FORBIDDEN_EXPR_ATTRS = frozenset({"feature_table", "feature_datasource"})
 
+# Known hallucinated chart APIs (not defined on any mdvtools.charts class).
+_FORBIDDEN_CHART_METHODS = frozenset({"set_row_indices", "set_background_filter"})
+
 _NAMES_REQUIRING_IMPORT = frozenset(
-    {"infer_datasource_roles", "build_expression_wrapper_token"}
+    {
+        "infer_datasource_roles",
+        "build_expression_wrapper_token",
+        "categorical_field_ids_from_metadata",
+    }
 )
+
+# Pandas/AnnData-style key; MDV metadata column dicts use ``datatype``.
+_FORBIDDEN_METADATA_COLUMN_KEYS = frozenset({"dtype"})
 
 
 CHART_CLASS_MODULES: dict[str, str] = {
@@ -349,6 +359,163 @@ def _check_wrapper_and_roles_api(tree: ast.AST, defined_names: set[str]) -> list
     return issues
 
 
+def _collect_chart_instance_types(tree: ast.AST) -> dict[str, str]:
+    """Map variable names to chart class names for ``var = ChartClass(...)`` assignments."""
+    bindings: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            continue
+        var_name = node.targets[0].id
+        value = node.value
+        if not isinstance(value, ast.Call):
+            continue
+        fn = value.func
+        class_name: str | None = None
+        if isinstance(fn, ast.Name) and fn.id in CHART_CLASS_MODULES:
+            class_name = fn.id
+        elif isinstance(fn, ast.Attribute) and fn.attr in CHART_CLASS_MODULES:
+            class_name = fn.attr
+        if class_name:
+            bindings[var_name] = class_name
+    return bindings
+
+
+@lru_cache(maxsize=64)
+def _load_chart_class(class_name: str) -> type[Any] | None:
+    module_name = CHART_CLASS_MODULES.get(class_name)
+    if not module_name:
+        return None
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name, None)
+
+
+@lru_cache(maxsize=64)
+def _allowed_chart_methods(class_name: str) -> frozenset[str]:
+    cls = _load_chart_class(class_name)
+    if cls is None:
+        return frozenset()
+    from mdvtools.charts.base_plot import BasePlot
+
+    allowed: set[str] = set()
+    for chart_cls in (BasePlot, cls):
+        for name, member in inspect.getmembers(chart_cls, predicate=inspect.isfunction):
+            if name.startswith("_"):
+                continue
+            allowed.add(name)
+    return frozenset(allowed)
+
+
+def _metadata_column_key_from_subscript(node: ast.Subscript) -> str | None:
+    sl = node.slice
+    if isinstance(sl, ast.Constant) and isinstance(sl.value, str):
+        return sl.value
+    return None
+
+
+def _is_dtype_metadata_access(node: ast.AST) -> bool:
+    """True when code reads ``dtype`` from a column metadata dict (not pandas ``.dtype``)."""
+    if isinstance(node, ast.Subscript):
+        key = _metadata_column_key_from_subscript(node)
+        if key in _FORBIDDEN_METADATA_COLUMN_KEYS:
+            return True
+    if isinstance(node, ast.Call):
+        func = node.func
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "get"
+            and len(node.args) >= 1
+        ):
+            arg0 = node.args[0]
+            if isinstance(arg0, ast.Constant) and isinstance(arg0.value, str):
+                if arg0.value in _FORBIDDEN_METADATA_COLUMN_KEYS:
+                    return True
+        for kw in node.keywords:
+            if kw.arg is None:
+                continue
+            if kw.arg != "dtype":
+                continue
+            if isinstance(kw.value, ast.Constant) and kw.value.value == "dtype":
+                return True
+    return False
+
+
+def _check_invalid_metadata_column_dtype_access(tree: ast.AST) -> list[PreflightIssue]:
+    issues: list[PreflightIssue] = []
+    for node in ast.walk(tree):
+        if not _is_dtype_metadata_access(node):
+            continue
+        issues.append(
+            PreflightIssue(
+                code="invalid_metadata_column_key",
+                message=(
+                    "MDV datasource column metadata uses 'datatype', not 'dtype'. "
+                    "Use CHATMDV_CATEGORICAL_FIELD_IDS or "
+                    "categorical_field_ids_from_metadata("
+                    "project.get_datasource_metadata(CHATMDV_OBS_DATASOURCE))."
+                ),
+                line=getattr(node, "lineno", None),
+                column=getattr(node, "col_offset", None),
+                symbol="dtype",
+            )
+        )
+    return issues
+
+
+def _check_chart_method_calls(
+    tree: ast.AST,
+    chart_bindings: dict[str, str],
+) -> list[PreflightIssue]:
+    issues: list[PreflightIssue] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Attribute):
+            continue
+        method = func.attr
+        if method in _FORBIDDEN_CHART_METHODS:
+            issues.append(
+                PreflightIssue(
+                    code="forbidden_chart_method",
+                    message=(
+                        f"Chart method `{method}` does not exist in mdvtools.charts. "
+                        "Do not subset charts by row index or invented filter setters; use "
+                        "SelectionDialogPlot, a filtered datasource, or dataframe analysis "
+                        "with print(...to_markdown()) for subset statistics."
+                    ),
+                    line=getattr(node, "lineno", None),
+                    column=getattr(node, "col_offset", None),
+                    symbol=method,
+                )
+            )
+            continue
+        if not isinstance(func.value, ast.Name):
+            continue
+        receiver = func.value.id
+        class_name = chart_bindings.get(receiver)
+        if not class_name:
+            continue
+        allowed = _allowed_chart_methods(class_name)
+        if method in allowed:
+            continue
+        issues.append(
+            PreflightIssue(
+                code="unknown_chart_method",
+                message=(
+                    f"`{receiver}.{method}()` is not a method on `{class_name}` "
+                    f"(or BasePlot). Use only documented chart setters such as "
+                    f"{sorted(allowed)[:12]}{'...' if len(allowed) > 12 else ''}."
+                ),
+                line=getattr(node, "lineno", None),
+                column=getattr(node, "col_offset", None),
+                symbol=method,
+            )
+        )
+    return issues
+
+
 def _check_wrapper_subgroup_literals(
     tree: ast.AST,
     allowed_subgroup_keys: set[str] | None,
@@ -406,6 +573,7 @@ def validate_generated_code_preflight(
     defined_names = _collect_defined_names(tree)
     imported_modules = _collect_imported_modules(tree)
     chart_calls = _extract_chart_calls(tree)
+    chart_bindings = _collect_chart_instance_types(tree)
     literal_bindings = _collect_literal_bindings(tree)
     dataframe_requests = _extract_dataframe_column_requests(tree, literal_bindings)
     seen: list[str] = []
@@ -457,6 +625,8 @@ def validate_generated_code_preflight(
             )
 
     issues.extend(_check_wrapper_and_roles_api(tree, defined_names))
+    issues.extend(_check_invalid_metadata_column_dtype_access(tree))
+    issues.extend(_check_chart_method_calls(tree, chart_bindings))
     issues.extend(_check_wrapper_subgroup_literals(tree, allowed_wrapper_subgroup_keys))
 
     if datasource_fields:
