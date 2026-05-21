@@ -4,6 +4,7 @@ Both methods accept either in-memory dataframe or a path to a delimited text fil
 build a default TablePlot when add_to_view is set. These tests pin shared behaviour so a fix
 landing on only one of the two implemntations is caught.
 """
+import copy
 import pandas as pd
 import pytest
 
@@ -48,7 +49,7 @@ def test_pandas_table_plot_params_respects_supplied_columns_only(tmp_path):
     p.add_datasource(
         name="ds",
         dataframe=csv,
-        columns=SUPPLIED_COLUMNS,
+        columns=copy.deepcopy(SUPPLIED_COLUMNS),
         supplied_columns_only=True,
         add_to_view="Default View",
     )
@@ -63,7 +64,7 @@ def test_polars_table_plot_params_respects_supplied_columns_only(tmp_path):
     p.add_datasource_polars(
         name="ds",
         dataframe=csv,
-        columns=SUPPLIED_COLUMNS,
+        columns=copy.deepcopy(SUPPLIED_COLUMNS),
         supplied_columns_only=True,
         add_to_view="Default View",
     )
