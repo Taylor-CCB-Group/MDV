@@ -232,13 +232,13 @@ pnpm run python-setup
 pnpm run playwright-preflight-project --diagnostic
 ```
 
-If Poetry or `.venv` recreation is blocked on macOS by ACL metadata:
+If `uv` or `.venv` recreation is blocked on macOS by ACL metadata:
 
 ```bash
 ls -le python/.venv
 chmod -N python/.venv
 cd python
-poetry install --with dev
+uv sync --group dev --frozen
 ```
 
 To reset the local Docker database:

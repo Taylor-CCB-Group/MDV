@@ -57,7 +57,7 @@ async function runSyntheticSpatialProjectCli(
     projectPath: string,
     synthetic: SyntheticSpatialGeneratorCliArgs,
 ) {
-    const poetryProjectDir = path.join(REPO_ROOT, "python");
+    const pythonProjectDir = path.join(REPO_ROOT, "python");
     const profile = synthetic.profile ?? "scatter-table";
     const nCells = synthetic.nCells ?? "200";
     const nGenes = synthetic.nGenes ?? "12";
@@ -84,7 +84,7 @@ async function runSyntheticSpatialProjectCli(
     for (const pythonPath of pythonCandidates) {
         try {
             await execFileAsync(pythonPath, args, {
-                cwd: poetryProjectDir,
+                cwd: pythonProjectDir,
                 env: {
                     ...process.env,
                     PYTHONPATH: buildPythonPath(),
