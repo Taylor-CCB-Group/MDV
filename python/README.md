@@ -26,7 +26,7 @@ Install [uv](https://docs.astral.sh/uv/) if it is not already available (e.g. th
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-The version in `python/.uv-version` is what CI uses; match it if you need reproducible lockfile behaviour.
+CI installs uv from `tool.uv.required-version` in `pyproject.toml`; match that if you need reproducible lockfile behaviour.
 
 ### Install MDV
 
