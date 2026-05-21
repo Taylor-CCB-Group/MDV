@@ -190,7 +190,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
             this.baseFeatures = this.getAllFeatures();
         }
         const initialConfig = {
-            genome: this.dataStore.genome?.name || this.dataStore.genome?.id || "hg38",
+            genome: this.dataStore.genome?.assembly  || "hg38",
             ...(this.config.igv_config || {}),
             tracks: [
                 {
@@ -497,8 +497,10 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                 type: "button",
                 current_value: "Add",
                 func: async () => {
-                    const name = this._pendingNameSpec?.current_value.trim() ?? "";
-                    const url = this._pendingUrlSpec?.current_value.trim() ?? "";
+                    // Use the local specs from this rendered settings panel.
+                    // Class-level refs can become stale when settings are rebuilt.
+                    const name = nameSpec.current_value.trim();
+                    const url = urlSpec.current_value.trim();
                     if (!name || !url) {
                         runInAction(() => { statusSpec.current_value = "Please provide both a Track Name and URL."; });
                         return;
@@ -536,7 +538,7 @@ BaseChart.types["igv_browser"] = {
             config.param = [cols.chr, cols.start, cols.end];
         } else if (ds.genome?.svs) {
             const cols = ds.genome.svs.sv_columns;
-            config.param = [cols.chr1, cols.pos1, cols.pos2, cols.chr2];
+            config.param = [cols.chr1, cols.pos1, cols.pos2, cols.chr2,cols.svtype,cols.length];
         }
     },
 };

@@ -1,5 +1,11 @@
-// @ts-expect-error igv typings are incomplete in this setup
-import igv from "igv/dist/igv.esm.js";
+type IgvTrackApi = {
+    TrackBase: new (...args: any[]) => any;
+    createTrack: (...args: any[]) => Promise<any>;
+    registerTrackClass: (name: string, klass: any) => void;
+};
+
+const { default: igvBase } = await import("igv");
+const igv = igvBase as typeof igvBase & IgvTrackApi;
 import type { IGVBaseFeature } from "./igvUtils";
 import { getStructuralVariantStyle } from "./igvUtils";
 type MdvStyle = { name?: string; color?: string } | null;

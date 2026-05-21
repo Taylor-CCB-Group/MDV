@@ -117,6 +117,47 @@ export const OffsetsConfigSchema = z.object({
     values: z.record(z.string(), z.record(z.string(), OffsetValuesSchema)).optional().describe("Nested dictionary: {filter_value: {group_value: transformation}}")
 }).describe("Configuration for spatial transformations to align different data groups or conditions");
 
+// Genome metadata schemas
+export const GenomicLocationColumnsSchema = z.object({
+    chr: z.string().describe("Column name containing chromosome values"),
+    start: z.string().describe("Column name containing genomic start coordinates"),
+    end: z.string().describe("Column name containing genomic end coordinates")
+}).describe("Column mapping for single-locus genomic intervals");
+
+export const GenomicLocationSchema = z.object({
+    columns: GenomicLocationColumnsSchema.describe("Column mapping for genomic interval rows")
+}).describe("Genome metadata for interval-based rows");
+
+export const SVColumnsSchema = z.object({
+    chr1: z.string().describe("Column name containing first breakpoint chromosome"),
+    pos1: z.string().describe("Column name containing first breakpoint position"),
+    pos2: z.string().describe("Column name containing second breakpoint position"),
+    chr2: z.string().describe("Column name containing second breakpoint chromosome"),
+    svtype: z.string().optional().describe("Column name containing structural variant type (optional)"),
+    length: z.string().optional().describe("Column name containing structural variant length (optional)")
+}).describe("Column mapping for structural variant rows");
+
+export const SvsGenomeSchema = z.object({
+    sv_columns: SVColumnsSchema.describe("Column mapping for structural variant rows")
+}).describe("Genome metadata for structural-variant rows");
+
+export const GenomeMetadataSchema = z.object({
+    assembly: z.string().describe("Genome build identifier (e.g., 'hg38', 'mm10')"),
+    ucsc_proxy_url: z.string().optional().describe("Optional proxy URL for UCSC genome browser requests - /ucsc_proxy used by default"),
+    chromosomes: z.record(z.string(), z.number().positive())
+        .optional()
+        .describe("Optional chromosome-length dictionary, required by some SV visualizations"),
+    genomic_location: GenomicLocationSchema.optional().describe("Genome metadata for interval rows"),
+    svs: SvsGenomeSchema.optional().describe("Genome metadata for structural variant rows")
+})
+    .refine(
+        (value) => Boolean(value.genomic_location || value.svs),
+        {
+            message: "Genome metadata must include either 'genomic_location' or 'svs'",
+        },
+    )
+    .describe("Datasource-level genome metadata used by genome-aware charts");
+
 // Genome browser track schema
 export const GenomeBrowserTrackSchema = z.object({
     label: z.string().describe("Human-readable name for the track"),
@@ -191,6 +232,7 @@ export const DataSourceSchema = z.object({
     regions: RegionsConfigSchema.optional().describe("Spatial regions configuration for spatial data"),
     interactions: InteractionsConfigSchema.optional().describe("Interaction data configuration"),
     offsets: OffsetsConfigSchema.optional().describe("Spatial transformation configuration"),
+    genome: GenomeMetadataSchema.optional().describe("Datasource-level genomic metadata for interval and structural-variant rows"),
     genome_browser: GenomeBrowserConfigSchema.optional().describe("Genome browser integration configuration"),
     tree_diagram: z.record(z.string(), z.unknown()).optional().describe("Tree diagram visualization configuration"),
     avivator: z.boolean().optional().describe("Whether Avivator image viewer integration is enabled"),
@@ -215,6 +257,11 @@ export type InteractionChartDefaults = z.infer<typeof InteractionChartDefaultsSc
 export type InteractionsConfig = z.infer<typeof InteractionsConfigSchema>;
 export type OffsetValues = z.infer<typeof OffsetValuesSchema>;
 export type OffsetsConfig = z.infer<typeof OffsetsConfigSchema>;
+export type GenomicLocationColumns = z.infer<typeof GenomicLocationColumnsSchema>;
+export type GenomicLocation = z.infer<typeof GenomicLocationSchema>;
+export type SVColumns = z.infer<typeof SVColumnsSchema>;
+export type SvsGenome = z.infer<typeof SvsGenomeSchema>;
+export type GenomeMetadata = z.infer<typeof GenomeMetadataSchema>;
 export type GenomeBrowserTrack = z.infer<typeof GenomeBrowserTrackSchema>;
 export type ATACBAMTrack = z.infer<typeof ATACBAMTrackSchema>;
 export type GenomeBrowserConfig = z.infer<typeof GenomeBrowserConfigSchema>;

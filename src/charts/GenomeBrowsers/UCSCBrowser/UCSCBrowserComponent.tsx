@@ -18,7 +18,7 @@ const UCSCBrowserComponent = observer(() => {
     const fieldSpecs = useFieldSpecs(chart.config.param);
     const highlightedIndex = useHighlightedIndex();
     const genome = chart.dataStore?.genome;
-    const url_proxy = chart.dataStore?.genome?.genomic?.ucsc_proxy_url || "ucsc_proxy";
+    const url_proxy = chart.dataStore?.genome?.ucsc_proxy_url || "ucsc_proxy";
 
     function getHighlightedRegion(): UCSCBrowserLocation | null {
         const location = highlightedIndexToLocation(highlightedIndex, fieldSpecs, Boolean(genome?.svs));
@@ -77,7 +77,7 @@ const UCSCBrowserComponent = observer(() => {
     // Calculate src reactively - this will re-run when config.location changes
     const src = useMemo(() => {
         // Use the base UCSC URL or config.src
-        const baseUrl = config.src || "https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg38";
+        const baseUrl = config.src || `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${genome?.assembly || "hg38"}`;
         const url = new URL(baseUrl);
 
         // Update or add the position parameter

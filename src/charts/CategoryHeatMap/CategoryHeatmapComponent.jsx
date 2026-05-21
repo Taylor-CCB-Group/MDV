@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useChart } from "../../react/context";
 import { useChartManager } from "../../react/hooks";
 
-const MAX_VISIBLE_CELLS = 1000;
+const MAX_VISIBLE_CELLS = 2000;
 
 function useFilter(datastore) {
     const [filter, setFilter] = useState({});

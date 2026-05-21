@@ -3,10 +3,7 @@ import { useChart } from "@/react/context";
 import { useEffect, useRef, useState } from "react";
 import type IGVBrowser from "./IGVBrowser";
 import { BASE_TRACK_ID } from "./IGVBrowser";
-// @ts-expect-error igv typings are incomplete in this setup
-import igv from "igv/dist/igv.esm.js";
 import type { Browser } from "igv";
-import "./mdvFeatureTrack";
 
 
 
@@ -23,6 +20,7 @@ const IGVBrowserComponent = observer(() => {
     useEffect(() => {
         let disposed = false;
         let localBrowser: Browser | null = null;
+        let igvApi: any = null;
         //this  is probably more complicated then it needs to be but
         //prevents errors on double mounting
         async function init() {
@@ -30,19 +28,22 @@ const IGVBrowserComponent = observer(() => {
             setLoading(true);
             setError(null);
             try {
+                await import("./mdvFeatureTrack");
+                const igvModule = await import("igv");
+                igvApi = igvModule.default;
                 //this will get all the features from the datasource and add them to track config
                 //this will only work with small datasources
                 const config = await chart.getInitialBrowserConfig();
                 if (disposed) return;
                 //create the browser instance in the chart div
                 const browser = await Promise.race([
-                    igv.createBrowser(rootRef.current, config),
+                    igvApi.createBrowser(rootRef.current, config),
                     new Promise<never>((_, reject) => {
                         setTimeout(() => reject(new Error("Timed out while initializing IGV browser.")), 20000);
                     }),
                 ]);
                 if (disposed) {
-                    igv.removeBrowser(browser);
+                    igvApi?.removeBrowser(browser);
                     return;
                 }
                 //now the browser has loaded - keep the its shadow dom for popout
@@ -88,7 +89,7 @@ const IGVBrowserComponent = observer(() => {
             disposed = true;
             const b = localBrowser || browserRef.current;
             if (b) {
-                igv.removeBrowser(b);
+                igvApi?.removeBrowser(b);
             }
             if (browserRef.current === b) browserRef.current = null;
         };

@@ -30,6 +30,8 @@
         "docsenv",
         "docs",
         "node_modules",
+        "data",
+        "sv_data",
         "dist",
         "vite-dist",
         "python",

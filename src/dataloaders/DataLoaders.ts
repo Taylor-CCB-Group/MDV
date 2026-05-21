@@ -218,9 +218,12 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
             return [];
         }
         data = applyDataLoaderFaultAfterFetch(faultConfig, data);
-        const arr  = new Uint8Array(data);
-        decompress = decompress || (arr.length >3 && arr[0] === 120 && arr[1] === 156)
-        data = decompress ? await decompressData(arr) : data;
+        // Heuristic check for zlib data (0x78 0x9C). This can false-positive,
+        // so decompression is attempted best-effort and falls back to raw bytes.
+        const arr = new Uint8Array(data);
+        const shouldDecompress =
+            decompress || (arr.length > 3 && arr[0] === 120 && arr[1] === 156);
+        data = shouldDecompress ? await decompressData(arr, true) : data;
         return processArrayBuffer(data, columns, size);
     };
 }
@@ -339,9 +342,21 @@ class CompressedBinaryDataLoader {
     }
 }
 
-async function decompressData(buffer: Uint8Array) {
+
+async function decompressData(buffer: Uint8Array, fallbackToRaw = false) {
     const { default: pako } = await import("pako");
-    return pako.inflate(buffer).buffer;
+    try {
+        return pako.inflate(buffer).buffer;
+    } catch (error) {
+        if (fallbackToRaw) {
+            console.warn(
+                "Failed to decompress payload, using raw bytes instead",
+                error,
+            );
+            return buffer.buffer;
+        }
+        throw error;
+    }
 }
 
 export {
