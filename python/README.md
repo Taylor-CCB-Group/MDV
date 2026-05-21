@@ -3,46 +3,45 @@
 
 ## Installation
 
-### Environment setup (recommended)
+### Make virtual environment
 
-From the repository root, use the `python-setup` script in `package.json`. It creates a [uv](https://docs.astral.sh/uv/)-managed virtual environment at `python/.venv`, installs Python dependencies, and builds the front-end assets that `mdvtools serve` serves from `python/mdvtools/static`:
+It is recommended, but not essential to create a virtual environment so there are no conflicts with modules in the global python.
 
-```bash
-pnpm i
-pnpm run python-setup
+To create and activate an environment in a Unix-like system:-
+```
+python -m venv /path/to/myenv
+source /path/to/myenv/bin/activate
+````
+In windows:-
+```
+python -m venv c:\path\to\myenv
+c:\path\to\myenv\Scripts\activate.bat
 ```
 
-You need [pnpm](https://pnpm.io/installation) (see `packageManager` in the root `package.json`) and `uv` on your PATH. Install uv if it is not already available (e.g. the dev Docker image includes it):
+### Install poetry
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+Install poetry if it is not already installed. This can be done with the official installer:
+
+```
+curl -sSL https://install.python-poetry.org | python3 -
 ```
 
-CI installs uv from `tool.uv.required-version` in `pyproject.toml`; match that if you need reproducible lockfile behaviour.
-
-Run Python tools with `uv run` from `python/` (no manual activation required), for example:
-
-```bash
-cd python
-uv run -- mdvtools serve /path/to/project
+Or with pipx:
+```
+pip install pipx
+pipx install poetry
 ```
 
-On Windows, the environment lives at `python/.venv`; activate with `python\.venv\Scripts\activate.bat` only if you prefer a traditional shell session.
+See the [poetry installation instructions](https://python-poetry.org/docs/#installing-with-pipx) for more details and troubleshooting.
 
-Avoid creating a separate `venv` with `python -m venv` elsewhere in the tree — that diverges from the repo’s normal layout and tooling (Playwright preflight, pyright, and agent docs expect `python/.venv` or the root `python-setup` flow).
+### Install MDV
 
-### Manual install (equivalent to `python-setup`)
+To install MDV, run:
 
-If `python-setup` fails, run its steps directly (you still need pnpm for the front-end build):
-
-```bash
-cd python
-uv sync --group dev --frozen
-cd ..
-pnpm run build-flask-vite
 ```
-
-Syncing Python packages alone is not enough for `mdvtools serve` — the Vite build must run at least once.
+cd MDV/python
+poetry install --with dev
+```
 
 ## Quick Start
 
@@ -209,14 +208,14 @@ make test-auth
 To run all core tests including performance tests:
 
 ```bash
-uv run -- pytest mdvtools/tests
+poetry run pytest mdvtools/tests
 ```
 
-Auth and backend tests depend on optional dependency groups that are not installed by `pnpm run python-setup`.
+Auth and backend tests depend on optional Poetry groups that are not installed by `pnpm run python-setup`.
 Install those groups first if you want to run the separated suites:
 
 ```bash
-uv sync --group dev --group backend --group auth --frozen
+poetry install --with dev,backend,auth
 ```
 
 ### Performance Testing in CI

@@ -89,23 +89,23 @@ make test-backend
 make test-auth
 
 # All core tests
-uv run -- pytest mdvtools/tests
+poetry run pytest mdvtools/tests
 ```
 
 ### Test Markers
 
 ```bash
 # Run only performance tests
-uv run -- pytest -m performance
+poetry run pytest -m performance
 
 # Run everything except performance tests
-uv run -- pytest mdvtools/tests -m "not performance"
+poetry run pytest mdvtools/tests -m "not performance"
 
 # Run slow tests
-uv run -- pytest -m slow
+poetry run pytest -m slow
 
 # Run integration tests
-uv run -- pytest -m integration
+poetry run pytest -m integration
 ```
 
 ## Performance Test Dataset Sizes
