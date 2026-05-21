@@ -75,13 +75,14 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
             type: "text",
             current_value: c.view_margins.value.toString(),
             func: (x) => {
+                const cur = c.view_margins ?? { type: "fixed_length" as const, value: 1000 };
                 let n = Number.parseInt(x);
                 n = Number.isNaN(n)
-                    ? c.view_margins.type === "percentage"
+                    ? cur.type === "percentage"
                         ? 20
                         : 1000
                     : n;
-                c.view_margins = { type: c.view_margins.type, value: n };
+                c.view_margins = { type: cur.type, value: n };
             },
         }
 
@@ -96,7 +97,8 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
             ],
             current_value: c.view_margins.type,
             func: (x) => {
-                c.view_margins = { type: x as "percentage" | "absolute" | "fixed_length", value: c.view_margins.value };
+                const cur = c.view_margins ?? { type: "fixed_length" as const, value: 1000 };
+                c.view_margins = { type: x as "percentage" | "absolute" | "fixed_length", value: cur.value };
             },
         })
         ];

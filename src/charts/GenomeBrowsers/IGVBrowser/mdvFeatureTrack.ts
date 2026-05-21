@@ -591,7 +591,7 @@ class MdvFeatureTrack extends igv.TrackBase {
         if (!viewports || viewports.length === 0) {
             return;
         }
-        await Promise.all(viewports.map(async (viewport) => {
+        await Promise.all(viewports.map(async (viewport: any) => {
             viewport.featureCache = undefined;
             await viewport.loadFeatures();
             viewport.repaint();

@@ -229,8 +229,6 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
             return "Internal server error", 500
         
     return app
-    
-    return app
 
 
 def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bool = True ,compress_column_data: bool = False):

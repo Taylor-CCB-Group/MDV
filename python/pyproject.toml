@@ -36,6 +36,8 @@ polars = "^1.31.0"
 ruff = "^0.3.7"
 spatialdata = "^0.7.2"
 spatialdata-io = "^0.6.0"
+pysam = "^0.24.0"
+pybedtools = "^0.12.0"
 
 [tool.poetry.group.dev]
 optional = true
