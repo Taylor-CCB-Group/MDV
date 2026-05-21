@@ -71,7 +71,7 @@ async function runSyntheticAnndataProjectCli(
     projectPath: string,
     synthetic: SyntheticAnndataGeneratorCliArgs,
 ) {
-    const pythonProjectDir = path.join(REPO_ROOT, "python");
+    const poetryProjectDir = path.join(REPO_ROOT, "python");
     const profile = synthetic.profile ?? "minimal";
     const nCells = synthetic.nCells ?? 1000;
     const nGenes = synthetic.nGenes ?? 50;
@@ -116,7 +116,7 @@ async function runSyntheticAnndataProjectCli(
     for (const pythonPath of pythonCandidates) {
         try {
             await execFileAsync(pythonPath, args, {
-                cwd: pythonProjectDir,
+                cwd: poetryProjectDir,
                 env: {
                     ...process.env,
                     PYTHONPATH: buildPythonPath(),
