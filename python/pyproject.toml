@@ -50,6 +50,11 @@ Homepage = "https://github.com/Taylor-CCB-Group/MDV"
 [project.scripts]
 mdvtools = "mdvtools.cli:cli"
 
+[tool.uv]
+
+[tool.uv.build-backend]
+module-root = ""
+
 [build-system]
 requires = ["uv_build>=0.9.25,<0.10.0"]
 build-backend = "uv_build"
