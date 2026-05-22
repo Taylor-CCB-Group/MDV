@@ -211,6 +211,16 @@ def _lint_code_with_ruff(code: str, log=print):
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
+def _replace_view_name_assignment(code: str, old_name: str, new_name: str) -> str:
+    """Replace view_name = 'old' or view_name = \"old\" with a safely quoted new value."""
+    new_assignment = f"view_name = {json.dumps(new_name)}"
+    for quote in ('"', "'"):
+        old_assignment = f"view_name = {quote}{old_name}{quote}"
+        if old_assignment in code:
+            return code.replace(old_assignment, new_assignment, 1)
+    return code
+
+
 def patch_viewname(code: str, project: MDVProject, fallback_view_name: Optional[str] = None):
     """Given a code string, replace the view_name with a unique name, 
     attempting to escape any quotes that might have been in the original.
@@ -244,20 +254,14 @@ def patch_viewname(code: str, project: MDVProject, fallback_view_name: Optional[
     if view_name not in existing_views:
         # just in case the view_name isn't a duplicate, but might have had quotes in it
         print(f'patched view_name: {escaped_view_name}')
-        complete_view_name = f"view_name = \"{view_name}\""
-        escaped_complete_view_name = f"view_name = \"{escaped_view_name}\""
-        return code.replace(complete_view_name, escaped_complete_view_name)
-        #return code.replace(view_name, escaped_view_name)
+        return _replace_view_name_assignment(code, view_name, escaped_view_name)
     n = 1
     new_view_name = f"{escaped_view_name} ({n})"
     while new_view_name in existing_views:
         n += 1
         new_view_name = f"{escaped_view_name} ({n})"
     print(f'patched view_name: {new_view_name}')
-    complete_view_name = f"view_name = \"{view_name}\""
-    new_complete_view_name = f"view_name = \"{new_view_name}\""
-    return code.replace(complete_view_name, new_complete_view_name)
-    #return code.replace(view_name, new_view_name)
+    return _replace_view_name_assignment(code, view_name, new_view_name)
 
 def parse_view_name(code: str):
     """Given a code string, extract the view_name from it using AST.
