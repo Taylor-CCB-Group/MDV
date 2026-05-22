@@ -71,7 +71,8 @@ Use ``--artifacts-dir`` to persist per-row ``generated_code.py`` / ``result.json
 
 Per-row ``exit_code`` is ``chat_cli.run_chat_once`` semantics (**0** success, **1**
 logical failure, **2** exception) when the worker returns normally; **3** worker killed
-by signal (SIGKILL is the usual Linux OOM case), **4** worker handshake/bootstrap failure.
+by signal (SIGKILL is the usual Linux OOM case), **4** worker handshake/bootstrap failure,
+**5** worker subprocess timed out (see ``--row-timeout`` / ``ROW_TIMEOUT_SECONDS``).
 Process exit: **0** if all rows succeeded, **1** if any row failed, **2** only for bad
 paths or empty CSV header.
 """
@@ -103,6 +104,12 @@ _SIGKILL = getattr(signal, "SIGKILL", 9)
 
 
 EXCERPT_MAX_LEN = 4000
+
+_DEFAULT_ROW_TIMEOUT_RAW = os.environ.get("CHATMDV_CSV_EVAL_ROW_TIMEOUT_SECONDS", "3600").strip()
+try:
+    ROW_TIMEOUT_SECONDS: float = float(_DEFAULT_ROW_TIMEOUT_RAW)
+except ValueError:
+    ROW_TIMEOUT_SECONDS = 3600.0
 
 SLIM_RESULT_FIELDS = [
     "exec_success",
@@ -249,6 +256,16 @@ def _parse_args() -> argparse.Namespace:
             "worker subprocess per row so SIGKILL is recorded and the run continues."
         ),
     )
+    parser.add_argument(
+        "--row-timeout",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help=(
+            "Per-row worker subprocess wall-clock timeout (default: ROW_TIMEOUT_SECONDS "
+            f"env or {ROW_TIMEOUT_SECONDS:g}s). Ignored with --in-process-rows."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -358,23 +375,46 @@ def _run_chat_row_subprocess(
     project_path: str,
     prompt: str,
     output_dir: str | None,
+    timeout_seconds: float | None = None,
 ) -> tuple[dict[str, object], int, str]:
     """Run ``run_chat_once`` in a child process.
 
     Returns ``(result_dict, row_exit_code, termination_tag)`` where ``termination_tag`` is
     ``\"\"`` for a normal worker handshake, ``\"sigkill\"`` when the child was SIGKILL'd
-    (common for Linux OOM), or ``\"signal_other\"`` for another fatal signal.
+    (common for Linux OOM), ``\"signal_other\"`` for another fatal signal, or
+    ``\"timeout\"`` when the worker exceeded ``timeout_seconds``.
     """
     payload = {"project_path": project_path, "prompt": prompt, "output_dir": output_dir}
     cmd = [sys.executable, str(_SCRIPT_PATH), "--csv-eval-worker"]
+    run_kwargs: dict[str, object] = {
+        "input": json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        "capture_output": True,
+        "check": False,
+        "cwd": str(_PY_ROOT),
+    }
+    if timeout_seconds is not None and timeout_seconds > 0:
+        run_kwargs["timeout"] = timeout_seconds
     try:
-        completed = subprocess.run(
-            cmd,
-            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            capture_output=True,
-            check=False,
-            cwd=str(_PY_ROOT),
+        completed = subprocess.run(cmd, **run_kwargs)
+    except subprocess.TimeoutExpired as exc:
+        stderr_txt = (exc.stderr or b"").decode("utf-8", errors="replace")
+        stdout_txt = (exc.stdout or b"").decode("utf-8", errors="replace")
+        cap_parts = []
+        if stdout_txt.strip():
+            cap_parts.append("Worker stdout excerpt:\n" + _excerpt_tail(stdout_txt, EXCERPT_MAX_LEN))
+        if stderr_txt.strip():
+            cap_parts.append("Worker stderr excerpt:\n" + _excerpt_tail(stderr_txt, EXCERPT_MAX_LEN))
+        cap = "\n".join(cap_parts)
+        msg = (
+            f"Worker subprocess timed out after {timeout_seconds:g}s; "
+            "the CSV runner continues with the next row."
         )
+        fail = _synthetic_worker_failure(
+            project_path=project_path,
+            message=msg,
+            stderr_excerpt=cap or stderr_txt,
+        )
+        return fail, 5, "timeout"
     except OSError as exc:
         fail = _synthetic_worker_failure(
             project_path=project_path,
@@ -469,6 +509,9 @@ def _run_chat_row_subprocess(
 def main() -> int:
     args = _parse_args()
     isolate_rows = not bool(args.in_process_rows)
+    row_timeout_seconds = (
+        args.row_timeout if args.row_timeout is not None else ROW_TIMEOUT_SECONDS
+    )
 
     csv_path = args.csv.expanduser().resolve()
     if not csv_path.is_file():
@@ -532,9 +575,14 @@ def main() -> int:
     comp_header = _find_header(raw_fieldnames, "complexity")
     n_rows = len(rows_in)
 
+    timeout_note = (
+        f", row timeout={row_timeout_seconds:g}s"
+        if isolate_rows and row_timeout_seconds > 0
+        else ""
+    )
     print(
         f"Processing {n_rows} row(s) from {csv_path.name} "
-        f"(row isolation subprocess={isolate_rows})",
+        f"(row isolation subprocess={isolate_rows}{timeout_note})",
         file=sys.stderr,
         flush=True,
     )
@@ -602,12 +650,21 @@ def main() -> int:
         out_dir_str = str(run_out) if run_out else None
         term_tag = ""
         if isolate_rows:
+            row_timeout = row_timeout_seconds if row_timeout_seconds > 0 else None
             result, exit_code, term_tag = _run_chat_row_subprocess(
                 project_path=path,
                 prompt=question,
                 output_dir=out_dir_str,
+                timeout_seconds=row_timeout,
             )
-            if term_tag == "sigkill":
+            if term_tag == "timeout":
+                print(
+                    f"[TIMEOUT] row={idx}: worker subprocess exceeded {row_timeout_seconds:g}s; "
+                    f"recorded as exit_code=5; continuing.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+            elif term_tag == "sigkill":
                 worker_sigkill_rows += 1
                 print(
                     f"[OOM?] row={idx}: worker subprocess was SIGKILL'd (Linux OOM killer "

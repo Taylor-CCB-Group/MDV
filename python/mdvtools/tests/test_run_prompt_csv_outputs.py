@@ -55,6 +55,7 @@ def test_run_prompt_csv_slim_results_and_details_jsonl(tmp_path, monkeypatch):
         str(input_csv),
         "--output-dir",
         str(out_dir),
+        "--in-process-rows",
     ]
     monkeypatch.setattr(sys, "argv", argv)
     exit_code = run_prompt_csv.main()
@@ -134,6 +135,7 @@ def test_run_prompt_csv_failure_details_in_jsonl_not_csv(tmp_path, monkeypatch):
         str(input_csv),
         "--output-dir",
         str(out_dir),
+        "--in-process-rows",
     ]
     monkeypatch.setattr(sys, "argv", argv)
     exit_code = run_prompt_csv.main()
