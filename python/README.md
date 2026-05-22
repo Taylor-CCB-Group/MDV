@@ -193,10 +193,29 @@ To run only performance/stress tests:
 make test-performance
 ```
 
-To run all tests including performance tests:
+To run the backend-only test suite:
 
 ```bash
-poetry run pytest mdvtools/
+make test-backend
+```
+
+To run the auth-only test suite:
+
+```bash
+make test-auth
+```
+
+To run all core tests including performance tests:
+
+```bash
+poetry run pytest mdvtools/tests
+```
+
+Auth and backend tests depend on optional Poetry groups that are not installed by `pnpm run python-setup`.
+Install those groups first if you want to run the separated suites:
+
+```bash
+poetry install --with dev,backend,auth
 ```
 
 ### Performance Testing in CI

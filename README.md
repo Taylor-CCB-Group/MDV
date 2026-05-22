@@ -61,7 +61,7 @@ code .
 
 This should display a prompt to re-open in a devcontainer, which will initially take a few minutes to build and then open a server on http://localhost:5055.
 
-For front-end development, a vite dev-server can be started with `npm run dev` from a terminal in the container. The main front-page for that is accessed at http://localhost:5170/ by default, and you can pick another port with `npm run dev -- --port <port>`.
+For front-end development, a vite dev-server can be started with `pnpm run dev` from a terminal in the container. The main front-page for that is accessed at http://localhost:5170/ by default, and you can pick another port with `pnpm run dev -- --port <port>`.
 
 
 ### Alternative steps for running locally

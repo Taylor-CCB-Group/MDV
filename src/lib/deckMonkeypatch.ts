@@ -12,6 +12,9 @@ class MonkeyPatchDeck extends Deck<any> {
     declare public viewManager;
     declare public animationLoop;
     declare public canvas;
+    declare _onPointerDown: (event: unknown) => void;
+    declare _onPointerMove: (event: unknown) => void;
+    declare _onPointerUp?: (event: unknown) => void;
 }
 
 /**
@@ -44,23 +47,7 @@ class EditableLayer {
 ```
 */
 
-export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
-    override _addEventHandlers() {
-        super._addEventHandlers();
-        // @ts-expect-error accessing protected props
-        const { eventManager } = this.context.deck;
-        const { eventHandler } = this.state._editableLayerState;
-        console.warn('---monkey patch adding click -> anyclick handler to editable layer pending deck update---');
-        eventManager.on('click', eventHandler, { priority: 100 });
-        eventManager.on('dblclick', eventHandler, { priority: 100 });
-    }
-    _onclick(event: any) {
-        this._onanyclick(event);
-    }
-    _ondblclick(event: any) {
-        this._onanyclick(event);
-    }
-}
+export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {}
 
 const EVENT_HANDLERS: { [eventName: string]: string } = {
     click: 'onClick', //is onClick a thing?
@@ -78,6 +65,14 @@ const RECOGNIZERS = {
     // pointerdown is being handled by deck.js _onPointerDown which does picking...
     // and then we miss out.
     click: [Tap, { event: 'click' }, null, ['dblclick']],
+} as const;
+
+const DECK_EVENT_MANAGER_EVENTS = {
+    pointerdown: (deck: MonkeyPatchDeck) => deck._onPointerDown,
+    pointermove: (deck: MonkeyPatchDeck) => deck._onPointerMove,
+    pointerleave: (deck: MonkeyPatchDeck) => deck._onPointerMove,
+    // Without pointerup, tap/click recognizers and panend do not reliably fire.
+    pointerup: (deck: MonkeyPatchDeck) => deck._onPointerUp,
 } as const;
 
 
@@ -129,11 +124,11 @@ export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeo
                 requestFailure
             };
         }),
-        events: {
-            pointerdown: deck._onPointerDown,
-            pointermove: deck._onPointerMove,
-            pointerleave: deck._onPointerMove
-        }
+        events: Object.fromEntries(
+            Object.entries(DECK_EVENT_MANAGER_EVENTS)
+                .map(([eventName, getHandler]) => [eventName, getHandler(deck)])
+                .filter(([, handler]) => typeof handler === "function")
+        ),
     });
     deck.eventManager = eventManager;
     for (const eventType in EVENT_HANDLERS) {

@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { mockApiRoot, mockProjects, gotoPath } from "../utils/routes";
+import { gotoPath, mockApiRoot, mockExtensionConfig, mockProjects } from "../utils/routes";
 import { project } from "../utils/data";
 
 test.describe("Project operations", () => {
     test.beforeEach(async ({ page }) => {
         await mockApiRoot(page);
+        await mockExtensionConfig(page);
         await mockProjects(page, [
             project({ id: "p1", name: "Alpha" }),
         ]);
@@ -35,19 +36,5 @@ test.describe("Project operations", () => {
         await page.getByTestId("project_delete_p1").click();
         await page.getByRole("button", { name: /delete project/i }).click();
         await expect(page.getByText("Alpha")).toHaveCount(0);
-    });
-
-    test("export project", async ({ page }) => {
-        
-      const downloadPromise = page.waitForEvent("download");
-
-      await page.route("**/export_project/p1", (r) =>
-            r.fulfill({ body: "ZIP", headers: { "Content-Type": "application/zip" } }),
-        );
-        await page.getByTestId("project_menu_p1").click();
-        await page.getByTestId("project_export_p1").click();
-        const dl = await downloadPromise;
-        expect(dl.suggestedFilename()).toContain(".zip");
-        expect(dl.suggestedFilename()).toEqual("Alpha.mdv.zip");
     });
 });

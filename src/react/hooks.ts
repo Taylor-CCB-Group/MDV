@@ -1,10 +1,10 @@
 import type React from "react";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action, autorun, runInAction } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
+import type { CategoricalDataType, ColumnName, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
@@ -13,11 +13,69 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
-import { getCategoryFilterIndices } from "./categoryFilterUtils";
+import { getCategoryFilterIndices, rowMatchesCategoryFilter, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
 import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
+import {
+    getOwnerVisibleRows,
+    isRowFilteredByOtherOwner,
+    type FilterArrayLike,
+    type RowScopePredicate,
+} from "@/lib/filterOwnership";
+import { useChartManagerContext } from "./chartManagerContext";
 
 /** Region constraint for `filterPoly` — restricts the polygon filter to rows in a specific region. */
 export type FilterPolyRegionOpts = { regionField: string; regionValue: string };
+type ChartScopeCategoryFilter = {
+    column: ColumnName;
+    category?: string | string[] | null;
+};
+type ChartScopeConfig = {
+    background_filter?: ChartScopeCategoryFilter;
+    category_filters?: ChartScopeCategoryFilter[];
+};
+
+let nextFilteredIndicesListenerId = 0;
+
+function isAllCategoryFilter(category?: string | string[] | null) {
+    if (category == null) return true;
+    if (isArray(category)) return category.length === 0 || category.includes("all");
+    return category === "" || category === "all";
+}
+
+export function getActiveChartScopeFilters(config: ChartScopeConfig) {
+    const filters: ChartScopeCategoryFilter[] = [];
+    const backgroundFilter = config.background_filter;
+    if (
+        backgroundFilter &&
+        !isAllCategoryFilter(backgroundFilter.category)
+    ) {
+        filters.push(backgroundFilter);
+    }
+
+    for (const filter of config.category_filters ?? []) {
+        if (!isAllCategoryFilter(filter.category)) {
+            filters.push(filter);
+        }
+    }
+    return filters;
+}
+
+function getChartScopeFilterKey(filters: ChartScopeCategoryFilter[]) {
+    return JSON.stringify(filters.map(({ column, category }) => ({ column, category })));
+}
+
+function isChartScopeFilterColumn(column: unknown): column is CategoryFilterColumn {
+    if (typeof column !== "object" || column === null) return false;
+    if (!("datatype" in column) || !("values" in column) || !("data" in column)) {
+        return false;
+    }
+    const datatype = column.datatype;
+    return (
+        (datatype === "text" || datatype === "text16" || datatype === "multitext") &&
+        Array.isArray(column.values) &&
+        column.data != null
+    );
+}
 
 /**
  * Get the chart's config.
@@ -32,7 +90,13 @@ export function useConfig<T>() {
     return config as T & BaseConfig; //todo: strict/inferred typing
 }
 export function useChartManager() {
-    return window.mdv.chartManager;
+    const chartManager = useChartManagerContext();
+    const globalChartManager = typeof window !== "undefined" ? window.mdv?.chartManager : undefined;
+    const resolvedChartManager = chartManager ?? globalChartManager;
+    if (!resolvedChartManager) {
+        throw new Error("ChartManager is not available yet.");
+    }
+    return resolvedChartManager;
 }
 export function useViewManager() {
     return useChartManager().viewManager;
@@ -155,6 +219,7 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
  */
 export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
     const chart = useChart();
+    const chartManager = useChartManager();
     // consider different loading strategies, lazy vs eager column data
     //todo generic type with corresponding check when loaded
     const [columns, setColumns] = useState<DataColumn<any>[]>([]);
@@ -170,18 +235,17 @@ export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
                 setColumns([]);
                 return;
             }
-            const cm = window.mdv.chartManager;
             // if this is less efficient than it could be with already loaded columns,
             // we could fix it upstream - although there'll always be some async...
             // but then that's generally the case with setState etc
             // console.log("loading columns", fieldNames);
-            cm.loadColumnSet(fieldNames, chart.dataStore.name, () => {
+            chartManager.loadColumnSet(fieldNames, chart.dataStore.name, () => {
                 const { columnIndex } = chart.dataStore;
                 const columns = fieldNames.map((f) => columnIndex[f]).filter(notEmpty);
                 setColumns(columns);
             });
         });
-    }, [specs, chart.dataStore]);
+    }, [specs, chart.dataStore, chartManager]);
     return columns;
 }
 export function useFieldSpec(spec?: FieldSpec) {
@@ -195,6 +259,7 @@ export function useFieldSpec(spec?: FieldSpec) {
 /** version of {@link useParamColumns} that only returns columns once they've been loaded */
 export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
+    const chartManager = useChartManager();
     const { columnIndex } = chart.dataStore;
     const [columns, setColumns] = useState<LoadedDataColumn<DataType>[]>([]);
     // const columns = useMemo(() => {
@@ -202,21 +267,20 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
         return autorun(() => {
             const param = chart.config.param;
             if (!isArray(param)) throw "config.param should always be an array";
-            const cm = window.mdv.chartManager;
             const dsName = chart.dataStore.name;
             if (!param || param.length === 0) {
                 setColumns([]);
                 return;
             }
             const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
-            cm.loadColumnSet(renderedParam, dsName, () => {
+            chartManager.loadColumnSet(renderedParam, dsName, () => {
                 const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
                 if (!allColumnsLoaded(cols)) throw "bad column state";
                 setColumns(cols);
             });
             return;
         });
-    }, [chart.config.param, columnIndex, chart.dataStore]);
+    }, [chart.config.param, columnIndex, chart.dataStore, chartManager]);
     return columns;
 }
 
@@ -225,6 +289,7 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
  */
 export function useOrderedParamColumns<T extends { order?: Record<string, number> } = SelectionDialogConfig>(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
+    const chartManager = useChartManager();
     const { columnIndex } = chart.dataStore;
     const config = useConfig<T>();
     const [orderedParams, setOrderedParams] = useState<LoadedDataColumn<DataType>[]>([]);
@@ -233,14 +298,13 @@ export function useOrderedParamColumns<T extends { order?: Record<string, number
         const disposer = autorun(() => {
             const param = config.param;
             if (!isArray(param)) throw "config.param should always be an array";
-            const cm = window.mdv.chartManager;
             const dsName = chart.dataStore.name;
             if (!param || param.length === 0) {
                 setOrderedParams([]);
                 return;
             }
             const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
-            cm.loadColumnSet(renderedParam, dsName, () => {
+            chartManager.loadColumnSet(renderedParam, dsName, () => {
                 // Get the loaded columns
                 const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
                 if (!allColumnsLoaded(cols)) throw "bad column state";
@@ -265,7 +329,7 @@ export function useOrderedParamColumns<T extends { order?: Record<string, number
 
         // Cleanup the disposer
         return () => disposer();
-    }, [config.param, config.order, columnIndex, chart.dataStore]);
+    }, [config.param, config.order, columnIndex, chart.dataStore, chartManager]);
 
     return orderedParams;
 }
@@ -296,11 +360,15 @@ export function useRegion() {
  */
 function useFilteredIndicesRefreshVersion() {
     const dataStore = useDataStore();
-    const listenerId = useId();
+    const listenerKeyRef = useRef<string | null>(null);
+    let listenerKey = listenerKeyRef.current;
+    if (listenerKey === null) {
+        listenerKey = `filtered-indices-${nextFilteredIndicesListenerId++}`;
+        listenerKeyRef.current = listenerKey;
+    }
     const [refreshVersion, setRefreshVersion] = useState(0);
 
     useEffect(() => {
-        const key = `filtered-indices-${listenerId}`;
         const listener = (type: string) => {
             if (!shouldRefreshFilteredIndices(type)) {
                 return;
@@ -308,11 +376,96 @@ function useFilteredIndicesRefreshVersion() {
             setRefreshVersion((version) => version + 1);
         };
 
-        dataStore.addListener(key, listener);
-        return () => dataStore.removeListener(key);
-    }, [dataStore, listenerId]);
+        dataStore.addListener(listenerKey, listener);
+        return () => dataStore.removeListener(listenerKey);
+    }, [dataStore, listenerKey]);
 
     return refreshVersion;
+}
+
+export function useChartScopeFilterPredicate() {
+    const dataStore = useDataStore();
+    const chartManager = useChartManager();
+    const config = useConfig<ChartScopeConfig>();
+    const activeFilters = getActiveChartScopeFilters(config);
+    const filterKey = getChartScopeFilterKey(activeFilters);
+    const [loadedFilterKey, setLoadedFilterKey] = useState("");
+
+    useEffect(() => {
+        if (activeFilters.length === 0) {
+            setLoadedFilterKey(filterKey);
+            return;
+        }
+
+        let cancelled = false;
+        const filterColumns = activeFilters.map(({ column }) => column);
+        const columnPromise = chartManager._getColumnsAsync(
+            dataStore.name,
+            filterColumns,
+        );
+
+        if (!columnPromise) {
+            setLoadedFilterKey(filterKey);
+            return;
+        }
+
+        columnPromise
+            .then(() => {
+                if (!cancelled) setLoadedFilterKey(filterKey);
+            })
+            .catch((error: unknown) => {
+                console.warn("failed to load chart-scope filter columns", error);
+                if (!cancelled) setLoadedFilterKey("");
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [chartManager, dataStore.name, filterKey]);
+
+    const predicate = useMemo<RowScopePredicate | null>(() => {
+        if (activeFilters.length === 0) {
+            return null;
+        }
+        if (loadedFilterKey !== filterKey) {
+            return null;
+        }
+
+        const filtersWithColumns = activeFilters.flatMap((filter) => {
+            const column = dataStore.columnIndex[filter.column];
+            if (!isColumnLoaded(column) || !isChartScopeFilterColumn(column)) {
+                return [];
+            }
+            return [{ filter, column }];
+        });
+
+        if (filtersWithColumns.length !== activeFilters.length) {
+            console.warn("chart-scope filter columns were not loaded");
+            return null;
+        }
+
+        return (rowIndex: number) =>
+            filtersWithColumns.every(({ filter, column }) =>
+                rowMatchesCategoryFilter(rowIndex, column, filter.category ?? null),
+            );
+    }, [dataStore.columnIndex, filterKey, loadedFilterKey]);
+
+    return {
+        predicate,
+        ready: activeFilters.length === 0 || (loadedFilterKey === filterKey && predicate !== null),
+    };
+}
+
+function useScopedFilteredIndices({
+    predicate,
+    ready,
+}: ReturnType<typeof useChartScopeFilterPredicate>) {
+    const simpleFilteredIndices = useSimplerFilteredIndices();
+    return useMemo(() => {
+        if (!ready) return new Uint32Array(0);
+        if (!predicate) return simpleFilteredIndices;
+        return simpleFilteredIndices.filter(predicate);
+    }, [predicate, ready, simpleFilteredIndices]);
 }
 
 /**
@@ -322,97 +475,8 @@ function useFilteredIndicesRefreshVersion() {
  * -- change properties/settings so that we can more dynamically select.
  */
 export function useFilteredIndices() {
-    // in the case of region data, it should be filtered by that as well...
-    // I really want to sort out how I use types here...
-    const config = useConfig<VivRoiConfig>();
-    const filterColumn = config.background_filter?.column;
-    const simpleFilteredIndices = useSimplerFilteredIndices();
-    const dataStore = useDataStore();
-    const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
-    useEffect(() => {
-        // return
-        let cancelled = false;
-        simpleFilteredIndices; // referenced so local filters refresh when the base filtered rows change
-        if (!filterColumn) return;
-        const indexPromise = dataStore.getFilteredIndices();
-        //todo maybe make more use of deck.gl category filters once we update to new version
-        const catFilters = [
-            config.background_filter,
-            ...config.category_filters.filter((f) => f.category !== "all"),
-        ];
-        const catColumns = catFilters.map((f) => f.column);
-        const colPromise = window.mdv.chartManager?._getColumnsAsync(
-            dataStore.name,
-            catColumns,
-        );
-        Promise.all([indexPromise, colPromise, dataStore._filteredIndicesPromise]).then(([indices]) => {
-            if (cancelled) return;
-            if (filterColumn) {
-                const cols = catFilters.map(
-                    ({ column }) => dataStore.columnIndex[column],
-                ).filter(notEmpty).filter(isColumnLoaded);
-                if (cols.length !== catFilters.length) {
-                    console.warn("housekeeping issue? expected all cols to be notEmpty and loaded.");
-                }
-                const filterValue = config.background_filter?.category;
-                if (filterValue) {
-                    //const filterIndex = col.values.indexOf(filterValue);
-                    const filterIndex = catFilters.map((f) => {
-                        if (isArray(f.category))
-                            return f.category.map((c) =>
-                                dataStore.columnIndex[f.column]?.values.indexOf(
-                                    c,
-                                ),
-                            ) as number[];
-                        return dataStore.columnIndex[f.column]?.values.indexOf(
-                            f.category,
-                        ) as number;
-                    });
-                    try {
-                        // const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
-                        const filteredIndices = indices.filter((i) =>
-                            catFilters.every((_, j) => {
-                                const f = filterIndex[j];
-                                if (typeof f === "number")
-                                    return f === cols[j].data[i];
-                                return f.some((fi) => cols[j].data[i] === fi);
-                            }),
-                        );
-                        setFilteredIndices(filteredIndices);
-                        // thinking about allowing gray-out of non-selected points... should be optional
-                        // const filteredOutIndices = indices.filter(i => col.data[i] !== filterIndex);
-                        // setFilteredOutIndices(filteredOutIndices);
-                    } catch (e) {
-                        console.error("error filtering indices", e);
-                        return;
-                    }
-                    return;
-                }
-            }
-            //@ts-ignore ! there seems to be a discrepancy here after ts upgrade???
-            setFilteredIndices(indices);
-        });
-        // should I have a cleanup function to cancel the promise if it's not resolved
-        // by the time the effect is triggered again?
-        return () => {
-            // if (!finished) console.log('filtered indices promise cancelled');
-            cancelled = true;
-        };
-
-        // using _filteredIndicesPromise as a dependency is working reasonably well,
-        // but possibly needs a bit more thought.
-    }, [
-        simpleFilteredIndices,
-        dataStore._filteredIndicesPromise,
-        filterColumn,
-        config.background_filter,
-        config.category_filters,
-        dataStore.columnIndex,
-        dataStore.getFilteredIndices,
-        dataStore.name,
-    ]);
-    if (!filterColumn) return simpleFilteredIndices;
-    return filteredIndices;
+    const chartScope = useChartScopeFilterPredicate();
+    return useScopedFilteredIndices(chartScope);
 }
 
 /** 
@@ -445,6 +509,57 @@ export function useFilterArray() {
         data; //referencing this so it's a dependency
         return ds.filterArray;
     }, [ds.filterArray, data]);
+}
+
+export type FilterOwner = {
+    getLocalFilter: () => FilterArrayLike;
+    bgfArray?: unknown;
+    filterMethod?: unknown;
+};
+
+export function useOwnedFilteredIndices(filterOwner?: FilterOwner | null) {
+    const chartScope = useChartScopeFilterPredicate();
+    const aggregateFilteredRows = useScopedFilteredIndices(chartScope);
+    const globalFilter = useFilterArray();
+    const localFilter = filterOwner?.getLocalFilter() ?? null;
+    const localFilterIsActive = Boolean(filterOwner?.filterMethod || filterOwner?.bgfArray);
+    const { predicate, ready } = chartScope;
+
+    const ownerVisibleRows = useMemo(() => {
+        if (!ready) return new Uint32Array(0);
+        return getOwnerVisibleRows({
+            aggregateRows: aggregateFilteredRows,
+            globalFilter,
+            localFilter,
+            localFilterIsActive,
+            scopePredicate: predicate,
+        });
+    }, [
+        aggregateFilteredRows,
+        globalFilter,
+        localFilter,
+        localFilterIsActive,
+        predicate,
+        ready,
+    ]);
+
+    const isExternallyFiltered = useCallback(
+        (rowIndex: number) =>
+            ready &&
+            isRowFilteredByOtherOwner(
+                rowIndex,
+                globalFilter,
+                localFilter,
+                predicate,
+            ),
+        [globalFilter, localFilter, predicate, ready],
+    );
+
+    return {
+        aggregateFilteredRows,
+        ownerVisibleRows,
+        isExternallyFiltered,
+    };
 }
 
 
@@ -496,7 +611,7 @@ export function useImgUrl(): string {
  * which will require more careful consideration (as of this writing it's mostly ChartManager._init() that mutates dataSources).
  */
 export function useDataSources() {
-    return window.mdv.chartManager?.dataSources;
+    return useChartManager().dataSources;
 }
 
 /**
@@ -580,7 +695,7 @@ export function useRangeDimension2D() {
 }
 
 
-export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClose: () => void) => {
+export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement | null>, onClose: () => void) => {
     useEffect(() => {
         if (!ref.current) return;
         // Observer to observe the an element and close it when it intersects the parent element (most likely while scrolling)
@@ -674,7 +789,7 @@ export const usePasteHandler = <T, V = T>({
  * Hook that provides the resize logic for a drawer
  */
 export const useResizeDrawer = (
-    dialogRef: React.RefObject<HTMLDivElement>, 
+    dialogRef: React.RefObject<HTMLDivElement | null>, 
     defaultDrawerWidth: number, 
     minDrawerWidth: number, 
     maxDrawerWidth: number

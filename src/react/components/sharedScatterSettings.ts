@@ -80,6 +80,19 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
                 config.opacity = value * value;
             },
         }),
+        g({
+            type: "radiobuttons",
+            label: "Action on Filter",
+            choices: [
+                ["Hide Points", "hide"],
+                ["Gray Out Points", "grey"],
+            ],
+            current_value: config.on_filter,
+            func: (x) => {
+                //@ts-expect-error x is a string, but we have a narrow "hide" | "grey" type
+                config.on_filter = x;
+            },
+        }),
     );
 
     if (includeZoomOnFilter) {

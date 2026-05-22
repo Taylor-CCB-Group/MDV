@@ -31,12 +31,18 @@ from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
 datatype_mappings = {
+    "int8": "integer",
+    "int16": "integer",
+    "uint8": "integer",
+    "uint16": "integer",
+    "uint32": "integer",
     "int64": "integer",
     "float64": "double",
     "float32": "double",
@@ -167,14 +173,136 @@ class MDVProject:
         ds["columns"][col_index[0]][parameter] = value
         self.set_datasource_metadata(ds)
 
-    def get_datasource_as_dataframe(self, datasource: str) -> pandas.DataFrame:
+    def get_datasource_as_dataframe(
+        self, datasource: str, columns: Optional[List[str]] = None
+    ) -> pandas.DataFrame:
         ## nb, I'd quite like to have some 'DataSourceName' type alias so we know it's not just any string...
+        from mdvtools.llm.column_field_resolve import _WRAPPER_RE
+
         ds = self.get_datasource_metadata(datasource)
-        df = pandas.DataFrame()
-        for c in ds["columns"]:
-            data = self.get_column(datasource, c["field"])
-            df[c["field"]] = data
-        return df
+        fields = [c["field"] for c in ds["columns"]]
+        field_set = set(fields)
+
+        if columns is None:
+            out: dict[str, Any] = {}
+            for field in fields:
+                out[field] = self.get_column(datasource, field)
+            return pandas.DataFrame(out)
+
+        requested_keys: list[str] = []
+        for col in columns:
+            key = col.strip() if isinstance(col, str) else col
+            if not isinstance(key, str):
+                raise AttributeError(f"invalid column key: {col!r}")
+            requested_keys.append(key)
+
+        # Chart "wrapper" tokens (e.g. gs|GENE(gs)|0) are not metadata field ids; they address
+        # rows-as-columns matrix columns. Handle those alongside normal field ids.
+        out: dict[str, Any] = {}
+        n_rows = int(ds.get("size", 0))
+        if "size" not in ds and fields:
+            # Preserve old fallback behavior without eagerly reading all columns.
+            n_rows = len(self.get_column(datasource, fields[0]))
+        for key in requested_keys:
+            if _WRAPPER_RE.match(key):
+                out[key] = self._read_wrapper_expression_column(
+                    datasource, key, n_rows
+                )
+            elif key in field_set:
+                out[key] = self.get_column(datasource, key)
+            else:
+                raise AttributeError(
+                    f"column {key!r} not found in {datasource} datasource "
+                    f"(have metadata fields: {fields})"
+                )
+        return pandas.DataFrame(out)
+
+    def _resolve_rows_as_columns_subgroup(
+        self, row_datasource: str, subgroup_key: str
+    ) -> tuple[str, bool]:
+        """
+        Return (h5 matrix group name under the row datasource, is_sparse).
+        Tries exact subgroup key, then `{key}_expr`, then the sole subgroup if unambiguous.
+        """
+        lnks = self.get_links(row_datasource, "rows_as_columns") or []
+        candidates = [subgroup_key, f"{subgroup_key}_expr", f"{subgroup_key}_EXPR"]
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            for cand in candidates:
+                if cand in subgroups:
+                    info = subgroups[cand]
+                    name = str(info.get("name", cand))
+                    sparse = info.get("type") == "sparse"
+                    return name, sparse
+            if len(subgroups) == 1:
+                _k, info = next(iter(subgroups.items()))
+                name = str(info.get("name", _k))
+                sparse = info.get("type") == "sparse"
+                return name, sparse
+        avail: list[str] = []
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            avail.extend(list(subgroups.keys()))
+        raise AttributeError(
+            f"rows-as-columns subgroup {subgroup_key!r} not found on {row_datasource!r}. "
+            f"Available subgroup keys: {avail}"
+        )
+
+    def _read_subgroup_matrix_column(
+        self, grp: Any, col_index: int, sparse: bool, n_rows: int
+    ) -> numpy.ndarray:
+        """One matrix column (genes x cells): cells are rows, col_index selects a gene column."""
+        if not sparse:
+            rows_per_col = int(grp["length"][0])
+            n_cols = len(grp["x"]) // rows_per_col
+            if not (0 <= col_index < n_cols):
+                raise IndexError(
+                    f"col_index {col_index} out of range for dense subgroup matrix "
+                    f"(valid range: [0, {n_cols - 1}])"
+                )
+            offset = col_index * rows_per_col
+            return numpy.asarray(
+                grp["x"][offset : offset + rows_per_col], dtype=numpy.float32
+            )
+        p = grp["p"]
+        n_cols = len(p) - 1
+        if not (0 <= col_index < n_cols):
+            raise IndexError(
+                f"col_index {col_index} out of range for sparse subgroup matrix "
+                f"(valid range: [0, {n_cols - 1}])"
+            )
+        offset = p[col_index : col_index + 2]
+        start, end = int(offset[0]), int(offset[1])
+        _indexes = numpy.array(grp["i"][start:end], dtype=numpy.int64)
+        _values = numpy.array(grp["x"][start:end], dtype=numpy.float32)
+        dense = numpy.zeros(n_rows, dtype=numpy.float32)
+        if _indexes.size:
+            dense[_indexes] = _values
+        return dense
+
+    def _read_wrapper_expression_column(
+        self, row_datasource: str, wrapper: str, n_rows: int
+    ) -> list[float]:
+        from mdvtools.llm.column_field_resolve import _WRAPPER_RE
+
+        m = _WRAPPER_RE.match(wrapper.strip())
+        if not m:
+            raise AttributeError(f"invalid expression wrapper: {wrapper!r}")
+        subgroup_key = m.group(1).strip()
+        col_index = int(m.group(3))
+        group_name, sparse = self._resolve_rows_as_columns_subgroup(
+            row_datasource, subgroup_key
+        )
+        h5 = self._get_h5_handle(read_only=True)
+        try:
+            gr = h5[row_datasource]
+            if not isinstance(gr, h5py.Group):
+                raise AttributeError(f"datasource {row_datasource!r} is not an h5 group")
+            sgrp = gr[group_name]
+            arr = self._read_subgroup_matrix_column(sgrp, col_index, sparse, n_rows)
+            return [float(x) for x in arr]
+        finally:
+            h5.close()
 
     def check_columns_exist(self, datasource, columns):
         md = self.get_datasource_metadata(datasource)
@@ -588,20 +716,29 @@ class MDVProject:
         elif not read_only:
             mode = "a"
         try:
-            return h5py.File(self.h5file, mode)
-        except Exception:
+            handle = h5py.File(self.h5file, mode)
+            return handle
+        except Exception as e:
             # certain environments seem to have issues with the handle not being closed instantly
             # if there is a better way to do this, please change it
             # if there are multiple processes trying to access the file, this may also help
             # (although if they're trying to write, who knows what bad things may happen to the project in general)
             time.sleep(0.1)
             attempt += 1
-            logger.error(f"error opening h5 file, attempt {attempt}...")
+            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            if lock_error:
+                logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
+            else:
+                logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
+            if attempt >= 20:
+                raise RuntimeError(
+                    f"unable to open h5 file after {attempt} attempts: {self.h5file}"
+                ) from e
             return self._get_h5_handle(read_only, attempt)
 
     def get_column(self, datasource: str, column, raw=False):
         cm = self.get_column_metadata(datasource, column)
-        h5 = self._get_h5_handle()
+        h5 = self._get_h5_handle(read_only=True)
         gr = h5[datasource]
         if not isinstance(gr, h5py.Group):
             h5.close()
@@ -1343,11 +1480,7 @@ class MDVProject:
             if add_to_view:
                 # TablePlot parameters
                 title = name
-                # Use collect_schema().names() for LazyFrame, .columns for DataFrame
-                if isinstance(dataframe, pl.LazyFrame):
-                    params = dataframe.collect_schema().names()
-                else:
-                    params = dataframe.columns
+                params = [x["field"] for x in columns]
                 size = [792, 472]
                 position = [10, 10]
             
@@ -2359,6 +2492,7 @@ def add_column_to_group(
     group (h5py.Group): The group to add the data to
     length (int): The length of the data
     """
+    col.setdefault("original_dtype", str(data.dtype))
 
     if (
         col["datatype"] == "text"
@@ -2431,7 +2565,7 @@ def add_column_to_group(
         for i in range(0, length):
             b = i * maxv
             try:
-                v = data[i]  # may raise KeyError if data is None at this index
+                v = data.iloc[i] if hasattr(data, "iloc") else data[i]
                 if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
@@ -2458,12 +2592,32 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
+        if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
+            try:
+                numeric = numpy.asarray(
+                    pandas.to_numeric(clean, errors="coerce"),
+                    dtype=numpy.float64,
+                )
+                finite_numeric = numeric[numpy.isfinite(numeric)]
+                out_of_range = finite_numeric[finite_numeric > 16_777_216]
+                if len(out_of_range) != 0:
+                    col.setdefault("storage_warnings", []).append(
+                        "uint32 -> float32 (integer): "
+                        f"{len(out_of_range)} value(s) exceed exact-integer range "
+                        f"(max={float(finite_numeric.max()):.0f}); precision loss possible."
+                    )
+            except Exception:
+                pass
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
+        if na.size == 0:
+            col["minMax"] = [0.0, 0.0]
+            col["quantiles"] = {}
+            return
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
@@ -2482,7 +2636,12 @@ def get_column_info(columns, dataframe, supplied_columns_only):
 
     if not supplied_columns_only:
         cols = [
-            {"datatype": datatype_mappings[d.name], "name": c, "field": c}
+            {
+                "datatype": datatype_mappings[d.name],
+                "name": c,
+                "field": c,
+                "original_dtype": d.name,
+            }
             for d, c in zip(dataframe.dtypes, dataframe.columns)
         ]
         # replace with user given column metadata
@@ -2545,6 +2704,7 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
     import numpy as np
     
     field = col_info["field"]
+    col_info.setdefault("original_dtype", str(polars_series.dtype))
     
     # Handle different column types
     if col_info["datatype"] in ["text", "text16", "multitext"]:
@@ -2616,6 +2776,21 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 # fillna is necessary because NaN cannot be cast to int
                 data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
 
+            if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
+                try:
+                    numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
+                    arr = numeric.to_numpy()
+                    finite = arr[np.isfinite(arr)]
+                    out_of_range = finite[finite > 16_777_216]
+                    if len(out_of_range) != 0:
+                        col_info.setdefault("storage_warnings", []).append(
+                            "uint32 -> float32 (integer): "
+                            f"{len(out_of_range)} value(s) exceed exact-integer range "
+                            f"(max={float(finite.max()):.0f}); precision loss possible."
+                        )
+                except Exception:
+                    pass
+
             # Create dataset
             h5_group.create_dataset(field, data=data)
 
@@ -2663,7 +2838,8 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
             cols.append({
                 "datatype": mdv_dtype,
                 "name": col_name,
-                "field": col_name
+                "field": col_name,
+                "original_dtype": str(polars_dtype),
             })
         
         # Replace with user given column metadata

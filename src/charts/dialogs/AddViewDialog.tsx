@@ -27,7 +27,7 @@ const AddViewDialogComponent = (props: {
     useEffect(() => {
         // Initialising the checkedDs with the data sources inside the view
         const tempDs: { [name: string]: boolean } = {};
-        dataSources.forEach?.(({name: ds}) => {
+        dataSources.forEach?.(({ name: ds }: { name: string }) => {
             tempDs[ds] = currentDataSources.indexOf(ds) !== -1;
         });
         setCheckedDs(tempDs);
@@ -92,7 +92,7 @@ const AddViewDialogComponent = (props: {
 
                 {dataSources.length > 1 && (
                     <FormGroup sx={{ mt: 2 }}>
-                        {dataSources?.map?.(({name: ds}) => (
+                        {dataSources?.map?.(({ name: ds }: { name: string }) => (
                             <FormControlLabel
                                 key={ds}
                                 control={

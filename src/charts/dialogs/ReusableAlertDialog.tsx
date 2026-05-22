@@ -5,11 +5,12 @@ import {
     Dialog,
     DialogActions,
 } from "@mui/material";
+import type { ReactElement } from "react";
 
 export interface ReusableAlertDialogProps {
     open: boolean;
     handleClose: () => void;
-    component: JSX.Element;
+    component: ReactElement;
     isAlertErrorComponent?: boolean;
     isConfirmButton?: boolean;
     confirmText?: string;

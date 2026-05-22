@@ -1,5 +1,5 @@
 import { MULTITEXT_EMPTY_INDEX } from "@/lib/multitext";
-import { getCategoryFilterIndices } from "@/react/categoryFilterUtils";
+import { getCategoryFilterIndices } from "@/lib/categoryFilterUtils";
 import { describe, expect, test } from "vitest";
 
 describe("getCategoryFilterIndices", () => {

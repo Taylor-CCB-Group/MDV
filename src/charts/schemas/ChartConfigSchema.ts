@@ -26,8 +26,10 @@ export const ParamTypeSchema = z.enum([
 export const RowsAsColsQuerySerializedSchema = z.object({
     type: z.literal("RowsAsColsQuery").describe("Identifies this as a rows-as-columns query"),
     linkedDsName: z.string().describe("Name of the linked datasource that contains the row data"),
-    // TODO - should have subgroup name
-    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource")
+    subgroupName: z.string().optional().describe(
+        "Canonical rows-as-columns subgroup key (see link `subgroups`). New `RowsAsColsQuery.toJSON` output always includes this; omit = first subgroup. Zod: keep optional until legacy configs are migrated, then make required.",
+    ),
+    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource"),
 }).describe("Configuration for queries that treat rows from another datasource as columns in the current chart");
 
 // Field specification can be a string (FieldName) or a serialized query
@@ -219,7 +221,7 @@ export const TableConfigSchema = BaseConfigSchema.extend({
 }).describe("Configuration for data tables displaying tabular information");
 
 export const TextBoxConfigSchema = BaseConfigSchema.extend({
-    type: z.literal("text_box").describe("Text box chart type"),
+    type: z.enum(["text_box_chart", "text_box"]).describe("Text box chart type"),
     text: z.string().describe("Text content to display in the text box"),
     // Additional text box specific properties
 }).describe("Configuration for text boxes displaying static or dynamic text content");
@@ -329,6 +331,7 @@ registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("pie_chart", PieChartConfigSchema, { version: "1" });
 registerChartConfigSchema("table", TableConfigSchema, { version: "1" });
+registerChartConfigSchema("text_box_chart", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("text_box", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("wordcloud", WordcloudConfigSchema, { version: "1" });
 registerChartConfigSchema("sankey", SankeyConfigSchema, { version: "1" });

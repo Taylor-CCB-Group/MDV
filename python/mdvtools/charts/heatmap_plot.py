@@ -5,6 +5,11 @@ from mdvtools.charts.base_plot import BasePlot
 
 class HeatmapPlot(BasePlot):
     def __init__(self, title, params, size, position, id=None, **kwargs):
+        if params is None or len(params) < 2:
+            raise ValueError(
+                "HeatmapPlot requires params=[<categorical>, <numeric_or_wrapper>, ...]. "
+                "Got fewer than 2 params."
+            )
         super().__init__(title, "heat_map", params, size, position, id, **kwargs)
 
     def set_method(self, method):

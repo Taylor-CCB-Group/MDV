@@ -280,6 +280,7 @@ describe('chartConfigUtils - deserialisation', () => {
           linkedDsName: 'genes',
           maxItems: 5,
           type: 'RowsAsColsQuery' as const,
+          subgroupName: 'gs',
         }),
         fields: ['gene1', 'gene2'],
       };
@@ -300,6 +301,7 @@ describe('chartConfigUtils - deserialisation', () => {
         linkedDsName: 'genes',
         maxItems: 5,
         type: 'RowsAsColsQuery',
+        subgroupName: 'gs',
       });
 
       // Now deserialize it back

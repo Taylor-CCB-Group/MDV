@@ -64,7 +64,7 @@ const createScale = (
         : d3.scaleLinear().domain(domain).range(range);
 
 const useBrushX = (
-    ref: React.RefObject<SVGSVGElement>,
+    ref: React.RefObject<SVGSVGElement | null>,
     brushConfig: HistogramBrushConfig | undefined,
     histoWidth: number,
     histoHeight: number,
@@ -81,7 +81,7 @@ const useBrushX = (
         const svg = d3.select(ref.current);
         const xScale = createScale(xScaleType, minMax, [0, histoWidth]);
         const brush = d3.brushX()
-            .handleSize(0.5)
+            .handleSize(1.25)
             .extent([[0, -2], [histoWidth, histoHeight + 2]])
             .on("brush end", (event) => {
                 if (!event.sourceEvent) return;

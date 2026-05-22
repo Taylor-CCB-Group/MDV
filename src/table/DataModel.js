@@ -261,7 +261,10 @@ class DataModel {
     }
 
     removeColumn(col) {
-        this.dataStore.removeColumn(col, true, true);
+        if (!this.dataStore.softDeleteColumn) {
+            throw new Error("DataStore.softDeleteColumn is required for column deletion");
+        }
+        this.dataStore.softDeleteColumn(col, true, true);
     }
 
     fillColumn(columnName, value, rowIndices, emptyOnly = false) {

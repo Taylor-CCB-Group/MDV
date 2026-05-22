@@ -1,4 +1,4 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, usePasteHandler, useSimplerFilteredIndices } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, useOwnedFilteredIndices, usePasteHandler } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useId, useRef } from "react";
@@ -373,7 +373,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         filter.filter("filterRange", [column.field], { min, max }, true);
     }, [column, filter, debouncedValue]);
 
-    const filteredIndices = useSimplerFilteredIndices();
+    const { ownerVisibleRows: filteredIndices } = useOwnedFilteredIndices(filter);
     const highlightedIndices = useHighlightedIndices();
     const numericData = getNumericColumnData(column);
     const overallHistogramQuery = useQuery<number[]>({

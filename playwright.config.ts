@@ -82,7 +82,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   // webServer: {
   //   // Update this to match the port of the server you are running
-  //   command: 'npm run dev',
+  //   command: 'pnpm run dev',
   //   url: 'http://localhost:5170/',
   //   reuseExistingServer: true,
   //   timeout: 120000,

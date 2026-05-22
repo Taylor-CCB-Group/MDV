@@ -54,6 +54,7 @@ import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRoutin
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
 const Dashboard: React.FC = () => {
+    const isProduction = import.meta.env.PROD;
     const {
         projects,
         isLoading: projectsLoading,
@@ -239,7 +240,7 @@ const Dashboard: React.FC = () => {
                         </Alert>
                     )}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
-                        {permissions.createProject && (
+                        {!isProduction && permissions.createProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
                                 <ButtonBase
                                     sx={{
@@ -271,7 +272,7 @@ const Dashboard: React.FC = () => {
                                 </ButtonBase>
                             </Grid>
                         )}
-                        {permissions.importProject && (
+                        {!isProduction && permissions.importProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
                                 <ButtonBase
                                     sx={{
@@ -507,7 +508,7 @@ const Dashboard: React.FC = () => {
                         }
                     />
                 )}
-                {open && permissions.importProject && (
+                {open && !isProduction && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
                 )}
                 {helpDialogOpen && (

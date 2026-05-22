@@ -7,8 +7,9 @@ import {
     useConfig,
     useFieldSpec,
     useFieldSpecs,
-    useFilteredIndices,
+    useOwnedFilteredIndices,
     useParamColumns,
+    type FilterOwner,
 } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -18,6 +19,7 @@ import type { ViewState } from "./components/VivScatterComponent";
 import SpatialLayer from "@/webgl/SpatialLayer";
 import { ScatterSquareExtension, ScatterDensityExension } from "../webgl/ScatterDeckExtension";
 import type { LayerExtension } from "@deck.gl/core";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
@@ -117,7 +119,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     contour_fillThreshold: 2,
     densityFields: [],
     dimension: "2d",
-    on_filter: "hide", //safer in case of large datasets
+    on_filter: "grey",
     // todo omit this so we can have better HMR...
     selectionFeatureCollection: getEmptyFeatureCollection(),
     field_legend: {
@@ -175,9 +177,8 @@ export function useRegionScale() {
  * It can be a bit janky when reacting to changes originating from the same view,
  * we should consider a better approach.
  */
-function useZoomOnFilter(modelMatrix: Matrix4) {
+function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
     const config = useConfig<ScatterPlotConfig>();
-    const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
     const [chartWidth, chartHeight] = useChartSize(); //not sure we want this, potentially re-rendering too often...
     // not using as dependency for scaling viewState to data - we don't want to zoom as chart size changes
@@ -335,7 +336,11 @@ export function getMissingColorFilterValue(
  * As of now, charts with appropriate spatial context can call `useSpatialLayers()` at any point
  * to access the scatterplot layer, and the tooltip function.
  */
-export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: FieldName | null) {
+export function useScatterplotLayer(
+    modelMatrix: Matrix4,
+    hoveredFieldId?: FieldName | null,
+    filterOwner?: FilterOwner | null,
+) {
     const id = useChartID();
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
@@ -344,7 +349,12 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     const { opacity } = config;
     const radiusScale = useScatterRadius();
 
-    const data = useFilteredIndices();
+    const {
+        aggregateFilteredRows,
+        ownerVisibleRows,
+        isExternallyFiltered,
+    } = useOwnedFilteredIndices(filterOwner);
+    const data = ownerVisibleRows;
     const params = useParamColumns();
     const [cx, cy, cz] = params;
     const scale = useRegionScale();
@@ -445,31 +455,40 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     // but this isn't really all that bad, so maybe we can stick with it.
     const tooltipCols = useFieldSpecs(config.tooltip.column);
     const getTooltipVal = useCallback(
-        (i: number) => {
+        (rowIndex: number) => {
             // if (!tooltipCol?.data) return '#'+i;
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
                     // Sanitise the strings before passing
-                    const value = col.data ? col.getValue(data[i]) : "loading...";
+                    const value = col.data ? col.getValue(rowIndex) : "loading...";
                     const strValue = value === undefined || value === null ? "" : String(value);
                     return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
             });
         },
-        [tooltipCols, data],
+        [tooltipCols],
+    );
+    const getTooltipRowIndex = useCallback(
+        (info?: PickingInfo | null) => {
+            const pickingInfo = info === undefined ? hoverInfoRef.current : info;
+            if (!pickingInfo || pickingInfo.index === -1) return undefined;
+            if (typeof pickingInfo.object === "number") return pickingInfo.object;
+            return data[pickingInfo.index];
+        },
+        [data],
     );
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        () => {
+        (info?: PickingInfo | null) => {
             if (!config.tooltip.show) return null;
             if (!config.tooltip.column) return null;
             // testing reading object properties --- pending further development (for GeoJSON layer in particular)
             // also consider some other things like transcripts / stats heatmap etc...
             // (not hardcoding DN property etc)
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
-            const hoverInfo = hoverInfoRef.current;
-            if (!hoverInfo || hoverInfo.index === -1) return null;
-            const tooltipVal = getTooltipVal(hoverInfo.index);
+            const rowIndex = getTooltipRowIndex(info);
+            if (rowIndex === undefined) return null;
+            const tooltipVal = getTooltipVal(rowIndex);
             if (!tooltipVal) return null;
             const tooltip: TooltipContent = {
                 //todo - this should be in a popper / should follow useOuterConainer...
@@ -479,11 +498,11 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
             };
             return tooltip;
         },
-        [getTooltipVal, config.tooltip.show, config.tooltip.column],
+        [getTooltipRowIndex, getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
 
     // const { modelMatrix, setModelMatrix } = useScatterModelMatrix();
-    const viewState = useZoomOnFilter(modelMatrix);
+    const viewState = useZoomOnFilter(modelMatrix, aggregateFilteredRows);
     const { point_shape } = config;
 
     const extensions = useMemo(() => {
@@ -588,6 +607,65 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
         updateHighlightedRows,
         paintHoveredRow,
     ]);
+
+    const greyOnFilter = config.on_filter === "grey";
+    const greyScatterplotLayer = useMemo(
+        () =>
+            new ScatterplotLayer({
+                id: `scatter-grey_${getVivId(`${id}detail-react`)}`,
+                data: { length: cx.data.length },
+                opacity,
+                stroked: false,
+                filled: true,
+                radiusScale,
+                getPosition: (_: unknown, { target, index }: { target: number[]; index: number }) => {
+                    target[0] = cx.data[index];
+                    target[1] = cy.data[index];
+                    if (cz) target[2] = cz.data[index];
+                    return target as unknown as [number, number];
+                },
+                getFillColor: [200, 200, 200],
+                getLineColor: [0, 0, 0],
+                billboard: true,
+                modelMatrix,
+                parameters: {
+                    depthTest: false,
+                },
+                getFilterValue: (_: unknown, { index }: { index: number }) => {
+                    if (!isExternallyFiltered(index)) return 0;
+                    return getMissingColorFilterValue(index, colorColumn, shouldFilterMissing, fallbackOnZero);
+                },
+                filterRange: [0.5, 1],
+                updateTriggers: {
+                    getFilterValue: [
+                        aggregateFilteredRows,
+                        isExternallyFiltered,
+                        colorColumn,
+                        shouldFilterMissing,
+                        fallbackOnZero,
+                    ],
+                    getPosition: [cx.data, cy.data, cz?.data],
+                },
+                extensions: [new DataFilterExtension()],
+                visible: greyOnFilter,
+            }),
+        [
+            id,
+            cx,
+            cy,
+            cz,
+            opacity,
+            radiusScale,
+            modelMatrix,
+            greyOnFilter,
+            aggregateFilteredRows,
+            isExternallyFiltered,
+            colorColumn,
+            shouldFilterMissing,
+            fallbackOnZero,
+        ],
+    );
+
     const onScatterGlobalKeyDown = useCallback(
         (event: KeyboardEvent) => {
             if (!scatterKeyboardActiveRef.current) return;
@@ -676,12 +754,21 @@ export function useScatterplotLayer(modelMatrix: Matrix4, hoveredFieldId?: Field
     return useMemo(
         () => ({
             scatterplotLayer,
+            greyScatterplotLayer,
             getTooltip,
             modelMatrix,
             viewState,
             unproject,
             setScatterKeyboardActive,
         }),
-        [scatterplotLayer, getTooltip, modelMatrix, viewState, unproject, setScatterKeyboardActive],
+        [
+            scatterplotLayer,
+            greyScatterplotLayer,
+            getTooltip,
+            modelMatrix,
+            viewState,
+            unproject,
+            setScatterKeyboardActive,
+        ],
     );
 }
