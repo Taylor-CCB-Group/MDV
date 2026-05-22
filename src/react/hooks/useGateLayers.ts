@@ -175,7 +175,8 @@ const useGateLayers = () => {
         // Create the objects of features to supply as the feature collection
         // Store gate id, gate name, and gate color as feature properties
         const features = filteredGates.flatMap((gate) =>
-            gate.geometry.features.map((feature) => ({
+            //todo nicer typing
+            gate.geometry.features.map((feature: (typeof gate.geometry.features)[number]) => ({
                 ...feature,
                 properties: {
                     ...feature.properties,

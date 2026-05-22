@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
+import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
-import { useChartID, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
+import { useChartID, useChartManager, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
 import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
-import { action } from "mobx";
+import { action, runInAction } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
 
 import { InputEditor } from "slickgrid-react";
+import { DataModel } from "@/table/DataModel";
+import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import type { AddColumnParams } from "../components/AddTableColumnDialog";
+import type { BulkEditAction } from "../components/BulkEditColumnDialog";
+import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
+import type { ColumnRemovalImpact } from "@/charts/types/columnRemoval";
+import type { BaseConfig } from "@/charts/BaseChart";
+import { flattenFields } from "@/lib/columnTypeHelpers";
+import { escapeHtml } from "@/utilities/Utilities";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type
@@ -25,6 +34,48 @@ export class TextEditorWithMaxLength extends InputEditor {
         }
     }
 }
+
+function isRenameableDataColumn(column: {
+    editable?: boolean;
+    sgindex?: unknown;
+    sgtype?: unknown;
+    deleted?: boolean;
+} | null | undefined) {
+    if (!column) {
+        return false;
+    }
+    return Boolean(column.editable) && column.sgindex == null && column.sgtype == null && column.deleted !== true;
+}
+
+function formatColumnHeaderName(name: string, isEditable: boolean) {
+    const safeName = escapeHtml(name);
+    return isEditable
+        ? `<span class="mdv-col-editable-icon mdi mdi-square-edit-outline" title="This column is editable, click on cell to edit" aria-hidden="true"></span><span class="mdv-col-name-text">${safeName}</span>`
+        : safeName;
+}
+
+function updateGridColumnHeader(
+    gridInstance: SlickgridReactInstance | null,
+    columnField: string,
+    columnName: string,
+    isEditable: boolean,
+) {
+    const grid = gridInstance?.slickGrid;
+    if (!grid) {
+        return;
+    }
+    const formattedName = formatColumnHeaderName(columnName, isEditable);
+    const liveColumn = grid.getColumns().find((column) => column.field === columnField);
+    if (liveColumn) {
+        liveColumn.name = formattedName;
+    }
+    if ("updateColumnHeader" in grid && typeof grid.updateColumnHeader === "function") {
+        grid.updateColumnHeader(columnField, formattedName);
+        return;
+    }
+    grid.invalidate();
+}
+// todo: this file is getting more and more dense, a separate PR for refactoring this file is required
 /**
  * Hook for managing SlickGrid React component state.
  * 
@@ -56,15 +107,30 @@ const useSlickGridReact = () => {
     const config = useConfig<TableChartReactConfig>();
     const dataStore = useDataStore();
     const chartId = useChartID();
-    const chart = useChart<TableChartReactConfig>();
+    const chart = useChart<TableChartReactConfig, TableChartReact>();
     const orderedParamColumns = useOrderedParamColumns<TableChartReactConfig>();
     const sortedFilteredIndices = useSortedFilteredIndices();
     const highlightedIndices = useHighlightedIndices();
     const theme = useTheme();
+    const chartManager = useChartManager();
+    const permission = chartManager?.config?.permission;
+    const isEditMode = permission === "edit";
 
     // States
     const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
     const [searchColumn, setSearchColumn] = useState<string | null>(null);
+    const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
+    const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
+    const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
+    const [bulkEditColumn, setBulkEditColumn] = useState<string | null>(null);
+    const [renameColumnState, setRenameColumnState] = useState<{
+        field: string;
+        initialName: string;
+    } | null>(null);
+    const [pendingColumnRemoval, setPendingColumnRemoval] = useState<{
+        columnName: string;
+        impact: ColumnRemovalImpact;
+    } | null>(null);
 
     // Refs
     const sortedFilteredIndicesRef = useRef(sortedFilteredIndices); // Holds latest value of indices when event handlers are called
@@ -73,11 +139,95 @@ const useSlickGridReact = () => {
     const gridRef = useRef<SlickgridReactInstance | null>(null);
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
     const cleanupRef = useRef<(() => void) | null>(null); // Cleanup event handlers
+    const isEditModeRef = useRef(isEditMode);
+
+    // Single instance of data model used in many places
+    const dataModel = useMemo(() => 
+        new DataModel(dataStore, { autoupdate: false })
+    , [dataStore]);
+
+    const getCurrentDisplayedFields = useCallback(() => {
+        const gridColumns = gridRef.current?.slickGrid?.getColumns();
+        if (gridColumns && gridColumns.length > 0) {
+            return gridColumns
+                .map((column) => column.field)
+                .filter(
+                    (field): field is string =>
+                        typeof field === "string" && field !== "__index__",
+                );
+        }
+        return orderedParamColumnsRef.current.map((column) => column.field);
+    }, []);
+
+    const requestColumnRemoval = useCallback(async (columnName: string) => {
+        try {
+            const impact = chartManager
+                ? await analyzeColumnRemoval({
+                    dataSourceName: dataStore.name,
+                    columnName,
+                    sourceChartId: chartId,
+                    currentViewName: chartManager.viewManager?.current_view ?? null,
+                    allViewNames: chartManager.viewManager?.all_views ?? [],
+                    // not in love with this... upstream `chartManager.charts` type could be better.
+                    currentCharts: Object.values(chartManager.charts ?? {}).flatMap((chartInfo) => {
+                        if (!chartInfo || typeof chartInfo !== "object") {
+                            return [];
+                        }
+                        const typedChartInfo = chartInfo as {
+                            dataSource?: { name?: string };
+                            chart?: { config?: unknown };
+                        };
+                        const dataSourceName = typedChartInfo.dataSource?.name;
+                        if (!dataSourceName) {
+                            return [];
+                        }
+                        return [{
+                            dataSourceName,
+                            config: typedChartInfo.chart?.config as BaseConfig,
+                        }];
+                    }),
+                    viewLoader: chartManager.viewLoader,
+                })
+                : {
+                    dataSourceName: dataStore.name,
+                    columnName,
+                    currentViewCharts: [],
+                    savedViews: [],
+                };
+            setPendingColumnRemoval({
+                columnName,
+                impact,
+            });
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to analyze column deletion");
+            setFeedbackAlert({
+                type: "error",
+                title: "Delete Column Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    columnName,
+                },
+            });
+        }
+    }, [chartId, chartManager, dataStore.name]);
 
     useEffect(() => {
         sortedFilteredIndicesRef.current = sortedFilteredIndices;
         orderedParamColumnsRef.current = orderedParamColumns;
     }, [sortedFilteredIndices, orderedParamColumns]);
+
+    useEffect(() => {
+        isEditModeRef.current = isEditMode;
+    }, [isEditMode]);
+
+    useEffect(() => {
+        chart.setAddColumnDialogOpener(() => setIsAddColumnDialogOpen(true));
+        return () => {
+            chart.setAddColumnDialogOpener(undefined);
+        };
+    }, [chart]);
 
     // Extract initial widths from config once (non-observable)
     // This avoids rules-of-hooks issues and prevents columnDefs from reacting to config.column_widths changes
@@ -118,9 +268,7 @@ const useSlickGridReact = () => {
             cols.push({
                 id: col.field,
                 field: col.field,
-                name: isColumnEditable
-                ? `<span class="mdv-col-editable-icon mdi mdi-square-edit-outline" title="This column is editable, click on cell to edit" aria-hidden="true"></span><span class="mdv-col-name-text">${col.name}</span>`
-                : col.name,
+                name: formatColumnHeaderName(col.name, isColumnEditable),
                 sortable: true,
                 width: colWidth,
                 editor: isColumnEditable
@@ -136,9 +284,32 @@ const useSlickGridReact = () => {
                         commandItems: [
                             {
                                 command: "find-replace",
-                                title: isColumnEditable ? "Find & Replace" : "Find",
+                                title: isColumnEditable && isEditMode ? "Find & Replace" : "Find",
                                 iconCssClass: "mdi mdi-magnify",
                             },
+                            ...(isColumnEditable && isEditMode
+                                ? [
+                                    ...(isRenameableDataColumn(col)
+                                        ? [
+                                            {
+                                                command: "rename-column",
+                                                title: "Rename Column",
+                                                iconCssClass: "mdi mdi-pencil",
+                                            },
+                                        ]
+                                        : []),
+                                    {
+                                        command: "bulk-edit",
+                                        title: "Bulk Edit",
+                                        iconCssClass: "mdi mdi-table-edit",
+                                    },
+                                    {
+                                        command: "remove-column",
+                                        title: "Delete Column",
+                                        iconCssClass: "mdi mdi-delete",
+                                    },
+                                ]
+                                : []),
                         ],
                     },
                 },
@@ -146,7 +317,7 @@ const useSlickGridReact = () => {
         }
 
         return cols;
-    }, [config.include_index, orderedParamColumns, initialWidths]);
+    }, [config.include_index, orderedParamColumns, initialWidths, isEditMode]);
 
     /**
      * A new data provider gets created whenever any of the dependencies change which
@@ -188,7 +359,7 @@ const useSlickGridReact = () => {
             gridRef.current = e.detail;
             
             // Store gridRef in chart instance for getConfig() access
-            (chart as any).gridRef = gridRef;
+            chart.setGridRef(gridRef);
 
             const grid = e.detail.slickGrid;
             if (grid && dataProvider) {
@@ -286,6 +457,22 @@ const useSlickGridReact = () => {
             config.order = newOrder;
         }));
 
+        slickEventHandler.subscribe(grid.onColumnsResized, action(() => {
+            const columnWidths: Record<string, number> = {};
+            const gridColumns = grid.getColumns();
+            for (const column of gridColumns) {
+                if (
+                    typeof column.field === "string" &&
+                    column.field !== "__index__" &&
+                    column.width &&
+                    column.width !== 100
+                ) {
+                    columnWidths[column.field] = column.width;
+                }
+            }
+            config.column_widths = columnWidths;
+        }));
+
         const pubSub = grid.getPubSubService();
         if (!pubSub) {
             // strong assertion acts as a type-guard
@@ -305,6 +492,34 @@ const useSlickGridReact = () => {
                 } else if (command === "find-replace") {
                     setSearchColumn(column.field);
                     setIsFindReplaceOpen(true);
+                } else if (command === "bulk-edit") {
+                    if (!isEditModeRef.current) {
+                        return;
+                    }
+                    setBulkEditColumn(column.field);
+                    setIsBulkEditDialogOpen(true);
+                } else if (command === "rename-column") {
+                    if (!isEditModeRef.current || typeof column.field !== "string") {
+                        return;
+                    }
+                    const targetColumn = dataStore.columnIndex[column.field];
+                    if (!targetColumn || !isRenameableDataColumn(targetColumn)) {
+                        setFeedbackAlert({
+                            type: "warning",
+                            title: "Rename Column Warning",
+                            message: "This column cannot be renamed.",
+                        });
+                        return;
+                    }
+                    setRenameColumnState({
+                        field: targetColumn.field,
+                        initialName: targetColumn.name,
+                    });
+                } else if (command === "remove-column") {
+                    if (!isEditModeRef.current) {
+                        return;
+                    }
+                    void requestColumnRemoval(column.field);
                 }
             },
         ));
@@ -325,7 +540,7 @@ const useSlickGridReact = () => {
             headerMenuSubscription?.unsubscribe?.();
             gridMenuSubscription?.unsubscribe?.();
         };
-    }, [config, chart, dataStore]);
+    }, [chart, config, dataStore, requestColumnRemoval]);
 
     useEffect(() => {
         // Cleanup the event handlers on unmount
@@ -462,25 +677,395 @@ const useSlickGridReact = () => {
                     // hack - seems somewhat closer to getting the right size here?
                     defaultRatioForStringType: 1.1,
                 },
-                editable: true,
+                editable: isEditMode,
                 enableCellNavigation: true,
                 enableExcelCopyBuffer: true,
                 multiSelect: true,
-                enableRowSelection: true,
-                rowSelectionOptions: {
+                enableSelection: true,
+                selectionOptions: {
+                    selectionType: "row",
                     selectActiveRow: true,
                 },
                 headerMenu: {
                     hideColumnHideCommand: true, // Disabled to avoid messing with the column order
                 },
             }) satisfies GridOption, // helps with autocomplete for options
-        [chartId, theme],
+        [chartId, theme, isEditMode],
     );
 
     const onDialogClose = useCallback(() => {
         setIsFindReplaceOpen(false);
         setSearchColumn(null);
     }, []);
+
+    const closeAddColumnDialog = useCallback(() => {
+        setIsAddColumnDialogOpen(false);
+    }, []);
+
+    const closeBulkEditDialog = useCallback(() => {
+        setIsBulkEditDialogOpen(false);
+        setBulkEditColumn(null);
+    }, []);
+
+    const closeRenameColumnDialog = useCallback(() => {
+        setRenameColumnState(null);
+    }, []);
+
+    const closeColumnRemovalDialog = useCallback(() => {
+        setPendingColumnRemoval(null);
+    }, []);
+
+    const confirmColumnRemoval = useCallback(async () => {
+        if (!pendingColumnRemoval) {
+            return;
+        }
+        const { columnName } = pendingColumnRemoval;
+        try {
+            dataModel.removeColumn(columnName);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to delete the column");
+            setPendingColumnRemoval(null);
+            setFeedbackAlert({
+                type: "error",
+                title: "Delete Column Error",
+                message: `Column ${columnName} could not be deleted.`,
+                stack: error.stack,
+                metadata: {
+                    columnName,
+                    deleteError: error.message,
+                },
+            });
+            return;
+        }
+
+        try {
+            const currentParam = chart.activeQueries.activeParams();
+            const nextParam = currentParam.filter(
+                (entry) => !(typeof entry === "string" && entry === columnName),
+            );
+            if (nextParam.length !== currentParam.length) {
+                chart.setParams(nextParam);
+                runInAction(() => {
+                    const nextRenderedFields = nextParam.flatMap((entry) => flattenFields(entry));
+                    config.order = Object.fromEntries(
+                        nextRenderedFields.map((field, index) => [field, index]),
+                    );
+                    if (config.sort?.columnId === columnName) {
+                        config.sort = undefined;
+                    }
+                });
+            }
+            if (chartManager?.viewManager?.saveView) {
+                await chartManager.viewManager.saveView();
+                if (chartManager.viewManager.hasUnsavedChanges?.()) {
+                    throw new Error("Saving the updated view did not complete successfully");
+                }
+            } else {
+                chartManager?.saveState?.();
+            }
+            setPendingColumnRemoval(null);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to save the updated view after deleting");
+            setPendingColumnRemoval(null);
+            setFeedbackAlert({
+                type: "error",
+                title: "Delete Column Error",
+                message: `Column ${columnName} was deleted locally, but saving the updated view failed. Reloading the project may restore this column.`,
+                stack: error.stack,
+                metadata: {
+                    columnName,
+                    saveError: error.message,
+                },
+            });
+        }
+    }, [chart, chartManager, config, dataModel, pendingColumnRemoval]);
+
+    const openColumnRemovalView = useCallback((viewName: string) => {
+        setPendingColumnRemoval(null);
+        chartManager?.changeView?.(viewName);
+    }, [chartManager]);
+
+    // Columns to be displayed for cloning
+    const cloneableColumns = useMemo(() => {
+        return dataStore.columns
+            .filter((column) => !column.subgroup)
+            .map((column) => ({
+                field: column.field,
+                name: column.name,
+                datatype: column.datatype,
+                stringLength: column.stringLength,
+                delimiter: column.delimiter,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [dataStore.columns]);
+
+    const addColumnDefaultPosition = useMemo(() => {
+        return config.include_index ? 2 : Math.min(2, orderedParamColumns.length + 1);
+    }, [config.include_index, orderedParamColumns.length]);
+
+    const handleAddColumn = useCallback(async ({
+        name,
+        datatype,
+        cloneColumn,
+        position,
+        stringLength,
+        delimiter,
+    }: AddColumnParams) => {
+        if (!isEditMode) {
+            return;
+        }
+        const trimmedName = name.trim();
+
+        if (!trimmedName) {
+            setFeedbackAlert({
+                type: "warning",
+                title: "Add Column Warning",
+                message: "Column name is required.",
+            });
+            return;
+        }
+
+        const existingMetadata = dataStore.getAllColumnsMetadata?.().find(
+            (column) => column.field === trimmedName,
+        );
+        if (dataStore.columnIndex[trimmedName] || (existingMetadata && !existingMetadata.deleted)) {
+            setFeedbackAlert({
+                type: "error",
+                title: "Add Column Error",
+                message: `Column ${trimmedName} already exists`,
+            });
+            return;
+        }
+
+        try {
+            if (cloneColumn && !dataStore.columnIndex[cloneColumn]?.data) {
+                if (!chartManager?.loadColumnSet) {
+                    throw new Error(`Column ${cloneColumn} not found`);
+                }
+                await new Promise<void>((resolve, reject) => {
+                    try {
+                        chartManager.loadColumnSet([cloneColumn], dataStore.name, () => {
+                            resolve();
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+                if (!dataStore.columnIndex[cloneColumn]?.data) {
+                    throw new Error(`Column ${cloneColumn} not found`);
+                }
+            }
+
+            // const dataModel = new DataModel(dataStore, { autoupdate: false });
+            // Create a new column
+            dataModel.createColumn({
+                name: trimmedName,
+                datatype: datatype,
+                cloneColumn,
+                stringLength,
+                delimiter,
+            });
+
+            // Get the position of the column to be inserted
+            const orderedFields = getCurrentDisplayedFields();
+            const displayedFields = config.include_index
+                ? ["__index__", ...orderedFields]
+                : [...orderedFields];
+            const parsedPosition = position ?? displayedFields.length + 1;
+            const insertionIndex = Math.min(
+                Math.max(parsedPosition - 1, 0),
+                displayedFields.length,
+            );
+            const displayedFieldSet = new Set(orderedFields);
+
+            // Locally deleted plain columns can linger in activeParams() even after the table UI
+            // has removed them. If we rebuild nextParam from that stale state, re-adding another
+            // column can resurrect deleted names, cause duplicate visible columns, and eventually
+            // make ChartManager try to load plain names as virtual fields. Rebuild from what is
+            // actually displayed, while still keeping query-backed entries intact.
+            const currentParam = chart.activeQueries
+                .activeParams()
+                .filter((entry) => {
+                    if (typeof entry !== "string") {
+                        return true;
+                    }
+                    return entry !== trimmedName && displayedFieldSet.has(entry);
+                });
+            const renderedEntryIndices = orderedFields
+                .map((field) =>
+                    currentParam.findIndex((entry) => flattenFields(entry).includes(field)),
+                )
+                .filter((entryIndex) => entryIndex !== -1);
+
+            // Active-link params expand to multiple visible columns, but they must remain a single
+            // top-level param entry so save/reload keeps them as active links instead of plain links.
+            const orderedParamIndices: number[] = [];
+            const seenParamIndices = new Set<number>();
+            for (const entryIndex of renderedEntryIndices) {
+                if (seenParamIndices.has(entryIndex)) {
+                    continue;
+                }
+                seenParamIndices.add(entryIndex);
+                orderedParamIndices.push(entryIndex);
+            }
+
+            // Map the display-layer insertion point to a top-level param insertion point.
+            // If the user inserts inside an expanded active-link group, normalize it to the
+            // group boundary instead of splitting the query-backed param entry.
+            const fieldInsertionIndex = config.include_index
+                ? Math.max(0, insertionIndex - 1)
+                : insertionIndex;
+            const paramInsertionIndex = new Set(
+                renderedEntryIndices.slice(0, fieldInsertionIndex),
+            ).size;
+
+            // Rebuild the current param order from the live grid so unsaved reorders are respected.
+            const orderedParamEntries = orderedParamIndices.map((entryIndex) => currentParam[entryIndex]);
+            const remainingParamEntries = currentParam.filter(
+                (_entry, entryIndex) => !seenParamIndices.has(entryIndex),
+            );
+
+            // Splice into a copy of config.param to preserve any FieldSpec/ColumnQuery objects
+            const nextParam = [...orderedParamEntries, ...remainingParamEntries];
+            nextParam.splice(paramInsertionIndex, 0, trimmedName);
+
+            // Flatten the params so ordering retains the query objects
+            const nextRenderedFields = nextParam.flatMap((entry) => flattenFields(entry));
+            const nextOrder = Object.fromEntries(
+                nextRenderedFields.map((field, index) => [field, index]),
+            );
+
+            chart.setParams(nextParam);
+            runInAction(() => {
+                config.order = nextOrder;
+            });
+
+            // Notify datastore and rerender the grid
+            dataStore.dataChanged([trimmedName]);
+            gridRef.current?.slickGrid?.invalidate();
+            setIsAddColumnDialogOpen(false);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to add editable column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Add Column Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    columnName: trimmedName,
+                    cloneColumn,
+                    position,
+                },
+            });
+        }
+    }, [chart, chartManager, config, dataStore, dataModel, getCurrentDisplayedFields, isEditMode]);
+
+    const handleBulkEdit = useCallback(({
+        action,
+        columnName,
+        value,
+    }: {
+        action: BulkEditAction;
+        columnName: string;
+        value: string;
+    }) => {
+        if (!isEditMode) {
+            return;
+        }
+        try {
+            // const dataModel = new DataModel(dataStore, { autoupdate: false });
+            const rowIndices = Array.from(sortedFilteredIndicesRef.current);
+
+            if (action === "fill-all") {
+                dataModel.fillColumn(columnName, value, rowIndices, false);
+            } else {
+                dataModel.fillColumn(columnName, value, rowIndices, true);
+            }
+
+            gridRef.current?.slickGrid?.invalidate();
+            closeBulkEditDialog();
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to bulk edit column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Bulk Edit Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    action,
+                    columnName,
+                },
+            });
+        }
+    }, [closeBulkEditDialog, dataModel, isEditMode]);
+
+    const handleRenameColumn = useCallback(({
+        columnField,
+        newName,
+    }: {
+        columnField: string;
+        newName: string;
+    }) => {
+        if (!isEditMode) {
+            return;
+        }
+        const column = dataStore.columnIndex[columnField];
+        if (!column || !isRenameableDataColumn(column)) {
+            setFeedbackAlert({
+                type: "warning",
+                title: "Rename Column Warning",
+                message: "This column cannot be renamed.",
+            });
+            return;
+        }
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            setFeedbackAlert({
+                type: "warning",
+                title: "Rename Column Warning",
+                message: "Column name is required.",
+            });
+            return;
+        }
+        const normalizedNewName = trimmedName.toLocaleLowerCase();
+        const hasDuplicateName = (dataStore.getAllColumnsMetadata?.() ?? []).some((entry) => {
+            if (entry.deleted || entry.field === columnField) {
+                return false;
+            }
+            return entry.name.trim().toLocaleLowerCase() === normalizedNewName;
+        });
+        if (hasDuplicateName) {
+            setFeedbackAlert({
+                type: "error",
+                title: "Rename Column Error",
+                message: `Column ${trimmedName} already exists`,
+            });
+            return;
+        }
+        try {
+            const didRename = dataStore.renameColumnDisplayName(columnField, trimmedName);
+            if (didRename) {
+                updateGridColumnHeader(gridRef.current, columnField, trimmedName, Boolean(column.editable));
+            }
+            setRenameColumnState(null);
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to rename the column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Rename Column Error",
+                message: error.message,
+                stack: error.stack,
+                metadata: {
+                    columnName: columnField,
+                },
+            });
+        }
+    }, [dataStore, isEditMode]);
 
     return {
         config,
@@ -499,8 +1084,27 @@ const useSlickGridReact = () => {
         options,
         columnDefs,
         handleGridCreated,
+        isEditMode,
         isColumnEditable,
         onDialogClose,
+        feedbackAlert,
+        setFeedbackAlert,
+        isAddColumnDialogOpen,
+        cloneableColumns,
+        addColumnDefaultPosition,
+        closeAddColumnDialog,
+        handleAddColumn,
+        isBulkEditDialogOpen,
+        bulkEditColumn,
+        closeBulkEditDialog,
+        handleBulkEdit,
+        renameColumnState,
+        closeRenameColumnDialog,
+        handleRenameColumn,
+        pendingColumnRemoval,
+        closeColumnRemovalDialog,
+        confirmColumnRemoval,
+        openColumnRemovalView,
     };
 };
 

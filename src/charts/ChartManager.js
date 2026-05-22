@@ -15,48 +15,19 @@ import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
-import ColorChooser from "./dialogs/ColorChooser";
+import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
-// this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
+// this is added as a side-effect of importing registerChartModules,
+// then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
 
-//default charts
-import "./HistogramChart.js";
-import "./RowChart.js";
-import "./TableChart.js";
-import "./WGL3DScatterPlot.js";
-import "./WGLScatterPlot.js";
-import "./RingChart.js";
-import "./TextBoxChart.js";
-import "./HeatMap.js";
-import "./ViolinPlot.js";
-import "./BoxPlot.js";
-import "./SankeyChart.js";
-import "./MultiLineChart.js";
-import "./DensityScatterPlot";
-// import "./SelectionDialog.js"; //now replaced with SelectionDialogReact (currently imported as a side-effect of import HmrHack)
-import "./StackedRowChart";
-import "./TreeDiagram";
-import "./CellNetworkChart";
-import "./FlexibleNetworkChart";
-import "./SingleHeatMap";
-import "./VivScatterPlot";
-import "./DotPlot";
-import "./ImageTableChart";
-import "./CellRadialChart";
-import "./RowSummaryBox";
-import "./VivScatterPlot";
-import "./ImageTableChart";
-import "./ImageScatterChart";
-// import "./WordCloudChart"; //todo: this only works in vite build, not webpack
-import "./CustomBoxPlot";
-import "./SingleSeriesChart";
-import "./GenomeBrowser";
-import "./DeepToolsHeatMap";
+// Chart and dialog type registrations via side-effect imports.
+import "./registerChartModules";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action, makeAutoObservable } from "mobx";
+import { makeObservable, observable, action } from "mobx";
+import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -66,7 +37,7 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
-
+import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -80,6 +51,18 @@ const column_orders = {
     text: 2,
     unique: 2,
 };
+
+class MissingColumnDataError extends Error {
+    constructor(dataSource, missingColumns, requestedColumns) {
+        super(
+            `Failed to load required column data for datasource "${dataSource}": ${missingColumns.join(", ")}`,
+        );
+        this.name = "MissingColumnDataError";
+        this.dataSource = dataSource;
+        this.missingColumns = missingColumns;
+        this.requestedColumns = requestedColumns;
+    }
+}
 
 const themes = {
     dark: {
@@ -236,7 +219,7 @@ export class ChartManager {
         // classes: ["ciview-main-menu-bar"],
         this.menuBar = createEl("div", {}, this.containerDiv);
 
-        createMdvPortal(MenuBarWrapper(), this.menuBar);
+        createMdvPortal(createElement(MenuBarWrapper), this.menuBar);
 
         this._setupThemeContextMenu();
 
@@ -1118,8 +1101,14 @@ export class ChartManager {
             removed: [],
             colors_changed: [],
         };
+        // Although, removed columns are deleted from the dirtyColumns in DataStore
+        // If a stale entry is still present, some checks are added to skip them
         for (const c in dc.added) {
             const td = getMd(c);
+            // Skip stale entries
+            if (!td) {
+                continue;
+            }
             rv.columns.push(td);
             rv.added.push(c);
         }
@@ -1130,14 +1119,23 @@ export class ChartManager {
         for (const c in dc.data_changed) {
             if (!rv.columns[c]) {
                 const td = getMd(c);
+                // Skip stale entries
+                if (!td) {
+                    continue;
+                }
                 rv.columns.push(td);
             }
         }
 
         for (const cc in dc.colors_changed) {
+            const column = dataStore.columnIndex[cc];
+            // Skip if the removed column is still present
+            if (!column) {
+                continue;
+            }
             rv.colors_changed.push({
                 column: cc,
-                colors: dataStore.columnIndex[cc].colors,
+                colors: column.colors,
             });
         }
 
@@ -1145,6 +1143,10 @@ export class ChartManager {
 
         function getMd(c) {
             const cl = dataStore.columnIndex[c];
+            // Skip stale entries if present
+            if (!cl) {
+                return null;
+            }
             const md = {
                 values: cl.values,
                 datatype: cl.datatype,
@@ -1155,9 +1157,15 @@ export class ChartManager {
             };
             const numRows = dataStore.size;
             
-            // Add stringLength to metadata for unique and multitext columns if stringLength property exists
-            if ((cl.datatype === "unique" || cl.datatype === "multitext") && cl.stringLength) {
+            // Add datatype-specific metadata required to reconstruct client-created columns on reload.
+            if (
+                (cl.datatype === "unique" || cl.datatype === "multitext") &&
+                cl.stringLength
+            ) {
                 md.stringLength = cl.stringLength;
+            }
+            if (cl.datatype === "multitext" && cl.delimiter) {
+                md.delimiter = cl.delimiter;
             }
             
             let arr;
@@ -1186,7 +1194,8 @@ export class ChartManager {
                     }
 
                     const rowBytes = cl.data.subarray(baseIndex, baseIndex + stringLength);
-                    const decoded = textDecoder.decode(rowBytes);
+                    // TextDecoder cannot decode a SharedArrayBuffer-backed view in some browsers.
+                    const decoded = textDecoder.decode(Uint8Array.from(rowBytes));
                     // Remove null padding characters
                     arr[i] = decoded.replace(/\0+$/, "");
                 }
@@ -1228,7 +1237,10 @@ export class ChartManager {
             if (dstore.dirtyMetadata.size !== 0) {
                 metadata[ds.name] = {};
                 for (const param of dstore.dirtyMetadata) {
-                    metadata[ds.name][param] = dstore[param];
+                    metadata[ds.name][param] =
+                        param === "columns"
+                            ? dstore.getAllColumnsMetadata()
+                            : dstore[param];
                 }
             }
         }
@@ -1433,6 +1445,7 @@ export class ChartManager {
         const lc = this.config.dataloading || {};
         split = lc.split || 10;
         threads = lc.threads || 2;
+        const retries = lc.retries ?? lc.maxRetries ?? 2;
         this.transactions[id] = {
             callback: callback,
             columns: [],
@@ -1440,6 +1453,8 @@ export class ChartManager {
             failedColumns: [],
             nextColumn: 0,
             columnsLoaded: 0,
+            retryAttempts: {},
+            retries,
             id: id,
         };
         let col_list = [];
@@ -1487,28 +1502,73 @@ export class ChartManager {
             return column_orders[a.datatype] - column_orders[b.datatype];
         });
 
+        let retryColumnFields = [];
+
         //"this.dataLoader is not a function" with e.g. "cell_types"
         this.dataLoader(columns, dataSource, dataStore.size)
             .then((resp) => {
+                const loadedFields = new Set(resp.map((col) => col.field));
                 for (const col of resp) {
                     dataStore.setColumnData(col.field, col.data);
+                }
+                const missingColumns = columns.filter(
+                    (column) => !loadedFields.has(column.field),
+                );
+                if (missingColumns.length) {
+                    console.error("Column data loader omitted requested columns", {
+                        dataSource,
+                        requestedColumns: columns.map((column) => column.field),
+                        missingColumns: missingColumns.map((column) => column.field),
+                    });
+                    retryColumnFields = missingColumns.map((column) => column.field);
                 }
                 trans.columnsLoaded++;
             })
             .catch((error) => {
                 //! this is an error that is not being handled properly... what happens to trans.failedColumns?
                 //! they do get passed to a callback... what does that callback do?
-                console.log(error);
+                console.error("Column data loader failed", {
+                    dataSource,
+                    requestedColumns: columns.map((column) => column.field),
+                    error,
+                });
                 trans.columnsLoaded++;
-                trans.failedColumns.push(columns);
+                retryColumnFields = columns.map((column) => column.field);
             })
             .finally(() => {
+                const retrySet = new Set();
+                const finalFailedColumns = [];
+                for (const field of retryColumnFields) {
+                    const attempts = trans.retryAttempts[field] || 0;
+                    if (attempts < trans.retries) {
+                        trans.retryAttempts[field] = attempts + 1;
+                        retrySet.add(field);
+                    } else {
+                        finalFailedColumns.push(dataStore.getColumnInfo(field));
+                    }
+                }
+                if (retrySet.size > 0) {
+                    const retryFields = [...retrySet];
+                    trans.columns.push(retryFields);
+                    console.warn("Retrying column data load", {
+                        dataSource,
+                        columns: retryFields,
+                        attempts: retryFields.map((field) => ({
+                            field,
+                            attempt: trans.retryAttempts[field],
+                            maxRetries: trans.retries,
+                        })),
+                    });
+                }
+                trans.failedColumns.push(...finalFailedColumns);
+                for (const col of col_list) {
+                    if (!retrySet.has(col)) {
+                        delete this.columnsLoading[dataSource][col];
+                    }
+                }
                 const total = trans.columns.length;
                 const loaded = trans.columnsLoaded;
                 let all_loaded = loaded * col_list.length;
-                for (const col of col_list) {
-                    delete this.columnsLoading[dataSource][col];
-                }
                 all_loaded =
                     all_loaded > trans.totalColumns
                         ? trans.totalColumns
@@ -1586,10 +1646,10 @@ export class ChartManager {
                 },
                 func: () => {
                     try {
-                        new ColorChooser(this, ds);
+                        new ColorPaletteWrapper(this, ds);
                     } catch (error) {
-                        console.error("error making ColorChooser", error);
-                        this.createInfoAlert("Error making color chooser", {
+                        console.error("error making ColorPalette", error);
+                        this.createInfoAlert("Error making Color Palette", {
                             type: "warning",
                             duration: 2000,
                         });
@@ -1758,6 +1818,9 @@ export class ChartManager {
      */
     async addChart(dataSource, config, notify = false) {
         if (!BaseChart.types[config.type]) {
+            await ensureLazyChartTypeRegistered(config.type);
+        }
+        if (!BaseChart.types[config.type]) {
             this.createInfoAlert(
                 `Tried to add unknown chart type '${config.type}'`,
                 { type: "danger", duration: 2000 },
@@ -1847,6 +1910,13 @@ export class ChartManager {
             await this._getColumnsAsync(dataSource, neededCols);
             await this._addChart(dataSource, config, div, notify);
         } catch (error) {
+            console.error("Failed to add chart", {
+                chartId: config.id,
+                chartType: config.type,
+                dataSource,
+                neededColumns: neededCols,
+                error,
+            });
             this.clearInfoAlerts();
             spinner.remove();
             ellipsis.remove();
@@ -1873,7 +1943,20 @@ export class ChartManager {
                     { message: error }
                     :
                     { message: "An error occurred while creating the chart" };
-            createMdvPortal(ErrorComponentReactWrapper({ error: errorObj, height, width, extraMetaData: { config } }), debugNode);
+            createMdvPortal(createElement(ErrorComponentReactWrapper, {
+                error: errorObj,
+                height,
+                width,
+                extraMetaData: {
+                    config,
+                    dataSource,
+                    neededColumns: neededCols,
+                    ...(error instanceof MissingColumnDataError && {
+                        missingColumns: error.missingColumns,
+                        requestedColumns: error.requestedColumns,
+                    }),
+                },
+            }), debugNode);
             const closeButtonContainer = createEl(
                 "div",
                 {
@@ -1908,6 +1991,8 @@ export class ChartManager {
             )
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
+        } finally {
+            this._markInitialChartLoadComplete(config);
         }
     }
 
@@ -1964,9 +2049,9 @@ export class ChartManager {
     }
 
     /**
-     * Map a chart param token to the DataStore column `field` id when it matches
-     * stable metadata `field` (via columnIndex or columns list). Display `name`
-     * is not used for resolution. Virtual expression columns use
+     * Map a chart param token to the DataStore column `field` id.
+     * Field ids are canonical and stable; display names are mutable and are
+     * not used for runtime resolution. Virtual expression columns use
      * `subgroup|label(subgroup)|index` and are returned unchanged.
      * @param {object} dStore DataStore instance
      * @param {string} token
@@ -1979,8 +2064,11 @@ export class ChartManager {
         if (dStore.columnIndex[token]) {
             return token;
         }
-        const c = dStore.columns.find((col) => col.field === token);
-        return c ? c.field : token;
+        const fieldMatch = dStore.columns.find((col) => col.field === token);
+        if (fieldMatch) {
+            return fieldMatch.field;
+        }
+        return token;
     }
 
     async _getColumnsAsync(dataSource, columns) {
@@ -1998,7 +2086,32 @@ export class ChartManager {
         const result = await new Promise((resolve) => {
             this._getColumnsThen(dataSource, allColumns, resolve);
         });
+        const missingColumns = this._getMissingColumnData(dataSource, allColumns);
+        if (missingColumns.length) {
+            console.error("Column loading completed with missing data", {
+                dataSource,
+                requestedColumns: allColumns,
+                missingColumns,
+            });
+            throw new MissingColumnDataError(dataSource, missingColumns, allColumns);
+        }
         return result;
+    }
+
+    _getMissingColumnData(dataSource, columns) {
+        const dStore = this.dsIndex[dataSource].dataStore;
+        const missing = [];
+        for (const col of columns) {
+            if (typeof col !== "string") {
+                continue;
+            }
+            const key = this._resolveToDataStoreFieldKey(dStore, col);
+            const column = dStore.columnIndex[key];
+            if (!column?.data) {
+                missing.push(key);
+            }
+        }
+        return missing;
     }
 
     _getColumnsThen(dataSource, columns, func) {
@@ -2042,40 +2155,43 @@ export class ChartManager {
                 }
             }
         }
-        const reqCols = [];
-        for (const x of columns) {
+        const reqCols = columns.filter((x) => {
             if (typeof x !== "string") {
-                const col = dStore.columnIndex[x];
-                if (!col) {
-                    continue;
+                const nonStringCol = dStore.columnIndex[x];
+                if (!nonStringCol) {
+                    return false;
                 }
-                if (!col.data) {
-                    reqCols.push(x);
-                }
-                continue;
+                return !nonStringCol.data;
             }
             const fieldKey = this._resolveToDataStoreFieldKey(dStore, x);
             if (this.columnsLoading[dataSource][fieldKey]) {
-                continue;
+                return false;
             }
             let col = dStore.columnIndex[fieldKey];
             if (!col) {
+                const metadata = dStore
+                    .getAllColumnsMetadata?.()
+                    .find((column) => column.field === fieldKey);
+                // Soft-deleted table columns can temporarily disappear from columnIndex while
+                // stale chart reactions still ask for them. Restore real datasource columns
+                // from metadata first, and only use addColumnFromField() for true virtual
+                // fields like subgroup|name|index.
+                if (metadata && !metadata.deleted) {
+                    dStore.addColumn(metadata, metadata.data, false, false);
+                    return true;
+                }
                 if (fieldKey.includes("|")) {
                     dStore.addColumnFromField(fieldKey);
-                    reqCols.push(fieldKey);
-                } else {
-                    throw new Error(
-                        `Unknown column '${x}' in datasource '${dataSource}'. ` +
-                            `If you added or replaced a datasource in this session, refresh the page. ` +
-                            `Chart param tokens must match column field ids in project metadata.`,
-                    );
+                    return true;
                 }
-                continue;
+                throw new Error(
+                    `Unknown column '${x}' in datasource '${dataSource}'. ` +
+                        `If you added or replaced a datasource in this session, refresh the page. ` +
+                        `Chart param tokens must match column field ids in project metadata.`,
+                );
             }
-            if (!col.data) {
-                reqCols.push(fieldKey);
-            }
-        }
+            return !col.data;
+        });
 
         //No columns needed
         //but columns requested by other actions may still be loading
@@ -2084,7 +2200,7 @@ export class ChartManager {
         }
         //load required columns, then check all requested are loaded
         else {
-            this.loadColumnSet(reqCols, dataSource, (failedColumns) => {
+            this.loadColumnSet(reqCols, dataSource, (failedColumns = []) => {
                 if (failedColumns.length) {
                     console.warn(
                         "got columns with some failures",
@@ -2221,20 +2337,24 @@ export class ChartManager {
         if (notify) {
             this._callListeners("chart_added", chart);
         }
-        //check to see if all inital charted loaded , then can call any listeners
-        if (this._toLoadCharts) {
-            this._toLoadCharts.delete(config);
-            if (this._toLoadCharts.size === 0) {
-                this._toLoadCharts = undefined;
-                if (this.viewData.links) {
-                    for (const l of this.viewData.links) {
-                        this._setUpLink(l);
-                    }
-                }
-                this._callListeners("view_loaded", this.viewManager.current_view);
+        return chart;
+    }
+
+    _markInitialChartLoadComplete(config) {
+        if (!this._toLoadCharts) {
+            return;
+        }
+        this._toLoadCharts.delete(config);
+        if (this._toLoadCharts.size !== 0) {
+            return;
+        }
+        this._toLoadCharts = undefined;
+        if (this.viewData.links) {
+            for (const l of this.viewData.links) {
+                this._setUpLink(l);
             }
         }
-        return chart;
+        this._callListeners("view_loaded", this.viewManager.current_view);
     }
 
     //gives a chart access to another datasource

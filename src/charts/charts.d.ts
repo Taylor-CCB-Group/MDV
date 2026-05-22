@@ -88,6 +88,8 @@ export type DataColumn<T extends DataType> = {
     datatype: T;
     /** whether the column's data can be changed */
     editable?: boolean;
+    /** whether the column has been soft-deleted and removed from user-facing column lists */
+    deleted?: boolean;
     /**In the case of a double/integer (number) column, the array
      * buffer should be the appropriate size to contain float32s. For text it should be Uint8
      * and contain numbers corresponding to the indexes in the values parameter. For a column of
@@ -203,6 +205,8 @@ export type GuiValueTypes = {
     //is the premise of this correct? technically, could we have a dropdown of numbers?
     dropdown: string;
     multidropdown: string[];
+    single_category_selection: string;
+    category_selection: string[];
     check: boolean;
     text: string;
     textbox: string;
@@ -261,6 +265,12 @@ export type GuiSpec<T extends GuiSpecType> = {
     func?: GuiFunc<T>;
     //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
+    sourceColumn?: T extends "category_selection" | "single_category_selection" ? (() => FieldSpec | undefined) : never;
+    getCurrentValue?: T extends "category_selection"
+        ? (() => string[])
+        : T extends "single_category_selection"
+          ? (() => string)
+          : never;
     /**
      * Used by `"radiobuttons"` to specify the choices available.
      * This is a tuple of `[string, string][]` where the first element of each tuple is the label to display,

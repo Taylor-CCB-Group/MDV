@@ -26,8 +26,10 @@ export const ParamTypeSchema = z.enum([
 export const RowsAsColsQuerySerializedSchema = z.object({
     type: z.literal("RowsAsColsQuery").describe("Identifies this as a rows-as-columns query"),
     linkedDsName: z.string().describe("Name of the linked datasource that contains the row data"),
-    // TODO - should have subgroup name
-    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource")
+    subgroupName: z.string().optional().describe(
+        "Canonical rows-as-columns subgroup key (see link `subgroups`). New `RowsAsColsQuery.toJSON` output always includes this; omit = first subgroup. Zod: keep optional until legacy configs are migrated, then make required.",
+    ),
+    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource"),
 }).describe("Configuration for queries that treat rows from another datasource as columns in the current chart");
 
 // Field specification can be a string (FieldName) or a serialized query
@@ -98,17 +100,33 @@ const FieldLegendConfigSchema = z.object({
     display: z.boolean().describe("Whether to display the density field legend"),
 }).describe("Configuration for density field legend visibility");
 
-const ContourScatterConfigSchema = z.object({
+const ContourVisualConfigSchema = z.object({
     contour_fill: z.boolean().optional().describe("Whether to render filled contour areas"),
     contour_fillThreshold: z.number().optional().describe("Threshold controlling how much of the contour is filled"),
     contour_bandwidth: z.number().positive().optional().describe("Kernel density bandwidth used for contour generation"),
     contour_intensity: z.number().min(0).max(1).optional().describe("Opacity/intensity applied to contour fills"),
     contour_opacity: z.number().min(0).max(1).optional().describe("Opacity applied to contour lines"),
+}).describe("Visual contour configuration shared by density-style charts");
+
+const DensityFieldsConfigSchema = z.object({
+    densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+}).describe("Density field selection shared by contour-based charts");
+
+const LegacyContourCategorySelectionConfigSchema = z.object({
     contourParameter: FieldSpecSchema.optional().describe("Categorical field used to choose contour categories"),
     category1: CategorySelectionSchema.optional().describe("First contour category selection"),
     category2: CategorySelectionSchema.optional().describe("Second contour category selection"),
-    densityFields: FieldSpecsSchema.optional().describe("Numeric fields to render as contour overlays"),
+}).describe("Legacy contour category selection shared by deck scatter density charts");
+
+const DensityFieldLegendConfigSchema = z.object({
     field_legend: FieldLegendConfigSchema.optional().describe("Legend settings for density field overlays"),
+}).describe("Legend configuration for density field overlays");
+
+const ContourScatterConfigSchema = z.object({
+    ...ContourVisualConfigSchema.shape,
+    ...LegacyContourCategorySelectionConfigSchema.shape,
+    ...DensityFieldsConfigSchema.shape,
+    ...DensityFieldLegendConfigSchema.shape,
 }).describe("Contour-specific configuration shared by deck scatter charts and spatial viewers");
 
 const ScatterAxisSchema = z.object({
@@ -203,7 +221,7 @@ export const TableConfigSchema = BaseConfigSchema.extend({
 }).describe("Configuration for data tables displaying tabular information");
 
 export const TextBoxConfigSchema = BaseConfigSchema.extend({
-    type: z.literal("text_box").describe("Text box chart type"),
+    type: z.enum(["text_box_chart", "text_box"]).describe("Text box chart type"),
     text: z.string().describe("Text content to display in the text box"),
     // Additional text box specific properties
 }).describe("Configuration for text boxes displaying static or dynamic text content");
@@ -270,6 +288,13 @@ export const DeckScatter3DConfigSchema = DeckScatterSharedConfigSchema.extend({
     viewState: OrbitViewStateSchema.optional().describe("Current deck.gl orbit view state"),
 }).describe("Configuration for the deck.gl 3D scatter plot");
 
+export const DeckSplatterConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("DeckSplatter").describe("Splatter plot chart type"),
+    category: FieldSpecSchema.optional().describe("Categorical column used for the row layout"),
+    ...DensityFieldsConfigSchema.shape,
+    ...ContourVisualConfigSchema.shape,
+}).describe("Configuration for splatter plots showing density fields across a category-by-field grid");
+
 export const RowChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("row_chart").describe("Row chart type"),
     // Additional row chart specific properties
@@ -306,6 +331,7 @@ registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("pie_chart", PieChartConfigSchema, { version: "1" });
 registerChartConfigSchema("table", TableConfigSchema, { version: "1" });
+registerChartConfigSchema("text_box_chart", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("text_box", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("wordcloud", WordcloudConfigSchema, { version: "1" });
 registerChartConfigSchema("sankey", SankeyConfigSchema, { version: "1" });
@@ -317,6 +343,7 @@ registerChartConfigSchema("DeckScatter", DeckScatterPlotConfigSchema, { version:
 registerChartConfigSchema("DeckContourScatter", DeckContourScatterConfigSchema, { version: "1" });
 registerChartConfigSchema("DeckDensity", DeckDensityConfigSchema, { version: "1" });
 registerChartConfigSchema("DeckScatter3D", DeckScatter3DConfigSchema, { version: "1" });
+registerChartConfigSchema("DeckSplatter", DeckSplatterConfigSchema, { version: "1" });
 registerChartConfigSchema("row_chart", RowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("stacked_row_chart", StackedRowChartConfigSchema, { version: "1" });
 registerChartConfigSchema("row_summary_box", RowSummaryBoxConfigSchema, { version: "1" });

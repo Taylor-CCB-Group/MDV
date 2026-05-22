@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SlickgridReact } from "slickgrid-react";
 import FindAndReplaceDialog from "./FindAndReplaceDialog";
 import useFindReplace from "../hooks/useFindReplace";
@@ -7,6 +7,10 @@ import useSlickGridReact from "../hooks/useSlickGridReact";
 import useEditCell from "../hooks/useEditCell";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./FeedbackAlertComponent";
+import AddTableColumnDialog from "./AddTableColumnDialog";
+import BulkEditColumnDialog from "./BulkEditColumnDialog";
+import ColumnRemovalImpactDialog from "./ColumnRemovalImpactDialog";
+import RenameTableColumnDialog from "./RenameTableColumnDialog";
 
 /**
  * Main component for the react table chart
@@ -21,14 +25,6 @@ import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./Feed
 // todo: add integration tests using playwright to test the working of this component
 const TableChartReactComponent = observer(() => {
     const [alertDialogOpen, setAlertDialogOpen] = useState(false);
-    const [feedbackAlert, setFeedbackAlert] = useState<FeedbackAlert>(null);
-
-    const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
-        setFeedbackAlert(alert);
-        if (alert) {
-            setAlertDialogOpen(true);
-        }
-    }, []);
 
     const {
         chartId,
@@ -45,9 +41,36 @@ const TableChartReactComponent = observer(() => {
         options,
         columnDefs,
         handleGridCreated,
+        isEditMode,
         isColumnEditable,
         onDialogClose,
+        feedbackAlert,
+        setFeedbackAlert,
+        isAddColumnDialogOpen,
+        cloneableColumns,
+        addColumnDefaultPosition,
+        closeAddColumnDialog,
+        handleAddColumn,
+        isBulkEditDialogOpen,
+        bulkEditColumn,
+        closeBulkEditDialog,
+        handleBulkEdit,
+        renameColumnState,
+        closeRenameColumnDialog,
+        handleRenameColumn,
+        pendingColumnRemoval,
+        closeColumnRemovalDialog,
+        confirmColumnRemoval,
+        openColumnRemovalView,
     } = useSlickGridReact();
+
+    const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
+        setFeedbackAlert(alert);
+    }, [setFeedbackAlert]);
+
+    useEffect(() => {
+        setAlertDialogOpen(Boolean(feedbackAlert));
+    }, [feedbackAlert]);
 
     const {
         matchCount,
@@ -68,6 +91,7 @@ const TableChartReactComponent = observer(() => {
         gridRef,
         selectionSourceRef,
         handleFeedbackAlert,
+        isEditMode,
     );
 
     const { handleBeforeEditCell, handleCellChange } = useEditCell(
@@ -76,6 +100,7 @@ const TableChartReactComponent = observer(() => {
         dataStore,
         gridRef,
         handleFeedbackAlert,
+        isEditMode,
     );
 
     const onClose = useCallback(() => {
@@ -86,7 +111,7 @@ const TableChartReactComponent = observer(() => {
     const onFeedbackDialogClose = useCallback(() => {
         setAlertDialogOpen(false);
         setFeedbackAlert(null);
-    }, []);
+    }, [setFeedbackAlert]);
 
     return (
         <div
@@ -117,9 +142,40 @@ const TableChartReactComponent = observer(() => {
                     columnName={searchColumn}
                     disableFindPrev={disableFindPrev}
                     disableFindNext={disableFindNext}
-                    isColumnEditable={isColumnEditable}
+                    isColumnEditable={isColumnEditable && isEditMode}
                 />
             </div>
+
+            <AddTableColumnDialog
+                open={isAddColumnDialogOpen}
+                cloneableColumns={cloneableColumns}
+                defaultPosition={addColumnDefaultPosition}
+                onClose={closeAddColumnDialog}
+                onSubmit={handleAddColumn}
+            />
+
+            <BulkEditColumnDialog
+                open={isBulkEditDialogOpen}
+                columnName={bulkEditColumn}
+                onClose={closeBulkEditDialog}
+                onSubmit={handleBulkEdit}
+            />
+
+            <RenameTableColumnDialog
+                open={Boolean(renameColumnState)}
+                columnField={renameColumnState?.field ?? null}
+                initialName={renameColumnState?.initialName ?? ""}
+                onClose={closeRenameColumnDialog}
+                onSubmit={handleRenameColumn}
+            />
+
+            <ColumnRemovalImpactDialog
+                impact={pendingColumnRemoval?.impact ?? null}
+                onClose={closeColumnRemovalDialog}
+                onConfirm={confirmColumnRemoval}
+                onOpenView={openColumnRemovalView}
+                open={Boolean(pendingColumnRemoval)}
+            />
 
             {feedbackAlert && (
                 <div data-testid="feedback-alert-dialog">

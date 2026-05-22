@@ -15,12 +15,15 @@ jobs:
   tsc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.21.0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-      - run: npm install
-      - run: npm run vite-build
-      - run: npm run test
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run vite-build
+      - run: pnpm run test
       # - uses: icrawl/action-tsc@v1

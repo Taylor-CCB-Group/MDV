@@ -47,4 +47,3 @@ def preflight_with_single_retry(
             f"{format_preflight_issues(second.issues)}"
         )
     return retry_code, metadata
-

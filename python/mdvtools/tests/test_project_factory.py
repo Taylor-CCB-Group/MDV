@@ -13,6 +13,7 @@ import logging
 import shutil
 import scanpy as sc
 from mdvtools.tests.mock_anndata import create_minimal_anndata
+from mdvtools.tests.mock_expression_layers import add_synth_expression_layers
 from mdvtools.conversions import convert_scanpy_to_mdv
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,8 @@ def create_test_h5ad_file(
     source: str = 'mock',
     dataset: str | None = None,
     n_cells: int = 100,
-    n_genes: int = 200
+    n_genes: int = 200,
+    extra_expression_layers: bool = False,
 ) -> str:
     """Create a test .h5ad file for upload tests.
     
@@ -55,7 +57,10 @@ def create_test_h5ad_file(
             raise ValueError(f"Unknown dataset: {dataset}. Available: pbmc3k, pbmc3k_processed")
     else:
         raise ValueError(f"Unknown source: {source}. Available: mock, scanpy")
-    
+
+    if extra_expression_layers:
+        add_synth_expression_layers(adata)
+
     # Ensure directory exists
     output_dir = os.path.dirname(output_path)
     if output_dir:
@@ -73,7 +78,8 @@ def create_test_project_zip(
     source: str = 'mock',
     dataset: str | None = None,
     n_cells: int = 100,
-    n_genes: int = 200
+    n_genes: int = 200,
+    extra_expression_layers: bool = False,
 ) -> str:
     """Create a test MDV project zip file for import tests.
     
@@ -109,7 +115,10 @@ def create_test_project_zip(
                 raise ValueError(f"Unknown dataset: {dataset}. Available: pbmc3k, pbmc3k_processed")
         else:
             raise ValueError(f"Unknown source: {source}. Available: mock, scanpy")
-        
+
+        if extra_expression_layers:
+            add_synth_expression_layers(adata)
+
         logger.info("Converting AnnData to MDV project...")
         convert_scanpy_to_mdv(project_dir, adata)
         

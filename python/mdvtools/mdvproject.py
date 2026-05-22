@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 import h5py
@@ -33,39 +32,17 @@ from mdvtools.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _agent_debug_log(
-    run_id: str,
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict,
-    *,
-    log: logging.Logger = logger,
-) -> None:
-    try:
-        log.debug(
-            "agent_debug run=%s hypothesis=%s location=%s message=%s data=%s",
-            run_id,
-            hypothesis_id,
-            location,
-            message,
-            data,
-        )
-    except Exception as log_exc:
-        log.warning(
-            "agent_debug_log failed at %s: %s",
-            location,
-            log_exc,
-            exc_info=True,
-        )
-
-
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
 datatype_mappings = {
+    "int8": "integer",
+    "int16": "integer",
+    "uint8": "integer",
+    "uint16": "integer",
+    "uint32": "integer",
     "int64": "integer",
     "float64": "double",
     "float32": "double",
@@ -203,31 +180,40 @@ class MDVProject:
         from mdvtools.llm.column_field_resolve import _WRAPPER_RE
 
         ds = self.get_datasource_metadata(datasource)
-        df = pandas.DataFrame()
-        for c in ds["columns"]:
-            data = self.get_column(datasource, c["field"])
-            df[c["field"]] = data
-        if columns is None:
-            return df
+        fields = [c["field"] for c in ds["columns"]]
+        field_set = set(fields)
 
-        # Chart "wrapper" tokens (e.g. gs|GENE(gs)|0) are not metadata field ids; they address
-        # rows-as-columns matrix columns. Handle those alongside normal field ids.
-        out: dict[str, Any] = {}
-        n_rows = int(ds.get("size", len(df) if len(df) else 0))
+        if columns is None:
+            out: dict[str, Any] = {}
+            for field in fields:
+                out[field] = self.get_column(datasource, field)
+            return pandas.DataFrame(out)
+
+        requested_keys: list[str] = []
         for col in columns:
             key = col.strip() if isinstance(col, str) else col
             if not isinstance(key, str):
                 raise AttributeError(f"invalid column key: {col!r}")
+            requested_keys.append(key)
+
+        # Chart "wrapper" tokens (e.g. gs|GENE(gs)|0) are not metadata field ids; they address
+        # rows-as-columns matrix columns. Handle those alongside normal field ids.
+        out: dict[str, Any] = {}
+        n_rows = int(ds.get("size", 0))
+        if "size" not in ds and fields:
+            # Preserve old fallback behavior without eagerly reading all columns.
+            n_rows = len(self.get_column(datasource, fields[0]))
+        for key in requested_keys:
             if _WRAPPER_RE.match(key):
-                out[col] = self._read_wrapper_expression_column(
+                out[key] = self._read_wrapper_expression_column(
                     datasource, key, n_rows
                 )
-            elif key in df.columns:
-                out[col] = df[key]
+            elif key in field_set:
+                out[key] = self.get_column(datasource, key)
             else:
                 raise AttributeError(
                     f"column {key!r} not found in {datasource} datasource "
-                    f"(have metadata fields: {list(df.columns)})"
+                    f"(have metadata fields: {fields})"
                 )
         return pandas.DataFrame(out)
 
@@ -273,10 +259,24 @@ class MDVProject:
     ) -> numpy.ndarray:
         """One matrix column (genes x cells): cells are rows, col_index selects a gene column."""
         if not sparse:
-            _len = int(grp["length"][0])
-            offset = col_index * _len
-            return numpy.asarray(grp["x"][offset : offset + _len], dtype=numpy.float32)
+            rows_per_col = int(grp["length"][0])
+            n_cols = len(grp["x"]) // rows_per_col
+            if not (0 <= col_index < n_cols):
+                raise IndexError(
+                    f"col_index {col_index} out of range for dense subgroup matrix "
+                    f"(valid range: [0, {n_cols - 1}])"
+                )
+            offset = col_index * rows_per_col
+            return numpy.asarray(
+                grp["x"][offset : offset + rows_per_col], dtype=numpy.float32
+            )
         p = grp["p"]
+        n_cols = len(p) - 1
+        if not (0 <= col_index < n_cols):
+            raise IndexError(
+                f"col_index {col_index} out of range for sparse subgroup matrix "
+                f"(valid range: [0, {n_cols - 1}])"
+            )
         offset = p[col_index : col_index + 2]
         start, end = int(offset[0]), int(offset[1])
         _indexes = numpy.array(grp["i"][start:end], dtype=numpy.int64)
@@ -358,7 +358,7 @@ class MDVProject:
         except ValueError as exc:
             raise ValueError(f"Gene {gene!r} not found in feature table {ds!r} column {ncol!r}.") from exc
         return build_expression_wrapper_token(sk, str(gene), idx)
-    
+
     def set_interactions(
         self,
         interaction_ds,
@@ -756,87 +756,25 @@ class MDVProject:
             mode = "w"
         elif not read_only:
             mode = "a"
-        # #region agent log
-        _agent_debug_log(
-            "pre-fix",
-            "H1",
-            "mdvproject.py:_get_h5_handle:entry",
-            "attempting h5 open",
-            {
-                "h5file": self.h5file,
-                "mode": mode,
-                "read_only": read_only,
-                "attempt_in": attempt,
-                "pid": os.getpid(),
-            },
-        )
-        # #endregion
         try:
             handle = h5py.File(self.h5file, mode)
-            # #region agent log
-            _agent_debug_log(
-                "pre-fix",
-                "H4",
-                "mdvproject.py:_get_h5_handle:success",
-                "h5 open success",
-                {
-                    "h5file": self.h5file,
-                    "mode": mode,
-                    "attempt_in": attempt,
-                    "pid": os.getpid(),
-                },
-            )
-            # #endregion
             return handle
         except Exception as e:
-            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
-            if not lock_error:
-                logger.error("error opening h5 file (non-lock failure)", exc_info=True)
-                raise
             # certain environments seem to have issues with the handle not being closed instantly
             # if there is a better way to do this, please change it
             # if there are multiple processes trying to access the file, this may also help
             # (although if they're trying to write, who knows what bad things may happen to the project in general)
-            # #region agent log
-            _agent_debug_log(
-                "pre-fix",
-                "H2",
-                "mdvproject.py:_get_h5_handle:except",
-                "h5 open failed",
-                {
-                    "h5file": self.h5file,
-                    "mode": mode,
-                    "read_only": read_only,
-                    "attempt_in": attempt,
-                    "error_type": type(e).__name__,
-                    "error": str(e),
-                    "pid": os.getpid(),
-                },
-            )
-            # #endregion
+            time.sleep(0.1)
             attempt += 1
-            logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
-            # #region agent log
-            _agent_debug_log(
-                "pre-fix",
-                "H3",
-                "mdvproject.py:_get_h5_handle:retry",
-                "retrying h5 open",
-                {
-                    "h5file": self.h5file,
-                    "mode": mode,
-                    "read_only": read_only,
-                    "attempt_out": attempt,
-                    "lock_error": lock_error,
-                    "pid": os.getpid(),
-                },
-            )
-            # #endregion
+            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            if lock_error:
+                logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
+            else:
+                logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
             if attempt >= 20:
                 raise RuntimeError(
                     f"unable to open h5 file after {attempt} attempts: {self.h5file}"
                 ) from e
-            time.sleep(0.1)
             return self._get_h5_handle(read_only, attempt)
 
     def get_column(self, datasource: str, column, raw=False):
@@ -1583,11 +1521,7 @@ class MDVProject:
             if add_to_view:
                 # TablePlot parameters
                 title = name
-                # Use collect_schema().names() for LazyFrame, .columns for DataFrame
-                if isinstance(dataframe, pl.LazyFrame):
-                    params = dataframe.collect_schema().names()
-                else:
-                    params = dataframe.columns
+                params = [x["field"] for x in columns]
                 size = [792, 472]
                 position = [10, 10]
             
@@ -2599,6 +2533,7 @@ def add_column_to_group(
     group (h5py.Group): The group to add the data to
     length (int): The length of the data
     """
+    col.setdefault("original_dtype", str(data.dtype))
 
     if (
         col["datatype"] == "text"
@@ -2671,7 +2606,7 @@ def add_column_to_group(
         for i in range(0, length):
             b = i * maxv
             try:
-                v = data[i]  # may raise KeyError if data is None at this index
+                v = data.iloc[i] if hasattr(data, "iloc") else data[i]
                 if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
@@ -2698,12 +2633,32 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
+        if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
+            try:
+                numeric = numpy.asarray(
+                    pandas.to_numeric(clean, errors="coerce"),
+                    dtype=numpy.float64,
+                )
+                finite_numeric = numeric[numpy.isfinite(numeric)]
+                out_of_range = finite_numeric[finite_numeric > 16_777_216]
+                if len(out_of_range) != 0:
+                    col.setdefault("storage_warnings", []).append(
+                        "uint32 -> float32 (integer): "
+                        f"{len(out_of_range)} value(s) exceed exact-integer range "
+                        f"(max={float(finite_numeric.max()):.0f}); precision loss possible."
+                    )
+            except Exception:
+                pass
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
+        if na.size == 0:
+            col["minMax"] = [0.0, 0.0]
+            col["quantiles"] = {}
+            return
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
@@ -2722,7 +2677,12 @@ def get_column_info(columns, dataframe, supplied_columns_only):
 
     if not supplied_columns_only:
         cols = [
-            {"datatype": datatype_mappings[d.name], "name": c, "field": c}
+            {
+                "datatype": datatype_mappings[d.name],
+                "name": c,
+                "field": c,
+                "original_dtype": d.name,
+            }
             for d, c in zip(dataframe.dtypes, dataframe.columns)
         ]
         # replace with user given column metadata
@@ -2785,6 +2745,7 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
     import numpy as np
     
     field = col_info["field"]
+    col_info.setdefault("original_dtype", str(polars_series.dtype))
     
     # Handle different column types
     if col_info["datatype"] in ["text", "text16", "multitext"]:
@@ -2856,6 +2817,21 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 # fillna is necessary because NaN cannot be cast to int
                 data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
 
+            if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
+                try:
+                    numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
+                    arr = numeric.to_numpy()
+                    finite = arr[np.isfinite(arr)]
+                    out_of_range = finite[finite > 16_777_216]
+                    if len(out_of_range) != 0:
+                        col_info.setdefault("storage_warnings", []).append(
+                            "uint32 -> float32 (integer): "
+                            f"{len(out_of_range)} value(s) exceed exact-integer range "
+                            f"(max={float(finite.max()):.0f}); precision loss possible."
+                        )
+                except Exception:
+                    pass
+
             # Create dataset
             h5_group.create_dataset(field, data=data)
 
@@ -2903,7 +2879,8 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
             cols.append({
                 "datatype": mdv_dtype,
                 "name": col_name,
-                "field": col_name
+                "field": col_name,
+                "original_dtype": str(polars_dtype),
             })
         
         # Replace with user given column metadata

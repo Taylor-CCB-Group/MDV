@@ -3,6 +3,35 @@ import { getChartConfigSchema } from "@/charts/schemas/ChartConfigRegistry";
 import { safeValidateChartConfig } from "@/charts/schemas/ChartConfigSchema";
 
 describe("chart config schema registration", () => {
+    test("validates text box configs for runtime and legacy aliases", () => {
+        const runtimeConfig = {
+            id: "text-box-runtime",
+            title: "Text Box Runtime",
+            type: "text_box_chart",
+            text: "## Section\nRuntime config",
+            param: [],
+            size: [420, 240],
+        };
+
+        const legacyAliasConfig = {
+            ...runtimeConfig,
+            id: "text-box-legacy",
+            title: "Text Box Legacy",
+            type: "text_box",
+        };
+
+        expect(getChartConfigSchema("text_box_chart")).toBeDefined();
+        expect(getChartConfigSchema("text_box")).toBeDefined();
+        expect(safeValidateChartConfig(runtimeConfig)).toMatchObject({
+            type: "text_box_chart",
+            text: "## Section\nRuntime config",
+        });
+        expect(safeValidateChartConfig(legacyAliasConfig)).toMatchObject({
+            type: "text_box",
+            text: "## Section\nRuntime config",
+        });
+    });
+
     test("validates the new deck contour scatter chart config", () => {
         const config = {
             id: "deck-contour-1",
@@ -81,6 +110,31 @@ describe("chart config schema registration", () => {
         expect(safeValidateChartConfig(config)).toMatchObject({
             type: "DeckDensity",
             contour_fill: true,
+        });
+    });
+
+    test("validates DeckSplatter against the shared contour and density field config sections", () => {
+        const config = {
+            id: "deck-splatter-1",
+            title: "Splatter",
+            type: "DeckSplatter",
+            param: ["x", "y"],
+            size: [500, 400],
+            category: "cell_type",
+            densityFields: ["marker_a", "marker_b"],
+            contour_fill: true,
+            contour_bandwidth: 1.5,
+            contour_intensity: 0.75,
+            contour_opacity: 0.4,
+            contour_fillThreshold: 2,
+        };
+
+        expect(getChartConfigSchema("DeckSplatter")).toBeDefined();
+        expect(safeValidateChartConfig(config)).toMatchObject({
+            type: "DeckSplatter",
+            category: "cell_type",
+            densityFields: ["marker_a", "marker_b"],
+            contour_bandwidth: 1.5,
         });
     });
 });

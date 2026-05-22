@@ -87,7 +87,11 @@ class HeatMap extends SVGChart {
      * Matches DataStore.getColumnInfo / addColumnFromField behaviour used elsewhere in ChartManager.
      */
     _ensureExpressionColumn(field) {
-        if (typeof field === "string" && field.includes("|")) {
+        if (
+            typeof field === "string" &&
+            !this.dataStore.columnIndex[field] &&
+            field.includes("|")
+        ) {
             this.dataStore.getColumnInfo(field);
         }
     }

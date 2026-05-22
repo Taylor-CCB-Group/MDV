@@ -1,15 +1,6 @@
 [tool.poetry]
-name = "mdvtools"
-version = "0.0.1"
-description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
-authors = [
-    "Martin Sergeant <m.j.sergeant1@googlemail.com>",
-    "PeterTodd <peter.todd@well.ox.ac.uk>",
-]
-readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
 ]
 
@@ -64,6 +55,7 @@ umap-learn = "^0.5.6"
 statsmodels = "^0.14.2"
 generate-tiff-offsets = "^0.1.7"
 spatialdata-plot = "^0.2.12"
+dummy-spatialdata = { version = "^0.1.9", python = ">=3.12,<3.13" }
 
 
 [tool.poetry.group.docs]
@@ -103,12 +95,44 @@ flask-jwt-extended = "^4.7.1"
 redis = "^5.2.1"
 
 [tool.pyright]
-venvPath = "../venv/"
+venvPath = ".."
+venv = "venv"
+pythonVersion = "3.12"
+include = [
+    "mdvtools",
+    "conftest.py",
+]
+exclude = [
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    "manual_tests",
+    "mdvtools/auth",
+    "mdvtools/dbutils",
+    "mdvtools/test_projects",
+]
 typeCheckingMode = "standard"
 
-# [project.urls]
-# "Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
-# "Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
+[project]
+name = "mdvtools"
+version = "1.2.3"
+description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = ">=3.11,<3.13"
+authors = [
+    { name = "Martin Sergeant", email = "m.j.sergeant1@googlemail.com" },
+    { name = "PeterTodd", email = "peter.todd@well.ox.ac.uk" },
+]
+dynamic = ["dependencies", "classifiers"]
+
+[project.urls]
+"Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
+"Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
+
+[project.scripts]
+mdvtools = "mdvtools.cli:cli"
 
 
 [build-system]

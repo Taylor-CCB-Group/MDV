@@ -11,6 +11,7 @@ _mlv/
 _avocato/
 project1/
 .DS_Store
+.pnpm-store/**
 _test.py
 __pycache__
 vite-dist
@@ -65,8 +66,17 @@ logs/
 /test-results/
 /playwright-report/
 /blob-report/
+/output/
 /playwright/.cache/
 /playwright/.auth/
+/.playwright-cli/
+/artifacts/playwright-cli/
+
+# Claude
+CLAUDE.md
+.claude/
+.cocoindex_code/
+
 
 # Generated test data
 tests_playwright/test-data/temp/

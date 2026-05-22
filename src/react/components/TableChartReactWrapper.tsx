@@ -8,6 +8,7 @@ import type { SlickgridReactInstance } from "slickgrid-react";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
 import { createEl } from "@/utilities/ElementsTyped";
 import { DataModel } from "@/table/DataModel";
+import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -47,9 +48,62 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
     return config;
 }
 
-class TableChartReact extends BaseReactChart<TableChartReactConfig> {
-    gridRef?: { current: SlickgridReactInstance | null };
+export function orderSerializedTableParams(
+    activeParams: TableChartReactConfig["param"],
+    serializedEntries: unknown[],
+    visibleFields: string[],
+) {
+    const selectedIndices = new Set<number>();
+    const matchedIndicesInDisplayOrder: number[] = [];
+
+    // Map each visible concrete field back to the first unmatched top-level param entry
+    // that produced it, so query-backed params are treated as one logical group.
+    for (const field of visibleFields) {
+        const index = activeParams.findIndex((entry, entryIndex) => {
+            if (selectedIndices.has(entryIndex)) {
+                return false;
+            }
+            return flattenFields(entry).includes(field);
+        });
+        if (index === -1) {
+            continue;
+        }
+        selectedIndices.add(index);
+        matchedIndicesInDisplayOrder.push(index);
+    }
+
+    const orderedParam: unknown[] = [];
+    let matchedIndexPointer = 0;
+    // Keep unmatched query-backed entries at their original top-level position so an
+    // active link is not lost or moved just because it currently resolves to zero
+    // concrete fields.
+    // For matched entries, use the visible display order; for unmatched query entries,
+    // preserve the original top-level position from activeParams.
+    for (let i = 0; i < activeParams.length; i += 1) {
+        if (selectedIndices.has(i)) {
+            const matchedIndex = matchedIndicesInDisplayOrder[matchedIndexPointer];
+            matchedIndexPointer += 1;
+            if (matchedIndex !== undefined) {
+                orderedParam.push(serializedEntries[matchedIndex]);
+            }
+            continue;
+        }
+        if (typeof activeParams[i] === "string") {
+            continue;
+        }
+        if (serializedEntries[i] !== undefined) {
+            orderedParam.push(serializedEntries[i]);
+        }
+    }
+
+    return orderedParam;
+}
+
+export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
+    private gridRef?: { current: SlickgridReactInstance | null };
+    private addColumnDialogOpener?: () => void;
     private downloadIconSpan: HTMLSpanElement | null = null;
+    private addColumnIconSpan: HTMLSpanElement | null = null;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
         // Adapt config before calling super constructor, which will make the config observable
@@ -63,6 +117,28 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                 this.downloadData();
             },
         }) as HTMLSpanElement;
+
+        const isEditMode = window.mdv?.chartManager?.config?.permission === "edit";
+
+        if (isEditMode) {
+            this.addColumnIconSpan = this.addMenuIcon("fas fa-plus", "Add Column", {
+                func: () => {
+                    this.openAddColumnDialog();
+                },
+            }) as HTMLSpanElement;
+        }
+    }
+
+    setGridRef(gridRef: { current: SlickgridReactInstance | null }) {
+        this.gridRef = gridRef;
+    }
+
+    setAddColumnDialogOpener(opener?: () => void) {
+        this.addColumnDialogOpener = opener;
+    }
+
+    openAddColumnDialog() {
+        this.addColumnDialogOpener?.();
     }
 
     private setDownloadIcon(downloading: boolean) {
@@ -127,30 +203,95 @@ class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         }
     }
 
-    getConfig() {
-        const config = super.getConfig();
-        
-        // Serialize current grid widths to config.column_widths for persistence
-        // This ensures persisted state reflects actual grid state at serialization time
-        // Grid manages widths internally during runtime, but we serialize them here for persistence
-        if (this.gridRef?.current?.slickGrid) {
-            try {
-                const columns = this.gridRef.current.slickGrid.getColumns();
-                const columnWidths: Record<string, number> = {};
-                
-                for (const col of columns) {
-                    if (col.width && col.width !== 100) {
-                        columnWidths[col.field] = col.width;
+    // Overriding the onColumnRemoved to update table config and avoid removing the whole table
+    onColumnRemoved(column: string) {
+        if (!Array.isArray(this.config.param)) {
+            return false;
+        }
+        // `config.param` can contain either plain field names or query-backed FieldSpec objects
+        // flatten each spec to concrete field names so removals work for both
+        const containsRemovedColumn = (fieldSpec: FieldSpec) =>
+            flattenFields(fieldSpec).includes(column);
+        if (!this.config.param.some(containsRemovedColumn)) {
+            return false;
+        }
+
+        action(() => {
+            // Remove column from config.param, config.order
+            this.config.param = this.config.param.filter(
+                (fieldSpec) => !containsRemovedColumn(fieldSpec),
+            );
+            const nextOrder = { ...(this.config.order ?? {}) };
+            const removedOrder = nextOrder[column];
+            delete nextOrder[column];
+
+            // Shift the index of the columns back after the removed column by 1
+            if (removedOrder !== undefined) {
+                for (const field in nextOrder) {
+                    if (nextOrder[field] > removedOrder) {
+                        nextOrder[field] -= 1;
                     }
                 }
-                
-                config.column_widths = columnWidths;
-            } catch (e) {
-                // If grid is not available or error occurs, keep existing config.column_widths
-                console.warn("Could not read grid widths in getConfig():", e);
+            }
+            this.config.order = nextOrder;
+
+            // Reset sort if sorted by removed column
+            if (this.config.sort?.columnId === column) {
+                this.config.sort = null;
+            }
+
+            // Remove the column width of removed column
+            if (this.config.column_widths?.[column] != null) {
+                delete this.config.column_widths[column];
+            }
+        })();
+
+        return false;
+    }
+
+    getConfig() {
+        const config = super.getConfig();
+        const gridColumns = this.gridRef?.current?.slickGrid?.getColumns() ?? [];
+        const visibleFields = gridColumns
+            .map((column) => column.field)
+            .filter(
+                (field): field is string =>
+                    typeof field === "string" &&
+                    field !== "__index__" &&
+                    Boolean(this.dataStore.columnIndex[field]),
+            );
+
+        if (visibleFields.length > 0 && Array.isArray(config.param)) {
+            const activeParams = this.activeQueries.activeParams();
+            // Params affect the active link and if turned into concrete fields, active link
+            // can turn to link, hence preserving the active link params
+            config.param = orderSerializedTableParams(activeParams, config.param, visibleFields);
+            
+            // Rest of the properties don't affect the active link
+            config.order = Object.fromEntries(
+                visibleFields.map((field, index) => [field, index]),
+            );
+
+            const visibleFieldSet = new Set(visibleFields);
+            const columnWidths: Record<string, number> = {};
+            for (const column of gridColumns) {
+                if (
+                    typeof column.field === "string" &&
+                    column.field !== "__index__" &&
+                    visibleFieldSet.has(column.field) &&
+                    column.width &&
+                    column.width !== 100
+                ) {
+                    columnWidths[column.field] = column.width;
+                }
+            }
+            config.column_widths = columnWidths;
+
+            if (config.sort?.columnId && !visibleFieldSet.has(config.sort.columnId)) {
+                config.sort = null;
             }
         }
-        
+
         return config;
     }
 

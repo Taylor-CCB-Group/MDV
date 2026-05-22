@@ -30,7 +30,7 @@ jobs:
         poetry-version: [ 1.7.1 ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Debug workflow trigger
         env:

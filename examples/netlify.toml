@@ -1,3 +1,11 @@
+[build]
+    command = "corepack enable && pnpm install --frozen-lockfile && pnpm run vite-build"
+    publish = "vite-dist/"
+
+[build.environment]
+    NODE_VERSION = "22"
+    PNPM_VERSION = "10.21.0"
+
 [[headers]]
     for = "/*"
     [headers.values]

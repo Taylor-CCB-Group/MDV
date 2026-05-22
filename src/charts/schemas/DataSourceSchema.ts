@@ -12,6 +12,7 @@ export const DataSourceColumnSchema = z.object({
     stringLength: z.number().int().positive().optional().describe("For unique columns: length of longest value; for multitext: max values per item"),
     colorLogScale: z.boolean().optional().describe("Whether to use logarithmic scaling for color mapping of numeric columns"),
     editable: z.boolean().optional().describe("Whether users can edit values in this column"),
+    deleted: z.boolean().optional().describe("Whether the column has been soft-deleted and removed from user-facing column lists"),
     is_url: z.boolean().optional().describe("Whether this column contains URL links (for unique and text columns)"),
     minMax: z.tuple([z.number(), z.number()]).optional().describe("For numeric columns: [minimum, maximum] values for optimization"),
     quantiles: z.object({

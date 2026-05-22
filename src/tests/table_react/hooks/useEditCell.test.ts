@@ -68,6 +68,7 @@ describe("useEditCell", () => {
                 dataStore,
                 gridRefWithNull,
                 setFeedbackAlert,
+                true,
             ),
         );
     
@@ -85,6 +86,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -113,6 +115,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -159,6 +162,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 
@@ -186,6 +190,42 @@ describe("useEditCell", () => {
             );
         });
 
+        test("should show error when permission is not editable", () => {
+            const { result } = renderHook(() =>
+                useEditCell(
+                    orderedParamColumnsRef,
+                    sortedIndicesRef,
+                    dataStore,
+                    gridRef,
+                    setFeedbackAlert,
+                    false,
+                ),
+            );
+
+            const changeEvent = new CustomEvent("cellChange", {
+                detail: {
+                    eventData: {},
+                    args: {
+                        row: 0,
+                        column: { field: "readonly" },
+                        item: { readonly: "" },
+                    } as OnCellChangeEventArgs,
+                },
+            }) as any;
+
+            act(() => {
+                result.current.handleCellChange(changeEvent);
+            });
+
+            expect(setFeedbackAlert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Edit Error",
+                    message: "Permission is not editable",
+                }),
+            );
+        });
+
         test("should show error when column is not editable", () => {
             const { result } = renderHook(() =>
                 useEditCell(
@@ -194,6 +234,7 @@ describe("useEditCell", () => {
                     dataStore,
                     gridRef,
                     setFeedbackAlert,
+                    true,
                 ),
             );
 

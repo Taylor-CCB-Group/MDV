@@ -1,4 +1,38 @@
 import { getExportCsvStream } from "@/datastore/dataExportUtils";
+import {
+    getCellValueAsString,
+    setCellValueFromString,
+} from "@/react/utils/valueReplacementUtil";
+
+const DEFAULT_MULTITEXT_CAPACITY = 24;
+const DEFAULT_UNIQUE_STRING_LENGTH = 64;
+
+let nextDataModelFilterListenerSeq = 0;
+
+/**
+ * Helper to clone data type agnostically 
+ */
+function cloneTypedArrayBuffer(data) {
+    const buffer = new SharedArrayBuffer(data.byteLength);
+    const ctor = data.constructor;
+    const copy = new ctor(buffer);
+    copy.set(data, 0);
+    return buffer;
+}
+
+/**
+ * Helper to parse positive integer or use fallback
+ */
+function parsePositiveIntOrDefault(value, fallback, label) {
+    if (value == null || value === "") {
+        return fallback;
+    }
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(`${label} must be a positive integer`);
+    }
+    return parsed;
+}
 
 class DataModel {
     /**
@@ -18,12 +52,25 @@ class DataModel {
         }
         this.size = len;
         this.listeners = {};
+        /** @type {string | null} */
+        this._dataStoreFilterListenerId = null;
         if (config.autoupdate == null || config.autoupdate === true) {
-            dataStore.addListener("sss", (type) => {
+            this._dataStoreFilterListenerId = `data-model-filter-${++nextDataModelFilterListenerSeq}`;
+            dataStore.addListener(this._dataStoreFilterListenerId, (type) => {
                 if (type === "filtered") {
                     this.updateModel();
                 }
             });
+        }
+    }
+
+    /**
+     * Removes the DataStore "filtered" autoupdate listener. Safe to call more than once.
+     */
+    dispose() {
+        if (this._dataStoreFilterListenerId) {
+            this.dataStore.removeListener(this._dataStoreFilterListenerId);
+            this._dataStoreFilterListenerId = null;
         }
     }
 
@@ -86,28 +133,170 @@ class DataModel {
     }
 
     /**
-     * @param {string} name
-     * @param {string} cloneCol
+     * @param {string|Object} column - `string` when we clone a column 
+     * and `object`: `{name, datatype, stringLength, delimiter}` when we create a new empty column
+     * 
+     * @param {string} [cloneCol] - optional legacy clone source
      */
-    createColumn(name, cloneCol) {
-        const col = {
-            name: name,
-            field: name,
-            datatype: "text",
-            values: [""],
-        };
-        const buff = new SharedArrayBuffer(this.dataStore.size);
-        if (cloneCol) {
-            const arr = this.dataStore.getRawColumn(cloneCol);
-            const newArr = new Uint8Array(buff);
-            newArr.set(arr);
-            col.values = this.dataStore.getColumnValues(cloneCol).slice(0);
+    createColumn(column, cloneCol) {
+        const columnSpec =
+            typeof column === "string"
+                ? {
+                    name: column,
+                    cloneColumn: cloneCol,
+                    datatype: cloneCol ? undefined : "text",
+                }
+                : column;
+
+        if (!columnSpec?.name) {
+            throw new Error("Column name is required");
         }
-        this.dataStore.addColumn(col, buff, true);
+
+        if (columnSpec.cloneColumn) {
+            this._createClonedColumn(columnSpec.name, columnSpec.cloneColumn);
+            return;
+        }
+
+        this._createEmptyColumn(columnSpec);
+    }
+
+    /**
+     * 
+     * @param {string} columnName - name of the new column
+     * @param {string} cloneColumnName - name of the column to be cloned from
+     * 
+     * Fetch the column spec of the actual column and assign them to the new column specs
+     * Create a deep copy of the data of the actual column to avoid mutations
+     * Add the new column to the datastore
+     */
+    _createClonedColumn(columnName, cloneColumnName) {
+        const clonedColumn = this.dataStore.columnIndex[cloneColumnName];
+        if (!clonedColumn?.data) {
+            throw new Error(`Column ${cloneColumnName} not found`);
+        }
+
+        const newColumn = {
+            name: columnName,
+            field: columnName,
+            datatype: clonedColumn.datatype,
+            editable: true,
+        };
+
+        // Assign the specs of the cloned column to new column
+        if (clonedColumn.values) {
+            newColumn.values = clonedColumn.values.slice();
+        }
+        if (clonedColumn.stringLength) {
+            newColumn.stringLength = clonedColumn.stringLength;
+        }
+        if (clonedColumn.delimiter) {
+            newColumn.delimiter = clonedColumn.delimiter;
+        }
+        if (clonedColumn.is_url) {
+            newColumn.is_url = clonedColumn.is_url;
+        }
+
+        this.dataStore.addColumn(
+            newColumn,
+            // clone the data of existing column to avoid mutations
+            cloneTypedArrayBuffer(clonedColumn.data),
+            true,
+        );
+    }
+
+    /**
+     * 
+     * @param {object} columnSpec - Column specs of new column to be created
+     * 
+     * Assign column specs based on the datatype and add the column to datastore
+     */
+    _createEmptyColumn(columnSpec) {
+        const datatype = columnSpec.datatype || "text";
+        const col = {
+            name: columnSpec.name,
+            field: columnSpec.name,
+            datatype,
+            editable: true,
+        };
+
+        let data;
+        // Prefill the column specs with default values based on the datatype
+        if (datatype === "text" || datatype === "text16") {
+            col.values = [""];
+            data = new Array(this.dataStore.size).fill("");
+        } else if (
+            datatype === "double" ||
+            datatype === "integer"
+        ) {
+            data = new Array(this.dataStore.size).fill(Number.NaN);
+        } else if (datatype === "int32") {
+            //! int32 cannot truly represent NaN, so empty int32 cells currently coerce during storage and need a real missing-value strategy later.
+            // todo: add a missing value sentinal for int32
+            throw new Error("Creating empty int32 column is not supported currently")
+        } else if (datatype === "multitext") {
+            const stringLength = parsePositiveIntOrDefault(
+                columnSpec.stringLength,
+                DEFAULT_MULTITEXT_CAPACITY,
+                "multitext capacity",
+            );
+            col.values = [];
+            col.stringLength = stringLength;
+            col.delimiter = columnSpec.delimiter || ",";
+            const buffer = new SharedArrayBuffer(this.dataStore.size * stringLength * 2);
+            const arr = new Uint16Array(buffer);
+            arr.fill(65535);
+            data = buffer;
+        } else if (datatype === "unique") {
+            const stringLength = parsePositiveIntOrDefault(
+                columnSpec.stringLength,
+                DEFAULT_UNIQUE_STRING_LENGTH,
+                "unique stringLength",
+            );
+            col.stringLength = stringLength;
+            data = new SharedArrayBuffer(this.dataStore.size * stringLength);
+        } else {
+            throw new Error(`Unsupported datatype: ${datatype}`);
+        }
+        this.dataStore.addColumn(col, data, true);
     }
 
     removeColumn(col) {
-        this.dataStore.removeColumn(col, true, true);
+        if (!this.dataStore.softDeleteColumn) {
+            throw new Error("DataStore.softDeleteColumn is required for column deletion");
+        }
+        this.dataStore.softDeleteColumn(col, true, true);
+    }
+
+    fillColumn(columnName, value, rowIndices, emptyOnly = false) {
+        const col = this.dataStore.columnIndex[columnName];
+        if (!col) {
+            throw new Error(`Column ${columnName} not found`);
+        }
+        if (!col.editable) {
+            throw new Error(`Column ${columnName} not editable`);
+        }
+        const rowCount =
+            this.dataStore.rowCount ?? this.dataStore.data?.length ?? this.dataStore.size ?? 0;
+
+        for (const rowIndex of rowIndices) {
+            if (
+                !Number.isFinite(rowIndex) ||
+                !Number.isInteger(rowIndex) ||
+                rowIndex < 0 ||
+                rowIndex >= rowCount
+            ) {
+                throw new Error(`Invalid row index ${rowIndex} for column ${columnName}`);
+            }
+            if (emptyOnly) {
+                const currentValue = getCellValueAsString(col, rowIndex);
+                if (currentValue !== "") {
+                    continue;
+                }
+            }
+            setCellValueFromString(col, rowIndex, value);
+        }
+
+        this.dataStore.dataChanged([columnName]);
     }
 
     async getDataAsBlob(delimiter = "\t", newline = "\n") {

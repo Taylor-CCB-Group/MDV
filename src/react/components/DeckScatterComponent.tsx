@@ -1,9 +1,8 @@
 import DeckGL from "@deck.gl/react";
-import { OrthographicView, OrbitView } from "@deck.gl/core";
+import { OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
 import { observer } from "mobx-react-lite";
-import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
-import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
-import { DataFilterExtension } from "@deck.gl/extensions";
+import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { LineLayer } from "@deck.gl/layers";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
@@ -17,9 +16,11 @@ import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import useGateLayers from "../hooks/useGateLayers";
-import { escapeHtml } from "@/utilities/Utilities";
 import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
+import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
+import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -137,7 +138,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
     const contourConfig = useConfig<DualContourLegacyConfig>();
-    const { opacity, viewState, on_filter, dimension } = config;
+    const { viewState, dimension } = config;
     const is2d = dimension === "2d";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
@@ -171,14 +172,10 @@ const DeckScatter = observer(function DeckScatterComponent({
     const chartHeight = height - margin.top - margin.bottom - 3.5;
     useZoomOnFilter(data);
 
-    const greyOnFilter = on_filter === "grey";
-
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
     //! beware unproject from here is not what we want, should review
-    const { scatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
-
-    const filterValue = useFilterArray();
+    const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
 
     const {
         gateLabelLayer,
@@ -189,51 +186,6 @@ const DeckScatter = observer(function DeckScatterComponent({
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
     const showLegend = contourConfig.field_legend.display;
     const legendPosition = { x: 10, y: 10 };
-
-    // this should move in to scatter_state, common with viv...
-    const greyScatterplotLayer = useMemo(
-        () =>
-            new ScatterplotLayer({
-                id: `scatterplot-layer-grey-${id}`,
-                data: { length: cx.data.length },
-                // pickable: true,
-                opacity,
-                stroked: false,
-                filled: true,
-                radiusScale,
-                getPosition: (_, { target, index }) => {
-                    target[0] = cx.data[index];
-                    target[1] = cy.data[index];
-                    // we need to review whether changes are needed here related to density...
-                    if (cz) target[2] = cz.data[index];
-                    return target as [number, number];
-                },
-                getFillColor: [200, 200, 200],
-                getLineColor: [0, 0, 0],
-                billboard: true,
-                parameters: {
-                    depthTest: false,
-                },
-                transitions: {
-                    getPosition: {
-                        duration: 100,
-                        //https://easings.net/#easeInOutCubic
-                        easing: (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
-                        // type: "spring",
-                    },
-                },
-                getFilterValue: (_: any, { index }: { index: number }) => filterValue[index] || 0, //how do we just pass the buffer?
-                filterRange: [0.5, 1],
-                updateTriggers: {
-                    //! using `data` as a trigger as `filterValue` was behind by one frame or something
-                    getFilterValue: data,
-                    getPosition: [cx.data, cy.data, cz?.data],
-                },
-                extensions: [new DataFilterExtension()],
-                visible: greyOnFilter,
-            }),
-        [cx, cy, cz, opacity, radiusScale, id, filterValue, data, greyOnFilter],
-    );
 
     const axisLinesLayer = useMemo(() => {
         if (is2d) return null;
@@ -278,11 +230,32 @@ const DeckScatter = observer(function DeckScatterComponent({
     }, [chartWidth, chartHeight, config.dimension, id]);
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [gateDisplayLayer, selectionLayer, scatterplotLayer, greyScatterplotLayer, gateLabelLayer, axisLinesLayer, 
+    const layers = [greyScatterplotLayer, scatterplotLayer, gateDisplayLayer, selectionLayer, gateLabelLayer, axisLinesLayer,
     ].filter(x => x !== null);
     
     const outerContainer = useOuterContainer();
-    const deckRef = useRef<any>();
+    const deckContainerRef = useRef<HTMLDivElement | null>(null);
+    const deckRef = useRef<any>(null);
+    const getTooltipContent = useCallback(
+        (info: PickingInfo) => {
+            const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
+            return getCombinedScatterTooltip(
+                richInfo,
+                {
+                    gateDisplayLayerId: gateDisplayLayer?.id,
+                    gateLabelLayerId: gateLabelLayer?.id,
+                    getPointTooltip: getTooltip,
+                },
+            );
+        },
+        [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
+    );
+    const {
+        clearTooltip,
+        getTooltip: getPortalTooltip,
+        suppressTooltipUntilPointerUp,
+        tooltipPortal,
+    } = useOuterContainerDeckTooltip(getTooltipContent, deckContainerRef);
 
     // unproject used for updating ranges - use deck viewport instead of layer
     const unproject = useCallback((coords: [number, number]) => {
@@ -324,13 +297,18 @@ const DeckScatter = observer(function DeckScatterComponent({
         <>
             <AxisComponent config={config} unproject={unproject}>
                 <div
+                    ref={deckContainerRef}
                     aria-label="Scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none" }}
-                    onMouseDown={(event) => {
+                    onPointerDown={suppressTooltipUntilPointerUp}
+                    onMouseDown={() => {
                         setScatterKeyboardActive(true);
                     }}
                     onMouseEnter={() => setScatterKeyboardActive(true)}
-                    onMouseLeave={() => setScatterKeyboardActive(false)}
+                    onMouseLeave={() => {
+                        clearTooltip();
+                        setScatterKeyboardActive(false);
+                    }}
                 >
                     <DeckGL
                         ref={deckRef}
@@ -345,27 +323,14 @@ const DeckScatter = observer(function DeckScatterComponent({
                         onViewStateChange={(v) => {
                             action(() => (config.viewState = v.viewState))();
                         }}
-                        getTooltip={(info) => {
-                            const layerId = info?.layer?.id;
-                            const obj = info?.object;
-                            if (gateDisplayLayer && layerId === gateDisplayLayer.id && obj?.properties?.gateName) {
-                                return { 
-                                    html: `<strong>${escapeHtml(obj.properties.gateName)}</strong><br/><small>Click on the label to edit</small>` 
-                                };
-                            }
-                            if (gateLabelLayer && layerId === gateLabelLayer.id && obj?.text != null) {
-                                return { 
-                                    html: `<strong>${escapeHtml(obj.text)}</strong><br/><small>Click on the label to edit</small>` 
-                                };
-                            }
-                            return getTooltip();
-                        }}
+                        getTooltip={getPortalTooltip}
                         getCursor={({ isDragging }) => {
                             return isDragging ? "grabbing" : "crosshair";
                         }}
                     />
                 </div>
             </AxisComponent>
+            {tooltipPortal}
             {showLegend && (
                 <FieldContourLegend
                     fields={legendFields}

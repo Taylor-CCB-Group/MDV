@@ -87,12 +87,12 @@ The index.html file contains a single div which houses the app. It can easily be
     <div> My Footer </div>
 ```
 
-Because the JavaScript uses WebWorkers and SharedArrayBuffers, a [service worker](https://github.com/gzuidhof/coi-serviceworker) is added to load the necessary headers:- 
+Because the JavaScript uses WebWorkers and SharedArrayBuffers, the app must run with COOP/COEP enabled:
 ```
 "Cross-Origin-Opener-Policy":"same-origin",
 "Cross-Origin-Embedder-Policy":"require-corp"
 ```
-If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker. In this case the project does not have to be served over https
+The dev server and Flask helpers in this repository already add these headers. If your deployment uses a different web server or reverse proxy, it must send the same headers consistently for pages using MDV, and any cross-origin assets must be served in a way that remains compatible with `require-corp`/CORS. If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker. In this case the project does not have to be served over https.
 
 ### To convert CSV data for a simple file server
 
@@ -122,7 +122,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, responsetype')
-        self.send_header('Cross-Origin-Opener-Policy', 'cross-origin')
+        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
         self.send_header('Cross-Origin-Resource-Policy', 'cross-origin')
         super().end_headers()
@@ -132,7 +132,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, responsetype')
-        self.send_header('Cross-Origin-Opener-Policy', 'cross-origin')
+        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
         self.send_header('Cross-Origin-Resource-Policy', 'cross-origin')
         super().end_headers()
@@ -193,10 +193,29 @@ To run only performance/stress tests:
 make test-performance
 ```
 
-To run all tests including performance tests:
+To run the backend-only test suite:
 
 ```bash
-poetry run pytest mdvtools/
+make test-backend
+```
+
+To run the auth-only test suite:
+
+```bash
+make test-auth
+```
+
+To run all core tests including performance tests:
+
+```bash
+poetry run pytest mdvtools/tests
+```
+
+Auth and backend tests depend on optional Poetry groups that are not installed by `pnpm run python-setup`.
+Install those groups first if you want to run the separated suites:
+
+```bash
+poetry install --with dev,backend,auth
 ```
 
 ### Performance Testing in CI
