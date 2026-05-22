@@ -43,10 +43,10 @@ RUN echo "Environment variables set:" && \
 # this layer will change less frequently than the others, so it's good to have it first
 # Install HDF5 library, for some reason Python dependency tools can't install it in this context as of now
 # see https://github.com/h5py/h5py/issues/2146 for similar-ish issue
-RUN apt-get update && apt-get install -y libhdf5-dev || (cat /var/log/apt/term.log && exit 1)
-RUN apt-get install -y netcat-openbsd || (cat /var/log/apt/term.log && exit 1)
-RUN apt-get install -y telnet || (cat /var/log/apt/term.log && exit 1)
-RUN apt-get install -y iputils-ping || (cat /var/log/apt/term.log && exit 1)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libhdf5-dev netcat-openbsd telnet iputils-ping \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    || (cat /var/log/apt/term.log && exit 1)
 
 # Pin uv to match tool.uv.required-version in python/pyproject.toml.
 # Base image ships uv via pip; `uv self update` only works for standalone installs.
