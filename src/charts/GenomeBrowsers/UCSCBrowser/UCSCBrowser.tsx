@@ -51,6 +51,7 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
         if (!c.view_margins) {
             c.view_margins = {type:"fixed_length", value:1000};
         }
+        const vm = c.view_margins;
         return [
             ...settings,
             g({
@@ -73,7 +74,7 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
             {
             label: "View margin length",
             type: "text",
-            current_value: c.view_margins.value.toString(),
+            current_value: vm.value.toString(),
             func: (x) => {
                 const cur = c.view_margins ?? { type: "fixed_length" as const, value: 1000 };
                 let n = Number.parseInt(x);
@@ -95,7 +96,7 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
                 ["absolute (bp)", "absolute"],
                 ["Fixed Length (bp)", "fixed_length"],
             ],
-            current_value: c.view_margins.type,
+            current_value: vm.type,
             func: (x) => {
                 const cur = c.view_margins ?? { type: "fixed_length" as const, value: 1000 };
                 c.view_margins = { type: x as "percentage" | "absolute" | "fixed_length", value: cur.value };

@@ -578,7 +578,14 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
 
 
     # get the chromosomes 
-    chromosomes = {x[0]:x[1].length for x in vcf.header.contigs.items() if not exclude_draft_chromosomes  or not draft_chrom_pattern.search(x[0])}
+    chromosomes = {
+        str(contig_name): contig.length
+        for contig_name, contig in vcf.header.contigs.items()
+        if (
+            not exclude_draft_chromosomes
+            or not draft_chrom_pattern.search(str(contig_name))
+        )
+    }
 
     for rec in (vcf):
         chr1= rec.chrom
@@ -591,9 +598,14 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
         if svtype in ["TRA","BND"] and rec.pos == rec.stop:
             if rec.pos != pos2:
                 print("malformed VCF record with SVTYPE TRA/BND and non-zero SVLEN, using POS and END as positions")
-            if len(rec.alts) > 1:
+            alts = rec.alts or ()
+            if len(alts) > 1:
                 print (f"More than 1 ALT allele found for record {rec}, using the first one")
-            m = BND_REMOTE_RE.search(rec.alts[0])
+            first_alt = next(iter(alts), None)
+            if first_alt is None:
+                print(f"No ALT allele found for BND/TRA record {rec}, skipping record")
+                continue
+            m = BND_REMOTE_RE.search(first_alt)
             if m:
                 chr2_t  = m.group(1)
                 chr2 = chr2_t

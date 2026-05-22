@@ -95,7 +95,10 @@ def _build_sv_bed_df(sv_df: pd.DataFrame, window_bp: int, inversion_as_bnd: bool
             if end > start:
                 rows.append([c1, start, end, sv_id_str])
 
-    return pd.DataFrame(rows, columns=["chrom", "start", "end", "sv_id"])
+    return pd.DataFrame(
+        rows,
+        columns=pd.Index(["chrom", "start", "end", "sv_id"]),
+    )
 
 
 def map_sv_genes(
