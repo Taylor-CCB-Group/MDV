@@ -594,16 +594,16 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
             continue
         svtype = rec.info.get("SVTYPE","UKN")
         length = abs(rec.info.get("SVLEN",0))
+        # samtools will take remove the 'END' field from info and add it as a 'stop' field in the record
         pos2  = rec.stop
-        if svtype in ["TRA","BND"] and rec.pos == rec.stop:
-            if rec.pos != pos2:
-                print("malformed VCF record with SVTYPE TRA/BND and non-zero SVLEN, using POS and END as positions")
+        if svtype in ["TRA","BND"]:
+            #look at alt allele to get the other chromosome and position 
             alts = rec.alts or ()
             if len(alts) > 1:
-                print (f"More than 1 ALT allele found for record {rec}, using the first one")
+                logger.warning(f"More than 1 ALT allele found for record {rec.id}, using the first one")
             first_alt = next(iter(alts), None)
             if first_alt is None:
-                print(f"No ALT allele found for BND/TRA record {rec}, skipping record")
+                logger.warning(f"No ALT allele found for BND/TRA record {rec.id}, skipping record")
                 continue
             m = BND_REMOTE_RE.search(first_alt)
             if m:
@@ -613,7 +613,7 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
                 if not chr2 in chromosomes:
                     continue
             else:
-                print(f"Could not parse ALT field for BND/TRA record {rec}, using CHR2 and POS2 from INFO")
+                logger.warning(f"Could not parse ALT field for BND/TRA record {rec.id}, using CHR2 and POS2 from INFO")
                 continue
         column_dict["chr1"].append(chr1)
         column_dict["pos1"].append(rec.pos)
