@@ -1965,7 +1965,8 @@ export class ChartManager {
 
     /**
      * Map a chart param token to the DataStore column `field` id when it matches
-     * `field` or display `name` in metadata. Virtual expression columns use
+     * stable metadata `field` (via columnIndex or columns list). Display `name`
+     * is not used for resolution. Virtual expression columns use
      * `subgroup|label(subgroup)|index` and are returned unchanged.
      * @param {object} dStore DataStore instance
      * @param {string} token
@@ -1978,9 +1979,7 @@ export class ChartManager {
         if (dStore.columnIndex[token]) {
             return token;
         }
-        const c = dStore.columns.find(
-            (col) => col.field === token || col.name === token,
-        );
+        const c = dStore.columns.find((col) => col.field === token);
         return c ? c.field : token;
     }
 
