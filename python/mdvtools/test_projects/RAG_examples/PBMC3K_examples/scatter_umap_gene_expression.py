@@ -34,6 +34,13 @@ def main():
         expr.datasource_name, columns=[expr.name_column]
     )
     names = df_var[expr.name_column].astype(str).tolist()
+    if gene not in names:
+        preview = ", ".join(names[:12])
+        suffix = f"; first genes: {preview}" if preview else ""
+        raise ValueError(
+            f"Gene {gene!r} not found in expression datasource {expr.datasource_name!r} "
+            f"column {expr.name_column!r} ({len(names)} names available{suffix})"
+        )
     idx = names.index(gene)
     wrapper = build_expression_wrapper_token(expr.subgroup_key, gene, idx)
 
