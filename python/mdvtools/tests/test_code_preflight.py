@@ -321,3 +321,14 @@ def main():
     assert meta["preflight_ok"] is True
     assert len(calls) == 1
 
+
+def test_preflight_ignores_wrapper_literal_with_trailing_garbage():
+    code = '''
+def main():
+    _ = "bad|MS4A1(bad)|3__junk"
+'''
+    res = validate_generated_code_preflight(
+        code, allowed_wrapper_subgroup_keys={"gs"}
+    )
+    assert not any(i.code == "invalid_wrapper_subgroup" for i in res.issues)
+

@@ -16,7 +16,7 @@ from typing import Any
 
 from mdvtools.llm.column_field_resolve import expression_wrapper_subgroup_key
 
-_WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)")
+_WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)\s*$")
 
 _FORBIDDEN_EXPR_ATTRS = frozenset({"feature_table", "feature_datasource"})
 
@@ -527,7 +527,7 @@ def _check_wrapper_subgroup_literals(
         if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
             continue
         token = node.value
-        if not _WRAPPER_RE.match(token):
+        if not _WRAPPER_RE.fullmatch(token):
             continue
         sg = expression_wrapper_subgroup_key(token)
         if sg is not None and sg not in allowed_subgroup_keys:
