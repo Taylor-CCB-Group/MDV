@@ -90,7 +90,10 @@ def infer_datasource_roles(project: Any) -> InferredDatasourceRoles:
 
     for item in links or []:
         try:
-            target_ds = str(item.get("datasource"))
+            raw_ds = item.get("datasource")
+            if raw_ds is None or not raw_ds:
+                continue
+            target_ds = str(raw_ds)
             link = item.get("link", {}).get("rows_as_columns", {})
             name_column = str(link.get("name_column") or "name")
             subgroups = link.get("subgroups") or {}

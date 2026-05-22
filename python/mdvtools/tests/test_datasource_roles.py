@@ -78,6 +78,35 @@ def test_infer_datasource_roles_prefers_cells_and_expr_subgroups():
     assert roles.expressions[1].subgroup_key == "protein_expr"
 
 
+def test_infer_datasource_roles_skips_missing_datasource_on_link():
+    class ProjectWithBadLink(FakeProject):
+        def get_links(self, datasource, filter=None):
+            links = super().get_links(datasource, filter)
+            links = list(links)
+            links.append(
+                {
+                    "datasource": None,
+                    "link": {
+                        "rows_as_columns": {
+                            "name_column": "name",
+                            "subgroups": {
+                                "bogus_expr": {
+                                    "name": "bogus_expr",
+                                    "label": "bogus_expr",
+                                    "type": "sparse",
+                                },
+                            },
+                        }
+                    },
+                }
+            )
+            return links
+
+    roles = infer_datasource_roles(ProjectWithBadLink())
+    assert [e.datasource_name for e in roles.expressions] == ["rna", "protein"]
+    assert "None" not in [e.datasource_name for e in roles.expressions]
+
+
 def test_format_feature_table_field_policy_lists_name_columns():
     roles = infer_datasource_roles(FakeProject())
     text = format_feature_table_field_policy(roles)
