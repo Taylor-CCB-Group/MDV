@@ -346,16 +346,11 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
             - **Table Plot** is for interactive row-level browsing in MDV when explicitly requested; tabular answers in chat use markdown `print(...)` previews (section 4), not a saved `TablePlot`, unless the user wants the table persisted in the project view.  
             - Violin plot: Requires only one categorical column and one numerical column.  
             - Wordcloud: Requires one categorical column.
-    Output format: Return python code for the requested result.
-    - For chart-oriented requests, return code that creates the chart view(s).
-    - For textual/table-first requests, return code that computes and prints concise, bounded tabular/text output in chat.
-
-    After generating the code, include a detailed explanation in your response (renderable by markdown renderer) that covers:
-    1. Why this chart is the best way to answer the question
-    2. What biological insights can be gained from this visualization
-    3. What subsequent analysis tasks could be performed based on these results
-
-    The explanation will be displayed in the chat window automatically.
+    Output format:
+    - Return only one fenced ```python code block with the complete runnable script.
+    - Do not add markdown narrative, bullet lists, or explanations before or after the code block.
+    - For chart-oriented requests, the script must create the chart view(s) described above.
+    - For textual/table-first requests, put answers in bounded print(...) calls inside the script.
 
 
 
