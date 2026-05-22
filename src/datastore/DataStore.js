@@ -1795,7 +1795,11 @@ class DataStore {
             typeof column === "string" &&
             column.includes("|")
         ) {
-            this.addColumnFromField(column);
+            try {
+                this.addColumnFromField(column);
+            } catch (_err) {
+                // Fall through to unified unknown-column error below.
+            }
             c = this.columnIndex[column];
         }
         if (!c) {
