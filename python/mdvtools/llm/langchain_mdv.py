@@ -673,6 +673,9 @@ class ProjectChat(ProjectChatProtocol):
                     retry_query = (
                         f"{rag_retrieval_query}\n\n"
                         "Fix this code preflight validation failure and return corrected runnable code only.\n"
+                        "If issues mention set_x_axis or set_y_axis on BoxPlot, ViolinPlot, ScatterPlot, or DotPlot, "
+                        "replace with set_axis_properties('x', {...}) and set_axis_properties('y', {...}) only.\n"
+                        "On ScatterPlot use set_filter, not set_on_filter (set_on_filter is for ScatterPlot3D only).\n"
                         f"Preflight issues:\n{issue_text}"
                     )
                     output_qa_retry = qa_chain.invoke({"query": retry_query})

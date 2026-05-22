@@ -5,6 +5,9 @@ Before `set_view`, discover the rows-as-columns subgroup key from the project (n
 Build wrappers with `mdvtools.llm.column_field_resolve.build_expression_wrapper_token`.
 
 Requires an existing MDV project with `cells` + expression link (e.g. from `convert_scanpy_to_mdv`).
+
+HeatmapPlot uses set_x_axis / set_y_axis / set_axis below — not set_axis_properties. For BoxPlot, ViolinPlot,
+ScatterPlot, DotPlot use set_axis_properties("x", {...}) only.
 """
 from __future__ import annotations
 

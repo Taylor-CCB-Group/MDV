@@ -203,6 +203,14 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
         - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`
           or invented filter setters such as `set_background_filter(...)`. Only call `set_*` (and other public) methods
           that exist on the chart class in `mdvtools.charts.*` (preflight validates this before execution).
+        - **Axis styling:** On `BoxPlot`, `ViolinPlot`, `ScatterPlot`, and `DotPlot`, use only
+          `plot.set_axis_properties("x", {{"label": "...", "textSize": 13, "tickfont": 10}})` and the same for `"y"`.
+          Never call `set_x_axis` or `set_y_axis` on those classes (valid only on `HistogramPlot`, `HeatmapPlot`,
+          `MultiLinePlot`, `AbundanceBoxPlot`).
+          On `ScatterPlot` / `BoxPlot` / `DensityScatterPlot`, use `set_filter(...)`, not `set_on_filter` (`ScatterPlot3D` only).
+        - **Chat preview tables:** For `groupby` summaries before `set_view`, use simple aggregates such as
+          `.median()`, `.describe()`, or tuple form `agg(col=("col", "median"))`. Do not mix named tuple aggregations with
+          bare `lambda` functions in the same `groupby(...).agg(...)` call.
           To show a subset, either:
             (a) create a filtered datasource when building a **new** project from raw data, or use the **narrow** ChatMDV
                 exception in section 3 (`chat_rank_genes_result` via `add_datasource` for long-format Scanpy marker tables
