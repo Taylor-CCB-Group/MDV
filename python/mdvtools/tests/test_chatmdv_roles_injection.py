@@ -1,3 +1,6 @@
+import numpy
+import pandas
+
 from mdvtools.llm.code_manipulation import prepare_code
 from mdvtools.llm.code_preflight import validate_generated_code_preflight
 from mdvtools.llm.datasource_roles import (
@@ -50,6 +53,23 @@ class _FakeProject:
                 },
             }
         raise KeyError(name)
+
+
+def _make_project_with_expression_link(tmp_path) -> MDVProject:
+    """Portable cells+genes project with rows-as-columns subgroup ``gs``."""
+    project_dir = tmp_path / "pbmc3k_like"
+    p = MDVProject(str(project_dir), delete_existing=True)
+    n_cells, n_genes = 4, 3
+    obs = pandas.DataFrame(
+        {"cell_id": [f"c{i}" for i in range(n_cells)], "leiden": [0, 0, 1, 1]}
+    )
+    p.add_datasource("cells", obs, columns=[{"field": "leiden", "datatype": "text"}])
+    var = pandas.DataFrame({"name": ["RALY", "MS4A1", "NKG7"]})
+    p.add_datasource("genes", var)
+    p.add_rows_as_columns_link("cells", "genes", "name", "GE")
+    x = numpy.zeros((n_cells, n_genes), dtype=numpy.float32)
+    p.add_rows_as_columns_subgroup("cells", "genes", "gs", x, name="gene_scores", sparse=False)
+    return p
 
 
 def test_build_chatmdv_roles_constants_block():
@@ -107,8 +127,8 @@ def main():
     assert any(i.code == "invalid_expression_role_attr" for i in res.issues)
 
 
-def test_collect_wrapper_subgroup_keys_pbmc3k():
-    project = MDVProject("/app/mdv/pbmc3k_chat", delete_existing=False)
+def test_collect_wrapper_subgroup_keys_pbmc3k(tmp_path):
+    project = _make_project_with_expression_link(tmp_path)
     keys = collect_wrapper_subgroup_keys_for_project(project)
     assert "gs" in keys
     roles = infer_datasource_roles(project)
