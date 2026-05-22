@@ -82,6 +82,12 @@ def main():
             except ValueError:
                 label_to_idx[g] = -1
     ordered = [g for g in ordered if label_to_idx.get(g, -1) >= 0]
+    if not ordered:
+        raise ValueError(
+            f"No marker genes resolved to expression wrappers for "
+            f"subgroup_key={subgroup_key!r} and cluster_key={cluster_key!r} "
+            f"(name_column={name_column!r}); check adata.var labels vs var_names."
+        )
 
     gene_params = [
         build_expression_wrapper_token(subgroup_key, g, label_to_idx[g]) for g in ordered
