@@ -65,6 +65,8 @@ def test_run_chat_once_failure_with_debug_output(tmp_path):
 
     assert exit_code == 2
     assert result["success"] is False
+    assert isinstance(result["duration_seconds"], float)
+    assert result["duration_seconds"] >= 0
     assert result["view_name"] is None
     assert result["debug_output_dir"] == str(output_dir.resolve())
     assert (output_dir / "result.json").exists()

@@ -182,9 +182,9 @@ def run_chat_once(
     abs_project = str(Path(project_path).expanduser().resolve())
     views_file = str(Path(abs_project) / "views.json")
     debug_output_dir: Optional[str] = None
+    timing_capture_start = time.perf_counter()
 
     try:
-        timing_capture_start = time.perf_counter()
         captured_output = ""
         if not os.path.isdir(abs_project):
             raise FileNotFoundError(f"Project folder not found: {abs_project}")
@@ -269,7 +269,7 @@ def run_chat_once(
             "debug_output_dir": None,
             "block_timings": {},
             "captured_output": "",
-            "duration_seconds": 0.0,
+            "duration_seconds": round(time.perf_counter() - timing_capture_start, 6),
             "view_snapshot_present": False,
             "chart_count": 0,
             "verification": "",
