@@ -8,7 +8,7 @@ export const REPO_ROOT = path.resolve(THIS_DIR, "..", "..", "..");
 export async function getPythonCandidates(): Promise<string[]> {
     const pythonProjectDir = path.join(REPO_ROOT, "python");
     const uvVenvPython = path.join(pythonProjectDir, ".venv", "bin", "python");
-    const repoVenvPython = path.join(REPO_ROOT, "venv", "bin", "python");
+    const repoVenvPython = path.join(pythonProjectDir, ".venv", "bin", "python");
     const candidates = [
         uvVenvPython,
         repoVenvPython,
