@@ -110,7 +110,7 @@ def test_main_json_output_schema(tmp_path, monkeypatch, capsys):
 def test_run_chat_once_installs_socketio_shim_when_missing(tmp_path, monkeypatch):
     project = _make_project(tmp_path)
     from mdvtools import websocket as mdv_websocket
-    mdv_websocket.socketio = None
+    monkeypatch.setattr(mdv_websocket, "socketio", None)
 
     class FakeProjectChat:
         def __init__(self, incoming_project):
