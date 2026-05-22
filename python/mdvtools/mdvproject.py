@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import h5py
@@ -32,21 +33,31 @@ from mdvtools.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict):
+def _agent_debug_log(
+    run_id: str,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict,
+    *,
+    log: logging.Logger = logger,
+) -> None:
     try:
-        payload = {
-            "sessionId": "5187b3",
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        with open("/app/.cursor/debug-5187b3.log", "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, default=str) + "\n")
-    except Exception:
-        pass
+        log.debug(
+            "agent_debug run=%s hypothesis=%s location=%s message=%s data=%s",
+            run_id,
+            hypothesis_id,
+            location,
+            message,
+            data,
+        )
+    except Exception as log_exc:
+        log.warning(
+            "agent_debug_log failed at %s: %s",
+            location,
+            log_exc,
+            exc_info=True,
+        )
 
 
 DataSourceName = str  # NewType("DataSourceName", str)
@@ -237,11 +248,17 @@ class MDVProject:
                     name = str(info.get("name", cand))
                     sparse = info.get("type") == "sparse"
                     return name, sparse
+        single_subgroup_links: list[tuple[dict, dict]] = []
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
             if len(subgroups) == 1:
-                _k, info = next(iter(subgroups.items()))
-                name = str(info.get("name", _k))
-                sparse = info.get("type") == "sparse"
-                return name, sparse
+                single_subgroup_links.append((ln, subgroups))
+        if len(single_subgroup_links) == 1:
+            _ln, subgroups = single_subgroup_links[0]
+            _k, info = next(iter(subgroups.items()))
+            name = str(info.get("name", _k))
+            sparse = info.get("type") == "sparse"
+            return name, sparse
         avail: list[str] = []
         for ln in lnks:
             subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
@@ -772,6 +789,10 @@ class MDVProject:
             # #endregion
             return handle
         except Exception as e:
+            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            if not lock_error:
+                logger.error("error opening h5 file (non-lock failure)", exc_info=True)
+                raise
             # certain environments seem to have issues with the handle not being closed instantly
             # if there is a better way to do this, please change it
             # if there are multiple processes trying to access the file, this may also help
@@ -793,13 +814,8 @@ class MDVProject:
                 },
             )
             # #endregion
-            time.sleep(0.1)
             attempt += 1
-            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
-            if lock_error:
-                logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
-            else:
-                logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
+            logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
             # #region agent log
             _agent_debug_log(
                 "pre-fix",
@@ -820,6 +836,7 @@ class MDVProject:
                 raise RuntimeError(
                     f"unable to open h5 file after {attempt} attempts: {self.h5file}"
                 ) from e
+            time.sleep(0.1)
             return self._get_h5_handle(read_only, attempt)
 
     def get_column(self, datasource: str, column, raw=False):
