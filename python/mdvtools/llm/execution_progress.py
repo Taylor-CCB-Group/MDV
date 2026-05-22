@@ -68,10 +68,10 @@ def parse_explicit_progress_line(line: str) -> ProgressEvent | None:
     except json.JSONDecodeError:
         return None
     msg = str(obj.get("msg") or obj.get("message") or "Progress update")
-    progress = int(obj.get("pct", obj.get("progress", 0)))
+    progress = _safe_int(obj.get("pct", obj.get("progress", 0)), default=0)
     progress = max(0, min(100, progress))
     stage = obj.get("stage")
-    delta = int(obj.get("delta", 0))
+    delta = _safe_int(obj.get("delta", 0), default=0)
     event = ProgressEvent(
         message=msg,
         progress=progress,
@@ -142,6 +142,19 @@ def build_heartbeat_event(
         elapsed_seconds=elapsed_int,
         source="heartbeat",
     )
+
+
+def _safe_int(value: Any, *, default: int = 0) -> int:
+    """Coerce noisy progress payloads to int without raising."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return default
 
 
 def _as_int_or_none(value: Any) -> int | None:
