@@ -51,8 +51,8 @@ Homepage = "https://github.com/Taylor-CCB-Group/MDV"
 mdvtools = "mdvtools.cli:cli"
 
 [tool.uv]
-# Match nikolaik/python-nodejs base image (uv installed via pip, currently 0.11.x).
-required-version = "0.11.1"
+# Pin uv for CI and local dev. Docker pins the same version via pip (see Dockerfile).
+required-version = "0.11.14"
 
 [tool.uv.build-backend]
 module-root = ""

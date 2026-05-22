@@ -48,41 +48,44 @@ RUN apt-get install -y netcat-openbsd || (cat /var/log/apt/term.log && exit 1)
 RUN apt-get install -y telnet || (cat /var/log/apt/term.log && exit 1)
 RUN apt-get install -y iputils-ping || (cat /var/log/apt/term.log && exit 1)
 
+# Pin uv to match tool.uv.required-version in python/pyproject.toml.
+# Base image ships uv via pip; `uv self update` only works for standalone installs.
+RUN pip install --no-cache-dir 'uv==0.11.14'
+
 # Switch to the pn user early in the process to avoid permission issues
 USER pn
 WORKDIR /app
 
 # Configure uv for the pn user - uv manages a project venv under `python/.venv`
-# 
+#
 # VIRTUAL ENVIRONMENTS IN DOCKER CONSIDERATIONS:
-# 
+#
 # PROS of using virtual environments (current approach):
 # - Security: uv sync runs in isolated environment, can't affect system packages
 # - Permission isolation: avoids conflicts with system-installed packages like certifi
 # - Standard practice: how uv is intended to be used
 # - Safer with untrusted code: LLM-generated code runs in more isolated environment
-# 
+#
 # CONS of using virtual environments:
 # - Less convenient for terminal use: need to run `uv run` for commands
 # - Seems redundant: container already provides isolation from host system
 # - Extra layer: adds complexity when debugging dependency issues
 # - Performance: slight overhead from virtual environment activation
-# 
+#
 # PROS of disabling virtual environments (previous approach):
 # - Convenience: can run python/pip commands directly in terminal without activation
 # - Simpler: no need to remember to use `uv run` for commands
 # - Direct access: easier to inspect installed packages and run ad-hoc scripts
-# 
+#
 # CONS of disabling virtual environments:
 # - Permission conflicts: user can't modify system packages (the current issue)
 # - Security risk: uv sync can affect system Python environment
 # - Mixing concerns: system packages and project packages in same namespace
-# 
+#
 # DECISION: Using virtual environments for security and permission isolation,
 # `.bashrc` is used to activate the virtual environment automatically.
 # uv sync uses `.venv` in the project directory by default.
-# The base image (nikolaik/python-nodejs) installs uv via pip without a fixed version.
-# Project tooling pins uv via tool.uv.required-version in python/pyproject.toml; keep that aligned with the image when it changes.
+# uv is pinned as root (see pip install above) to match python/pyproject.toml required-version.
 
 # Prefer binary wheels to avoid slow/fragile source builds (e.g., numcodecs on arm64)
 ENV PIP_PREFER_BINARY=1
@@ -130,7 +133,7 @@ WORKDIR /app/python
 RUN uv sync --frozen --group dev --group backend --group auth
 
 # Expose the port that Flask will run on
-EXPOSE 5055 
+EXPOSE 5055
 
 # something changed requiring this for `source` to work in package scripts
 RUN pnpm config set script-shell "/bin/bash"
@@ -153,13 +156,11 @@ USER pn
 # environment variable. Flask-SocketIO requires Redis to share session state across workers.
 # Without Redis, you'll get "KeyError: 'Session is disconnected'" errors.
 # Example: REDIS_URL=redis://redis:6379/0
-# 
+#
 # Single worker (no Redis needed):
 #   -w 1
-# 
+#
 # Multi-worker (Redis required):
 #   -w 4  # or any number > 1
 CMD ["uv", "run", "--", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["uv", "run", "--", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
-
-
