@@ -34,7 +34,11 @@ from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
-from .column_field_resolve import normalize_view_chart_params, prune_view_charts_with_invalid_params
+from .column_field_resolve import (
+    field_set_from_columns,
+    normalize_view_chart_params,
+    prune_view_charts_with_invalid_params,
+)
 from .verification import build_verification_summary
 from .datasource_roles import collect_wrapper_subgroup_keys_for_project, infer_datasource_roles
 from .code_execution import execute_code
@@ -365,7 +369,7 @@ class ProjectChat(ProjectChatProtocol):
             if roles is not None:
                 exprs = roles.expressions or []
                 if exprs:
-                    expr_lines = "\n".join(
+                    expr_lines = (
                         f"- df2 maps to expression datasource '{exprs[0].datasource_name}' "
                         f"(feature names in column '{exprs[0].name_column}', default subgroup '{exprs[0].subgroup_key}')"
                     )
@@ -623,9 +627,9 @@ class ProjectChat(ProjectChatProtocol):
                     view_name=question,
                 )
 
-                if _is_text_table_intent(question) and _is_text_table_only_code(final_code):
+                if _is_text_table_intent(question) and not _is_text_table_only_code(final_code):
                     chat_debug_logger.info(
-                        "Detected text/table-first intent with chart-only output; regenerating with chat-first instruction."
+                        "Detected text/table-first intent with chart-heavy output; regenerating with chat-first instruction."
                     )
                     chat_first_query = (
                         f"{rag_retrieval_query}\n\n"
@@ -660,14 +664,24 @@ class ProjectChat(ProjectChatProtocol):
                     if not isinstance(ds, dict):
                         continue
                     ds_name = ds.get("name")
-                    cols = ds.get("columns")
-                    if not isinstance(ds_name, str) or not isinstance(cols, list):
+                    if not isinstance(ds_name, str):
                         continue
-                    datasource_fields[ds_name] = {
-                        str(c.get("field"))
-                        for c in cols
-                        if isinstance(c, dict) and c.get("field")
-                    }
+                    fields: set[str] = set()
+                    try:
+                        md = self.project.get_datasource_metadata(ds_name)
+                        if isinstance(md, dict):
+                            md_cols = md.get("columns")
+                            if isinstance(md_cols, list):
+                                fields |= field_set_from_columns(md_cols)
+                    except Exception:
+                        pass
+                    cols = ds.get("columns")
+                    if isinstance(cols, list):
+                        for c in cols:
+                            if isinstance(c, dict) and c.get("field"):
+                                fields.add(str(c.get("field")))
+                    if fields:
+                        datasource_fields[ds_name] = fields
 
                 def _regenerate_for_preflight(issue_text: str) -> str:
                     retry_query = (
