@@ -28,24 +28,27 @@ test.describe.skip("Template", () => {
 
     test("example: project loads with a data count", async ({ page }) => {
         // createTemporaryProjectViaSyntheticAnndata creates a fresh project and
-        // navigates `page` to it. Always clean up in a finally block.
-        const handle: SyntheticAnndataTemporaryProjectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
-            nameSegment: `template--${Date.now()}`,
-            synthetic: {
-                profile: "minimal",
-                nCells: 200,
-                nGenes: 12,
-                force: true,
-            },
-        });
-
+        // navigates `page` to it. Assign inside try; clean up in finally.
+        let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
         try {
+            handle = await createTemporaryProjectViaSyntheticAnndata(page, {
+                nameSegment: `template--${Date.now()}`,
+                synthetic: {
+                    profile: "minimal",
+                    nCells: 200,
+                    nGenes: 12,
+                    force: true,
+                },
+            });
+
             // Your test logic here.
             // `page` is already on the project URL.
             const count = await page.locator(".ciview-cell-count").textContent();
             expect(count).toBeTruthy();
         } finally {
-            await handle.cleanup();
+            if (handle !== undefined) {
+                await handle.cleanup();
+            }
         }
     });
 });
