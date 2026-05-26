@@ -5,7 +5,7 @@ setup, fixture architecture, and migration path. It is not the day-to-day guide.
 
 For current usage, use:
 
-- `docs/playwright/PLAYWRIGHT_SETUP_AND_RUN.md`
+- `docs/playwright/PLAYWRIGHT_GUIDE.md`
 - `docs/playwright/PLAYWRIGHT_ARCHITECTURE.md`
 - `docs/playwright/PLAYWRIGHT_WRITING_TESTS.md`
 
