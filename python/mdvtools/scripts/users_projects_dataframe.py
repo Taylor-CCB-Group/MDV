@@ -39,7 +39,12 @@ def _fetch_auth0_login_stats() -> Dict[str, Dict[str, Any]]:
     client_secret = app.config.get("AUTH0_CLIENT_SECRET")
     auth0_db_connection = app.config.get("AUTH0_DB_CONNECTION")
 
-    if not all([auth0_domain, client_id, client_secret, auth0_db_connection]):
+    if (
+        not isinstance(auth0_domain, str)
+        or not isinstance(client_id, str)
+        or not isinstance(client_secret, str)
+        or not isinstance(auth0_db_connection, str)
+    ):
         raise RuntimeError(
             "Missing Auth0 configuration. Expected AUTH0_DOMAIN, AUTH0_CLIENT_ID, "
             "AUTH0_CLIENT_SECRET, and AUTH0_DB_CONNECTION in app config."
@@ -94,8 +99,9 @@ def load_users_projects_df(include_auth0_login_stats: bool = False):
     """
     with app.app_context():
         # Query all user–project links with user and project joined
+        # todo: Update models to use SQLAlchemy 2.0 style Mapped annotations in dbutils/dbmodels.py and remove type: ignore comments
         q = (
-            db.session.query(
+            db.session.query( 
                 User.id.label("user_id"),
                 User.email,
                 User.first_name,
@@ -110,12 +116,12 @@ def load_users_projects_df(include_auth0_login_stats: bool = False):
                 Project.is_public,
                 Project.is_deleted,
                 Project.description.label("project_description"),
-                UserProject.can_read,
-                UserProject.can_write,
-                UserProject.is_owner,
+                UserProject.can_read,       # type: ignore[arg-type]
+                UserProject.can_write,      # type: ignore[arg-type]
+                UserProject.is_owner,       # type: ignore[arg-type]
             )
-            .join(UserProject, User.id == UserProject.user_id)
-            .join(Project, Project.id == UserProject.project_id)
+            .join(UserProject, User.id == UserProject.user_id)   # type: ignore[arg-type]
+            .join(Project, Project.id == UserProject.project_id) # type: ignore[arg-type]
             .order_by(User.email, Project.name)
         )
         rows = q.all()
