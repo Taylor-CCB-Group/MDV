@@ -327,7 +327,7 @@ class Dimension {
             }
             this._applyStateTransition(i, nextState);
         }
-        if (this.filterMethod && this.filterArguments) {
+        if (this.filterMethod) {
             this[this.filterMethod](this.filterArguments, this.filterColumns);
         }
         this.parent._callListeners("filtered", this);
@@ -343,7 +343,7 @@ class Dimension {
                 this._applyStateTransition(i, this.filterArray[i] - 2);
             }
         }
-        if (this.filterMethod && this.filterArguments) {
+        if (this.filterMethod) {
             this[this.filterMethod](this.filterArguments, this.filterColumns);
         }
         this.parent._callListeners("filtered", this);
