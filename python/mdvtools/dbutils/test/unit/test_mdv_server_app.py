@@ -315,11 +315,52 @@ class TestLoadConfig(unittest.TestCase):
         """Test loading config for test environment."""
         mock_abspath.return_value = '/test/path'
         mock_dirname.return_value = '/test'
-        
+
         load_config(self.app, config_name='test')
-        
+
         self.assertEqual(self.app.config['PREFERRED_URL_SCHEME'], 'http')
         self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'sqlite:///:memory:')
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    def test_load_config_sqlite_backend_default_path(self, mock_abspath, mock_dirname, mock_file):
+        """Test that DB_BACKEND=sqlite sets a sqlite URI with the default path."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+
+        with patch.dict(os.environ, {'DB_BACKEND': 'sqlite'}, clear=True):
+            load_config(self.app)
+
+        self.assertEqual(self.app.config['DB_BACKEND'], 'sqlite')
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'sqlite:////app/mdv/mdv.sqlite3')
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    def test_load_config_sqlite_backend_custom_path(self, mock_abspath, mock_dirname, mock_file):
+        """Test that SQLITE_DB_PATH overrides the default sqlite path."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+
+        with patch.dict(os.environ, {'DB_BACKEND': 'sqlite', 'SQLITE_DB_PATH': '/data/custom.sqlite3'}, clear=True):
+            load_config(self.app)
+
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'sqlite:////data/custom.sqlite3')
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    def test_load_config_unknown_backend_falls_back_to_sqlite(self, mock_abspath, mock_dirname, mock_file):
+        """Test that an unrecognised DB_BACKEND value falls back to sqlite."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+
+        with patch.dict(os.environ, {'DB_BACKEND': 'mongodb'}, clear=True):
+            load_config(self.app)
+
+        self.assertEqual(self.app.config['DB_BACKEND'], 'sqlite')
+        self.assertIn('sqlite:///', self.app.config['SQLALCHEMY_DATABASE_URI'])
 
 
 class TestCreateBaseDirectory(unittest.TestCase):
@@ -702,16 +743,42 @@ class TestCreateFlaskApp(unittest.TestCase):
     @patch('mdvtools.dbutils.mdv_server_app.db')
     @patch('mdvtools.dbutils.mdv_server_app.tables_exist')
     def test_create_flask_app_production_config(self, mock_tables_exist, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_cache_users, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
-        """Test app creation with production configuration."""
+        """Test app creation with postgres production configuration calls wait_for_database."""
         mock_tables_exist.return_value = True
-        
-        # We need to ensure the app has the required config for the auth provider.
-        mock_load_config.side_effect = lambda app, *args: app.config.update({"DEFAULT_AUTH_METHOD": "dummy"})
-        
+
+        mock_load_config.side_effect = lambda app, *args: app.config.update({
+            "DEFAULT_AUTH_METHOD": "dummy",
+            "DB_BACKEND": "postgres",
+        })
+
         app = create_flask_app(config_name='production')
 
         self.assertIsInstance(app, Flask)
         mock_wait_for_db.assert_called_once()
+
+    @patch('mdvtools.dbutils.mdv_server_app.serve_projects_from_filesystem')
+    @patch('mdvtools.dbutils.mdv_server_app.serve_projects_from_db')
+    @patch('mdvtools.dbutils.mdv_server_app.register_routes')
+    @patch('mdvtools.dbutils.mdv_server_app.ProjectBlueprint.register_app')
+    @patch('mdvtools.dbutils.mdv_server_app.cache_user_projects')
+    @patch('mdvtools.dbutils.mdv_server_app.wait_for_database')
+    @patch('mdvtools.dbutils.mdv_server_app.load_config')
+    @patch('mdvtools.dbutils.mdv_server_app.create_base_directory')
+    @patch('mdvtools.dbutils.mdv_server_app.db')
+    @patch('mdvtools.dbutils.mdv_server_app.tables_exist')
+    def test_create_flask_app_sqlite_skips_wait_for_database(self, mock_tables_exist, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_cache_users, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
+        """Test that wait_for_database is not called when DB_BACKEND is sqlite."""
+        mock_tables_exist.return_value = True
+
+        mock_load_config.side_effect = lambda app, *args: app.config.update({
+            "DEFAULT_AUTH_METHOD": "dummy",
+            "DB_BACKEND": "sqlite",
+        })
+
+        app = create_flask_app(config_name='production')
+
+        self.assertIsInstance(app, Flask)
+        mock_wait_for_db.assert_not_called()
 
     @patch('mdvtools.dbutils.mdv_server_app.load_config', side_effect=Exception("Config load failed"))
     def test_create_flask_app_config_error(self, mock_load_config):
