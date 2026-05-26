@@ -40,10 +40,10 @@ def _fetch_auth0_login_stats() -> Dict[str, Dict[str, Any]]:
     auth0_db_connection = app.config.get("AUTH0_DB_CONNECTION")
 
     if (
-        not isinstance(auth0_domain, str)
-        or not isinstance(client_id, str)
-        or not isinstance(client_secret, str)
-        or not isinstance(auth0_db_connection, str)
+        not isinstance(auth0_domain, str) or not auth0_domain.strip()
+        or not isinstance(client_id, str) or not client_id.strip()
+        or not isinstance(client_secret, str) or not client_secret.strip()
+        or not isinstance(auth0_db_connection, str) or not auth0_db_connection.strip()
     ):
         raise RuntimeError(
             "Missing Auth0 configuration. Expected AUTH0_DOMAIN, AUTH0_CLIENT_ID, "
