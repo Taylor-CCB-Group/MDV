@@ -138,7 +138,7 @@ def load_users_projects_df(include_auth0_login_stats: bool = False):
         columns.extend(["last_login", "logins_count"])
 
     if not rows:
-        return pd.DataFrame(columns=columns)
+        return pd.DataFrame(columns=columns)  # type: ignore[arg-type]
 
     records = []
     for r in rows:
@@ -167,7 +167,7 @@ def load_users_projects_df(include_auth0_login_stats: bool = False):
             record["logins_count"] = stats.get("logins_count")
         records.append(record)
 
-    return pd.DataFrame(records, columns=columns)
+    return pd.DataFrame(records, columns=columns)  # type: ignore[arg-type]
 
 
 def main():
