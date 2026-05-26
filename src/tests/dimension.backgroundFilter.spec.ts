@@ -1,6 +1,12 @@
 import Dimension from "@/datastore/Dimension";
 import { describe, expect, test } from "vitest";
 
+type TestParent = {
+    size: number;
+    filterArray: Uint8Array;
+    filterSize: number;
+};
+
 function createParent(size: number, bgData?: Uint8Array) {
     return {
         size,
@@ -17,6 +23,19 @@ function createParent(size: number, bgData?: Uint8Array) {
     };
 }
 
+function createMultitextParent(column: any, size: number) {
+    return {
+        size,
+        filterArray: new Uint8Array(size),
+        filterSize: size,
+        columnIndex: {
+            tags: column,
+        },
+        _callListeners: () => {},
+        dimensions: [] as unknown[],
+    };
+}
+
 function createDimension(size: number, bgData?: Uint8Array) {
     const parent = createParent(size, bgData);
     const dim = new Dimension(parent as never);
@@ -24,7 +43,14 @@ function createDimension(size: number, bgData?: Uint8Array) {
     return { parent, dim };
 }
 
-function assertInvariant(parent: ReturnType<typeof createParent>, dim: Dimension) {
+function createMultitextDimension(column: any, size: number) {
+    const parent = createMultitextParent(column, size);
+    const dim = new Dimension(parent as never);
+    parent.dimensions.push(dim);
+    return { parent, dim };
+}
+
+function assertInvariant(parent: TestParent, dim: Dimension) {
     let unfiltered = 0;
     for (let i = 0; i < parent.size; i++) {
         const state = dim.filterArray[i];
@@ -74,6 +100,28 @@ describe("Dimension 0/1/2/3 background-filter transitions", () => {
 
         dim.clearBackgroundFilter();
         expect(Array.from(dim.filterArray)).toEqual([0, 1, 0, 0]);
+        assertInvariant(parent, dim);
+    });
+
+    test("background filter matches packed multitext rows by selected item", () => {
+        const column = {
+            field: "tags",
+            name: "tags",
+            datatype: "multitext" as const,
+            delimiter: ",",
+            stringLength: 3,
+            values: ["N/A", "a", "b"],
+            data: new Uint16Array([
+                1, 65535, 65535,
+                2, 65535, 65535,
+                1, 2, 65535,
+            ]),
+        };
+        const { parent, dim } = createMultitextDimension(column, 3);
+
+        dim.setBackgroundFilter("tags", ["b"]);
+
+        expect(Array.from(dim.filterArray)).toEqual([2, 0, 0]);
         assertInvariant(parent, dim);
     });
 

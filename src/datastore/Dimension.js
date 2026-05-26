@@ -59,8 +59,6 @@ class Dimension {
             //     // console.error('Error in evaluating filterPredicate', e);
             // }
             //not interested in rows already in background filter
-          
-            const shouldExclude = !predicate(i);
             const prevState = localFilter[i];
             // When a local filter is active, background-hidden rows must also
             // contribute to exclusion scope (promote 2 -> 3 once).
@@ -68,10 +66,12 @@ class Dimension {
                 this._applyStateTransition(i, 3);
                 continue;
             }
-            // local brush should only mutate visible points
+            // local brush should only mutate visible points, so skip if background filtered
+            // wil be updated when  set/clear background filter is called           
             if (prevState === 3) {
                 continue;
             }
+            const shouldExclude = !predicate(i);
             if (shouldExclude) {
                 if (prevState === 0) {
                     this._applyStateTransition(i, 1);
@@ -262,6 +262,14 @@ class Dimension {
                 indices.add(ci);
             }
         }
+        const selectedCats = new Set(cats);
+        const isMultitext = col.datatype === "multitext";
+        const multitextCapacity = Math.max(col.stringLength || 1, 1);
+        const multitextDelimiter = col.delimiter
+            ? col.delimiter
+            : col.values.some((value) => value?.includes(";"))
+              ? ";"
+              : ",";
         const data = col.data;
         this.bgfData = {
             column: column,
@@ -271,20 +279,58 @@ class Dimension {
         for (let i = 0; i < this.parent.size; i++) {
             const prevState = this.filterArray[i];
             let nextState = prevState;
-            const hasLocalFilter = Boolean(this.filterMethod);
-            if (indices.has(data[i])) {
+            let rowMatches = false;
+            if (isMultitext && multitextCapacity > 1) {
+                const start = i * multitextCapacity;
+                for (let offset = 0; offset < multitextCapacity; offset += 1) {
+                    const valueIndex = data[start + offset];
+                    if (
+                        valueIndex === undefined ||
+                        valueIndex === null ||
+                        valueIndex === 65535
+                    ) {
+                        break;
+                    }
+                    if (indices.has(valueIndex)) {
+                        rowMatches = true;
+                        break;
+                    }
+                }
+            } else if (isMultitext) {
+                const valueIndex = data[i];
+                if (indices.has(valueIndex)) {
+                    rowMatches = true;
+                } else {
+                    const value = col.values[valueIndex];
+                    if (typeof value === "string") {
+                        const items = value
+                            .split(multitextDelimiter)
+                            .map((item) => item.trim())
+                            .filter((item) => item.length > 0);
+                        rowMatches = items.some((item) => selectedCats.has(item));
+                    }
+                }
+            } else {
+                rowMatches = indices.has(data[i]);
+            }
+
+            if (rowMatches) {
                 if (prevState === 2 || prevState === 3) {
                     nextState -= 2;
                 }
             } else {
                 if (prevState === 0) {
-                    nextState = hasLocalFilter ? 3 : 2;
+                    nextState = 2;
                 } else if (prevState === 1) {
                     nextState = 3;
                 }
             }
             this._applyStateTransition(i, nextState);
         }
+        if (this.filterMethod && this.filterArguments) {
+            this[this.filterMethod](this.filterArguments, this.filterColumns);
+        }
+        this.parent._callListeners("filtered", this);
     }
 
     clearBackgroundFilter() {
@@ -297,6 +343,10 @@ class Dimension {
                 this._applyStateTransition(i, this.filterArray[i] - 2);
             }
         }
+        if (this.filterMethod && this.filterArguments) {
+            this[this.filterMethod](this.filterArguments, this.filterColumns);
+        }
+        this.parent._callListeners("filtered", this);
     }
 
     destroy(notify = true) {
