@@ -40,16 +40,17 @@
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
     "test": "vitest",
+    "playwright-setup": "pnpm install && pnpm exec playwright install --with-deps",
     "playwright-preflight-project": "node scripts/playwright/playwright_project_preflight.mjs",
     "playwright-test": "node scripts/playwright/playwright_all_runner.mjs",
     "playwright-test-catalog": "node scripts/playwright/playwright_catalog_runner.mjs",
-    "playwright-test-catalog-ui": "node scripts/playwright/playwright_catalog_ui_runner.mjs",
+    "playwright-test-catalog-ui": "node scripts/playwright/playwright_catalog_runner.mjs --ui",
     "playwright-test-catalog-dev": "node scripts/playwright/playwright_catalog_dev_runner.mjs",
-    "playwright-test-catalog-dev-ui": "node scripts/playwright/playwright_catalog_dev_ui_runner.mjs",
+    "playwright-test-catalog-dev-ui": "node scripts/playwright/playwright_catalog_dev_runner.mjs --ui",
     "playwright-test-project": "node scripts/playwright/playwright_project_runner.mjs",
-    "playwright-test-project-ui": "node scripts/playwright/playwright_project_ui_runner.mjs",
+    "playwright-test-project-ui": "node scripts/playwright/playwright_project_runner.mjs --ui",
     "playwright-test-all": "node scripts/playwright/playwright_all_runner.mjs",
-    "playwright-test-ui": "node scripts/playwright/run_playwright_cli.mjs test --ui"
+    "playwright-test-ui": "node scripts/playwright/playwright_all_runner.mjs --ui"
   },
   "repository": {
     "type": "git",
