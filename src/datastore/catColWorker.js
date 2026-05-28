@@ -261,8 +261,9 @@ function addSimpleMean(data, gFilter, lFilter, catData, conf) {
             a[n].count++;
         }
     }
-    const it = r[0].values[0];
-    let amax = it.count === 0 ? 0 : it.total / it.count;
+    const it = r[0];
+    const first = it.values[0];
+    let amax = it.count === 0 ? 0 : first.total / it.count;
     let amin = amax;
     let fmax = 0;
     for (let i = 0; i < dlen; i++) {
