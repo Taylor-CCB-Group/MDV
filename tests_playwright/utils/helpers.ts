@@ -212,12 +212,16 @@ export function getChartColorLegendHost(page: Page, chartTitle: string) {
     return getChartPanelByTitle(page, chartTitle).locator(".legend-container");
 }
 
+function escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export async function setChartColorBy(page: Page, chartTitle: string, columnName: string) {
     await openChartSettingsDialog(page, chartTitle);
     await searchChartSettings(page, "Color By");
     const colorRow = getSettingRow(page, "Color By");
     await colorRow.getByRole("combobox").first().click();
-    const rx = new RegExp(`^${columnName}(\\b|\\s|\\()`, "i");
+    const rx = new RegExp(`^${escapeRegex(columnName)}(\\b|\\s|\\()`, "i");
     await page.getByRole("option", { name: rx }).first().click();
     await closeTopDialog(page);
     await expect(getChartColorLegendHost(page, chartTitle)).toBeVisible({ timeout: 30_000 });

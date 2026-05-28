@@ -20,10 +20,11 @@ export function buildColorLegendSpec(
         return null;
     }
 
-    const colors = dataStore.getColumnColors(column, config);
-    if (!colors) {
+    const rawColors = dataStore.getColumnColors(column, config);
+    if (!rawColors) {
         return null;
     }
+    const colors = rawColors.map(color => String(color));
 
     const name = config.name ?? c.name;
 
@@ -44,7 +45,7 @@ export function buildColorLegendSpec(
         return {
             kind: "continuous",
             label: name,
-            colors: colors as string[],
+            colors,
             range,
         };
     }
