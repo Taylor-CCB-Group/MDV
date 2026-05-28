@@ -49,14 +49,30 @@ test.describe("Density grid selection overlay", () => {
             await expect(toolbar.getByRole("button", { name: "Freehand", exact: true })).toBeVisible();
             await expect(toolbar.getByRole("button", { name: "Modify", exact: true })).toBeVisible();
             await expect(toolbar.getByRole("button", { name: "Pan", exact: true })).toBeVisible();
-            await expect(toolbar.getByRole("button", { name: "Single scatter view", exact: true })).toBeVisible();
+            await expect(
+                toolbar.getByRole("button", { name: "Density layer view", exact: true }),
+            ).toBeVisible();
             await expect(toolbar.getByRole("button", { name: "Manage Gates", exact: true })).toBeVisible();
 
             const panel = page.locator(".ciview-chart-panel").filter({ hasText: title }).first();
             await expect(panel.getByText("Choose density fields to build the grid.")).toHaveCount(0);
-            await expect(panel.locator(".deckgl-overlay").first()).toBeVisible({ timeout: 30_000 });
+            await expect
+                .poll(async () =>
+                    page.evaluate((chartTitle) => {
+                        const charts = Object.values((window as any).mdv.chartManager.charts) as Array<{
+                            chart?: { config?: { title?: string }; contentDiv?: HTMLElement };
+                        }>;
+                        const content = charts.find((c) => c.chart?.config?.title === chartTitle)?.chart
+                            ?.contentDiv;
+                        return content?.querySelectorAll(".mdv-chart-array__cell").length ?? 0;
+                    }, title),
+                )
+                .toBeGreaterThan(0);
+            await expect(
+                panel.locator(".mdv-chart-array__canvas canvas, .deckgl-overlay canvas").first(),
+            ).toBeVisible({ timeout: 30_000 });
 
-            await toolbar.getByRole("button", { name: "Single scatter view", exact: true }).click();
+            await toolbar.getByRole("button", { name: "Density layer view", exact: true }).click();
             await expect(toolbar.getByRole("button", { name: "Rectangle", exact: true })).toBeVisible();
             await expect(toolbar.getByRole("button", { name: "Manage Gates", exact: true })).toBeVisible();
         } finally {

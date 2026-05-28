@@ -1,23 +1,27 @@
 import type { Layer, OrthographicViewState } from "@deck.gl/core";
+import { getConcreteFieldNames } from "@/charts/chartConfigUtils";
+import type { FieldSpecs } from "@/lib/columnTypeHelpers";
 import {
     getChartArrayViewId,
     getChartArrayViewStates,
     hasUsableOrthographicViewState,
     getVivGridDetailViewId,
+    supportsChartArrayGridMode,
 } from "./chartArrayGridUtils";
 import { shouldDrawDeckLayerInViewport, type DeckLayerScopeInput } from "./deckLayerViewportScope";
 
 export { getChartArrayViewStates, hasUsableOrthographicViewState, getVivGridDetailViewId };
 
-/** Chart types that expose the density grid setting (see `includeDensityModeToggle`). */
+/** @deprecated Use {@link supportsChartArrayGridMode} */
 export const DENSITY_GRID_CHART_TYPES = new Set([
     "DeckContourScatter",
     "DeckDensity",
     "VivMdvRegionReact",
 ]);
 
+/** @deprecated Use {@link supportsChartArrayGridMode} */
 export function supportsDensityGridMode(chartType: string | undefined) {
-    return typeof chartType === "string" && DENSITY_GRID_CHART_TYPES.has(chartType);
+    return supportsChartArrayGridMode(chartType);
 }
 
 export function getDensityGridViewId(chartId: string, fieldId: string, index: number) {
@@ -109,8 +113,54 @@ type CloneableDeckLayer = Layer & {
     clone: (props: Record<string, unknown>) => Layer;
 };
 
+export const CHART_ARRAY_OVERLAY_DETAIL_SUFFIX = "detail-react";
+export const CHART_ARRAY_GRID_LAYER_SUFFIX = "chart-array-grid";
+
+/** Overlay detail layers use `-#<chartId>detail-react#`; grid clones use `chart-array-grid` instead. */
+export function toChartArrayGridLayerId(layerId: string): string {
+    if (layerId.includes(CHART_ARRAY_GRID_LAYER_SUFFIX)) {
+        return layerId;
+    }
+    if (layerId.includes(CHART_ARRAY_OVERLAY_DETAIL_SUFFIX)) {
+        return layerId.replace(CHART_ARRAY_OVERLAY_DETAIL_SUFFIX, CHART_ARRAY_GRID_LAYER_SUFFIX);
+    }
+    return `${layerId}-${CHART_ARRAY_GRID_LAYER_SUFFIX}`;
+}
+
+export function cloneLayerForChartArrayGrid(
+    layer: CloneableDeckLayer,
+    props: Record<string, unknown> = {},
+): Layer {
+    return cloneDeckLayer(layer, {
+        ...props,
+        id: toChartArrayGridLayerId(layer.id),
+    });
+}
+
+export function cloneDeckLayerForRender(
+    layer: CloneableDeckLayer,
+    props: Record<string, unknown> = {},
+): Layer {
+    return cloneDeckLayer(layer, {
+        ...props,
+        id: layer.id,
+    });
+}
+
 export function cloneDeckLayer(layer: CloneableDeckLayer, props: Record<string, unknown>): Layer {
     return layer.clone(props);
+}
+
+export const DENSITY_GRID_EMPTY_STATE_MESSAGES = {
+    noCellsConfigured: "Choose density fields to build the grid.",
+    loadingCells: "Loading density fields...",
+    noRows: "No rows remain after the current filters.",
+} as const;
+
+/** Count configured density columns (not loaded field count). */
+export function getConfiguredDensityFieldCount(densityFields: FieldSpecs | undefined): number {
+    if (densityFields === undefined || densityFields === null) return 0;
+    return getConcreteFieldNames(densityFields).length;
 }
 
 export function getSerializableViewState(viewState: OrthographicViewState): OrthographicViewState {
@@ -120,4 +170,29 @@ export function getSerializableViewState(viewState: OrthographicViewState): Orth
         minZoom: viewState.minZoom,
         maxZoom: viewState.maxZoom,
     };
+}
+
+/** Normalize DeckGL view-state updates from single- or multi-view controllers. */
+export function applyDeckViewStateChange(
+    update: OrthographicViewState | Record<string, OrthographicViewState>,
+    current?: OrthographicViewState,
+): OrthographicViewState {
+    if (
+        update &&
+        typeof update === "object" &&
+        "target" in update &&
+        Array.isArray((update as OrthographicViewState).target)
+    ) {
+        return getSerializableViewState(update as OrthographicViewState);
+    }
+    const record = update as Record<string, OrthographicViewState>;
+    const next = Object.values(record).find(
+        (viewState) =>
+            viewState &&
+            Array.isArray(viewState.target) &&
+            Number.isFinite(Number(viewState.zoom)),
+    );
+    if (next) return getSerializableViewState(next);
+    if (current) return getSerializableViewState(current);
+    return { target: [0, 0, 0], zoom: 0 };
 }

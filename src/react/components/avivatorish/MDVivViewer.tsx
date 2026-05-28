@@ -5,7 +5,7 @@ import type { MjolnirEvent } from 'mjolnir.js';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
 import { ScaleBarLayer } from "@hms-dbmi/viv";
-import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
+import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo, Deck } from "deck.gl";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
@@ -77,6 +77,7 @@ export type VivViewerWrapperProps = {
     useDevicePixels?: boolean;
     outerContainer?: HTMLElement;
     selectionLayer?: EditableGeoJsonLayer;
+    onDeckInstance?: (deck: Deck | null) => void;
 };
 export type VivViewerWrapperState = {
     viewStates: any;
@@ -168,12 +169,71 @@ class MDVivViewerWrapper extends React.PureComponent<
      * as of anything related to that, this is dubious and liable to need attention in the future.
      */
     _cleanupMouseEvents?: () => void;
+    private _lastNotifiedDeck: Deck | null | undefined;
+    private _lastNotifiedDeckCallback: VivViewerWrapperProps["onDeckInstance"];
+    private _cachedVivLayersKey = "";
+    private _cachedOtherLayers: unknown[] = [];
+    private _cachedScaleBarLayer: unknown = null;
+
+    _notifyDeckInstance(force = false) {
+        const deckRef = this.state.deckRef?.current;
+        const deck =
+            deckRef && typeof deckRef === "object" && "deck" in deckRef
+                ? (deckRef as { deck: Deck }).deck
+                : null;
+        const callbackChanged =
+            this._lastNotifiedDeckCallback !== this.props.onDeckInstance;
+        if (!force && !callbackChanged && this._lastNotifiedDeck === deck) {
+            return;
+        }
+        this._lastNotifiedDeck = deck;
+        this._lastNotifiedDeckCallback = this.props.onDeckInstance;
+        this.props.onDeckInstance?.(deck);
+    }
+
+    _getVivLayersForRender() {
+        const { views, layerProps } = this.props;
+        const { viewStates } = this.state;
+        const viewStatesKey = views
+            .map((view) => {
+                const vs = viewStates[view.id];
+                if (!vs) return view.id;
+                const target = Array.isArray(vs.target) ? vs.target.join(",") : "";
+                return `${view.id}:${view.width}x${view.height}:${vs.zoom}:${target}`;
+            })
+            .join("|");
+        const layerPropsKey = layerProps
+            .map((props: Record<string, unknown>) =>
+                [
+                    JSON.stringify(props.selections),
+                    JSON.stringify(props.channelsVisible),
+                    JSON.stringify(props.contrastLimits),
+                ].join(";"),
+            )
+            .join("|");
+        const cacheKey = `${viewStatesKey}\u0001${layerPropsKey}`;
+        if (cacheKey === this._cachedVivLayersKey) {
+            return {
+                otherLayers: this._cachedOtherLayers,
+                scaleBarLayer: this._cachedScaleBarLayer,
+            };
+        }
+        const vivLayerGroups = this._renderLayers();
+        const vivLayers = vivLayerGroups.flat();
+        const scaleBarLayer = vivLayers.find((layer: unknown) => layer instanceof ScaleBarLayer);
+        const otherLayers = vivLayers.filter((layer: unknown) => layer !== scaleBarLayer);
+        this._cachedVivLayersKey = cacheKey;
+        this._cachedOtherLayers = otherLayers;
+        this._cachedScaleBarLayer = scaleBarLayer ?? null;
+        return { otherLayers, scaleBarLayer };
+    }
+
     _rebindSelectionMouseEvents() {
         if (!this.state.deckRef?.current) return;
         try {
             const deck = this.state.deckRef.current.deck;
-            this._cleanupMouseEvents?.();
-            this._cleanupMouseEvents = rebindMouseEvents(deck, this.props.selectionLayer);
+            // no longer returning a cleanup function here as we use queueMicrotask vs setTimeout
+            rebindMouseEvents(deck, this.props.selectionLayer);
         } catch (e) {
             console.error(
                 "attempt to reset deck eventManager element failed",
@@ -181,9 +241,17 @@ class MDVivViewerWrapper extends React.PureComponent<
             );
         }
     }
+    componentDidMount() {
+        this._notifyDeckInstance(true);
+    }
+
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
         const { views, outerContainer } = props;
+
+        if (prevProps.onDeckInstance !== props.onDeckInstance) {
+            this._notifyDeckInstance(true);
+        }
 
         const outerContainerChanged = outerContainer !== this.state.outerContainer;
         const viewsIdentityChanged =
@@ -235,6 +303,9 @@ class MDVivViewerWrapper extends React.PureComponent<
         }
     }
     componentWillUnmount(): void {
+        this._lastNotifiedDeck = undefined;
+        this._lastNotifiedDeckCallback = undefined;
+        this.props.onDeckInstance?.(null);
         this._cleanupMouseEvents?.();
         this._cleanupMouseEvents = undefined;
     }
@@ -395,12 +466,9 @@ class MDVivViewerWrapper extends React.PureComponent<
         }
         // MDV: make sure the scalebar is on top of other layers
         // perhaps this should be in _renderLayers(), yolo.
-        const vivLayerGroups = this._renderLayers();
-        const vivLayers = vivLayerGroups.flat();
-        const scaleBarLayer = vivLayers.find((layer: any) => layer instanceof ScaleBarLayer);
-        const otherLayers = vivLayers.filter((layer: any) => layer !== scaleBarLayer);
+        const { otherLayers, scaleBarLayer } = this._getVivLayersForRender();
         const layers = deckProps?.layers === undefined
-            ? [vivLayers]
+            ? [otherLayers]
             : [otherLayers, ...deckProps.layers];
         // XXX: including an undefined scaleBarLayer above causes some other layers to not render
         if (scaleBarLayer) {
@@ -426,6 +494,9 @@ class MDVivViewerWrapper extends React.PureComponent<
                 <DeckGL
                     // MDV: we mess with deck internals via ref to get eventManager to work in popouts
                     ref={this.state.deckRef}
+                    onLoad={() => {
+                        this._notifyDeckInstance(true);
+                    }}
                     // eslint-disable-next-line react/jsx-props-no-spreading
                     {...(deckPropsWithPicking ?? {})}
                     layerFilter={this.layerFilter}

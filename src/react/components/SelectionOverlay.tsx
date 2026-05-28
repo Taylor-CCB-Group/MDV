@@ -31,7 +31,11 @@ import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
 import { useChart } from "../context";
 import { action } from "mobx";
 import type { DualContourLegacyConfig } from "../contour_state";
-import { supportsDensityGridMode } from "./densityGridUtils";
+import {
+    isChartArrayGridMode,
+    supportsChartArrayGridMode,
+} from "./chartArrayGridUtils";
+import { getConfiguredDensityFieldCount } from "./densityGridUtils";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -152,8 +156,13 @@ export default observer(function SelectionOverlay() {
     const config = useConfig<DeckScatterConfigWithRegion>();
     const contourConfig = useConfig<DualContourLegacyConfig>();
     const is2d = config.dimension === "2d";
-    const supportsDensityGrid = supportsDensityGridMode(config.type);
-    const isDensityGrid = supportsDensityGrid && is2d && contourConfig.density_mode === "grid";
+    const supportsChartArrayGrid = supportsChartArrayGridMode(config.type);
+    const isDensityGrid = isChartArrayGridMode({
+        chartType: config.type,
+        dimension: config.dimension,
+        layoutMode: contourConfig.density_mode,
+        cellCount: getConfiguredDensityFieldCount(contourConfig.densityFields),
+    });
     const { 
         setSelectionMode, 
         selectionFeatureCollection,
@@ -223,13 +232,14 @@ export default observer(function SelectionOverlay() {
 
     const toggleDensityGrid = useCallback(() => {
         action(() => {
+            (chart as { skipChartArrayViewFitOnce?: boolean }).skipChartArrayViewFitOnce = true;
             const nextIsGrid = contourConfig.density_mode !== "grid";
             contourConfig.density_mode = nextIsGrid ? "grid" : "overlay";
             if (nextIsGrid) {
                 contourConfig.contour_fill = true;
             }
         })();
-    }, [contourConfig]);
+    }, [contourConfig, chart]);
 
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc.
@@ -301,7 +311,7 @@ export default observer(function SelectionOverlay() {
                 }}
             >
                 {toolButtons}
-                {supportsDensityGrid && is2d && (
+                {supportsChartArrayGrid && is2d && (
                     <IconWithTooltip
                         tooltipText={
                             isDensityGrid

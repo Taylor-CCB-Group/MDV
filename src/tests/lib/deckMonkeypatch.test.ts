@@ -37,7 +37,7 @@ vi.mock("mjolnir.js", () => {
     };
 });
 
-import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import { rebindMouseEvents, resolveDeckSelectionLayer } from "@/lib/deckMonkeypatch";
 
 describe("deckMonkeypatch", () => {
     it("registers pointerup when rebinding deck events", () => {
@@ -68,5 +68,24 @@ describe("deckMonkeypatch", () => {
         expect(options.events.pointermove).toBe(deck._onPointerMove);
         expect(options.events.pointerleave).toBe(deck._onPointerMove);
         expect(options.events.pointerup).toBe(deck._onPointerUp);
+    });
+
+    it("resolves mounted selection layers before re-initializing editable state", () => {
+        const mountedSelection = {
+            id: "selection_-#chartchart-array-grid#",
+            context: { deck: {} },
+            initializeState: vi.fn(),
+        };
+        const staleSelection = {
+            id: "selection_-#chartdetail-react#",
+            initializeState: vi.fn(),
+        };
+        const deck = {
+            layerManager: {
+                layers: [mountedSelection],
+            },
+        } as any;
+
+        expect(resolveDeckSelectionLayer(deck, staleSelection as any)).toBe(mountedSelection);
     });
 });

@@ -5,6 +5,7 @@ import { TriangleLayerContours } from "./HeatmapContourExtension";
 import type { ContourLayerProps } from "@/react/contour_state";
 import { HeatmapLayer } from "deck.gl";
 import type { Framebuffer } from "@luma.gl/core";
+import { heatmapContourBackend } from "./contourBackend";
 
 export type SpatialLayerProps = ScatterplotLayerProps & {
     //pending typing that allows for other kinds of layers etc
@@ -124,9 +125,17 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
         //         ...p,
         //     });
         // });
-        const densityLayers = contourLayers.filter((l) => l).map(props =>
-            createHeatmapContourLayer(this.getSubLayerProps(props)),
-        );
+        const densityLayers = contourLayers
+            .filter((layer): layer is NonNullable<ContourLayerProps> => layer !== undefined)
+            .map((props) =>
+                heatmapContourBackend.buildDynamicLayer({
+                    contourLayer: this.getSubLayerProps(props),
+                    id: props.id,
+                    radiusPixels: props.radiusPixels,
+                    debounce: props.debounce,
+                    weightsTextureSize: props.weightsTextureSize,
+                }),
+            );
         return [
             // add 'grey-out' layer here... that implies a different type of data being passed.
             // it might want to know about background_filter...

@@ -22,7 +22,8 @@ import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import DeckDensityGridComponent from "./DeckDensityGridComponent";
-import { supportsDensityGridMode } from "./densityGridUtils";
+import { isChartArrayGridMode } from "./chartArrayGridUtils";
+import { cloneDeckLayerForRender, getConfiguredDensityFieldCount } from "./densityGridUtils";
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -147,8 +148,12 @@ const DeckScatter = observer(function DeckScatterComponent({
     const contourConfig = useConfig<DualContourLegacyConfig>();
     const { viewState, dimension } = config;
     const is2d = dimension === "2d";
-    const showDensityGrid =
-        supportsDensityGridMode(config.type) && is2d && contourConfig.density_mode === "grid";
+    const showDensityGrid = isChartArrayGridMode({
+        chartType: config.type,
+        dimension: config.dimension,
+        layoutMode: contourConfig.density_mode,
+        cellCount: getConfiguredDensityFieldCount(contourConfig.densityFields),
+    });
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
@@ -238,10 +243,38 @@ const DeckScatter = observer(function DeckScatterComponent({
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
 
+    const shouldCloneOverlayLayersRef = useRef(false);
+    if (showDensityGrid) {
+        shouldCloneOverlayLayersRef.current = true;
+    }
+
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [greyScatterplotLayer, scatterplotLayer, gateDisplayLayer, selectionLayer, gateLabelLayer, axisLinesLayer,
-    ].filter(x => x !== null);
-    
+    const layers = useMemo(
+        () => {
+            const sources = [
+                greyScatterplotLayer,
+                scatterplotLayer,
+                gateDisplayLayer,
+                selectionLayer,
+                gateLabelLayer,
+                axisLinesLayer,
+            ].filter((layer): layer is NonNullable<typeof layer> => layer !== null);
+            if (!shouldCloneOverlayLayersRef.current) {
+                return sources;
+            }
+            return sources.map((layer) => cloneDeckLayerForRender(layer));
+        },
+        [
+            greyScatterplotLayer,
+            scatterplotLayer,
+            gateDisplayLayer,
+            selectionLayer,
+            gateLabelLayer,
+            axisLinesLayer,
+            showDensityGrid,
+        ],
+    );
+
     const outerContainer = useOuterContainer();
     const deckContainerRef = useRef<HTMLDivElement | null>(null);
     const deckRef = useRef<any>(null);
@@ -291,7 +324,14 @@ const DeckScatter = observer(function DeckScatterComponent({
 
 
     if (showDensityGrid) {
-        return <DeckDensityGridComponent />;
+        return (
+            <div
+                className="min-h-0 min-w-0"
+                style={{ width: "100%", height: "100%", outline: "none" }}
+            >
+                <DeckDensityGridComponent />
+            </div>
+        );
     }
 
     return (
