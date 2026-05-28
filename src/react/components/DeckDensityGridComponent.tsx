@@ -11,7 +11,7 @@ import {
     useDensityGridContours,
     useDensityGridViewState,
 } from "../hooks/useDensityGridCells";
-import { useChartID, useConfig, useFilteredIndices } from "../hooks";
+import { useChartID, useConfig } from "../hooks";
 import { useDeckSelectionMouseRebind } from "../hooks/useDeckSelectionMouseRebind";
 import { useOuterContainer } from "../screen_state";
 import type { DualContourLegacyConfig } from "../contour_state";
