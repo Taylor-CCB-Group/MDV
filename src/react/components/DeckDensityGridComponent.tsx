@@ -100,7 +100,6 @@ function resolveDeckDevice(deck: unknown): Device | null {
 export default function DeckDensityGridComponent() {
     const chartId = useChartID();
     const config = useConfig<DensityGridConfig>();
-    const rows = useFilteredIndices();
     const outerContainer = useOuterContainer();
     const deckRef = useRef<any>(null);
     const renderCacheRef = useRef<ChartArrayRenderCache | null>(null);
