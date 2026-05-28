@@ -128,6 +128,8 @@ class HeatMap extends SVGChart {
 
     getColorLegendSpec() {
         const cs = this.config.color_scale;
+        // Match setColorFunction: virtual expression fields must exist before legend min/max lookups.
+        this._ensureExpressionColumn(this.config.param[1]);
         const conf = {
             overideValues: {
                 max: 1,

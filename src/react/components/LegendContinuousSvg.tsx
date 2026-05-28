@@ -1,7 +1,13 @@
-import { useId, useLayoutEffect, useRef } from "react";
-import { axisBottom } from "d3-axis";
+import { useLayoutEffect, useRef } from "react";
+import { axisBottom } from "d3";
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
+
+let nextLegendGradientId = 0;
+
+function createLegendGradientId() {
+    return `legend-gradient-${globalThis.crypto?.randomUUID?.() ?? ++nextLegendGradientId}`;
+}
 
 export type LegendContinuousSvgProps = {
     label: string;
@@ -23,7 +29,9 @@ export default function LegendContinuousSvg({
     width = 120,
     height = 45,
 }: LegendContinuousSvgProps) {
-    const gradientId = useId().replace(/:/g, "");
+    // SVG ids are document-global, and legends may be rendered through separate React roots.
+    const gradientIdRef = useRef<string>(createLegendGradientId());
+    const gradientId = gradientIdRef.current;
     const axisRef = useRef<SVGGElement>(null);
     const len = colors.length;
     const colorPct = colors.map((color, i) => {

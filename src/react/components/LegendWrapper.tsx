@@ -102,7 +102,7 @@ export default class LegendWrapper<
             doc,
         });
         if (this.interactions.resizable) {
-            makeResizable(wrapper);
+            makeResizable(wrapper, { doc });
         }
         this.interactionsAttached = true;
     }
