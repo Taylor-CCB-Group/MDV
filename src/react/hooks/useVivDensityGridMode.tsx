@@ -642,10 +642,8 @@ export function useVivDensityGridMode(
                     <ChartArrayEmptyState
                         configuredCellCount={0}
                         loadedCellCount={0}
-                        rowCount={rows.length}
                         noCellsConfiguredMessage={emptyMessages.noCellsConfigured}
                         loadingCellsMessage={emptyMessages.loadingCells}
-                        noRowsMessage={emptyMessages.noRows}
                     />
                 ),
                 layout: null,
@@ -661,10 +659,8 @@ export function useVivDensityGridMode(
                         waitingForViewState={true}
                         configuredCellCount={configuredFieldCount}
                         loadedCellCount={densityFields.length}
-                        rowCount={rows.length}
                         noCellsConfiguredMessage={emptyMessages.noCellsConfigured}
                         loadingCellsMessage={emptyMessages.loadingCells}
-                        noRowsMessage={emptyMessages.noRows}
                     />
                 ),
                 layout: null,
@@ -679,28 +675,8 @@ export function useVivDensityGridMode(
                     <ChartArrayEmptyState
                         configuredCellCount={configuredFieldCount}
                         loadedCellCount={0}
-                        rowCount={rows.length}
                         noCellsConfiguredMessage={emptyMessages.noCellsConfigured}
                         loadingCellsMessage={emptyMessages.loadingCells}
-                        noRowsMessage={emptyMessages.noRows}
-                    />
-                ),
-                layout: null,
-                viewer: null,
-                tooltipPortal: null,
-                containerHandlers,
-            };
-        }
-        if (rows.length === 0) {
-            return {
-                blocking: (
-                    <ChartArrayEmptyState
-                        configuredCellCount={configuredFieldCount}
-                        loadedCellCount={densityFields.length}
-                        rowCount={0}
-                        noCellsConfiguredMessage={emptyMessages.noCellsConfigured}
-                        loadingCellsMessage={emptyMessages.loadingCells}
-                        noRowsMessage={emptyMessages.noRows}
                     />
                 ),
                 layout: null,
@@ -750,7 +726,6 @@ export function useVivDensityGridMode(
         enabled,
         configuredFieldCount,
         densityFields.length,
-        rows.length,
         viewState,
         canRenderDeck,
         grid.scrollContainerRef,

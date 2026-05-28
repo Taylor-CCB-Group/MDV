@@ -39,7 +39,6 @@ const ENABLE_STATIC_GRID_BUFFER =
 const DENSITY_GRID_EMPTY_STATE_MESSAGES = {
     noCellsConfigured: "Choose density fields to build the grid.",
     loadingCells: "Loading density fields...",
-    noRows: "No rows remain after the current filters.",
 } as const;
 
 function applyDeckViewStateChange(
@@ -332,10 +331,8 @@ export default function DeckDensityGridComponent() {
             <ChartArrayEmptyState
                 configuredCellCount={0}
                 loadedCellCount={0}
-                rowCount={rows.length}
                 noCellsConfiguredMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.noCellsConfigured}
                 loadingCellsMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.loadingCells}
-                noRowsMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.noRows}
             />
         );
     }
@@ -344,26 +341,11 @@ export default function DeckDensityGridComponent() {
             <ChartArrayEmptyState
                 configuredCellCount={configuredFieldCount}
                 loadedCellCount={0}
-                rowCount={rows.length}
                 noCellsConfiguredMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.noCellsConfigured}
                 loadingCellsMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.loadingCells}
-                noRowsMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.noRows}
             />
         );
     }
-    if (rows.length === 0) {
-        return (
-            <ChartArrayEmptyState
-                configuredCellCount={configuredFieldCount}
-                loadedCellCount={densityFields.length}
-                rowCount={0}
-                noCellsConfiguredMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.noCellsConfigured}
-                loadingCellsMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.loadingCells}
-                noRowsMessage={DENSITY_GRID_EMPTY_STATE_MESSAGES.noRows}
-            />
-        );
-    }
-
     return (
         <div className="relative flex h-full w-full min-w-0 flex-col">
             <div
