@@ -110,6 +110,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
 
     constructor(dataStore: DataStore, div: string | HTMLDivElement, config: IGVBrowserConfig) {
         config.view_margins = config.view_margins || { type: "percentage", value: 20 };
+        config.feature_label = config.feature_label || "_none_";
         config.max_initial_features =
             config.max_initial_features && config.max_initial_features > 0
                 ? config.max_initial_features
@@ -213,10 +214,10 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
             ],
         } as any;
 
-        const safeLocus = toSafeLocusString(this.config.location);
+        /*const safeLocus = toSafeLocusString(this.config.location);
         if (safeLocus) {
             initialConfig.locus = safeLocus;
-        }
+        }*/
         initialConfig.__mdvDataStore = this.dataStore;
         return initialConfig;
     }
@@ -255,19 +256,11 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         this.updateMDVFeatures();
     }
 
-    setLabelFunction(column: string | null) {
-        if (!this.baseTrack) return;
-        if (!column || column === "_none") {
-            this.config.feature_label = undefined;
-        } else {
-            this.config.feature_label = column;
-        }
-        this.updateMDVFeatures();
-    }
+    
 
     getFeatureStyle(rowIndex: number) {
         const labelColumn = this.config.feature_label;
-        const name = labelColumn ? `${this.dataStore.getRowText(rowIndex, labelColumn)}` : undefined;
+        const name = labelColumn && labelColumn !== "_none_" ? `${this.dataStore.getRowText(rowIndex, labelColumn)}` : undefined;
         let color: string | unknown;
         color = this.colorFunction ? this.colorFunction(rowIndex) : "#888888";
         return { name, color };
@@ -328,9 +321,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         if (data.source === this || !this.locationFields.length || !data?.indexes?.length) {
             return;
         }
-        if (!this.config.highlight_selected_region) {
-            return;
-        }
+
         const row = this.dataStore.getRowAsObject(data.indexes[0], this.locationFields) as Record<string, unknown>;
         const chrValue = row[this.locationFields[0]] as string;
         const startValue = (row[this.locationFields[1]]) as number;
@@ -418,15 +409,15 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         const c = this.config;
         const vm = c.view_margins || { type: "percentage", value: 20 };
         const cols = this.dataStore.getColumnList();
-        cols.push({ name: "None", field: "_none" });
+        cols.push({ name: "None", field: "_none_" });
         settings.push(
             g({
                 label: "Feature Label",
                 type: "dropdown",
                 values: [cols, "name", "field"],
-                current_value: c.feature_label || "_none",
+                current_value: c.feature_label || "_none_",
                 func: (x: string) => {
-                    this.setLabelFunction(x === "_none" ? null : x);
+                    c.feature_label = x === "_none" ? undefined : x;
                 },
             }),
         );
@@ -528,8 +519,6 @@ BaseChart.types["igv_browser"] = {
     class: IGVBrowser,
     name: "IGV Browser",
     params: [],
-    methodsUsingColumns: ["setLabelFunction"],
-    configEntriesUsingColumns: ["feature_label"],
     required: (ds) => {
         return ds.genome?.genomic_location || ds.genome?.svs;
     },

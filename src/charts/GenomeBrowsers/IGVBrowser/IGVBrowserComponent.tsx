@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type IGVBrowser from "./IGVBrowser";
 import { BASE_TRACK_ID } from "./IGVBrowser";
 import type { Browser } from "igv";
+import { useFieldSpec } from "@/react/hooks";
+import type { IGVBrowserLocation } from "./igvUtils";
+
 
 
 
@@ -11,10 +14,10 @@ const IGVBrowserComponent = observer(() => {
     const chart = useChart() as IGVBrowser;
     const rootRef = useRef<HTMLDivElement | null>(null);
     const browserRef = useRef<Browser | null>(null);
-    const lastLocusRef = useRef<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const featureLabelColumn = useFieldSpec(chart.config.feature_label==="_none_"?undefined:chart.config.feature_label);
 
 
     useEffect(() => {
@@ -65,11 +68,11 @@ const IGVBrowserComponent = observer(() => {
                 });
 
                 browser.on("locuschange", (frames: any) => {
-                    const frame = Array.isArray(frames) ? frames[0] : frames;
-                    if (!frame?.chr) return;
-                    const locus = `${frame.chr}:${Math.floor(frame.start)}-${Math.floor(frame.end)}`;
-                    lastLocusRef.current = locus;
-                    chart.setLocationFromLocus(frame.chr, frame.start, frame.end);
+                    //const frame = Array.isArray(frames) ? frames[0] : frames;
+                    //if (!frame?.chr) return;
+                    //const locus = `${frame.chr}:${Math.floor(frame.start)}-${Math.floor(frame.end)}`;
+                    //lastLocusRef.current = locus;
+                    //chart.setLocationFromLocus(frame.chr, frame.start, frame.end);
                 });
                 setLoading(false);
             } catch (e) {
@@ -102,7 +105,18 @@ const IGVBrowserComponent = observer(() => {
         };
     }, [chart]);
 
- 
+    useEffect(() => {
+        const lf = chart.config.feature_label;
+        if (lf !== "_none_" &&(!featureLabelColumn || featureLabelColumn.field !== lf)) return;
+        void chart.updateMDVFeatures();
+    }, [chart, chart.config.feature_label, featureLabelColumn, ]);
+
+     /*useEffect(() => {
+        const locus = buildLocusSearch(chart.config.location);
+        if (!locus) return;
+        if (locus === lastLocusRef.current) return;
+        browserRef.current?.search(locus);
+    }, [chart.config.location]);*/
 
     /*useEffect(() => {
         if (highlightedIndex >= 0) {

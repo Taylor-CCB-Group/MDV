@@ -345,7 +345,7 @@ class MdvFeatureTrack extends igv.TrackBase {
                 if (style?.name !== undefined) {
                     proxy.name = style.name;
                 } else {
-                    delete proxy.name;
+                    proxy.name="";
                 }
                 if (style?.color !== undefined) {
                     proxy.color = style.color;

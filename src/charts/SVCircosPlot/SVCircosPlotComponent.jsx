@@ -25,7 +25,7 @@ const CHROMOSOME_COLORS = [
 ];
 
 
-//don't want to use filtredindxes as the filter buffer is used directly]
+//don't want to use filtredindxes as the filter buffer is used directly
 //in wbgl , just need to know when filtering happans
 const useFilter = (datastore) => {
     const [filter, setFilter] = useState({});
