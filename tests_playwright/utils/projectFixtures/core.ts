@@ -28,7 +28,8 @@ async function sleep(ms: number) {
 }
 
 export async function waitForProjectReady(page: Page) {
-    await page.waitForLoadState("networkidle");
+    // Vite dev pages can keep HMR/network channels open, so networkidle may never resolve.
+    await page.waitForLoadState("domcontentloaded");
     await page.waitForFunction(() => Boolean((window as any).mdv?.chartManager?.viewManager));
     await expect(page.locator(".ciview-contentDiv").first()).toBeVisible({ timeout: 60_000 });
     const forbiddenDialog = page.getByRole("dialog").filter({

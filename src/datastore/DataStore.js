@@ -9,7 +9,6 @@ import "./ValueSetDimension";
 import "./SortableDimension.js";
 import "./DeepToolsDimension.js";
 import { scaleLinear, scaleSymlog } from "d3-scale";
-import { getColorLegend, getColorBar } from "../utilities/Color.js";
 import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
@@ -1597,37 +1596,6 @@ class DataStore {
         const c = this.columnIndex[column];
         const i = c.values.indexOf(cat);
         return this.getColumnColors(column)[i];
-    }
-
-    /**
-     * Makes a color bar/legend based on the give column
-     * @param {string} column - the field/id of the column
-     * @param {object} config - see [here]{@link DataStore#getColorFunction}
-     * @returns {HTMLElement} - a color bar or color legend
-     */
-    getColorLegend(column, config = {}) {
-        const colors = this.getColumnColors(column, config);
-        const c = this.columnIndex[column];
-        const name = config.name || c.name;
-        if (
-            c.datatype === "integer" ||
-            c.datatype === "double" ||
-            c.datatype === "int32"
-        ) {
-            const [min, max] = this.getMinMaxForColumn(column);
-            let range = [min, max];
-            if (config.overideValues) {
-                const ov = config.overideValues;
-                range = [
-                    ov.min == null ? min : ov.min,
-                    ov.max == null ? max : ov.max,
-                ];
-            }
-            return getColorBar(colors, { range: range, label: name });
-        }
-        if (isColumnText(c)) {
-            return getColorLegend(colors, c.values, { label: name });
-        }
     }
 
     /**
