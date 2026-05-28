@@ -177,6 +177,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     }
     
     let config: C = JSON.parse(JSON.stringify(originalConfig));
+    normalizeLegacyColorLegendConfig(config as unknown as Record<string, unknown>);
     if (!config.id) {
         // what about when we duplicate a chart?
         config.id = getRandomString();
@@ -272,5 +273,17 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
 
 
     return config;
+}
+
+function normalizeLegacyColorLegendConfig(config: Record<string, unknown>) {
+    const colorLegend = config.color_legend;
+    if (!colorLegend || typeof colorLegend !== "object") {
+        return;
+    }
+    const legendRecord = colorLegend as Record<string, unknown>;
+    // Backwards compatibility: some generated configs used a misspelled key.
+    if (legendRecord.display === undefined && typeof legendRecord.dsiplay === "boolean") {
+        legendRecord.display = legendRecord.dsiplay;
+    }
 }
 

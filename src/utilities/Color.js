@@ -9,6 +9,10 @@ import { scaleLinear } from "d3-scale";
 import { axisBottom } from "d3-axis";
 import { getRandomString } from "./Utilities";
 
+/**
+ * Imperative DOM legend builders used by scale legends (node size, link thickness, etc.).
+ * The color_by chart legend uses React: see ColorLegend.tsx and buildColorLegendSpec.ts.
+ */
 function getColorLegendCustom(scale, config = {}) {
     const ticks = scale.ticks(config.ticks || 4);
     const widths = ticks.map((x) => scale(x));

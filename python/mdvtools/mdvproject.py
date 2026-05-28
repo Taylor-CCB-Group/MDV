@@ -2388,7 +2388,7 @@ class MDVProject:
             "title": region,
             "radius": 3.5,
             "color_by": regions["default_color"],
-            "color_legend": {"dsiplay": False},
+            "color_legend": {"display": False},
             "region": region,
             "roi": r_info.get("roi"),
         }

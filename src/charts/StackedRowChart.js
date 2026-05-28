@@ -3,6 +3,7 @@ import { easeLinear } from "d3-ease";
 import SVGChart from "./SVGChart.js";
 import BaseChart from "./BaseChart";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
+import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
 
 class StackedRowChart extends SVGChart {
     constructor(dataStore, div, config) {
@@ -62,8 +63,8 @@ class StackedRowChart extends SVGChart {
         }
     }
 
-    getColorLegend() {
-        return this.dataStore.getColorLegend(this.config.param[1]);
+    getColorLegendSpec() {
+        return buildColorLegendSpec(this.dataStore, this.config.param[1]);
     }
 
     getSettings() {
