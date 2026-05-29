@@ -26,6 +26,7 @@ import { useDeckMountEpoch } from "./useDeckMountEpoch";
 import { createHeatmapContourLayer } from "@/webgl/SpatialLayer";
 import { tagDeckLayerViewportScope } from "../components/deckLayerViewportScope";
 import {
+    cloneDeckLayerForRender,
     DENSITY_GRID_EMPTY_STATE_MESSAGES,
     getVivGridDetailViewId,
 } from "../components/densityGridUtils";
@@ -108,20 +109,28 @@ function isStaticSharedGeometryLayer(layer: Layer): boolean {
     return layer.id.startsWith("scatter_") || layer.id.startsWith("scatter-grey_");
 }
 
-/** View state for the offscreen pass: shared pan/zoom with per-cell CSS dimensions. */
-function buildStaticPassViewState(
-    viewState: VivViewState,
-    cssWidth: number,
-    cssHeight: number,
-): OrthographicViewState {
+/** Shared pan/zoom for the offscreen pass (viewport size is on the OrthographicView). */
+function buildStaticPassViewState(viewState: VivViewState): OrthographicViewState {
     return {
         target: viewState.target,
         zoom: viewState.zoom,
         minZoom: viewState.minZoom,
         maxZoom: viewState.maxZoom,
-        width: cssWidth,
-        height: cssHeight,
-    } as OrthographicViewState;
+    };
+}
+
+type CloneableDeckLayer = Layer & {
+    clone: (props: Record<string, unknown>) => Layer;
+};
+
+function cloneLayersForStaticPass(layers: Layer[]): Layer[] {
+    return layers.map((layer) => {
+        const cloneable = layer as CloneableDeckLayer;
+        if (!cloneable.clone) return layer;
+        return cloneDeckLayerForRender(cloneable, {
+            id: `${layer.id}-static-fbo`,
+        });
+    });
 }
 
 export type { VivDensityGridViewerProps } from "../components/vivDensityGridViewerProps";
@@ -370,23 +379,16 @@ export function useVivDensityGridMode(
     const devicePixelRatio =
         typeof window !== "undefined" ? window.devicePixelRatio : 1;
 
+    // Match reference cell 0 used by useVivDensityGridViewState for zoom fit.
     const staticPassPixelSize = useMemo(() => {
-        const firstVisibleIndex = grid.visibleCellIndices[0];
-        const bounds =
-            typeof firstVisibleIndex === "number"
-                ? grid.getCellBounds(firstVisibleIndex)
-                : undefined;
-        if (bounds && bounds.width > 0 && bounds.height > 0) {
-            return {
-                width: Math.max(1, Math.round(bounds.width)),
-                height: Math.max(1, Math.round(bounds.height)),
-            };
+        if (grid.cellCount === 0 || referenceCellWidth <= 0 || referenceCellHeight <= 0) {
+            return { width: 0, height: 0 };
         }
         return {
-            width: Math.max(1, Math.round(grid.metrics.rootSize.width)),
-            height: Math.max(1, Math.round(grid.metrics.rootSize.height)),
+            width: Math.max(1, Math.round(referenceCellWidth)),
+            height: Math.max(1, Math.round(referenceCellHeight)),
         };
-    }, [grid.visibleCellIndices, grid.getCellBounds, grid.metrics.rootSize]);
+    }, [grid.cellCount, referenceCellWidth, referenceCellHeight]);
 
     const staticLayerIds = useMemo(
         () => staticSourceLayers.map((layer) => layer.id),
@@ -458,9 +460,13 @@ export function useVivDensityGridMode(
 
         const cssWidth = staticPassPixelSize.width;
         const cssHeight = staticPassPixelSize.height;
+        if (cssWidth <= 0 || cssHeight <= 0) {
+            return;
+        }
         const physicalWidth = Math.max(1, Math.round(cssWidth * devicePixelRatio));
         const physicalHeight = Math.max(1, Math.round(cssHeight * devicePixelRatio));
-        const staticViewState = buildStaticPassViewState(viewState, cssWidth, cssHeight);
+        const staticViewState = buildStaticPassViewState(viewState);
+        const layersForStaticPass = cloneLayersForStaticPass(staticSourceLayers);
 
         if (!renderCacheRef.current) {
             renderCacheRef.current = new ChartArrayRenderCache();
@@ -484,7 +490,7 @@ export function useVivDensityGridMode(
                 cssWidth,
                 cssHeight,
                 viewState: staticViewState,
-                layers: staticSourceLayers,
+                layers: layersForStaticPass,
             });
             staticContentFrameRef.current += 1;
             staticPassRef.current = {
