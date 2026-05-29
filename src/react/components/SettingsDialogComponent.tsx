@@ -29,7 +29,6 @@ import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { Clear } from "@mui/icons-material";
 import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
-import { useDataStore } from "../context";
 import {
     getCategorySelectionDropdownKey,
 } from "./categorySelectionUtils";
