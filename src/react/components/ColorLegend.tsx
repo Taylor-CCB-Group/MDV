@@ -38,7 +38,7 @@ function ColorLegendCategorical({
             <div
                 className="legend-body overflow-y-auto overflow-x-hidden w-full"
                 style={{
-                    height: "calc(100% - 10px)",
+                    height: "calc(100% - 20px)",
                 }}
             >
                 <LegendCategoricalSvg items={svgItems} />
