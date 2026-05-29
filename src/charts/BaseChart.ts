@@ -19,7 +19,10 @@ import 'tippy.js/dist/tippy.css';
 import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
 import type { ColorLegendSpec } from "@/react/colorLegend/types";
 import ColorLegend from "@/react/components/ColorLegend";
-import LegendWrapper from "@/react/components/LegendWrapper";
+import LegendWrapper, {
+    type LegendWrapperComponentProps,
+} from "@/react/components/LegendWrapper";
+import { createElement } from "react";
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
 export type LegacyColorBy = { column: DataColumn<any> }
@@ -88,6 +91,8 @@ class BaseChart<T extends BaseConfig> {
     menuTooltips:TippyInstance[]=[];
     legend: HTMLDivElement | undefined;
     colorLegendWrapper: LegendWrapper<ColorLegendSpec, T>;
+    colorLegendFilterDimension: Dimension | null = null;
+    colorLegendFilter: { column: string; value: string } | null = null;
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
     _fullscreenChangeHandler: () => void;
@@ -179,6 +184,7 @@ class BaseChart<T extends BaseConfig> {
         this.resetButton.style.display = "none";
         this.resetButton.addEventListener("click", () => {
             this.removeFilter();
+            this.clearColorLegendCategoryFilter();
             this.resetButton.style.display = "none";
         });
 
@@ -571,6 +577,67 @@ class BaseChart<T extends BaseConfig> {
         }
     }
 
+    getColorLegendFilterDimension(): Dimension {
+        if (!this.colorLegendFilterDimension) {
+            this.colorLegendFilterDimension =
+                this.dataStore.getDimension("category_dimension");
+        }
+        return this.colorLegendFilterDimension;
+    }
+
+    getActiveColorLegendValue(spec: ColorLegendSpec): string | null {
+        if (
+            spec.kind !== "categorical" ||
+            this.colorLegendFilter?.column !== spec.column
+        ) {
+            return null;
+        }
+        return this.colorLegendFilter.value;
+    }
+
+    updateResetButtonVisibility(): void {
+        if (this.colorLegendFilter || this.getFilter?.()) {
+            this.resetButton.style.display = "inline";
+        } else {
+            this.resetButton.style.display = "none";
+        }
+    }
+
+    clearColorLegendCategoryFilter(updateLegend = true): void {
+        if (!this.colorLegendFilterDimension || !this.colorLegendFilter) {
+            return;
+        }
+        this.colorLegendFilterDimension.removeFilter();
+        this.colorLegendFilter = null;
+        this.updateResetButtonVisibility();
+        if (updateLegend) {
+            this.setColorLegend();
+        }
+    }
+
+    toggleColorLegendCategoryFilter(
+        spec: ColorLegendSpec,
+        value: string,
+    ): void {
+        if (spec.kind !== "categorical") {
+            return;
+        }
+        const dimension = this.getColorLegendFilterDimension();
+        const isActive =
+            this.colorLegendFilter?.column === spec.column &&
+            this.colorLegendFilter.value === value;
+
+        if (isActive) {
+            this.clearColorLegendCategoryFilter();
+            return;
+        }
+
+        this.colorLegendFilter = { column: spec.column, value };
+        dimension.filter("filterCategories", [spec.column], value);
+        this.updateResetButtonVisibility();
+        this.setColorLegend();
+    }
+
     /**
      * adds (or removes) the color legend depending on the chart's
      * config color_legend.display value - assumes chart has a
@@ -609,10 +676,19 @@ class BaseChart<T extends BaseConfig> {
             this.legend = undefined;
             return;
         }
+        const ColorLegendWithInteractions = (
+            props: LegendWrapperComponentProps<ColorLegendSpec>,
+        ) =>
+            createElement(ColorLegend, {
+                ...props,
+                activeCategoricalValue: this.getActiveColorLegendValue(spec),
+                onCategoricalItemClick: (value: string) =>
+                    this.toggleColorLegendCategoryFilter(spec, value),
+            });
         this.colorLegendWrapper.render(
             spec,
             { left: ll, top: lt },
-            ColorLegend,
+            ColorLegendWithInteractions,
             spec.kind === "categorical"
                 ? {
                       dragHandle: ".legend-body",
@@ -629,6 +705,12 @@ class BaseChart<T extends BaseConfig> {
     }
 
     getColorFunction(column: FieldName, asArray?: boolean) {
+        if (
+            this.colorLegendFilter &&
+            this.colorLegendFilter.column !== column
+        ) {
+            this.clearColorLegendCategoryFilter(false);
+        }
         this.config.color_by = column;
         const conf = {
             asArray: asArray,
@@ -674,6 +756,7 @@ class BaseChart<T extends BaseConfig> {
         }
         if (this.colorByColumn) {
             if (this.config.color_by === column) {
+                this.clearColorLegendCategoryFilter(false);
                 this.config.color_by = undefined;
                 this.colorByDefault?.();
             }
@@ -721,6 +804,11 @@ class BaseChart<T extends BaseConfig> {
     remove(notify?: boolean) {
         this.colorLegendWrapper.unmount();
         this.legend = undefined;
+        if (this.colorLegendFilterDimension) {
+            this.colorLegendFilterDimension.destroy(notify);
+            this.colorLegendFilterDimension = null;
+            this.colorLegendFilter = null;
+        }
         this.titleBar.remove();
         this.contentDiv.remove();
         this.dataStore.removeListener(this.config.id);
@@ -844,6 +932,7 @@ class BaseChart<T extends BaseConfig> {
                 columnType: filter,
                 func: (x) => {
                     if (x === "_none") {
+                        this.clearColorLegendCategoryFilter(false);
                         c.color_by = undefined;
                         this.colorByDefault?.();
                     } else {

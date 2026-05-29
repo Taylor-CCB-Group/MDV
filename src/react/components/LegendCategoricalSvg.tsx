@@ -8,7 +8,9 @@ export type LegendCategoricalSvgProps = {
     items: LegendCategoricalSvgItem[];
     /** Called when pointer enters/leaves a row (optional, used by field contour legend). */
     onItemHover?: (key: string | null) => void;
+    onItemClick?: (key: string) => void;
     hoveredKey?: string | null;
+    activeKey?: string | null;
 };
 
 const H_FAC = 12;
@@ -29,7 +31,9 @@ export function legendCategoricalContainerHeight(itemCount: number): number {
 export default function LegendCategoricalSvg({
     items,
     onItemHover,
+    onItemClick,
     hoveredKey = null,
+    activeKey = null,
 }: LegendCategoricalSvgProps) {
     const height = legendCategoricalBodyHeight(items.length);
 
@@ -40,8 +44,12 @@ export default function LegendCategoricalSvg({
                     const y = (i + 1) * 2 + i * H_FAC;
                     const isHovered =
                         hoveredKey !== null && hoveredKey === item.key;
+                    const isActive =
+                        activeKey !== null && activeKey === item.key;
+                    const focusedKey = hoveredKey ?? activeKey;
                     const dimmed =
-                        hoveredKey !== null && hoveredKey !== item.key;
+                        focusedKey !== null && focusedKey !== item.key;
+                    const isInteractive = Boolean(onItemHover || onItemClick);
                     return (
                         <g
                             key={item.key}
@@ -55,7 +63,12 @@ export default function LegendCategoricalSvg({
                                     ? () => onItemHover(null)
                                     : undefined
                             }
-                            className={onItemHover ? "cursor-pointer" : undefined}
+                            onClick={
+                                onItemClick
+                                    ? () => onItemClick(item.key)
+                                    : undefined
+                            }
+                            className={isInteractive ? "cursor-pointer" : undefined}
                             style={{
                                 opacity: dimmed ? 0.4 : 1,
                             }}
@@ -66,13 +79,20 @@ export default function LegendCategoricalSvg({
                                 height="10"
                                 width="10"
                                 fill={item.color}
-                                stroke={isHovered ? "currentColor" : "none"}
-                                strokeWidth={isHovered ? 2 : 0}
+                                stroke={
+                                    isHovered || isActive
+                                        ? "currentColor"
+                                        : "none"
+                                }
+                                strokeWidth={isHovered ? 2 : isActive ? 1.5 : 0}
                             />
                             <text
                                 y={y + 9}
                                 x={14}
                                 className="text-xs fill-current"
+                                style={{
+                                    fontWeight: isActive ? 700 : undefined,
+                                }}
                             >
                                 {item.label === "" ? "none" : item.label}
                             </text>

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ColorLegendSpec } from "@/react/colorLegend/types";
 import LegendCategoricalSvg, {
     legendCategoricalContainerHeight,
@@ -9,17 +9,24 @@ export type ColorLegendProps = {
     spec: ColorLegendSpec;
     /** Called after DOM for this legend is committed (used to attach drag/resize on the wrapper). */
     onLayoutReady?: () => void;
+    activeCategoricalValue?: string | null;
+    onCategoricalItemClick?: (value: string) => void;
 };
 
 function ColorLegendCategorical({
     label,
     items,
+    activeValue = null,
+    onItemClick,
 }: {
     label: string;
-    items: { color: string; name: string }[];
+    items: { color: string; name: string; value: string }[];
+    activeValue?: string | null;
+    onItemClick?: (value: string) => void;
 }) {
-    const svgItems = items.map((item, i) => ({
-        key: `${item.name}-${i}`,
+    const [hoveredValue, setHoveredValue] = useState<string | null>(null);
+    const svgItems = items.map((item) => ({
+        key: item.value,
         color: item.color,
         label: item.name,
     }));
@@ -41,7 +48,13 @@ function ColorLegendCategorical({
                     height: "calc(100% - 10px)",
                 }}
             >
-                <LegendCategoricalSvg items={svgItems} />
+                <LegendCategoricalSvg
+                    items={svgItems}
+                    hoveredKey={hoveredValue}
+                    activeKey={activeValue}
+                    onItemHover={setHoveredValue}
+                    onItemClick={onItemClick}
+                />
             </div>
         </>
     );
@@ -50,7 +63,12 @@ function ColorLegendCategorical({
 /**
  * Inner content for the chart color legend wrapper (categorical list or continuous color bar).
  */
-export default function ColorLegend({ spec, onLayoutReady }: ColorLegendProps) {
+export default function ColorLegend({
+    spec,
+    onLayoutReady,
+    activeCategoricalValue = null,
+    onCategoricalItemClick,
+}: ColorLegendProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
@@ -87,6 +105,8 @@ export default function ColorLegend({ spec, onLayoutReady }: ColorLegendProps) {
                 <ColorLegendCategorical
                     label={spec.label}
                     items={spec.items}
+                    activeValue={activeCategoricalValue}
+                    onItemClick={onCategoricalItemClick}
                 />
             </div>
         );
