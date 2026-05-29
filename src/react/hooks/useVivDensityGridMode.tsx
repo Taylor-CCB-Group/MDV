@@ -11,7 +11,7 @@ import {
     useDensityGridContours,
 } from "./useDensityGridCells";
 import { useVivDensityGridViewState } from "./useVivDensityGridViewState";
-import { useChartID, useConfig, useFilteredIndices } from "../hooks";
+import { useChartID, useConfig } from "../hooks";
 import { useSpatialLayers } from "../spatial_context";
 import ChartArrayLayout from "../components/ChartArrayLayout";
 import ChartArrayCellLabel from "../components/ChartArrayCellLabel";
@@ -164,7 +164,6 @@ export function useVivDensityGridMode(
     const viewerStore = useViewerStoreApi();
     const viewState = useViewerStore((store) => store.viewState);
     const outerContainer = useOuterContainer();
-    const rows = useFilteredIndices();
 
     const {
         scatterProps: {
