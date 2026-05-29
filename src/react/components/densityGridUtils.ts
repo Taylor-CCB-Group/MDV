@@ -91,15 +91,21 @@ export function shouldDrawLayerInViewport(
     layer: LayerViewportFilterInput,
     viewportId: string,
     vivIdForViewport: string,
+    isPicking?: boolean,
 ) {
     return shouldDrawDeckLayerInViewport(layer, viewportId, {
         overlayDetailVivId: vivIdForViewport,
+        isPicking,
     });
 }
 
 /** layerFilter for Deck-only density grid (no viv id suffix on viewports). */
-export function shouldDrawLayerInDeckDensityGrid(layer: LayerViewportFilterInput, viewportId: string) {
-    return shouldDrawDeckLayerInViewport(layer, viewportId);
+export function shouldDrawLayerInDeckDensityGrid(
+    layer: LayerViewportFilterInput,
+    viewportId: string,
+    isPicking?: boolean,
+) {
+    return shouldDrawDeckLayerInViewport(layer, viewportId, { isPicking });
 }
 
 export function getDensityGridViewStates(

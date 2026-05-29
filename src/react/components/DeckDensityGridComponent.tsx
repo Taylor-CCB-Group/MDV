@@ -295,10 +295,11 @@ export default function DeckDensityGridComponent() {
                 <DeckGL
                     ref={deckRef}
                     controller={false}
-                    layerFilter={({ layer, viewport }) =>
+                    layerFilter={({ layer, viewport, isPicking }) =>
                         shouldDrawLayerInDeckDensityGrid(
                             { id: layer.id, props: layer.props as Record<string, unknown> },
                             viewport.id,
+                            isPicking,
                         )
                     }
                     layers={allLayers}

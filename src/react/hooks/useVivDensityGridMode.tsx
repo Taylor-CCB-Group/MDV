@@ -24,7 +24,10 @@ import {
 import { resolveDeckDevice } from "../components/deckDeviceUtils";
 import { useDeckMountEpoch } from "./useDeckMountEpoch";
 import { createHeatmapContourLayer } from "@/webgl/SpatialLayer";
-import { tagDeckLayerViewportScope } from "../components/deckLayerViewportScope";
+import {
+    tagDeckLayerPickOnlyInStaticComposite,
+    tagDeckLayerViewportScope,
+} from "../components/deckLayerViewportScope";
 import {
     cloneDeckLayerForRender,
     DENSITY_GRID_EMPTY_STATE_MESSAGES,
@@ -68,9 +71,12 @@ function buildGridDeckLayersWithStaticComposite(
     viewIds: readonly string[],
     rootSize: { width: number; height: number },
 ): Layer[] {
+    const pickOnlyGeometryLayers = allDeckLayers
+        .filter(isStaticSharedGeometryLayer)
+        .map((layer) => tagDeckLayerPickOnlyInStaticComposite(layer as CloneableDeckLayer));
     const baseLayers = allDeckLayers.filter((layer) => !isStaticSharedGeometryLayer(layer));
     if (visibleCellIndices.length === 0) {
-        return baseLayers;
+        return [...pickOnlyGeometryLayers, ...baseLayers];
     }
     const viewStateById = new Map(viewStates.map((vs) => [vs.id, vs]));
     const compositeLayers = visibleCellIndices.flatMap((index) => {
@@ -97,7 +103,7 @@ function buildGridDeckLayersWithStaticComposite(
             ),
         ];
     });
-    return [...compositeLayers, ...baseLayers];
+    return [...compositeLayers, ...pickOnlyGeometryLayers, ...baseLayers];
 }
 
 export const VIV_SCATTER_DECK_KEY = "viv-scatter-deck";

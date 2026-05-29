@@ -128,9 +128,9 @@ class MDVivViewerWrapper extends React.PureComponent<
      * @returns {boolean} Whether or not this layer should be drawn in this viewport.
      */
     // eslint-disable-next-line class-methods-use-this
-    layerFilter({ layer, viewport }: any) {
+    layerFilter({ layer, viewport, isPicking }: any) {
         const viewportId = viewport.id as string;
-        return shouldDrawLayerInViewport(layer, viewportId, getVivId(viewportId));
+        return shouldDrawLayerInViewport(layer, viewportId, getVivId(viewportId), isPicking);
     }
 
     /**

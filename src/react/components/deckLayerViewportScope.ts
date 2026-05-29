@@ -11,6 +11,13 @@ import { isDensityGridViewport, matchesDensityGridView } from "./densityGridUtil
  */
 export const MDV_DECK_LAYER_VIEWPORT_SCOPE = "mdvDeckLayerViewportScope" as const;
 
+/**
+ * When true, the layer is omitted from the color pass and kept only for deck picking
+ * (static FBO composite shows the same geometry).
+ */
+export const MDV_DECK_LAYER_PICK_ONLY_IN_STATIC_COMPOSITE =
+    "mdvDeckLayerPickOnlyInStaticComposite" as const;
+
 export type DeckLayerViewportScope = "chart-shared" | "per-viewport";
 
 export type DeckLayerScopeInput = {
@@ -24,6 +31,10 @@ export function getDeckLayerViewportScope(layer: DeckLayerScopeInput): DeckLayer
         return scope;
     }
     return undefined;
+}
+
+export function getDeckLayerPickOnlyInStaticComposite(layer: DeckLayerScopeInput): boolean {
+    return layer.props?.[MDV_DECK_LAYER_PICK_ONLY_IN_STATIC_COMPOSITE] === true;
 }
 
 /** Fallback for layers not yet tagged (selection id prefix, explicit viewId, viv detail id). */
@@ -54,9 +65,17 @@ export function tagDeckLayerViewportScope<L extends CloneableDeckLayer>(
     }) as L;
 }
 
+export function tagDeckLayerPickOnlyInStaticComposite<L extends CloneableDeckLayer>(layer: L): L {
+    return layer.clone({
+        [MDV_DECK_LAYER_PICK_ONLY_IN_STATIC_COMPOSITE]: true,
+    }) as L;
+}
+
 export type DeckLayerViewportFilterOptions = {
     /** Viv id suffix for the overlay detail viewport, e.g. `-#my-chartdetail-react#`. */
     overlayDetailVivId?: string;
+    /** deck.gl layerFilter: true during picking passes. */
+    isPicking?: boolean;
 };
 
 /**
@@ -67,6 +86,10 @@ export function shouldDrawDeckLayerInViewport(
     viewportId: string,
     options?: DeckLayerViewportFilterOptions,
 ): boolean {
+    if (getDeckLayerPickOnlyInStaticComposite(layer) && options?.isPicking !== true) {
+        return false;
+    }
+
     const scope = inferDeckLayerViewportScope(layer);
     const overlayVivId = options?.overlayDetailVivId;
 
