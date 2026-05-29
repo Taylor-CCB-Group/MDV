@@ -67,11 +67,27 @@ describe("buildColorLegendSpec", () => {
             },
         });
         const spec = buildColorLegendSpec(store, "expression", {
-            overideValues: { min: 2, max: 8 },
+            overrideValues: { min: 2, max: 8 },
         });
         expect(spec).toMatchObject({
             kind: "continuous",
             range: [2, 8],
+        });
+    });
+
+    test("supports legacy misspelled override key", () => {
+        const store = createStore({
+            expression: {
+                datatype: "double",
+                name: "Expression",
+            },
+        });
+        const spec = buildColorLegendSpec(store, "expression", {
+            overideValues: { min: 3, max: 7 },
+        });
+        expect(spec).toMatchObject({
+            kind: "continuous",
+            range: [3, 7],
         });
     });
 

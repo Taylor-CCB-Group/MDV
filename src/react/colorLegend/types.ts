@@ -39,5 +39,7 @@ export type ColorLegendOverrideValues = {
 
 export type ColorLegendBuildConfig = {
     name?: string;
+    overrideValues?: ColorLegendOverrideValues;
+    /** @deprecated Use overrideValues instead. Kept for existing color config callers. */
     overideValues?: ColorLegendOverrideValues;
 };
