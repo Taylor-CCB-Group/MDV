@@ -5,11 +5,14 @@ import type { MjolnirEvent } from 'mjolnir.js';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
 import { ScaleBarLayer } from "@hms-dbmi/viv";
+import type { Layer } from "@deck.gl/core";
 import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo, Deck } from "deck.gl";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { shouldDrawLayerInViewport } from "../densityGridUtils";
+import { tagDeckLayerPickOnlyInStaticComposite } from "../deckLayerViewportScope";
+import { isVivImageLayer } from "@/webgl/chartArrayStaticLayers";
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
@@ -78,6 +81,8 @@ export type VivViewerWrapperProps = {
     outerContainer?: HTMLElement;
     selectionLayer?: EditableGeoJsonLayer;
     onDeckInstance?: (deck: Deck | null) => void;
+    /** When true, viv image layers are pick-only; color comes from the chart-array static FBO composite. */
+    vivImageLayersPickOnlyInStaticComposite?: boolean;
 };
 export type VivViewerWrapperState = {
     viewStates: any;
@@ -211,7 +216,10 @@ class MDVivViewerWrapper extends React.PureComponent<
                 ].join(";"),
             )
             .join("|");
-        const cacheKey = `${viewStatesKey}\u0001${layerPropsKey}`;
+        const pickOnlyKey = this.props.vivImageLayersPickOnlyInStaticComposite
+            ? "pick-only"
+            : "live";
+        const cacheKey = `${viewStatesKey}\u0001${layerPropsKey}\u0001${pickOnlyKey}`;
         if (cacheKey === this._cachedVivLayersKey) {
             return {
                 otherLayers: this._cachedOtherLayers,
@@ -221,7 +229,22 @@ class MDVivViewerWrapper extends React.PureComponent<
         const vivLayerGroups = this._renderLayers();
         const vivLayers = vivLayerGroups.flat();
         const scaleBarLayer = vivLayers.find((layer: unknown) => layer instanceof ScaleBarLayer);
-        const otherLayers = vivLayers.filter((layer: unknown) => layer !== scaleBarLayer);
+        let otherLayers = vivLayers.filter((layer: unknown) => layer !== scaleBarLayer);
+        if (this.props.vivImageLayersPickOnlyInStaticComposite) {
+            otherLayers = otherLayers.map((layer) => {
+                const deckLayer = layer as Layer;
+                if (!isVivImageLayer(deckLayer)) {
+                    return layer;
+                }
+                const cloneable = deckLayer as Layer & {
+                    clone: (props: Record<string, unknown>) => Layer;
+                };
+                if (typeof cloneable.clone !== "function") {
+                    return layer;
+                }
+                return tagDeckLayerPickOnlyInStaticComposite(cloneable);
+            });
+        }
         this._cachedVivLayersKey = cacheKey;
         this._cachedOtherLayers = otherLayers;
         this._cachedScaleBarLayer = scaleBarLayer ?? null;

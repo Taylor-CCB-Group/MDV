@@ -60,6 +60,7 @@ import {
     createChartArrayStaticCompositeLayer,
     getFramebufferCompositeBounds,
 } from "@/webgl/chartArrayStaticBitmapLayers";
+import { buildVivImageLayersForStaticPass } from "@/webgl/chartArrayStaticLayers";
 
 function buildGridDeckLayersWithStaticComposite(
     allDeckLayers: Layer[],
@@ -72,9 +73,9 @@ function buildGridDeckLayersWithStaticComposite(
     rootSize: { width: number; height: number },
 ): Layer[] {
     const pickOnlyGeometryLayers = allDeckLayers
-        .filter(isStaticSharedGeometryLayer)
+        .filter(isChartArrayScatterStaticLayer)
         .map((layer) => tagDeckLayerPickOnlyInStaticComposite(layer as CloneableDeckLayer));
-    const baseLayers = allDeckLayers.filter((layer) => !isStaticSharedGeometryLayer(layer));
+    const baseLayers = allDeckLayers.filter((layer) => !isChartArrayScatterStaticLayer(layer));
     if (visibleCellIndices.length === 0) {
         return [...pickOnlyGeometryLayers, ...baseLayers];
     }
@@ -111,7 +112,7 @@ export const VIV_SCATTER_DECK_KEY = "viv-scatter-deck";
 const ENABLE_STATIC_GRID_BUFFER =
     (import.meta.env.VITE_MDV_DENSITY_GRID_STATIC_BUFFER ?? "true") !== "false";
 
-function isStaticSharedGeometryLayer(layer: Layer): boolean {
+function isChartArrayScatterStaticLayer(layer: Layer): boolean {
     return layer.id.startsWith("scatter_") || layer.id.startsWith("scatter-grey_");
 }
 
@@ -366,11 +367,6 @@ export function useVivDensityGridMode(
         [allDeckLayers],
     );
 
-    const staticSourceLayers = useMemo(
-        () => allDeckLayers.filter(isStaticSharedGeometryLayer),
-        [allDeckLayers],
-    );
-
     const renderCacheRef = useRef<ChartArrayRenderCache | null>(null);
     const staticPassRendererRef = useRef<ChartArrayStaticPassRenderer | null>(null);
     const deckInstanceRef = useRef<Deck | null>(null);
@@ -395,6 +391,41 @@ export function useVivDensityGridMode(
             height: Math.max(1, Math.round(referenceCellHeight)),
         };
     }, [grid.cellCount, referenceCellWidth, referenceCellHeight]);
+
+    const vivLayersForStaticPass = useMemo(
+        () =>
+            ome && staticPassPixelSize.width > 0 && staticPassPixelSize.height > 0
+                ? buildVivImageLayersForStaticPass({
+                      width: staticPassPixelSize.width,
+                      height: staticPassPixelSize.height,
+                      layerConfig,
+                  })
+                : [],
+        [ome, staticPassPixelSize.width, staticPassPixelSize.height, layerConfig],
+    );
+
+    const staticSourceLayers = useMemo(
+        () => [
+            ...vivLayersForStaticPass,
+            ...allDeckLayers.filter(isChartArrayScatterStaticLayer),
+        ],
+        [allDeckLayers, vivLayersForStaticPass],
+    );
+
+    const vivStaticLayerKey = useMemo(
+        () =>
+            buildDeckLayerCacheKey([
+                String(staticPassPixelSize.width),
+                String(staticPassPixelSize.height),
+                JSON.stringify(layerConfig.channelsVisible),
+                JSON.stringify(layerConfig.contrastLimits),
+                JSON.stringify(layerConfig.selections),
+                JSON.stringify(layerConfig.colors),
+                String(layerConfig.brightness),
+                String(layerConfig.contrast),
+            ]),
+        [staticPassPixelSize.width, staticPassPixelSize.height, layerConfig],
+    );
 
     const staticLayerIds = useMemo(
         () => staticSourceLayers.map((layer) => layer.id),
@@ -421,11 +452,12 @@ export function useVivDensityGridMode(
         const viewIdsKey = grid.viewIds.join(",");
         const rootSizeKey = `${grid.metrics.rootSize.width}x${grid.metrics.rootSize.height}`;
         const visibleCellIndicesKey = grid.visibleCellIndices.join(",");
-        return `${staticBufferKey}|${staticContentKey}|${chartArrayDeckLayersCacheKey}|${visibleCellIndicesKey}|${viewIdsKey}|${rootSizeKey}`;
+        return `${staticBufferKey}|${staticContentKey}|${chartArrayDeckLayersCacheKey}|${vivStaticLayerKey}|${visibleCellIndicesKey}|${viewIdsKey}|${rootSizeKey}`;
     }, [
         staticBufferKey,
         staticContentKey,
         chartArrayDeckLayersCacheKey,
+        vivStaticLayerKey,
         grid.visibleCellIndices,
         grid.viewIds,
         grid.metrics.rootSize,
@@ -524,6 +556,15 @@ export function useVivDensityGridMode(
         staticPassPixelSize.height,
         devicePixelRatio,
     ]);
+
+    const staticCompositeActive = useMemo(() => {
+        staticPassRevision;
+        if (!ENABLE_STATIC_GRID_BUFFER || staticPassFailed || !enabled) {
+            return false;
+        }
+        const cached = staticPassRef.current;
+        return Boolean(cached && cached.renderKey === staticRenderKey);
+    }, [staticPassRevision, staticPassFailed, staticRenderKey, enabled]);
 
     const deckLayersForRender = useMemo(() => {
         // Invalidation only: re-run when the offscreen raster pass finishes (staticPassRef is a ref).
@@ -724,6 +765,7 @@ export function useVivDensityGridMode(
                   onViewStateChange,
                   deckProps,
                   onDeckInstance,
+                  vivImageLayersPickOnlyInStaticComposite: staticCompositeActive,
               }
             : null;
 
@@ -754,6 +796,7 @@ export function useVivDensityGridMode(
         onViewStateChange,
         deckProps,
         onDeckInstance,
+        staticCompositeActive,
         tooltipPortal,
         containerHandlers,
     ]);
