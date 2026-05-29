@@ -44,14 +44,12 @@ export function useDeckSelectionMouseRebind(
         if (editingGateId) return;
 
         let cancelled = false;
-        let cleanup: (() => void) | undefined;
-
         const tryBind = () => {
             const deck = deckRef.current?.deck;
             const layer = selectionLayerRef.current;
             if (!deck || cancelled) return false;
             try {
-                cleanup = rebindMouseEvents(deck, layer);
+                rebindMouseEvents(deck, layer);
                 return true;
             } catch (e) {
                 console.error(
@@ -65,7 +63,6 @@ export function useDeckSelectionMouseRebind(
         if (tryBind()) {
             return () => {
                 cancelled = true;
-                cleanup?.();
             };
         }
 
@@ -79,7 +76,6 @@ export function useDeckSelectionMouseRebind(
         return () => {
             cancelled = true;
             window.clearInterval(timer);
-            cleanup?.();
         };
     }, [outerContainer, deckRef, enabled, canvasKey, editingGateId]);
 }
