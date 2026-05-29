@@ -20,7 +20,11 @@ export function buildColorLegendSpec(
         return null;
     }
 
-    const rawColors = dataStore.getColumnColors(column, config);
+    const overrideValues = config.overrideValues ?? config.overideValues;
+    const colorConfig = overrideValues
+        ? { ...config, overideValues: overrideValues }
+        : config;
+    const rawColors = dataStore.getColumnColors(column, colorConfig);
     if (!rawColors) {
         return null;
     }
@@ -35,8 +39,8 @@ export function buildColorLegendSpec(
     ) {
         const [min, max] = dataStore.getMinMaxForColumn(column);
         let range: [number, number] = [min, max];
-        if (config.overideValues) {
-            const ov = config.overideValues;
+        if (overrideValues) {
+            const ov = overrideValues;
             range = [
                 ov.min == null ? min : ov.min,
                 ov.max == null ? max : ov.max,
