@@ -60,11 +60,13 @@ export function buildColorLegendSpec(
             (value, i) => ({
                 color: String(colors[i]),
                 name: String(value),
+                value: String(value),
             }),
         );
         return {
             kind: "categorical",
             label: name,
+            column,
             items,
         };
     }
