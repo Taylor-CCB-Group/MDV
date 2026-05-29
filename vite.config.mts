@@ -63,12 +63,16 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  */
 function getRollupOptions() {
     if (build === 'production') {
+        const version =process.env.mdv_version ? "-" + process.env.mdv_version : "";
+
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
-                entryFileNames: 'mdv.js',
+
+                entryFileNames: `mdv${version}.js`,
                 assetFileNames: flaskAssetFileNames,
+
             }
         }
     } if (build === 'desktop_pt') {

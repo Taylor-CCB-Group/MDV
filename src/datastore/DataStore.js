@@ -276,10 +276,11 @@ class DataStore {
     /**
      * Removes all filters from the datastore,
      * More efficient than removing each filter individually
-     * Filters on dimnensions with a noclear property will not
+     * Filters on dimensions with a 'noclear' property will not
      * be removed
      */
     removeAllFilters() {
+        //clear in one go 
         this.filterArray.fill(0);
         const noclear = [];
         for (const dim of this.dimensions) {
@@ -287,22 +288,25 @@ class DataStore {
                 noclear.push(dim);
                 continue;
             }
-            dim.filterArray.fill(0);
-            dim.filterMethod = null;
-            if (dim.bgfArray) {
+            if (dim.bgfData){
                 for (let i = 0; i < this.size; i++) {
-                    if (dim.bgfArray[i] === 0) {
-                        dim.filterArray[i] = 2;
+                    if (dim.filterArray[i] ===1 || dim.filterArray[i] === 3) {
+                        dim.filterArray[i] -=1;
                     }
                 }
             }
+            else{
+                dim.filterArray.fill(0);
+            }
+
+            dim.filterMethod = null;
         }
         this.filterSize = this.size;
         //need to re-add the noclear filters (if any)
         for (const dim of noclear) {
             const f = dim.filterArray;
             for (let n = 0; n < f.length; n++) {
-                if (f[n] === 1) {
+                if (f[n] === 1 || f[n] === 3) {
                     if (++this.filterArray[n] === 1) {
                         this.filterSize--;
                     }

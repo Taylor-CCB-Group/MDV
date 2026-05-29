@@ -14,7 +14,7 @@ import { getRandomString } from "./Utilities";
  * The color_by chart legend uses React: see ColorLegend.tsx and buildColorLegendSpec.ts.
  */
 function getColorLegendCustom(scale, config = {}) {
-    const ticks = scale.ticks(config.ticks || 4);
+    const ticks = config.tickValues || scale.ticks(config.ticks || 4);
     const widths = ticks.map((x) => scale(x));
     return getColorLegend(widths, ticks, config);
 }
@@ -22,11 +22,35 @@ function getColorLegendCustom(scale, config = {}) {
 function getColorLegend(colors, names, config = {}) {
     const len = colors.length;
     const type = config.type || "color";
-    const h_fac = type === "circle" ? 20 : 12;
-    const height = len * h_fac + (len + 2) * 2;
+    const h_fac = type === "circle" ? (config.itemGap || 24) : 12;
+    const itemTop = config.itemTop || 0;
+    const dynamicCircleSpacing = type === "circle" && config.dynamicCircleSpacing;
+    const circleGap = config.circleGap ?? 4;
+    const baseCy = itemTop + 6;
+    const itemY = [];
+    let contentBottom = 0;
+    if (dynamicCircleSpacing) {
+        let currentCy = baseCy;
+        for (let i = 0; i < len; i++) {
+            const radius = Number(colors[i]) || 0;
+            if (i > 0) {
+                const prevRadius = Number(colors[i - 1]) || 0;
+                currentCy += prevRadius + radius + circleGap;
+            }
+            itemY.push(currentCy);
+            contentBottom = Math.max(contentBottom, currentCy + radius);
+        }
+    } else {
+        for (let i = 0; i < len; i++) {
+            const y = itemTop + (i + 1) * 2 + i * h_fac;
+            itemY.push(y + 4);
+            contentBottom = Math.max(contentBottom, y + h_fac);
+        }
+    }
+    const height = Math.max(len * h_fac + (len + 2) * 2 + itemTop, contentBottom + 8);
     const container = createEl("div", {
         styles: {
-            width: "120px",
+            width: `${config.width || 120}px`,
             height: `${(height > 215 ? 215 : height) + 35}px`,
             position: "absolute",
             border: "0.5px solid black",
@@ -73,14 +97,17 @@ function getColorLegend(colors, names, config = {}) {
     );
 
     const legendg = createSVGEl("g", {}, legend);
-    const t_offset = type === "color" ? 14 : type === "line" ? 20 : 30;
+    const defaultTextOffset = type === "color" ? 14 : type === "line" ? 20 : 30;
+    const t_offset = config.textOffset || defaultTextOffset;
+    const circleX = config.circleX || 15;
 
     for (let i = 0; i < len; i++) {
         if (type === "color") {
+            const y = itemTop + (i + 1) * 2 + i * h_fac;
             createSVGEl(
                 "rect",
                 {
-                    y: (i + 1) * 2 + i * h_fac,
+                    y,
                     x: 2,
                     height: "10",
                     width: "10",
@@ -91,10 +118,11 @@ function getColorLegend(colors, names, config = {}) {
                 legendg,
             );
         } else if (type === "line") {
+            const y = itemTop + (i + 1) * 2 + i * h_fac;
             createSVGEl(
                 "rect",
                 {
-                    y: (i + 1) * 2 + i * h_fac,
+                    y,
                     x: 2,
                     height: "10",
                     width: colors[i],
@@ -105,11 +133,12 @@ function getColorLegend(colors, names, config = {}) {
                 legendg,
             );
         } else if (type === "circle") {
+            const cy = itemY[i];
             createSVGEl(
                 "circle",
                 {
-                    cy: (i + 1) * 2 + i * h_fac + 4,
-                    cx: 15,
+                    cy,
+                    cx: circleX,
                     r: colors[i],
                     styles: {
                         fill: "gray",
@@ -122,7 +151,7 @@ function getColorLegend(colors, names, config = {}) {
         const t = createSVGEl(
             "text",
             {
-                y: (i + 1) * 2 + i * h_fac + 6 + 3,
+                y: type === "circle" ? itemY[i] + 5 : itemTop + (i + 1) * 2 + i * h_fac + 9,
                 x: t_offset,
                 //Firefox was wrong. Changing to "center" made Chrome wrong in same way
                 // "alignment-baseline":"middle",

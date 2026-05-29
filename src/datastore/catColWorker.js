@@ -9,8 +9,9 @@ onmessage = (e) => {
         );
     }
     const dLen = data.length;
-    const cat = new Uint8Array(e.data[2]);
     const config = e.data[4];
+    const cat = config.y_datatype === "text16" ? new Uint16Array(e.data[2]) : new Uint8Array(e.data[2]);
+    
     const len = cat.length;
     let valLen = config.values.length;
     const scaleVals = config.scaleVals;
@@ -45,7 +46,7 @@ onmessage = (e) => {
             catTotals,
             valLen,
             scaleVals,
-        );
+            );
     } else {
         addMedians(
             result,
@@ -57,7 +58,7 @@ onmessage = (e) => {
             cat,
             catTotals,
             valLen,
-            scaleVals,
+            scaleVals
         );
     }
 
@@ -101,16 +102,11 @@ function addMedians(
     cat,
     catTotals,
     valLen,
-    scaleVals,
+    scaleVals
 ) {
     const t = performance.now();
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         catTotals[c]++;
         for (let n = 0; n < dLen; n++) {
@@ -129,12 +125,7 @@ function addMedians(
         }
     }
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         for (let n = 0; n < dLen; n++) {
             if (Number.isNaN(data[n][i])) {
@@ -177,12 +168,7 @@ function addMedianst(
 ) {
     const t = performance.now();
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         catTotals[c]++;
         for (let n = 0; n < dLen; n++) {
@@ -219,15 +205,10 @@ function addAverages(
     cat,
     catTotals,
     valLen,
-    scaleVals,
+    scaleVals
 ) {
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
         catTotals[c]++;
         for (let n = 0; n < dLen; n++) {
@@ -267,12 +248,7 @@ function addSimpleMean(data, gFilter, lFilter, catData, conf) {
         values: conf.columns.map((x, i) => ({ id: x, total: 0, count: 0 })),
     }));
     for (let i = 0; i < len; i++) {
-        //if filtered out in global but not in local
-        if (gFilter[i] !== 0) {
-            if (gFilter[i] !== lFilter[i]) {
-                continue;
-            }
-        }
+        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = catData[i];
         const a = r[c].values;
         r[c].count++;
@@ -285,19 +261,34 @@ function addSimpleMean(data, gFilter, lFilter, catData, conf) {
             a[n].count++;
         }
     }
-    const it = r[0].values[0];
-    let amax = it.count === 0 ? 0 : it.total / it.count;
+    const it = r[0];
+    const first = it.values[0];
+    let amax = it.count === 0 ? 0 : first.total / it.count;
     let amin = amax;
+    let fmax = 0;
     for (let i = 0; i < dlen; i++) {
         for (let n = 0; n < conf.values.length; n++) {
             const item = r[n].values[i];
-            const av = item.count === 0 ? 0 : item.total / item.count;
+            const av = item.count === 0 ? 0 : item.total / r[n].count;
             item.frac = r[n].count === 0 ? 0 : (item.count / r[n].count) * 100;
+            fmax = item.frac > fmax ? item.frac : fmax;
             amax = av > amax ? av : amax;
             amin = av < amin ? av : amin;
             item.mean = av;
             item.cat_id = n;
         }
     }
-    return { data: r, mean_range: [amin, amax] };
+    return { data: r, mean_range: [amin, amax], frac_range: [0, fmax] };
+}
+
+function shouldIncludeRow(i, gFilter, lFilter) {
+    //never include background filtered rows
+    if (lFilter[i] >1) {
+        return false;
+    }
+   
+    if (gFilter[i] !== 0 && gFilter[i] !== lFilter[i]) {
+        return false;
+    }
+    return true;
 }
