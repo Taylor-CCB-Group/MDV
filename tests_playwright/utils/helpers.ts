@@ -232,7 +232,7 @@ export async function getChartColorLegendState(page: Page, chartTitle: string): 
         const panels = [...document.querySelectorAll(".ciview-chart-panel")];
         const panel = panels.find((entry) => {
             const titleNode = entry.querySelector(".ciview-chart-title");
-            return titleNode?.textContent?.includes(title) ?? false;
+            return titleNode?.textContent?.trim() === title;
         });
         const host = panel?.querySelector(".legend-container");
         if (!(host instanceof HTMLElement)) {
@@ -302,7 +302,7 @@ export async function resizeChartColorLegend(
     }
     await page.mouse.move(box.x + 4, box.y + 4);
     await page.mouse.down();
-    await page.mouse.move(box.x + deltaX, box.y + deltaY);
+    await page.mouse.move(box.x + 4 + deltaX, box.y + 4 + deltaY);
     await page.mouse.up();
 }
 
