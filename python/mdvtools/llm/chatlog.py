@@ -1,5 +1,9 @@
 # https://stackoverflow.com/questions/39740632/python-type-hinting-without-cyclic-imports
 from __future__ import annotations
+
+from mdvtools._optional import require_extra
+require_extra("app", "langchain_core")
+
 import datetime
 import os
 import json

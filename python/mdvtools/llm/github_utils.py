@@ -1,3 +1,6 @@
+from mdvtools._optional import require_extra
+require_extra("app", "nbformat")
+
 from dotenv import load_dotenv
 import requests
 import os
