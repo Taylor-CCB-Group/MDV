@@ -1,4 +1,8 @@
-from mdvtools.llm.code_manipulation import parse_view_name, patch_viewname
+from mdvtools.llm.code_manipulation import (
+    parse_view_name,
+    patch_viewname,
+    resolve_persisted_view_name,
+)
 from mdvtools.llm.code_manipulation import prepare_code, _defines_function_named_main
 
 
@@ -9,6 +13,9 @@ class _FakeProjectViews:
     @property
     def views(self):
         return self._views
+
+    def get_view(self, view):
+        return self._views.get(view)
 
 
 class TestParseViewName:
@@ -67,6 +74,13 @@ def test_patch_viewname_renames_duplicate_with_double_quotes():
     project = _FakeProjectViews(["Heatmap"])
     out = patch_viewname(code, project)
     assert 'view_name = "Heatmap (1)"' in out
+
+
+def test_resolve_persisted_view_name_omits_missing_view():
+    project = _FakeProjectViews(["Saved view"])
+
+    assert resolve_persisted_view_name(project, "Saved view") == "Saved view"
+    assert resolve_persisted_view_name(project, "Print-only answer") is None
 
 
 def test_prepare_code_does_not_append_else_when_llm_includes_else_main(tmp_path):

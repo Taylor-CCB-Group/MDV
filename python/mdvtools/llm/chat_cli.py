@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
-from mdvtools.llm.chat_protocol import AskQuestionResult, ProjectChat
+from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChat
 from mdvtools.mdvproject import MDVProject
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -201,10 +201,14 @@ def run_chat_once(
         if mdv_websocket.socketio is None:
             mdv_websocket.socketio = _CliSocketIOShim()  # type: ignore[assignment]
 
-        def _handle_error(_error: Any, *, extra_metadata: Optional[dict] = None) -> None:
-            del extra_metadata
+        def _handle_error(
+            error: str | Exception,
+            *,
+            extra_metadata: Optional[dict] = None,
+        ) -> None:
+            del error, extra_metadata
 
-        chat_request = {
+        chat_request: ChatRequest = {
             "message": prompt,
             "id": f"chat-cli-{uuid.uuid4().hex[:8]}",
             "conversation_id": f"chat-cli-{uuid.uuid4().hex[:8]}",

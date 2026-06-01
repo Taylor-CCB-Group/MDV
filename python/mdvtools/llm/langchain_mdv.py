@@ -5,7 +5,7 @@ from contextlib import contextmanager
 import os
 import traceback
 import html
-from typing import List
+from typing import Any, List, Optional
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
@@ -33,7 +33,12 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
+from .code_manipulation import (
+    extract_explanation_from_response,
+    parse_view_name,
+    prepare_code,
+    resolve_persisted_view_name,
+)
 from .column_field_resolve import (
     field_set_from_columns,
     normalize_view_chart_params,
@@ -183,67 +188,71 @@ def time_block(name):
 # but we can call `matplotlib.use('Agg')` before calling the agent (and any other code that might try to draw)
 matplotlib.use('Agg') # this should prevent it making any windows etc
 
-print('# setting keys and variables')
-# .env file should have OPENAI_API_KEY
-load_dotenv()
-# if it isn't set, we raise an error more explicitly to log it
-if not os.getenv("OPENAI_API_KEY"):
-    print("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
-    raise ValueError("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
-
-print('# Crawl the local repository to get a list of relevant file paths')
-with time_block("b1: Local repo crawling"):
-    code_files_urls = crawl_local_repo()
-
-    # Initialize an empty list to store the extracted code documents
-    code_strings = []
-
-    # populate code_strings with the code from .py & .ipynb files in code_files_urls
-    for i in range(0, len(code_files_urls)):
-        if code_files_urls[i].endswith(".py"):
-            content = extract_python_code_from_py(code_files_urls[i])
-            doc = Document(page_content=content, metadata={"url": code_files_urls[i], "file_index": i})
-            code_strings.append(doc)
-        elif code_files_urls[i].endswith(".ipynb"):
-            content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
-            doc_ipynb = Document(page_content=content_ipynb, metadata={"url": code_files_urls[i], "file_index": i})
-            code_strings.append(doc_ipynb)
-
-print('# Initialize a text splitter for chunking the code strings')
-
-with time_block("b2: Text splitter initialising"):
-    text_splitter = RecursiveCharacterTextSplitter.from_language(
-        language=Language.PYTHON,  # Specify the language as Python
-        chunk_size=20000,           # Set the chunk size to 1500 characters
-        chunk_overlap=2000          # Set the chunk overlap to 150 characters
-    )
-    print('# Split the code documents into chunks using the text splitter')
-    texts = text_splitter.split_documents(code_strings)
-
-print('# Initialize an instance of the OpenAIEmbeddings class')
-with time_block("b3: Embeddings creating"):
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-large"  # Specify the model to use for generating embeddings
-    )
-
-print(embeddings)
-print('# Create an index from the embedded code chunks')
-print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index')
-
-
-with time_block("b4: FAISS database creating"):
-    db = FAISS.from_documents(texts, embeddings)
-
-print("# Initialize the retriever from the FAISS index")
-
-with time_block("b5: Retriever creating"):
-    retriever = db.as_retriever(
-        search_type="similarity",      # Specify the search type as "similarity"
-        search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
-    )
+_rag_retriever: Optional[Any] = None
 
 # ... for testing basic mechanics without invoking the agent
 mock_agent = False
+
+
+def _ensure_openai_api_key() -> None:
+    load_dotenv()
+    if not os.getenv("OPENAI_API_KEY"):
+        raise ValueError(
+            "OPENAI_API_KEY is not set in the environment variables. "
+            "Please set it if LLM integration is required."
+        )
+
+
+def _get_rag_retriever():
+    """Build the code RAG retriever on first use (requires OPENAI_API_KEY)."""
+    global _rag_retriever
+    if _rag_retriever is not None:
+        return _rag_retriever
+
+    _ensure_openai_api_key()
+
+    print('# Crawl the local repository to get a list of relevant file paths')
+    with time_block("b1: Local repo crawling"):
+        code_files_urls = crawl_local_repo()
+
+        code_strings = []
+        for i in range(0, len(code_files_urls)):
+            if code_files_urls[i].endswith(".py"):
+                content = extract_python_code_from_py(code_files_urls[i])
+                doc = Document(
+                    page_content=content,
+                    metadata={"url": code_files_urls[i], "file_index": i},
+                )
+                code_strings.append(doc)
+            elif code_files_urls[i].endswith(".ipynb"):
+                content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
+                doc_ipynb = Document(
+                    page_content=content_ipynb,
+                    metadata={"url": code_files_urls[i], "file_index": i},
+                )
+                code_strings.append(doc_ipynb)
+
+    with time_block("b2: Text splitter initialising"):
+        text_splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.PYTHON,
+            chunk_size=20000,
+            chunk_overlap=2000,
+        )
+        texts = text_splitter.split_documents(code_strings)
+
+    with time_block("b3: Embeddings creating"):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+
+    with time_block("b4: FAISS database creating"):
+        db = FAISS.from_documents(texts, embeddings)
+
+    with time_block("b5: Retriever creating"):
+        _rag_retriever = db.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": 5},
+        )
+
+    return _rag_retriever
 
 
 class ProjectChat(ProjectChatProtocol):
@@ -290,6 +299,7 @@ class ProjectChat(ProjectChatProtocol):
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
+                    _ensure_openai_api_key()
                     llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
                     structured_llm = llm.with_structured_output(SuggestedQuestions)
                     prompt_text = create_suggested_questions_prompt(self.project)
@@ -604,7 +614,7 @@ class ProjectChat(ProjectChatProtocol):
                 qa_chain = RetrievalQA.from_llm(
                     llm=code_llm, 
                     prompt=prompt_RAG_template, 
-                    retriever=retriever,
+                    retriever=_get_rag_retriever(),
                     return_source_documents=True,
                 )
                 output_qa = qa_chain.invoke({"query": rag_retrieval_query})
@@ -817,15 +827,16 @@ class ProjectChat(ProjectChatProtocol):
                     step_total=total_steps,
                 )
                 # Parse view name from the code
-                view_name = parse_view_name(final_code)
-                if view_name is None:
+                parsed_view_name = parse_view_name(final_code)
+                if parsed_view_name is None:
                     raise Exception("Parsing view name failed")
+                view_name = resolve_persisted_view_name(self.project, parsed_view_name)
                 log(f"view_name: {view_name}")
 
             with time_block("b15c: Normalize chart params (name to field id)"):
                 try:
-                    view_obj = self.project.get_view(view_name)
-                    if view_obj:
+                    view_obj = self.project.get_view(view_name) if view_name is not None else None
+                    if view_obj and view_name is not None:
                         ic = view_obj.get("initialCharts")
                         if isinstance(ic, dict):
                             valid_names = {

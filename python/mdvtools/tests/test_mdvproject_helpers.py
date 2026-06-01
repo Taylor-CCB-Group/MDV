@@ -29,7 +29,8 @@ def test_agent_debug_log_logs_warning_on_logger_failure():
 
 def test_resolve_rows_as_columns_prefers_candidate_over_other_link_single_subgroup():
     class Stub:
-        def get_links(self, _ds, filter=None):
+        def get_links(self, datasource, filter=None):
+            del datasource
             return [
                 {
                     "datasource": "genes",
@@ -62,7 +63,8 @@ def test_resolve_rows_as_columns_prefers_candidate_over_other_link_single_subgro
 
 def test_resolve_rows_as_columns_single_subgroup_fallback_only_when_one_link():
     class OneLink:
-        def get_links(self, _ds, filter=None):
+        def get_links(self, datasource, filter=None):
+            del datasource
             return [
                 {
                     "datasource": "genes",
@@ -85,7 +87,8 @@ def test_resolve_rows_as_columns_single_subgroup_fallback_only_when_one_link():
 
 def test_resolve_rows_as_columns_no_fallback_when_multiple_single_subgroup_links():
     class TwoLinks:
-        def get_links(self, _ds, filter=None):
+        def get_links(self, datasource, filter=None):
+            del datasource
             return [
                 {
                     "datasource": "a",

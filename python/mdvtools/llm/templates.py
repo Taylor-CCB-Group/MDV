@@ -1,5 +1,7 @@
-from mdvtools.mdvproject import MDVProject
 from typing import Any
+
+from mdvtools.project_protocols import CreateProjectPromptProject
+from mdvtools.mdvproject import MDVProject
 from mdvtools.markdown_utils import create_project_markdown, create_column_markdown
 from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
@@ -117,7 +119,13 @@ import sys
 
 
 
-def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasource_name: str, final_answer: str, question: str) -> str:
+def get_createproject_prompt_RAG(
+    project: CreateProjectPromptProject,
+    path_to_data: str,
+    datasource_name: str,
+    final_answer: str,
+    question: str,
+) -> str:
     """
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
     Handles both standard and gene-related queries.

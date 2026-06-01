@@ -11,10 +11,13 @@ class _FakeProject:
         self.datasources = [{"name": "cells"}]
         self.dir = "/tmp/fake-project"
 
-    def get_datasource_metadata(self, name):
+    def get_datasource_metadata(self, name: str):
         if name == "cells":
             return {"name": "cells", "size": 10, "columns": [{"field": "leiden", "name": "Leiden"}]}
         raise KeyError(name)
+
+    def get_datasource_names(self) -> list[str]:
+        return [str(ds["name"]) for ds in self.datasources]
 
     def get_view(self, _name):
         return {"initialCharts": {}}

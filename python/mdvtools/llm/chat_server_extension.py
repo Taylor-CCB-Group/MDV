@@ -144,16 +144,18 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     leave_room(room)
                     return
                 else:
+                    response = {
+                        "message": result["code"],
+                        "id": id,
+                        "verification": result.get("verification"),
+                        "data_preview": result.get("data_preview"),
+                        "needs_refresh": result.get("needs_refresh", False),
+                    }
+                    if result["view_name"] is not None:
+                        response["view"] = result["view_name"]
                     socketio.emit(
                         "chat_response",
-                        {
-                            "message": result["code"],
-                            "view": result["view_name"],
-                            "id": id,
-                            "verification": result.get("verification"),
-                            "data_preview": result.get("data_preview"),
-                            "needs_refresh": result.get("needs_refresh", False),
-                        },
+                        response,
                         namespace=f"/project/{project.id}",
                         to=room,
                     )

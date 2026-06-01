@@ -1,5 +1,7 @@
 import os
 import sys
+import json
+import logging
 import h5py
 import numpy
 import pandas
@@ -28,8 +30,33 @@ import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
 from mdvtools.logging_config import get_logger
+from mdvtools.project_protocols import RowsAsColumnsLinkSource
 
 logger = get_logger(__name__)
+
+
+def _agent_debug_log(
+    run_id: str,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict,
+    *,
+    log: logging.Logger | None = None,
+) -> None:
+    """Structured debug logging for agent workflows (logger-only, no file I/O)."""
+    target = log if log is not None else logger
+    payload = {
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+    }
+    try:
+        target.debug(json.dumps(payload))
+    except Exception:
+        target.warning("agent debug log failed", exc_info=True)
 
 
 DataSourceName = str  # NewType("DataSourceName", str)
@@ -218,7 +245,9 @@ class MDVProject:
         return pandas.DataFrame(out)
 
     def _resolve_rows_as_columns_subgroup(
-        self, row_datasource: str, subgroup_key: str
+        self: RowsAsColumnsLinkSource,
+        row_datasource: str,
+        subgroup_key: str,
     ) -> tuple[str, bool]:
         """
         Return (h5 matrix group name under the row datasource, is_sparse).
@@ -760,17 +789,14 @@ class MDVProject:
             handle = h5py.File(self.h5file, mode)
             return handle
         except Exception as e:
+            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            if not lock_error:
+                raise
             # certain environments seem to have issues with the handle not being closed instantly
-            # if there is a better way to do this, please change it
-            # if there are multiple processes trying to access the file, this may also help
-            # (although if they're trying to write, who knows what bad things may happen to the project in general)
+            # if there are multiple processes trying to access the file, retry on lock contention
             time.sleep(0.1)
             attempt += 1
-            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
-            if lock_error:
-                logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
-            else:
-                logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
+            logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
             if attempt >= 20:
                 raise RuntimeError(
                     f"unable to open h5 file after {attempt} attempts: {self.h5file}"

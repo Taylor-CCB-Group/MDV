@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+from typing import Any, Optional
+
+from mdvtools.project_protocols import ProjectViewLookup, ProjectViewsLike
 import pandas as pd
 import regex as re
 from mdvtools.llm.templates import packages_functions
@@ -9,9 +11,6 @@ import ast
 import subprocess
 import tempfile
 import os
-
-if TYPE_CHECKING:
-    from mdvtools.mdvproject import MDVProject
 
 # Match `def main(...):` / `async def main(...):` at line start (fallback when AST parse fails).
 _MAIN_DEF_RE = re.compile(r"^\s*(?:async\s+)?def\s+main\s*\(", re.MULTILINE)
@@ -66,7 +65,7 @@ def _autofix_generated_code(code: str, log=print) -> str:
     return code
 
 
-def _prepend_chatmdv_roles_block(code: str, project: MDVProject) -> str:
+def _prepend_chatmdv_roles_block(code: str, project: Any) -> str:
     try:
         roles_block = build_chatmdv_roles_constants_block(project)
     except Exception:
@@ -86,7 +85,7 @@ def extract_explanation_from_response(response: str):
 def prepare_code(
     result: str,
     data: Optional[str | pd.DataFrame],
-    project: MDVProject,
+    project: ProjectViewsLike,
     log=print,
     modify_existing_project=False,
     view_name="default",
@@ -221,7 +220,7 @@ def _replace_view_name_assignment(code: str, old_name: str, new_name: str) -> st
     return code
 
 
-def patch_viewname(code: str, project: MDVProject, fallback_view_name: Optional[str] = None):
+def patch_viewname(code: str, project: ProjectViewsLike, fallback_view_name: Optional[str] = None):
     """Given a code string, replace the view_name with a unique name, 
     attempting to escape any quotes that might have been in the original.
     """
@@ -282,3 +281,10 @@ def parse_view_name(code: str):
         pass
 
     return None
+
+
+def resolve_persisted_view_name(project: ProjectViewLookup, parsed_view_name: Optional[str]) -> Optional[str]:
+    """Return the generated view name only when it was actually persisted."""
+    if parsed_view_name is None:
+        return None
+    return parsed_view_name if project.get_view(parsed_view_name) is not None else None
