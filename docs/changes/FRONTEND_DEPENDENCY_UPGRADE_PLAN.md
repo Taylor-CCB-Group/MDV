@@ -86,7 +86,7 @@ This document tracks dependency upgrade work that may be split across multiple P
 - Local smoke-test direction:
   - Use the catalog Playwright tests against a Vite dev server for React shell and route-mocked catalog workflows.
   - Use the project Playwright tests against a live backend for chart-manager, datastore, vanilla-event, MobX, and Zustand interaction coverage.
-  - `docs/playwright/PLAYWRIGHT_SETUP_AND_RUN.md` documents the current commands; add a named PR C smoke subset there if this track becomes a regular local validation step.
+  - `docs/playwright/PLAYWRIGHT_GUIDE.md` documents the current commands; add a named PR C smoke subset there if this track becomes a regular local validation step.
 - Latest local validation note (8th May 2026):
   - Off/on probe runs against `scripts/playwright/playwright_compiler_probe.mjs` completed in both modes without hard runtime failures.
   - Timing and payload composition varied between runs (different chart/data composition observed), so current measurements are treated as smoke validation, not a strict performance benchmark.
