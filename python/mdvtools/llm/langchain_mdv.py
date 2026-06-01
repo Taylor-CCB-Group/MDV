@@ -283,6 +283,7 @@ class ProjectChat(ProjectChatProtocol):
         self.ds_name = project.datasources[0]['name']
         try:
             # raise ValueError("test error")
+            _ensure_openai_api_key()
             self.df = None
             # Prepare dataframes for the agent.
             # ChatMDV historically assumed df1=cells and df2=genes. Many projects instead use
@@ -299,7 +300,6 @@ class ProjectChat(ProjectChatProtocol):
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
-                    _ensure_openai_api_key()
                     llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
                     structured_llm = llm.with_structured_output(SuggestedQuestions)
                     prompt_text = create_suggested_questions_prompt(self.project)
@@ -309,12 +309,12 @@ class ProjectChat(ProjectChatProtocol):
                     self.log(f"Generated suggested questions: {self.suggested_questions}")
             except Exception as e:
                 self.log(f"Could not generate suggested questions: {e}")
-                self.suggested_questions = [str(e)]
+                self.suggested_questions = []
 
             self.init_error = False
         except Exception as e:
-            error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
-            self.log(error_message)
+            error_message = str(e)[:500]
+            self.log(f"{error_message}\n\n{traceback.format_exc()}")
             
             self.error_message = error_message
             self.init_error = True
@@ -322,9 +322,7 @@ class ProjectChat(ProjectChatProtocol):
     def get_suggested_questions(self):
         if self.init_error:
             return []
-        if self.suggested_questions:
-            return self.suggested_questions
-        return ["This should be unreachable"]
+        return self.suggested_questions
     
     def get_or_create_memory(self, conversation_id: str):
         """Get or create conversation memory for a specific conversation"""

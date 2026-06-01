@@ -2172,7 +2172,7 @@ export class ChartManager {
             if (this.columnsLoading[dataSource][fieldKey]) {
                 return false;
             }
-            let col = dStore.columnIndex[fieldKey];
+            const col = dStore.columnIndex[fieldKey];
             if (!col) {
                 const metadata = dStore
                     .getAllColumnsMetadata?.()
@@ -2189,11 +2189,7 @@ export class ChartManager {
                     dStore.addColumnFromField(fieldKey);
                     return true;
                 }
-                throw new Error(
-                    `Unknown column '${x}' in datasource '${dataSource}'. ` +
-                        `If you added or replaced a datasource in this session, refresh the page. ` +
-                        `Chart param tokens must match column field ids in project metadata.`,
-                );
+                return false;
             }
             return !col.data;
         });

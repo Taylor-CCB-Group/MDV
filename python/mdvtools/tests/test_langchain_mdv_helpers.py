@@ -1,7 +1,11 @@
+from typing import cast
+
 from mdvtools.llm.langchain_mdv import (
+    ProjectChat,
     _is_text_table_intent,
     _is_text_table_only_code,
 )
+from mdvtools.mdvproject import MDVProject
 
 
 def test_is_text_table_only_code_print_only():
@@ -25,3 +29,20 @@ def test_text_table_intent_skips_retry_when_output_already_text_table_only():
     assert _is_text_table_intent(question) is True
     assert _is_text_table_intent(question) and not _is_text_table_only_code(chart_code)
     assert not (_is_text_table_intent(question) and not _is_text_table_only_code(text_code))
+
+
+def test_project_chat_initialization_fails_without_openai_key(monkeypatch):
+    class FakeProject:
+        datasources = [{"name": "cells"}]
+
+        def get_datasource_as_dataframe(self, _name):
+            raise AssertionError("datasource loading should not run without an API key")
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr("mdvtools.llm.langchain_mdv.load_dotenv", lambda: False)
+
+    chat = ProjectChat(cast(MDVProject, FakeProject()))
+
+    assert chat.init_error is True
+    assert chat.error_message is not None
+    assert "OPENAI_API_KEY is not set" in chat.error_message
