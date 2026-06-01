@@ -661,3 +661,1135 @@ class StandaloneCramTrack extends igv.TrackBase {
 }
 
 igv.registerTrackClass("standalone_cram_track", StandaloneCramTrack);
+
+type SupplementalSegment = {
+    chr: string;
+    start: number;
+    strand: "+" | "-";
+    lenOnRef: number;
+    readStart: number;
+    readEnd: number;
+};
+
+function parseCigarReferenceLength(cigar: unknown): number {
+    if (typeof cigar !== "string" || !cigar) {
+        return 0;
+    }
+    const matches = cigar.matchAll(/(\d+)([MIDNSHP=X])/g);
+    let total = 0;
+    for (const match of matches) {
+        const len = Number.parseInt(match[1] || "0", 10);
+        const op = match[2];
+        if (!Number.isFinite(len)) continue;
+        if (op === "M" || op === "D" || op === "N" || op === "=" || op === "X") {
+            total += len;
+        }
+    }
+    return total;
+}
+
+function parseCigarReadLength(cigar: unknown): number {
+    if (typeof cigar !== "string" || !cigar) {
+        return 0;
+    }
+    const matches = cigar.matchAll(/(\d+)([MIDNSHP=X])/g);
+    let total = 0;
+    for (const match of matches) {
+        const len = Number.parseInt(match[1] || "0", 10);
+        const op = match[2];
+        if (!Number.isFinite(len)) continue;
+        if (op === "M" || op === "I" || op === "S" || op === "=" || op === "X") {
+            total += len;
+        }
+    }
+    return total;
+}
+
+function parseCigarClips(cigar: unknown): { left: number; right: number } {
+    if (typeof cigar !== "string" || !cigar) {
+        return { left: 0, right: 0 };
+    }
+    const left = /^(\d+)[SH]/.exec(cigar);
+    const right = /(\d+)[SH]$/.exec(cigar);
+    return {
+        left: left ? Number.parseInt(left[1], 10) : 0,
+        right: right ? Number.parseInt(right[1], 10) : 0,
+    };
+}
+
+function computeReadInterval(readLength: number, clips: { left: number; right: number }, strandPlus: boolean): { readStart: number; readEnd: number } {
+    if (readLength <= 0) {
+        return { readStart: 0, readEnd: 0 };
+    }
+    if (strandPlus) {
+        const readStart = clips.left;
+        const readEnd = Math.max(readStart, readLength - clips.right);
+        return { readStart, readEnd };
+    }
+    // For reverse-strand alignments, CIGAR clip sides map to opposite read ends.
+    const readStart = clips.right;
+    const readEnd = Math.max(readStart, readLength - clips.left);
+    return { readStart, readEnd };
+}
+
+function parseCigarOps(cigar: unknown): Array<{ len: number; op: string }> {
+    if (typeof cigar !== "string" || !cigar) return [];
+    const out: Array<{ len: number; op: string }> = [];
+    const matches = cigar.matchAll(/(\d+)([MIDNSHP=X])/g);
+    for (const m of matches) {
+        const len = Number.parseInt(m[1] || "0", 10);
+        const op = m[2] || "";
+        if (!Number.isFinite(len) || len <= 0 || !op) continue;
+        out.push({ len, op });
+    }
+    return out;
+}
+
+const TERMINAL_MATCH_TOLERANCE_BP = 200;
+const MIN_ROLE_CLIP_BP = 50;
+
+function getTerminalClipTotals(cigar: unknown): { leftClip: number; rightClip: number } {
+    const ops = parseCigarOps(cigar);
+    if (ops.length === 0) return { leftClip: 0, rightClip: 0 };
+
+    let leftClip = 0;
+    let leftEdgeMatch = 0;
+    let i = 0;
+    for (; i < ops.length; i++) {
+        const { op, len } = ops[i];
+        if (op === "H" || op === "S") {
+            leftClip += len;
+        } else {
+            break;
+        }
+    }
+    // If edge op is match, compare it against immediately-adjacent clips behind it.
+    // This handles patterns like 624M10475H (clip dominates).
+    if (i < ops.length) {
+        const edge = ops[i];
+        if (
+            edge &&
+            (edge.op === "M" || edge.op === "=" || edge.op === "X")
+        ) {
+            leftEdgeMatch = edge.len;
+            let k = i + 1;
+            let adjacentClip = 0;
+            for (; k < ops.length; k++) {
+                const { op, len } = ops[k];
+                if (op === "H" || op === "S") {
+                    adjacentClip += len;
+                } else {
+                    break;
+                }
+            }
+            if (adjacentClip > 0) {
+                leftClip += adjacentClip;
+            } else if (edge.len <= TERMINAL_MATCH_TOLERANCE_BP) {
+                // No immediate clip after edge match: keep previous tolerance behavior.
+                i += 1;
+                for (; i < ops.length; i++) {
+                    const { op, len } = ops[i];
+                    if (op === "H" || op === "S") {
+                        leftClip += len;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    if (leftClip > 0 && leftEdgeMatch > 0) {
+        leftClip = Math.max(leftClip, leftEdgeMatch);
+    }
+
+    let rightClip = 0;
+    let rightEdgeMatch = 0;
+    let j = ops.length - 1;
+    for (; j >= 0; j--) {
+        const { op, len } = ops[j];
+        if (op === "H" || op === "S") {
+            rightClip += len;
+        } else {
+            break;
+        }
+    }
+    if (j >= 0) {
+        const edge = ops[j];
+        if (
+            edge &&
+            (edge.op === "M" || edge.op === "=" || edge.op === "X")
+        ) {
+            rightEdgeMatch = edge.len;
+            let k = j - 1;
+            let adjacentClip = 0;
+            for (; k >= 0; k--) {
+                const { op, len } = ops[k];
+                if (op === "H" || op === "S") {
+                    adjacentClip += len;
+                } else {
+                    break;
+                }
+            }
+            if (adjacentClip > 0) {
+                rightClip += adjacentClip;
+            } else if (edge.len <= TERMINAL_MATCH_TOLERANCE_BP) {
+                // No immediate clip before edge match: keep previous tolerance behavior.
+                j -= 1;
+                for (; j >= 0; j--) {
+                    const { op, len } = ops[j];
+                    if (op === "H" || op === "S") {
+                        rightClip += len;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    if (rightClip > 0 && rightEdgeMatch > 0) {
+        rightClip = Math.max(rightClip, rightEdgeMatch);
+    }
+    return { leftClip, rightClip };
+}
+
+function getTerminalEdgeMatchTotals(cigar: unknown): { leftMatch: number; rightMatch: number } {
+    const ops = parseCigarOps(cigar);
+    if (ops.length === 0) return { leftMatch: 0, rightMatch: 0 };
+
+    let leftMatch = 0;
+    for (let i = 0; i < ops.length; i++) {
+        const { op, len } = ops[i];
+        if (op === "H" || op === "S") continue;
+        if (op === "M" || op === "=" || op === "X") leftMatch = len;
+        break;
+    }
+
+    let rightMatch = 0;
+    for (let i = ops.length - 1; i >= 0; i--) {
+        const { op, len } = ops[i];
+        if (op === "H" || op === "S") continue;
+        if (op === "M" || op === "=" || op === "X") rightMatch = len;
+        break;
+    }
+
+    return { leftMatch, rightMatch };
+}
+
+function computeOriginalReadIntervalFromCigar(cigar: unknown, strandPlus: boolean): { readStart: number; readEnd: number } | null {
+    const ops = parseCigarOps(cigar);
+    if (ops.length === 0) return null;
+
+    const { leftClip, rightClip } = getTerminalClipTotals(cigar);
+
+    let alignedQueryLen = 0;
+    for (const { len, op } of ops) {
+        if (op === "M" || op === "I" || op === "=" || op === "X") {
+            alignedQueryLen += len;
+        }
+    }
+    if (alignedQueryLen <= 0) return null;
+
+    // Coordinates on the original read sequence (0-based, end-exclusive).
+    let qStart = leftClip;
+    let qEnd = qStart + alignedQueryLen;
+    const readLen = leftClip + alignedQueryLen + rightClip;
+    if (readLen <= 0) return null;
+
+    if (!strandPlus) {
+        // Reverse-strand CIGAR clip sides are mirrored relative to original read orientation.
+        const rStart = Math.max(0, readLen - qEnd);
+        const rEnd = Math.max(rStart, readLen - qStart);
+        qStart = rStart;
+        qEnd = rEnd;
+    }
+
+    return { readStart: qStart, readEnd: qEnd };
+}
+
+type EndpointSide = "start" | "end";
+
+function endpointCoord(start: number, end: number, strandPlus: boolean, side: EndpointSide): number {
+    if (side === "start") {
+        return strandPlus ? start : end;
+    }
+    return strandPlus ? end : start;
+}
+
+function parseSupplementaryAlignments(saTag: unknown): SupplementalSegment[] {
+    if (typeof saTag !== "string" || !saTag.trim()) {
+        return [];
+    }
+    const out: SupplementalSegment[] = [];
+    const records = saTag.split(";").map(v => v.trim()).filter(Boolean);
+    for (const record of records) {
+        const tokens = record.split(",");
+        if (tokens.length < 6) continue;
+        const chr = tokens[0];
+        const oneBasedStart = Number.parseInt(tokens[1] || "", 10);
+        const strandToken = tokens[2];
+        const cigar = tokens[3];
+        if (typeof chr !== "string" || !chr) continue;
+        if (!Number.isFinite(oneBasedStart)) continue;
+        const strand: "+" | "-" = strandToken === "-" ? "-" : "+";
+        const lenOnRef = parseCigarReferenceLength(cigar);
+        if (lenOnRef <= 0) continue;
+        const interval = computeOriginalReadIntervalFromCigar(cigar, strand === "+");
+        if (!interval) continue;
+        out.push({
+            chr,
+            start: Math.max(0, oneBasedStart - 1),
+            strand,
+            lenOnRef,
+            readStart: interval.readStart,
+            readEnd: interval.readEnd,
+        });
+    }
+    return out;
+}
+
+class MdvSplitAlignmentTrack extends igv.TrackBase {
+    config: any;
+    browser: any;
+    trackView: any;
+    delegateTrack: any;
+    private _interOverlay: HTMLCanvasElement | null = null;
+    private _overlayRefreshTimer: number | null = null;
+    private _activeReadName: string | null = null;
+    private _hoverBoundViewports = new WeakSet<any>();
+    private _hoverRepaintPending = false;
+    private _proxyClickState: any = null;
+    private _hoverEvalPending = false;
+    private _lastHoverEvalTs = 0;
+
+    constructor(config: any, browser: any) {
+        super(config, browser);
+        this.config = config;
+        this.browser = browser;
+    }
+
+    async postInit() {
+        this.delegateTrack = await igv.createTrack(
+            {
+                ...this.config,
+                type: "alignment",
+                format: this.config.format,
+                url: this.config.url,
+                indexURL: this.config.indexURL,
+                name: this.config.name || "Split Reads",
+                searchable: false,
+                // Keep rendering minimal: we care about blocks/gaps/splits, not base mismatch detail.
+                showMismatches: false,
+                showAllBases: false,
+                showCoverage: false,
+                hideSmallIndels: true,
+                indelSizeThreshold: 5,
+            },
+            this.browser,
+        );
+        this.installSplitReadColoring();
+        if (typeof window !== "undefined" && this._overlayRefreshTimer === null) {
+            // Keep overlay synchronized with IGV viewport transforms (pan/scroll/resize).
+            this._overlayRefreshTimer = window.setInterval(() => {
+                this.refreshInterOverlay();
+            }, 120);
+        }
+    }
+
+    private splitReadColor(readName: string): string {
+        // Deterministic per-read hue for split reads.
+        let hash = 0;
+        for (let i = 0; i < readName.length; i++) {
+            hash = ((hash << 5) - hash + readName.charCodeAt(i)) | 0;
+        }
+        const hue = Math.abs(hash) % 360;
+        return `hsl(${hue}, 70%, 45%)`;
+    }
+
+    private splitReadColorAlpha(readName: string, alpha: number): string {
+        let hash = 0;
+        for (let i = 0; i < readName.length; i++) {
+            hash = ((hash << 5) - hash + readName.charCodeAt(i)) | 0;
+        }
+        const hue = Math.abs(hash) % 360;
+        return `hsla(${hue}, 70%, 45%, ${alpha})`;
+    }
+
+    private installSplitReadColoring() {
+        // Keep default IGV fill colors; split-read color is used for links/outlines.
+    }
+
+    private syncDelegateContext() {
+        if (!this.delegateTrack) return;
+        this.delegateTrack.trackView = this.trackView;
+        this.delegateTrack.browser = this.browser;
+        if (this.delegateTrack.trackView && !this.delegateTrack.trackView.axisCanvas) {
+            this.delegateTrack.trackView.axisCanvas = {
+                style: { display: "none" },
+            };
+        }
+    }
+
+    private requestHoverRepaint() {
+        if (this._hoverRepaintPending) return;
+        this._hoverRepaintPending = true;
+        const runner = () => {
+            this._hoverRepaintPending = false;
+            this.trackView?.repaintViews?.();
+        };
+        if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(runner);
+        } else {
+            runner();
+        }
+    }
+
+    private pickSplitReadNameFromHits(hits: any[]): string | null {
+        const first = Array.isArray(hits) && hits.length > 0 ? hits[0] : null;
+        const candidate =
+            first?.firstAlignment && this.hasSplitTag(first.firstAlignment) ? first.firstAlignment :
+            first?.secondAlignment && this.hasSplitTag(first.secondAlignment) ? first.secondAlignment :
+            this.hasSplitTag(first) ? first :
+            null;
+        return typeof candidate?.readName === "string" ? candidate.readName : null;
+    }
+
+    private buildProxyClickState(sourceViewport: any, event: MouseEvent): any {
+        const delegateViewports = this.delegateTrack?.trackView?.viewports || [];
+        let delegateViewport = delegateViewports.find((vp: any) => vp?.referenceFrame === sourceViewport?.referenceFrame);
+        if (!delegateViewport && Array.isArray(this.trackView?.viewports)) {
+            const idx = this.trackView.viewports.indexOf(sourceViewport);
+            if (idx >= 0 && idx < delegateViewports.length) {
+                delegateViewport = delegateViewports[idx];
+            }
+        }
+        if (!delegateViewport || typeof delegateViewport.createClickState !== "function") return null;
+        return delegateViewport.createClickState(event);
+    }
+
+    private ensureHoverHandlers() {
+        const viewports = this.trackView?.viewports || [];
+        for (const vp of viewports) {
+            if (!vp?.viewportElement || this._hoverBoundViewports.has(vp)) continue;
+            this._hoverBoundViewports.add(vp);
+            const evaluateHover = (event: MouseEvent) => {
+                if (this.browser?.dragObject || this.browser?.isScrolling) return;
+                this.syncDelegateContext();
+                const clickState = typeof vp.createClickState === "function" ? vp.createClickState(event) : null;
+                if (!clickState) return;
+                // Keep hover fast on dense tracks: use delegate hit-testing only.
+                const hits = this.delegateTrack?.clickedFeatures?.(clickState) || [];
+                const readName = this.pickSplitReadNameFromHits(hits);
+                if (readName !== this._activeReadName) {
+                    this._activeReadName = readName;
+                    this.requestHoverRepaint();
+                }
+            };
+            const move = (event: MouseEvent) => {
+                const now = Date.now();
+                if (now - this._lastHoverEvalTs < 90) return;
+                if (this._hoverEvalPending) return;
+                this._hoverEvalPending = true;
+                const run = () => {
+                    this._hoverEvalPending = false;
+                    this._lastHoverEvalTs = Date.now();
+                    evaluateHover(event);
+                };
+                if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+                    window.requestAnimationFrame(run);
+                } else {
+                    run();
+                }
+            };
+            const updateProxy = (event: MouseEvent) => {
+                this.syncDelegateContext();
+                const state = this.buildProxyClickState(vp, event);
+                if (state?.viewport?.cachedFeatures) {
+                    this._proxyClickState = state;
+                }
+            };
+            const leave = () => {
+                if (this._activeReadName !== null) {
+                    this._activeReadName = null;
+                    this.requestHoverRepaint();
+                }
+            };
+            vp.viewportElement.addEventListener("mousedown", updateProxy);
+            vp.viewportElement.addEventListener("mouseup", updateProxy);
+            vp.viewportElement.addEventListener("click", updateProxy);
+            vp.viewportElement.addEventListener("mousemove", move);
+            vp.viewportElement.addEventListener("mouseleave", leave);
+        }
+    }
+
+    async getFeatures(chr: string, start: number, end: number, bpPerPixel: number) {
+        this.syncDelegateContext();
+        return this.delegateTrack.getFeatures(chr, start, end, bpPerPixel);
+    }
+
+    clickedFeatures(clickState: any) {
+        this.syncDelegateContext();
+        const resolved = this.resolveSplitClickObject(clickState);
+        if (resolved?.state) {
+            const delegated = this.delegateTrack?.clickedFeatures?.(resolved.state) || [];
+            if (delegated.length > 0) return delegated;
+            if (resolved.clickedObject) return [resolved.clickedObject];
+        }
+        return this.delegateTrack?.clickedFeatures?.(clickState) || [];
+    }
+
+    private resolveSplitClickObject(clickState: any): { clickedObject: any; state: any } | null {
+        const delegate = this.delegateTrack;
+        if (!delegate) return null;
+
+        const tryState = (state: any): { clickedObject: any; state: any } | null => {
+            if (!state) return null;
+            const viewport = state?.viewport;
+            const cached = viewport?.cachedFeatures;
+            const genomicLocation = Number(state?.genomicLocation);
+            const y = Number(state?.y);
+            const bpPerPixel = Number(state?.referenceFrame?.bpPerPixel ?? 1);
+            const rowHeight = delegate?.displayMode === "SQUISHED"
+                ? (delegate?.squishedRowHeight || 8)
+                : (delegate?.alignmentRowHeight || 14);
+            const tolBp = Math.max(1, 3 * (Number.isFinite(bpPerPixel) ? bpPerPixel : 1));
+
+            if (cached && Number.isFinite(genomicLocation) && Number.isFinite(y)) {
+                const rows = this.gatherPackedAlignments(cached);
+                if (rows.length > 0) {
+                    let bestRow: { y: number; alignments: any[] } | null = null;
+                    let bestRowDist = Number.POSITIVE_INFINITY;
+                    for (const row of rows) {
+                        const d = Math.abs(Number(row.y) - y);
+                        if (d < bestRowDist) {
+                            bestRowDist = d;
+                            bestRow = row;
+                        }
+                    }
+
+                    const rowsToCheck = bestRow ? [bestRow] : [];
+                    let best: { alignment: any; dist: number } | null = null;
+                    for (const row of rowsToCheck) {
+                        for (const item of row.alignments || []) {
+                            const alignments = item?.paired
+                                ? [item.firstAlignment, item.secondAlignment].filter(Boolean)
+                                : [item];
+                            for (const alignment of alignments) {
+                                const start = Number(alignment?.start);
+                                const end = start + Number(alignment?.lengthOnRef || 0);
+                                if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+                                const contains = typeof alignment?.containsLocation === "function"
+                                    ? alignment.containsLocation(genomicLocation, Boolean(delegate?.showSoftClips))
+                                    : (genomicLocation >= start && genomicLocation <= end);
+                                const dist = contains ? 0 : Math.min(Math.abs(genomicLocation - start), Math.abs(genomicLocation - end));
+                                if (dist > tolBp) continue;
+                                if (!best || dist < best.dist) {
+                                    best = { alignment, dist };
+                                }
+                            }
+                        }
+                    }
+                    if (best?.alignment) {
+                        return { clickedObject: best.alignment, state };
+                    }
+                }
+            }
+
+            // Fallback to IGV's built-in resolver.
+            const clickedObject = delegate?.getClickedObject?.(state);
+            return clickedObject ? { clickedObject, state } : null;
+        };
+
+        // 1) direct state first
+        const direct = tryState(clickState);
+        if (direct) return direct;
+
+        const delegateViewports = delegate?.trackView?.viewports || [];
+        const event = clickState?.event;
+        const ex = Number(event?.clientX);
+        const ey = Number(event?.clientY);
+
+        // 2) viewport under pointer from delegate track view
+        if (Number.isFinite(ex) && Number.isFinite(ey)) {
+            for (const vp of delegateViewports) {
+                if (typeof vp?.createClickState !== "function") continue;
+                const el = vp?.viewportElement as HTMLElement | undefined;
+                if (!el) continue;
+                const rect = el.getBoundingClientRect();
+                if (ex < rect.left || ex > rect.right || ey < rect.top || ey > rect.bottom) continue;
+                const state = vp.createClickState(event);
+                const hit = tryState(state);
+                if (hit) return hit;
+            }
+        }
+
+        // 3) same reference frame fallback
+        const rf = clickState?.referenceFrame;
+        if (rf && event) {
+            const match = delegateViewports.find((vp: any) => vp?.referenceFrame === rf && typeof vp?.createClickState === "function");
+            if (match) {
+                const state = match.createClickState(event);
+                const hit = tryState(state);
+                if (hit) return hit;
+            }
+        }
+
+        // 4) genomic remap fallback (independent of pointer geometry)
+        const genomicLocation = Number(clickState?.genomicLocation);
+        const chr = clickState?.referenceFrame?.chr;
+        if (Number.isFinite(genomicLocation) && typeof chr === "string") {
+            const localCanvasY = Number(clickState?.canvasY);
+            for (const vp of delegateViewports) {
+                const vrf = vp?.referenceFrame;
+                const vChr = vrf?.chr;
+                const vStart = Number(vrf?.start);
+                const vBpp = Number(vrf?.bpPerPixel);
+                const vWidth = Number(vp?.getWidth?.());
+                if (vChr !== chr || !Number.isFinite(vStart) || !Number.isFinite(vBpp) || !Number.isFinite(vWidth) || vBpp <= 0) {
+                    continue;
+                }
+                const vEnd = vStart + vWidth * vBpp;
+                if (genomicLocation < vStart || genomicLocation > vEnd) continue;
+                const canvasX = (genomicLocation - vStart) / vBpp;
+                const contentTop = Number(vp?.getContentTop?.() ?? vp?.contentTop ?? 0);
+                const canvasY = Number.isFinite(localCanvasY) ? localCanvasY : 0;
+                const state = {
+                    ...clickState,
+                    viewport: vp,
+                    referenceFrame: vrf,
+                    genomicLocation,
+                    canvasX,
+                    canvasY,
+                    y: canvasY + contentTop,
+                };
+                const hit = tryState(state);
+                if (hit) return hit;
+            }
+        }
+
+        return null;
+    }
+
+    async popupData(clickState: any) {
+        this.syncDelegateContext();
+        const delegate = this.delegateTrack;
+        if (!delegate) return [];
+        const resolved = this.resolveSplitClickObject(clickState);
+        if (resolved?.state) {
+            const delegated = await delegate.popupData?.(resolved.state);
+            if (Array.isArray(delegated) && delegated.length > 0) return delegated;
+        }
+        if (resolved?.clickedObject?.popupData) {
+            return await resolved.clickedObject.popupData(
+                resolved.state.genomicLocation,
+                delegate.hiddenTags,
+                delegate.showTags,
+                undefined,
+                delegate.browser?.genome,
+            );
+        }
+        return await delegate.popupData?.(clickState) || [];
+    }
+
+    contextMenuItemList(clickState: any) {
+        this.syncDelegateContext();
+        return this.delegateTrack?.contextMenuItemList?.(clickState) || [];
+    }
+
+    private getVisibleReferenceFrames() {
+        const viewports = this.trackView?.viewports || [];
+        const frames: Array<{ chr: string; start: number; end: number; bpPerPixel: number; viewport: any }> = [];
+        for (const vp of viewports) {
+            if (!vp?.isVisible?.()) continue;
+            const rf = vp.referenceFrame;
+            const chr = rf?.chr;
+            const start = Number(rf?.start);
+            const width = Number(vp?.getWidth?.());
+            const bpp = Number(rf?.bpPerPixel);
+            if (typeof chr !== "string" || !Number.isFinite(start) || !Number.isFinite(width) || !Number.isFinite(bpp)) {
+                continue;
+            }
+            frames.push({
+                chr,
+                start,
+                end: start + width * bpp,
+                bpPerPixel: bpp,
+                viewport: vp,
+            });
+        }
+        return frames;
+    }
+
+    private ensureInterOverlayCanvas(): HTMLCanvasElement | null {
+        if (typeof document === "undefined") return null;
+        const host: HTMLElement | null = this.browser?.columnContainer || this.browser?.root || null;
+        if (!host) return null;
+        if (getComputedStyle(host).position === "static") {
+            host.style.position = "relative";
+        }
+        if (!this._interOverlay || !host.contains(this._interOverlay)) {
+            const existing = host.querySelector("canvas[data-mdv-split-overlay='inter']") as HTMLCanvasElement | null;
+            if (existing) {
+                this._interOverlay = existing;
+            } else {
+                const c = document.createElement("canvas");
+                c.dataset.mdvSplitOverlay = "inter";
+                c.style.position = "absolute";
+                c.style.left = "0";
+                c.style.top = "0";
+                c.style.width = "100%";
+                c.style.height = "100%";
+                c.style.pointerEvents = "none";
+                c.style.zIndex = "9999";
+                host.appendChild(c);
+                this._interOverlay = c;
+            }
+        }
+        const rect = host.getBoundingClientRect();
+        const w = Math.max(1, Math.round(rect.width));
+        const h = Math.max(1, Math.round(rect.height));
+        if (this._interOverlay.width !== w || this._interOverlay.height !== h) {
+            this._interOverlay.width = w;
+            this._interOverlay.height = h;
+        }
+        return this._interOverlay;
+    }
+
+    private clearInterOverlay() {
+        const host: HTMLElement | null = this.browser?.columnContainer || this.browser?.root || null;
+        if (!host) return;
+        const overlays = host.querySelectorAll("canvas[data-mdv-split-overlay='inter']");
+        overlays.forEach((c) => {
+            const canvas = c as HTMLCanvasElement;
+            const ctx = canvas.getContext("2d");
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.remove();
+        });
+        this._interOverlay = null;
+    }
+
+    clearSplitOverlay() {
+        this.clearInterOverlay();
+    }
+
+    clearSplitReadFilter() {
+        this._activeReadName = null;
+        if (this.delegateTrack?.alignmentTrack) {
+            this.delegateTrack.alignmentTrack.selectedReadName = undefined;
+        }
+        this.trackView?.repaintViews?.();
+    }
+
+    private refreshInterOverlay() {
+        this.ensureHoverHandlers();
+        const visibleFrames = this.getVisibleReferenceFrames();
+        if (visibleFrames.length < 2) {
+            this.clearInterOverlay();
+            return;
+        }
+        this.drawInterFrameOverlay(visibleFrames);
+    }
+
+    private refreshActiveReadSelection() {
+        const selected = this.delegateTrack?.alignmentTrack?.selectedReadName;
+        if (typeof selected === "string" && selected.length > 0) {
+            this._activeReadName = selected;
+        }
+    }
+
+    private getBreakpointSides(primaryReadStart: number, primaryReadEnd: number, saReadStart: number, saReadEnd: number): {
+        primarySide: EndpointSide;
+        saSide: EndpointSide;
+    } {
+        const tol = 3;
+        if (saReadStart >= primaryReadEnd - tol) {
+            return { primarySide: "end", saSide: "start" };
+        }
+        if (primaryReadStart >= saReadEnd - tol) {
+            return { primarySide: "start", saSide: "end" };
+        }
+        const dEndStart = Math.abs(primaryReadEnd - saReadStart);
+        const dStartEnd = Math.abs(primaryReadStart - saReadEnd);
+        return dEndStart <= dStartEnd
+            ? { primarySide: "end", saSide: "start" }
+            : { primarySide: "start", saSide: "end" };
+    }
+
+    private parseAlignmentReadInterval(alignment: any): {
+        readStart: number;
+        readEnd: number;
+        strandPlus: boolean;
+        clipAtReadStart: boolean;
+        clipAtReadEnd: boolean;
+    } | null {
+        const strandPlus = alignment?.strand !== false;
+        const interval = computeOriginalReadIntervalFromCigar(alignment?.cigar, strandPlus);
+        if (!interval) return null;
+        const { leftClip, rightClip } = getTerminalClipTotals(alignment?.cigar);
+        const { leftMatch, rightMatch } = getTerminalEdgeMatchTotals(alignment?.cigar);
+        const leftClipEffective = leftClip >= MIN_ROLE_CLIP_BP && leftClip > leftMatch;
+        const rightClipEffective = rightClip >= MIN_ROLE_CLIP_BP && rightClip > rightMatch;
+        const clipAtReadStart = strandPlus ? leftClipEffective : rightClipEffective;
+        const clipAtReadEnd = strandPlus ? rightClipEffective : leftClipEffective;
+        return {
+            readStart: interval.readStart,
+            readEnd: interval.readEnd,
+            strandPlus,
+            clipAtReadStart,
+            clipAtReadEnd,
+        };
+    }
+
+    private hasSplitTag(alignment: any): boolean {
+        const tags = typeof alignment?.tags === "function" ? alignment.tags() : undefined;
+        return Boolean(tags?.SA ?? tags?.["SA"]);
+    }
+
+    private orderNodesByReadPath<T extends {
+        readStart: number;
+        readEnd: number;
+        clipAtReadStart?: boolean;
+        clipAtReadEnd?: boolean;
+    }>(nodes: T[]): T[] {
+        // Build a path using explicit read-coordinate continuity:
+        // choose the next segment whose readStart is closest to previous readEnd.
+        const remaining = [...nodes].sort((a, b) => (a.readStart - b.readStart) || (a.readEnd - b.readEnd));
+        if (remaining.length <= 1) return remaining;
+
+        // If present, seed with segment clipped at read end (first segment),
+        // else earliest by readStart.
+        let seedIdx = remaining.findIndex(n => Boolean(n.clipAtReadEnd) && !Boolean(n.clipAtReadStart));
+        if (seedIdx < 0) {
+            seedIdx = remaining.findIndex(n => Boolean(n.clipAtReadEnd));
+        }
+        if (seedIdx < 0) seedIdx = 0;
+        const ordered: T[] = [remaining.splice(seedIdx, 1)[0] as T];
+        while (remaining.length > 0) {
+            const prev = ordered[ordered.length - 1];
+            let bestIdx = 0;
+            let bestDist = Number.POSITIVE_INFINITY;
+            for (let i = 0; i < remaining.length; i++) {
+                const cand = remaining[i];
+                const dist = Math.abs(cand.readStart - prev.readEnd);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestIdx = i;
+                } else if (dist === bestDist) {
+                    const cur = remaining[bestIdx];
+                    if (cand.readStart < cur.readStart || (cand.readStart === cur.readStart && cand.readEnd < cur.readEnd)) {
+                        bestIdx = i;
+                    }
+                }
+            }
+            ordered.push(remaining.splice(bestIdx, 1)[0] as T);
+        }
+        return ordered;
+    }
+
+    private gatherPackedAlignments(alignmentContainer: any) {
+        const packedGroups = alignmentContainer?.packedGroups;
+        const rows: Array<{ y: number; alignments: any[] }> = [];
+        if (!packedGroups || typeof packedGroups.values !== "function") {
+            return rows;
+        }
+
+        const alignmentRowHeight = this.delegateTrack?.displayMode === "SQUISHED"
+            ? this.delegateTrack?.squishedRowHeight || 8
+            : this.delegateTrack?.alignmentRowHeight || 14;
+        const yInset = Number(this.delegateTrack?.alignmentsYOffset) || 0;
+        let y = yInset;
+        for (const group of packedGroups.values()) {
+            const groupRows = group?.rows || [];
+            const groupTop = y;
+            for (const row of groupRows) {
+                const rowTop = y;
+                const rowBottom = y + alignmentRowHeight;
+                if (!Number.isFinite(Number(row?.pixelTop))) {
+                    row.pixelTop = rowTop;
+                }
+                if (!Number.isFinite(Number(row?.pixelBottom)) || Number(row?.pixelBottom) <= Number(row?.pixelTop)) {
+                    row.pixelBottom = rowBottom;
+                }
+                rows.push({
+                    y: y + alignmentRowHeight / 2,
+                    alignments: row?.alignments || [],
+                });
+                y += alignmentRowHeight;
+            }
+            const groupBottom = y;
+            if (!Number.isFinite(Number(group?.pixelTop))) {
+                group.pixelTop = groupTop;
+            }
+            if (!Number.isFinite(Number(group?.pixelBottom)) || Number(group?.pixelBottom) <= Number(group?.pixelTop)) {
+                group.pixelBottom = Math.max(groupBottom, Number(group?.pixelTop) + alignmentRowHeight);
+            }
+            y += this.delegateTrack?.groupBy ? 5 : 0;
+        }
+        return rows;
+    }
+
+    private drawInterFrameOverlay(visibleFrames: Array<{ chr: string; start: number; end: number; bpPerPixel: number; viewport: any }>) {
+        if (visibleFrames.length < 2) {
+            this.clearInterOverlay();
+            return;
+        }
+        const overlay = this.ensureInterOverlayCanvas();
+        const octx = overlay?.getContext("2d");
+        if (!overlay || !octx) return;
+        octx.clearRect(0, 0, overlay.width, overlay.height);
+        const host: HTMLElement | null = this.browser?.columnContainer || this.browser?.root || null;
+        const hostRect = host?.getBoundingClientRect?.();
+        if (!hostRect) return;
+
+        type Node = {
+            readName: string;
+            frame: { chr: string; start: number; end: number; bpPerPixel: number; viewport: any };
+            y: number;
+            aStart: number;
+            aEnd: number;
+            readStart: number;
+            readEnd: number;
+            strandPlus: boolean;
+            hasSplit: boolean;
+        };
+
+        const nodesByRead = new Map<string, Node[]>();
+        for (const frame of visibleFrames) {
+            const cached = frame.viewport?.cachedFeatures;
+            const rows = this.gatherPackedAlignments(cached);
+            for (const row of rows) {
+                for (const item of row.alignments) {
+                    const alignments = item?.paired ? [item.firstAlignment, item.secondAlignment].filter(Boolean) : [item];
+                    for (const alignment of alignments) {
+                        const readName = typeof alignment?.readName === "string" ? alignment.readName : "";
+                        if (!readName) continue;
+                        const aStart = Number(alignment.start);
+                        const aEnd = aStart + Number(alignment.lengthOnRef || 0);
+                        if (!Number.isFinite(aStart) || !Number.isFinite(aEnd)) continue;
+                        const interval = this.parseAlignmentReadInterval(alignment);
+                        if (!interval) continue;
+                        const list = nodesByRead.get(readName) || [];
+                        list.push({
+                            readName,
+                            frame,
+                            y: row.y,
+                            aStart,
+                            aEnd,
+                            readStart: interval.readStart,
+                            readEnd: interval.readEnd,
+                            strandPlus: interval.strandPlus,
+                            clipAtReadStart: interval.clipAtReadStart,
+                            clipAtReadEnd: interval.clipAtReadEnd,
+                            hasSplit: this.hasSplitTag(alignment),
+                        });
+                        nodesByRead.set(readName, list);
+                    }
+                }
+            }
+        }
+
+        octx.save();
+        octx.lineWidth = this.config.interSplitLineWidth || 1.8;
+        for (const [readName, nodes] of nodesByRead.entries()) {
+            if (this._activeReadName && readName !== this._activeReadName) continue;
+            if (nodes.length < 2) continue;
+            if (!nodes.some(n => n.hasSplit)) continue;
+            const orderedNodes = this.orderNodesByReadPath(nodes);
+            octx.strokeStyle = this.splitReadColor(readName);
+            for (let i = 0; i < orderedNodes.length - 1; i++) {
+                const source = orderedNodes[i];
+                const target = orderedNodes[i + 1];
+                if (source.frame.viewport === target.frame.viewport) continue;
+
+                const sourceRect = source.frame.viewport?.viewportElement?.getBoundingClientRect?.();
+                const targetRect = target.frame.viewport?.viewportElement?.getBoundingClientRect?.();
+                if (!sourceRect || !targetRect) continue;
+
+                const sourceBp = endpointCoord(source.aStart, source.aEnd, source.strandPlus, "end");
+                const targetBp = endpointCoord(target.aStart, target.aEnd, target.strandPlus, "start");
+
+                const sourceContentTop = Number(source.frame.viewport?.getContentTop?.() || 0);
+                const targetContentTop = Number(target.frame.viewport?.getContentTop?.() || 0);
+                const x1 = (sourceRect.left - hostRect.left) + ((sourceBp - source.frame.start) / source.frame.bpPerPixel);
+                const y1 = (sourceRect.top - hostRect.top) + (source.y - sourceContentTop);
+                const x2 = (targetRect.left - hostRect.left) + ((targetBp - target.frame.start) / target.frame.bpPerPixel);
+                const y2 = (targetRect.top - hostRect.top) + (target.y - targetContentTop);
+
+                if (x1 < (sourceRect.left - hostRect.left) || x1 > (sourceRect.right - hostRect.left)) continue;
+                if (x2 < (targetRect.left - hostRect.left) || x2 > (targetRect.right - hostRect.left)) continue;
+
+                const cx = (x1 + x2) / 2;
+                const cy = Math.min(y1, y2) - Math.max(16, Math.min(72, Math.abs(x2 - x1) * 0.12));
+                const sourceLeft = sourceRect.left - hostRect.left;
+                const sourceTop = sourceRect.top - hostRect.top;
+                const sourceWidth = Math.max(1, sourceRect.width);
+                const sourceHeight = Math.max(1, sourceRect.height);
+                const targetLeft = targetRect.left - hostRect.left;
+                const targetTop = targetRect.top - hostRect.top;
+                const targetWidth = Math.max(1, targetRect.width);
+                const targetHeight = Math.max(1, targetRect.height);
+
+                octx.save();
+                octx.beginPath();
+                octx.rect(sourceLeft, sourceTop, sourceWidth, sourceHeight);
+                octx.rect(targetLeft, targetTop, targetWidth, targetHeight);
+                octx.clip();
+                octx.beginPath();
+                octx.moveTo(x1, y1);
+                octx.quadraticCurveTo(cx, cy, x2, y2);
+                octx.stroke();
+                octx.restore();
+            }
+        }
+        octx.restore();
+    }
+
+    private drawSplitOverlays(options: any) {
+        this.ensureHoverHandlers();
+        const ctx: CanvasRenderingContext2D | undefined = options?.context;
+        const referenceFrame = options?.referenceFrame;
+        const bpStart = Number(options?.bpStart);
+        const bpPerPixel = Number(options?.bpPerPixel);
+        const pixelWidth = Number(options?.pixelWidth);
+        const alignmentContainer = options?.features;
+        if (!ctx || !referenceFrame || !Number.isFinite(bpStart) || !Number.isFinite(bpPerPixel) || !Number.isFinite(pixelWidth)) {
+            return;
+        }
+
+        const visibleFrames = this.getVisibleReferenceFrames();
+        if (visibleFrames.length < 2) {
+            this.clearInterOverlay();
+        }
+        const thisChr = referenceFrame.chr;
+        const thisStart = Number(referenceFrame.start);
+        const viewportWidth = Number(options?.viewport?.getWidth?.() || options?.viewportWidth || 0);
+        const thisEnd = thisStart + viewportWidth * bpPerPixel;
+        const viewportPixelTop = Number(options?.pixelTop || 0);
+        const viewportPixelBottom = viewportPixelTop + Number(options?.pixelHeight || 0);
+
+        const rows = this.gatherPackedAlignments(alignmentContainer);
+        if (rows.length === 0) {
+            return;
+        }
+        type LocalNode = {
+            readName: string;
+            y: number;
+            aStart: number;
+            aEnd: number;
+            readStart: number;
+            readEnd: number;
+            strandPlus: boolean;
+            clipAtReadStart: boolean;
+            clipAtReadEnd: boolean;
+            hasSplit: boolean;
+        };
+        const rowEntries: Array<{ y: number; alignment: any }> = [];
+        const nodesByRead = new Map<string, LocalNode[]>();
+        for (const row of rows) {
+            for (const a0 of row.alignments) {
+                const alignments = a0?.paired ? [a0.firstAlignment, a0.secondAlignment].filter(Boolean) : [a0];
+                for (const alignment of alignments) {
+                    rowEntries.push({ y: row.y, alignment });
+                    const readName = typeof alignment?.readName === "string" ? alignment.readName : "";
+                    if (!readName) continue;
+                    const aStart = Number(alignment.start);
+                    const aEnd = aStart + Number(alignment.lengthOnRef || 0);
+                    if (!Number.isFinite(aStart) || !Number.isFinite(aEnd)) continue;
+                    if (aEnd < bpStart || aStart > bpStart + pixelWidth * bpPerPixel) continue;
+                    const interval = this.parseAlignmentReadInterval(alignment);
+                    if (!interval) continue;
+                    const list = nodesByRead.get(readName) || [];
+                    list.push({
+                        readName,
+                        y: row.y,
+                        aStart,
+                        aEnd,
+                        readStart: interval.readStart,
+                        readEnd: interval.readEnd,
+                        strandPlus: interval.strandPlus,
+                        clipAtReadStart: interval.clipAtReadStart,
+                        clipAtReadEnd: interval.clipAtReadEnd,
+                        hasSplit: this.hasSplitTag(alignment),
+                    });
+                    nodesByRead.set(readName, list);
+                }
+            }
+        }
+
+        ctx.save();
+        ctx.lineWidth = this.config.splitLineWidth || 1.5;
+        for (const [readName, nodes] of nodesByRead.entries()) {
+            if (this._activeReadName && readName !== this._activeReadName) continue;
+            if (nodes.length < 2) continue;
+            if (!nodes.some(n => n.hasSplit)) continue;
+            const orderedNodes = this.orderNodesByReadPath(nodes);
+            ctx.strokeStyle = this.splitReadColor(readName);
+            for (let i = 0; i < orderedNodes.length - 1; i++) {
+                const source = orderedNodes[i];
+                const target = orderedNodes[i + 1];
+                const sourceBp = endpointCoord(source.aStart, source.aEnd, source.strandPlus, "end");
+                const targetBp = endpointCoord(target.aStart, target.aEnd, target.strandPlus, "start");
+                const sourceX = (sourceBp - bpStart) / bpPerPixel;
+                const targetX = (targetBp - bpStart) / bpPerPixel;
+                if (sourceX < 0 || sourceX > pixelWidth) continue;
+                if (targetX < 0 || targetX > pixelWidth) continue;
+                if (source.y < viewportPixelTop || source.y > viewportPixelBottom) continue;
+                if (target.y < viewportPixelTop || target.y > viewportPixelBottom) continue;
+                const midX = (sourceX + targetX) / 2;
+                const midY = Math.min(source.y, target.y) - Math.max(8, Math.min(32, Math.abs(targetX - sourceX) * 0.14));
+                ctx.beginPath();
+                ctx.moveTo(sourceX, source.y);
+                ctx.quadraticCurveTo(midX, midY, targetX, target.y);
+                ctx.stroke();
+            }
+        }
+
+        for (const { y, alignment } of rowEntries) {
+            const readName = typeof alignment?.readName === "string" ? alignment.readName : "";
+            if (!readName || !this.hasSplitTag(alignment)) continue;
+            const aStart = Number(alignment.start);
+            const aEnd = aStart + Number(alignment.lengthOnRef || 0);
+            if (!Number.isFinite(aStart) || !Number.isFinite(aEnd)) continue;
+            const left = Math.max(0, (aStart - bpStart) / bpPerPixel);
+            const right = Math.min(pixelWidth, (aEnd - bpStart) / bpPerPixel);
+            const width = right - left;
+            if (width <= 1) continue;
+            const rowHeight = this.delegateTrack?.displayMode === "SQUISHED"
+                ? this.delegateTrack?.squishedRowHeight || 8
+                : this.delegateTrack?.alignmentRowHeight || 14;
+            const outlineTop = y - rowHeight / 2 + 0.5;
+            const outlineHeight = Math.max(4, rowHeight - 2);
+            ctx.save();
+            const isHovered = this._activeReadName === readName;
+            const hasHover = this._activeReadName !== null;
+            if (hasHover && !isHovered) {
+                ctx.fillStyle = "rgba(150, 150, 150, 0.16)";
+                ctx.strokeStyle = "rgba(120, 120, 120, 0.9)";
+            } else {
+                ctx.fillStyle = this.splitReadColorAlpha(readName, 0.20);
+                ctx.strokeStyle = this.splitReadColor(readName);
+            }
+            ctx.fillRect(left, outlineTop, width, outlineHeight);
+            ctx.lineWidth = 1;
+            ctx.strokeRect(left, outlineTop, width, outlineHeight);
+            ctx.restore();
+        }
+        ctx.restore();
+        this.drawInterFrameOverlay(visibleFrames);
+    }
+
+    computePixelHeight(features: any) {
+        this.syncDelegateContext();
+        if (typeof this.delegateTrack?.computePixelHeight === "function") {
+            return this.delegateTrack.computePixelHeight(features);
+        }
+        return this.config.height || 220;
+    }
+
+    draw(options: any) {
+        this.syncDelegateContext();
+        this.delegateTrack.draw(options);
+        this.drawSplitOverlays(options);
+    }
+}
+
+igv.registerTrackClass("mdv_split_alignment_track", MdvSplitAlignmentTrack);

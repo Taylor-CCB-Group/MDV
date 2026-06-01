@@ -296,11 +296,11 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
 
             const loweredPath = getPathWithoutQueryOrHash(trimmedUrl).toLowerCase();
             if (loweredPath.endsWith(".cram")) {
-                trackConfig.type = "alignment";
+                trackConfig.type = "mdv_split_alignment_track";
                 trackConfig.format = "cram";
                 trackConfig.indexURL = appendSuffixBeforeQueryOrHash(trimmedUrl, ".crai");
             } else if (loweredPath.endsWith(".bam")) {
-                trackConfig.type = "alignment";
+                trackConfig.type = "mdv_split_alignment_track";
                 trackConfig.format = "bam";
                 trackConfig.indexURL = appendSuffixBeforeQueryOrHash(trimmedUrl, ".bai");
             }
@@ -363,7 +363,16 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         if (this.browser?.search && searchLocus) {
             this.setSearchPending(true);
             try {
+                const trackViews = Array.isArray((this.browser as any)?.trackViews) ? (this.browser as any).trackViews : [];
+                for (const tv of trackViews) {
+                    tv?.track?.clearSplitOverlay?.();
+                    tv?.track?.clearSplitReadFilter?.();
+                }
                 await this.browser.search(searchLocus);
+                for (const tv of trackViews) {
+                    tv?.track?.clearSplitOverlay?.();
+                    tv?.track?.clearSplitReadFilter?.();
+                }
                 this.browser.clearROIs();
                 const highlight ={
                     name:"highlight",
