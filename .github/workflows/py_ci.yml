@@ -36,7 +36,7 @@ jobs:
           working-directory: python
           cache-dependency-glob: "**/uv.lock"
 
-      - run: uv sync --group dev --group backend --group auth --frozen
+      - run: uv sync --group dev --extra app --frozen
 
       - run: make test
 
@@ -60,7 +60,7 @@ jobs:
           working-directory: python
           cache-dependency-glob: "**/uv.lock"
 
-      - run: uv sync --group dev --group backend --group auth --frozen
+      - run: uv sync --group dev --extra app --frozen
       - run: make type
   # ruff job is disabled for now pending making it run cleanly...
   # ruff:

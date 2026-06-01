@@ -51,7 +51,7 @@ jobs:
           working-directory: python
           cache-dependency-glob: "**/uv.lock"
 
-      - run: uv sync --group dev --group backend --group auth --frozen
+      - run: uv sync --group dev --extra app --frozen
 
       - name: Run performance tests
         run: make test-performance
