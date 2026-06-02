@@ -15,6 +15,7 @@ export type LegendCategoricalSvgProps = {
 
 const H_FAC = 12;
 const MAX_HEIGHT = 215;
+export const LEGEND_CATEGORICAL_WIDTH = 180;
 
 export function legendCategoricalBodyHeight(itemCount: number): number {
     return itemCount * H_FAC + (itemCount + 2) * 2;
@@ -38,7 +39,7 @@ export default function LegendCategoricalSvg({
     const height = legendCategoricalBodyHeight(items.length);
 
     return (
-        <svg height={height} width={180} className="relative">
+        <svg height={height} width={LEGEND_CATEGORICAL_WIDTH} className="relative">
             <g>
                 {items.map((item, i) => {
                     const y = (i + 1) * 2 + i * H_FAC;

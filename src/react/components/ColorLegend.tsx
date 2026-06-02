@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ColorLegendSpec } from "@/react/colorLegend/types";
 import LegendCategoricalSvg, {
+    LEGEND_CATEGORICAL_WIDTH,
     legendCategoricalContainerHeight,
 } from "./LegendCategoricalSvg";
 import LegendContinuousSvg from "./LegendContinuousSvg";
@@ -82,7 +83,7 @@ export default function ColorLegend({
             return;
         }
         const height = legendCategoricalContainerHeight(spec.items.length);
-        el.style.width = "120px";
+        el.style.width = `${LEGEND_CATEGORICAL_WIDTH}px`;
         el.style.height = `${height}px`;
         el.style.border = "0.5px solid black";
     }, [spec]);
