@@ -16,6 +16,9 @@ From the ``python`` directory where package ``mdvtools`` resolves (repository
 
 Each row ``Path`` must be an existing MDV project folder (with ``datasources``, etc.).
 Example in this workspace: ``/app/mdv/pbmc3k_chat`` (used in ``prompts_pbmc3k.csv``).
+Create it reproducibly with::
+
+  python mdvtools/test_projects/chatmdv_csv_eval/setup_pbmc3k_chat.py
 
 Environment: same as Chat MDV (e.g. ``OPENAI_API_KEY`` in ``.env`` if used).
 
