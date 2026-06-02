@@ -22,6 +22,14 @@ import ColorLegend from "@/react/components/ColorLegend";
 import LegendWrapper, {
     type LegendWrapperComponentProps,
 } from "@/react/components/LegendWrapper";
+import {
+    clearColorLegendFilter,
+    destroyColorLegendFilter,
+    getActiveCategoricalColorLegendValue,
+    restoreColorLegendFilter,
+    toggleCategoricalColorLegendFilter,
+    type ColorLegendFilter,
+} from "./colorLegend/colorLegendFilterUtils";
 import { createElement } from "react";
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
@@ -92,7 +100,7 @@ class BaseChart<T extends BaseConfig> {
     legend: HTMLDivElement | undefined;
     colorLegendWrapper: LegendWrapper<ColorLegendSpec, T>;
     colorLegendFilterDimension: Dimension | null = null;
-    colorLegendFilter: { column: string; value: string } | null = null;
+    colorLegendFilter: ColorLegendFilter | null = null;
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
     _fullscreenChangeHandler: () => void;
@@ -184,13 +192,16 @@ class BaseChart<T extends BaseConfig> {
         this.resetButton.style.display = "none";
         this.resetButton.addEventListener("click", () => {
             this.removeFilter();
-            this.clearColorLegendCategoryFilter();
+            clearColorLegendFilter(this);
             this.resetButton.style.display = "none";
         });
 
         //register with datastore to listen to filter events
         this.dataStore.addListener(this.config.id, (type, data) => {
             if (type === "filtered") {
+                if (data === "all_removed") {
+                    clearColorLegendFilter(this);
+                }
                 this.onDataFiltered(data);
             } else if (type === "data_changed") {
                 this.onDataChanged(data);
@@ -577,65 +588,12 @@ class BaseChart<T extends BaseConfig> {
         }
     }
 
-    getColorLegendFilterDimension(): Dimension {
-        if (!this.colorLegendFilterDimension) {
-            this.colorLegendFilterDimension =
-                this.dataStore.getDimension("category_dimension");
-        }
-        return this.colorLegendFilterDimension;
-    }
-
-    getActiveColorLegendValue(spec: ColorLegendSpec): string | null {
-        if (
-            spec.kind !== "categorical" ||
-            this.colorLegendFilter?.column !== spec.column
-        ) {
-            return null;
-        }
-        return this.colorLegendFilter.value;
-    }
-
     updateResetButtonVisibility(): void {
         if (this.colorLegendFilter || this.getFilter?.()) {
             this.resetButton.style.display = "inline";
         } else {
             this.resetButton.style.display = "none";
         }
-    }
-
-    clearColorLegendCategoryFilter(updateLegend = true): void {
-        if (!this.colorLegendFilterDimension || !this.colorLegendFilter) {
-            return;
-        }
-        this.colorLegendFilterDimension.removeFilter();
-        this.colorLegendFilter = null;
-        this.updateResetButtonVisibility();
-        if (updateLegend) {
-            this.setColorLegend();
-        }
-    }
-
-    toggleColorLegendCategoryFilter(
-        spec: ColorLegendSpec,
-        value: string,
-    ): void {
-        if (spec.kind !== "categorical") {
-            return;
-        }
-        const dimension = this.getColorLegendFilterDimension();
-        const isActive =
-            this.colorLegendFilter?.column === spec.column &&
-            this.colorLegendFilter.value === value;
-
-        if (isActive) {
-            this.clearColorLegendCategoryFilter();
-            return;
-        }
-
-        this.colorLegendFilter = { column: spec.column, value };
-        dimension.filter("filterCategories", [spec.column], value);
-        this.updateResetButtonVisibility();
-        this.setColorLegend();
     }
 
     /**
@@ -676,14 +634,18 @@ class BaseChart<T extends BaseConfig> {
             this.legend = undefined;
             return;
         }
+        restoreColorLegendFilter(this, spec);
         const ColorLegendWithInteractions = (
             props: LegendWrapperComponentProps<ColorLegendSpec>,
         ) =>
             createElement(ColorLegend, {
                 ...props,
-                activeCategoricalValue: this.getActiveColorLegendValue(spec),
+                activeCategoricalValue: getActiveCategoricalColorLegendValue(
+                    this,
+                    spec,
+                ),
                 onCategoricalItemClick: (value: string) =>
-                    this.toggleColorLegendCategoryFilter(spec, value),
+                    toggleCategoricalColorLegendFilter(this, spec, value),
             });
         this.colorLegendWrapper.render(
             spec,
@@ -709,7 +671,7 @@ class BaseChart<T extends BaseConfig> {
             this.colorLegendFilter &&
             this.colorLegendFilter.column !== column
         ) {
-            this.clearColorLegendCategoryFilter(false);
+            clearColorLegendFilter(this, false);
         }
         this.config.color_by = column;
         const conf = {
@@ -756,7 +718,7 @@ class BaseChart<T extends BaseConfig> {
         }
         if (this.colorByColumn) {
             if (this.config.color_by === column) {
-                this.clearColorLegendCategoryFilter(false);
+                clearColorLegendFilter(this, false);
                 this.config.color_by = undefined;
                 this.colorByDefault?.();
             }
@@ -804,11 +766,7 @@ class BaseChart<T extends BaseConfig> {
     remove(notify?: boolean) {
         this.colorLegendWrapper.unmount();
         this.legend = undefined;
-        if (this.colorLegendFilterDimension) {
-            this.colorLegendFilterDimension.destroy(notify);
-            this.colorLegendFilterDimension = null;
-            this.colorLegendFilter = null;
-        }
+        destroyColorLegendFilter(this, notify);
         this.titleBar.remove();
         this.contentDiv.remove();
         this.dataStore.removeListener(this.config.id);
@@ -932,7 +890,7 @@ class BaseChart<T extends BaseConfig> {
                 columnType: filter,
                 func: (x) => {
                     if (x === "_none") {
-                        this.clearColorLegendCategoryFilter(false);
+                        clearColorLegendFilter(this, false);
                         c.color_by = undefined;
                         this.colorByDefault?.();
                     } else {
@@ -1177,6 +1135,7 @@ class BaseChart<T extends BaseConfig> {
     getConfig() {
         if (this.legend) {
             this.config.color_legend = {
+                ...this.config.color_legend,
                 display: true,
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };

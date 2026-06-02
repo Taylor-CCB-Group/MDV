@@ -142,10 +142,13 @@ class WGLChart extends SVGChart {
     }
 
     onDataFiltered(dim) {
+        if (!this.app) {
+            return;
+        }
         if (dim === "all_removed") {
             this.app.clearBrush();
             this.app.setFilter(false);
-            this.resetButton.style.display = "none";
+            this.updateResetButtonVisibility();
         }
         this.app.setHighlightPoints(null);
         this.app.refresh();
