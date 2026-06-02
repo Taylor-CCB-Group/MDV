@@ -3,7 +3,7 @@ import WGLChart from "./WGLChart.js";
 import BaseChart from "./BaseChart";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { createEl } from "../utilities/Elements.js";
-import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
+import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil.ts";
 
 class OffsetDialog extends BaseDialog {
     constructor(scatterPlot) {
@@ -250,15 +250,26 @@ class WGLScatterPlot extends WGLChart {
         if (!config.title) {
             config.title = `${x_name} x ${y_name}`;
         }
+
+        if (!config.background_filter) {
+            config.background_filter = {
+                column: null,
+                categories: [],
+            };
+        } else if (config.background_filter.column === "__none__") {
+            config.background_filter.column = null;
+        } else if (!config.background_filter.categories) {
+            config.background_filter.categories = config.background_filter.category
+                ? [config.background_filter.category]
+                : [];
+        }
         super(dataStore, div, config, { x: {}, y: {} });
 
         this.x = this.config.param[0];
         this.y = this.config.param[1];
         this.dim = this.getDimension();
-        const bf = config.background_filter;
-        if (bf) {
-            this.dim.setBackgroundFilter(bf.column, bf.category);
-        }
+       
+        void this.setBackgroundFilter();
         this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
         this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
         this.type = "wgl_scatter_plot";
@@ -326,10 +337,6 @@ class WGLScatterPlot extends WGLChart {
         this.x = this.config.param[0];
         this.y = this.config.param[1];
         this.dim = this.getDimension();
-        const bf = config.background_filter;
-        if (bf) {
-            this.dim.setBackgroundFilter(bf.column, bf.category);
-        }
         this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
         this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
         const colorFunc = this.afterAppCreation();
@@ -348,6 +355,25 @@ class WGLScatterPlot extends WGLChart {
         this.onDataFiltered();
         this.updateAxis();
         super.drawChart();
+    }
+
+    async setBackgroundFilter() {
+        const bf = this.config.background_filter;
+        const categories = Array.isArray(bf?.categories)
+            ? bf.categories.filter((x) => x !== undefined && x !== null)
+            : [];
+        if (
+            !bf ||
+            !bf.column ||
+            bf.column === "__none__" ||
+            categories.length === 0
+        ) {
+            this.dim.clearBackgroundFilter();
+        } else {
+            await loadColumn(this.dataStore.name, bf.column);
+            this.dim.setBackgroundFilter(bf.column, categories);
+        }
+        this.onDataFiltered();
     }
 
     /**
@@ -611,6 +637,24 @@ class WGLScatterPlot extends WGLChart {
     getSettings() {
         const settings = super.getSettings({ pointMax: 30, pointMin: 0 });
         const c = this.config;
+        if (!c.background_filter) {
+            c.background_filter = {
+                column: null,
+                categories: [],
+            };
+        } else if (c.background_filter.column === "__none__") {
+            c.background_filter.column = null;
+        } else if (!c.background_filter.categories) {
+            c.background_filter.categories = c.background_filter.category
+                ? [c.background_filter.category]
+                : [];
+        }
+        const textColumns = this.dataStore.getColumnList("string");
+        const textColumnsWithNone = textColumns.slice(0);
+        textColumnsWithNone.push({ name: "None", field: null });
+        const bfColumn = c.background_filter.column || null;
+        const bgCurrentCats = c.background_filter.categories
+            || (c.background_filter.category ? [c.background_filter.category] : []);
         //this is legacy and probably not used anymore
         if (c.image_choices) {
             const ic = c.image_choices.slice(0);
@@ -693,6 +737,41 @@ class WGLScatterPlot extends WGLChart {
                 },
             });
         }
+        const backgroundColumnSetting = {
+            type: "dropdown",
+            label: "Background Filter Column",
+            current_value: bfColumn,
+            values: [textColumnsWithNone, "name", "field"],
+            func: (x) => {
+                c.background_filter = {
+                    ...c.background_filter,
+                    column: x,
+                    categories:
+                        x == null ? [] : c.background_filter.categories,
+                    category:
+                        x == null
+                            ? undefined
+                            : c.background_filter.category,
+                };
+                void this.setBackgroundFilter();
+            },
+        };
+        settings.push(backgroundColumnSetting);
+        settings.push({
+            type: "category_selection",
+            label: "Background Filter Categories",
+            current_value: bgCurrentCats,
+            sourceColumn: () => {
+                const col = c.background_filter.column;
+                return col || undefined;
+            },
+            getCurrentValue: () => c.background_filter.categories || [],
+            func: (vals) => {
+                c.background_filter.categories = vals;
+                c.background_filter.category = vals[0];
+                void this.setBackgroundFilter();
+            },
+        });
         settings.push({
             type: "radiobuttons",
             label: "Background Color",

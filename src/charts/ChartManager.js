@@ -1020,7 +1020,12 @@ export class ChartManager {
             }
         }
         if (config.background_filter) {
-            set.add(config.background_filter.column);
+            if (
+                config.background_filter.column &&
+                config.background_filter.column !== "__none__"
+            ) {
+                set.add(config.background_filter.column);
+            }
         }
 
         //are there any config entries that refer to column(s)

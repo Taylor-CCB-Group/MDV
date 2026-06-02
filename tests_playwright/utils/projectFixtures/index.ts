@@ -7,7 +7,7 @@
  * | `syntheticAnndata.ts` | `generate_synthetic_anndata_project.py` + `/rescan_projects` |
  * | `syntheticSpatial.ts` | `generate_synthetic_spatial_project.py` + `/rescan_projects` |
  * | `core.ts` | Shared: wait ready, delete API, list projects, rescan |
- * | `pythonEnv.ts` | Poetry / `PYTHONPATH` for subprocess helpers |
+ * | `pythonEnv.ts` | uv `.venv` / `PYTHONPATH` for subprocess helpers |
  */
 
 export * from "./core";
