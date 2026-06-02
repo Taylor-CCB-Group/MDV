@@ -148,7 +148,7 @@ describe("useSlickGridReact", () => {
             removeColumn: vi.fn(),
             hasColumnMetadata: vi.fn(() => false),
             getAllColumnsMetadata: vi.fn(() =>
-                (mockDataStore?.columns ?? mockOrderedParamColumns).map((column) => ({
+                (mockDataStore?.columns ?? mockOrderedParamColumns).map((column: LoadedDataColumn<DataType>) => ({
                     field: column.field,
                     name: column.name,
                     datatype: column.datatype,
