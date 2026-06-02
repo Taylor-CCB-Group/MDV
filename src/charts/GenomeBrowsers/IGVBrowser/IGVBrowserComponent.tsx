@@ -42,7 +42,7 @@ const IGVBrowserComponent = observer(() => {
                 const browser = await Promise.race([
                     igvApi.createBrowser(rootRef.current, config),
                     new Promise<never>((_, reject) => {
-                        setTimeout(() => reject(new Error("Timed out while initializing IGV browser.")), 20000);
+                        setTimeout(() => reject(new Error("Timed out while initializing IGV browser.")), 30000);
                     }),
                 ]);
                 if (disposed) {
