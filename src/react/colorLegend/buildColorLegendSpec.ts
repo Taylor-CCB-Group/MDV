@@ -1,5 +1,5 @@
 import type DataStore from "@/datastore/DataStore";
-import { isColumnText } from "@/utilities/Utilities";
+import { isColumnNumeric, isColumnText } from "@/utilities/Utilities";
 import type {
     ColorLegendBuildConfig,
     ColorLegendCategoricalItem,
@@ -32,11 +32,7 @@ export function buildColorLegendSpec(
 
     const name = config.name ?? c.name;
 
-    if (
-        c.datatype === "integer" ||
-        c.datatype === "double" ||
-        c.datatype === "int32"
-    ) {
+    if (isColumnNumeric(c)) {
         const [min, max] = dataStore.getMinMaxForColumn(column);
         let range: [number, number] = [min, max];
         if (overrideValues) {
