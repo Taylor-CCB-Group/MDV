@@ -8,6 +8,7 @@ import { getColorLegendCustom } from "../utilities/Color.js";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -177,8 +178,7 @@ class DotPlot extends SVGChart {
         this.setColorLegend();
     }
 
-    getColorLegend() {
-        //this.updateColorScheme();
+    getColorLegendSpec() {
         const cs = this.config.color_scale;
         const mm = this.data.mean_range;
         const conf = {
@@ -190,7 +190,7 @@ class DotPlot extends SVGChart {
             },
             name: "Mean Expression",
         };
-        return this.dataStore.getColorLegend(this.fieldNames[0], conf);
+        return buildColorLegendSpec(this.dataStore, this.fieldNames[0], conf);
     }
 
     showFractionLegend() {
