@@ -192,6 +192,7 @@ class BaseChart<T extends BaseConfig> {
         this.resetButton.style.display = "none";
         this.resetButton.addEventListener("click", () => {
             this.removeFilter();
+            // clear legend filter when reset button of chart is clicked
             clearColorLegendFilter(this);
             this.resetButton.style.display = "none";
         });
@@ -200,6 +201,7 @@ class BaseChart<T extends BaseConfig> {
         this.dataStore.addListener(this.config.id, (type, data) => {
             if (type === "filtered") {
                 if (data === "all_removed") {
+                    // clear legend filter when reset all filters button is clicked
                     clearColorLegendFilter(this);
                 }
                 this.onDataFiltered(data);

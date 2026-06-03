@@ -1,10 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from "react";
 import type { ColorLegendSpec } from "@/react/colorLegend/types";
 import LegendCategoricalSvg, {
+    getCategoricalLabelMaxWidth,
+    LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
     LEGEND_CATEGORICAL_WIDTH,
     legendCategoricalContainerHeight,
 } from "./LegendCategoricalSvg";
 import LegendContinuousSvg, {
+    DEFAULT_CONTINUOUS_LEGEND_WIDTH,
     DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
 } from "./LegendContinuousSvg";
 
@@ -28,17 +37,58 @@ function ColorLegendCategorical({
     onItemClick?: (value: string) => void;
 }) {
     const [hoveredValue, setHoveredValue] = useState<string | null>(null);
+    const titleRef = useRef<HTMLDivElement>(null);
+    const bodyRef = useRef<HTMLDivElement>(null);
+    const [showTitleTooltip, setShowTitleTooltip] = useState(false);
+    const [labelMaxWidth, setLabelMaxWidth] = useState(
+        LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
+    );
     const svgItems = items.map((item) => ({
         key: item.value,
         color: item.color,
         label: item.name,
     }));
 
+    const updateTitleTooltip = useCallback(() => {
+        const el = titleRef.current;
+        if (!el) {
+            return;
+        }
+        setShowTitleTooltip(el.scrollWidth > el.clientWidth);
+    }, []);
+
+    useLayoutEffect(() => {
+        updateTitleTooltip();
+    });
+
+    useLayoutEffect(() => {
+        const body = bodyRef.current;
+        if (!body) {
+            return;
+        }
+        const updateLayout = () => {
+            const width = body.clientWidth || LEGEND_CATEGORICAL_WIDTH;
+            setLabelMaxWidth(getCategoricalLabelMaxWidth(width));
+            updateTitleTooltip();
+        };
+        updateLayout();
+        if (typeof ResizeObserver === "undefined") {
+            return;
+        }
+        const observer = new ResizeObserver(updateLayout);
+        observer.observe(body);
+        if (titleRef.current) {
+            observer.observe(titleRef.current);
+        }
+        return () => observer.disconnect();
+    }, [updateTitleTooltip]);
+
     return (
         <div className="legend-drag-handle h-full w-full overflow-hidden">
             <div
+                ref={titleRef}
                 className="legend-title overflow-hidden text-ellipsis"
-                title={label}
+                title={showTitleTooltip ? label : undefined}
                 style={{
                     height: "20px",
                     whiteSpace: "nowrap",
@@ -47,6 +97,7 @@ function ColorLegendCategorical({
                 {label}
             </div>
             <div
+                ref={bodyRef}
                 className="legend-body overflow-y-auto overflow-x-hidden w-full"
                 style={{
                     height: "calc(100% - 20px)",
@@ -58,6 +109,7 @@ function ColorLegendCategorical({
                     activeKey={activeValue}
                     onItemHover={setHoveredValue}
                     onItemClick={onItemClick}
+                    labelMaxWidth={labelMaxWidth}
                 />
             </div>
         </div>
@@ -96,7 +148,7 @@ export default function ColorLegend({
         if (!el || spec.kind !== "continuous") {
             return;
         }
-        const width = spec.width ?? 120;
+        const width = spec.width ?? DEFAULT_CONTINUOUS_LEGEND_WIDTH;
         const height = spec.height ?? DEFAULT_CONTINUOUS_LEGEND_HEIGHT;
         el.style.width = `${width}px`;
         el.style.height = `${height}px`;

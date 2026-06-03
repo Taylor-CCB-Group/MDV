@@ -108,6 +108,37 @@ describe("ColorLegend", () => {
         expect(onCategoricalItemClick).toHaveBeenCalledWith("T cell");
     });
 
+    test("adds SVG title tooltip for truncated categorical row labels", () => {
+        const longLabel =
+            "CD8-positive cytotoxic T lymphocyte population cluster";
+        const { container } = render(
+            <div className="legend-container">
+                <ColorLegend
+                    spec={{
+                        kind: "categorical",
+                        label: "Cell type",
+                        column: "cell_type",
+                        items: [
+                            {
+                                color: "#ff0000",
+                                name: longLabel,
+                                value: longLabel,
+                            },
+                        ],
+                    }}
+                />
+            </div>,
+        );
+
+        const titles = container.querySelectorAll("title");
+        expect(titles.length).toBeGreaterThan(0);
+        expect(Array.from(titles).some((t) => t.textContent === longLabel)).toBe(
+            true,
+        );
+        const rowText = container.querySelector(".legend-body svg text");
+        expect(rowText?.textContent?.endsWith("…")).toBe(true);
+    });
+
     test("applies active categorical styling", () => {
         render(
             <div className="legend-container">

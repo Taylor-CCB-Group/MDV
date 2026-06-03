@@ -1,30 +1,26 @@
-export type LegendCategoricalSvgItem = {
-    key: string;
-    color: string;
-    label: string;
-};
+import {
+    LEGEND_CATEGORICAL_LABEL_START_X,
+    LEGEND_CATEGORICAL_WIDTH,
+} from "./legendConstants";
+import type { LegendCategoricalSvgProps } from "./legendTypes";
+import {
+    LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
+    formatLegendLabel,
+    legendCategoricalBodyHeight,
+    legendCategoricalContainerHeight,
+    legendCategoricalRowY,
+} from "./legendUtils";
 
-export type LegendCategoricalSvgProps = {
-    items: LegendCategoricalSvgItem[];
-    /** Called when pointer enters/leaves a row (optional, used by field contour legend). */
-    onItemHover?: (key: string | null) => void;
-    onItemClick?: (key: string) => void;
-    hoveredKey?: string | null;
-    activeKey?: string | null;
-};
-
-const H_FAC = 12;
-const MAX_HEIGHT = 215;
-export const LEGEND_CATEGORICAL_WIDTH = 180;
-
-export function legendCategoricalBodyHeight(itemCount: number): number {
-    return itemCount * H_FAC + (itemCount + 2) * 2;
-}
-
-export function legendCategoricalContainerHeight(itemCount: number): number {
-    const bodyHeight = legendCategoricalBodyHeight(itemCount);
-    return bodyHeight > MAX_HEIGHT ? MAX_HEIGHT + 35 : bodyHeight + 35;
-}
+export {
+    getCategoricalLabelMaxWidth,
+    LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
+    legendCategoricalContainerHeight,
+} from "./legendUtils";
+export { LEGEND_CATEGORICAL_WIDTH } from "./legendConstants";
+export type {
+    LegendCategoricalSvgItem,
+    LegendCategoricalSvgProps,
+} from "./legendTypes";
 
 /**
  * Shared SVG list for categorical legends (color legend and field contour legend).
@@ -35,6 +31,7 @@ export default function LegendCategoricalSvg({
     onItemClick,
     hoveredKey = null,
     activeKey = null,
+    labelMaxWidth = LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
 }: LegendCategoricalSvgProps) {
     const height = legendCategoricalBodyHeight(items.length);
 
@@ -46,8 +43,11 @@ export default function LegendCategoricalSvg({
         >
             <g>
                 {items.map((item, i) => {
-                    const y = (i + 1) * 2 + i * H_FAC;
-                    const label = item.label === "" ? "none" : item.label;
+                    const y = legendCategoricalRowY(i);
+                    const formatted = formatLegendLabel(
+                        item.label,
+                        labelMaxWidth,
+                    );
                     const isHovered =
                         hoveredKey !== null && hoveredKey === item.key;
                     const isActive =
@@ -92,16 +92,19 @@ export default function LegendCategoricalSvg({
                                 }
                                 strokeWidth={isHovered ? 2 : isActive ? 1.5 : 0}
                             />
+                            {formatted.truncated ? (
+                                <title>{formatted.full}</title>
+                            ) : null}
                             <text
                                 y={y + 9}
-                                x={14}
-                                aria-label={label}
+                                x={LEGEND_CATEGORICAL_LABEL_START_X}
+                                aria-label={formatted.full}
                                 className="text-xs fill-current"
                                 style={{
                                     fontWeight: isActive ? 700 : undefined,
                                 }}
                             >
-                                {label}
+                                {formatted.display}
                             </text>
                         </g>
                     );

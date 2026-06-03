@@ -1,0 +1,14 @@
+export const LEGEND_CATEGORICAL_WIDTH = 180;
+export const LEGEND_CATEGORICAL_LABEL_START_X = 14;
+export const LEGEND_CATEGORICAL_LABEL_PADDING_X = 4;
+export const LEGEND_CATEGORICAL_ROW_HEIGHT = 12;
+export const LEGEND_CATEGORICAL_MAX_BODY_HEIGHT = 215;
+
+export const DEFAULT_CONTINUOUS_LEGEND_WIDTH = 180;
+export const DEFAULT_CONTINUOUS_LEGEND_HEIGHT = 65;
+export const CONTINUOUS_MIN_LAYOUT_WIDTH = 40;
+export const CONTINUOUS_HORIZONTAL_PADDING = 10;
+export const CONTINUOUS_TICK_TARGET_SPACING = 55;
+
+/** Matches Tailwind `text-xs` used on legend labels. */
+export const LEGEND_LABEL_FONT = "12px sans-serif";
