@@ -1,5 +1,7 @@
 import os
 import sys
+import json
+import logging
 import h5py
 import numpy
 import pandas
@@ -28,8 +30,33 @@ import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
 from mdvtools.logging_config import get_logger
+from mdvtools.project_protocols import RowsAsColumnsLinkSource
 
 logger = get_logger(__name__)
+
+
+def _agent_debug_log(
+    run_id: str,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict,
+    *,
+    log: logging.Logger | None = None,
+) -> None:
+    """Structured debug logging for agent workflows (logger-only, no file I/O)."""
+    target = log if log is not None else logger
+    payload = {
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+    }
+    try:
+        target.debug(json.dumps(payload))
+    except Exception:
+        target.warning("agent debug log failed", exc_info=True)
 
 
 DataSourceName = str  # NewType("DataSourceName", str)
@@ -218,7 +245,9 @@ class MDVProject:
         return pandas.DataFrame(out)
 
     def _resolve_rows_as_columns_subgroup(
-        self, row_datasource: str, subgroup_key: str
+        self: RowsAsColumnsLinkSource,
+        row_datasource: str,
+        subgroup_key: str,
     ) -> tuple[str, bool]:
         """
         Return (h5 matrix group name under the row datasource, is_sparse).
@@ -234,11 +263,15 @@ class MDVProject:
                     name = str(info.get("name", cand))
                     sparse = info.get("type") == "sparse"
                     return name, sparse
-            if len(subgroups) == 1:
-                _k, info = next(iter(subgroups.items()))
-                name = str(info.get("name", _k))
-                sparse = info.get("type") == "sparse"
-                return name, sparse
+        all_subgroups: dict[str, Any] = {}
+        for ln in lnks:
+            subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            all_subgroups.update(subgroups)
+        if len(all_subgroups) == 1:
+            _k, info = next(iter(all_subgroups.items()))
+            name = str(info.get("name", _k))
+            sparse = info.get("type") == "sparse"
+            return name, sparse
         avail: list[str] = []
         for ln in lnks:
             subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
@@ -317,7 +350,42 @@ class MDVProject:
             list[str]: A list of datasource names
         """
         return [ds["name"] for ds in self.datasources]
-    
+
+    def get_datasource_roles(self):
+        """Infer observation vs expression datasource roles (ChatMDV / wrapper charts)."""
+        from mdvtools.llm.datasource_roles import infer_datasource_roles
+
+        return infer_datasource_roles(self)
+
+    def build_gene_wrapper(
+        self,
+        gene: str,
+        *,
+        subgroup_key: str | None = None,
+        expression_datasource: str | None = None,
+        name_column: str | None = None,
+    ) -> str:
+        """
+        Resolve a gene label to a canonical rows-as-columns wrapper token on the obs datasource.
+        """
+        from mdvtools.llm.column_field_resolve import build_expression_wrapper_token
+        from mdvtools.llm.datasource_roles import infer_datasource_roles
+
+        roles = infer_datasource_roles(self)
+        expr = roles.preferred_expression()
+        if expr is None:
+            raise RuntimeError("No rows-as-columns expression link; cannot build gene wrappers.")
+        ds = expression_datasource or expr.datasource_name
+        ncol = name_column or expr.name_column
+        sk = subgroup_key or expr.subgroup_key
+        df_var = self.get_datasource_as_dataframe(ds, columns=[ncol])
+        names = df_var[ncol].astype(str).tolist()
+        try:
+            idx = names.index(str(gene))
+        except ValueError as exc:
+            raise ValueError(f"Gene {gene!r} not found in feature table {ds!r} column {ncol!r}.") from exc
+        return build_expression_wrapper_token(sk, str(gene), idx)
+
     def set_interactions(
         self,
         interaction_ds,
@@ -719,17 +787,14 @@ class MDVProject:
             handle = h5py.File(self.h5file, mode)
             return handle
         except Exception as e:
+            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            if not lock_error:
+                raise
             # certain environments seem to have issues with the handle not being closed instantly
-            # if there is a better way to do this, please change it
-            # if there are multiple processes trying to access the file, this may also help
-            # (although if they're trying to write, who knows what bad things may happen to the project in general)
+            # if there are multiple processes trying to access the file, retry on lock contention
             time.sleep(0.1)
             attempt += 1
-            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
-            if lock_error:
-                logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
-            else:
-                logger.error(f"error opening h5 file, attempt {attempt}...", exc_info=True)
+            logger.debug(f"h5 lock contention opening file, retry attempt {attempt}")
             if attempt >= 20:
                 raise RuntimeError(
                     f"unable to open h5 file after {attempt} attempts: {self.h5file}"

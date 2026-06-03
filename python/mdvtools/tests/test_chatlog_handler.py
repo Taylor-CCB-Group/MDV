@@ -1,6 +1,6 @@
 import logging
 
-from langchain_core.outputs import Generation, LLMResult
+from langchain_core.outputs import LLMResult
 
 from mdvtools.llm.chatlog import LangchainLoggingHandler
 
@@ -13,7 +13,7 @@ def test_langchain_logging_handler_avoids_info_noise(caplog):
 
     with caplog.at_level(logging.INFO):
         handler.on_chat_model_start({}, [])
-        handler.on_llm_end(LLMResult(generations=[[Generation(text="ok")]]))
+        handler.on_llm_end(LLMResult(generations=[[]]))
         handler.on_chain_start({"name": "demo"}, {})
         handler.on_chain_end({})
 

@@ -1,3 +1,7 @@
+"""
+ChatMDV RAG example (HistogramPlot). set_x_axis / set_y_axis are valid on HistogramPlot only.
+For BoxPlot, ViolinPlot, ScatterPlot, DotPlot use set_axis_properties("x", {...}) instead.
+"""
 import os
 import json
 import pandas as pd

@@ -2054,9 +2054,10 @@ export class ChartManager {
     }
 
     /**
-     * Map a chart param token to a DataStore column `field` id.
+     * Map a chart param token to the DataStore column `field` id.
      * Field ids are canonical and stable; display names are mutable and are
-     * not used for runtime resolution.
+     * not used for runtime resolution. Virtual expression columns use
+     * `subgroup|label(subgroup)|index` and are returned unchanged.
      * @param {object} dStore DataStore instance
      * @param {string} token
      * @returns {string}
@@ -2160,41 +2161,37 @@ export class ChartManager {
             }
         }
         const reqCols = columns.filter((x) => {
-            //column already loading - but what if something went wrong earlier?
-            if (this.columnsLoading[dataSource][x]) {
-                return false;
-            }
-            const col = dStore.columnIndex[x];
-            //no record of column- need to load it (plus metadata)
-            if (!col) {
-                // what if x is something like a MulticolumnQuery?
-                if (typeof x !== "string") {
-                    // we could make dataStore understand it as a 'field'...
-                    // or if we return false to filter it out, chart deserialise can handle it?
-                    return false;
-                } else {
-                    const metadata = dStore
-                        .getAllColumnsMetadata?.()
-                        .find((column) => column.field === x);
-                    // Soft-deleted table columns can temporarily disappear from columnIndex while
-                    // stale chart reactions still ask for them. Restore real datasource columns
-                    // from metadata first, and only use addColumnFromField() for true virtual
-                    // fields like subgroup|name|index. Plain stale names should be skipped.
-                    if (metadata && !metadata.deleted) {
-                        dStore.addColumn(metadata, metadata.data, false, false);
-                        return true;
-                    }
-                    if (x.includes("|")) {
-                        dStore.addColumnFromField(x);
-                        return true;
-                    }
+            if (typeof x !== "string") {
+                const nonStringCol = dStore.columnIndex[x];
+                if (!nonStringCol) {
                     return false;
                 }
+                return !nonStringCol.data;
             }
-            if (!col.data) {
-                return true;
+            const fieldKey = this._resolveToDataStoreFieldKey(dStore, x);
+            if (this.columnsLoading[dataSource][fieldKey]) {
+                return false;
             }
-            return false;
+            const col = dStore.columnIndex[fieldKey];
+            if (!col) {
+                const metadata = dStore
+                    .getAllColumnsMetadata?.()
+                    .find((column) => column.field === fieldKey);
+                // Soft-deleted table columns can temporarily disappear from columnIndex while
+                // stale chart reactions still ask for them. Restore real datasource columns
+                // from metadata first, and only use addColumnFromField() for true virtual
+                // fields like subgroup|name|index.
+                if (metadata && !metadata.deleted) {
+                    dStore.addColumn(metadata, metadata.data, false, false);
+                    return true;
+                }
+                if (fieldKey.includes("|")) {
+                    dStore.addColumnFromField(fieldKey);
+                    return true;
+                }
+                return false;
+            }
+            return !col.data;
         });
 
         //No columns needed

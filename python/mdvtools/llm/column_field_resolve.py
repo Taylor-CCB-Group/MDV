@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_WRAPPER_RE = re.compile(r"^([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)$")
+_WRAPPER_RE = re.compile(r"([^|]+)\|([^|(]+)\(\1\)\|\s*(\d+)\s*$")
 _MARKER_ALIASES = {
     "group": "cluster",
     "cluster": "group",
@@ -93,7 +93,7 @@ def rows_as_columns_subgroup_keys_from_metadata(md: dict[str, Any]) -> set[str]:
 
 def expression_wrapper_subgroup_key(token: str) -> str | None:
     """Return subgroup key from a wrapper token, or None if not a wrapper."""
-    m = _WRAPPER_RE.match(token.strip()) if isinstance(token, str) else None
+    m = _WRAPPER_RE.fullmatch(token.strip()) if isinstance(token, str) else None
     if not m:
         return None
     return m.group(1).strip()
@@ -114,7 +114,7 @@ def resolve_param_string(
     """Map a single param string to canonical field id when needed."""
     if not isinstance(s, str):
         return s
-    if _WRAPPER_RE.match(s):
+    if _WRAPPER_RE.fullmatch(s.strip()):
         return s
     if s in field_set:
         return s

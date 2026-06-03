@@ -18,6 +18,10 @@ class ScatterPlot(BasePlot):
     def set_filter(self, filter_type):
         self.plot_data["on_filter"] = filter_type
 
+    def set_on_filter(self, on_filter):
+        """Alias for set_filter (ScatterPlot3D uses this name; 2D scatter should prefer set_filter)."""
+        self.set_filter(on_filter)
+
     def set_radius(self, radius):
         self.plot_data["radius"] = radius
 

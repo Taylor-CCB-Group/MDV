@@ -5,6 +5,9 @@
 ## The total counts in the obs attribute of an AnnData object is helps identify cells 
 ## with low total counts (potential debris or dying cells) and extremely high counts (potential doublets).
 ## Ensures the dataset is not skewed by technical artifacts
+##
+## HistogramPlot uses set_x_axis / set_y_axis (below). For BoxPlot, ViolinPlot, ScatterPlot, DotPlot
+## use set_axis_properties("x", {...}) — never copy set_x_axis onto those chart classes.
 
 import os
 import pandas as pd

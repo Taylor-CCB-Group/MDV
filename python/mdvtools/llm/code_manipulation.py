@@ -1,16 +1,16 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+from typing import Any, Optional
+
+from mdvtools.project_protocols import ProjectViewLookup, ProjectViewsLike
 import pandas as pd
 import regex as re
 from mdvtools.llm.templates import packages_functions
+from mdvtools.llm.datasource_roles import build_chatmdv_roles_constants_block
 import json
 import ast
 import subprocess
 import tempfile
 import os
-
-if TYPE_CHECKING:
-    from mdvtools.mdvproject import MDVProject
 
 # Match `def main(...):` / `async def main(...):` at line start (fallback when AST parse fails).
 _MAIN_DEF_RE = re.compile(r"^\s*(?:async\s+)?def\s+main\s*\(", re.MULTILINE)
@@ -50,6 +50,31 @@ def extract_code_from_response(response: str):
     # return matches[-1].strip()
 
 
+def _autofix_generated_code(code: str, log=print) -> str:
+    """Best-effort fixes for common ChatMDV codegen mistakes before execution."""
+    if "project.get_datasource_roles()" in code:
+        log("# Autofix: project.get_datasource_roles() -> infer_datasource_roles(project)")
+        code = code.replace(
+            "project.get_datasource_roles()",
+            "infer_datasource_roles(project)",
+        )
+    for bad_attr in (".feature_table", ".feature_datasource"):
+        if bad_attr in code:
+            log(f"# Autofix: expr{bad_attr} -> expr.datasource_name")
+            code = code.replace(bad_attr, ".datasource_name")
+    return code
+
+
+def _prepend_chatmdv_roles_block(code: str, project: Any) -> str:
+    try:
+        roles_block = build_chatmdv_roles_constants_block(project)
+    except Exception:
+        return code
+    if not roles_block.strip():
+        return code
+    return f"{roles_block}\n\n{code}"
+
+
 def extract_explanation_from_response(response: str):
     """Extracts the explanation text by removing code blocks from the response."""
     # Remove all code blocks (```python...``` or ```...```)
@@ -60,7 +85,7 @@ def extract_explanation_from_response(response: str):
 def prepare_code(
     result: str,
     data: Optional[str | pd.DataFrame],
-    project: MDVProject,
+    project: ProjectViewsLike,
     log=print,
     modify_existing_project=False,
     view_name="default",
@@ -111,14 +136,17 @@ def prepare_code(
     has_trailing_else_main = "else:\n    main()" in captured_str or "else:\n\tmain()" in captured_str
 
     if has_module_guard or has_trailing_else_main:
-        final_code = f"{packages_functions}\n{captured_lines}"
+        body = captured_lines
     elif _defines_function_named_main(captured_str):
-        final_code = f"""{packages_functions}\n{captured_lines}
+        body = f"""{captured_lines}
 
 if __name__ == "__main__":
     main()"""
     else:
-        final_code = f"{packages_functions}\n{captured_lines}"
+        body = captured_lines
+    final_code = f"{packages_functions}\n{body}"
+    final_code = _prepend_chatmdv_roles_block(final_code, project)
+    final_code = _autofix_generated_code(final_code, log=log)
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:
         # Do NOT do naive `replace("project.add_datasource", "# project.add_datasource")`: it only comments the first
@@ -182,7 +210,17 @@ def _lint_code_with_ruff(code: str, log=print):
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-def patch_viewname(code: str, project: MDVProject, fallback_view_name: Optional[str] = None):
+def _replace_view_name_assignment(code: str, old_name: str, new_name: str) -> str:
+    """Replace view_name = 'old' or view_name = \"old\" with a safely quoted new value."""
+    new_assignment = f"view_name = {json.dumps(new_name)}"
+    for quote in ('"', "'"):
+        old_assignment = f"view_name = {quote}{old_name}{quote}"
+        if old_assignment in code:
+            return code.replace(old_assignment, new_assignment, 1)
+    return code
+
+
+def patch_viewname(code: str, project: ProjectViewsLike, fallback_view_name: Optional[str] = None):
     """Given a code string, replace the view_name with a unique name, 
     attempting to escape any quotes that might have been in the original.
     """
@@ -215,20 +253,14 @@ def patch_viewname(code: str, project: MDVProject, fallback_view_name: Optional[
     if view_name not in existing_views:
         # just in case the view_name isn't a duplicate, but might have had quotes in it
         print(f'patched view_name: {escaped_view_name}')
-        complete_view_name = f"view_name = \"{view_name}\""
-        escaped_complete_view_name = f"view_name = \"{escaped_view_name}\""
-        return code.replace(complete_view_name, escaped_complete_view_name)
-        #return code.replace(view_name, escaped_view_name)
+        return _replace_view_name_assignment(code, view_name, escaped_view_name)
     n = 1
     new_view_name = f"{escaped_view_name} ({n})"
     while new_view_name in existing_views:
         n += 1
         new_view_name = f"{escaped_view_name} ({n})"
     print(f'patched view_name: {new_view_name}')
-    complete_view_name = f"view_name = \"{view_name}\""
-    new_complete_view_name = f"view_name = \"{new_view_name}\""
-    return code.replace(complete_view_name, new_complete_view_name)
-    #return code.replace(view_name, new_view_name)
+    return _replace_view_name_assignment(code, view_name, new_view_name)
 
 def parse_view_name(code: str):
     """Given a code string, extract the view_name from it using AST.
@@ -249,3 +281,10 @@ def parse_view_name(code: str):
         pass
 
     return None
+
+
+def resolve_persisted_view_name(project: ProjectViewLookup, parsed_view_name: Optional[str]) -> Optional[str]:
+    """Return the generated view name only when it was actually persisted."""
+    if parsed_view_name is None:
+        return None
+    return parsed_view_name if project.get_view(parsed_view_name) is not None else None
