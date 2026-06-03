@@ -99,7 +99,7 @@ COPY --chown=pn:pn python/README.md ./python/
 WORKDIR /app/python
 # The first layer does not include the full source tree yet,
 # so we sync dependencies without installing the project itself.
-RUN uv sync --no-install-project --frozen --group dev --group backend --group auth
+RUN uv sync --no-install-project --frozen --group dev --extra app
 
 WORKDIR /app
 # copy package manager metadata as a separate step so dependency install can be cached (with correct ownership)
@@ -130,7 +130,7 @@ WORKDIR /app/python
 # installing again so we have mdvtools as a module, on top of the previous install layer with dependencies
 # this step should be very fast
 # if we don't have this, the server itself runs, but anything that doesn't run from this workdir will fail to import mdvtools
-RUN uv sync --frozen --group dev --group backend --group auth
+RUN uv sync --frozen --group dev --extra app
 
 # Expose the port that Flask will run on
 EXPOSE 5055

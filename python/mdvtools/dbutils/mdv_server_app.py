@@ -1,3 +1,6 @@
+from mdvtools._optional import require_extra
+require_extra("app", "sqlalchemy")
+
 import os
 import sys
 import time
