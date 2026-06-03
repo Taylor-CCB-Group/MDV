@@ -85,6 +85,38 @@ def test_resolve_rows_as_columns_single_subgroup_fallback_only_when_one_link():
     assert sparse is False
 
 
+def test_resolve_rows_as_columns_no_fallback_when_one_link_has_many_subgroups():
+    class MixedLinks:
+        def get_links(self, datasource, filter=None):
+            del datasource
+            return [
+                {
+                    "datasource": "multi",
+                    "link": {
+                        "rows_as_columns": {
+                            "subgroups": {
+                                "a": {"name": "mat_a", "type": "dense"},
+                                "b": {"name": "mat_b", "type": "dense"},
+                            }
+                        }
+                    },
+                },
+                {
+                    "datasource": "single",
+                    "link": {
+                        "rows_as_columns": {
+                            "subgroups": {"z": {"name": "mat_z", "type": "sparse"}}
+                        }
+                    },
+                },
+            ]
+
+    with pytest.raises(AttributeError, match="not found"):
+        mp.MDVProject._resolve_rows_as_columns_subgroup(
+            MixedLinks(), "cells", "missing"
+        )
+
+
 def test_resolve_rows_as_columns_no_fallback_when_multiple_single_subgroup_links():
     class TwoLinks:
         def get_links(self, datasource, filter=None):

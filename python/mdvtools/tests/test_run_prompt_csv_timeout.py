@@ -21,7 +21,10 @@ def test_run_chat_row_subprocess_timeout_returns_failed_result():
         output=b"partial stdout",
         stderr=b"partial stderr",
     )
-    with patch.object(run_prompt_csv.subprocess, "run", side_effect=exc):
+    with (
+        patch.object(run_prompt_csv.subprocess, "run", side_effect=exc),
+        patch.object(run_prompt_csv.time, "time", side_effect=[100.0, 105.5]),
+    ):
         result, exit_code, term_tag = run_prompt_csv._run_chat_row_subprocess(
             project_path="/tmp/proj",
             prompt="test",
@@ -33,3 +36,4 @@ def test_run_chat_row_subprocess_timeout_returns_failed_result():
     assert result["success"] is False
     assert "timed out after 10" in str(result["message"])
     assert "partial stdout" in str(result["captured_output"])
+    assert result["duration_seconds"] == 5.5

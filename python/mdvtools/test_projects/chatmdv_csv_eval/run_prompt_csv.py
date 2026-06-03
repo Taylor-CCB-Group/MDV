@@ -297,6 +297,7 @@ def _synthetic_worker_failure(
     project_path: str,
     message: str,
     stderr_excerpt: str = "",
+    duration_seconds: float = 0.0,
 ) -> dict[str, object]:
     cap = stderr_excerpt.strip()
     return {
@@ -308,7 +309,7 @@ def _synthetic_worker_failure(
         "debug_output_dir": None,
         "block_timings": {},
         "captured_output": cap,
-        "duration_seconds": 0.0,
+        "duration_seconds": duration_seconds,
         "view_snapshot_present": False,
         "chart_count": 0,
         "verification": "",
@@ -397,6 +398,7 @@ def _run_chat_row_subprocess(
     }
     if timeout_seconds is not None and timeout_seconds > 0:
         run_kwargs["timeout"] = timeout_seconds
+    start_time = time.time()
     try:
         completed = subprocess.run(cmd, **run_kwargs)
     except subprocess.TimeoutExpired as exc:
@@ -416,6 +418,7 @@ def _run_chat_row_subprocess(
             project_path=project_path,
             message=msg,
             stderr_excerpt=cap or stderr_txt,
+            duration_seconds=time.time() - start_time,
         )
         return fail, 5, "timeout"
     except OSError as exc:

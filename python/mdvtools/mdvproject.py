@@ -263,14 +263,12 @@ class MDVProject:
                     name = str(info.get("name", cand))
                     sparse = info.get("type") == "sparse"
                     return name, sparse
-        single_subgroup_links: list[tuple[dict, dict]] = []
+        all_subgroups: dict[str, Any] = {}
         for ln in lnks:
             subgroups = (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
-            if len(subgroups) == 1:
-                single_subgroup_links.append((ln, subgroups))
-        if len(single_subgroup_links) == 1:
-            _ln, subgroups = single_subgroup_links[0]
-            _k, info = next(iter(subgroups.items()))
+            all_subgroups.update(subgroups)
+        if len(all_subgroups) == 1:
+            _k, info = next(iter(all_subgroups.items()))
             name = str(info.get("name", _k))
             sparse = info.get("type") == "sparse"
             return name, sparse
