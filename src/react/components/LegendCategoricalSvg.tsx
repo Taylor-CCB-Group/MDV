@@ -61,10 +61,11 @@ export default function LegendCategoricalSvg({
                                 opacity: dimmed ? 0.4 : 1,
                             }}
                         >
+                            <title>{item.label === "" ? "none" : item.label}</title>
                             <rect
                                 y={y}
                                 x={2}
-                                height="10"
+
                                 width="10"
                                 fill={item.color}
                                 stroke={isHovered ? "currentColor" : "none"}
