@@ -11,7 +11,7 @@ How to build and publish the `mdvtools` package. One package, one version, one
 ## Prerequisites
 
 - Accounts on **TestPyPI** and **PyPI**, and **collaborator** access on the `mdvtools`
-  project on each (ask Martin Sergeant to add you).
+  project on each.
 - An **API token** for each index (account → API tokens). Export it when publishing:
   ```bash
   export UV_PUBLISH_TOKEN="pypi-…"     # the token for the index you're publishing to

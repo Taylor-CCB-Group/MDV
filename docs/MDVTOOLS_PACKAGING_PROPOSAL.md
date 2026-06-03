@@ -1,12 +1,8 @@
 # mdvtools Packaging & Release Proposal
 
-**Status:** Decisions locked (grilling session 2026-05-29). See `docs/adr/0001`, `docs/adr/0002`, and `CONTEXT.md`.
 **Author:** Marouf Shaikh
 **Date:** 2026-05-29
-**Goal (set by management):** Stop maintaining two diverging `pyproject.toml` files. Manage **one** well-structured `pyproject.toml` that serves both the slim `pip install mdvtools` (the majority of users) and the full Docker image. Maintainability first; smaller install is a secondary benefit.
-
-**Recommendation (decided):** Collapse to a **single `python/pyproject.toml`** on **uv**. Required deps = slim core; the entire optional cluster becomes **one `app` extra** + guarded imports. `pip install mdvtools` → slim; the Docker image runs `uv sync --all-extras` → full. **Delete `mdvtools_lite_build/`.** No second package, no second version, no `force-include`, ship all modules.
-
+**Goal:** Stop maintaining two diverging `pyproject.toml` files. Manage **one** well-structured `pyproject.toml` that serves both the slim `pip install mdvtools` (the majority of users) and the full Docker image. Maintainability first; smaller install is a secondary benefit.
 ---
 
 ## 1. The problem
@@ -29,13 +25,13 @@ Because both files hand-declare `name = "mdvtools"`, `version`, and overlapping 
 
 ---
 
-## 2. Martin's concern, answered with numbers
+## 2. Some concerns, answered with numbers
 
 Martin built the lite wheel and observed:
 
 > *"I use hatch to cherry-pick modules… even doing this, with all the dependencies, the install is still **over 1.4 GB**."*
 
-That observation is the whole argument, and Martin draws the right conclusion himself: *"the only other way is optional dependencies + a graceful way of handling them."* The build backend's file-selection power operates on the axis that doesn't matter (`.py` source), while the 1.4 GB lives in **dependencies**, which `[project.optional-dependencies]` controls — backend-agnostically.
+ The build backend's file-selection power operates on the axis that doesn't matter (`.py` source), while the 1.4 GB lives in **dependencies**, which `[project.optional-dependencies]` controls — backend-agnostically.
 
 | What | Size | Notes |
 |---|---|---|
@@ -169,19 +165,9 @@ llm     → auth    (chat_server_extension)      ┘
 
 ## 7. Open questions for standup
 
-1. ~~Why was uv #468 reverted (#471)?~~ **Moot** — uv re-landed on `main` via #472 and is passing CI.
-2. **`required-version` exact pin** — #472 set `[tool.uv] required-version = "0.11.14"` (exact `==`), which fails on any uv drift (hit during this work). Consider relaxing to a range (e.g. `>=0.11.14,<0.12`).
-3. **PyPI ownership** — add Marouf (`mrfshk`) as collaborator on PyPI + TestPyPI `mdvtools` (Martin to action).
-4. **Existing-user impact** — slim install becomes *lighter*; full-app users must add `[app]`. spatial is unchanged (stays in core). The full Docker image now also pulls `gspread`/`oauth2client` (previously absent). Note in release notes / version bump.
+1. **`required-version` exact pin** — #472 set `[tool.uv] required-version = "0.11.14"` (exact `==`), which fails on any uv drift (hit during this work). Consider relaxing to a range (e.g. `>=0.11.14,<0.12`).
 
 ---
-
-## 8. Appendix — approaches considered and not chosen
-
-- **Keep Poetry** (the earlier recommendation). Poetry 2.x supports PEP 621 extras and would be a ~2-line Dockerfile change, but it leaves us on Poetry against the team's direction and re-converts the toml later anyway. Rejected — see ADR-0002.
-- **Spatial as an extra** (Martin's preference). Today's PyPI wheel already ships spatial + requires spatialdata; demoting it breaks existing `pip install mdvtools` users for a maintainability goal that doesn't require the break. Rejected — spatial stays in core. (ADR-0001)
-- **Separate named extras (spatial/chat/server/auth).** auth+dbutils+llm form an import cycle, so three "independent" extras that each pull the other two is false granularity. Collapsed to one `app` extra. (ADR-0001 / §4)
-- **Two PyPI packages (pydantic-ai umbrella) / separate repo (Martin's "MDVApp").** Both *add* packages/versions to manage — the opposite of the goal. The 576 KB figure removes the footprint rationale. Rejected. (ADR-0001)
 
 ## 9. References
 
