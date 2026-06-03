@@ -131,6 +131,7 @@ export function restoreColorLegendFilter(
     spec: ColorLegendSpec,
 ): void {
     if (chart.colorLegendFilter) {
+        chart.updateResetButtonVisibility();
         return;
     }
     const savedFilter = chart.config.color_legend?.filter;

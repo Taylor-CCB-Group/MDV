@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { axisBottom } from "d3";
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
@@ -17,6 +17,8 @@ export type LegendContinuousSvgProps = {
     height?: number;
 };
 
+export const DEFAULT_CONTINUOUS_LEGEND_HEIGHT = 65;
+
 /**
  * Reusable continuous gradient legend SVG (bar + optional axis).
  * This is intentionally independent of color-legend wrapper logic so other
@@ -27,12 +29,15 @@ export default function LegendContinuousSvg({
     colors,
     range,
     width = 120,
-    height = 45,
+    height = DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
 }: LegendContinuousSvgProps) {
     // SVG ids are document-global, and legends may be rendered through separate React roots.
     const gradientIdRef = useRef<string>(createLegendGradientId());
     const gradientId = gradientIdRef.current;
     const axisRef = useRef<SVGGElement>(null);
+    const svgRef = useRef<SVGSVGElement>(null);
+    const [observedWidth, setObservedWidth] = useState(width);
+    const layoutWidth = Math.max(observedWidth, 40);
     const len = colors.length;
     const colorPct = colors.map((color, i) => {
         // Use proportional stops across [0,100] and keep keys unique via index.
@@ -41,27 +46,41 @@ export default function LegendContinuousSvg({
         return [`${pct}%`, color, i] as const;
     });
 
-    let barHeight = height;
-    if (label) {
-        barHeight -= 10;
-    }
-    if (range) {
-        barHeight -= 25;
-    }
+    const barY = label ? 15 : 0;
+    const barHeight = 10;
+
+    useLayoutEffect(() => {
+        const container = svgRef.current?.parentElement;
+        if (!container) {
+            return;
+        }
+        const updateLayout = () => {
+            setObservedWidth(container.clientWidth || width);
+        };
+        updateLayout();
+        if (typeof ResizeObserver === "undefined") {
+            return;
+        }
+        const observer = new ResizeObserver(updateLayout);
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [height, width]);
 
     useLayoutEffect(() => {
         const axisG = axisRef.current;
         if (!axisG) {
             return;
         }
-        const scale = scaleLinear().domain([range[0], range[1]]).range([0, width - 20]);
+        const scale = scaleLinear()
+            .domain([range[0], range[1]])
+            .range([0, layoutWidth - 20]);
         const axis = axisBottom(scale)
             .tickFormat((v) =>
                 Number(v) >= 10000
                     ? Number.parseFloat(String(v)).toPrecision(2)
                     : String(v),
             )
-            .ticks(Math.ceil(width / 20));
+            .ticks(Math.max(2, Math.ceil(layoutWidth / 35)));
 
         const selection = select(axisG);
         selection.call(axis);
@@ -75,18 +94,20 @@ export default function LegendContinuousSvg({
         return () => {
             selection.selectAll("*").remove();
         };
-    }, [range, width]);
+    }, [layoutWidth, range]);
 
     return (
         <svg
-            height={height}
-            width={width}
-            className="relative"
+            ref={svgRef}
+            height="100%"
+            width="100%"
+            className="relative overflow-hidden"
         >
             <g>
                 {label ? (
                     <text
                         x={10}
+                        aria-label={label}
                         alignmentBaseline="hanging"
                         className="fill-current text-xs"
                     >
@@ -114,14 +135,14 @@ export default function LegendContinuousSvg({
                 </defs>
                 <rect
                     x={10}
-                    y={label ? 10 : 0}
-                    width={width - 20}
+                    y={barY}
+                    width={layoutWidth - 20}
                     height={barHeight}
                     fill={`url(#${gradientId})`}
                 />
                 <g
                     ref={axisRef}
-                    transform={`translate(10,${height - 25})`}
+                    transform={`translate(10,${barY + barHeight})`}
                 />
             </g>
         </svg>

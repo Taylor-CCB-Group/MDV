@@ -39,10 +39,15 @@ export default function LegendCategoricalSvg({
     const height = legendCategoricalBodyHeight(items.length);
 
     return (
-        <svg height={height} width={LEGEND_CATEGORICAL_WIDTH} className="relative">
+        <svg
+            height={height}
+            width="100%"
+            className="relative overflow-hidden"
+        >
             <g>
                 {items.map((item, i) => {
                     const y = (i + 1) * 2 + i * H_FAC;
+                    const label = item.label === "" ? "none" : item.label;
                     const isHovered =
                         hoveredKey !== null && hoveredKey === item.key;
                     const isActive =
@@ -90,12 +95,13 @@ export default function LegendCategoricalSvg({
                             <text
                                 y={y + 9}
                                 x={14}
+                                aria-label={label}
                                 className="text-xs fill-current"
                                 style={{
                                     fontWeight: isActive ? 700 : undefined,
                                 }}
                             >
-                                {item.label === "" ? "none" : item.label}
+                                {label}
                             </text>
                         </g>
                     );

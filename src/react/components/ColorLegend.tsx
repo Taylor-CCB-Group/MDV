@@ -4,7 +4,9 @@ import LegendCategoricalSvg, {
     LEGEND_CATEGORICAL_WIDTH,
     legendCategoricalContainerHeight,
 } from "./LegendCategoricalSvg";
-import LegendContinuousSvg from "./LegendContinuousSvg";
+import LegendContinuousSvg, {
+    DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
+} from "./LegendContinuousSvg";
 
 export type ColorLegendProps = {
     spec: ColorLegendSpec;
@@ -33,9 +35,10 @@ function ColorLegendCategorical({
     }));
 
     return (
-        <>
+        <div className="legend-drag-handle h-full w-full overflow-hidden">
             <div
-                className="legend-title"
+                className="legend-title overflow-hidden text-ellipsis"
+                title={label}
                 style={{
                     height: "20px",
                     whiteSpace: "nowrap",
@@ -57,7 +60,7 @@ function ColorLegendCategorical({
                     onItemClick={onItemClick}
                 />
             </div>
-        </>
+        </div>
     );
 }
 
@@ -94,7 +97,7 @@ export default function ColorLegend({
             return;
         }
         const width = spec.width ?? 120;
-        const height = spec.height ?? 45;
+        const height = spec.height ?? DEFAULT_CONTINUOUS_LEGEND_HEIGHT;
         el.style.width = `${width}px`;
         el.style.height = `${height}px`;
         el.style.border = "";
@@ -114,7 +117,7 @@ export default function ColorLegend({
     }
 
     return (
-        <div ref={containerRef}>
+        <div ref={containerRef} className="h-full w-full overflow-hidden">
             <LegendContinuousSvg
                 label={spec.label}
                 colors={spec.colors}

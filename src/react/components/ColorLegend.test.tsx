@@ -4,7 +4,7 @@ import ColorLegend from "./ColorLegend";
 
 describe("ColorLegend", () => {
     test("renders categorical legend title and labels", () => {
-        render(
+        const { container } = render(
             <div className="legend-container">
                 <ColorLegend
                     spec={{
@@ -30,6 +30,13 @@ describe("ColorLegend", () => {
         expect(screen.getByText("Cell type")).toBeTruthy();
         expect(screen.getByText("T cell")).toBeTruthy();
         expect(screen.getByText("B cell")).toBeTruthy();
+        expect(container.querySelector(".legend-drag-handle")).toBeTruthy();
+        expect(container.querySelector(".legend-title")?.className).toContain(
+            "text-ellipsis",
+        );
+        const svg = container.querySelector("svg");
+        expect(svg?.classList).toContain("overflow-hidden");
+        expect(svg?.getAttribute("width")).toBe("100%");
     });
 
     test("applies local hover styling for categorical rows", () => {
@@ -157,5 +164,11 @@ describe("ColorLegend", () => {
         expect(screen.getByText("Expression")).toBeTruthy();
         expect(container.querySelector("linearGradient")).toBeTruthy();
         expect(container.querySelector("rect[fill^='url(#']")).toBeTruthy();
+        expect(container.querySelector("svg")?.getAttribute("width")).toBe(
+            "100%",
+        );
+        expect(container.querySelector("svg")?.getAttribute("height")).toBe(
+            "100%",
+        );
     });
 });

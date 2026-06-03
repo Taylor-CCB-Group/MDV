@@ -653,10 +653,10 @@ class BaseChart<T extends BaseConfig> {
             ColorLegendWithInteractions,
             spec.kind === "categorical"
                 ? {
-                      dragHandle: ".legend-body",
+                      dragHandle: ".legend-drag-handle",
                       resizable: true,
                   }
-                : {},
+                : { resizable: true },
         );
         this.legend = this.colorLegendWrapper.getWrapperElement() ?? undefined;
         if (!this.legend) {
