@@ -86,12 +86,12 @@ def test_resolve_rows_as_columns_single_subgroup_fallback_only_when_one_link():
 
 
 def test_resolve_rows_as_columns_no_fallback_when_one_link_has_many_subgroups():
-    class MixedLinks:
+    class OneLinkManySubgroups:
         def get_links(self, datasource, filter=None):
             del datasource
             return [
                 {
-                    "datasource": "multi",
+                    "datasource": "genes",
                     "link": {
                         "rows_as_columns": {
                             "subgroups": {
@@ -100,20 +100,12 @@ def test_resolve_rows_as_columns_no_fallback_when_one_link_has_many_subgroups():
                             }
                         }
                     },
-                },
-                {
-                    "datasource": "single",
-                    "link": {
-                        "rows_as_columns": {
-                            "subgroups": {"z": {"name": "mat_z", "type": "sparse"}}
-                        }
-                    },
-                },
+                }
             ]
 
     with pytest.raises(AttributeError, match="not found"):
         mp.MDVProject._resolve_rows_as_columns_subgroup(
-            MixedLinks(), "cells", "missing"
+            OneLinkManySubgroups(), "cells", "missing"
         )
 
 
