@@ -15,7 +15,11 @@ import {
     ModifyMode,
     // DrawRectangleMode,
     // TransformMode,
-    // TranslateMode,
+    // nb: non-geospatial coordinate system support is in v9.3.1
+    // we should be able to use this and get rid of 'translate-mode-exp'
+    // but the issues when switching seem more to do with logic than coordinates
+    // or maybe we need to pass some different prop (should be inferred?)
+    // TranslateMode as TranslateModeEx,
     CompositeMode,
     type GeoJsonEditMode,
 } from '@deck.gl-community/editable-layers';
@@ -24,7 +28,6 @@ import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-is
 import useGateActions from "../hooks/useGateActions";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
-import { getEmptyFeatureCollection } from "../deck_state";
 import { TuneOutlined } from "@mui/icons-material";
 import { LassoIcon, SplineIcon } from "lucide-react";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";

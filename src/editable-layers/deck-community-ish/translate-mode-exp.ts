@@ -84,6 +84,8 @@ function cloneSimpleFeature(feature: SimpleFeature): SimpleFeature {
 
 /**
  * This is an edit mode for translating GeoJSON features with non-geographic coordinates.
+ * 
+ * This should no longer be necessary with https://github.com/visgl/deck.gl-community/releases/tag/v9.3.1
  */
 export default class TranslateModeEx extends TranslateMode {
   getTranslateAction(
