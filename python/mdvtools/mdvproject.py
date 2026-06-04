@@ -200,10 +200,9 @@ class MDVProject:
         field_set = set(fields)
 
         if columns is None:
-            out: dict[str, Any] = {}
-            for field in fields:
-                out[field] = self.get_column(datasource, field)
-            return pandas.DataFrame(out)
+            return pandas.DataFrame(
+                {field: self.get_column(datasource, field) for field in fields}
+            )
 
         requested_keys: list[str] = []
         for col in columns:
