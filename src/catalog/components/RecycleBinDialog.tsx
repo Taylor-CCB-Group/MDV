@@ -54,7 +54,11 @@ const RecycleBinDialog = ({
 
     useEffect(() => {
         if (open) {
-            void fetchProjects().then(setProjects);
+            void fetchProjects()
+                .then(setProjects)
+                .catch(() => {
+                    setProjects([]);
+                });
         }
     }, [fetchProjects, open]);
 

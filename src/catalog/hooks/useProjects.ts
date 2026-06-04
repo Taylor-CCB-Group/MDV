@@ -399,13 +399,18 @@ const useProjects = () => {
             setIsLoading(true);
             setError(null);
             try {
+                const parsedProjectIds = projectIds.map((projectId) => Number(projectId));
+                if (parsedProjectIds.some((projectId) => !Number.isInteger(projectId))) {
+                    throw new Error("Invalid project id selected for deletion.");
+                }
+
                 const response = await apiFetch("projects/soft-delete", {
                     method: "POST",
                     headers: {
                         Accept: "application/json",
                         "Content-Type": "application/json",
                     },
-                    body: JSON.stringify({ projectIds: projectIds.map(Number) }),
+                    body: JSON.stringify({ projectIds: parsedProjectIds }),
                 });
                 if (!response.ok) {
                     throw await parseErrorResponse({
