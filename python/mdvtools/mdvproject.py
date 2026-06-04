@@ -140,11 +140,16 @@ class MDVProject:
     def writable(self):
         """
         Determine whether the user running this process has write-permission on relevant files
-        (state.json as a heuristic for now).
         This is independent of any permissions set in db etc,
         but can be used to guard against inappropriate admin actions
         """
-        return os.access(self.statefile, os.W_OK)
+        return (
+            # belt and braces
+            os.access(self.statefile, os.W_OK)
+            and os.access(self.dir, os.W_OK | os.X_OK)
+            and os.access(self.viewsfile, os.W_OK)
+            and os.access(self.h5file, os.W_OK)
+        )
 
     @property
     def datasources(self):
