@@ -16,6 +16,7 @@ const useUser = () => {
     useEffect(() => {
         const fetchUser = async () => {
             setIsLoading(true);
+            setError(null);
             try {
                 const response = await apiFetch("profile");
                 if (!response.ok) {
@@ -30,6 +31,7 @@ const useUser = () => {
                 setUser(userData);
             } catch (err) {
                 console.error("Error fetching user data:", err);
+                setUser(null);
                 setError("Unable to fetch user data");
             } finally {
                 setIsLoading(false);
