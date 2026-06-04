@@ -403,9 +403,11 @@ def serve_projects_from_db(app):
                             # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
                             access_level_val = getattr(project, 'access_level', None)
                             is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
+                        # nb this will warn in log if the project isn't writable by current user
+                        # avoiding touching other aspects of surrounding logic for now.
                         p.set_editable(is_editable)
                     except Exception:
-                        # Favor editable by default on unexpected errors
+                        # Favor editable by default on unexpected errors (see comment above on writable check)
                         p.set_editable(True)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)

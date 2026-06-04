@@ -35,30 +35,6 @@ from mdvtools.project_protocols import RowsAsColumnsLinkSource
 logger = get_logger(__name__)
 
 
-def _agent_debug_log(
-    run_id: str,
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict,
-    *,
-    log: logging.Logger | None = None,
-) -> None:
-    """Structured debug logging for agent workflows (logger-only, no file I/O)."""
-    target = log if log is not None else logger
-    payload = {
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-    }
-    try:
-        target.debug(json.dumps(payload))
-    except Exception:
-        target.warning("agent debug log failed", exc_info=True)
-
-
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
@@ -135,6 +111,16 @@ class MDVProject:
         self.backend_db = backend_db
 
     @property
+    def writable(self):
+        """
+        Determine whether the user running this process has write-permission on relevant files
+        (state.json as a heuristic for now).
+        This is independent of any permissions set in db etc,
+        but can be used to guard against inappropriate admin actions
+        """
+        return os.access(self.statefile, os.W_OK)
+
+    @property
     def datasources(self):
         return get_json(self.datasourcesfile)
 
@@ -168,6 +154,9 @@ class MDVProject:
         save_json(self.statefile, value ,self.safe_file_save)
 
     def set_editable(self, edit=True):
+        if not self.writable:
+            logger.log(1, f"can't set_editable on '{self.dir}' because it's not writable")
+            return
         c = self.state
         c["permission"] = "edit" if edit else "view"
         self.state = c
