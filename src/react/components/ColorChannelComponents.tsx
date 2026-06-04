@@ -33,6 +33,14 @@ import {
 } from "./avivatorish/state";
 import { getSingleSelectionStats } from "./avivatorish/utils";
 
+const DEFAULT_BRIGHTNESS_CONTRAST = 0.5;
+
+function withChannelValue(values: number[], index: number, value: number) {
+    return Array.from({ length: Math.max(values.length, index + 1) }, (_, i) =>
+        i === index ? value : values[i] ?? DEFAULT_BRIGHTNESS_CONTRAST,
+    );
+}
+
 type Range = [number, number];
 type ScaleMode = "auto" | HistogramScaleType;
 const HISTOGRAM_BINS = 200;
@@ -323,6 +331,8 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     const { contrast, brightness } = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
+    const contrastValue = contrast[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
+    const brightnessValue = brightness[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
     return (
         <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
             <div className="flex items-center gap-2">
@@ -332,21 +342,19 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                 <Slider
                     size="small"
                     disabled={isChannelLoading[index]}
-                    value={contrast[index]}
+                    value={contrastValue}
                     min={0.1}
                     max={0.9}
                     step={0.01}
                     onChange={(_, v) => {
                         if (isArray(v)) return;
-                        const newContrast = [...contrast];
-                        newContrast[index] = v;
-                        channelsStore.setState({ contrast: newContrast });
+                        channelsStore.setState({ contrast: withChannelValue(contrast, index, v) });
                     }}
                     onClick={(e) => {
                         if (e.detail === 2) {
-                            const newContrast = [...contrast];
-                            newContrast[index] = 0.5;
-                            channelsStore.setState({ contrast: newContrast });
+                            channelsStore.setState({
+                                contrast: withChannelValue(contrast, index, DEFAULT_BRIGHTNESS_CONTRAST),
+                            });
                         }
                     }}
                 />
@@ -358,21 +366,19 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                 <Slider
                     size="small"
                     disabled={isChannelLoading[index]}
-                    value={brightness[index]}
+                    value={brightnessValue}
                     min={0.01}
                     max={0.99}
                     step={0.01}
                     onChange={(_, v) => {
                         if (isArray(v)) return;
-                        const newBrightness = [...brightness];
-                        newBrightness[index] = v;
-                        channelsStore.setState({ brightness: newBrightness });
+                        channelsStore.setState({ brightness: withChannelValue(brightness, index, v) });
                     }}
                     onClick={(e) => {
                         if (e.detail === 2) {
-                            const newBrightness = [...brightness];
-                            newBrightness[index] = 0.5;
-                            channelsStore.setState({ brightness: newBrightness });
+                            channelsStore.setState({
+                                brightness: withChannelValue(brightness, index, DEFAULT_BRIGHTNESS_CONTRAST),
+                            });
                         }
                     }}
                 />

@@ -1,24 +1,35 @@
-import {
-    type Layer,
-    LayerExtension,
-    type UpdateParameters,
-} from "@deck.gl/core";
+import type { Layer, UpdateParameters } from "@deck.gl/core";
+import { VivLayerExtension } from "@hms-dbmi/viv";
+import { VIV_CHANNEL_INDEX_PLACEHOLDER as I } from "@vivjs/constants";
 
 export type ContrastProps = {
     contrast: number[];
     brightness: number[];
 };
 
-export default class VivContrastExtension extends LayerExtension<ContrastProps> {
+const M = "vivContrast";
+const DEFAULT_BRIGHTNESS = 0.5;
+const DEFAULT_CONTRAST = 0.5;
+
+export default class VivContrastExtension extends VivLayerExtension<ContrastProps> {
     static get componentName(): string {
         return "VivContrastExtension";
     }
-    getShaders(this: Layer<ContrastProps>, extension: this) {
+
+    getVivShaderTemplates() {
         return {
-            inject: {
-                "fs:#decl": /*glsl*/ `///----- VivContrastExtension decl
-                uniform float contrast[6];
-                uniform float brightness[6];
+            modules: [
+                {
+                    name: M,
+                    uniformTypes: {
+                        [`contrast${I}`]: "f32",
+                        [`brightness${I}`]: "f32",
+                    },
+                    fs: /*glsl*/ `///----- VivContrastExtension decl
+                uniform ${M}Uniforms {
+                    float contrast${I};
+                    float brightness${I};
+                } ${M};
 
                 //https://cis700-procedural-graphics.github.io/files/toolbox_functions.pdf
                 float bias(float b, float t) {
@@ -32,51 +43,53 @@ export default class VivContrastExtension extends LayerExtension<ContrastProps> 
                     }
                 }
                 float applyBrightnessContrast(float intensity, int channelIndex) {
+                    float contrast[NUM_CHANNELS] = float[NUM_CHANNELS](
+                        ${M}.contrast${I},
+                    );
+                    float brightness[NUM_CHANNELS] = float[NUM_CHANNELS](
+                        ${M}.brightness${I},
+                    );
                     float c = contrast[channelIndex];
                     float b = brightness[channelIndex];
                     return bias(b, gain(c, intensity));
                 }
                 ///---- end VivContrastExtension
                 `,
-                "fs:DECKGL_PROCESS_INTENSITY": /*glsl*/ `///----- VivContrastExtension DECKGL_PROCESS_INTENSITY
+                    inject: {
+                        "fs:DECKGL_PROCESS_INTENSITY": /*glsl*/ `///----- VivContrastExtension DECKGL_PROCESS_INTENSITY
                 intensity = apply_contrast_limits(intensity, contrastLimits);
                 intensity = clamp(intensity, 0., 1.);
                 intensity = applyBrightnessContrast(intensity, channelIndex);
                 ///---- end VivContrastExtension
                 `,
-                // 'fs:DECKGL_MUTATE_COLOR': /*glsl*/`
-                // //---- VivContrastExtension DECKGL_MUTATE_COLOR
-                // // contrast adjustment
-                // `
-            },
+                    },
+                },
+            ],
         };
     }
+
     updateState(
         this: Layer<ContrastProps>,
         params: UpdateParameters<Layer<ContrastProps>>,
         extension: this,
     ): void {
+        super.updateState(params, extension);
         const { props } = params;
-        const { contrast, brightness } = props;
-        // should be arrays of 6... probably in imageSettingsStore.
-        // --- would be nice if viv etc were better about managing variable number of channels ---
-        if (contrast.length !== 6 || brightness.length !== 6) {
-            // throw new Error('contrast and brightness must be arrays of length 6');
-            const contrastA = Array(6);
-            const brightnessA = Array(6);
-            for (let i = 0; i < 6; i++) {
-                //don't really car about default values for missing entries...
-                contrastA[i] = contrast[i] ?? 1;
-                brightnessA[i] = brightness[i] ?? 0;
-            }
-            for (const model of this.getModels())
-                model.setUniforms({
-                    contrast: contrastA,
-                    brightness: brightnessA,
-                });
-            return;
+        const { contrast = [], brightness = [] } = props;
+        const getNumChannels = "getNumChannels" in this && typeof this.getNumChannels === "function"
+            ? this.getNumChannels.bind(this)
+            : undefined;
+        const numChannels = getNumChannels?.()
+            ?? ("selections" in props && Array.isArray(props.selections) ? props.selections.length : 0);
+        const vivContrastUniforms: Record<string, number> = {};
+
+        for (let i = 0; i < numChannels; i++) {
+            vivContrastUniforms[`contrast${i}`] = contrast[i] ?? DEFAULT_CONTRAST;
+            vivContrastUniforms[`brightness${i}`] = brightness[i] ?? DEFAULT_BRIGHTNESS;
         }
-        for (const model of this.getModels())
-            model.setUniforms({ contrast, brightness });
+
+        for (const model of this.getModels()) {
+            model.shaderInputs.setProps({ [M]: vivContrastUniforms });
+        }
     }
 }

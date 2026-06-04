@@ -16,7 +16,8 @@ import {
     // DrawRectangleMode,
     // TransformMode,
     // TranslateMode,
-    CompositeMode
+    CompositeMode,
+    type GeoJsonEditMode,
 } from '@deck.gl-community/editable-layers';
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
@@ -30,42 +31,46 @@ import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
 import { useChart } from "../context";
 
+function compositeModes(modes: unknown[]) {
+    return modes as GeoJsonEditMode[];
+}
+
 class EditMode extends CompositeMode {
     constructor() {
-        super([
+        super(compositeModes([
             new TranslateModeEx(), //works with cartesian / non-GIS coordinates
             new ModifyMode(),
-        ]);
+        ]));
     }
 }
 
 
 class RectangleMode extends CompositeMode {
     constructor() {
-        super([
+        super(compositeModes([
             // we pass in modeProps to the layer, not the edit mode.
             // new DrawRectangleMode(), //with modeConfig: { dragToDraw: true }
             //our version, which we shouldn't need but looks/works a bit different as of now
             new DrawRectangleByDraggingMode(),
             new TranslateModeEx(),
-        ]);
+        ]));
     }
 }
 class PolygonMode extends CompositeMode {
     constructor() {
-        super([
+        super(compositeModes([
             new DrawPolygonMode(),
             new TranslateModeEx(),
-        ]);
+        ]));
     }
 }
 // todo - figure out weird conflict behaviour with this mode...
 class FreehandMode extends CompositeMode {
     constructor() {
-        super([
+        super(compositeModes([
             new DrawPolygonByDraggingMode(),
             new TranslateModeEx(),
-        ]);
+        ]));
     }
 }
 // material-ui icons, or font-awesome icons... or custom in some cases...
