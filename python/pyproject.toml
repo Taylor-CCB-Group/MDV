@@ -51,7 +51,7 @@ dependencies = [
 app = [
     # server / database
     "flask-sqlalchemy>=3.1.1,<4",
-    "psycopg2>=2.9.9,<3",
+    "psycopg2-binary>=2.9.9,<3",
     "gunicorn==23.0.0",
     "psycogreen>=1.0.2,<2",
     # chat / LLM
