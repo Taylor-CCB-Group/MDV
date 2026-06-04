@@ -32,6 +32,7 @@ import {
     useViewerStore,
 } from "./avivatorish/state";
 import { getSingleSelectionStats } from "./avivatorish/utils";
+import { MAX_CHANNELS } from "@vivjs/constants";
 
 const DEFAULT_BRIGHTNESS_CONTRAST = 0.5;
 
@@ -539,7 +540,7 @@ const AddChannel = () => {
         selections,
         setPropertiesForChannel,
     }));
-    const canAddChannel = selections.length < 6;
+    const canAddChannel = selections.length < MAX_CHANNELS;
     const { addChannel, removeChannel } = useChannelsStore((state) => ({
         addChannel: state.addChannel,
         removeChannel: state.removeChannel,
