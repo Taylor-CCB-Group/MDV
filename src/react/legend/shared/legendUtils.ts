@@ -8,8 +8,8 @@ import {
     LEGEND_CATEGORICAL_ROW_HEIGHT,
     LEGEND_CATEGORICAL_WIDTH,
     LEGEND_LABEL_FONT,
-} from "./legendConstants";
-import type { ContinuousLegendLayout, GradientStop } from "./legendTypes";
+} from "@/react/legend/shared/legendConstants";
+import type { ContinuousLegendLayout, GradientStop } from "@/react/legend/shared/legendTypes";
 
 const ellipsis = "…";
 let measureCanvas: HTMLCanvasElement | null = null;

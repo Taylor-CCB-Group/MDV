@@ -16,12 +16,12 @@ import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 import tippy, {type Instance as TippyInstance} from "tippy.js";
 import 'tippy.js/dist/tippy.css';
-import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
-import type { ColorLegendSpec } from "@/react/colorLegend/types";
-import ColorLegend from "@/react/components/ColorLegend";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
+import ColorLegend from "@/react/components/legend/ColorLegend";
 import LegendWrapper, {
     type LegendWrapperComponentProps,
-} from "@/react/components/LegendWrapper";
+} from "@/react/components/legend/LegendWrapper";
 import {
     clearColorLegendFilter,
     destroyColorLegendFilter,
@@ -29,7 +29,7 @@ import {
     restoreColorLegendFilter,
     toggleCategoricalColorLegendFilter,
     type ColorLegendFilter,
-} from "./colorLegend/colorLegendFilterUtils";
+} from "@/react/legend/color_legend/colorLegendFilter";
 import { createElement } from "react";
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;

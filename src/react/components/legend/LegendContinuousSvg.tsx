@@ -5,20 +5,20 @@ import { select } from "d3-selection";
 import {
     DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
     DEFAULT_CONTINUOUS_LEGEND_WIDTH,
-} from "./legendConstants";
-import type { LegendContinuousSvgProps } from "./legendTypes";
+} from "@/react/legend/shared/legendConstants";
+import type { LegendContinuousSvgProps } from "@/react/legend/shared/legendTypes";
 import {
     formatContinuousTick,
     formatLegendLabel,
     getContinuousLegendLayout,
     getGradientStops,
-} from "./legendUtils";
+} from "@/react/legend/shared/legendUtils";
 
 export {
     DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
     DEFAULT_CONTINUOUS_LEGEND_WIDTH,
-} from "./legendConstants";
-export type { LegendContinuousSvgProps } from "./legendTypes";
+} from "@/react/legend/shared/legendConstants";
+export type { LegendContinuousSvgProps } from "@/react/legend/shared/legendTypes";
 
 let nextLegendGradientId = 0;
 

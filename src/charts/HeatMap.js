@@ -6,7 +6,7 @@ import { scaleLinear } from "d3-scale";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { axisLeft } from "d3";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
-import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class HeatMap extends SVGChart {
     constructor(dataStore, div, config) {

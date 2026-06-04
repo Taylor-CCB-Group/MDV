@@ -5,17 +5,17 @@ import {
     useRef,
     useState,
 } from "react";
-import type { ColorLegendSpec } from "@/react/colorLegend/types";
+import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import LegendCategoricalSvg, {
     getCategoricalLabelMaxWidth,
     LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
     LEGEND_CATEGORICAL_WIDTH,
     legendCategoricalContainerHeight,
-} from "./LegendCategoricalSvg";
+} from "@/react/components/legend/LegendCategoricalSvg";
 import LegendContinuousSvg, {
     DEFAULT_CONTINUOUS_LEGEND_WIDTH,
     DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
-} from "./LegendContinuousSvg";
+} from "@/react/components/legend/LegendContinuousSvg";
 
 export type ColorLegendProps = {
     spec: ColorLegendSpec;

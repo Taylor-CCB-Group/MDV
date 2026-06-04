@@ -1,26 +1,26 @@
 import {
     LEGEND_CATEGORICAL_LABEL_START_X,
     LEGEND_CATEGORICAL_WIDTH,
-} from "./legendConstants";
-import type { LegendCategoricalSvgProps } from "./legendTypes";
+} from "@/react/legend/shared/legendConstants";
+import type { LegendCategoricalSvgProps } from "@/react/legend/shared/legendTypes";
 import {
     LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
     formatLegendLabel,
     legendCategoricalBodyHeight,
     legendCategoricalContainerHeight,
     legendCategoricalRowY,
-} from "./legendUtils";
+} from "@/react/legend/shared/legendUtils";
 
 export {
     getCategoricalLabelMaxWidth,
     LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
     legendCategoricalContainerHeight,
-} from "./legendUtils";
-export { LEGEND_CATEGORICAL_WIDTH } from "./legendConstants";
+} from "@/react/legend/shared/legendUtils";
+export { LEGEND_CATEGORICAL_WIDTH } from "@/react/legend/shared/legendConstants";
 export type {
     LegendCategoricalSvgItem,
     LegendCategoricalSvgProps,
-} from "./legendTypes";
+} from "@/react/legend/shared/legendTypes";
 
 /**
  * Shared SVG list for categorical legends (color legend and field contour legend).

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import ColorLegend from "./ColorLegend";
+import ColorLegend from "@/react/components/legend/ColorLegend";
 
 describe("ColorLegend", () => {
     test("renders categorical legend title and labels", () => {

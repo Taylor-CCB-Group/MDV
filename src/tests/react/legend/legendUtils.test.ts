@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
     formatLegendLabel,
     measureLegendLabelWidth,
-} from "./legendUtils";
+} from "@/react/legend/shared/legendUtils";
 
 describe("legendUtils", () => {
     test("does not truncate short labels", () => {

@@ -1,6 +1,6 @@
 import type DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
-import type { ColorLegendSpec } from "@/react/colorLegend/types";
+import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 
 // Keep these operations as utilities while the state model is small.
 // Convert this module into a controller if filter modes and lifecycle state grow.
