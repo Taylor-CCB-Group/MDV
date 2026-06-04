@@ -44,7 +44,9 @@ def _agent_debug_log(
     *,
     log: logging.Logger | None = None,
 ) -> None:
-    """Structured debug logging for agent workflows (logger-only, no file I/O)."""
+    """Structured debug logging for agent workflows (logger-only, no file I/O).
+    note: this should probably be removed, but I've realised it's used elsewhere so leaving for now.
+    """
     target = log if log is not None else logger
     payload = {
         "runId": run_id,
@@ -135,6 +137,21 @@ class MDVProject:
         self.backend_db = backend_db
 
     @property
+    def writable(self):
+        """
+        Determine whether the user running this process has write-permission on relevant files
+        This is independent of any permissions set in db etc,
+        but can be used to guard against inappropriate admin actions
+        """
+        return (
+            # belt and braces
+            os.access(self.statefile, os.W_OK)
+            and os.access(self.dir, os.W_OK | os.X_OK)
+            and os.access(self.viewsfile, os.W_OK)
+            and os.access(self.h5file, os.W_OK)
+        )
+
+    @property
     def datasources(self):
         return get_json(self.datasourcesfile)
 
@@ -168,6 +185,9 @@ class MDVProject:
         save_json(self.statefile, value ,self.safe_file_save)
 
     def set_editable(self, edit=True):
+        if not self.writable:
+            logger.log(1, f"can't set_editable on '{self.dir}' because it's not writable")
+            return
         c = self.state
         c["permission"] = "edit" if edit else "view"
         self.state = c
@@ -211,10 +231,9 @@ class MDVProject:
         field_set = set(fields)
 
         if columns is None:
-            out: dict[str, Any] = {}
-            for field in fields:
-                out[field] = self.get_column(datasource, field)
-            return pandas.DataFrame(out)
+            return pandas.DataFrame(
+                {field: self.get_column(datasource, field) for field in fields}
+            )
 
         requested_keys: list[str] = []
         for col in columns:
