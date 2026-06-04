@@ -43,6 +43,10 @@ export default class VivContrastExtension extends VivLayerExtension<ContrastProp
                     }
                 }
                 float applyBrightnessContrast(float intensity, int channelIndex) {
+                    // could we change the signature here rather than expanding to all channels internally?
+                    // hopefully the glsl stack will make this not as bad as it looks
+                    // maybe one day luma.gl will understand arrays in UBOs so we can do
+                    // "${M}.contrast[channelIndex]"
                     float contrast[NUM_CHANNELS] = float[NUM_CHANNELS](
                         ${M}.contrast${I},
                     );

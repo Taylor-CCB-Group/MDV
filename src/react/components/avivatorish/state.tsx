@@ -64,14 +64,14 @@ export type ChannelsState = {
 };
 
 export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
-    channelsVisible: [] as boolean[],
-    contrastLimits: [] as [number, number][],
-    brightness: [] as number[], //not ending up as mobx observables... not sure why
-    contrast: [] as number[],
+    channelsVisible: [],
+    contrastLimits: [],
+    brightness: [], //not ending up as mobx observables... not sure why
+    contrast: [],
     colors: [],
-    domains: [] as [number, number][],
+    domains: [],
     raster: [],
-    selections: [] as { z: number; c: number; t: number }[],
+    selections: [],
     ids: [],
     // not for serialization... think about this.
     loader: [{ labels: [], shape: [] }],
