@@ -191,7 +191,7 @@ def create_app(
                     # if we don't have write-permission, then we definitely shouldn't allow `permission: "edit"` to get to the frontend
                     if not project.writable:
                         log("overriding editable permission because state is not writable")
-                        state["permission"] = "read-only"
+                        state["permission"] = "view"
                     # do we want this to always be true/not a flag we pass?
                     state["websocket"] = project.writable and options.websocket
                     # in future, we could iterate over a list of extensions.
