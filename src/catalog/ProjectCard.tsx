@@ -13,6 +13,7 @@ import {
     Card,
     CardContent,
     CardMedia,
+    Checkbox,
     Divider,
     IconButton,
     ListItemIcon,
@@ -55,6 +56,9 @@ export interface ProjectCardProps {
     onExport: (id: string, name: string) => Promise<void>;
     thumbnail?: string;
     readme?: string;
+    selectionMode?: boolean;
+    selected?: boolean;
+    onSelectionChange?: (id: string, selected: boolean) => void;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({
@@ -69,6 +73,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onExport,
     thumbnail,
     readme,
+    selectionMode = false,
+    selected = false,
+    onSelectionChange,
 }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
@@ -116,6 +123,21 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             data-testid="project_card"
             data-project-id={id}
         >
+            {selectionMode && operationPermissions.deleteProject && permissions.edit && permissions.owner && onSelectionChange && (
+                <Checkbox
+                    checked={selected}
+                    onChange={(event) => onSelectionChange(id, event.target.checked)}
+                    onClick={(event) => event.stopPropagation()}
+                    inputProps={{ "aria-label": `select project ${name}` }}
+                    sx={{
+                        position: "absolute",
+                        top: 8,
+                        left: 8,
+                        bgcolor: "background.paper",
+                        zIndex: 1,
+                    }}
+                />
+            )}
             <a
                 href={href}
                 style={{
@@ -301,7 +323,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                 <ListItemIcon>
                                     <DeleteIcon color="error" fontSize="small" />
                                 </ListItemIcon>
-                                <ListItemText>Delete Project</ListItemText>
+                                <ListItemText>Move to Recycle Bin</ListItemText>
                             </MenuItem>
                         )}
                     </Menu>
