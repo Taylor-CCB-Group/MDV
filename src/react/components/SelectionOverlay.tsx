@@ -34,6 +34,9 @@ import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
 import { useChart } from "../context";
 
+//wtf do we need this adapter for and how can the types be so confusing/wrong?
+//"Type 'ModifyMode' is not assignable to type 'GeoJsonEditMode'." etc
+//even though `class ModifyMode extends GeoJsonEditMode`
 function compositeModes(modes: unknown[]) {
     return modes as GeoJsonEditMode[];
 }
