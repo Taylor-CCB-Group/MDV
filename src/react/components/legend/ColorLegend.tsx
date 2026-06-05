@@ -23,6 +23,8 @@ export type ColorLegendProps = {
     onLayoutReady?: () => void;
     activeCategoricalValue?: string | null;
     onCategoricalItemClick?: (value: string) => void;
+    activeContinuousRange?: [number, number] | null;
+    onContinuousRangeChange?: (range: [number, number] | null) => void;
 };
 
 function ColorLegendCategorical({
@@ -125,6 +127,8 @@ export default function ColorLegend({
     onLayoutReady,
     activeCategoricalValue = null,
     onCategoricalItemClick,
+    activeContinuousRange = null,
+    onContinuousRangeChange,
 }: ColorLegendProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -177,6 +181,8 @@ export default function ColorLegend({
                 range={spec.range}
                 width={spec.width}
                 height={spec.height}
+                activeRange={activeContinuousRange}
+                onRangeChange={onContinuousRangeChange}
             />
         </div>
     );

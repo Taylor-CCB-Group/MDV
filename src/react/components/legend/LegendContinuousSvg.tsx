@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { axisBottom } from "d3";
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
@@ -37,17 +37,98 @@ export default function LegendContinuousSvg({
     range,
     width = DEFAULT_CONTINUOUS_LEGEND_WIDTH,
     height = DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
+    activeRange = null,
+    onRangeChange,
 }: LegendContinuousSvgProps) {
     // SVG ids are document-global, and legends may be rendered through separate React roots.
     const gradientIdRef = useRef<string>(createLegendGradientId());
     const gradientId = gradientIdRef.current;
     const axisRef = useRef<SVGGElement>(null);
+    const barRef = useRef<SVGRectElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const [observedWidth, setObservedWidth] = useState(width);
+    const dragStartRef = useRef<number | null>(null);
+    const [draftRange, setDraftRange] = useState<[number, number] | null>(null);
     const layout = getContinuousLegendLayout(observedWidth, Boolean(label));
     const colorStops = getGradientStops(colors);
     const formattedLabel = label
         ? formatLegendLabel(label, layout.labelMaxWidth)
+        : null;
+    const interactive = Boolean(onRangeChange);
+
+    const valueToX = (value: number) => {
+        const span = range[1] - range[0];
+        if (span === 0) {
+            return layout.barX;
+        }
+        const fraction = Math.min(
+            1,
+            Math.max(0, (value - range[0]) / span),
+        );
+        return layout.barX + fraction * layout.axisWidth;
+    };
+
+    const getEventValue = (event: MouseEvent<SVGElement>) => {
+        const rect = barRef.current?.getBoundingClientRect();
+        if (!rect || rect.width === 0) {
+            return range[0];
+        }
+        const fraction = Math.min(
+            1,
+            Math.max(0, (event.clientX - rect.left) / rect.width),
+        );
+        return range[0] + fraction * (range[1] - range[0]);
+    };
+
+    const normalizeRange = (start: number, end: number): [number, number] =>
+        start <= end ? [start, end] : [end, start];
+
+    const handleRangeMouseDown = (event: MouseEvent<SVGElement>) => {
+        if (!onRangeChange) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const value = getEventValue(event);
+        dragStartRef.current = value;
+        setDraftRange([value, value]);
+    };
+
+    const handleRangeMouseMove = (event: MouseEvent<SVGElement>) => {
+        if (dragStartRef.current === null) {
+            return;
+        }
+        event.stopPropagation();
+        setDraftRange(normalizeRange(dragStartRef.current, getEventValue(event)));
+    };
+
+    const handleRangeMouseUp = (event: MouseEvent<SVGElement>) => {
+        if (!onRangeChange || dragStartRef.current === null) {
+            return;
+        }
+        event.stopPropagation();
+        const start = dragStartRef.current;
+        const end = getEventValue(event);
+        const span = Math.abs(range[1] - range[0]);
+        const nextRange = normalizeRange(start, end);
+        dragStartRef.current = null;
+        setDraftRange(null);
+
+        if (Math.abs(end - start) < span * 0.005) {
+            if (activeRange) {
+                onRangeChange(null);
+            }
+            return;
+        }
+        onRangeChange(nextRange);
+    };
+
+    const selectedRange = draftRange ?? activeRange;
+    const selectedBounds = selectedRange
+        ? {
+              left: valueToX(selectedRange[0]),
+              right: valueToX(selectedRange[1]),
+          }
         : null;
 
     useLayoutEffect(() => {
@@ -102,7 +183,7 @@ export default function LegendContinuousSvg({
         >
             <g>
                 {formattedLabel ? (
-                    <g>
+                    <g className="legend-continuous-drag-handle">
                         {formattedLabel.truncated ? (
                             <title>{formattedLabel.full}</title>
                         ) : null}
@@ -136,15 +217,69 @@ export default function LegendContinuousSvg({
                     </linearGradient>
                 </defs>
                 <rect
+                    ref={barRef}
                     x={layout.barX}
                     y={layout.barY}
                     width={layout.axisWidth}
                     height={layout.barHeight}
                     fill={`url(#${gradientId})`}
                 />
+                {selectedBounds ? (
+                    <g pointerEvents="none">
+                        <rect
+                            x={layout.barX}
+                            y={layout.barY}
+                            width={Math.max(0, selectedBounds.left - layout.barX)}
+                            height={layout.barHeight}
+                            fill="rgba(0,0,0,0.45)"
+                        />
+                        <rect
+                            x={selectedBounds.right}
+                            y={layout.barY}
+                            width={Math.max(
+                                0,
+                                layout.barX +
+                                    layout.axisWidth -
+                                    selectedBounds.right,
+                            )}
+                            height={layout.barHeight}
+                            fill="rgba(0,0,0,0.45)"
+                        />
+                        <rect
+                            x={selectedBounds.left}
+                            y={layout.barY - 1}
+                            width={Math.max(
+                                1,
+                                selectedBounds.right - selectedBounds.left,
+                            )}
+                            height={layout.barHeight + 2}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                        />
+                    </g>
+                ) : null}
                 <g
                     ref={axisRef}
                     transform={`translate(${layout.barX},${layout.barY + layout.barHeight})`}
+                />
+                <rect
+                    x={Math.max(0, layout.barX - 8)}
+                    y={layout.barY - 4}
+                    width={layout.axisWidth + 16}
+                    height={layout.barHeight + 8}
+                    fill="transparent"
+                    role={interactive ? "slider" : undefined}
+                    aria-label={
+                        interactive
+                            ? `Filter ${label || "continuous legend"} range`
+                            : undefined
+                    }
+                    className={interactive ? "cursor-crosshair" : undefined}
+                    onMouseDown={handleRangeMouseDown}
+                    onMouseMove={handleRangeMouseMove}
+                    onMouseUp={handleRangeMouseUp}
+                    onMouseLeave={handleRangeMouseMove}
                 />
             </g>
         </svg>
