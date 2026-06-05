@@ -226,6 +226,7 @@ describe("ColorLegend", () => {
                     spec={{
                         kind: "continuous",
                         label: "Expression",
+                        column: "expression",
                         colors: ["#000000", "#ffffff"],
                         range: [0, 1],
                     }}
@@ -241,5 +242,67 @@ describe("ColorLegend", () => {
         expect(container.querySelector("svg")?.getAttribute("height")).toBe(
             "100%",
         );
+    });
+
+    test("calls continuous range handler after dragging on gradient bar", () => {
+        const onContinuousRangeChange = vi.fn();
+        const { container } = render(
+            <div className="legend-container">
+                <ColorLegend
+                    spec={{
+                        kind: "continuous",
+                        label: "Expression",
+                        column: "expression",
+                        colors: ["#000000", "#ffffff"],
+                        range: [0, 100],
+                    }}
+                    onContinuousRangeChange={onContinuousRangeChange}
+                />
+            </div>,
+        );
+        const gradientBar = container.querySelector("rect[fill^='url(#']");
+        const hitTarget = container.querySelector("rect[role='slider']");
+        if (!hitTarget || !gradientBar) {
+            throw new Error("Expected continuous legend range hit target");
+        }
+        expect(hitTarget.getAttribute("x")).toBe("20");
+        Object.defineProperty(gradientBar, "getBoundingClientRect", {
+            value: () => ({
+                x: 10,
+                y: 0,
+                left: 10,
+                top: 0,
+                right: 110,
+                bottom: 10,
+                width: 100,
+                height: 10,
+                toJSON: () => ({}),
+            }),
+        });
+
+        fireEvent.mouseDown(hitTarget, { clientX: 30 });
+        fireEvent.mouseMove(hitTarget, { clientX: 70 });
+        fireEvent.mouseUp(hitTarget, { clientX: 70 });
+
+        expect(onContinuousRangeChange).toHaveBeenCalledWith([20, 60]);
+    });
+
+    test("renders active continuous range selection", () => {
+        const { container } = render(
+            <div className="legend-container">
+                <ColorLegend
+                    spec={{
+                        kind: "continuous",
+                        label: "Expression",
+                        column: "expression",
+                        colors: ["#000000", "#ffffff"],
+                        range: [0, 100],
+                    }}
+                    activeContinuousRange={[25, 75]}
+                />
+            </div>,
+        );
+
+        expect(container.querySelector("rect[stroke='currentColor']")).toBeTruthy();
     });
 });

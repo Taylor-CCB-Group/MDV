@@ -10,8 +10,15 @@ export type ColorLegendCategoricalFilter = {
     value: string;
 };
 
-// Add a numeric range variant to this union when continuous legend filtering is implemented.
-export type ColorLegendFilter = ColorLegendCategoricalFilter;
+export type ColorLegendContinuousFilter = {
+    kind: "continuous";
+    column: string;
+    range: [number, number];
+};
+
+export type ColorLegendFilter =
+    | ColorLegendCategoricalFilter
+    | ColorLegendContinuousFilter;
 
 export type ColorLegendFilterChart = {
     config: {
@@ -22,6 +29,7 @@ export type ColorLegendFilterChart = {
     };
     dataStore: DataStore;
     colorLegendFilterDimension: Dimension | null;
+    colorLegendFilterDimensionKind: ColorLegendFilter["kind"] | null;
     colorLegendFilter: ColorLegendFilter | null;
     setColorLegend(): void;
     updateResetButtonVisibility(): void;
@@ -31,14 +39,26 @@ function getColorLegendFilterDimension(
     chart: ColorLegendFilterChart,
     filter: ColorLegendFilter,
 ): Dimension {
+    if (
+        chart.colorLegendFilterDimension &&
+        chart.colorLegendFilterDimensionKind !== filter.kind
+    ) {
+        chart.colorLegendFilterDimension.destroy(false);
+        chart.colorLegendFilterDimension = null;
+        chart.colorLegendFilterDimensionKind = null;
+    }
     if (!chart.colorLegendFilterDimension) {
         switch (filter.kind) {
             case "categorical":
                 chart.colorLegendFilterDimension =
                     chart.dataStore.getDimension("category_dimension");
                 break;
-            // Add a range dimension case for a future numeric legend filter variant.
+            case "continuous":
+                chart.colorLegendFilterDimension =
+                    chart.dataStore.getDimension("range_dimension");
+                break;
         }
+        chart.colorLegendFilterDimensionKind = filter.kind;
     }
     return chart.colorLegendFilterDimension;
 }
@@ -55,6 +75,20 @@ export function getActiveCategoricalColorLegendValue(
         return null;
     }
     return chart.colorLegendFilter.value;
+}
+
+export function getActiveContinuousColorLegendRange(
+    chart: ColorLegendFilterChart,
+    spec: ColorLegendSpec,
+): [number, number] | null {
+    if (
+        spec.kind !== "continuous" ||
+        chart.colorLegendFilter?.kind !== "continuous" ||
+        chart.colorLegendFilter.column !== spec.column
+    ) {
+        return null;
+    }
+    return chart.colorLegendFilter.range;
 }
 
 export function clearColorLegendFilter(
@@ -93,7 +127,16 @@ export function applyColorLegendFilter(
                 filter.value,
             );
             break;
-        // Add numeric range filtering here when continuous legend interactions are defined.
+        case "continuous":
+            // This mirrors SelectionDialog's numeric filter path:
+            // RangeDimension.filterRange keeps rows where column is between min and max.
+            dimension.filter(
+                "filterRange",
+                [filter.column],
+                { min: filter.range[0], max: filter.range[1] },
+                true,
+            );
+            break;
     }
     chart.updateResetButtonVisibility();
     if (updateLegend) {
@@ -126,6 +169,25 @@ export function toggleCategoricalColorLegendFilter(
     });
 }
 
+export function setContinuousColorLegendFilter(
+    chart: ColorLegendFilterChart,
+    spec: ColorLegendSpec,
+    range: [number, number] | null,
+): void {
+    if (spec.kind !== "continuous") {
+        return;
+    }
+    if (range === null) {
+        clearColorLegendFilter(chart);
+        return;
+    }
+    applyColorLegendFilter(chart, {
+        kind: "continuous",
+        column: spec.column,
+        range,
+    });
+}
+
 export function restoreColorLegendFilter(
     chart: ColorLegendFilterChart,
     spec: ColorLegendSpec,
@@ -137,13 +199,11 @@ export function restoreColorLegendFilter(
     const savedFilter = chart.config.color_legend?.filter;
     if (
         !savedFilter ||
-        savedFilter.kind !== "categorical" ||
-        spec.kind !== "categorical" ||
-        savedFilter.column !== spec.column
+        savedFilter.column !== spec.column ||
+        savedFilter.kind !== spec.kind
     ) {
         return;
     }
-    // Restore numeric range filters here when continuous legend filtering is implemented.
     applyColorLegendFilter(chart, savedFilter, false);
 }
 
@@ -153,5 +213,6 @@ export function destroyColorLegendFilter(
 ): void {
     chart.colorLegendFilterDimension?.destroy(notify);
     chart.colorLegendFilterDimension = null;
+    chart.colorLegendFilterDimensionKind = null;
     chart.colorLegendFilter = null;
 }
