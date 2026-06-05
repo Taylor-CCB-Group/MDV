@@ -5,7 +5,123 @@ import type IGVBrowser from "./IGVBrowser";
 import { BASE_TRACK_ID } from "./IGVBrowser";
 import type { Browser } from "igv";
 import { useFieldSpec } from "@/react/hooks";
-import type { IGVBrowserLocation } from "./igvUtils";
+
+
+
+
+const IGV_DOCUMENT_EVENTS = new Set([
+    "mousemove",
+    "mouseup",
+    "mouseleave",
+    "mouseexit",
+    "keyup",
+]);
+
+const IGV_WINDOW_EVENTS = new Set([
+    "resize",
+    "beforeunload",
+]);
+
+let igvEventRerouteCleanup: (() => void) | null = null;
+let igvEventRerouteRefCount = 0;
+
+function installIgvGlobalEventReroute(targetDoc: Document) {
+    const targetWin = targetDoc.defaultView;
+    if (!targetWin || targetDoc === document) {
+        return () => {};
+    }
+
+    if (igvEventRerouteCleanup) {
+        igvEventRerouteRefCount += 1;
+        return () => {
+            igvEventRerouteRefCount -= 1;
+            if (igvEventRerouteRefCount <= 0) {
+                igvEventRerouteCleanup?.();
+                igvEventRerouteCleanup = null;
+                igvEventRerouteRefCount = 0;
+            }
+        };
+    }
+
+    igvEventRerouteRefCount = 1;
+
+    const originalDocumentAdd = document.addEventListener.bind(document);
+    const originalDocumentRemove = document.removeEventListener.bind(document);
+    const originalWindowAdd = window.addEventListener.bind(window);
+    const originalWindowRemove = window.removeEventListener.bind(window);
+
+    document.addEventListener = function (
+        type: string,
+        listener: EventListenerOrEventListenerObject | null,
+        options?: boolean | AddEventListenerOptions,
+    ) {
+        if (!listener) {
+            return;
+        }
+        if (IGV_DOCUMENT_EVENTS.has(type)) {
+            return targetDoc.addEventListener(type, listener, options);
+        }
+        return originalDocumentAdd(type, listener, options);
+    };
+
+    document.removeEventListener = function (
+        type: string,
+        listener: EventListenerOrEventListenerObject | null,
+        options?: boolean | EventListenerOptions,
+    ) {
+        if (!listener) {
+            return;
+        }
+        if (IGV_DOCUMENT_EVENTS.has(type)) {
+            return targetDoc.removeEventListener(type, listener, options);
+        }
+        return originalDocumentRemove(type, listener, options);
+    };
+
+    window.addEventListener = function (
+        type: string,
+        listener: EventListenerOrEventListenerObject | null,
+        options?: boolean | AddEventListenerOptions,
+    ) {
+        if (!listener) {
+            return;
+        }
+        if (IGV_WINDOW_EVENTS.has(type)) {
+            return targetWin.addEventListener(type, listener, options);
+        }
+        return originalWindowAdd(type, listener, options);
+    };
+
+    window.removeEventListener = function (
+        type: string,
+        listener: EventListenerOrEventListenerObject | null,
+        options?: boolean | EventListenerOptions,
+    ) {
+        if (!listener) {
+            return;
+        }
+        if (IGV_WINDOW_EVENTS.has(type)) {
+            return targetWin.removeEventListener(type, listener, options);
+        }
+        return originalWindowRemove(type, listener, options);
+    };
+
+    igvEventRerouteCleanup = () => {
+        document.addEventListener = originalDocumentAdd;
+        document.removeEventListener = originalDocumentRemove;
+        window.addEventListener = originalWindowAdd;
+        window.removeEventListener = originalWindowRemove;
+    };
+
+    return () => {
+        igvEventRerouteRefCount -= 1;
+        if (igvEventRerouteRefCount <= 0) {
+            igvEventRerouteCleanup?.();
+            igvEventRerouteCleanup = null;
+            igvEventRerouteRefCount = 0;
+        }
+    };
+}
 
 
 
@@ -18,7 +134,11 @@ const IGVBrowserComponent = observer(() => {
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const featureLabelColumn = useFieldSpec(chart.config.feature_label==="_none_"?undefined:chart.config.feature_label);
+    const remountNonce = chart.browserRemountNonce;
 
+    useEffect(() => {
+        return installIgvGlobalEventReroute(chart.__doc__);
+    }, [chart, remountNonce]);
 
     useEffect(() => {
         let disposed = false;

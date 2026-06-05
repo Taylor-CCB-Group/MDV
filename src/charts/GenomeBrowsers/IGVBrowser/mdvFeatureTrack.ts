@@ -876,6 +876,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
     private _boundLocusChangeHandler?: () => void;
 
     constructor(config: any, browser: any) {
+        config.visibilityWindow=100000;
         super(config, browser);
         this.config = config;
         this.browser = browser;
@@ -1466,11 +1467,6 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         if (visibleFrames.length < 2) {
             this.clearInterOverlay();
         }
-
-        const thisStart = Number(referenceFrame.start);
-        const viewportWidth = Number(options?.viewport?.getWidth?.() || options?.viewportWidth || 0);
-      
-
         const rowsByViewport = this.buildRowsByViewport(visibleFrames);
 
         let rows = rowsByViewport.get(options?.viewport) || [];

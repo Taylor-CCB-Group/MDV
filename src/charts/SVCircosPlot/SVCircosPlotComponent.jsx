@@ -1,11 +1,12 @@
 import {observer} from "mobx-react-lite";
 import SVLayer from "./SVLayer.js";
-import {useState} from "react";
+import {useRef, useState} from "react";
 import DeckGL from 'deck.gl';
 import { OrthographicView } from '@deck.gl/core';
 import { v4 as uuidv4 } from 'uuid';
 import {useEffect,useMemo} from "react";
 import {useOuterContainer} from "../../react/screen_state";
+import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 
 import {useChart} from "../../react/context";
 import { useChartSize } from "@/react/hooks.js";
@@ -194,7 +195,8 @@ const SVCircosPlotComponent = observer(()=>{
     const cb = chart.config.color_by;
     
     const {data,totalLength,chromosomeSegments} = useMemo(()=>calculateSVs(chart.config.param,chart.dataStore),[]);
-    const doc = useOuterContainer();
+    const outerContainer = useOuterContainer();
+    const deckRef = useRef(null);
     const [width,height] = useChartSize();
     
 
@@ -243,6 +245,20 @@ const SVCircosPlotComponent = observer(()=>{
         setHoveredIndex(info.index);
       }
     }
+
+    useEffect(() => {
+        outerContainer;
+        if (deckRef.current?.deck) {
+            try {
+                return rebindMouseEvents(deckRef.current.deck);
+            } catch (e) {
+                console.error(
+                    "attempt to reset deck eventManager element failed - could be related to brittle deck monkeypatch",
+                    e,
+                );
+            }
+        }
+    }, [outerContainer]);
     
         const zoomLevel = Array.isArray(viewState.zoom) ? viewState.zoom[0] : 0;
         const { tickStep, majorEvery } = getDisplaySpacing(zoomLevel);
@@ -322,7 +338,7 @@ const SVCircosPlotComponent = observer(()=>{
             highlightedObjectIndex: hoveredIndex,
             radius: 1000,
             totalLength,
-            container:doc.body,
+            container:outerContainer,
             center: [0, 0],
             rotation:0,
             updateTriggers:{
@@ -339,13 +355,14 @@ const SVCircosPlotComponent = observer(()=>{
       };
     return(
         <DeckGL
+            ref={deckRef}
             layers={layers}
             viewState={viewState}
             onViewStateChange={handleViewStateChange}
             onClick={clicked}
             onHover={handleHover}
             getCursor={() => hoveredIndex >= 0 ? 'pointer' : 'default'}
-            container={document.body}
+            container={outerContainer}
             views={new OrthographicView()}
             controller={true}
         />  

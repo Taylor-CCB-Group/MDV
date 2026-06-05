@@ -3,7 +3,7 @@ import { BaseReactChart } from "../../../react/components/BaseReactChart";
 import type DataStore from "../../../datastore/DataStore";
 import IGVBrowserComponent from "./IGVBrowserComponent";
 import { g } from "../../../lib/utils";
-import { action,toJS } from "mobx";
+import { action, makeObservable, observable, runInAction } from "mobx";
 import {
     type IGVBrowserLocation,
     type IGVBrowserViewMargins,
@@ -26,7 +26,7 @@ interface IGVBrowserConfig extends BaseConfig {
 
 const BASE_TRACK_ID = "_mdv_base_track";
 const DEFAULT_MAX_INITIAL_FEATURES = 500000;
-const DEFAULT_BASE_TRACK_VISIBILITY_WINDOW = 300000000;
+const DEFAULT_BASE_TRACK_VISIBILITY_WINDOW = 100000;
 
 function parseCoordinate(value: unknown): number | null {
     if (typeof value === "number") {
@@ -86,14 +86,10 @@ function appendSuffixBeforeQueryOrHash(url: string, suffix: string): string {
     return `${path}${suffix}${query}${hash}`;
 }
 
-
-
-
-import { observable, runInAction } from "mobx";
-
 class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     browser: any;
     baseTrack: any;
+    browserRemountNonce = 0;
 
     igvContainer:{div: HTMLDivElement, css: string} | null = null;
     baseFeatures: IGVBaseFeature[] = [];
@@ -122,6 +118,10 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                 ? config.base_track_visibility_window
                 : DEFAULT_BASE_TRACK_VISIBILITY_WINDOW;
         super(dataStore, div, config, IGVBrowserComponent);
+        makeObservable(this, {
+            browserRemountNonce: observable,
+            requestBrowserEventRerouteRefresh: action.bound,
+        });
         this.locationFields = getLocationFieldsFromGenome(this.dataStore.genome) || [];
         this.isSvs = Boolean(this.dataStore.genome?.svs?.sv_columns);
        
@@ -145,16 +145,26 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         //to the shadow dom
     changeBaseDocument(doc: Document) {
         super.changeBaseDocument(doc);
-        //create a style element in the right context
-        if (!this.igvContainer) return;
-        const styleElement = doc.createElement('style');
-        styleElement.textContent = this.igvContainer.css;
-        //replace it in the shadow root
-        const  shadowRoot = this.igvContainer.div.shadowRoot;
-        if (shadowRoot) {
-            shadowRoot.adoptedStyleSheets = [];
-            shadowRoot.appendChild(styleElement);
+        if (this.igvContainer) {
+            const styleElement = doc.createElement('style');
+            styleElement.textContent = this.igvContainer.css;
+            //replace it in the shadow root
+            const  shadowRoot = this.igvContainer.div.shadowRoot;
+            if (shadowRoot) {
+                shadowRoot.adoptedStyleSheets = [];
+                shadowRoot.appendChild(styleElement);
+            }
         }
+        this.requestBrowserEventRerouteRefresh();
+        //changing locus (to the same one) will re-add mouse events in the new context
+        const locus =this.browser.currentLoci();
+        if (locus && this.browser?.search) 
+            void this.browser.search(Array.isArray(locus) ? locus.join(" ") : locus);
+            
+    }
+
+    requestBrowserEventRerouteRefresh() {
+        this.browserRemountNonce += 1;
     }
 
     clearPendingTrackFields() {
@@ -206,7 +216,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                     height: 220,
                     searchable: false,
                     supportsWholeGenome: true,
-                    visibilityWindow: -1,
+                    visibilityWindow: this.config.base_track_visibility_window ?? DEFAULT_BASE_TRACK_VISIBILITY_WINDOW,
                     __mdvGetFeatureStyle: (rowIndex: number) => this.getFeatureStyle(rowIndex),
                     __mdvIsFeatureVisible: (rowIndex: number) => this.isFeatureVisible(rowIndex),
                 },
