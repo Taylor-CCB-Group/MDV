@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
     formatLegendLabel,
+    getContinuousLegendLayout,
     measureLegendLabelWidth,
 } from "@/react/legend/shared/legendUtils";
 
@@ -21,5 +22,13 @@ describe("legendUtils", () => {
         expect(result.display.endsWith("…")).toBe(true);
         expect(result.display.length).toBeLessThan(long.length);
         expect(result.full).toBe(long);
+    });
+
+    test("continuous layout leaves side padding for rotated tick labels", () => {
+        const layout = getContinuousLegendLayout(180, true);
+
+        expect(layout.barX).toBe(28);
+        expect(layout.axisWidth).toBe(124);
+        expect(layout.tickCount).toBe(4);
     });
 });

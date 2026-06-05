@@ -192,9 +192,11 @@ describe("ColorLegend", () => {
                 />
             </div>,
         );
+        const host = container.querySelector(".legend-container");
         expect(screen.getByText("Expression")).toBeTruthy();
         expect(container.querySelector("linearGradient")).toBeTruthy();
         expect(container.querySelector("rect[fill^='url(#']")).toBeTruthy();
+        expect(host?.getAttribute("style")).toContain("height: 80px");
         expect(container.querySelector("svg")?.getAttribute("width")).toBe(
             "100%",
         );
