@@ -1,11 +1,14 @@
-from mdvtools.mdvproject import MDVProject
 from typing import Any
+
+from mdvtools.project_protocols import CreateProjectPromptProject
+from mdvtools.mdvproject import MDVProject
 from mdvtools.markdown_utils import create_project_markdown, create_column_markdown
 from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
+    format_metadata_column_schema_policy,
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
@@ -96,6 +99,11 @@ from mdvtools.charts.text_box_plot import TextBox
 from mdvtools.charts.row_summary_box_plot import RowSummaryBox
 from mdvtools.charts.selection_dialog_plot import SelectionDialogPlot
 from mdvtools.charts.sankey_plot import SankeyPlot
+from mdvtools.llm.datasource_roles import (
+    infer_datasource_roles,
+    categorical_field_ids_from_metadata,
+)
+from mdvtools.llm.column_field_resolve import build_expression_wrapper_token
 
 import json
 import numpy as np
@@ -112,7 +120,7 @@ import sys
 
 
 def get_createproject_prompt_RAG(
-    project: MDVProject,
+    project: CreateProjectPromptProject,
     path_to_data: str,
     datasource_name: str,
     final_answer: str,
@@ -136,6 +144,7 @@ def get_createproject_prompt_RAG(
     hybrid_routing_policy = format_scanpy_hybrid_routing_policy()
     viz_consistency_policy = format_visualization_consistency_policy()
     no_hallucination_policy = format_no_hallucination_chart_policy()
+    metadata_column_policy = format_metadata_column_schema_policy()
     expr_lines = ""
     if roles.expressions:
         expr_lines = "\n".join(
@@ -191,18 +200,40 @@ def get_createproject_prompt_RAG(
     4. Plot Construction:
         - No hallucinated datasources or columns (all chart types):
 """+no_hallucination_policy+"""
+        - Column metadata schema and multi-gene heatmaps (ChatMDV):
+"""+metadata_column_policy+"""
         - Use a chart class (e.g., DotPlot, BoxPlot, SelectionDialogPlot) and set `params = [...]` using selected **field ids** (see Parameter Handling).
             - The suggested columns and chart type are given by """+final_answer+"""
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
-        - **Before** `project.set_view(...)`, print a concise text preview of any table, aggregate, or subset the charts depend on (for example `print(df_result.head(40).to_string())` or grouped top-N). Keep rows/columns bounded so the output stays readable; this stdout is shown in the chat window.
+        - **Before** `project.set_view(...)`, print a concise preview of any table, aggregate, or subset the charts depend on using **GitHub-flavored markdown tables** so the chat UI can render them (for example `print(df_result.head(40).to_markdown(index=False))` or `print(grouped.head(20).to_markdown())`). Do **not** use `DataFrame.to_string()` for chat previews. Keep rows/columns bounded so the output stays readable; this stdout is shown in the chat window.
         - **Before** `project.set_view(...)`, ensure saved charts use the **same data pipeline** as those printed previews (see "Visualization vs analysis consistency" below).
         - Set the view using `project.set_view(view_name, view_object)`
-        - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`.
+        - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`
+          or invented filter setters such as `set_background_filter(...)`. Only call `set_*` (and other public) methods
+          that exist on the chart class in `mdvtools.charts.*` (preflight validates this before execution).
+        - **Axis styling:** On `BoxPlot`, `ViolinPlot`, `ScatterPlot`, and `DotPlot`, use only
+          `plot.set_axis_properties("x", {{"label": "...", "textSize": 13, "tickfont": 10}})` and the same for `"y"`.
+          Never call `set_x_axis` or `set_y_axis` on those classes (valid only on `HistogramPlot`, `HeatmapPlot`,
+          `MultiLinePlot`, `AbundanceBoxPlot`).
+          On `ScatterPlot` / `BoxPlot` / `DensityScatterPlot`, use `set_filter(...)`, not `set_on_filter` (`ScatterPlot3D` only).
+        - **Chat preview tables:** For `groupby` summaries before `set_view`, use simple aggregates such as
+          `.median()`, `.describe()`, or tuple form `agg(col=("col", "median"))`. Do not mix named tuple aggregations with
+          bare `lambda` functions in the same `groupby(...).agg(...)` call.
           To show a subset, either:
             (a) create a filtered datasource when building a **new** project from raw data, or use the **narrow** ChatMDV
                 exception in section 3 (`chat_rank_genes_result` via `add_datasource` for long-format Scanpy marker tables
                 when editing a project), or
             (b) include a `SelectionDialogPlot` so the user can filter interactively in the UI.
+        - Expression on an embedding **within a group** (general pattern):
+            - Build a **full-dataset** `ScatterPlot` with embedding field ids in `params` and color via
+              `set_color_by` / `set_default_color` using a **wrapper token** from `build_expression_wrapper_token`
+              (see section 5).
+            - When the user asks to focus on a categorical group, add a `SelectionDialogPlot` whose `params` list the
+              relevant categorical **Field IDs** from Project Data Context (section 8); do **not** pass row indices into
+              the scatter chart.
+            - For numeric summaries of a subset (means, counts, distributions in chat), filter with
+              `project.get_datasource_as_dataframe(...)` and bounded `print(...to_markdown())`; keep the saved scatter
+              on the full dataset unless the user explicitly needs a persisted filtered datasource.
         - Visualization vs analysis consistency (ChatMDV):
 """+viz_consistency_policy+"""
 
@@ -226,15 +257,24 @@ def get_createproject_prompt_RAG(
             `"<subgroup_key>|<feature>(<subgroup_key>)|<index>"`
           where:
             - `<subgroup_key>` **must** match a key from the rows-as-columns link for this project (see **section 2**
-              “default_subgroup=...” lines). Do **not** copy tutorial examples that use `rna_expr` unless that key is listed.
+              “default_subgroup=...” lines, or injected `CHATMDV_EXPR_SUBGROUP_KEY`). Do **not** copy tutorial examples that use `rna_expr` unless that key is listed.
             - `<feature>` is a value from the feature table's label column (`name_column` from the link, e.g. `gene_ids` or `name` — match the project)
             - `<index>` is the row index of that feature in the feature table (0-based)
+        - **ChatMDV injected constants (always in generated scripts):** Use `CHATMDV_OBS_DATASOURCE`, `CHATMDV_EXPR_DATASOURCE`, `CHATMDV_EXPR_NAME_COLUMN`, `CHATMDV_EXPR_SUBGROUP_KEY`, `CHATMDV_EXPRESSIONS`, and `CHATMDV_CATEGORICAL_FIELD_IDS` when present. Do **not** call `project.get_datasource_roles()` (does not exist). Prefer these constants over re-calling `infer_datasource_roles(project)` when editing an existing project. For categoricals, use `CHATMDV_CATEGORICAL_FIELD_IDS` or `categorical_field_ids_from_metadata(...)` — never `col['dtype']`.
+        - **RowsAsColumnsExpression fields:** Use `expr.datasource_name` and `expr.name_column` / `expr.subgroup_key`. Never use `expr.feature_table`, `expr.feature_datasource`, or similar invented attributes.
+        - Build wrappers with `build_expression_wrapper_token(subgroup_key, feature, index)`; do not hand-build f-strings unless necessary.
         - Example (wrapper expression):
             ```python
-            subgroup_key = "gs"  # use the default_subgroup from section 2 / Datasource roles for this project
+            if CHATMDV_EXPR_DATASOURCE is None:
+                raise RuntimeError("No rows-as-columns expression link; cannot build gene wrappers.")
             feature = "GENE_OR_PROTEIN_NAME"
-            feature_index = data_frame_var[name_column].tolist().index(feature)
-            wrapper = f"{{subgroup_key}}|{{feature}}({{subgroup_key}})|{{feature_index}}"
+            df_var = project.get_datasource_as_dataframe(
+                CHATMDV_EXPR_DATASOURCE, columns=[CHATMDV_EXPR_NAME_COLUMN]
+            )
+            feature_index = df_var[CHATMDV_EXPR_NAME_COLUMN].astype(str).tolist().index(feature)
+            wrapper = build_expression_wrapper_token(
+                CHATMDV_EXPR_SUBGROUP_KEY, feature, feature_index
+            )
             ```
 
     6. Gene-Related Queries:
@@ -257,8 +297,9 @@ def get_createproject_prompt_RAG(
         - Do NOT create `TextBox` or `TablePlot` by default when the user intent is primarily textual/table output.
 
     8. Selection dialog usage:
-        - Add `SelectionDialogPlot` only when interactive filtering materially helps answer the question
-          (for example, when the user asks to explore subsets interactively).
+        - Add `SelectionDialogPlot` when interactive filtering materially helps answer the question—for example,
+          expression on an embedding **within** a categorical group, or when the user asks to explore subsets
+          interactively (pair with a full-dataset scatter colored by expression; see section 4).
         - Do not add a selection dialog unconditionally.
 
     9. Follow-up phrasing and intent routing:
@@ -306,20 +347,18 @@ def get_createproject_prompt_RAG(
             - Selection dialog plot: Requires any column.  
             - Stacked row chart: Requires two categorical columns.  
                 - If only one categorical variable is available, use it twice.  
-            - Table Plot: Requires any column(s).  
-            - Text box plot: Requires no columns, just text.  
+            - Table Plot: Requires any column(s). Use only when the user explicitly asks for a **table in the view**, to **browse rows**, or to **list** values—not for questions about **relationships**, **correlations**, or **distributions** between numeric columns (use scatter/density/box/violin instead).
+            - Text box plot: Requires no columns, just text.
+        - **Chart type selection (when multiple types are suggested):**
+            - Questions about **relationship**, **correlation**, **association**, or **comparison between two numeric columns** → prefer **Scatter plot (2D)** or **Density Scatter plot** (with a categorical color column when available). Do **not** save a `TablePlot` unless the user explicitly requests a table chart or row browsing in the view.
+            - **Table Plot** is for interactive row-level browsing in MDV when explicitly requested; tabular answers in chat use markdown `print(...)` previews (section 4), not a saved `TablePlot`, unless the user wants the table persisted in the project view.  
             - Violin plot: Requires only one categorical column and one numerical column.  
             - Wordcloud: Requires one categorical column.
-    Output format: Return python code for the requested result.
-    - For chart-oriented requests, return code that creates the chart view(s).
-    - For textual/table-first requests, return code that computes and prints concise, bounded tabular/text output in chat.
-
-    After generating the code, include a detailed explanation in your response (renderable by markdown renderer) that covers:
-    1. Why this chart is the best way to answer the question
-    2. What biological insights can be gained from this visualization
-    3. What subsequent analysis tasks could be performed based on these results
-
-    The explanation will be displayed in the chat window automatically.
+    Output format:
+    - Return only one fenced ```python code block with the complete runnable script.
+    - Do not add markdown narrative, bullet lists, or explanations before or after the code block.
+    - For chart-oriented requests, the script must create the chart view(s) described above.
+    - For textual/table-first requests, put answers in bounded print(...) calls inside the script.
 
 
 

@@ -213,7 +213,7 @@ Update `docs/playwright/PLAYWRIGHT_ARCHITECTURE.md` when:
 - execution policy changes
 - spec classification changes
 
-Update `docs/playwright/PLAYWRIGHT_SETUP_AND_RUN.md` when:
+Update `docs/playwright/PLAYWRIGHT_GUIDE.md` when:
 
 - a supported command changes
 - setup prerequisites change

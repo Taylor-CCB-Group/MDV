@@ -75,6 +75,11 @@ describe("mdvRouting", () => {
         expect(shouldRenderDashboard()).toBe(false);
     });
 
+    test("treats explicit api-root dir as project viewer mode", () => {
+        setUrl("/?dir=http://localhost:5055");
+        expect(shouldRenderDashboard()).toBe(false);
+    });
+
     test("renders dashboard for root route", () => {
         setUrl("/");
         expect(isProjectPath()).toBe(false);

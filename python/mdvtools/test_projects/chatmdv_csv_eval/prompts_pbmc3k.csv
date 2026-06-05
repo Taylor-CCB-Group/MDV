@@ -1,0 +1,11 @@
+Path,Dataset,Question for evaluation,Complexity score
+/app/mdv/pbmc3k_chat,PBMC3K,Show a UMAP plot colored by Leiden clusters.,2
+/app/mdv/pbmc3k_chat,PBMC3K,Show the expression pattern of RALY on the UMAP plot.,3
+/app/mdv/pbmc3k_chat,PBMC3K,"Compare the expression of NKG7 and GNLY across Leiden clusters using a heatmap.",1
+/app/mdv/pbmc3k_chat,PBMC3K,Generate a violin plot of CD19 expression across Leiden clusters.,1
+/app/mdv/pbmc3k_chat,PBMC3K,Create a histogram of the percentage of mitochondrial gene expression.,1
+/app/mdv/pbmc3k_chat,PBMC3K,How many cells are in each Leiden cluster?,2
+/app/mdv/pbmc3k_chat,PBMC3K,Plot the distribution of the number of genes per cell and the total counts per Leiden cluster.,3
+/app/mdv/pbmc3k_chat,PBMC3K,Show a scatter plot of the number of genes per cell versus percent mitochondrial genes.,1
+/app/mdv/pbmc3k_chat,PBMC3K,Plot the first three PCA components of the PBMC3K dataset.,2
+/app/mdv/pbmc3k_chat,PBMC3K,Which Leiden cluster expresses GNLY the most?,2

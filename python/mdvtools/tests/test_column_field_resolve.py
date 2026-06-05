@@ -1,8 +1,10 @@
 from mdvtools.llm.column_field_resolve import (
+    build_expression_wrapper_token,
+    expression_wrapper_subgroup_key,
     normalize_view_chart_params,
     prune_view_charts_with_invalid_params,
+    resolve_param_string,
     rows_as_columns_subgroup_keys_from_metadata,
-    build_expression_wrapper_token,
 )
 
 
@@ -144,6 +146,16 @@ def test_subgroup_keys_from_metadata():
 
 def test_build_expression_wrapper_token():
     assert build_expression_wrapper_token("gs", "MS4A1", 3) == "gs|MS4A1(gs)|3"
+
+
+def test_expression_wrapper_subgroup_key_rejects_trailing_garbage():
+    assert expression_wrapper_subgroup_key("gs|MS4A1(gs)|3__junk") is None
+    assert expression_wrapper_subgroup_key("gs|MS4A1(gs)|3") == "gs"
+
+
+def test_resolve_param_string_rejects_wrapper_with_trailing_garbage():
+    token = "gs|MS4A1(gs)|3__junk"
+    assert resolve_param_string(token, field_set=set(), name_map={}) == token
 
 
 def test_normalize_then_prune_removes_bad_marker_chart():

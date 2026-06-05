@@ -1,3 +1,4 @@
+import { local } from "d3-selection";
 import Dimension from "./Dimension.js";
 class CatColDimension extends Dimension {
     constructor(parent) {
@@ -9,40 +10,16 @@ class CatColDimension extends Dimension {
 
     filterCatCol(args, columns) {
         const p = this.parent;
-        const filter = p.filterArray;
-        const localFilter = this.filterArray;
         const catCol = p.columnIndex[columns[0]];
         const catData = catCol.data;
-        const len = catData.length;
         const colData = p.columnIndex[columns[1]].data;
         const thr = args.threshold || 0;
         const cat = catCol.values.indexOf(args.cat);
-
-        for (let i = 0; i < len; i++) {
-            //repetitive code - ideally have inline function
+        const predicate = (i) => {
             const d = colData[i];
-            if (catData[i] === cat && !Number.isNaN(d) && d > thr) {
-                //is filtered locally
-                if (localFilter[i] === 1) {
-                    //remove from global filter
-                    if (--filter[i] === 0) {
-                        //increase unfiltered size if no filters left on this row
-                        p.filterSize++;
-                    }
-                }
-                //remove local filter
-                localFilter[i] = 0;
-            } else {
-                //not already filtered locally, update global
-                if (localFilter[i] === 0) {
-                    if (++filter[i] === 1) {
-                        p.filterSize--;
-                    }
-                }
-                //add local filter
-                localFilter[i] = 1;
-            }
-        }
+            return catData[i] === cat && !Number.isNaN(d) && d > thr;
+        };
+        this.filterPredicate({ predicate }, columns);
     }
 
     getAverages(callback, columns, config = {}) {
@@ -56,6 +33,7 @@ class CatColDimension extends Dimension {
 
         config.values = cIndex[columns[0]].values;
         config.columns = columns.slice(1);
+        config.y_datatype= cIndex[columns[0]].datatype;
         const colBuffers = [];
         for (let n = 1; n < columns.length; n++) {
             colBuffers.push([

@@ -2,9 +2,13 @@ import inspect
 
 from mdvtools.llm.datasource_roles import (
     CHAT_RANK_GENES_DATASOURCE_NAME,
+    build_chatmdv_roles_constants_block,
+    categorical_field_ids_from_metadata,
+    column_field_id,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
+    format_metadata_column_schema_policy,
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
@@ -19,6 +23,18 @@ class FakeProject:
 
     def get_datasource_names(self):
         return self._names
+
+    def get_datasource_metadata(self, name):
+        if name == "cells":
+            return {
+                "name": "cells",
+                "size": 100,
+                "columns": [
+                    {"field": "major", "name": "Major", "datatype": "text"},
+                    {"field": "n_genes", "name": "n genes", "datatype": "integer"},
+                ],
+            }
+        return {"name": name, "size": 0, "columns": []}
 
     def get_links(self, datasource, filter=None):
         assert datasource == "cells"
@@ -62,6 +78,35 @@ def test_infer_datasource_roles_prefers_cells_and_expr_subgroups():
     assert roles.expressions[1].subgroup_key == "protein_expr"
 
 
+def test_infer_datasource_roles_skips_missing_datasource_on_link():
+    class ProjectWithBadLink(FakeProject):
+        def get_links(self, datasource, filter=None):
+            links = super().get_links(datasource, filter)
+            links = list(links)
+            links.append(
+                {
+                    "datasource": None,
+                    "link": {
+                        "rows_as_columns": {
+                            "name_column": "name",
+                            "subgroups": {
+                                "bogus_expr": {
+                                    "name": "bogus_expr",
+                                    "label": "bogus_expr",
+                                    "type": "sparse",
+                                },
+                            },
+                        }
+                    },
+                }
+            )
+            return links
+
+    roles = infer_datasource_roles(ProjectWithBadLink())
+    assert [e.datasource_name for e in roles.expressions] == ["rna", "protein"]
+    assert "None" not in [e.datasource_name for e in roles.expressions]
+
+
 def test_format_feature_table_field_policy_lists_name_columns():
     roles = infer_datasource_roles(FakeProject())
     text = format_feature_table_field_policy(roles)
@@ -79,6 +124,33 @@ def test_format_no_hallucination_chart_policy():
     assert "Never** invent" in text or "invent a datasource" in text
     assert "color_by" in text
     assert "get_datasource_as_dataframe" in text
+    assert "datatype" in text
+    assert "dtype" in text
+
+
+def test_categorical_field_ids_from_metadata():
+    meta = {
+        "columns": [
+            {"field": "major", "datatype": "text", "name": "Major"},
+            {"field": "X_umap_1", "datatype": "double", "name": "UMAP1"},
+        ]
+    }
+    assert categorical_field_ids_from_metadata(meta) == ["major"]
+    assert column_field_id(meta["columns"][0]) == "major"
+
+
+def test_build_chatmdv_roles_constants_includes_categorical_field_ids():
+    block = build_chatmdv_roles_constants_block(FakeProject())
+    assert "CHATMDV_CATEGORICAL_FIELD_IDS" in block
+    assert "major" in block
+
+
+def test_format_metadata_column_schema_policy():
+    text = format_metadata_column_schema_policy()
+    assert "datatype" in text
+    assert "dtype" in text
+    assert "HeatmapPlot" in text
+    assert "build_expression_wrapper_token" in text
 
 
 def test_format_visualization_consistency_policy():

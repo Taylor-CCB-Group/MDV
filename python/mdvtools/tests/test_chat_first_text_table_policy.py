@@ -1,11 +1,9 @@
 from types import SimpleNamespace
-from typing import cast
 
 from langchain.prompts import PromptTemplate
 
 from mdvtools.llm import templates
 from mdvtools.llm.verification import build_verification_summary
-from mdvtools.mdvproject import MDVProject
 
 
 class _FakeProject:
@@ -13,10 +11,13 @@ class _FakeProject:
         self.datasources = [{"name": "cells"}]
         self.dir = "/tmp/fake-project"
 
-    def get_datasource_metadata(self, name):
+    def get_datasource_metadata(self, name: str):
         if name == "cells":
             return {"name": "cells", "size": 10, "columns": [{"field": "leiden", "name": "Leiden"}]}
         raise KeyError(name)
+
+    def get_datasource_names(self) -> list[str]:
+        return [str(ds["name"]) for ds in self.datasources]
 
     def get_view(self, _name):
         return {"initialCharts": {}}
@@ -32,7 +33,7 @@ def test_prompt_includes_chat_first_text_table_policy(monkeypatch):
     monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
 
     prompt = templates.get_createproject_prompt_RAG(
-        project=cast(MDVProject, _FakeProject()),
+        project=_FakeProject(),
         path_to_data="",
         datasource_name="cells",
         final_answer='fields "leiden"\ncharts "Table Plot"',
@@ -67,6 +68,9 @@ def test_prompt_includes_chat_first_text_table_policy(monkeypatch):
     assert "rna_expr" in prompt.lower()
     assert "Metadata-first chart params" in prompt
     assert "Never** invent" in prompt or "invent a datasource" in prompt
+    assert "to_markdown" in prompt
+    assert "Chart type selection" in prompt
+    assert "relationship" in prompt.lower()
 
 
 def test_prompt_includes_marker_gene_policy_with_h5ad(monkeypatch):
@@ -79,7 +83,7 @@ def test_prompt_includes_marker_gene_policy_with_h5ad(monkeypatch):
     monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
 
     prompt = templates.get_createproject_prompt_RAG(
-        project=cast(MDVProject, _FakeProject()),
+        project=_FakeProject(),
         path_to_data="/project/scanpy_data.h5ad",
         datasource_name="cells",
         final_answer='fields "leiden"\ncharts "Table Plot"',
@@ -103,7 +107,7 @@ def test_createproject_prompt_RAG_formats_as_retrieval_qa_template(monkeypatch):
     monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
 
     prompt = templates.get_createproject_prompt_RAG(
-        project=cast(MDVProject, _FakeProject()),
+        project=_FakeProject(),
         path_to_data="",
         datasource_name="cells",
         final_answer='fields "leiden"\ncharts "Table Plot"',
@@ -122,6 +126,6 @@ def test_verification_uses_response_wording_not_view_wording():
         view_name="v",
     )
 
-    assert "not used in this response" in summary
+    assert "Wrapper expression" not in summary
     assert "### Columns / outputs (from code)" in summary
     assert "### Chart types (if any, from code)" in summary

@@ -44,6 +44,12 @@ function formatChatError(error: unknown): string {
     const rawMessage =
         (error instanceof Error && error.message) ||
         (typeof error === "string" ? error : undefined) ||
+        (typeof error === "object" &&
+            error !== null &&
+            "message" in error &&
+            typeof error.message === "string"
+            ? error.message
+            : undefined) ||
         axiosMessage ||
         "An unknown error occurred.";
 
@@ -196,18 +202,22 @@ const sendMessageSocket = async (message: string, id: string, _routeUnused: stri
     const socket = window.mdv.chartManager.ipc?.socket;
     if (!socket) return;
 
-    socket.emit('chat_request', { message, id, conversation_id: conversationId });
     const response = await new Promise<ChatResponse>((resolve, reject) => {
         const timeout = time ? setTimeout(() => {
-            socket.off('chat_response', onChatResponse);
+            cleanup();
             reject(new Error('Socket request timeout'));
         }, time) : undefined;
 
-        const onChatResponse = (data: any) => {
+        const cleanup = () => {
             clearTimeout(timeout);
+            socket.off('chat_response', onChatResponse);
+            socket.off('chat_error', onError);
+        };
+
+        const onChatResponse = (data: any) => {
+            cleanup();
             try {
                 const parsed = completedChatResponseSchema.parse(data);
-                socket.off('chat_response', onChatResponse);
                 resolve(parsed);
             } catch (error) {
                 reject(error);
@@ -215,14 +225,13 @@ const sendMessageSocket = async (message: string, id: string, _routeUnused: stri
         };
 
         const onError = (error: any) => {
-            clearTimeout(timeout);
-            socket.off('chat_response', onChatResponse);
-            socket.off('chat_error', onError);
+            cleanup();
             reject(error);
         };
 
         socket.on('chat_response', onChatResponse);
         socket.on('chat_error', onError);
+        socket.emit('chat_request', { message, id, conversation_id: conversationId });
     });
 
     return response;
