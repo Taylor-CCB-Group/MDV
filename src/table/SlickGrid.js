@@ -2496,13 +2496,22 @@ const jQuery = $;
       var i;
       if (!stylesheet) {
         var sheets = __doc__.styleSheets;
+
+        function getSafeCssRules(sheet) {
+          try {
+            return sheet.cssRules || sheet.rules || [];
+          } catch (e) {
+            return null;
+          }
+        }
         
         for (let i = 0; i < sheets.length; i++) {
           if ((sheets[i].ownerNode || sheets[i].owningElement) == $style[0]) {
             stylesheet = sheets[i];
             break;
           }
-          if (sheets[i].cssRules[0] && sheets[i].cssRules[0].selectorText && sheets[i].cssRules[0].selectorText.includes(uid)){
+          var sheetRules = getSafeCssRules(sheets[i]);
+          if (sheetRules && sheetRules[0] && sheetRules[0].selectorText && sheetRules[0].selectorText.includes(uid)){
             stylesheet=sheets[i];
             break;
           }
@@ -2515,7 +2524,7 @@ const jQuery = $;
         // find and cache column CSS rules
         columnCssRulesL = [];
         columnCssRulesR = [];
-        var cssRules = (stylesheet.cssRules || stylesheet.rules);
+        var cssRules = getSafeCssRules(stylesheet) || [];
         var matches, columnIdx;
         for (i = 0; i < cssRules.length; i++) {
           var selector = cssRules[i].selectorText;
@@ -6331,9 +6340,18 @@ const jQuery = $;
       __doc__=doc;
       stylesheet=null;
       var sheets = __doc__.styleSheets;
+
+      function getSafeCssRules(sheet) {
+        try {
+          return sheet.cssRules || sheet.rules || [];
+        } catch (e) {
+          return null;
+        }
+      }
         
       for (let i = 0; i < sheets.length; i++) {
-        if (sheets[i].cssRules[0].selectorText && sheets[i].cssRules[0].selectorText.includes(uid)){
+        var sheetRules = getSafeCssRules(sheets[i]);
+        if (sheetRules && sheetRules[0] && sheetRules[0].selectorText && sheetRules[0].selectorText.includes(uid)){
           stylesheet=sheets[i];
           break;
         }

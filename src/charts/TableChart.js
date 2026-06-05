@@ -366,6 +366,10 @@ class TableChart extends BaseChart {
             this.grid.unregisterPlugin(this.overlay);
             this.grid.registerPlugin(this.overlay);
         }
+        setTimeout(() => {
+            this.setSize();
+            this.grid.setColumns(this.grid.getColumns());
+        }, 500);
     }
 
     setSize(x, y) {
