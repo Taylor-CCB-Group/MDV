@@ -26,8 +26,10 @@ export const ParamTypeSchema = z.enum([
 export const RowsAsColsQuerySerializedSchema = z.object({
     type: z.literal("RowsAsColsQuery").describe("Identifies this as a rows-as-columns query"),
     linkedDsName: z.string().describe("Name of the linked datasource that contains the row data"),
-    // TODO - should have subgroup name
-    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource")
+    subgroupName: z.string().optional().describe(
+        "Canonical rows-as-columns subgroup key (see link `subgroups`). New `RowsAsColsQuery.toJSON` output always includes this; omit = first subgroup. Zod: keep optional until legacy configs are migrated, then make required.",
+    ),
+    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource"),
 }).describe("Configuration for queries that treat rows from another datasource as columns in the current chart");
 
 // Field specification can be a string (FieldName) or a serialized query
@@ -68,7 +70,15 @@ export const BaseConfigSchema = GridStackConfigSchema.extend({
 // todo - this should be a union of all the color config options, not applied to all charts
 export const ChartColorConfigSchema = z.object({
     color_by: FieldSpecSchema.optional().describe("Field or column configuration used to determine color mapping"),
-    color_legend: z.record(z.string(), z.unknown()).optional().describe("Custom color legend configuration"),
+    color_legend: z
+        .object({
+            // Keep optional for backwards compatibility with legacy/partially-serialized
+            // configs where `color_legend` exists but `display` may be missing/misspelled.
+            display: z.boolean().optional().describe("Whether the color legend is visible"),
+            pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
+        })
+        .optional()
+        .describe("Color legend display and position"),
     log_color_scale: z.boolean().optional().describe("Whether to use logarithmic scaling for color values"),
     trim_color_scale: z.enum(["0.05", "0.01", "0.001", "none"]).optional().describe("Quantile trimming for color scale to handle outliers"),
     color_overlay: z.number().optional().describe("Opacity value for color overlay effects"),

@@ -27,10 +27,9 @@ jobs:
     strategy:
       matrix:
         python-version: [ 3.12 ]
-        poetry-version: [ 1.7.1 ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Debug workflow trigger
         env:
@@ -43,14 +42,16 @@ jobs:
           echo "Commit message: $COMMIT_MESSAGE"
           echo "PR title: $PR_TITLE"
           echo "Branch: $BRANCH"
-      - run: pipx install poetry
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
 
-      - run: poetry install --with dev,backend,auth
-      - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          working-directory: python
+          cache-dependency-glob: "**/uv.lock"
+
+      - run: uv sync --group dev --extra app --frozen
 
       - name: Run performance tests
         run: make test-performance

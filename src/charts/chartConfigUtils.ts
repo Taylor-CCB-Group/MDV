@@ -177,6 +177,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     }
     
     let config: C = JSON.parse(JSON.stringify(originalConfig));
+    normalizeLegacyColorLegendConfig(config);
     if (!config.id) {
         // what about when we duplicate a chart?
         config.id = getRandomString();
@@ -274,3 +275,20 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     return config;
 }
 
+type LegacyColorLegendConfig = {
+    color_legend?: {
+        display?: boolean;
+        dsiplay?: boolean;
+    };
+};
+
+function normalizeLegacyColorLegendConfig(config: LegacyColorLegendConfig) {
+    const colorLegend = config.color_legend;
+    if (!colorLegend) {
+        return;
+    }
+    // Older Python-generated projects used `dsiplay`; normalize it once so later code only reads `display`.
+    if (colorLegend.display === undefined && typeof colorLegend.dsiplay === "boolean") {
+        colorLegend.display = colorLegend.dsiplay;
+    }
+}

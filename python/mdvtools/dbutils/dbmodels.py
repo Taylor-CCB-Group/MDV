@@ -1,3 +1,6 @@
+from mdvtools._optional import require_extra
+require_extra("app", "flask_sqlalchemy")
+
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 

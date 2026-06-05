@@ -4,6 +4,7 @@ import {
 } from "./DataLoaders";
 import type { DataSource, DataColumn, DataType, LoadedDataColumn } from "@/charts/charts";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
+import { createElement } from "react";
 import { createMdvPortal } from "@/react/react_utils";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import { decompressData } from "./DataLoaders";
@@ -12,7 +13,7 @@ let projectRoot = "";
 /**
  * This could potentially also have some more awareness of what type of json it is fetching, and e.g. do some zod validation
  */
-export async function fetchJsonConfig(url: string, root: string, createErrorComponent = false)  {
+export async function fetchJsonConfig<T = any>(url: string, root: string, createErrorComponent = false): Promise<T> {
     try {
         const resp = await fetch(url);
         const config = await resp.json();
@@ -20,14 +21,14 @@ export async function fetchJsonConfig(url: string, root: string, createErrorComp
             throw new Error(JSON.stringify(config, null, 2));
         }
         //rewriteBaseUrlRecursive(config, root); //removed.
-        return config;
+        return config as T;
     } catch (error: any) {
         if (createErrorComponent) {
             //todo less hacky CSS - also consider making the dialog open by default
             document.body.style.display = "flex";
             document.body.style.justifyContent = "center";
             document.body.style.alignItems = "center";
-            createMdvPortal(ErrorComponentReactWrapper({ error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
+            createMdvPortal(createElement(ErrorComponentReactWrapper, { error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
         }
         console.error(`Error fetching ${url}: ${error}`);
         throw error;

@@ -1,10 +1,20 @@
 # heatmap_plot.py
 
 from mdvtools.charts.base_plot import BasePlot
+from collections.abc import Sequence
 
 
 class HeatmapPlot(BasePlot):
     def __init__(self, title, params, size, position, id=None, **kwargs):
+        if (
+            not isinstance(params, Sequence)
+            or isinstance(params, str)
+            or len(params) < 2
+        ):
+            raise ValueError(
+                "HeatmapPlot requires params=[<categorical>, <numeric_or_wrapper>, ...]. "
+                "Got fewer than 2 params."
+            )
         super().__init__(title, "heat_map", params, size, position, id, **kwargs)
 
     def set_method(self, method):

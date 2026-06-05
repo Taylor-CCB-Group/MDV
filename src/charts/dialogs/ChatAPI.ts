@@ -5,12 +5,98 @@ import * as z from 'zod/v4';
 import { useQuery } from '@tanstack/react-query';
 import { useChartManager, useViewManager } from "@/react/hooks";
 
+type ParsedProviderError = {
+    statusCode?: string;
+    providerMessage?: string;
+    providerType?: string;
+    providerCode?: string;
+    raw: string;
+};
+
+function parseProviderError(rawText: string): ParsedProviderError {
+    const statusCode = rawText.match(/Error code:\s*(\d{3})/i)?.[1];
+    const providerMessage =
+        rawText.match(/['"]message['"]:\s*['"]([^'"]+)['"]/i)?.[1] ??
+        rawText.match(/message:\s*([^,\n]+)/i)?.[1]?.trim();
+    const providerType = rawText.match(/['"]type['"]:\s*['"]([^'"]+)['"]/i)?.[1];
+    const providerCode = rawText.match(/['"]code['"]:\s*['"]([^'"]+)['"]/i)?.[1];
+    return { statusCode, providerMessage, providerType, providerCode, raw: rawText };
+}
+
+function getRecoveryHint(error: ParsedProviderError): string {
+    if (error.providerCode === "insufficient_quota") {
+        return "Check your API plan/billing details, then retry the request.";
+    }
+    if (error.providerCode === "invalid_api_key") {
+        return "Check your API key configuration and make sure it is valid for this environment.";
+    }
+    if (error.statusCode === "429") {
+        return "The service is currently rate-limited. Wait a moment and retry.";
+    }
+    return "Try again in a moment. If this keeps happening, contact your admin and include the technical details.";
+}
+
+function formatChatError(error: unknown): string {
+    const axiosMessage =
+        axios.isAxiosError(error) && typeof error.response?.data === "object"
+            ? JSON.stringify(error.response.data)
+            : undefined;
+    const rawMessage =
+        (error instanceof Error && error.message) ||
+        (typeof error === "string" ? error : undefined) ||
+        (typeof error === "object" &&
+            error !== null &&
+            "message" in error &&
+            typeof error.message === "string"
+            ? error.message
+            : undefined) ||
+        axiosMessage ||
+        "An unknown error occurred.";
+
+    const cleaned = rawMessage.replace(/^ERROR:\s*/i, "").trim();
+    const parsed = parseProviderError(cleaned);
+    const friendlyReason =
+        parsed.providerMessage ??
+        (parsed.statusCode ? `Request failed with status ${parsed.statusCode}.` : cleaned);
+    const recoveryHint = getRecoveryHint(parsed);
+    const statusLine = parsed.statusCode ? `- **HTTP status:** ${parsed.statusCode}\n` : "";
+    const typeLine = parsed.providerType ? `- **Type:** ${parsed.providerType}\n` : "";
+    const codeLine = parsed.providerCode ? `- **Code:** ${parsed.providerCode}\n` : "";
+
+    return [
+        "### Chat request failed",
+        "",
+        friendlyReason,
+        "",
+        "What you can do next:",
+        `- ${recoveryHint}`,
+        "- Retry after resolving the issue above.",
+        "",
+        ...(statusLine || typeLine || codeLine
+            ? ["Technical details:", statusLine + typeLine + codeLine]
+            : []),
+        "<details><summary>Raw error details</summary>",
+        "",
+        "```",
+        cleaned,
+        "```",
+        "",
+        "</details>",
+    ].join("\n");
+}
+
 const completedChatResponseSchema = z.object({
     message: z.string(),
     /** 
      * This should be a string that identifies newly created views.
      */
     view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
+    /** Provenance summary (also embedded as a TextBox in the created view). */
+    verification: z.string().optional().nullable(),
+    /** Truncated stdout from executed script (tabular preview). */
+    data_preview: z.string().optional().nullable(),
+    /** Reload the page when opening the view so datasources.json changes are picked up. */
+    needs_refresh: z.boolean().optional(),
     // timestamp: z.string(),
     error: z.boolean().optional(),
 });
@@ -49,6 +135,8 @@ const chatLogItemSchema = z.object({
     timestamp: z.string().optional(),
     view_name: z.string().optional().nullable(),
     error: z.boolean().optional(),
+    verification: z.string().optional().nullable(),
+    data_preview: z.string().optional().nullable(),
 });
 // this is possible - may consider it at some point.
 // .transform((data) => ({
@@ -64,6 +152,12 @@ type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 export type ChatMessage = {
     text: string;
     view?: string;
+    /** Provenance summary (same as the view TextBox when present). */
+    verification?: string | null;
+    /** Truncated script stdout shown in chat before the main reply. */
+    data_preview?: string | null;
+    /** When true, "Load view" should reload the app so new/updated datasources load in ChartManager. */
+    needs_refresh?: boolean;
     sender: 'user' | 'bot' | 'system';
     id: string;
     conversationId: string;
@@ -108,18 +202,22 @@ const sendMessageSocket = async (message: string, id: string, _routeUnused: stri
     const socket = window.mdv.chartManager.ipc?.socket;
     if (!socket) return;
 
-    socket.emit('chat_request', { message, id, conversation_id: conversationId });
     const response = await new Promise<ChatResponse>((resolve, reject) => {
         const timeout = time ? setTimeout(() => {
-            socket.off('chat_response', onChatResponse);
+            cleanup();
             reject(new Error('Socket request timeout'));
         }, time) : undefined;
 
-        const onChatResponse = (data: any) => {
+        const cleanup = () => {
             clearTimeout(timeout);
+            socket.off('chat_response', onChatResponse);
+            socket.off('chat_error', onError);
+        };
+
+        const onChatResponse = (data: any) => {
+            cleanup();
             try {
                 const parsed = completedChatResponseSchema.parse(data);
-                socket.off('chat_response', onChatResponse);
                 resolve(parsed);
             } catch (error) {
                 reject(error);
@@ -127,14 +225,13 @@ const sendMessageSocket = async (message: string, id: string, _routeUnused: stri
         };
 
         const onError = (error: any) => {
-            clearTimeout(timeout);
-            socket.off('chat_response', onChatResponse);
-            socket.off('chat_error', onError);
+            cleanup();
             reject(error);
         };
 
         socket.on('chat_response', onChatResponse);
         socket.on('chat_error', onError);
+        socket.emit('chat_request', { message, id, conversation_id: conversationId });
     });
 
     return response;
@@ -184,6 +281,8 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
         sender: 'bot',
         text: log.response,
         view: viewName,
+        verification: log?.verification,
+        data_preview: log?.data_preview,
         error: log?.error,
     };
     
@@ -331,9 +430,7 @@ const useChat = () => {
             // const suggestedQuestions = await axios.get("");
             if (response?.suggested_questions) setSuggestedQuestions(response?.suggested_questions);
         } catch (error: any) {
-            const errorMessage =  error?.message ? 
-                error.message : 
-                (typeof error === "string" ? error : "ERROR: An unknown error occurred. Please try again later.")
+            const errorMessage = formatChatError(error);
             console.error('Error sending welcome message: ', errorMessage);
             if (messages.length === 0) {
                 setMessages([{
@@ -413,12 +510,13 @@ const useChat = () => {
                     id: generateId(),
                     conversationId,
                     view: response?.view,
+                    verification: response?.verification ?? undefined,
+                    data_preview: response?.data_preview ?? undefined,
+                    needs_refresh: response?.needs_refresh ?? false,
                 }])
             }
         } catch (error: any) {
-            const errorMessage =  error?.message ? 
-                error.message : 
-                (typeof error === "string" ? error : "ERROR: An unknown error occurred. Please try again later.")
+            const errorMessage = formatChatError(error);
             setMessages(prev => [...prev, {
                 text: errorMessage,
                 sender: 'bot',
@@ -457,9 +555,7 @@ const useChat = () => {
                 conversationId: newConversationId
             }]);
         } catch (error: any) {
-            const errorMessage =  error?.message ? 
-                error.message : 
-                (typeof error === "string" ? error : "ERROR: An unknown error occurred. Please try again later.")
+            const errorMessage = formatChatError(error);
             setMessages([{
                 text: errorMessage,
                 sender: 'system',

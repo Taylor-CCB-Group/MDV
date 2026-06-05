@@ -10,6 +10,8 @@ class WordcloudPlot(BasePlot):
         self.plot_data["wordcloud"] = True
 
     def set_axis_properties(self, axis, properties):
-        self.plot_data["axis"] = properties
+        if "axis" not in self.plot_data:
+            self.plot_data["axis"] = {}
+        self.plot_data["axis"][axis] = properties
 
     # Any additional methods specific to wordclouds can be added here

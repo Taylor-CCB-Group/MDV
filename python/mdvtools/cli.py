@@ -140,6 +140,35 @@ def merge_project(base_project, extra_project, prefix, view_prefix):
     merge_projects(base_project, extra_project, prefix=prefix, view_prefix=view_prefix)
     click.echo(f"Merged '{extra_project}' into '{base_project}'.")
 
+@cli.command("patch-spatial-annotations")
+@click.argument("project_dir")
+@click.argument("annotation_csv")
+@click.option("--datasource", default="cells", show_default=True, help="MDV datasource to patch.")
+@click.option("--spatialdata-path", default=None, help="SpatialData store to read. Defaults to auto-detecting under PROJECT_DIR/spatial.")
+@click.option("--table-name", default=None, help="SpatialData table name. Required if more than one table exists.")
+@click.option("--annotation-key", default=None, help="Column in ANNOTATION_CSV to use as the table instance key. Defaults to the SpatialData instance key.")
+@click.option("--separator", default=",", show_default=True, help="Annotation CSV delimiter.")
+@click.option("--missing-value", default="ND", show_default=True, help="Value used for cells missing from the annotation CSV.")
+@click.option("--apply", "apply_changes", is_flag=True, help="Write changes. Without this flag, only a dry-run report is produced.")
+@click.option("--overwrite-preserved", is_flag=True, help="Replace an existing preservation column such as cell_index.")
+def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialdata_path, table_name, annotation_key, separator, missing_value, apply_changes, overwrite_preserved):
+    """Patch an existing spatial MDV project with instance-key annotations."""
+    from .spatial.annotations import patch_spatial_annotations as patch_annotations
+
+    report = patch_annotations(
+        project_dir,
+        annotation_csv,
+        datasource=datasource,
+        spatialdata_path=spatialdata_path,
+        table_name=table_name,
+        annotation_key=annotation_key,
+        separator=separator,
+        missing_value=missing_value,
+        apply_changes=apply_changes,
+        overwrite_preserved=overwrite_preserved,
+    )
+    click.echo(report.to_text())
+
 @cli.command("convert-spatial")
 @click.argument('output_folder')
 @click.argument('spatialdata_path')

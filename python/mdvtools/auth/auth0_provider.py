@@ -1,3 +1,6 @@
+from mdvtools._optional import require_extra
+require_extra("app", "authlib")
+
 import time
 import requests
 import threading

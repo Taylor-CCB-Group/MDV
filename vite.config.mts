@@ -1,8 +1,10 @@
 import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
-import react from '@vitejs/plugin-react';
-import { babel } from '@rollup/plugin-babel';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import { babel as rollupBabel } from '@rollup/plugin-babel';
+import rolldownBabel from '@rolldown/plugin-babel';
 import glsl from 'vite-plugin-glsl';
+import { visualizer } from 'rollup-plugin-visualizer';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -22,6 +24,18 @@ const build = (process.env.build || "desktop_pt") as 'production' | 'dev_pt' | '
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 // maybe also the various build configurations at some point.
+
+const reactCompiler = reactCompilerPreset();
+reactCompiler.rolldown.filter ??= {};
+// this doesn't like decorators it seems, for now if we only point it at tsx files then it doesn't have a problem
+// (as far as we've noticed)
+reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
+const useReactCompiler =
+    process.env.VITE_USE_REACT_COMPILER === "1" ||
+    process.env.VITE_USE_REACT_COMPILER === "true";
+const enableBundleAnalysis =
+    process.env.VITE_BUNDLE_ANALYZE === "1" ||
+    process.env.VITE_BUNDLE_ANALYZE === "true";
 
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
@@ -49,12 +63,16 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  */
 function getRollupOptions() {
     if (build === 'production') {
+        const version =process.env.mdv_version ? "-" + process.env.mdv_version : "";
+
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
-                entryFileNames: 'mdv.js',
+
+                entryFileNames: `mdv${version}.js`,
                 assetFileNames: flaskAssetFileNames,
+
             }
         }
     } if (build === 'desktop_pt') {
@@ -62,7 +80,7 @@ function getRollupOptions() {
         // used for Flask...
         return {
             input: {
-                'mdv': 'src/modules/static_index.ts',
+                'mdv': 'src/modules/project_bootstrap.tsx',
                 'catalog': 'src/catalog/catalog_index.tsx',
                 'login': 'src/login/login_index.tsx',
             },
@@ -87,7 +105,7 @@ function getRollupOptions() {
     if (process.env.VITE_ENTRYPOINT) {
         // If you want a custom entrypoint - in particular, in order to have a custom DataLoader for interfacing
         // with another backend, you can specify it with VITE_ENTRYPOINT environment variable, e.g.
-        // `VITE_ENTRYPOINT=path/to/my_index.js npx vite build --outDir path/to/output`
+        // `VITE_ENTRYPOINT=path/to/my_index.js pnpm exec vite build --outDir path/to/output`
         // (nb, we may change the logic in this config...)
         return {
             input: process.env.VITE_ENTRYPOINT,
@@ -176,7 +194,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
     },
     plugins: [
         glsl(),
-        babel({
+        rollupBabel({
             babelHelpers: 'bundled',
             extensions: ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'],
             include: ['src/**/*'],
@@ -189,17 +207,24 @@ export default defineConfig(async (): Promise<UserConfig> => {
         }),
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
-            babel: {
-                plugins: [
-                    [
-                        "@babel/plugin-proposal-decorators",
-                        {
-                            version: "2023-05"
-                        }
-                    ]
-                ]
-            }
-        })
+        }),
+        ...(useReactCompiler
+            ? [
+                rolldownBabel({
+                    presets: [reactCompiler],
+                }),
+            ]
+            : []),
+        ...(enableBundleAnalysis
+            ? [
+                visualizer({
+                    filename: process.env.VITE_BUNDLE_ANALYZE_OUTPUT || "dist/bundle-analysis.html",
+                    template: "treemap",
+                    gzipSize: true,
+                    brotliSize: true,
+                }),
+            ]
+            : []),
     ],
     worker: {
         format: (process.env.worker_format || 'iife') as 'es' | 'iife',
@@ -208,6 +233,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
         alias: {
             "@": path.resolve(configDir, "./src"),
         }
-    }
+    },
+    // Vite 7 crawls all **/*.html for dep pre-bundling. Python/Flask templates and
+    // public/index.html reference static/js/mdv.js (built output), which is not a
+    // resolvable package — limit scanning to real Vite entry HTML files.
+    optimizeDeps: {
+        entries: [
+            path.resolve(configDir, 'index.html'),
+            path.resolve(configDir, 'src/static.html'),
+            path.resolve(configDir, 'src/obvios.html'),
+            path.resolve(configDir, 'login_dev.html'),
+            path.resolve(configDir, 'catalog_dev.html'),
+        ],
+    },
     } as UserConfig;
 });

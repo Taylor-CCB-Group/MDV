@@ -1,3 +1,6 @@
+from mdvtools._optional import require_extra
+require_extra("app", "langchain_openai")
+
 import time
 import logging
 import re
@@ -5,7 +8,7 @@ from contextlib import contextmanager
 import os
 import traceback
 import html
-from typing import List
+from typing import Any, List, Optional
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
@@ -33,9 +36,33 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
+from .code_manipulation import (
+    extract_explanation_from_response,
+    parse_view_name,
+    prepare_code,
+    resolve_persisted_view_name,
+)
+from .column_field_resolve import (
+    field_set_from_columns,
+    normalize_view_chart_params,
+    prune_view_charts_with_invalid_params,
+)
+from .verification import build_verification_summary
+from .datasource_roles import collect_wrapper_subgroup_keys_for_project, infer_datasource_roles
 from .code_execution import execute_code
+from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
+from .chat_client_refresh import client_needs_refresh_after_chat
+from .execution_progress import (
+    attach_failed_source_context,
+    ProgressEvent,
+    ProgressThrottler,
+    build_heartbeat_event,
+    friendly_subprocess_failure_message,
+    infer_progress_event_from_output,
+    parse_explicit_progress_line,
+)
+from .preflight_flow import preflight_with_single_retry
 
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
@@ -73,6 +100,75 @@ chat_debug_handler.setFormatter(formatter)
 # attach the handler
 chat_debug_logger.addHandler(chat_debug_handler)
 
+
+_CHART_CLASS_RE = re.compile(
+    r"\b(DotPlot|ScatterPlot|HeatmapPlot|HistogramPlot|BoxPlot|ViolinPlot|"
+    r"DensityScatterPlot|ScatterPlot3D|RowChart|StackedRowChart|PieChart|RingChart|"
+    r"AbundanceBoxPlot|MultiLinePlot|TablePlot|WordcloudPlot|SankeyPlot|"
+    r"SelectionDialogPlot|RowSummaryBox|TextBox)\s*\("
+)
+
+
+def _is_text_table_intent(question: str) -> bool:
+    q = question.lower()
+    text_table_keywords = [
+        "predict",
+        "annotate",
+        "annotation",
+        "label",
+        "list",
+        "table",
+        "summarize",
+        "summary",
+        "top ",
+        "rank",
+        "mapping",
+        "which cell type",
+        "cell type",
+    ]
+    chart_intent_keywords = [
+        "plot",
+        "chart",
+        "visualize",
+        "scatter",
+        "heatmap",
+        "umap",
+        "tsne",
+        "violin",
+        "histogram",
+        "dotplot",
+    ]
+    has_text_table = any(k in q for k in text_table_keywords)
+    has_explicit_chart = any(k in q for k in chart_intent_keywords)
+    return has_text_table and not has_explicit_chart
+
+
+def _extract_chart_classes(code: str) -> list[str]:
+    seen: list[str] = []
+    for m in _CHART_CLASS_RE.finditer(code):
+        c = m.group(1)
+        if c not in seen:
+            seen.append(c)
+    return seen
+
+
+def _is_text_table_only_code(code: str) -> bool:
+    chart_classes = _extract_chart_classes(code)
+    if not chart_classes:
+        return True
+    allowed = {"TextBox", "TablePlot", "SelectionDialogPlot", "RowSummaryBox"}
+    return all(c in allowed for c in chart_classes)
+
+
+def _build_rag_retrieval_query(user_question: str, charts_part: str) -> str:
+    """Combine the user question with agent-suggested chart types for RAG retrieval."""
+    question = (user_question or "").strip()
+    charts = (charts_part or "").strip()
+    if question and charts:
+        return f"User question: {question}\nSuggested chart types: {charts}"
+    return question or charts
+
+
 class SuggestedQuestions(BaseModel):
     """A list of suggested questions to ask about the data."""
     questions: List[str] = Field(
@@ -95,67 +191,71 @@ def time_block(name):
 # but we can call `matplotlib.use('Agg')` before calling the agent (and any other code that might try to draw)
 matplotlib.use('Agg') # this should prevent it making any windows etc
 
-print('# setting keys and variables')
-# .env file should have OPENAI_API_KEY
-load_dotenv()
-# if it isn't set, we raise an error more explicitly to log it
-if not os.getenv("OPENAI_API_KEY"):
-    print("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
-    raise ValueError("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
-
-print('# Crawl the local repository to get a list of relevant file paths')
-with time_block("b1: Local repo crawling"):
-    code_files_urls = crawl_local_repo()
-
-    # Initialize an empty list to store the extracted code documents
-    code_strings = []
-
-    # populate code_strings with the code from .py & .ipynb files in code_files_urls
-    for i in range(0, len(code_files_urls)):
-        if code_files_urls[i].endswith(".py"):
-            content = extract_python_code_from_py(code_files_urls[i])
-            doc = Document(page_content=content, metadata={"url": code_files_urls[i], "file_index": i})
-            code_strings.append(doc)
-        elif code_files_urls[i].endswith(".ipynb"):
-            content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
-            doc_ipynb = Document(page_content=content_ipynb, metadata={"url": code_files_urls[i], "file_index": i})
-            code_strings.append(doc_ipynb)
-
-print('# Initialize a text splitter for chunking the code strings')
-
-with time_block("b2: Text splitter initialising"):
-    text_splitter = RecursiveCharacterTextSplitter.from_language(
-        language=Language.PYTHON,  # Specify the language as Python
-        chunk_size=20000,           # Set the chunk size to 1500 characters
-        chunk_overlap=2000          # Set the chunk overlap to 150 characters
-    )
-    print('# Split the code documents into chunks using the text splitter')
-    texts = text_splitter.split_documents(code_strings)
-
-print('# Initialize an instance of the OpenAIEmbeddings class')
-with time_block("b3: Embeddings creating"):
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-large"  # Specify the model to use for generating embeddings
-    )
-
-print(embeddings)
-print('# Create an index from the embedded code chunks')
-print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index')
-
-
-with time_block("b4: FAISS database creating"):
-    db = FAISS.from_documents(texts, embeddings)
-
-print("# Initialize the retriever from the FAISS index")
-
-with time_block("b5: Retriever creating"):
-    retriever = db.as_retriever(
-        search_type="similarity",      # Specify the search type as "similarity"
-        search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
-    )
+_rag_retriever: Optional[Any] = None
 
 # ... for testing basic mechanics without invoking the agent
 mock_agent = False
+
+
+def _ensure_openai_api_key() -> None:
+    load_dotenv()
+    if not os.getenv("OPENAI_API_KEY"):
+        raise ValueError(
+            "OPENAI_API_KEY is not set in the environment variables. "
+            "Please set it if LLM integration is required."
+        )
+
+
+def _get_rag_retriever():
+    """Build the code RAG retriever on first use (requires OPENAI_API_KEY)."""
+    global _rag_retriever
+    if _rag_retriever is not None:
+        return _rag_retriever
+
+    _ensure_openai_api_key()
+
+    print('# Crawl the local repository to get a list of relevant file paths')
+    with time_block("b1: Local repo crawling"):
+        code_files_urls = crawl_local_repo()
+
+        code_strings = []
+        for i in range(0, len(code_files_urls)):
+            if code_files_urls[i].endswith(".py"):
+                content = extract_python_code_from_py(code_files_urls[i])
+                doc = Document(
+                    page_content=content,
+                    metadata={"url": code_files_urls[i], "file_index": i},
+                )
+                code_strings.append(doc)
+            elif code_files_urls[i].endswith(".ipynb"):
+                content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
+                doc_ipynb = Document(
+                    page_content=content_ipynb,
+                    metadata={"url": code_files_urls[i], "file_index": i},
+                )
+                code_strings.append(doc_ipynb)
+
+    with time_block("b2: Text splitter initialising"):
+        text_splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.PYTHON,
+            chunk_size=20000,
+            chunk_overlap=2000,
+        )
+        texts = text_splitter.split_documents(code_strings)
+
+    with time_block("b3: Embeddings creating"):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+
+    with time_block("b4: FAISS database creating"):
+        db = FAISS.from_documents(texts, embeddings)
+
+    with time_block("b5: Retriever creating"):
+        _rag_retriever = db.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": 5},
+        )
+
+    return _rag_retriever
 
 
 class ProjectChat(ProjectChatProtocol):
@@ -186,12 +286,20 @@ class ProjectChat(ProjectChatProtocol):
         self.ds_name = project.datasources[0]['name']
         try:
             # raise ValueError("test error")
+            _ensure_openai_api_key()
             self.df = None
-            # Prepare dataframes for the agent
-            if len(self.project.datasources) >= 2:
-                self.df_list = [self.project.get_datasource_as_dataframe(ds['name']) for ds in self.project.datasources[:2]]
+            # Prepare dataframes for the agent.
+            # ChatMDV historically assumed df1=cells and df2=genes. Many projects instead use
+            # wrapper-capable expression datasources (e.g. rna/protein) linked via rows-as-columns.
+            roles = infer_datasource_roles(self.project)
+            self.roles = roles
+            df1 = self.project.get_datasource_as_dataframe(roles.obs_datasource)
+            primary_expr = roles.preferred_expression()
+            if primary_expr is not None:
+                df2 = self.project.get_datasource_as_dataframe(primary_expr.datasource_name)
+                self.df_list = [df1, df2]
             else:
-                self.df_list = [self.project.get_datasource_as_dataframe(self.project.datasources[0]['name'])]
+                self.df_list = [df1]
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
@@ -204,12 +312,12 @@ class ProjectChat(ProjectChatProtocol):
                     self.log(f"Generated suggested questions: {self.suggested_questions}")
             except Exception as e:
                 self.log(f"Could not generate suggested questions: {e}")
-                self.suggested_questions = [str(e)]
+                self.suggested_questions = []
 
             self.init_error = False
         except Exception as e:
-            error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
-            self.log(error_message)
+            error_message = str(e)[:500]
+            self.log(f"{error_message}\n\n{traceback.format_exc()}")
             
             self.error_message = error_message
             self.init_error = True
@@ -217,9 +325,7 @@ class ProjectChat(ProjectChatProtocol):
     def get_suggested_questions(self):
         if self.init_error:
             return []
-        if self.suggested_questions:
-            return self.suggested_questions
-        return ["This should be unreachable"]
+        return self.suggested_questions
     
     def get_or_create_memory(self, conversation_id: str):
         """Get or create conversation memory for a specific conversation"""
@@ -268,10 +374,42 @@ class ProjectChat(ProjectChatProtocol):
         contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
 
         # Step 3: Define the Agent Prompt
+        role_hint = ""
+        try:
+            roles = getattr(self, "roles", None)
+            if roles is not None:
+                exprs = roles.expressions or []
+                if exprs:
+                    expr_lines = (
+                        f"- df2 maps to expression datasource '{exprs[0].datasource_name}' "
+                        f"(feature names in column '{exprs[0].name_column}', default subgroup '{exprs[0].subgroup_key}')"
+                    )
+                else:
+                    expr_lines = "- No rows-as-columns expression datasource detected for this project."
+                role_hint = (
+                    "\n\nDatasource roles:\n"
+                    f"- df1 maps to obs datasource '{roles.obs_datasource}'\n"
+                    f"{expr_lines}\n"
+                    "- For any chart `params` on the **feature table datasource** (df2), use **Field ID** strings from "
+                    "`df2.columns` / project metadata for **that** datasource (e.g. `gene_ids` when listed for `genes`); "
+                    "do not use those ids as `params` on charts bound to **cells** unless `cells` lists the same Field ID.\n"
+                    "- Do not pair Scanpy `rank_genes_groups` tables with DotPlot/Heatmap on cells using wrapper `params` "
+                    "as a substitute for that table (see ChatMDV \"Marker ranking vs DotPlot\" in RAG); optional "
+                    "`add_datasource('chat_rank_genes_result', ...)` for an in-view table.\n"
+                    "- Do not pair other Scanpy summary tables with MDV wrapper-based expression charts for the "
+                    "same metric unless values are guaranteed identical; prefer one pipeline (see ChatMDV viz consistency "
+                    "in RAG).\n"
+                )
+        except Exception:
+            role_hint = ""
+
         prompt_data_template = f"""You have access to the following Pandas DataFrames: 
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
+        {role_hint}
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
         Use these to correct the column names mentioned by the user.
+        Before writing any `project.get_datasource_as_dataframe(datasource_name, columns=[...])` call, you must verify the datasource schema and only request columns that exist on that datasource.
+        Never assume a `name` column exists on `cells`; if the task asks for genes/markers, use the expression datasource or explicit marker ranking outputs instead of `cells.name`.
         You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
         Use `df.info()` or `df.index()`.
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
@@ -318,8 +456,8 @@ class ProjectChat(ProjectChatProtocol):
         
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room, conversation_id)
-        log = socket_api.log
-        log(f"Asking question: {question}")
+        log = chat_debug_logger.info
+        chat_debug_logger.info("Asking question: %s", question)
 
         if question == "test error":
             raise Exception("testing error response as requested")
@@ -362,17 +500,29 @@ class ProjectChat(ProjectChatProtocol):
             )
         
         progress = 0
+        total_steps = 6
+
+        def _step_message(step: int, text: str) -> str:
+            return f"Step {step}/{total_steps}: {text}"
         if mock_agent:
             ok, strdout, stderr = execute_code(
                 'import mdvtools\nprint("mdvtools import ok")'
             )
-            return {"code": f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}", "view_name": None, "error": False, "message": "Success"}
+            return {
+                "code": f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}",
+                "view_name": None,
+                "error": False,
+                "message": "Success",
+                "verification": None,
+                "data_preview": format_stdout_for_chat(strdout),
+                "needs_refresh": False,
+            }
         
         with time_block("b10a: Agent invoking"):  # ~0.005% of time
             socket_api.update_chat_progress(
-                "Agent invoking", id, progress, 0
+                _step_message(1, "Understanding your request"), id, progress, 0, step_index=1, step_total=total_steps
             )
-            log(f"Asking the LLM: '{question}'")
+            chat_debug_logger.info("Asking the LLM: %r", question)
             if self.init_error:
                 socket_api.update_chat_progress(
                     f"Agent initialisation error: {str(self.error_message)}", id, 100, 0
@@ -382,15 +532,33 @@ class ProjectChat(ProjectChatProtocol):
         try:
             with time_block("b10b: Pandas agent invoking"):  # ~31.4% of time
                 socket_api.update_chat_progress(
-                    "Pandas agent invoking...", id, progress, 31
+                    _step_message(2, "Inspecting datasources and available fields"),
+                    id,
+                    progress,
+                    31,
+                    step_index=2,
+                    step_total=total_steps,
                 )
                 progress += 31
+                socket_api.update_chat_progress(
+                    _step_message(3, "Generating runnable analysis code (this can take up to 1-2 minutes)"),
+                    id,
+                    progress,
+                    0,
+                    step_index=3,
+                    step_total=total_steps,
+                )
                 response = agent(question)
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
             
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 socket_api.update_chat_progress(
-                    "RAG prompt preparation...", id, progress, 1
+                    _step_message(3, "Preparing analysis context"),
+                    id,
+                    progress,
+                    1,
+                    step_index=3,
+                    step_total=total_steps,
                 )
                 # List all files in the directory
                 files_in_dir = os.listdir(self.project.dir)
@@ -431,24 +599,32 @@ class ProjectChat(ProjectChatProtocol):
 
             with time_block("b12: RAG chain"):  # ~60% of time
                 socket_api.update_chat_progress(
-                    "Invoking RAG chain...", id, progress, 60
+                    _step_message(3, "Generating runnable analysis code"),
+                    id,
+                    progress,
+                    60,
+                    step_index=3,
+                    step_total=total_steps,
                 )
                 progress += 60
 
                 match = re.search(r'charts\s+(.*)', response['output'])
                 charts_part = match.group(1) if match else response['output']
+                rag_retrieval_query = _build_rag_retrieval_query(question, charts_part)
 
                 qa_chain = RetrievalQA.from_llm(
                     llm=code_llm, 
                     prompt=prompt_RAG_template, 
-                    retriever=retriever,
+                    retriever=_get_rag_retriever(),
                     return_source_documents=True,
                 )
-                output_qa = qa_chain.invoke({"query": charts_part})
+                output_qa = qa_chain.invoke({"query": rag_retrieval_query})
                 # Log the complete prompt after context injection
                 if "source_documents" in output_qa:
                     retrieved_context = "\n".join(doc.page_content for doc in output_qa["source_documents"])
-                    complete_prompt = prompt_RAG_template.format(context=retrieved_context, question=charts_part)
+                    complete_prompt = prompt_RAG_template.format(
+                        context=retrieved_context, question=rag_retrieval_query
+                    )
                     chat_debug_logger.info(f"=== Complete RAG Prompt (with injected context) ===\n{complete_prompt}\n=== End Complete Prompt ===")
                 result = output_qa["result"]
 
@@ -457,36 +633,259 @@ class ProjectChat(ProjectChatProtocol):
                     result,
                     self.df,
                     self.project,
-                    log,
+                    chat_debug_logger.info,
                     modify_existing_project=True,
                     view_name=question,
                 )
+
+                if _is_text_table_intent(question) and not _is_text_table_only_code(final_code):
+                    chat_debug_logger.info(
+                        "Detected text/table-first intent with chart-heavy output; regenerating with chat-first instruction."
+                    )
+                    chat_first_query = (
+                        f"{rag_retrieval_query}\n\n"
+                        "IMPORTANT: This request is text/table-first. "
+                        "Prefer chat explanation and concise bounded stdout (`print(...)`) instead of creating "
+                        "TextBox/TablePlot/SelectionDialog-only outputs unless the user explicitly requested a chart."
+                    )
+                    output_qa_retry = qa_chain.invoke({"query": chat_first_query})
+                    result_retry = output_qa_retry["result"]
+                    final_code_retry = prepare_code(
+                        result_retry,
+                        self.df,
+                        self.project,
+                        chat_debug_logger.info,
+                        modify_existing_project=True,
+                        view_name=question,
+                    )
+                    if not _is_text_table_only_code(final_code_retry):
+                        output_qa = output_qa_retry
+                        result = result_retry
+                        final_code = final_code_retry
+                    else:
+                        # Keep retry result anyway when it remains text/table-only;
+                        # downstream chat explanation/stdout still carries the answer.
+                        output_qa = output_qa_retry
+                        result = result_retry
+                        final_code = final_code_retry
+
+            with time_block("b13b: Preflight validate and retry"):
+                datasource_fields: dict[str, set[str]] = {}
+                for ds in self.project.datasources or []:
+                    if not isinstance(ds, dict):
+                        continue
+                    ds_name = ds.get("name")
+                    if not isinstance(ds_name, str):
+                        continue
+                    fields: set[str] = set()
+                    try:
+                        md = self.project.get_datasource_metadata(ds_name)
+                        if isinstance(md, dict):
+                            md_cols = md.get("columns")
+                            if isinstance(md_cols, list):
+                                fields |= field_set_from_columns(md_cols)
+                    except Exception:
+                        pass
+                    cols = ds.get("columns")
+                    if isinstance(cols, list):
+                        for c in cols:
+                            if isinstance(c, dict) and c.get("field"):
+                                fields.add(str(c.get("field")))
+                    if fields:
+                        datasource_fields[ds_name] = fields
+
+                def _regenerate_for_preflight(issue_text: str) -> str:
+                    retry_query = (
+                        f"{rag_retrieval_query}\n\n"
+                        "Fix this code preflight validation failure and return corrected runnable code only.\n"
+                        "If issues mention set_x_axis or set_y_axis on BoxPlot, ViolinPlot, ScatterPlot, or DotPlot, "
+                        "replace with set_axis_properties('x', {...}) and set_axis_properties('y', {...}) only.\n"
+                        "On ScatterPlot use set_filter, not set_on_filter (set_on_filter is for ScatterPlot3D only).\n"
+                        f"Preflight issues:\n{issue_text}"
+                    )
+                    output_qa_retry = qa_chain.invoke({"query": retry_query})
+                    result_retry = output_qa_retry["result"]
+                    return prepare_code(
+                        result_retry,
+                        self.df,
+                        self.project,
+                        chat_debug_logger.info,
+                        modify_existing_project=True,
+                        view_name=question,
+                    )
+
+                allowed_wrapper_subgroup_keys = collect_wrapper_subgroup_keys_for_project(
+                    self.project
+                )
+                final_code, preflight_meta = preflight_with_single_retry(
+                    initial_code=final_code,
+                    regenerate_once=_regenerate_for_preflight,
+                    log=chat_debug_logger.info,
+                    datasource_fields=datasource_fields,
+                    allowed_wrapper_subgroup_keys=allowed_wrapper_subgroup_keys,
+                )
+                chat_debug_logger.info("Preflight metadata: %s", preflight_meta)
 
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
             with time_block("b14: Execute code"):  # ~9% of time
                 socket_api.update_chat_progress(
-                    "Executing code...", id, progress, 9
+                    _step_message(4, "Running analysis on your data"),
+                    id,
+                    progress,
+                    9,
+                    step_index=4,
+                    step_total=total_steps,
                 )
                 progress += 9
+                progress_throttler = ProgressThrottler(min_interval_seconds=3.0)
+                current_stage: str | None = None
+
+                def emit_progress_event(event: ProgressEvent) -> None:
+                    nonlocal current_stage
+                    if event.stage:
+                        current_stage = event.stage
+                    if event.progress == 0 and progress > 0:
+                        event = ProgressEvent(
+                            message=event.message,
+                            progress=progress,
+                            delta=event.delta,
+                            stage=event.stage,
+                            step_index=event.step_index,
+                            step_total=event.step_total,
+                            eta_seconds=event.eta_seconds,
+                            elapsed_seconds=event.elapsed_seconds,
+                            source=event.source,
+                        )
+                    if not progress_throttler.should_emit(event):
+                        return
+                    socket_api.update_chat_progress(
+                        event.message,
+                        id,
+                        event.progress,
+                        event.delta,
+                        stage=event.stage,
+                        step_index=event.step_index,
+                        step_total=event.step_total,
+                        eta_seconds=event.eta_seconds,
+                        elapsed_seconds=event.elapsed_seconds,
+                        source=event.source,
+                    )
+
+                def handle_output_line(_source: str, line: str) -> None:
+                    explicit = parse_explicit_progress_line(line)
+                    if explicit is not None:
+                        emit_progress_event(explicit)
+                        return
+                    inferred = infer_progress_event_from_output(line)
+                    if inferred is not None:
+                        emit_progress_event(inferred)
+
+                def handle_heartbeat(elapsed_seconds: float) -> None:
+                    emit_progress_event(
+                        build_heartbeat_event(
+                            elapsed_seconds,
+                            stage=current_stage,
+                            step_index=4,
+                            step_total=total_steps,
+                        )
+                    )
+
                 ok, stdout, stderr = execute_code(
-                    final_code, open_code=False, log=log
+                    final_code,
+                    open_code=False,
+                    log=chat_debug_logger.info,
+                    on_output_line=handle_output_line,
+                    on_heartbeat=handle_heartbeat,
                 )
                 chat_debug_logger.info(f"Code Execution Result - OK: {ok}")
                 chat_debug_logger.info(f"Code Execution STDOUT:\n{stdout}")
                 chat_debug_logger.info(f"Code Execution STDERR:\n{stderr}")
 
             if not ok:
-                # Log code execution error
+                # Preserve full diagnostics in backend logs, but surface friendly messaging for kill-style exits.
+                chat_debug_logger.error("Code execution failed diagnostics:\n%s", stderr)
+                friendly = friendly_subprocess_failure_message(stderr or "")
+                if friendly is not None:
+                    raise Exception(
+                        attach_failed_source_context(
+                            friendly,
+                            stderr or "",
+                            fallback_code=final_code,
+                        )
+                    )
                 raise Exception(f"Code execution failed: \n{stderr}")
-            
+
+            data_preview_text = format_stdout_for_chat(stdout)
+
             with time_block("b15: Parse view name"):
+                socket_api.update_chat_progress(
+                    _step_message(5, "Validating and organizing results"),
+                    id,
+                    progress,
+                    0,
+                    step_index=5,
+                    step_total=total_steps,
+                )
                 # Parse view name from the code
-                view_name = parse_view_name(final_code)
-                if view_name is None:
+                parsed_view_name = parse_view_name(final_code)
+                if parsed_view_name is None:
                     raise Exception("Parsing view name failed")
+                view_name = resolve_persisted_view_name(self.project, parsed_view_name)
                 log(f"view_name: {view_name}")
-                
+
+            with time_block("b15c: Normalize chart params (name to field id)"):
+                try:
+                    view_obj = self.project.get_view(view_name) if view_name is not None else None
+                    if view_obj and view_name is not None:
+                        ic = view_obj.get("initialCharts")
+                        if isinstance(ic, dict):
+                            valid_names = {
+                                str(d["name"])
+                                for d in (self.project.datasources or [])
+                                if isinstance(d, dict) and d.get("name")
+                            }
+                            for ds_name in ic:
+                                if ds_name not in valid_names:
+                                    chat_debug_logger.warning(
+                                        "View %s initialCharts references unknown datasource %r (have: %s)",
+                                        view_name,
+                                        ds_name,
+                                        sorted(valid_names),
+                                    )
+                        normalized = normalize_view_chart_params(
+                            view_obj, self.project
+                        )
+                        pruned, n_dropped = prune_view_charts_with_invalid_params(
+                            normalized, self.project
+                        )
+                        if n_dropped:
+                            log(
+                                f"pruned {n_dropped} chart(s) with param tokens not in datasource metadata"
+                            )
+                        self.project.set_view(view_name, pruned)
+                except Exception as norm_ex:
+                    chat_debug_logger.warning(
+                        "normalize_view_chart_params failed for view %s: %s",
+                        view_name,
+                        norm_ex,
+                        exc_info=True,
+                    )
+
+            verification_text = ""
+            with time_block("b15b: Verification summary"):
+                try:
+                    verification_text = build_verification_summary(
+                        self.project, final_code, view_name
+                    )
+                except Exception as ver_ex:
+                    chat_debug_logger.warning(
+                        "build_verification_summary failed for view %s: %s",
+                        view_name,
+                        ver_ex,
+                        exc_info=True,
+                    )
+
             with time_block("b16: Log chat item"):
                  # Extract the explanation section from the LLM's response (removing code blocks)
                 explanation = extract_explanation_from_response(output_qa["result"])
@@ -509,33 +908,61 @@ class ProjectChat(ProjectChatProtocol):
                     f"{final_code}\n"
                     "```\n\n"
                     "<br><br>"
-                    f"{html.escape(explanation)}"
+                    f"{explanation}"
                     "\n\n"
                     f"{context_files}"
                 )
                 # Log successful code execution
                 log_chat_item(
-                    project=self.project, 
-                    question=question, 
-                    output=output_qa, 
-                    prompt_template=prompt_RAG, 
-                    response=final_code_updated, 
-                    conversation_id=conversation_id, 
-                    context=context, 
-                    view_name=view_name
+                    project=self.project,
+                    question=question,
+                    output=output_qa,
+                    prompt_template=prompt_RAG,
+                    response=final_code_updated,
+                    conversation_id=conversation_id,
+                    context=context,
+                    view_name=view_name,
+                    verification=verification_text or None,
+                    data_preview=data_preview_text,
                 )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
-                    "Finished processing query", id, 100, 0
+                    _step_message(6, "Done — results are ready"),
+                    id,
+                    100,
+                    0,
+                    step_index=6,
+                    step_total=total_steps,
                 )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
-                return {"code": final_code_updated, "view_name": view_name, "error": False, "message": "Success"}
+                return {
+                    "code": final_code_updated,
+                    "view_name": view_name,
+                    "error": False,
+                    "message": "Success",
+                    "verification": verification_text or None,
+                    "data_preview": data_preview_text,
+                    "needs_refresh": client_needs_refresh_after_chat(final_code),
+                }
         except Exception as e:
             # Log general error
             error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
             print(f"{error_message}")
             socket_api.update_chat_progress(
-                f"Error: {error_message}", id, 100, 0
+                f"Analysis failed: {str(e)[:200]}",
+                id,
+                100,
+                0,
+                step_index=4,
+                step_total=total_steps,
             )
             handle_error(e)
-            return {"code": None, "view_name": None, "error": True, "message": f"ERROR: {error_message}"}
+            return {
+                "code": None,
+                "view_name": None,
+                "error": True,
+                "message": f"ERROR: {error_message}",
+                "verification": None,
+                "data_preview": None,
+                "needs_refresh": False,
+            }

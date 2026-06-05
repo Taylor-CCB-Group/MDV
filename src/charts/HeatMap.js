@@ -6,6 +6,7 @@ import { scaleLinear } from "d3-scale";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { axisLeft } from "d3";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
 
 class HeatMap extends SVGChart {
     constructor(dataStore, div, config) {
@@ -82,8 +83,23 @@ class HeatMap extends SVGChart {
         return new Blob([arr.join("\n")], { type: "text/plain" });
     }
 
+    /**
+     * Ensure virtual expression columns (FieldName with "|") are registered before min/max/color lookups.
+     * Matches DataStore.getColumnInfo / addColumnFromField behaviour used elsewhere in ChartManager.
+     */
+    _ensureExpressionColumn(field) {
+        if (
+            typeof field === "string" &&
+            !this.dataStore.columnIndex[field] &&
+            field.includes("|")
+        ) {
+            this.dataStore.getColumnInfo(field);
+        }
+    }
+
     setColorFunction() {
         const p = this.config.param;
+        this._ensureExpressionColumn(p[1]);
         const conf = {
             useValue: true,
             overideValues: {
@@ -110,8 +126,10 @@ class HeatMap extends SVGChart {
         this.setColorLegend();
     }
 
-    getColorLegend() {
+    getColorLegendSpec() {
         const cs = this.config.color_scale;
+        // Match setColorFunction: virtual expression fields must exist before legend min/max lookups.
+        this._ensureExpressionColumn(this.config.param[1]);
         const conf = {
             overideValues: {
                 max: 1,
@@ -134,7 +152,7 @@ class HeatMap extends SVGChart {
             },
             name: "Scale",
         };
-        return this.dataStore.getColorLegend(this.config.param[1], conf);
+        return buildColorLegendSpec(this.dataStore, this.config.param[1], conf);
     }
 
     onDataFiltered(dim) {
@@ -154,6 +172,7 @@ class HeatMap extends SVGChart {
                 ? null
                 : this.config.color_scale.trim;
         for (let x = 1; x < p.length; x++) {
+            this._ensureExpressionColumn(p[x]);
             const col = this.dataStore.columnIndex[p[x]];
             const [min, max] = this.dataStore.getMinMaxForColumn(p[x]);
             const quantile = q && col.quantiles && col.quantiles !== "NA" && col.quantiles[q];

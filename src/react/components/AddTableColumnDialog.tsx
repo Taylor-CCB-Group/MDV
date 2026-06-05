@@ -3,12 +3,10 @@ import type { DataType } from "@/charts/charts";
 import {
     Autocomplete,
     Button,
-    Checkbox,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
-    FormControlLabel,
     Stack,
     TextField,
     Typography,
@@ -27,12 +25,14 @@ export type AddColumnParams = {
     name: string;
     datatype: DataType;
     cloneColumn?: string | null;
+    sourceColumns?: string[] | null;
+    mode?: "empty" | "clone" | "compound";
     position?: number | null;
     stringLength?: number | null;
     delimiter?: string | null;
 };
 
-type AddColumnMode = "empty" | "clone";
+type AddColumnMode = "empty" | "clone" | "compound";
 
 type AddTableColumnDialogProps = {
     open: boolean;
@@ -52,6 +52,8 @@ const DATATYPE_OPTIONS: DataType[] = [
     "unique",
     "multitext",
 ];
+const COMPOUND_DATATYPE_OPTIONS: Array<"text" | "text16"> = ["text", "text16"];
+const ADD_COLUMN_MODE_OPTIONS: AddColumnMode[] = ["empty", "clone", "compound"];
 
 const AddTableColumnDialog = ({
     open,
@@ -64,13 +66,26 @@ const AddTableColumnDialog = ({
     const [mode, setMode] = useState<AddColumnMode>("empty");
     const [datatype, setDatatype] = useState<DataType>("text");
     const [cloneColumn, setCloneColumn] = useState("");
-	const [position, setPosition] = useState(String(defaultPosition));
-	const [stringLength, setStringLength] = useState("");
-	const [delimiter, setDelimiter] = useState(",");
+    const [sourceColumns, setSourceColumns] = useState<string[]>([]);
+    const [position, setPosition] = useState(String(defaultPosition));
+    const [stringLength, setStringLength] = useState("");
+    const [delimiter, setDelimiter] = useState(",");
     const [nameError, setNameError] = useState<string | null>(null);
+    const [sourceColumnError, setSourceColumnError] = useState<string | null>(null);
 
     const selectedCloneColumn = cloneableColumns.find((column) => column.field === cloneColumn);
-    const selectedDatatype = mode === "clone" ? selectedCloneColumn?.datatype ?? "text" : datatype;
+    const compoundSourceColumns = cloneableColumns.filter(
+        (column) => column.datatype === "text" || column.datatype === "text16",
+    );
+    const selectedSourceColumns = compoundSourceColumns.filter((column) =>
+        sourceColumns.includes(column.field),
+    );
+    const selectedDatatype =
+        mode === "clone"
+            ? selectedCloneColumn?.datatype ?? "text"
+            : mode === "compound"
+              ? (datatype === "text16" ? "text16" : "text")
+              : datatype;
 
     // Reset values when the dialog is opened to avoid stale values
     useEffect(() => {
@@ -80,25 +95,33 @@ const AddTableColumnDialog = ({
         setName("");
         setMode("empty");
         setDatatype("text");
-	        setCloneColumn(cloneableColumns[0]?.field ?? "");
-	        setPosition(String(defaultPosition));
-	        setStringLength("");
-	        setDelimiter(",");
-            setNameError(null);
-	    }, [open, cloneableColumns, defaultPosition]);
+        setCloneColumn(cloneableColumns[0]?.field ?? "");
+        setSourceColumns([]);
+        setPosition(String(defaultPosition));
+        setStringLength("");
+        setDelimiter("_");
+        setNameError(null);
+        setSourceColumnError(null);
+    }, [open, cloneableColumns, defaultPosition]);
 
-	    const handleSubmit = () => {
-	        const trimmedName = name.trim();
-	        if (!trimmedName) {
+    const handleSubmit = () => {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
                 setNameError("Column name is required");
-	            return;
-	        }
+            return;
+        }
+        if (mode === "compound" && sourceColumns.length < 2) {
+            setSourceColumnError("Select at least 2 source columns");
+            return;
+        }
         const parsedPosition = Number.parseInt(position, 10);
         const parsedStringLength = Number.parseInt(stringLength, 10);
         onSubmit({
             name: trimmedName,
+            mode,
             datatype: selectedDatatype,
             cloneColumn: mode === "clone" && cloneColumn ? cloneColumn : null,
+            sourceColumns: mode === "compound" ? sourceColumns : null,
             position: Number.isNaN(parsedPosition) ? null : parsedPosition,
             stringLength:
                 selectedDatatype === "unique" || selectedDatatype === "multitext"
@@ -106,7 +129,10 @@ const AddTableColumnDialog = ({
                         ? null
                         : parsedStringLength
                     : null,
-            delimiter: selectedDatatype === "multitext" ? delimiter : null,
+            delimiter:
+                selectedDatatype === "multitext" || mode === "compound"
+                    ? delimiter
+                    : null,
         });
     };
 
@@ -118,36 +144,40 @@ const AddTableColumnDialog = ({
             </DialogTitle>
             <DialogContent dividers>
                 <Stack spacing={2} sx={{ pt: 0.5 }}>
-	                    <TextField
-	                        autoFocus
-	                        label="Column Name"
-	                        value={name}
-	                        onChange={(event) => {
+                    <TextField
+                        autoFocus
+                        label="Column Name"
+                        value={name}
+                        onChange={(event) => {
                                 setName(event.target.value);
                                 setNameError(null);
                             }}
-	                        onKeyDown={(event) => {
-	                            if (event.key === "Enter") {
-	                                event.preventDefault();
-	                                handleSubmit();
-	                            }
-	                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleSubmit();
+                            }
+                        }}
                             error={!!nameError}
                             helperText={nameError}
-	                        fullWidth
-	                    />
+                        fullWidth
+                    />
 
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={mode === "clone"}
-                                onChange={(event) => {
-                                    setMode(event.target.checked ? "clone" : "empty");
-                                }}
-                                disabled={cloneableColumns.length === 0}
-                            />
+                    <Autocomplete
+                        options={ADD_COLUMN_MODE_OPTIONS}
+                        value={mode}
+                        onChange={(_, value) => setMode(value ?? "empty")}
+                        disableClearable
+                        getOptionLabel={(option) =>
+                            option === "empty"
+                                ? "Empty"
+                                : option === "clone"
+                                  ? "Clone"
+                                  : "Compound"
                         }
-                        label="Clone existing column"
+                        renderInput={(params) => (
+                            <TextField {...params} label="Mode" fullWidth />
+                        )}
                     />
 
                     {mode === "clone" ? (
@@ -205,14 +235,52 @@ const AddTableColumnDialog = ({
                                 }}
                             />
                         </>
+                    ) : mode === "compound" ? (
+                        <>
+                            <Autocomplete
+                                options={compoundSourceColumns}
+                                multiple
+                                value={selectedSourceColumns}
+                                onChange={(_, values) => {
+                                    setSourceColumns(values.map((value) => value.field));
+                                    setSourceColumnError(null);
+                                }}
+                                getOptionLabel={(option) => option.name}
+                                isOptionEqualToValue={(option, value) => option.field === value.field}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Source Columns"
+                                        error={!!sourceColumnError}
+                                        helperText={sourceColumnError}
+                                        fullWidth
+                                    />
+                                )}
+                            />
+                            <Autocomplete
+                                options={COMPOUND_DATATYPE_OPTIONS}
+                                value={selectedDatatype}
+                                onChange={(_, value) => setDatatype(value ?? "text")}
+                                getOptionLabel={(option) => option}
+                                renderInput={(params) => (
+                                    <TextField {...params} label="Datatype" fullWidth />
+                                )}
+                            />
+                            <TextField
+                                label="Separator"
+                                value={delimiter}
+                                onChange={(event) => setDelimiter(event.target.value)}
+                                fullWidth
+                            />
+                        </>
                     ) : (
-	                        <Autocomplete
-	                            options={DATATYPE_OPTIONS}
-	                            value={datatype}
-	                            onChange={(_, value) => setDatatype(value ?? "text")}
-	                            getOptionLabel={(option) => option}
-	                            renderInput={(params) => (
-	                                <TextField
+                        <Autocomplete
+                            options={DATATYPE_OPTIONS}
+                            value={datatype}
+                            onChange={(_, value) => setDatatype(value ?? "text")}
+                            getOptionLabel={(option) => option}
+                            renderInput={(params) => (
+                                <TextField
                                     {...params}
                                     label="Datatype"
                                     placeholder="Search datatype"
@@ -274,7 +342,7 @@ const AddTableColumnDialog = ({
                     />
 
                     <Typography variant="body2" color="text.secondary">
-                        New columns are editable. Empty columns use the selected datatype, and cloned columns inherit their source datatype.
+                        New columns are editable. Compound source columns are limited to text/text16, and a requested text output auto-upgrades to text16 if distinct values exceed 256.
                     </Typography>
                 </Stack>
             </DialogContent>

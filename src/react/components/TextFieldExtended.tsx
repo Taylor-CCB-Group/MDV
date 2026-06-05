@@ -1,5 +1,6 @@
 import { styled } from '@mui/material/styles';
 import { TextField, type TextFieldProps } from "@mui/material";
+import type { ReactElement } from "react";
 
 const StyledAdornment = styled('div')(({ theme }) => ({
     display: 'flex',
@@ -14,7 +15,7 @@ const StyledAdornment = styled('div')(({ theme }) => ({
 /** Modified version of TextField that allows a `customEndAdornment`
  * along with the standard endAdornment passed in `InputProps`.
  */
-export const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.Element; customStartAdornment?: JSX.Element}) => {
+export const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: ReactElement; customStartAdornment?: ReactElement}) => {
     const { InputProps, customEndAdornment, ...rest } = props;
     const inputProps: typeof InputProps = {
         ...InputProps,

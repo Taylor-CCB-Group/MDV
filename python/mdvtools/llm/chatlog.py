@@ -1,5 +1,9 @@
 # https://stackoverflow.com/questions/39740632/python-type-hinting-without-cyclic-imports
 from __future__ import annotations
+
+from mdvtools._optional import require_extra
+require_extra("app", "langchain_core")
+
 import datetime
 import os
 import json
@@ -36,7 +40,8 @@ class ChatLogItem:
     conversation_id: Optional[str] = None
     view_name: Optional[str] = None
     error: Optional[bool] = None
-    
+    verification: Optional[str] = None
+    data_preview: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -49,6 +54,8 @@ class ChatLogItem:
             "conversation_id": self.conversation_id,
             "view_name": self.view_name,
             "error": self.error,
+            "verification": self.verification,
+            "data_preview": self.data_preview,
         }
 
     @classmethod
@@ -63,6 +70,8 @@ class ChatLogItem:
             conversation_id=data.get("conversation_id"),
             view_name=data.get("view_name"),
             error=data.get("error"),
+            verification=data.get("verification"),
+            data_preview=data.get("data_preview"),
         )
 
 class ChatLogger:
@@ -153,7 +162,14 @@ class ChatSocketAPI:
     def log(self, msg: str):
         self.logger.info(msg)
     
-    def update_chat_progress(self, message: str, id: str, progress: int, delta: int):
+    def update_chat_progress(
+        self,
+        message: str,
+        id: str,
+        progress: int,
+        delta: int,
+        **extra: Any,
+    ):
         """
         Send a message to the chat log and also update the progress bar.
         
@@ -174,9 +190,18 @@ class ChatSocketAPI:
         # if to is None:
         #     log(f"Chat progress update for {id} but no associated user found, skipping.")
         #     return
-        self.socketio.emit(self.progress_name, {
+        payload: dict[str, Any] = {
             "message": message, "id": id, "progress": progress, "delta": delta
-        }, namespace=self.project_namespace, to=self.room)
+        }
+        payload.update(extra)
+        # Keep structured observability without echoing payload internals into user chat logs.
+        self.logger.debug("chat_progress %s", payload)
+        self.socketio.emit(
+            self.progress_name,
+            payload,
+            namespace=self.project_namespace,
+            to=self.room,
+        )
 
 class ChatSocketIOHandler(logging.StreamHandler):
     def __init__(self, socketio: SocketIO, event_name: str, namespace: str, id: str, room: str):
@@ -256,20 +281,34 @@ class LangchainLoggingHandler(BaseCallbackHandler):
     def on_chat_model_start(
         self, serialized: Dict[str, Any], messages: List[List[BaseMessage]], **kwargs
     ) -> None:
-        self.log("Chat model started")
+        self.logger.debug("Chat model started")
 
     def on_llm_end(self, response: LLMResult, **kwargs) -> None:
-        self.log(f"Chat model ended, response: {response}")
+        generations = getattr(response, "generations", None)
+        count = len(generations) if generations is not None else 0
+        self.logger.debug("Chat model ended (generation_batches=%s)", count)
 
     def on_chain_start(
         self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs
     ) -> None:
-        self.log(f"Chain {serialized.get('name')} started")
+        self.logger.debug("Chain started: %s", serialized.get("name"))
 
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
-        self.log(f"Chain ended, outputs: {outputs}")
+        self.logger.debug("Chain ended")
 
-def log_chat_item(project, question, output, prompt_template, response, conversation_id, context: str | None, view_name: str | None, error: bool = False):
+def log_chat_item(
+    project,
+    question,
+    output,
+    prompt_template,
+    response,
+    conversation_id,
+    context: str | None,
+    view_name: str | None,
+    error: bool = False,
+    verification: str | None = None,
+    data_preview: str | None = None,
+):
     """
     Log a chat interaction to the chat log file.
     Args:
@@ -280,6 +319,8 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         conversation_id: ID to group messages from the same conversation
         context: Context of the response code generated which contains file names
         error: Whether this log is for an error
+        verification: Optional provenance text (same as the view TextBox), omitted on error
+        data_preview: Optional truncated script stdout for chat, omitted on error
     """
     # Create a ChatLogger instance for this project
     chat_file = os.path.join(project.dir, "chat_log.json")
@@ -288,7 +329,8 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         context = "[]"
         view_name = None
         prompt_template = prompt_template or ""
-        
+        verification = None
+        data_preview = None
 
     # Ensure context is always a non-optional string for ChatLogItem
     context_str: str = context if context is not None else "[]"
@@ -301,6 +343,8 @@ def log_chat_item(project, question, output, prompt_template, response, conversa
         timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         conversation_id=conversation_id,
         view_name=view_name,
-        error=error
+        error=error,
+        verification=verification,
+        data_preview=data_preview,
     )
     chat_logger.log_chat(chat_item)

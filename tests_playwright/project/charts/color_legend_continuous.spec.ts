@@ -1,0 +1,90 @@
+/**
+ * Targets the Vite dev frontend (React color legend). Run with:
+ *   TEST_BASE_URL=http://127.0.0.1:5170 pnpm run playwright-test-project tests_playwright/project/charts/color_legend_continuous.spec.ts --project=chromium --reporter=list
+ */
+import test, { expect } from "@playwright/test";
+import {
+    addChartViaUi,
+    dragChartColorLegend,
+    getChartColorLegendHost,
+    getChartColorLegendState,
+    getFirstNumericColorByColumn,
+    isWorktreeFrontendForPlaywright,
+    saveCurrentView,
+    setChartColorBy,
+    waitForChartByTitle,
+} from "../../utils/helpers";
+import {
+    createTemporaryProjectViaSyntheticAnndata,
+    waitForProjectReady,
+    type SyntheticAnndataTemporaryProjectHandle,
+} from "../../utils/projectFixtures";
+
+test.describe("Color legend continuous", () => {
+    test.setTimeout(180_000);
+
+    test.beforeEach(() => {
+        test.skip(
+            !isWorktreeFrontendForPlaywright(),
+            "React color legend requires the Vite dev server; set TEST_BASE_URL=http://127.0.0.1:5170",
+        );
+    });
+
+    test("continuous legend visibility, drag, and persistence after save reload", async ({
+        page,
+    }) => {
+        const scatterTitle = `Scatter Continuous Color Legend ${Date.now()}`;
+
+        let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        try {
+            handle = await createTemporaryProjectViaSyntheticAnndata(page, {
+                nameSegment: `color-legend-continuous--${Date.now()}`,
+                synthetic: {
+                    profile: "minimal",
+                    nCells: 200,
+                    nGenes: 12,
+                    force: true,
+                },
+            });
+
+            await addChartViaUi(page, "2D Scatter Plot", scatterTitle);
+            await waitForChartByTitle(page, scatterTitle);
+
+            const numericColorBy = await getFirstNumericColorByColumn(page);
+            await setChartColorBy(page, scatterTitle, numericColorBy);
+
+            const legend = getChartColorLegendHost(page, scatterTitle);
+            await expect(legend).toBeVisible();
+            await expect(legend.locator(".legend-body")).toHaveCount(0);
+
+            const initial = await getChartColorLegendState(page, scatterTitle);
+            expect(initial.width).toBeGreaterThan(40);
+            expect(initial.height).toBeGreaterThan(20);
+
+            const beforeDrag = { left: initial.left, top: initial.top };
+            await dragChartColorLegend(page, scatterTitle, 100, 60);
+            await expect
+                .poll(async () => {
+                    const moved = await getChartColorLegendState(page, scatterTitle);
+                    return Math.abs(moved.left - beforeDrag.left) + Math.abs(moved.top - beforeDrag.top);
+                })
+                .toBeGreaterThan(20);
+
+            await saveCurrentView(page);
+            const saved = await getChartColorLegendState(page, scatterTitle);
+            await page.goto(handle.projectUrl);
+            await waitForProjectReady(page);
+
+            await expect(getChartColorLegendHost(page, scatterTitle)).toBeVisible({ timeout: 60_000 });
+            const reloaded = await getChartColorLegendState(page, scatterTitle);
+            expect(reloaded.width).toBeGreaterThan(40);
+            expect(reloaded.height).toBeGreaterThan(20);
+            expect(Math.abs(reloaded.left - saved.left)).toBeLessThanOrEqual(3);
+            expect(Math.abs(reloaded.top - saved.top)).toBeLessThanOrEqual(3);
+        } finally {
+            if (handle !== undefined) {
+                await handle.cleanup();
+            }
+        }
+    });
+});

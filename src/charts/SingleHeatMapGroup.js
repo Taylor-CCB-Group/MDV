@@ -2,6 +2,7 @@ import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
+import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
 
 class SingleHeatMapGroup extends SVGChart {
     constructor(dataStore, div, config) {
@@ -217,7 +218,7 @@ class SingleHeatMapGroup extends SVGChart {
         this.drawChart();
     }
 
-    getColorLegend() {
+    getColorLegendSpec() {
         const cs = this.config.color_scale;
         const conf = {
             overideValues: {
@@ -244,7 +245,7 @@ class SingleHeatMapGroup extends SVGChart {
             conf.overideValues.min = mm[0];
             conf.overideValues.max = mm[1];
         }
-        return this.dataStore.getColorLegend(this.config.param[2], conf);
+        return buildColorLegendSpec(this.dataStore, this.config.param[2], conf);
     }
 
     getSettings() {

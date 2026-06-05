@@ -65,12 +65,9 @@ export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> 
         // any mobx state, so we can't just hide it in the base class.
         // (although maybe we could design a hook that hides it?)
         // const Observed = observer(ReactComponentFunction);
-        // createEl maps only `classes` to `classList`; `className` becomes a non-functional attribute, so `.react-chart`
-        // in charts.css does not apply. Using `className` here is intentional until addElProps is fixed and charts are
-        // audited (issue #426); then switch to `classes: ["react-chart"]`.
         this.reactEl = createEl(
             "div",
-            { className: "react-chart" },
+            { classes: ["react-chart"] },
             this.contentDiv,
         ); //other things may still be added to contentDiv outside react (e.g. legend)
         this.ComponentFn = ReactComponentFunction;

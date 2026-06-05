@@ -60,6 +60,7 @@ const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(({ width, hei
 
   const detailView = useMemo(() => new DetailView({
     id: 'detail-view',
+    // @ts-expect-error viv runtime supports this, types do not
     snapScaleBar: true,
     width: viewerWidth,
     height: viewerHeight

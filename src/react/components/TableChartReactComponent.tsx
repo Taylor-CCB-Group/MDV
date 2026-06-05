@@ -9,6 +9,8 @@ import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./FeedbackAlertComponent";
 import AddTableColumnDialog from "./AddTableColumnDialog";
 import BulkEditColumnDialog from "./BulkEditColumnDialog";
+import ColumnRemovalImpactDialog from "./ColumnRemovalImpactDialog";
+import RenameTableColumnDialog from "./RenameTableColumnDialog";
 
 /**
  * Main component for the react table chart
@@ -53,6 +55,13 @@ const TableChartReactComponent = observer(() => {
         bulkEditColumn,
         closeBulkEditDialog,
         handleBulkEdit,
+        renameColumnState,
+        closeRenameColumnDialog,
+        handleRenameColumn,
+        pendingColumnRemoval,
+        closeColumnRemovalDialog,
+        confirmColumnRemoval,
+        openColumnRemovalView,
     } = useSlickGridReact();
 
     const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
@@ -150,6 +159,22 @@ const TableChartReactComponent = observer(() => {
                 columnName={bulkEditColumn}
                 onClose={closeBulkEditDialog}
                 onSubmit={handleBulkEdit}
+            />
+
+            <RenameTableColumnDialog
+                open={Boolean(renameColumnState)}
+                columnField={renameColumnState?.field ?? null}
+                initialName={renameColumnState?.initialName ?? ""}
+                onClose={closeRenameColumnDialog}
+                onSubmit={handleRenameColumn}
+            />
+
+            <ColumnRemovalImpactDialog
+                impact={pendingColumnRemoval?.impact ?? null}
+                onClose={closeColumnRemovalDialog}
+                onConfirm={confirmColumnRemoval}
+                onOpenView={openColumnRemovalView}
+                open={Boolean(pendingColumnRemoval)}
             />
 
             {feedbackAlert && (

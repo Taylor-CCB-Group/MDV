@@ -9,7 +9,6 @@ import "./ValueSetDimension";
 import "./SortableDimension.js";
 import "./DeepToolsDimension.js";
 import { scaleLinear, scaleSymlog } from "d3-scale";
-import { getColorLegend, getColorBar } from "../utilities/Color.js";
 import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
@@ -19,6 +18,14 @@ import {
     getMultitextDelimiter,
     getMultitextJoinDelimiter,
 } from "@/lib/multitext";
+import {
+    findColumnMetadataIndex,
+    isSoftDeletedColumn,
+    normalizeColumnsMetadata,
+    removeColumnMetadata,
+    toColumnMetadata,
+    updateColumnMetadata,
+} from "./columnMetadataUtils";
 import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
 import { logValidationError } from "@/lib/validationLogging";
 
@@ -160,8 +167,13 @@ class DataStore {
         this.tree_diagram = config.tree_diagram;
 
         if (config.columns) {
-            for (const c of config.columns) {
-                this.addColumn(c, c.data);
+            const originalColumns = config.columns;
+            config.columns = normalizeColumnsMetadata(config.columns);
+            for (const c of originalColumns) {
+                if (isSoftDeletedColumn(c)) {
+                    continue;
+                }
+                this.addColumn(c, c.data, false, false);
             }
         }
 
@@ -264,10 +276,11 @@ class DataStore {
     /**
      * Removes all filters from the datastore,
      * More efficient than removing each filter individually
-     * Filters on dimnensions with a noclear property will not
+     * Filters on dimensions with a 'noclear' property will not
      * be removed
      */
     removeAllFilters() {
+        //clear in one go 
         this.filterArray.fill(0);
         const noclear = [];
         for (const dim of this.dimensions) {
@@ -275,22 +288,25 @@ class DataStore {
                 noclear.push(dim);
                 continue;
             }
-            dim.filterArray.fill(0);
-            dim.filterMethod = null;
-            if (dim.bgfArray) {
+            if (dim.bgfData){
                 for (let i = 0; i < this.size; i++) {
-                    if (dim.bgfArray[i] === 0) {
-                        dim.filterArray[i] = 2;
+                    if (dim.filterArray[i] ===1 || dim.filterArray[i] === 3) {
+                        dim.filterArray[i] -=1;
                     }
                 }
             }
+            else{
+                dim.filterArray.fill(0);
+            }
+
+            dim.filterMethod = null;
         }
         this.filterSize = this.size;
         //need to re-add the noclear filters (if any)
         for (const dim of noclear) {
             const f = dim.filterArray;
             for (let n = 0; n < f.length; n++) {
-                if (f[n] === 1) {
+                if (f[n] === 1 || f[n] === 3) {
                     if (++this.filterArray[n] === 1) {
                         this.filterSize--;
                     }
@@ -451,10 +467,38 @@ class DataStore {
         }
     }
 
+    /**
+     * Remove a column from runtime-visible collections only.
+     * @param {string} column
+     * @param {boolean} [notify=false]
+     * @returns {boolean}
+     */
+    _removeVisibleColumn(column, notify = false) {
+        const c = this.columnIndex[column];
+        if (!c) {
+            return false;
+        }
+        if (notify) {
+            this._callListeners("column_removed", column);
+        }
+        c.data = null;
+        c.buffer = null;
+        c.originalData = null;
+        this.columns = this.columns.filter((item) => item.field !== column);
+        delete this.columnIndex[column];
+        delete this.indexes[column];
+        const i = this.columnsWithData.indexOf(column);
+        if (i !== -1) {
+            this.columnsWithData.splice(i, 1);
+        }
+        return true;
+    }
+
     /*
      * todo infer generic type for column, not sure how to do this in jsdoc
      * @typedef {import("@/charts/charts.js").DataColumn<any>} Column
      *  */
+
     /**
      * Adds a column's metadata and optionally it's data to the DataStore
      * [Data Source](../../docs/extradocs/datasource.md)
@@ -463,7 +507,7 @@ class DataStore {
      * @param {boolean} [dirty=false] true for columns that are not synched with the backend,
      * ~~for example 'virtual' columns added from a `rows_as_columns` link~~
      */
-    addColumn(column, data = null, dirty = false) {
+    addColumn(column, data = null, dirty = false, trackMetadata = true) {
         /** @type {Column} */
         const c = {
             ...column, //may be useful to get any other properties we didn't explicitly copy before.
@@ -527,16 +571,19 @@ class DataStore {
             c.minMax = this._normalizeMinMax(c, column.minMax);
         }
 
+        if (trackMetadata) {
+            this.config.columns = updateColumnMetadata(this.config.columns, c);
+        }
         this.columns.push(c);
         this.columnIndex[c.field] = c;
         if (data) {
-            this.setColumnData(column.field, data);
+            this.setColumnData(c.field, data);
         }
         // Delete column from dirtyColumns.removed if it exists (this could happen when a column is removed and the state is not saved)
         // This avoids the new column from getting deleted
         delete this.dirtyColumns.removed[c.field];
         if (dirty) {
-            this.dirtyColumns.added[column.field] = true;
+            this.dirtyColumns.added[c.field] = true;
         }
         // can we infer/check the type of column here?
         return c;
@@ -1552,37 +1599,6 @@ class DataStore {
     }
 
     /**
-     * Makes a color bar/legend based on the give column
-     * @param {string} column - the field/id of the column
-     * @param {object} config - see [here]{@link DataStore#getColorFunction}
-     * @returns {HTMLElement} - a color bar or color legend
-     */
-    getColorLegend(column, config = {}) {
-        const colors = this.getColumnColors(column, config);
-        const c = this.columnIndex[column];
-        const name = config.name || c.name;
-        if (
-            c.datatype === "integer" ||
-            c.datatype === "double" ||
-            c.datatype === "int32"
-        ) {
-            const [min, max] = this.getMinMaxForColumn(column);
-            let range = [min, max];
-            if (config.overideValues) {
-                const ov = config.overideValues;
-                range = [
-                    ov.min == null ? min : ov.min,
-                    ov.max == null ? max : ov.max,
-                ];
-            }
-            return getColorBar(colors, { range: range, label: name });
-        }
-        if (isColumnText(c)) {
-            return getColorLegend(colors, c.values, { label: name });
-        }
-    }
-
-    /**
      * This method returns an object whose keys are categories
      * and values are the colors of the categories
      * @param {string} column The column id(field) (only text/multitext columns)
@@ -1796,19 +1812,50 @@ class DataStore {
     }
 
     /**
-     * Returns the min/max values for a given column
+     * Returns the min/max values for a given column.
+     *
+     * Note: this method is not metadata-only. If `minMax` is missing it will attempt
+     * to derive it from loaded column data. Callers that rely on lazy-loading should
+     * ensure column data is loaded before using this API.
+     *
      * @param {string} column The column id(field). Should be a numeric column, otherwise an error will be thrown
      * @returns {[number, number]} An array - the first value being the min value and the second the max value
      */
     getMinMaxForColumn(column) {
-        const c = this.columnIndex[column];
+        let c = this.columnIndex[column];
+        if (
+            !c &&
+            typeof column === "string" &&
+            column.includes("|")
+        ) {
+            try {
+                this.addColumnFromField(column);
+            } catch (_err) {
+                // Fall through to unified unknown-column error below.
+            }
+            c = this.columnIndex[column];
+        }
+        if (!c) {
+            throw new Error(
+                `Trying to get minMax for unknown column '${column}' in datasource '${this.name}'`,
+            );
+        }
         if (!isDatatypeNumeric(c.datatype)) {
             throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
         }
         // Compute and normalize if missing
         if (!c.minMax) {
             if (!c.data) {
-                throw new Error(`Attempting to compute minMax for column '${column}' which is not loaded...`);
+                throw new Error(
+                    `getMinMaxForColumn('${column}') requires loaded data when minMax metadata is missing. This API may derive minMax from column data and is not guaranteed to be metadata-only.`,
+                );
+            }
+            if (!c.__warnedMinMaxComputedFromData) {
+                // Signpost implicit fallback so this is easier to notice while developing lazy-loading flows.
+                console.warn(
+                    `DataStore '${this.name}': deriving minMax from loaded data for '${column}' because metadata minMax is missing.`,
+                );
+                c.__warnedMinMaxComputedFromData = true;
             }
             const computed = this._computeMinMaxFromData(c);
             // Normalize ensures [min, max] ordering and handles edge cases
@@ -1854,6 +1901,35 @@ class DataStore {
         return this.columns.map((x) => x.field);
     }
 
+    getAllColumnsMetadata() {
+        return (this.config.columns ?? []).map((column) => ({ ...column }));
+    }
+
+    hasColumnMetadata(field) {
+        return (this.config.columns ?? []).some((column) => column.field === field);
+    }
+
+    /**
+     * Removes the column and all its data.
+     * This remains as the explicit hard-delete datastore path and is not used by the
+     * current React table delete flow, which goes through softDeleteColumn().
+     * @param {string} column - the columns id/field
+     * @param {boolean} [dirty=false] if true, tags that the column should also be removed from the
+     * backend
+     * @param {boolean} [notify=false] if true notifies any listeners that the column has been removed
+     */
+    removeColumn(column, dirty = false, notify = false) {
+        delete this.dirtyColumns.data_changed[column];
+        delete this.dirtyColumns.colors_changed[column];
+        this.config.columns = removeColumnMetadata(this.config.columns, column);
+        if (this.dirtyColumns.added[column]) {
+            delete this.dirtyColumns.added[column];
+        } else if (dirty) {
+            this.dirtyColumns.removed[column] = true;
+        }
+        this._removeVisibleColumn(column, notify);
+    }
+
     /**
      * @param {string | undefined} column - the column's field/id
      * @param {"name_value" | undefined} format - if "name_value", returns `{name: string, value: string}[]` for use in settings 'dropdown' widget
@@ -1888,54 +1964,93 @@ class DataStore {
     }
 
     /**
-     * Removes the column and all its data
-     * @param {string} column - the columns id/field
-     * @param {boolean} [dirty=false] if true, tags that the column should also be removed from the
-     * backend
-     * @param {boolean} [notify=false] if true notifies any listeners that the column has been removed
+     * Rename the user-visible column name without changing the field identifier.
+     * Persists through datasource columns metadata and the normal save flow.
+     * @param {string} column
+     * @param {string} newName
+     * @param {boolean} [dirty=true]
+     * @returns {boolean}
      */
-
-    removeColumn(column, dirty = false, notify = false) {
+    renameColumnDisplayName(column, newName, dirty = true) {
         const c = this.columnIndex[column];
-        // Delete the column from entries of dirtyColumns
+        if (!c) {
+            throw new Error(`column '${column}' not found in ds '${this.name}'`);
+        }
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            throw new Error("Column name is required");
+        }
+        if (c.name === trimmedName) {
+            return false;
+        }
+        c.name = trimmedName;
+        this.config.columns = updateColumnMetadata(this.config.columns, c);
+        if (dirty) {
+            this.dirtyMetadata.add("columns");
+        }
+        return true;
+    }
+
+    /**
+     * Soft-delete a column by marking metadata as deleted.
+     * Also removes the column from runtime-visible collections.
+     * @param {string} column
+     * @param {boolean} [dirty=false]
+     * @param {boolean} [notify=false]
+     * @returns {void}
+     */
+    softDeleteColumn(column, dirty = false, notify = false) {
         delete this.dirtyColumns.data_changed[column];
         delete this.dirtyColumns.colors_changed[column];
-        // Defensive check: in reactive/asynchronous flows this column can be deleted before getValue runs.
-        if (!c) {
-            // If column is marked dirty, then remove it from the dirtyColumns
-            if (dirty) {
-                if (this.dirtyColumns.added[column]) {
-                    delete this.dirtyColumns.added[column];
-                } else {
-                    this.dirtyColumns.removed[column] = true;
-                }
-            }
-            // Notify that column is removed if notify is true
-            if (notify) {
-                this._callListeners("column_removed", column);
-            }
+
+        // New unsaved columns should disappear completely rather than be tombstoned.
+        if (this.dirtyColumns.added[column]) {
+            delete this.dirtyColumns.added[column];
+            this.config.columns = removeColumnMetadata(this.config.columns, column);
+            this._removeVisibleColumn(column, notify);
             return;
         }
-        c.data = null;
-        c.buffer = null;
-        this.columns = this.columns.filter((c) => c.field !== column);
-        delete this.columnIndex[column];
-        const i = this.columnsWithData.indexOf(column);
-        if (i !== -1) {
-            this.columnsWithData.splice(i, 1);
-        }
-        if (dirty) {
-            //added and removed without saving
-            if (this.dirtyColumns.added[column]) {
-                delete this.dirtyColumns.added[column];
-            } else {
-                this.dirtyColumns.removed[column] = true;
+
+        const index = findColumnMetadataIndex(this.config.columns, column);
+        if (index === -1) {
+            const visibleColumn = this.columnIndex[column];
+            if (!visibleColumn) {
+                // Stale/reactive path: nothing visible and no metadata to update.
+                // Avoid inventing partial metadata here, otherwise a soft delete could save an
+                // invalid datasource entry for a column that no longer really exists.
+                this._removeVisibleColumn(column, notify);
+                return;
             }
+            // Soft delete can race with metadata state (for example after local add/remove cycles).
+            // If runtime still knows the column but metadata does not, recover a full metadata
+            // entry from the live column so the delete persists as a valid tombstone.
+            const fallbackMetadata = toColumnMetadata(visibleColumn);
+            this.config.columns = normalizeColumnsMetadata([
+                ...(this.config.columns ?? []),
+                {
+                    ...fallbackMetadata,
+                    deleted: true,
+                },
+            ]);
+            if (dirty) {
+                this.dirtyMetadata.add("columns");
+            }
+            this._removeVisibleColumn(column, notify);
+            return;
         }
-        if (notify) {
-            this._callListeners("column_removed", column);
+
+        const nextColumns = [...(this.config.columns ?? [])];
+        nextColumns[index] = {
+            ...nextColumns[index],
+            deleted: true,
+        };
+        this.config.columns = normalizeColumnsMetadata(nextColumns);
+        if (dirty) {
+            this.dirtyMetadata.add("columns");
         }
+        this._removeVisibleColumn(column, notify);
     }
+
 }
 
 function linspace(start, end, n) {

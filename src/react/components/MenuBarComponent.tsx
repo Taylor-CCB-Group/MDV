@@ -11,7 +11,6 @@ import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
 import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
-import FileUploadDialogReact from "@/charts/dialogs/FileUploadDialogWrapper";
 import { useProject } from "@/modules/ProjectContext";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
 import ChatButtons from "./ChatButtons";
@@ -48,7 +47,8 @@ const MenuBarComponent = observer(() => {
         new ViewDialogWrapper("delete");
     };
 
-    const handleAddDataSourceClick = () => {
+    const handleAddDataSourceClick = async () => {
+        const { default: FileUploadDialogReact } = await import("@/charts/dialogs/FileUploadDialogWrapper");
         new FileUploadDialogReact();
     };
 

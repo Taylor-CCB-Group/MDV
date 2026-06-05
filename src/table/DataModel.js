@@ -6,6 +6,7 @@ import {
 
 const DEFAULT_MULTITEXT_CAPACITY = 24;
 const DEFAULT_UNIQUE_STRING_LENGTH = 64;
+const MAX_TEXT16_DISTINCT_VALUES = 65536;
 
 let nextDataModelFilterListenerSeq = 0;
 
@@ -157,7 +158,60 @@ class DataModel {
             return;
         }
 
+        if (columnSpec.mode === "compound" || columnSpec.sourceColumns) {
+            this._createCompoundColumn(columnSpec);
+            return;
+        }
+
         this._createEmptyColumn(columnSpec);
+    }
+
+    _createCompoundColumn(columnSpec) {
+        const sourceColumns = columnSpec.sourceColumns;
+        if (!Array.isArray(sourceColumns) || sourceColumns.length < 2) {
+            throw new Error("Compound columns require at least 2 source columns");
+        }
+        const requestedDatatype = columnSpec.datatype === "text16" ? "text16" : "text";
+        const separator = columnSpec.delimiter ?? "_";
+        for (const sourceColumnName of sourceColumns) {
+            const sourceColumn = this.dataStore.columnIndex[sourceColumnName];
+            if (!sourceColumn?.data) {
+                throw new Error(`Column ${sourceColumnName} not found`);
+            }
+            if (sourceColumn.datatype !== "text" && sourceColumn.datatype !== "text16") {
+                throw new Error(
+                    `Compound source column ${sourceColumnName} must be text or text16`,
+                );
+            }
+        }
+        const values = new Array(this.dataStore.size);
+        for (let rowIndex = 0; rowIndex < this.dataStore.size; rowIndex++) {
+            const rowValues = sourceColumns.map((sourceColumnName) => {
+                const sourceColumn = this.dataStore.columnIndex[sourceColumnName];
+                const value = getCellValueAsString(sourceColumn, rowIndex);
+                return value === "missing" ? "" : value;
+            });
+            values[rowIndex] = rowValues.join(separator);
+        }
+        const distinctCount = new Set(values).size;
+        if (distinctCount > MAX_TEXT16_DISTINCT_VALUES) {
+            throw new Error(
+                `Compound column '${columnSpec.name}' has ${distinctCount} distinct values, exceeding text16 limit (${MAX_TEXT16_DISTINCT_VALUES})`,
+            );
+        }
+        const datatype =
+            requestedDatatype === "text" && distinctCount > 256 ? "text16" : requestedDatatype;
+        this.dataStore.addColumn(
+            {
+                name: columnSpec.name,
+                field: columnSpec.name,
+                datatype,
+                editable: true,
+                values: [""],
+            },
+            values,
+            true,
+        );
     }
 
     /**
@@ -261,7 +315,10 @@ class DataModel {
     }
 
     removeColumn(col) {
-        this.dataStore.removeColumn(col, true, true);
+        if (!this.dataStore.softDeleteColumn) {
+            throw new Error("DataStore.softDeleteColumn is required for column deletion");
+        }
+        this.dataStore.softDeleteColumn(col, true, true);
     }
 
     fillColumn(columnName, value, rowIndices, emptyOnly = false) {

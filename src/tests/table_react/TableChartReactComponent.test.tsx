@@ -25,8 +25,22 @@ vi.mock("@/react/components/BulkEditColumnDialog", () => ({
     default: () => <div data-testid="mock-bulk-edit-dialog" />,
 }));
 
+vi.mock("@/react/components/RenameTableColumnDialog", () => ({
+    default: ({ open }: { open: boolean }) =>
+        open ? <div data-testid="mock-rename-column-dialog" /> : null,
+}));
+
+vi.mock("@/react/components/ColumnRemovalImpactDialog", () => ({
+    default: () => <div data-testid="mock-column-removal-dialog" />,
+}));
+
 vi.mock("@/charts/dialogs/ReusableAlertDialog", () => ({
     default: () => <div data-testid="mock-alert-dialog" />,
+}));
+
+vi.mock("@/react/components/FeedbackAlertComponent", () => ({
+    default: () => <div data-testid="mock-feedback-alert-component" />,
+    isDebugError: () => false,
 }));
 
 // Mock the hooks
@@ -76,6 +90,13 @@ describe("TableChartReactComponent", () => {
             bulkEditColumn: null,
             closeBulkEditDialog: vi.fn(),
             handleBulkEdit: vi.fn(),
+            renameColumnState: null,
+            closeRenameColumnDialog: vi.fn(),
+            handleRenameColumn: vi.fn(),
+            pendingColumnRemoval: null,
+            closeColumnRemovalDialog: vi.fn(),
+            confirmColumnRemoval: vi.fn(),
+            openColumnRemovalView: vi.fn(),
         };
 
         mockFindReplaceReturn = {
@@ -115,6 +136,22 @@ describe("TableChartReactComponent", () => {
 
         const dialogWrapper = screen.getByTestId("find-replace-dialog-wrapper");
         expect(dialogWrapper).toBeDefined();
+    });
+
+    test("should not render rename column dialog by default", () => {
+        render(<TableChartReactComponent />);
+
+        expect(screen.queryByTestId("mock-rename-column-dialog")).toBeNull();
+    });
+
+    test("should render rename column dialog when rename is active", () => {
+        mockSlickGridReactReturn.renameColumnState = {
+            field: "age",
+            initialName: "Age",
+        };
+        render(<TableChartReactComponent />);
+
+        expect(screen.getByTestId("mock-rename-column-dialog")).toBeDefined();
     });
 
     test("should not show feedback alert by default", () => {
