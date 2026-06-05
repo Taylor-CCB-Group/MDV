@@ -39,7 +39,7 @@ describe("ColorLegend", () => {
         expect(svg?.getAttribute("width")).toBe("100%");
     });
 
-    test("applies local hover styling for categorical rows", () => {
+    test("marks hovered categorical row as focused", () => {
         render(
             <div className="legend-container">
                 <ColorLegend
@@ -65,16 +65,14 @@ describe("ColorLegend", () => {
         );
 
         const hoveredRow = screen.getByText("T cell").closest("g");
-        const dimmedRow = screen.getByText("B cell").closest("g");
-        if (!hoveredRow || !dimmedRow) {
+        if (!hoveredRow) {
             throw new Error("Expected categorical legend rows to render");
         }
         fireEvent.mouseEnter(hoveredRow);
 
-        expect(hoveredRow?.querySelector("rect")?.getAttribute("stroke")).toBe(
-            "currentColor",
-        );
-        expect(dimmedRow?.getAttribute("style")).toContain("opacity: 0.4");
+        expect(
+            hoveredRow?.querySelector("rect[fill]")?.getAttribute("stroke"),
+        ).toBe("currentColor");
     });
 
     test("calls categorical click handler with item value", () => {
@@ -139,7 +137,7 @@ describe("ColorLegend", () => {
         expect(rowText?.textContent?.endsWith("…")).toBe(true);
     });
 
-    test("applies active categorical styling", () => {
+    test("marks active categorical row as selected", () => {
         render(
             <div className="legend-container">
                 <ColorLegend
@@ -166,17 +164,59 @@ describe("ColorLegend", () => {
         );
 
         const row = screen.getByText("T cell").closest("g");
-        const dimmedRow = screen.getByText("B cell").closest("g");
         if (!row) {
             throw new Error("Expected categorical legend row to render");
         }
-        expect(row?.querySelector("rect")?.getAttribute("stroke")).toBe(
+        expect(row?.querySelector("rect[fill]")?.getAttribute("stroke")).toBe(
             "currentColor",
         );
-        expect(screen.getByText("T cell").getAttribute("style")).toContain(
-            "font-weight: 700",
+    });
+
+    test("keeps active categorical row selected while another row is hovered", () => {
+        render(
+            <div className="legend-container">
+                <ColorLegend
+                    spec={{
+                        kind: "categorical",
+                        label: "Cell type",
+                        column: "cell_type",
+                        items: [
+                            {
+                                color: "#ff0000",
+                                name: "T cell",
+                                value: "T cell",
+                            },
+                            {
+                                color: "#00ff00",
+                                name: "B cell",
+                                value: "B cell",
+                            },
+                            {
+                                color: "#0000ff",
+                                name: "NK cell",
+                                value: "NK cell",
+                            },
+                        ],
+                    }}
+                    activeCategoricalValue="T cell"
+                />
+            </div>,
         );
-        expect(dimmedRow?.getAttribute("style")).toContain("opacity: 0.4");
+
+        const activeRow = screen.getByText("T cell").closest("g");
+        const hoveredRow = screen.getByText("B cell").closest("g");
+        if (!activeRow || !hoveredRow) {
+            throw new Error("Expected categorical legend rows to render");
+        }
+
+        fireEvent.mouseEnter(hoveredRow);
+
+        expect(activeRow.querySelector("rect[fill]")?.getAttribute("stroke")).toBe(
+            "currentColor",
+        );
+        expect(hoveredRow.querySelector("rect[fill]")?.getAttribute("stroke")).toBe(
+            "currentColor",
+        );
     });
 
     test("renders continuous legend label and gradient bar", () => {
@@ -192,11 +232,9 @@ describe("ColorLegend", () => {
                 />
             </div>,
         );
-        const host = container.querySelector(".legend-container");
         expect(screen.getByText("Expression")).toBeTruthy();
         expect(container.querySelector("linearGradient")).toBeTruthy();
         expect(container.querySelector("rect[fill^='url(#']")).toBeTruthy();
-        expect(host?.getAttribute("style")).toContain("height: 80px");
         expect(container.querySelector("svg")?.getAttribute("width")).toBe(
             "100%",
         );

@@ -87,11 +87,11 @@ function ColorLegendCategorical({
         <div className="legend-drag-handle h-full w-full overflow-hidden">
             <div
                 ref={titleRef}
-                className="legend-title overflow-hidden text-ellipsis"
+                className="legend-title legend-drag-handle overflow-hidden text-ellipsis font-medium"
                 title={showTitleTooltip ? label : undefined}
                 style={{
                     height: "20px",
-                    whiteSpace: "nowrap",
+                    whiteSpace: "nowrap"
                 }}
             >
                 {label}
@@ -101,6 +101,7 @@ function ColorLegendCategorical({
                 className="legend-body overflow-y-auto overflow-x-hidden w-full"
                 style={{
                     height: "calc(100% - 20px)",
+                    marginTop: 4,
                 }}
             >
                 <LegendCategoricalSvg
