@@ -8,28 +8,38 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ## [1.3.0] - 2026-06-04
 
-A feature release: new chart types, table editing, gating/permissions, ChatMDV
-evaluation tooling, and a large batch of fixes and dependency upgrades. Packaging was
-consolidated internally — the published `pip install mdvtools` is the same slim/lite
-core as before.
+> ⚠️ **Behaviour change — `mdvtools convert-spatial`** now takes the path to a SpatialData
+> zarr store **directly**. It previously expected a *parent folder* containing one or more
+> stores; pass the new `--batch` flag to restore that directory-scanning behaviour. Update
+> any scripts or commands that pointed at a parent folder (#412).
+
+A feature release: a new react data table, gating, new chart types, ChatMDV evaluation
+tooling, and a large batch of fixes and dependency upgrades. Packaging was consolidated
+internally — the published `pip install mdvtools` is the same slim/lite core as before.
 
 ### Added
-- Gating feature and access controls, plus permission display in the GUI (#328, #388, #389, #359).
-- New chart types: DeckSplatter (#391) and deck scatter density with shared contour
-  settings and log bandwidth control (#390).
-- Table editing in the new react table: add, bulk-edit, remove, and rename columns, plus
-  hard compound columns (#386, #436, #478).
-- Conversions: X-based UMAP & Leiden options for AnnData/SpatialData (#392), Xenium
-  annotation merge (#444), a SpatialData conversion report runner with `--batch` flag
-  (#412), and tsv/tab file upload support (#405, #408).
-- App/UX: Settings dialog with general folder and search (#382), view creation for a new
-  datasource (#362), keyboard shortcuts for view dialogs (#377), react Text Box with
-  collapsible markdown and mermaid diagrams (#425), subgroup selection in the link UI
-  (#457), background filters (#460), react color scheme dialog (#415), schema-validation
-  logging UI (#384), and category-selection widgets (#399, #401).
-- ChatMDV: verification (#419) and an evaluation & testing framework (#469).
-- The full application is now installable from PyPI as an opt-in extra:
-  `pip install "mdvtools[app]"` (database/server + chat/LLM + auth).
+- New **SlickGrid-based react data table**: inline cell editing, find-and-replace,
+  multi-row highlighting, and sortable columns (#328).
+- **Gating** — draw rectangle/polygon gates on scatter and spatial (viv) plots to define,
+  name, colour, and manage cell populations (gates become a filterable column), with a
+  Manage Gates dialog (#328, #388).
+- Table column management: add, bulk-edit (fill all / fill empty), remove (impact dialog
+  and soft delete), rename, and **compound columns — build a new column by combining two or
+  more existing text columns** (#386, #436, #478).
+- New chart types: a deck-based scatter **density** chart with shared contour settings and
+  log bandwidth control (#390), and an experimental **Splatter Plot** (#391).
+- **Permission shown in the GUI** — a view/edit lock icon on the project view (#359).
+- Conversions: X-based UMAP & Leiden options for AnnData/SpatialData (#392); a helper to
+  merge spatial (Xenium) annotations, patching `cell_id` (#444); a SpatialData conversion
+  report runner (#412); tsv/tab file upload with file-extension hints (#405, #408).
+- App/UX: Settings dialog with a General folder and search (#382); automatic view creation
+  when a datasource is uploaded (#362); Enter-key submission in view dialogs (#377); react
+  Text Box with collapsible markdown and mermaid diagrams (#425); subgroup selection in the
+  link UI (#457); background filters (#460); schema-validation logging UI (#384); and
+  category-selection widgets plus improved multitext/tag-annotation handling (#399, #401).
+- ChatMDV: a verification step (#419) and an evaluation & testing framework (#469).
+- The full application is installable from PyPI as an opt-in extra:
+  `pip install "mdvtools[app]"` (database/server + chat/LLM + auth) (#477).
 
 ### Changed
 - Consolidated the previously separate `pyproject.toml` files (the lite build under
@@ -38,11 +48,16 @@ core as before.
   server/chat/auth stack now lives behind the `app` extra, guarded at import (#477).
 - Build and publish migrated from Poetry/Hatchling + twine to **uv** (#472).
 - Supported Python is now `>=3.11,<3.13`.
-- Frontend toolchain: upgraded to Vite 8 (#442), migrated to pnpm (#441), enabled the
-  React compiler (#443), and moved CI to Node 24 (#455); various dependency upgrades
-  (#458). Playwright workflows stabilized with added tooling (#449, #432, #464, #473).
+- **Color Scheme dialog reimplemented in react and renamed "Color Palette"** (#415); the
+  color legend likewise moved to a react component, deprecating the misspelled
+  `overideValues` config key in favour of the correct spelling (backward compatible) (#479).
+- Frontend toolchain: upgraded to Vite 8 (#442), migrated to pnpm (#441), CI to Node 24
+  (#455); added **opt-in** React Compiler support to the Vite build (off by default; enable
+  with `VITE_USE_REACT_COMPILER=1`) (#443). Dependency upgrades (#458); Playwright workflow
+  tooling and synthetic SpatialData test data (#449, #432, #464, #473).
 - ChartManager now boots through a react wrapper with a nicer loading state and more lazy
   module loading for bundle splitting (#448).
+- Home navigation now uses links and preserves explicit directory routing (#389).
 
 ### Fixed
 - Scatter rendering: local filter ownership, common grey layer, z-index/mouse events, and
@@ -56,6 +71,7 @@ core as before.
   add-chart param state for multi-column selections (#400); react table replace now
   replaces the actual column value (#463); settings folder collapse during filtered
   search (#404).
+- Wider scatter brush handles so they no longer disappear and are easier to click (#411).
 
 [Unreleased]: https://github.com/Taylor-CCB-Group/MDV/compare/v1.3.0...HEAD
 [1.3.0]: https://github.com/Taylor-CCB-Group/MDV/releases/tag/v1.3.0
