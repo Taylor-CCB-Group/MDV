@@ -13,12 +13,12 @@ All notable changes to `mdvtools` are documented here. The format is based on
 > stores; pass the new `--batch` flag to restore that directory-scanning behaviour. Update
 > any scripts or commands that pointed at a parent folder (#412).
 
-A feature release: a new react data table, gating, new chart types, ChatMDV evaluation
+A feature release: a new React data table, gating, new chart types, ChatMDV evaluation
 tooling, and a large batch of fixes and dependency upgrades. Packaging was consolidated
 internally — the published `pip install mdvtools` is the same slim/lite core as before.
 
 ### Added
-- New **SlickGrid-based react data table**: inline cell editing, find-and-replace,
+- New **SlickGrid-based React data table**: inline cell editing, find-and-replace,
   multi-row highlighting, and sortable columns (#328).
 - **Gating** — draw rectangle/polygon gates on scatter and spatial (viv) plots to define,
   name, colour, and manage cell populations (gates become a filterable column), with a
@@ -33,7 +33,7 @@ internally — the published `pip install mdvtools` is the same slim/lite core a
   merge spatial (Xenium) annotations, patching `cell_id` (#444); a SpatialData conversion
   report runner (#412); tsv/tab file upload with file-extension hints (#405, #408).
 - App/UX: Settings dialog with a General folder and search (#382); automatic view creation
-  when a datasource is uploaded (#362); Enter-key submission in view dialogs (#377); react
+  when a datasource is uploaded (#362); Enter-key submission in view dialogs (#377); React
   Text Box with collapsible markdown and mermaid diagrams (#425); subgroup selection in the
   link UI (#457); background filters (#460); schema-validation logging UI (#384); and
   category-selection widgets plus improved multitext/tag-annotation handling (#399, #401).
@@ -48,27 +48,27 @@ internally — the published `pip install mdvtools` is the same slim/lite core a
   server/chat/auth stack now lives behind the `app` extra, guarded at import (#477).
 - Build and publish migrated from Poetry/Hatchling + twine to **uv** (#472).
 - Supported Python is now `>=3.11,<3.13`.
-- **Color Scheme dialog reimplemented in react and renamed "Color Palette"** (#415); the
-  color legend likewise moved to a react component, deprecating the misspelled
+- **Color Scheme dialog reimplemented in React and renamed "Color Palette"** (#415); the
+  color legend likewise moved to a React component, deprecating the misspelled
   `overideValues` config key in favour of the correct spelling (backward compatible) (#479).
 - Frontend toolchain: upgraded to Vite 8 (#442), migrated to pnpm (#441), CI to Node 24
   (#455); added **opt-in** React Compiler support to the Vite build (off by default; enable
-  with `VITE_USE_REACT_COMPILER=1`) (#443). Dependency upgrades (#458); Playwright workflow
+  with `VITE_USE_React_COMPILER=1`) (#443). Dependency upgrades (#458); Playwright workflow
   tooling and synthetic SpatialData test data (#449, #432, #464, #473).
-- ChartManager now boots through a react wrapper with a nicer loading state and more lazy
+- ChartManager now boots through a React wrapper with a nicer loading state and more lazy
   module loading for bundle splitting (#448).
 - Home navigation now uses links and preserves explicit directory routing (#389).
 
 ### Fixed
 - Scatter rendering: local filter ownership, common grey layer, z-index/mouse events, and
   hiding missing values on grey layers (#427, #428, #429, #402).
-- slickgrid row selection and stray react roots (#445); deck mouse-event rebinding for new
-  versions (#447); react-chart class layout/overflow (#431); chart loading checks and
+- slickgrid row selection and stray React roots (#445); deck mouse-event rebinding for new
+  versions (#447); React-chart class layout/overflow (#431); chart loading checks and
   clearer error messages (#465).
 - Safari TLS error on the project view (#439); local dev and netlify preview routing
   (#385); invisible MUI modals in datasource fullscreen (#396).
 - `add_datasource_polars` `TablePlot` now respects `supplied_columns_only` (#467);
-  add-chart param state for multi-column selections (#400); react table replace now
+  add-chart param state for multi-column selections (#400); React table replace now
   replaces the actual column value (#463); settings folder collapse during filtered
   search (#404).
 - Wider scatter brush handles so they no longer disappear and are easier to click (#411).
