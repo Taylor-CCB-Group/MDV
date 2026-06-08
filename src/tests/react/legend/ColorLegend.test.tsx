@@ -287,6 +287,48 @@ describe("ColorLegend", () => {
         expect(onContinuousRangeChange).toHaveBeenCalledWith([20, 60]);
     });
 
+    test("commits continuous range when mouse is released outside the legend", () => {
+        const onContinuousRangeChange = vi.fn();
+        const { container } = render(
+            <div className="legend-container">
+                <ColorLegend
+                    spec={{
+                        kind: "continuous",
+                        label: "Expression",
+                        column: "expression",
+                        colors: ["#000000", "#ffffff"],
+                        range: [0, 100],
+                    }}
+                    onContinuousRangeChange={onContinuousRangeChange}
+                />
+            </div>,
+        );
+        const gradientBar = container.querySelector("rect[fill^='url(#']");
+        const hitTarget = container.querySelector("rect[role='slider']");
+        if (!hitTarget || !gradientBar) {
+            throw new Error("Expected continuous legend range hit target");
+        }
+        Object.defineProperty(gradientBar, "getBoundingClientRect", {
+            value: () => ({
+                x: 10,
+                y: 0,
+                left: 10,
+                top: 0,
+                right: 110,
+                bottom: 10,
+                width: 100,
+                height: 10,
+                toJSON: () => ({}),
+            }),
+        });
+
+        fireEvent.mouseDown(hitTarget, { clientX: 50 });
+        fireEvent.mouseMove(document, { clientX: 130 });
+        fireEvent.mouseUp(document, { clientX: 130 });
+
+        expect(onContinuousRangeChange).toHaveBeenCalledWith([40, 100]);
+    });
+
     test("renders active continuous range selection", () => {
         const { container } = render(
             <div className="legend-container">

@@ -1,6 +1,5 @@
 import {
     useCallback,
-    useEffect,
     useLayoutEffect,
     useRef,
     useState,
@@ -137,7 +136,7 @@ export default function ColorLegend({
         onLayoutReady?.();
     }, [spec, onLayoutReady]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const el = containerRef.current?.parentElement;
         if (!el || spec.kind !== "categorical") {
             return;
@@ -148,7 +147,7 @@ export default function ColorLegend({
         el.style.border = "0.5px solid black";
     }, [spec]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const el = containerRef.current?.parentElement;
         if (!el || spec.kind !== "continuous") {
             return;

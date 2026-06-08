@@ -1,4 +1,10 @@
-import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import {
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type MouseEvent,
+} from "react";
 import { axisBottom } from "d3";
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
@@ -48,6 +54,7 @@ export default function LegendContinuousSvg({
     const svgRef = useRef<SVGSVGElement>(null);
     const [observedWidth, setObservedWidth] = useState(width);
     const dragStartRef = useRef<number | null>(null);
+    const cleanupDocumentRangeListenersRef = useRef<(() => void) | null>(null);
     const [draftRange, setDraftRange] = useState<[number, number] | null>(null);
     const layout = getContinuousLegendLayout(observedWidth, Boolean(label));
     const colorStops = getGradientStops(colors);
@@ -68,14 +75,14 @@ export default function LegendContinuousSvg({
         return layout.barX + fraction * layout.axisWidth;
     };
 
-    const getEventValue = (event: MouseEvent<SVGElement>) => {
+    const getClientValue = (clientX: number) => {
         const rect = barRef.current?.getBoundingClientRect();
         if (!rect || rect.width === 0) {
             return range[0];
         }
         const fraction = Math.min(
             1,
-            Math.max(0, (event.clientX - rect.left) / rect.width),
+            Math.max(0, (clientX - rect.left) / rect.width),
         );
         return range[0] + fraction * (range[1] - range[0]);
     };
@@ -83,32 +90,17 @@ export default function LegendContinuousSvg({
     const normalizeRange = (start: number, end: number): [number, number] =>
         start <= end ? [start, end] : [end, start];
 
-    const handleRangeMouseDown = (event: MouseEvent<SVGElement>) => {
-        if (!onRangeChange) {
-            return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        const value = getEventValue(event);
-        dragStartRef.current = value;
-        setDraftRange([value, value]);
+    const cleanupDocumentRangeListeners = () => {
+        cleanupDocumentRangeListenersRef.current?.();
+        cleanupDocumentRangeListenersRef.current = null;
     };
 
-    const handleRangeMouseMove = (event: MouseEvent<SVGElement>) => {
-        if (dragStartRef.current === null) {
-            return;
-        }
-        event.stopPropagation();
-        setDraftRange(normalizeRange(dragStartRef.current, getEventValue(event)));
-    };
-
-    const handleRangeMouseUp = (event: MouseEvent<SVGElement>) => {
+    const finishRangeSelection = (clientX: number) => {
         if (!onRangeChange || dragStartRef.current === null) {
             return;
         }
-        event.stopPropagation();
         const start = dragStartRef.current;
-        const end = getEventValue(event);
+        const end = getClientValue(clientX);
         const span = Math.abs(range[1] - range[0]);
         const nextRange = normalizeRange(start, end);
         dragStartRef.current = null;
@@ -121,6 +113,65 @@ export default function LegendContinuousSvg({
             return;
         }
         onRangeChange(nextRange);
+    };
+
+    const handleRangeMouseDown = (event: MouseEvent<SVGElement>) => {
+        if (!onRangeChange) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        cleanupDocumentRangeListeners();
+        const value = getClientValue(event.clientX);
+        dragStartRef.current = value;
+        setDraftRange([value, value]);
+
+        const ownerDocument = svgRef.current?.ownerDocument;
+        if (!ownerDocument) {
+            return;
+        }
+        const handleDocumentMouseMove = (documentEvent: globalThis.MouseEvent) => {
+            if (dragStartRef.current === null) {
+                return;
+            }
+            documentEvent.preventDefault();
+            documentEvent.stopPropagation();
+            setDraftRange(
+                normalizeRange(
+                    dragStartRef.current,
+                    getClientValue(documentEvent.clientX),
+                ),
+            );
+        };
+        const handleDocumentMouseUp = (documentEvent: globalThis.MouseEvent) => {
+            documentEvent.preventDefault();
+            documentEvent.stopPropagation();
+            cleanupDocumentRangeListeners();
+            finishRangeSelection(documentEvent.clientX);
+        };
+        ownerDocument.addEventListener("mousemove", handleDocumentMouseMove);
+        ownerDocument.addEventListener("mouseup", handleDocumentMouseUp);
+        cleanupDocumentRangeListenersRef.current = () => {
+            ownerDocument.removeEventListener("mousemove", handleDocumentMouseMove);
+            ownerDocument.removeEventListener("mouseup", handleDocumentMouseUp);
+        };
+    };
+
+    const handleRangeMouseMove = (event: MouseEvent<SVGElement>) => {
+        if (dragStartRef.current === null) {
+            return;
+        }
+        event.stopPropagation();
+        setDraftRange(normalizeRange(dragStartRef.current, getClientValue(event.clientX)));
+    };
+
+    const handleRangeMouseUp = (event: MouseEvent<SVGElement>) => {
+        if (!onRangeChange || dragStartRef.current === null) {
+            return;
+        }
+        event.stopPropagation();
+        cleanupDocumentRangeListeners();
+        finishRangeSelection(event.clientX);
     };
 
     const selectedRange = draftRange ?? activeRange;
@@ -147,6 +198,14 @@ export default function LegendContinuousSvg({
         observer.observe(container);
         return () => observer.disconnect();
     }, [width]);
+
+    useEffect(
+        () => () => {
+            cleanupDocumentRangeListenersRef.current?.();
+            cleanupDocumentRangeListenersRef.current = null;
+        },
+        [],
+    );
 
     useLayoutEffect(() => {
         const axisG = axisRef.current;
@@ -279,7 +338,6 @@ export default function LegendContinuousSvg({
                     onMouseDown={handleRangeMouseDown}
                     onMouseMove={handleRangeMouseMove}
                     onMouseUp={handleRangeMouseUp}
-                    onMouseLeave={handleRangeMouseMove}
                 />
             </g>
         </svg>
