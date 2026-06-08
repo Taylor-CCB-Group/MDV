@@ -32,7 +32,7 @@ export type RangeState = {
     editingGateId: string | null;
     setEditingGateId: (id: string | null) => void;
     setSelectionFeatureCollection: (newSelection: SimpleFeatureCollection) => void
-    selectionMode: unknown;
+    selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
@@ -113,7 +113,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const setSelectionFeatureCollection = useCallback(action((newSelection: SimpleFeatureCollection) => {
         chart.config.selectionFeatureCollection = newSelection;
     }), []);
-    const [selectionMode, setSelectionMode] = useState<unknown>(new CompositeMode([]));
+    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
