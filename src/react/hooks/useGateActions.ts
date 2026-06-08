@@ -9,6 +9,7 @@ import { getEmptyFeatureCollection } from "../deck_state";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
 import { Tools } from "../components/SelectionOverlay";
+import type { GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 
 const useGateActions = () => {
     const gateManager = useGateManager();
@@ -126,7 +127,7 @@ const useGateActions = () => {
                     setSelectionFeatureCollection(JSON.parse(JSON.stringify(gate.geometry)));
                     setEditingGateId(gateId);
                     const panMode = Tools["pan"].mode;
-                    setSelectionMode(new panMode());
+                    setSelectionMode(new panMode() as GeoJsonEditMode);
                     setSelectedTool("Pan");
                 }
             }

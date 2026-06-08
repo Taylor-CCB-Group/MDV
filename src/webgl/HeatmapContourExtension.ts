@@ -69,7 +69,7 @@ const triangleContourUniforms = {
 export type _TriangleLayerProps = {
     data: { attributes: { positions: Buffer; texCoords: Buffer } };
     colorDomain: number[];
-    aggregationMode: string;
+    aggregationMode: number;
     threshold: number;
     intensity: number;
     vertexCount: number;
