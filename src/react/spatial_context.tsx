@@ -17,6 +17,7 @@ import type { FieldName } from "@/charts/charts";
 import type { Tool } from "./components/SelectionOverlay";
 import { useGateManager } from "./gates/useGateManager";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
+import { tagDeckLayerViewportScope } from "./components/deckLayerViewportScope";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -186,14 +187,22 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         }
     }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
-    
+
+    useEffect(() => {
+        if (editingGateId && selectionFeatureCollection.features.length > 0) {
+            setSelectedFeatureIndexes([0]);
+        } else if (!editingGateId) {
+            setSelectedFeatureIndexes([]);
+        }
+    }, [editingGateId, selectionFeatureCollection.features.length]);
+
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
 
     // todo: we need to do something about editing gate color
     //! When the dev tools are open, there is lagging while dragging this layer
     const editableLayer = useMemo(() => {
-        return new MonkeyPatchEditableGeoJsonLayer({
+        const layer = new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection as any,
             mode: selectionMode,
@@ -212,7 +221,6 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             selectedFeatureIndexes,
             // adding `action` here gets rid of warnings but doesn't help with performance.
             onEdit: action(({ updatedData }) => {
-                // console.log("onEdit", editType, updatedData);
                 const feature = updatedData.features.at(-1);
                 // updatedData.features = [feature];
                 setSelectionFeatureCollection({
@@ -232,9 +240,16 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 // it looks as though editable-layer.js _addEventHandlers() isn't called again when eventManager has been changed.
                 // outerContainer
             }
-        })
-    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
-        setSelectionFeatureCollection, getFillColor, getLineColor,
+        });
+        return tagDeckLayerViewportScope(layer, "chart-shared");
+    }, [
+        selectionFeatureCollection,
+        selectionMode,
+        id,
+        selectedFeatureIndexes,
+        setSelectionFeatureCollection,
+        getFillColor,
+        getLineColor,
     ]);
 
     return {

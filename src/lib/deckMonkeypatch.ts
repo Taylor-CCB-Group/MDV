@@ -2,6 +2,8 @@ import { EventManager, InputDirection, Pan, Pinch, Tap } from 'mjolnir.js';
 // import { EVENT_HANDLERS, RECOGNIZERS } from '@deck.gl/core/dist/lib/constants';
 import { Deck } from '@deck.gl/core';
 import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
+import type { Position } from '@turf/helpers';
+import { unprojectCanvasPoint } from '@/react/components/densityGridUtils';
 
 // we don't need the keys; we'll break in.
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
@@ -47,7 +49,52 @@ class EditableLayer {
 ```
 */
 
-export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {}
+/**
+ * Editable layers use `context.viewport.unproject` with canvas-relative pixels.
+ * In density-grid mode one canvas hosts many sub-viewports, so we resolve the
+ * viewport under the pointer before unprojecting.
+ */
+export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
+    getMapCoords(screenCoords: Position): Position {
+        const deck = this.context.deck;
+        const viewports = deck?.getViewports?.();
+        if (viewports && viewports.length > 1) {
+            return unprojectCanvasPoint(viewports, screenCoords[0], screenCoords[1]) as Position;
+        }
+        return this.context.viewport.unproject([screenCoords[0], screenCoords[1]]) as Position;
+    }
+
+    getPicks(screenCoords: [number, number]) {
+        const deck = this.context.deck;
+        if (!deck) {
+            return [];
+        }
+        const radius = this.props.pickingRadius;
+        const depth = this.props.pickingDepth;
+        const layerId = this.props.id;
+        const allPicks = deck.pickMultipleObjects({
+            x: screenCoords[0],
+            y: screenCoords[1],
+            radius,
+            depth,
+        });
+        const matching = allPicks.filter(
+            (pick) =>
+                pick.layer?.id &&
+                (pick.layer.id === layerId || pick.layer.id.startsWith(`${layerId}-`)),
+        );
+        if (matching.length > 0) {
+            return matching;
+        }
+        return deck.pickMultipleObjects({
+            x: screenCoords[0],
+            y: screenCoords[1],
+            layerIds: [layerId],
+            radius,
+            depth,
+        });
+    }
+}
 
 const EVENT_HANDLERS: { [eventName: string]: string } = {
     click: 'onClick', //is onClick a thing?

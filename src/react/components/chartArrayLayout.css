@@ -1,0 +1,96 @@
+/* Prototype chart-array layout — paired with ChartArrayLayout.tsx; not final. */
+
+.mdv-chart-array {
+    --mdv-chart-array-gap: 8px;
+    --mdv-chart-array-padding: 12px;
+    --mdv-chart-array-min-cell: 260px;
+    --mdv-chart-array-columns: 1;
+
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    gap: var(--mdv-chart-array-gap);
+    padding: var(--mdv-chart-array-padding);
+    position: relative;
+}
+
+/* Fill the scrollport; one cell uses the full inner area (padding aside). */
+.mdv-chart-array[data-layout="single"],
+.mdv-chart-array[data-layout="pair"] {
+    height: 100%;
+    min-height: 100%;
+}
+
+.mdv-chart-array[data-layout="single"] {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+.mdv-chart-array[data-layout="pair"] {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+}
+
+/* Three or more: flex rows; each item grows to an even share of the row width. */
+.mdv-chart-array[data-layout="grid"] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    align-content: flex-start;
+}
+
+.mdv-chart-array[data-layout="grid"][data-grid-fill="true"] {
+    height: 100%;
+    min-height: 100%;
+    align-content: stretch;
+}
+
+.mdv-chart-array[data-layout="grid"] .mdv-chart-array__cell {
+    box-sizing: border-box;
+    flex: 1 1
+        calc(
+            (100% - var(--mdv-chart-array-gap) * (var(--mdv-chart-array-columns) - 1)) /
+                var(--mdv-chart-array-columns)
+        );
+    max-width: calc(
+        (100% - var(--mdv-chart-array-gap) * (var(--mdv-chart-array-columns) - 1)) /
+            var(--mdv-chart-array-columns)
+    );
+    min-width: min(var(--mdv-chart-array-min-cell), 100%);
+}
+
+.mdv-chart-array[data-layout="grid"]:not([data-grid-fill="true"]) .mdv-chart-array__cell {
+    aspect-ratio: 1;
+}
+
+.mdv-chart-array[data-layout="grid"][data-grid-fill="true"] .mdv-chart-array__cell {
+    min-height: 0;
+}
+
+.mdv-chart-array__canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+.mdv-chart-array__canvas .deckgl-overlay,
+.mdv-chart-array__canvas canvas {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.mdv-chart-array__cell {
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    border-radius: 2px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    pointer-events: none;
+}

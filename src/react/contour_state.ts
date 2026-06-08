@@ -5,6 +5,7 @@ import type {
     Disposer,
     LoadedDataColumn,
     FieldName,
+    NumberDataType,
 } from "@/charts/charts";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -50,9 +51,23 @@ export type FieldContourProps = {
     intensity: number;
     opacity: number;
     fillThreshold: number;
-    fields?: LoadedDataColumn<"double">[];
+    fields?: LoadedDataColumn<NumberDataType>[];
+    /** Indices into `fields` to build contours for. Omit to build all fields. */
+    visibleFieldIndices?: readonly number[];
     hoveredFieldId?: FieldName | null;
 }
+
+function getFieldContourIndices(fieldCount: number, visibleFieldIndices?: readonly number[]) {
+    return visibleFieldIndices ?? Array.from({ length: fieldCount }, (_, index) => index);
+}
+
+export function isLoadedNumericContourField(field: DataColumn<any>): field is LoadedDataColumn<NumberDataType> {
+    return (
+        (field.datatype === "double" || field.datatype === "integer" || field.datatype === "int32") &&
+        field.data !== undefined
+    );
+}
+
 function rgb(
     r: number,
     g: number,
@@ -157,6 +172,9 @@ function createBaseContourLayerProps(params: {
         debounce: 1000,
         weightsTextureSize: 256, // Intermediate value for balanced performance and quality
         pickable: false,
+        updateTriggers: {
+            getPosition: [cx, cy],
+        },
     };
 }
 
@@ -216,28 +234,134 @@ export function useCategoryContour(props: CategoryContourProps) {
 }
 /** pending better definition */
 export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
+function buildFieldContourLayerProps(params: {
+    id: string;
+    name: string;
+    fieldId: FieldName;
+    fieldData: ArrayLike<number>;
+    minMax: readonly [number, number];
+    data: ReturnType<typeof useFilteredIndices>;
+    cx: { data: ArrayLike<number> };
+    cy: { data: ArrayLike<number> };
+    radiusPixels: number;
+    fill: boolean;
+    fillThreshold: number;
+    intensity: number;
+    opacity: number;
+    hoveredFieldId?: FieldName | null;
+}) {
+    const {
+        id,
+        name,
+        fieldId,
+        fieldData,
+        minMax,
+        data,
+        cx,
+        cy,
+        radiusPixels,
+        fill,
+        fillThreshold,
+        intensity,
+        opacity,
+        hoveredFieldId,
+    } = params;
+    // Adjust opacity based on hover state
+    const isHovered = hoveredFieldId === fieldId;
+    const hasHover = hoveredFieldId !== null && hoveredFieldId !== undefined;
+    // Hovered field: increase opacity (clamped to 1.0)
+    // Non-hovered fields: reduce opacity when another field is hovered
+    const adjustedOpacity = isHovered
+        ? Math.min(1.0, opacity * 1.5)
+        : hasHover
+          ? opacity * 0.8
+          : opacity;
+    const adjustedIntensity = isHovered
+        ? Math.min(1.0, intensity * 1.5)
+        : hasHover
+          ? intensity * 0.8
+          : intensity;
+    const baseProps = createBaseContourLayerProps({
+        id: `${id}_${name}`, // if we base this id on index rather than name we might do some transitions
+        data, // todo filter sparse data
+        cx,
+        cy,
+        radiusPixels,
+        fillOpacity: adjustedIntensity,
+        contourOpacity: adjustedOpacity,
+        contourFill: fill ? fillThreshold : 10000,
+        colorRange: [getFieldColor(fieldId)],
+    });
+
+    return {
+        ...baseProps,
+        getWeight: (i: number) => {
+            // potential for this to be animated in fun ways...
+            // phase shift for each field in shader...
+
+            // normalization pending refactor/design
+            // things to consider: in some circumstances normalise range across all fields
+            const [min, max] = minMax;
+            const range = max - min;
+            if (range === 0) return 0;
+            const value = fieldData[i];
+            if (value < min) return 0;
+            if (value > max) return 1;
+            const normalizedValue = (value - min) / range;
+            return normalizedValue;
+        },
+        transitions: {
+            // nb - failed to get this working
+            // will need changes to the HeatmapContourExtension implementation
+            // (updateState vs draw, props vs state) but attempts thus far have been fruitless
+            // plan to implement that differently anyway.
+            // fillOpacity: 500,
+            // contourOpacity: 500
+            /// getWeight transition not working either
+            getWeight: {
+                duration: 1000,
+                // easing: t => t,
+            },
+        },
+        updateTriggers: {
+            ...baseProps.updateTriggers,
+            getWeight: [fieldData],
+        },
+    };
+}
+
 export function useFieldContour(props: FieldContourProps) {
-    const { id, fill, bandwidth, intensity, opacity, fillThreshold, fields, hoveredFieldId } =
-        props;
+    const {
+        id,
+        fill,
+        bandwidth,
+        intensity,
+        opacity,
+        fillThreshold,
+        fields,
+        visibleFieldIndices,
+        hoveredFieldId,
+    } = props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
     const data = useFilteredIndices();
     const { zoom } = useViewState();
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
-    //won't be necessary when we implement heatmap differently
+    // won't be necessary when we implement heatmap differently
     // const [debounceZoom] = useDebounce(zoom, 500);
-    const debounceZoom = zoom; //actually - re-evaluating memo was never a bottleneck
+    const debounceZoom = zoom; // actually - re-evaluating memo was never a bottleneck
+    const visibleFieldIndicesKey = visibleFieldIndices?.join("\u0000") ?? "";
 
     return useMemo(() => {
         if (!fields) return [];
-        //If I return a layer here rather than props, will it behave as expected?
-        //not really - we want to pass this into getSublayerProps() so the id is used correctly
+        // If I return a layer here rather than props, will it behave as expected?
+        // not really - we want to pass this into getSublayerProps() so the id is used correctly
         const radiusPixels = 30 * bandwidth * 2 ** debounceZoom;
         // console.log('radiusPixels', radiusPixels);
         // there is an issue of the scaling of these layers e.g. with images that have been resized...
         // what is different about how we scale these layers vs other scatterplot layer?
-        //const fieldStats = fields.reduce((field) => { ... });
+        // const fieldStats = fields.reduce((field) => { ... });
         // Sort fields so that hovered field is drawn last (on top)
         // maybe too strong - could have more fine-tuning of boost/attenuation...
         // maybe want a copy of hoveredField drawn on top with different parameters (animation...)
@@ -248,88 +372,54 @@ export function useFieldContour(props: FieldContourProps) {
         //     if (!aIsHovered && bIsHovered) return -1; // a goes before b
         //     return 0; // maintain original order for non-hovered fields
         // });
-        return fields.map(({ name, field: fieldId, data: fieldData, minMax }) => {
-            // Adjust opacity based on hover state
-            const isHovered = hoveredFieldId === fieldId;
-            const hasHover = hoveredFieldId !== null && hoveredFieldId !== undefined;
-            
-            // Hovered field: increase opacity (clamped to 1.0)
-            // Non-hovered fields: reduce opacity when another field is hovered
-            const adjustedOpacity = isHovered 
-                ? Math.min(1.0, opacity * 1.5)
-                : hasHover 
-                    ? opacity * 0.8
-                    : opacity;
-            
-            const adjustedIntensity = isHovered 
-                ? Math.min(1.0, intensity * 1.5)
-                : hasHover 
-                    ? intensity * 0.8
-                    : intensity;
-            
-            const baseProps = createBaseContourLayerProps({
-                id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
-                data, //todo filter sparse data
+        const fieldIndices = getFieldContourIndices(fields.length, visibleFieldIndices);
+        const buildLayer = (fieldIndex: number) => {
+            const field = fields[fieldIndex];
+            if (!field) return undefined;
+            const { name, field: fieldId, data: fieldData, minMax } = field;
+            return buildFieldContourLayerProps({
+                id,
+                name,
+                fieldId,
+                fieldData,
+                minMax,
+                data,
                 cx,
                 cy,
                 radiusPixels,
-                fillOpacity: adjustedIntensity,
-                contourOpacity: adjustedOpacity,
-                contourFill: fill ? fillThreshold : 10000,
-                colorRange: [getFieldColor(fieldId)],
+                fill,
+                fillThreshold,
+                intensity,
+                opacity,
+                hoveredFieldId,
             });
-            
-            return {
-                ...baseProps,
-                getWeight: (i: number) => {
-                    //potential for this to be animated in fun ways...
-                    //phase shift for each field in shader...
+        };
 
-                    //normalization pending refactor/design
-                    //things to consider: in some circumstances normalise range across all fields
-                    const [min, max] = minMax;
-                    const range = max - min;
-                    if (range === 0) return 0;
-                    const value = fieldData[i];
-                    if (value < min) return 0;
-                    if (value > max) return 1;
-                    const normalizedValue = (value - min) / range;
-                    return normalizedValue;
-                },
-                transitions: {
-                    // nb - failed to get this working
-                    // will need changes to the HeatmapContourExtension implementation
-                    // (updateState vs draw, props vs state) but attempts thus far have been fruitless
-                    // plan to implement that differently anyway.
-                    // fillOpacity: 500,
-                    // contourOpacity: 500
-                    /// getWeight transition not working either
-                    getWeight: {
-                        duration: 1000,
-                        // easing: t => t,
-                    },
-                },
-                updateTriggers: {
-                    getWeight: [fieldData],
-                    // getFilterValue: [fieldData]
-                },
-                // not working?
-                // getFilterValue: (i: number) => fieldData[i] === 0,
-                // extensions: [new DataFilterExtension({filterSize: 1})]
-            };
-        });
+        if (!visibleFieldIndices) {
+            return fields.map((_, fieldIndex) => buildLayer(fieldIndex)).filter((layer) => layer !== undefined);
+        }
+
+        // Sparse array aligned with `fields` so callers can index by original field position.
+        const layers: Array<ReturnType<typeof buildFieldContourLayerProps> | undefined> = [];
+        for (const fieldIndex of fieldIndices) {
+            layers[fieldIndex] = buildLayer(fieldIndex);
+        }
+        return layers;
     }, [
         id,
         data,
         intensity,
         cx,
         cy,
+        cx.field,
+        cy.field,
         debounceZoom,
         bandwidth,
         fill,
         opacity,
         fillThreshold,
         fields,
+        visibleFieldIndicesKey,
         hoveredFieldId,
     ]);
 }
@@ -342,6 +432,9 @@ export type ContourVisualConfig = {
     contour_intensity: number;
     contour_opacity: number;
 }
+
+export type DensityMode = "overlay" | "grid";
+
 /** In future I think we want something more flexible & expressive,
  * but this should be somewhat compatible with the previous implementation
  */
@@ -351,6 +444,7 @@ export type DualContourLegacyConfig = {
     category1?: string | string[];
     category2?: string | string[];
     densityFields?: FieldSpecs; // don't have a way of specifying datatype here
+    density_mode?: DensityMode;
     field_legend: {
         display: boolean;
         // todo - more legend configuration options
@@ -359,13 +453,14 @@ export type DualContourLegacyConfig = {
 
 type DensityVisualisationFolderOptions = {
     categorySelectionControls: AnyGuiSpec[];
+    displayControls?: AnyGuiSpec[];
     legendControls?: AnyGuiSpec[];
     disposers?: Disposer[];
 };
 
 export function getDensityVisualisationFolder(
     config: ContourVisualConfig,
-    { categorySelectionControls, legendControls = [], disposers = [] }: DensityVisualisationFolderOptions,
+    { categorySelectionControls, displayControls = [], legendControls = [], disposers = [] }: DensityVisualisationFolderOptions,
 ) {
     const currentValue: AnyGuiSpec[] = [
         g({
@@ -373,6 +468,7 @@ export function getDensityVisualisationFolder(
             label: "Category selection",
             current_value: categorySelectionControls,
         }),
+        ...displayControls,
         ...getContourVisualSettings(config),
     ];
 
@@ -463,7 +559,10 @@ function useContourCategorySelections(config: DualContourLegacyConfig) {
     return categories;
 }
 
-export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
+export function getDensitySettings(
+    c: DualContourLegacyConfig & BaseConfig,
+    { includeDensityModeToggle = false }: { includeDensityModeToggle?: boolean } = {},
+) {
     return getDensityVisualisationFolder(c, {
         categorySelectionControls: [
             //maybe 2-spaces format is better...
@@ -519,6 +618,19 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
                 },
             }),
         ],
+        displayControls: includeDensityModeToggle
+            ? [
+                  g({
+                      type: "check",
+                      label: "Show density fields as grid",
+                      current_value: c.density_mode === "grid",
+                      func: (x) => {
+                          c.density_mode = x ? "grid" : "overlay";
+                          if (x) c.contour_fill = true;
+                      },
+                  }),
+              ]
+            : [],
         legendControls: [
             g({
                 type: "check",
@@ -619,10 +731,14 @@ export function useLegacyDualContour(hoveredFieldId?: FieldName | null): Contour
         fillThreshold: config.contour_fillThreshold ?? 2,
     };
     const fields = useFieldSpecs(config.densityFields);
+    const overlayFields =
+        config.density_mode === "grid"
+            ? []
+            : fields.filter(isLoadedNumericContourField);
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        fields: fields.filter(field => field.datatype === "double") as LoadedDataColumn<"double">[],
+        fields: overlayFields,
         hoveredFieldId,
     });
     const contour1 = useCategoryContour({
@@ -653,8 +769,8 @@ export function useFieldContourLegend(densityFields?: FieldSpecs): FieldLegendIt
     const fields = useFieldSpecs(densityFields);
     
     return useMemo(() => {
-        // Filter to only double fields (matching the filter in useLegacyDualContour)
-        const doubleFields = fields.filter(field => field.datatype === "double");
+        // Filter to numeric fields (matching the filter in useLegacyDualContour)
+        const doubleFields = fields.filter(isLoadedNumericContourField);
         
         return doubleFields.map(field => ({
             name: field.name,

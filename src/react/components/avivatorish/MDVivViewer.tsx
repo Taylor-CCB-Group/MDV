@@ -9,6 +9,7 @@ import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } 
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
+import { shouldDrawLayerInViewport } from "../densityGridUtils";
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
@@ -127,8 +128,8 @@ class MDVivViewerWrapper extends React.PureComponent<
      */
     // eslint-disable-next-line class-methods-use-this
     layerFilter({ layer, viewport }: any) {
-        //return true; // for testing whether viv id matching is an issue
-        return layer.id.includes(getVivId(viewport.id));
+        const viewportId = viewport.id as string;
+        return shouldDrawLayerInViewport(layer, viewportId, getVivId(viewportId));
     }
 
     /**
@@ -167,28 +168,37 @@ class MDVivViewerWrapper extends React.PureComponent<
      * as of anything related to that, this is dubious and liable to need attention in the future.
      */
     _cleanupMouseEvents?: () => void;
+    _rebindSelectionMouseEvents() {
+        if (!this.state.deckRef?.current) return;
+        try {
+            const deck = this.state.deckRef.current.deck;
+            this._cleanupMouseEvents?.();
+            this._cleanupMouseEvents = rebindMouseEvents(deck, this.props.selectionLayer);
+        } catch (e) {
+            console.error(
+                "attempt to reset deck eventManager element failed",
+                e,
+            );
+        }
+    }
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
-        const { views, outerContainer, selectionLayer } = props;
+        const { views, outerContainer } = props;
 
-        if (
-            outerContainer !== this.state.outerContainer &&
-            this.state.deckRef?.current
-        ) {
-            try {
-                this.setState({ outerContainer });
-                const deck = this.state.deckRef.current.deck;
-                this._cleanupMouseEvents?.();
-                //this should be common with DeckScatterComponent - make a helper/hook...
-                this._cleanupMouseEvents = rebindMouseEvents(deck, selectionLayer);
-            } catch (e) {
-                console.error(
-                    "attempt to reset deck eventManager element failed",
-                    e,
-                );
-            }
+        const outerContainerChanged = outerContainer !== this.state.outerContainer;
+        const viewsIdentityChanged =
+            prevProps.views.length !== views.length ||
+            views.some((view, index) => view.id !== prevProps.views[index]?.id);
+
+        if (outerContainerChanged) {
+            this.setState({ outerContainer });
         }
-        
+        if (
+            this.state.deckRef?.current &&
+            (outerContainerChanged || viewsIdentityChanged)
+        ) {
+            this._rebindSelectionMouseEvents();
+        }
 
         // Only update state if the previous viewState prop does not match the current one
         // so that people can update viewState
@@ -385,7 +395,8 @@ class MDVivViewerWrapper extends React.PureComponent<
         }
         // MDV: make sure the scalebar is on top of other layers
         // perhaps this should be in _renderLayers(), yolo.
-        const vivLayers = this._renderLayers()[0];
+        const vivLayerGroups = this._renderLayers();
+        const vivLayers = vivLayerGroups.flat();
         const scaleBarLayer = vivLayers.find((layer: any) => layer instanceof ScaleBarLayer);
         const otherLayers = vivLayers.filter((layer: any) => layer !== scaleBarLayer);
         const layers = deckProps?.layers === undefined

@@ -7,6 +7,8 @@ import SelectionOverlay from "./SelectionOverlay";
 import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend } from "../contour_state";
 import type { DualContourLegacyConfig } from "../contour_state";
+import VivDensityGridComponent from "./VivDensityGridComponent";
+import { supportsDensityGridMode } from "./densityGridUtils";
 import type { FieldName } from "@/charts/charts";
 import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
@@ -22,6 +24,7 @@ import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } 
 import useGateLayers from "../hooks/useGateLayers";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { tagDeckLayerViewportScope } from "./deckLayerViewportScope";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -37,33 +40,33 @@ export const VivScatter = () => {
     );
 };
 
-const useJsonLayer = (showJson: boolean) => {
+export const useJsonLayer = (showJson: boolean) => {
     const id = useChartID();
     const { root } = useProject();
     const { json } = useRegion(); // return type is 'any' and we assume 'json' will be a string - but want that to be different in future.
     const layer_id = `json_${getVivId(`${id}detail-react`)}`;
     const layer = useMemo(() => {
-        return json
-            ? new GeoJsonLayer({
-                  id: layer_id,
-                  data: `${root}/${json}`,
-                  opacity: 1,
-                  filled: true,
-                  getFillColor: (f) => [255, 255, 255, 150],
-                  getLineColor: (f) => [255, 255, 255, 150],
-                  getLineWidth: 2,
-                  lineWidthMinPixels: 1,
-                  getPointRadius: 10,
-                  pickable: true,
-                  autoHighlight: true,
-                  //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
-                  getText: (f) => f.properties.DN,
-                  getTextColor: [255, 255, 255, 255],
-                  getTextSize: 12,
-                  textBackground: true,
-                  visible: showJson,
-              })
-            : null;
+        if (!json) return null;
+        const geoJsonLayer = new GeoJsonLayer({
+            id: layer_id,
+            data: `${root}/${json}`,
+            opacity: 1,
+            filled: true,
+            getFillColor: (f) => [255, 255, 255, 150],
+            getLineColor: (f) => [255, 255, 255, 150],
+            getLineWidth: 2,
+            lineWidthMinPixels: 1,
+            getPointRadius: 10,
+            pickable: true,
+            autoHighlight: true,
+            //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
+            getText: (f) => f.properties.DN,
+            getTextColor: [255, 255, 255, 255],
+            getTextSize: 12,
+            textBackground: true,
+            visible: showJson,
+        });
+        return tagDeckLayerViewportScope(geoJsonLayer, "chart-shared");
     }, [json, showJson, layer_id, root]);
     return layer;
 };
@@ -99,12 +102,19 @@ const Main = observer(
             controllerOptions,
         } = useGateLayers();
 
+        const roiConfig = useConfig<VivRoiConfig>();
+        const contourConfig = useConfig<DualContourLegacyConfig>();
+        const showDensityGrid =
+            supportsDensityGridMode(roiConfig.type) &&
+            roiConfig.dimension !== "3d" &&
+            (contourConfig.densityFields?.length ?? 0) > 0 &&
+            contourConfig.density_mode === "grid";
+
         // Get field contour legend data
-        const config = useConfig<DualContourLegacyConfig>();
-        const legendFields = useFieldContourLegend(config.densityFields);
+        const legendFields = useFieldContourLegend(contourConfig.densityFields);
 
         // Legend visibility - fixed position in bottom-left
-        const showLegend = config.field_legend.display;
+        const showLegend = contourConfig.field_legend.display;
 
         // Fixed bottom-left position: 10px from left, 10px from bottom
         const legendPosition = { x: 10, y: 10 };
@@ -246,6 +256,16 @@ const Main = observer(
             ],
         );
         if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
+
+        if (showDensityGrid) {
+            return (
+                <>
+                    <SelectionOverlay />
+                    <VivDensityGridComponent />
+                </>
+            );
+        }
+
         // if (import.meta.env.DEV) trace();
         return (
             <>

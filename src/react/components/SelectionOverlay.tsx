@@ -23,12 +23,15 @@ import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-is
 import useGateActions from "../hooks/useGateActions";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
-import { getEmptyFeatureCollection } from "../deck_state";
-import { TuneOutlined } from "@mui/icons-material";
+import { GridView, TuneOutlined } from "@mui/icons-material";
+import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 import { LassoIcon, SplineIcon } from "lucide-react";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
 import { useChart } from "../context";
+import { action } from "mobx";
+import type { DualContourLegacyConfig } from "../contour_state";
+import { supportsDensityGridMode } from "./densityGridUtils";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -147,6 +150,10 @@ export default observer(function SelectionOverlay() {
     const chart = useChart<DeckScatterConfigWithRegion>();
     const chartId = useChartID();
     const config = useConfig<DeckScatterConfigWithRegion>();
+    const contourConfig = useConfig<DualContourLegacyConfig>();
+    const is2d = config.dimension === "2d";
+    const supportsDensityGrid = supportsDensityGridMode(config.type);
+    const isDensityGrid = supportsDensityGrid && is2d && contourConfig.density_mode === "grid";
     const { 
         setSelectionMode, 
         selectionFeatureCollection,
@@ -183,27 +190,47 @@ export default observer(function SelectionOverlay() {
         };
       }, [chartId]);
 
-    const toolsToShow = useMemo(
-        () =>
-            editingGateId
-                ? ToolArray.filter((t) => EDIT_MODE_TOOL_NAMES.includes(t.name))
-                : ToolArray,
-        [editingGateId],
+    const toolsToShow = useMemo(() => {
+        if (editingGateId) {
+            return ToolArray.filter((t) => EDIT_MODE_TOOL_NAMES.includes(t.name));
+        }
+        return ToolArray;
+    }, [editingGateId]);
+
+    const setSelectedTool = useCallback(
+        (tool: Tool) => {
+            const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
+            if (!mode) {
+                console.error("no mode found for tool", tool);
+                return;
+            }
+            setSelectionMode(new mode());
+            setSelectedToolX(tool);
+        },
+        [setSelectionMode, setSelectedToolX],
     );
 
-    const setSelectedTool = useCallback((tool: Tool) => {
-        // pending refactor
-        const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
-        if (!mode) {
-            console.error("no mode found for tool", tool);
-            return;
+    const wasDensityGridRef = useRef(isDensityGrid);
+    useEffect(() => {
+        const enteredGrid = isDensityGrid && !wasDensityGridRef.current;
+        const leftGrid = wasDensityGridRef.current && !isDensityGrid;
+        if (enteredGrid || leftGrid) {
+            // Deck remounts between overlay and grid; recreate the active edit mode and handlers.
+            setSelectedTool(selectedTool);
         }
+        wasDensityGridRef.current = isDensityGrid;
+    }, [isDensityGrid, selectedTool, setSelectedTool]);
 
-        //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
-        //setSelectionMode(new CompositeMode([new mode(), new TranslateModeEx()]));
-        setSelectionMode(new mode());
-        setSelectedToolX(tool);
-    }, [setSelectionMode, editingGateId, setSelectionFeatureCollection, setSelectedToolX]);
+    const toggleDensityGrid = useCallback(() => {
+        action(() => {
+            const nextIsGrid = contourConfig.density_mode !== "grid";
+            contourConfig.density_mode = nextIsGrid ? "grid" : "overlay";
+            if (nextIsGrid) {
+                contourConfig.contour_fill = true;
+            }
+        })();
+    }, [contourConfig]);
+
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc.
     // (thanks copilot, that may be over-ambitious)
@@ -266,7 +293,6 @@ export default observer(function SelectionOverlay() {
             <ButtonGroup
                 variant="contained"
                 aria-label="choose tool for manipulating view or selection"
-                //moving this to the top right corner and absolute to avoid interfering with axes
                 className="z-[2] p-2 absolute top-0 right-0 opacity-90"
                 sx={{
                     backgroundColor: theme === "dark" ? "rgba(37,37,37,0.92)" : "rgba(245,245,245,0.92)",
@@ -275,6 +301,27 @@ export default observer(function SelectionOverlay() {
                 }}
             >
                 {toolButtons}
+                {supportsDensityGrid && is2d && (
+                    <IconWithTooltip
+                        tooltipText={
+                            isDensityGrid
+                                ? "Switch to single scatter view"
+                                : "Show density fields as grid"
+                        }
+                        onClick={toggleDensityGrid}
+                        iconButtonProps={{
+                            sx: {
+                                backgroundColor: "transparent",
+                                color: "var(--text_color)",
+                                borderRadius: 10,
+                                zIndex: 2,
+                            },
+                            "aria-label": isDensityGrid ? "Density layer view" : "Density grid view",
+                        }}
+                    >
+                        {isDensityGrid ? <LayersOutlinedIcon /> : <GridView />}
+                    </IconWithTooltip>
+                )}
                 <Divider 
                     orientation="vertical" 
                     sx={{

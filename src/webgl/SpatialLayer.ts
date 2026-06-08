@@ -18,6 +18,11 @@ type DensityLayerProps = ScatterplotLayerProps & {
     // are framebuffers appropriate for use as props?
     framebuffer: Framebuffer;
 };
+type HeatmapContourLayerProps = NonNullable<ContourLayerProps> & {
+    extensions?: unknown;
+    viewId?: string;
+};
+
 class DensityLayer extends Layer<DensityLayerProps> {
     layerName = "DensityLayer";
     static defaultProps = {};
@@ -46,6 +51,24 @@ class DensityLayer extends Layer<DensityLayerProps> {
         const models = this.getModels();
         // models.forEach(model => model.);
     }
+}
+
+export function createHeatmapContourLayer(props: HeatmapContourLayerProps) {
+    const { extensions, ...p } = props;
+    const heatmapProps: any = {
+        ...p,
+        _subLayerProps: {
+            triangle: {
+                type: TriangleLayerContours,
+            },
+            "triangle-layer": {
+                contourOpacity: p.contourOpacity,
+                contourFill: p.contourFill,
+                fillOpacity: p.fillOpacity,
+            },
+        },
+    };
+    return new HeatmapLayer(heatmapProps);
 }
 
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
@@ -101,22 +124,9 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
         //         ...p,
         //     });
         // });
-        const densityLayers = contourLayers.filter((l) => l).map(props => {
-            const { extensions, ...p } = this.getSubLayerProps(props);
-            return new HeatmapLayer({
-                ...p,
-                _subLayerProps: {
-                    triangle: {
-                        type: TriangleLayerContours,
-                    },
-                    "triangle-layer": {
-                        contourOpacity: p.contourOpacity,
-                        contourFill: p.contourFill,
-                        fillOpacity: p.fillOpacity,
-                    },
-                },
-            });
-        });
+        const densityLayers = contourLayers.filter((l) => l).map(props =>
+            createHeatmapContourLayer(this.getSubLayerProps(props)),
+        );
         return [
             // add 'grey-out' layer here... that implies a different type of data being passed.
             // it might want to know about background_filter...
