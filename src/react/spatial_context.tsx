@@ -2,8 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type RangeDimension from "../datastore/RangeDimension";
 import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
-import { CompositeMode, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
-import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
+import { CompositeMode, type SimpleFeature, type SimpleFeatureCollection, type SimpleGeometry, type Position, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
@@ -28,11 +27,11 @@ import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "
 export type P = [number, number];
 export type RangeState = {
     rangeDimension: RangeDimension;
-    selectionFeatureCollection: FeatureCollection;
+    selectionFeatureCollection: SimpleFeatureCollection;
     editableLayer: MonkeyPatchEditableGeoJsonLayer;
     editingGateId: string | null;
     setEditingGateId: (id: string | null) => void;
-    setSelectionFeatureCollection: (newSelection: FeatureCollection) => void
+    setSelectionFeatureCollection: (newSelection: SimpleFeatureCollection) => void
     selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     selectedTool: Tool;
@@ -57,7 +56,7 @@ export type SpatialAnnotationState = {
 const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
 
-function useSelectionCoords(selection: FeatureCollection) {
+function useSelectionCoords(selection: SimpleFeatureCollection) {
     // where should we keep this in config for persisting?
     const feature = selection?.features[0];
     const coords = useMemo(() => {
@@ -65,13 +64,23 @@ function useSelectionCoords(selection: FeatureCollection) {
         //these casts are unsafe in a general sense, but should be ok in our editor.
         //?we could set a property in the feature to say when it's simple AABB?
         //^^ need to be careful about managing that property.
-        const geometry = feature.geometry as Geometry;
+        const geometry = feature.geometry as SimpleGeometry;
         const raw = geometry.coordinates as Position[][];
         //! without toJS, this can be orders of magnitude slower than before - careful with that mobx, eugene...
         // still adds significant overhead - may need a different strategy for critical/hot paths.
         return toJS(raw[0]);
     }, [feature]);
     return coords as [number, number][];
+}
+
+function isSimpleFeature(feature: unknown): feature is SimpleFeature {
+    return typeof feature === "object"
+        && feature !== null
+        && "geometry" in feature
+        && typeof feature.geometry === "object"
+        && feature.geometry !== null
+        && "type" in feature.geometry
+        && feature.geometry.type !== "GeometryCollection";
 }
 
 /** 
@@ -98,10 +107,10 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // making selectionFeatureCollection part of config, so it can be persisted
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
-    //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<SimpleFeatureCollection>(getEmptyFeatureCollection());
     //! it appears to drastically affect performance having this in mobx config - why?
     const { selectionFeatureCollection } = chart.config;
-    const setSelectionFeatureCollection = useCallback(action((newSelection: FeatureCollection) => {
+    const setSelectionFeatureCollection = useCallback(action((newSelection: SimpleFeatureCollection) => {
         chart.config.selectionFeatureCollection = newSelection;
     }), []);
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
@@ -195,7 +204,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const editableLayer = useMemo(() => {
         return new MonkeyPatchEditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
-            data: selectionFeatureCollection as any,
+            data: selectionFeatureCollection,
             mode: selectionMode,
             getFillColor,
             getLineColor,
@@ -217,7 +226,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 // updatedData.features = [feature];
                 setSelectionFeatureCollection({
                     ...updatedData,
-                    features: feature ? [feature] : []
+                    features: isSimpleFeature(feature) ? [feature] : []
                 });
             }),
             onHover(pickingInfo, event) {
