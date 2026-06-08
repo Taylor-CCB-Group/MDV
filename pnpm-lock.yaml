@@ -119,9 +119,15 @@ importers:
       '@slickgrid-universal/common':
         specifier: 10.6.0
         version: 10.6.0
+      '@spatialdata/avivatorish':
+        specifier: ^0.1.0
+        version: 0.1.0(b1235b24ca004e234da3e4c035d43e3a)
       '@spatialdata/core':
         specifier: 0.1.0
         version: 0.1.0
+      '@spatialdata/layers':
+        specifier: ^0.1.0
+        version: 0.1.0(4eff8b0fade424b0171a85a804c7311a)
       '@spatialdata/vis':
         specifier: ^0.1.0
         version: 0.1.0(5fed9fb1d070481f396b27a4e9a53f69)
@@ -11039,7 +11045,7 @@ snapshots:
 
   geotiff@2.1.4-beta.0:
     dependencies:
-      '@petamoriken/float16': 3.9.2
+      '@petamoriken/float16': 3.9.3
       lerc: 3.0.0
       pako: 2.1.0
       parse-headers: 2.0.6
