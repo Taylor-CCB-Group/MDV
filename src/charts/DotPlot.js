@@ -8,7 +8,7 @@ import { getColorLegendCustom } from "../utilities/Color.js";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
