@@ -13,6 +13,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 import { useChartManager } from "../hooks";
 import CustomTooltip from "./CustomTooltip";
+import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
 
 type JSONObject = { [key: string]: any };
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
@@ -90,6 +92,175 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
     return recursiveFilter(obj, []) || {};
 }
 
+function omitValidationFindings(json: any) {
+    if (typeof json !== "object" || json === null || !("validationFindings" in json)) {
+        return json;
+    }
+    const { validationFindings: _validationFindings, ...jsonWithoutValidationFindings } = json;
+    return jsonWithoutValidationFindings;
+}
+
+function formatSeenAt(timestamp: number) {
+    return new Date(timestamp).toISOString();
+}
+
+function issuePathLabel(path: string) {
+    return path || "(root)";
+}
+
+function FindingDetailsJson({ label, value }: { label: string; value: unknown }) {
+    return (
+        <Box
+            component="details"
+            sx={{
+                mt: 1,
+                "& summary": {
+                    cursor: "pointer",
+                    fontWeight: 600,
+                },
+            }}
+        >
+            <summary>{label}</summary>
+            <JsonView
+                src={value}
+                style={{
+                    fontSize: "0.8125rem",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    padding: "8px",
+                }}
+                collapsed={1}
+            />
+        </Box>
+    );
+}
+
+function ValidationFindingCard({ finding }: { finding: ValidationFinding }) {
+    const latest = finding.latest;
+
+    return (
+        <Box
+            sx={{
+                border: "1px solid var(--border_menu_bar_color)",
+                borderRadius: "8px",
+                p: 1.5,
+                mb: 1,
+            }}
+        >
+            <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 1 }}>
+                <Typography sx={{ fontWeight: 700 }}>
+                    {finding.subject}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                    Repeated {finding.count} {finding.count === 1 ? "time" : "times"}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.75 }}>
+                    Latest: {formatSeenAt(finding.lastSeenAt)}
+                </Typography>
+            </Box>
+            <Box sx={{ mt: 1 }}>
+                {latest?.issues?.length ? (
+                    latest.issues.map((issue, index) => (
+                        <Box
+                            key={`${issue.path}-${issue.message}-${index}`}
+                            sx={{
+                                borderLeft: "3px solid #f2c94c",
+                                pl: 1,
+                                mb: 1,
+                            }}
+                        >
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                                    fontWeight: 600,
+                                }}
+                            >
+                                {issuePathLabel(issue.path)}
+                                {issue.code ? ` (${issue.code})` : ""}
+                            </Typography>
+                            <Typography variant="body2">{issue.message}</Typography>
+                        </Box>
+                    ))
+                ) : (
+                    <Typography variant="body2">No issue details recorded.</Typography>
+                )}
+            </Box>
+            {latest?.rawConfig !== undefined && (
+                <FindingDetailsJson label="Raw config" value={latest.rawConfig} />
+            )}
+            {latest?.details !== undefined && (
+                <FindingDetailsJson label="Details" value={latest.details} />
+            )}
+        </Box>
+    );
+}
+
+function ValidationFindingGroup({
+    title,
+    findingsBySubject,
+}: {
+    title: string;
+    findingsBySubject: Record<string, ValidationFinding[]>;
+}) {
+    const entries = Object.entries(findingsBySubject).sort(([a], [b]) => a.localeCompare(b));
+    if (entries.length === 0) return null;
+
+    const totalFindings = entries.reduce((sum, [, findings]) => sum + findings.length, 0);
+
+    return (
+        <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                {title} ({totalFindings})
+            </Typography>
+            {entries.map(([subject, findings]) => {
+                const repeatCount = findings.reduce((sum, finding) => sum + finding.count, 0);
+                return (
+                    <Box key={subject} sx={{ mb: 1.5 }}>
+                        <Typography variant="body2" sx={{ mb: 0.75, opacity: 0.8 }}>
+                            {subject}: {findings.length} grouped {findings.length === 1 ? "finding" : "findings"}, {repeatCount} total {repeatCount === 1 ? "report" : "reports"}
+                        </Typography>
+                        {findings.map((finding) => (
+                            <ValidationFindingCard key={finding.signature} finding={finding} />
+                        ))}
+                    </Box>
+                );
+            })}
+        </Box>
+    );
+}
+
+export function ValidationIssuesSection({
+    validationFindings,
+}: {
+    validationFindings?: ValidationFindingsStore;
+}) {
+    const snapshot = validationFindings?.snapshot;
+    const hasAnyFindings = Boolean(validationFindings?.hasAny);
+
+    if (!hasAnyFindings || !snapshot || !validationFindings) {
+        return <Typography>No validation issues recorded.</Typography>;
+    }
+
+    return (
+        <>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, mb: 1 }}>
+                <Typography>
+                    Total: <strong>{snapshot.totalCount}</strong>
+                </Typography>
+                <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => validationFindings.clearAll()}
+                >
+                    Clear
+                </Button>
+            </Box>
+            <ValidationFindingGroup title="Charts" findingsBySubject={snapshot.charts} />
+            <ValidationFindingGroup title="Datasources" findingsBySubject={snapshot.datasources} />
+        </>
+    );
+}
+
 const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     json,
     header,
@@ -102,18 +273,21 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     const [filter, setFilter] = useState("");
     const [debouncedFilter] = useDebounce(filter, 300); //why is this returning a tuple?
     const { validationFindings } = useChartManager();
+    const jsonWithoutValidationFindings = useMemo(
+        () => omitValidationFindings(json),
+        [json],
+    );
     const jsonWithVivTelemetry = useMemo(
         () => ({
-            ...json,
+            ...jsonWithoutValidationFindings,
             vivLoaderCacheTelemetry: vivLoaderCacheTelemetryObservable.snapshot,
         }),
-        [json, vivLoaderCacheTelemetryObservable.snapshot],
+        [jsonWithoutValidationFindings, vivLoaderCacheTelemetryObservable.snapshot],
     );
     const filteredJson = useMemo(
         () => filterJSON(jsonWithVivTelemetry, debouncedFilter),
         [jsonWithVivTelemetry, debouncedFilter],
     );
-    const chartTypeCounts: Record<string, number> = validationFindings?.chartTypeCounts ?? {};
     const hasAnyFindings = Boolean(validationFindings?.hasAny);
     const injectFaultAndReload = (mode: DataLoaderFaultMode) => {
         if (setDataLoaderFaultMode(mode)) {
@@ -206,40 +380,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                     </AccordionSummary>
                     <Divider />
                     <AccordionDetails sx={{ mt: 1 }}>
-                        {hasAnyFindings ? (
-                            <>
-                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, mb: 1 }}>
-                                    <Typography>
-                                        Total: <strong>{validationFindings.totalCount}</strong>
-                                    </Typography>
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        onClick={() => validationFindings.clearAll()}
-                                    >
-                                        Clear
-                                    </Button>
-                                </Box>
-                                <Box sx={{ mb: 1 }}>
-                                    {Object.entries(chartTypeCounts).length > 0 ? (
-                                        Object.entries(chartTypeCounts)
-                                            .sort((a, b) => b[1] - a[1])
-                                            .map(([chartType, count]) => (
-                                                <Typography key={chartType} sx={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
-                                                    {chartType}: {count}
-                                                </Typography>
-                                            ))
-                                    ) : (
-                                        <Typography>No chart validation issues recorded yet.</Typography>
-                                    )}
-                                </Box>
-                                <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                                    Aggregated details are also available in the JSON below under <code>validationFindings</code>.
-                                </Typography>
-                            </>
-                        ) : (
-                            <Typography>No validation issues recorded.</Typography>
-                        )}
+                        <ValidationIssuesSection validationFindings={validationFindings} />
                     </AccordionDetails>
                 </Accordion>
             )}
