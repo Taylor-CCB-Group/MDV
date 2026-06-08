@@ -167,7 +167,9 @@ async function fetchSingleFileOmeTiffOffsets(url: string) {
 }
 
 /**
- * Given an image source, creates a PixelSource[] and returns XML-meta
+ * MDV-local loader entry point. Zarr/SpatialData paths may delegate to
+ * `@spatialdata/avivatorish` in future; OME-TIFF and multi-TIFF routes stay here
+ * until upstream restores them as optional plugins. See docs/spatialdata-vis-integration.md.
  */
 export async function createLoader(
     urlOrFile: UrlOrFiles,
