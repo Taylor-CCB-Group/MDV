@@ -12,6 +12,7 @@ import {
     shouldDrawLayerInViewport,
     supportsDensityGridMode,
     unprojectCanvasPoint,
+    toChartArrayGridLayerId,
 } from "./densityGridUtils";
 
 describe("densityGridUtils", () => {
@@ -74,6 +75,15 @@ describe("densityGridUtils", () => {
                 getDensityGridViewId("chart-1", "field_b", 1),
             ),
         ).toBe(false);
+    });
+
+    test("maps overlay detail layer ids to chart-array grid ids", () => {
+        expect(toChartArrayGridLayerId("scatter-grey_-#3PZt1Jdetail-react#")).toBe(
+            "scatter-grey_-#3PZt1Jchart-array-grid#",
+        );
+        expect(toChartArrayGridLayerId("json_-#3PZt1Jchart-array-grid#")).toBe(
+            "json_-#3PZt1Jchart-array-grid#",
+        );
     });
 
     test("identifies editable selection layers", () => {

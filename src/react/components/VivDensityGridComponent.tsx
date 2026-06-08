@@ -9,7 +9,7 @@ import {
     useDensityGridContours,
 } from "../hooks/useDensityGridCells";
 import { useVivDensityGridViewState } from "../hooks/useVivDensityGridViewState";
-import { useChartID, useConfig, useFilteredIndices } from "../hooks";
+import { useChartID, useConfig } from "../hooks";
 import { useSpatialLayers } from "../spatial_context";
 import ChartArrayLayout from "./ChartArrayLayout";
 import { createHeatmapContourLayer } from "@/webgl/SpatialLayer";
@@ -32,7 +32,6 @@ export default function VivDensityGridComponent() {
     const viewState = useViewerStore((store) => store.viewState);
     const outerContainer = useOuterContainer();
     const deckContainerRef = useRef<HTMLDivElement | null>(null);
-    const rows = useFilteredIndices();
 
     const {
         scatterProps: { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive },
@@ -99,7 +98,7 @@ export default function VivDensityGridComponent() {
                     });
                 })
                 .filter((view): view is DetailView => view !== null),
-        [grid.visibleCellIndices, grid.viewIds, grid.metrics.cellBounds],
+        [grid.visibleCellIndices, grid.viewIds, grid.getCellBounds],
     );
 
     const viewStates = useMemo(() => {
@@ -249,10 +248,7 @@ export default function VivDensityGridComponent() {
     if (densityFields.length === 0) {
         return <div className="flex h-full items-center justify-center text-sm">Loading density fields...</div>;
     }
-    if (rows.length === 0) {
-        return <div className="flex h-full items-center justify-center text-sm">No rows remain after the current filters.</div>;
-    }
-
+    
     return (
         <>
             <div

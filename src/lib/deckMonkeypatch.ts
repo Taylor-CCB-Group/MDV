@@ -5,6 +5,42 @@ import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
 import type { Position } from '@turf/helpers';
 import { unprojectCanvasPoint } from '@/react/components/densityGridUtils';
 
+type DeckLayerLike = {
+    id: string;
+    context?: { deck?: unknown };
+    getLayers?: () => unknown;
+};
+
+function flattenDeckLayers(layers: readonly DeckLayerLike[]): DeckLayerLike[] {
+    const flattened: DeckLayerLike[] = [];
+    for (const layer of layers) {
+        flattened.push(layer);
+        const sublayers = layer.getLayers?.();
+        if (Array.isArray(sublayers)) {
+            flattened.push(...flattenDeckLayers(sublayers as DeckLayerLike[]));
+        }
+    }
+    return flattened;
+}
+
+/** Resolve the selection layer instance that is actually mounted on the deck. */
+export function resolveDeckSelectionLayer(
+    deck: Deck,
+    selectionLayer?: EditableGeoJsonLayer,
+): EditableGeoJsonLayer | undefined {
+    const layerManager = (deck as unknown as { layerManager?: { layers?: DeckLayerLike[] } }).layerManager;
+    const mounted = flattenDeckLayers(layerManager?.layers ?? []).find((layer) =>
+        layer.id.startsWith("selection_"),
+    );
+    if (mounted) {
+        return mounted as EditableGeoJsonLayer;
+    }
+    if (selectionLayer?.context?.deck) {
+        return selectionLayer;
+    }
+    return undefined;
+}
+
 // we don't need the keys; we'll break in.
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
 //! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
@@ -190,16 +226,21 @@ export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeo
     viewManager._rebuildViewports();
     viewManager.setNeedsUpdate("MDV monkeypatch change event manager");
     if (!selectionLayer) return;
-    const timer = setTimeout(() => {
-        // deferring this seems to allow it to have the right kind of internal state...
-        // needs more testing.
+    queueMicrotask(() => {
         try {
-            selectionLayer.initializeState();
+            const activeSelectionLayer = resolveDeckSelectionLayer(deckO, selectionLayer);
+            if (!activeSelectionLayer?.context?.deck) {
+                return;
+            }
+            const layerInternal = activeSelectionLayer as {
+                internalState?: unknown;
+            };
+            if (layerInternal.internalState) {
+                return;
+            }
+            activeSelectionLayer.initializeState();
         } catch (e) {
             console.error("Error re-initializing (monkey-patching) editable layer state", e);
         }
     });
-    return () => {
-        clearTimeout(timer);
-    };
 }

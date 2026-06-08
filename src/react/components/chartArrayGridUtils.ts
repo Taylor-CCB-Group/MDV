@@ -1,5 +1,11 @@
 import type { OrthographicViewState } from "@deck.gl/core";
 
+const CHART_ARRAY_GRID_CHART_TYPES = new Set([
+    "DeckContourScatter",
+    "DeckDensity",
+    "VivMdvRegionReact",
+]);
+
 export function getChartArrayViewId(
     chartId: string,
     cellKey: string,
@@ -35,4 +41,27 @@ export function hasUsableOrthographicViewState(viewState: OrthographicViewState 
 
 export function getVivGridDetailViewId(chartId: string, cellKey: string, index: number) {
     return `${getChartArrayViewId(chartId, cellKey, index, "density-grid")}detail-react`;
+}
+
+export function supportsChartArrayGridMode(chartType: string | undefined): boolean {
+    return typeof chartType === "string" && CHART_ARRAY_GRID_CHART_TYPES.has(chartType);
+}
+
+export function isChartArrayGridMode({
+    chartType,
+    dimension,
+    layoutMode,
+    cellCount,
+}: {
+    chartType: string | undefined;
+    dimension: string | undefined;
+    layoutMode: string | undefined;
+    cellCount: number;
+}): boolean {
+    return (
+        supportsChartArrayGridMode(chartType) &&
+        dimension === "2d" &&
+        layoutMode === "grid" &&
+        cellCount > 0
+    );
 }

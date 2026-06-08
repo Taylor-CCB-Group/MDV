@@ -1,5 +1,6 @@
 - only run `pnpm exec tsgo` when TypeScript files or TS-facing configs changed
 - when TypeScript files change, run `pnpm exec biome lint` on touched paths only (read-only; no `--write`); do not run `jsformat`, `jslint`, or `biome check --write` on `./src` — formatting the tree would touch many unrelated lines; do not remove `biome-ignore` comments without reading the rationale and confirming the underlying constraint is still addressed
+- for `useExhaustiveDependencies`, prefer fixing the dependency list over adding `biome-ignore`; when a dep is only there to re-run the hook, reference it in the body as a bare expression (e.g. `staticPassRevision;` with a short comment) rather than wiring it into control flow — only suppress when the rule cannot be satisfied without changing runtime behaviour
 - for Python checks in worktrees, prefer the local `venv`:
 - tests: `./venv/bin/python -m pytest python/mdvtools/tests -m "not performance"`
 - pyright: from `python/`, run `../venv/bin/pyright`

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getDensityGridViewId } from "./densityGridUtils";
 import {
+    MDV_DECK_LAYER_PICK_ONLY_IN_STATIC_COMPOSITE,
     MDV_DECK_LAYER_VIEWPORT_SCOPE,
     shouldDrawDeckLayerInViewport,
 } from "./deckLayerViewportScope";
@@ -44,5 +45,19 @@ describe("deckLayerViewportScope", () => {
     test("infers chart-shared for selection layers without explicit scope", () => {
         const selection = { id: "selection_-#chartdetail-react#", props: {} };
         expect(shouldDrawDeckLayerInViewport(selection, gridView)).toBe(true);
+    });
+
+    test("pick-only-in-static layers draw only during picking", () => {
+        const scatter = {
+            id: "scatter_chart-array-grid",
+            props: {
+                [MDV_DECK_LAYER_VIEWPORT_SCOPE]: "chart-shared",
+                [MDV_DECK_LAYER_PICK_ONLY_IN_STATIC_COMPOSITE]: true,
+            },
+        };
+
+        expect(shouldDrawDeckLayerInViewport(scatter, gridView)).toBe(false);
+        expect(shouldDrawDeckLayerInViewport(scatter, gridView, { isPicking: false })).toBe(false);
+        expect(shouldDrawDeckLayerInViewport(scatter, gridView, { isPicking: true })).toBe(true);
     });
 });
