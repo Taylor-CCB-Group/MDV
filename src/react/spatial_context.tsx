@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type RangeDimension from "../datastore/RangeDimension";
 import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
-import { CompositeMode, type SimpleFeature, type SimpleFeatureCollection, type SimpleGeometry, type Position } from "@deck.gl-community/editable-layers";
+import { CompositeMode, type SimpleFeature, type SimpleFeatureCollection, type SimpleGeometry, type Position, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
@@ -33,7 +33,7 @@ export type RangeState = {
     setEditingGateId: (id: string | null) => void;
     setSelectionFeatureCollection: (newSelection: SimpleFeatureCollection) => void
     selectionMode: unknown;
-    setSelectionMode: (mode: unknown) => void;
+    setSelectionMode: (mode: GeoJsonEditMode) => void;
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
     modelMatrix: Matrix4;

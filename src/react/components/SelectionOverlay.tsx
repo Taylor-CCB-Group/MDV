@@ -202,6 +202,7 @@ export default observer(function SelectionOverlay() {
         [editingGateId],
     );
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: need to check that gate id is correct here?
     const setSelectedTool = useCallback((tool: Tool) => {
         // pending refactor
         const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
@@ -212,7 +213,7 @@ export default observer(function SelectionOverlay() {
 
         //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
         //setSelectionMode(new CompositeMode([new mode(), new TranslateModeEx()]));
-        setSelectionMode(new mode());
+        setSelectionMode(new mode() as GeoJsonEditMode);
         setSelectedToolX(tool);
     }, [setSelectionMode, editingGateId, setSelectionFeatureCollection, setSelectedToolX]);
     // add a row of buttons to the top of the chart
