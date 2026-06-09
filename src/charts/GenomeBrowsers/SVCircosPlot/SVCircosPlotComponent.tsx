@@ -328,10 +328,12 @@ const SVCircosPlotComponent = observer(() => {
         const plotDiameter = 2 * 1120 + 100;
         const minDim = Math.min(width, height);
         const zoom = Math.log2(minDim / plotDiameter);
-        setViewState({
-            target: [0, 0],
-            zoom: [zoom, zoom],
-        });
+        if (width > 0 && height > 0) {
+            setViewState({
+                target: [0, 0],
+                zoom: [zoom, zoom],
+            });
+        }
     }, [width, height]);
 
     const handleHover = (info: HoverInfo) => {
@@ -435,14 +437,14 @@ const SVCircosPlotComponent = observer(() => {
             highlightedObjectIndex: hoveredIndex,
             radius: 1000,
             totalLength,
-                container: outerContainer,
-                center: [0, 0],
-                rotation: 0,
-                updateTriggers: {
-                    getFilter: [filter.timeStamp],
-                    getColor: [colorChange],
-                },
-            }),
+            container: outerContainer,
+            center: [0, 0],
+            rotation: 0,
+            updateTriggers: {
+                getFilter: [filter.timeStamp],
+                getColor: [colorChange],
+            },
+        }),
     ];
 
     const handleViewStateChange = ({ viewState: nextViewState }: ViewStateChangeParameters<OrthographicViewState>) => {

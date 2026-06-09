@@ -373,7 +373,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
 
     setSize(x: number, y: number) {
         super.setSize(x, y);
-        window.dispatchEvent(new Event("resize"));
+        void this.browser?.layoutChange?.();
     }
 
     getSettings() {
