@@ -98,6 +98,7 @@
     "@spatialdata/avivatorish": "^0.1.0",
     "@spatialdata/core": "0.1.0",
     "@spatialdata/layers": "^0.1.0",
+    "@spatialdata/react": "^0.1.0",
     "@spatialdata/vis": "^0.1.0",
     "@tanstack/react-query": "^5.80.0",
     "@tanstack/react-virtual": "^3.11.1",
