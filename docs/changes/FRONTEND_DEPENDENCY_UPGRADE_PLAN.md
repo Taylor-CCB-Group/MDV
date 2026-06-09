@@ -93,6 +93,25 @@ This document tracks dependency upgrade work that may be split across multiple P
   - `pnpm exec tsgo` passes.
   - Direct Vite production build validation passes with React Compiler enabled by default:
     `pnpm exec cross-env NODE_OPTIONS="--max-old-space-size=4096" build=dev_pt vite build --outDir ./vite-dist`
+- React Compiler lint follow-up:
+  - Added a dedicated probe command:
+    `pnpm run lint:react-compiler`
+  - The probe uses `eslint-plugin-react-hooks` `recommended-latest` rules through `eslint.react-compiler.config.mjs`.
+  - Treat this as diagnostic output, not a CI gate yet.
+  - Current scope is `src/**/*.{ts,tsx}`, excluding `src/react/components/avivatorish/**` because legacy inline ESLint comments there add noise unrelated to compiler readiness.
+  - First run reports 143 diagnostics across 52 files:
+    - `react-hooks/exhaustive-deps`: 52 warnings
+    - `react-hooks/set-state-in-effect`: 38 errors
+    - `react-hooks/refs`: 21 errors
+    - `react-hooks/immutability`: 19 errors
+    - `react-hooks/rules-of-hooks`: 9 errors
+    - `react-hooks/use-memo`: 3 errors
+    - `react-hooks/preserve-manual-memoization`: 1 error
+  - Suggested triage order:
+    - fix real hook ordering and dependency issues first
+    - review ref reads during render and config/prop mutation in React components
+    - convert derived state-in-effect patterns where practical
+    - keep imperative integration exceptions explicit for chart, deck.gl, SlickGrid, MobX, and popout/window plumbing
 
 
 ### PR D: SpatialData.js integration after Viv/deck/luma alignment
