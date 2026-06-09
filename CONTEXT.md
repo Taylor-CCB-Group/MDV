@@ -31,7 +31,7 @@ detail, no decisions. Decisions that are hard to reverse live in `docs/adr/`.
   install, calling the feature raises a friendly "install `mdvtools[<extra>]`" error
   instead of an `ImportError` at import time.
 
-## Tooling terms (kept distinct — the proposal conflated them)
+## Tooling terms
 
 - **Build backend** — the tool that turns the source tree into a wheel/sdist
   (e.g. `uv_build`, `hatchling`, `poetry-core`). Determines how files are selected into
@@ -40,3 +40,40 @@ detail, no decisions. Decisions that are hard to reverse live in `docs/adr/`.
 - **Installer / lockfile manager** — the tool that resolves, locks, and installs
   dependencies into an environment (e.g. `uv`, `pip`, `poetry`). Produces the lockfile
   (`uv.lock`). Independent of the build backend.
+
+## Running-jobs / DGE terms
+
+Vocabulary for the async analysis-jobs work (Differential Gene Expression is the first tool).
+Glossary only — the decisions live in `docs/adr/` (0003–0007).
+
+- **cells datasource** — the `obs` table; one row per cell.
+
+- **genes datasource** — the `var` table; one row per gene.
+
+- **expression matrix / subgroup** — the genes×cells values, stored as a rows-as-columns
+  subgroup under the `cells` datasource. `gs` holds `adata.X`; each named layer holds an
+  `adata.layers[...]`.
+
+- **filter / subset** — the user's current selection over `cells` rows.
+
+- **job** — one run of a **tool** against a datasource, a set of params, and a **subset**.
+
+- **tool** — a registry-defined analysis (e.g. `dge_scanpy`) with a params spec and an output
+  spec.
+
+- **executor** — the pluggable transport that runs a **job** (local subprocess now, HPC
+  later).
+
+- **worker** — the environment-agnostic compute process; reads and writes **only** its
+  **workspace**.
+
+- **owner** — the web server; the sole reader/writer of the project store.
+
+- **workspace** — the per-job directory holding the materialized inputs, intermediates, and
+  outputs for one **job**.
+
+- **ingest** — the **owner** step that reads **worker** outputs and writes them into the
+  project.
+
+- **manifest / provenance** — the recorded metadata about a **job** run (tool / scanpy / MDV
+  versions, params, subset hash, duration).
