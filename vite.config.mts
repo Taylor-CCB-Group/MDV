@@ -31,8 +31,8 @@ reactCompiler.rolldown.filter ??= {};
 // (as far as we've noticed)
 reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
 const useReactCompiler =
-    process.env.VITE_USE_REACT_COMPILER === "1" ||
-    process.env.VITE_USE_REACT_COMPILER === "true";
+    process.env.VITE_USE_REACT_COMPILER !== "0" &&
+    process.env.VITE_USE_REACT_COMPILER !== "false";
 const enableBundleAnalysis =
     process.env.VITE_BUNDLE_ANALYZE === "1" ||
     process.env.VITE_BUNDLE_ANALYZE === "true";
