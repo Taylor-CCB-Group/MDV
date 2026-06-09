@@ -2,15 +2,14 @@ import { project, picking } from "@deck.gl/core";
 import { Layer } from "@deck.gl/core";
 import { Model, Geometry } from "@luma.gl/engine";
 
-/* i could use deck.gl's filtering extension but it 
+/* I could use deck.gl's filtering extension but it 
  it appears to work in a similar way shader-modules.ts line 241
     if (dataFilter_value == 0.0) {
        gl_Position = vec4(0.);
     }
  at the end of the vertex shadwer 
- so if we do it at the beginning and return early
+ So if we do it at the beginning and return early
  it should be more efficient
- keeps the compiler happy
 */
 const vs = `#version 300 es
 precision highp float;

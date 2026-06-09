@@ -16,7 +16,7 @@ class SVCircosPlot extends BaseReactChart {
         } 
         //initially color by sv type
         if (!config.color_by){
-            config.color_by=dataStore.genome.svs.sv_columns.svtype;
+            config.color_by=dataStore.genome.columns.svtype;
         }
         //all this could be automatic bases on zod scheama
         config.trim_color_scale = config.trim_color_scale  ??  "none";

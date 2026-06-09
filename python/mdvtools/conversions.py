@@ -652,15 +652,14 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
     md["genome"]={
         "chromosomes": chromosomes,
         "assembly": genome,
-        "svs":{
-            "sv_columns":{
-                "chr1":"chr1",
-                "chr2":"chr2",
-                "pos1":"pos1",
-                "pos2":"pos2",
-                "svtype":"svtype",
-                "length":"length"
-            }
+        "type":"sv",
+        "columns":{
+            "chr1":"chr1",
+            "chr2":"chr2",
+            "pos1":"pos1",
+            "pos2":"pos2",
+            "svtype":"svtype",
+            "length":"length"
         }
     }
     mdv.set_datasource_metadata(md)
