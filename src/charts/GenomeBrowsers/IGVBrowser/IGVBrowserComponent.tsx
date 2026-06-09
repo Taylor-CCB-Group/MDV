@@ -5,6 +5,7 @@ import type IGVBrowser from "./IGVBrowser";
 import { BASE_TRACK_ID } from "./IGVBrowser";
 import type { Browser } from "igv";
 import { useFieldSpec } from "@/react/hooks";
+import { useGenomicInfo } from "../genomicLocationUtils";
 
 
 
@@ -134,13 +135,28 @@ const IGVBrowserComponent = observer(() => {
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const featureLabelColumn = useFieldSpec(chart.config.feature_label==="_none_"?undefined:chart.config.feature_label);
+    const {
+        genomicInfo,
+        areColumnsLoaded,
+        genomicColumns,
+    } = useGenomicInfo();
+ 
     const remountNonce = chart.browserRemountNonce;
+
+
 
     useEffect(() => {
         return installIgvGlobalEventReroute(chart.__doc__);
     }, [chart, remountNonce]);
 
     useEffect(() => {
+        
+        if (!areColumnsLoaded) {
+            setLoading(true);
+            setError(null);
+            return;
+        }
+
         let disposed = false;
         let localBrowser: Browser | null = null;
         let igvApi: any = null;
@@ -156,6 +172,8 @@ const IGVBrowserComponent = observer(() => {
                 igvApi = igvModule.default;
                 //this will get all the features from the datasource and add them to track config
                 //this will only work with small datasources
+                chart.genomicInfo = genomicInfo;
+                chart.columnsLoaded = areColumnsLoaded;
                 const config = await chart.getInitialBrowserConfig();
                 if (disposed) return;
                 //create the browser instance in the chart div
@@ -216,7 +234,7 @@ const IGVBrowserComponent = observer(() => {
             }
             if (browserRef.current === b) browserRef.current = null;
         };
-    }, []);
+    }, [areColumnsLoaded, chart]);
 
     useEffect(() => {
         chart.setSearchPendingHandler(setSearching);
@@ -231,18 +249,7 @@ const IGVBrowserComponent = observer(() => {
         void chart.updateMDVFeatures();
     }, [chart, chart.config.feature_label, featureLabelColumn, ]);
 
-     /*useEffect(() => {
-        const locus = buildLocusSearch(chart.config.location);
-        if (!locus) return;
-        if (locus === lastLocusRef.current) return;
-        browserRef.current?.search(locus);
-    }, [chart.config.location]);*/
 
-    /*useEffect(() => {
-        if (highlightedIndex >= 0) {
-            chart.onDataHighlighted({ indexes: [highlightedIndex] });
-        }
-    }, [highlightedIndex, chart]);*/
 
     return (
         <div style={{ width: "100%", height: "100%", position: "relative" }}>

@@ -8,6 +8,7 @@ const { default: igvBase } = await import("igv");
 const igv = igvBase as typeof igvBase & IgvTrackApi;
 import type { IGVBaseFeature } from "./igvUtils";
 import { getStructuralVariantStyle } from "./igvUtils";
+
 type MdvStyle = { name?: string; color?: string } | null;
 
 class MdvFeatureTrack extends igv.TrackBase {
@@ -134,7 +135,7 @@ class MdvFeatureTrack extends igv.TrackBase {
         const normalizedSvType = typeof proxy.svtype === "string" ? proxy.svtype.trim().toUpperCase() : "";
         const style = getStructuralVariantStyle(proxy.svtype);
         const color = proxy.color || style.fillStyle;
-        const stroke = proxy.color || style.strokeStyle;
+        const stroke = proxy.color || style.strokeStyle; 
         const featureStart = Number.isFinite(renderStart) ? Number(renderStart) : proxy.start;
         const featureEnd = Number.isFinite(renderEnd) ? Number(renderEnd) : proxy.end;
         const startPx = Math.round((featureStart - bpStart) / bpPerPixel);
@@ -163,7 +164,7 @@ class MdvFeatureTrack extends igv.TrackBase {
 
         ctx.save();
         ctx.lineWidth = 2;
-        ctx.fillStyle = color;
+        ctx.fillStyle =color;
         ctx.strokeStyle = stroke;
 
         if (style.glyph === "breakend") {

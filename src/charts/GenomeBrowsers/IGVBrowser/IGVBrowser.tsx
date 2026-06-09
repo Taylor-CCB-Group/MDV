@@ -5,18 +5,20 @@ import IGVBrowserComponent from "./IGVBrowserComponent";
 import { g } from "../../../lib/utils";
 import { action, makeObservable, observable, runInAction } from "mobx";
 import {
-    type IGVBrowserLocation,
-    type IGVBrowserViewMargins,
     type IGVBaseFeature,
-    applyViewMargins,
     buildBaseFeatures,
-    getLocationFieldsFromGenome,
-    locationFromFieldValues,
 } from "./igvUtils";
 
+import {
+    applyViewMargins,
+    locationFromFieldValues,
+    type GenomeLocation,
+    type GenomeViewMargins,
+    type GenomeMetadata,
+} from "../genomicLocationUtils";
+
 interface IGVBrowserConfig extends BaseConfig {
-    view_margins?: IGVBrowserViewMargins;
-    location?: IGVBrowserLocation;
+    view_margins?: GenomeViewMargins;
     feature_label?: string;
     max_initial_features?: number;
     igv_config?: Record<string, unknown>;
@@ -41,7 +43,7 @@ function parseCoordinate(value: unknown): number | null {
     return null;
 }
 
-function toSafeLocusString(location: IGVBrowserLocation | undefined): string | null {
+function toSafeLocusString(location: GenomeLocation[] ): string | null {
     const locations = Array.isArray(location) ? location : location ? [location] : [];
     const loci: string[] = [];
 
@@ -62,8 +64,7 @@ function toSafeLocusString(location: IGVBrowserLocation | undefined): string | n
         }
         loci.push(`${loc.chr}:${s}-${e}`);
     }
-
-    return loci.length ? loci.join(" ") : null;
+    return  loci.length >0 ? loci.join(" ") : null;
 }
 
 function getPathWithoutQueryOrHash(url: string): string {
@@ -80,7 +81,6 @@ function appendSuffixBeforeQueryOrHash(url: string, suffix: string): string {
     if (path.toLowerCase().endsWith(suffix.toLowerCase())) {
         return url;
     }
-
     const query = match.groups.query ?? "";
     const hash = match.groups.hash ?? "";
     return `${path}${suffix}${query}${hash}`;
@@ -94,9 +94,9 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     igvContainer:{div: HTMLDivElement, css: string} | null = null;
     baseFeatures: IGVBaseFeature[] = [];
     colorFunction: ((rowIndex: number) => unknown) | null = null;
-    locationFields: string[] = [];
-    isSvs = false;
+    columnsLoaded = false;
     guardrailMessage = "";
+    genomicInfo: GenomeMetadata;
   
     // Stable observable spec objects for Track Name/URL inputs and status; set in getSettings()
     private _pendingNameSpec: { current_value: string } | null = null;
@@ -105,6 +105,9 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     private _setSearchPending: ((pending: boolean) => void) | null = null;
 
     constructor(dataStore: DataStore, div: string | HTMLDivElement, config: IGVBrowserConfig) {
+        if (!dataStore.genome || !dataStore.genome.columns) {
+            throw new Error("IGVBrowser requires a genome with genomic columns defined in the data store");
+        }
         config.view_margins = config.view_margins || { type: "percentage", value: 20 };
         config.feature_label = config.feature_label || "_none_";
         config.max_initial_features =
@@ -118,14 +121,11 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                 ? config.base_track_visibility_window
                 : DEFAULT_BASE_TRACK_VISIBILITY_WINDOW;
         super(dataStore, div, config, IGVBrowserComponent);
+        this.genomicInfo = dataStore.genome;
         makeObservable(this, {
             browserRemountNonce: observable,
             requestBrowserEventRerouteRefresh: action.bound,
         });
-        this.locationFields = getLocationFieldsFromGenome(this.dataStore.genome) || [];
-        this.isSvs = Boolean(this.dataStore.genome?.svs?.sv_columns);
-       
-      
     }
 
     keepShadowDom(igvContainer: HTMLDivElement) {
@@ -160,7 +160,6 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         const locus =this.browser.currentLoci();
         if (locus && this.browser?.search) 
             void this.browser.search(Array.isArray(locus) ? locus.join(" ") : locus);
-            
     }
 
     requestBrowserEventRerouteRefresh() {
@@ -182,27 +181,25 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     private setSearchPending(pending: boolean) {
         this._setSearchPending?.(pending);
     }
+
     //gets all the features in format igv understands chr,start and end
     //Also id which is the datastore index
     getAllFeatures(){
         const max = this.config.max_initial_features || DEFAULT_MAX_INITIAL_FEATURES;
         const numRows = Math.min(this.dataStore.size, max);
         const rows: Record<string, unknown>[] = new Array(numRows);
-        const columns = [...this.locationFields];
+        const columns = Object.values(this.genomicInfo.columns) as string[];
 
         for (let i = 0; i < numRows; i++) {
             rows[i] = this.dataStore.getRowAsObject(i, columns) as Record<string, unknown>;
         }
-        return buildBaseFeatures(rows, this.locationFields, this.isSvs, max).features;
+        return buildBaseFeatures(rows,this.genomicInfo, max);
     }
 
-
-    getInitialBrowserConfig() {
-        if (this.baseFeatures.length === 0) {
-            this.baseFeatures = this.getAllFeatures();
-        }
+    getInitialBrowserConfig(){
+        this.baseFeatures = this.getAllFeatures(); 
         const initialConfig = {
-            genome: this.dataStore.genome?.assembly  || "hg38",
+            genome: this.genomicInfo.assembly,
             ...(this.config.igv_config || {}),
             tracks: [
                 {
@@ -210,7 +207,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                     name: "MDV Features",
                     type: "mdv_feature_track",
                     format: "bed",
-                    isSvs: this.isSvs,
+                    isSvs: this.genomicInfo.type === "sv",
                     features: this.baseFeatures,
                     displayMode: "EXPANDED",
                     height: 220,
@@ -223,11 +220,6 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                 ...((((this.config.igv_config as any)?.tracks as any[]) || []).filter((t) => t.id !== BASE_TRACK_ID)),
             ],
         } as any;
-
-        /*const safeLocus = toSafeLocusString(this.config.location);
-        if (safeLocus) {
-            initialConfig.locus = safeLocus;
-        }*/
         initialConfig.__mdvDataStore = this.dataStore;
         return initialConfig;
     }
@@ -235,14 +227,6 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     attachBrowser(browser: any, baseTrack: any) {
         this.browser = browser;
         this.baseTrack = baseTrack;
-       /* if (this.config.feature_label) {
-            this.setLabelFunction(this.config.feature_label);
-        }
-        if (this.config.color_by && typeof this.config.color_by === "string") {
-            this.colorByColumn(this.config.color_by);
-        }
-        this.onDataFiltered();
-        */
     }
 
     getColorOptions() {
@@ -328,48 +312,23 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     }
 
     async onDataHighlighted(data: any) {
-        if (data.source === this || !this.locationFields.length || !data?.indexes?.length) {
+        if (data.source ===  !data?.indexes?.length ) {
             return;
         }
-
-        const row = this.dataStore.getRowAsObject(data.indexes[0], this.locationFields) as Record<string, unknown>;
-        const chrValue = row[this.locationFields[0]] as string;
-        const startValue = (row[this.locationFields[1]]) as number;
-        const endValue = (row[this.locationFields[2]]) as number;
-
-        const rawLocation = locationFromFieldValues(
-            {
-                chr: chrValue,
-                start: startValue,
-                end: endValue,
-                chr2: this.isSvs ? row[this.locationFields[3]] as string: undefined,
-            },
-            this.isSvs,
-        );
-        if (!rawLocation) return;
-        const locations = Array.isArray(rawLocation) ? rawLocation : [rawLocation];
-        const nextLocations = locations.map((loc) => applyViewMargins(loc, this.config.view_margins!));
-        let nextLocation: IGVBrowserLocation;
-        if (nextLocations.length === 1) {
-            const first = nextLocations[0];
-            if (!first) return;
-            nextLocation = first;
-        } else {
-            const first = nextLocations[0];
-            const second = nextLocations[1];
-            if (!first || !second) return;
-            nextLocation = [first, second];
-        }
-        const searchLocus = toSafeLocusString(nextLocation);
-        const roiSource = locations[0];
-        action(() => {
-            this.config.location = nextLocation;
-        })();
-
-        const features = [{...roiSource,name:"highlight1",color:"blue"}];
-        if (nextLocations.length === 2) {
-            features.push({chr:nextLocations[1].chr,start:endValue,end:endValue,name:"highlight",color:"blue"});
-        }
+        const location = locationFromFieldValues(this.dataStore, data.indexes[0], this.genomicInfo);
+        if (!location) return;
+        //apply the view margins
+        const expandedLocation = location.map((loc) => applyViewMargins(loc, this.config.view_margins!));
+        //convert to nice string
+        const searchLocus = toSafeLocusString(expandedLocation);
+        //highlight the actual feature in the expanded view
+        const features = location.map((loc, i) => ({
+            chr: loc.chr,
+            start: loc.start,
+            end: loc.end,
+            id: `highlight_${data.indexes[0]}_${i}`,
+        }));
+            
         if (this.browser?.search && searchLocus) {
             this.setSearchPending(true);
             try {
@@ -378,12 +337,8 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                     tv?.track?.clearSplitOverlay?.();
                     tv?.track?.clearSplitReadFilter?.();
                 }
-                await this.browser.search(searchLocus);
-                for (const tv of trackViews) {
-                    tv?.track?.clearSplitOverlay?.();
-                    tv?.track?.clearSplitReadFilter?.();
-                }
                 this.browser.clearROIs();
+                await this.browser.search(searchLocus);
                 const highlight ={
                     name:"highlight",
                     type:"annotation",
@@ -397,11 +352,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         }
     }
 
-    setLocationFromLocus(chr: string, start: number, end: number) {
-        action(() => {
-            this.config.location = { chr, start: Math.floor(start), end: Math.floor(end) };
-        })();
-    }
+   
 
     getConfig() {
         const c = super.getConfig();
@@ -537,22 +488,9 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
 BaseChart.types["igv_browser"] = {
     class: IGVBrowser,
     name: "IGV Browser",
-    params: [],
     required: (ds) => {
-        return ds.genome?.genomic_location || ds.genome?.svs;
-    },
-    init(config, ds) {
-        const locationFields = getLocationFieldsFromGenome(ds.genome);
-        if (!locationFields) return;
-        config.param = locationFields;
-        if (ds.genome?.genomic_location) {
-            const cols = ds.genome.genomic_location.columns;
-            config.param = [cols.chr, cols.start, cols.end];
-        } else if (ds.genome?.svs) {
-            const cols = ds.genome.svs.sv_columns;
-            config.param = [cols.chr1, cols.pos1, cols.pos2, cols.chr2,cols.svtype,cols.length];
-        }
-    },
+        return ds.genome;
+    }
 };
 
 export { BASE_TRACK_ID };

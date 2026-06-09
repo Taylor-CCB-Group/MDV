@@ -5,12 +5,13 @@ This module provides a minimal Flask application that exposes endpoints
 for serving project data, images, configurations, and handling file operations
 with support for HTTP range requests and security headers.
 """
+import argparse
 import json
-import requests
+import logging
 import os
+import requests
 import sys
 import zlib
-import logging
 from urllib.parse import urlencode
 from flask import (
     Flask,
@@ -39,7 +40,20 @@ ALLOWED_UCSC_HOSTS = {
 
 MAX_UCSC_BYTES = 10 * 1024 * 1024  # 10MB max for UCSC image responses
 
-def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
+
+def _resolve_track_file(path: str, track_directories: list[str]) -> str | None:
+    for track_directory in track_directories:
+        file_name = safe_join(track_directory, path)
+        if file_name is not None and os.path.exists(file_name):
+            return file_name
+    return None
+
+
+def create_app(
+    project: MDVProject,
+    compress_column_data: bool = False,
+    track_directories: list[str] | None = None,
+) -> Flask:
     """
     Create and configure a Flask application for serving MDV project data.
 
@@ -51,6 +65,10 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     """
     app = Flask(__name__)
     app.after_request(add_safe_headers)
+    resolved_track_directories = [
+        os.path.abspath(track_directory)
+        for track_directory in (track_directories or [])
+    ]
 
     @app.route("/")
     def project_index():
@@ -153,6 +171,16 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
             return send_file(file_name)
         return get_range(file_name, range_header)
 
+    @app.route("/mytracks/<path:path>")
+    def send_external_track(path):
+        file_name = _resolve_track_file(path, resolved_track_directories)
+        if file_name is None:
+            return "File not found", 404
+        range_header = request.headers.get("Range", None)
+        if not range_header:
+            return send_file(file_name)
+        return get_range(file_name, range_header)
+
     # spatial data files (zarr stores etc.)
     @app.route("/spatial/<path:path>")
     def get_spatialdata(path):
@@ -231,35 +259,78 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     return app
 
 
-def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bool = True ,compress_column_data: bool = False):
+def serve_project(
+    project: MDVProject | str,
+    port: int = 5050,
+    open_browser: bool = True,
+    compress_column_data: bool = False,
+    track_directories: list[str] | None = None,
+):
     """Serve an MDV project using a lightweight Flask server. 
     Args:
         project (MDVProject | str): The MDV project instance or path to the project directory.
         port (int): The port to run the server on. Defaults to 5050.
         open_browser (bool): Whether to open the browser automatically. Defaults to True.
         compress_column_data (bool): Whether to compress column data. Defaults to False.
+        track_directories (list[str] | None): Extra directories to search for /mytracks files.
     """
     if isinstance(project, str):
         project = MDVProject(project)
-    app = create_app(project, compress_column_data=compress_column_data)
+    app = create_app(
+        project,
+        compress_column_data=compress_column_data,
+        track_directories=track_directories,
+    )
     if open_browser:
         import webbrowser
         webbrowser.open(f"http://localhost:{port}/")
     app.run(port=port)
 
 
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Serve an MDV project.")
+    parser.add_argument("path", help="Path to the MDV project directory.")
+    parser.add_argument(
+        "--track-dir",
+        action="append",
+        default=[],
+        help="Extra track directory searched by /mytracks. Repeat to add multiple directories.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5050,
+        help="Port to serve on.",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open the browser automatically.",
+    )
+    parser.add_argument(
+        "--compress-column-data",
+        action="store_true",
+        help="Compress column data responses.",
+    )
+    return parser
+
+
 if __name__ == "__main__":
     try:
-        if len(sys.argv) > 1:
-            path = sys.argv[1]
-        else:
-            raise ValueError("No project path provided as a command-line argument.")
+        args = _build_parser().parse_args()
+        path = args.path
         if not os.path.exists(path):
             raise FileNotFoundError(f"{path} not found")
         ds_path = os.path.join(path, "datasources.json")
         if not os.path.exists(ds_path):
             raise FileNotFoundError(f"{path} does not contain a valid MDV project.")
-        serve_project(MDVProject(path))
+        serve_project(
+            MDVProject(path),
+            port=args.port,
+            open_browser=not args.no_browser,
+            compress_column_data=args.compress_column_data,
+            track_directories=args.track_dir,
+        )
 
     except Exception as e:
         print(f"Error: {e}")

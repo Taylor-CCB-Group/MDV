@@ -5,30 +5,17 @@ import UCSCBrowserComponent from "./UCSCBrowserComponent";
 import { BaseReactChart } from "../../../react/components/BaseReactChart";
 import type DataStore from "../../../datastore/DataStore";
 import { applyViewMargins } from "../genomicLocationUtils";
+import {type GenomeLocation,GenomeViewMargins} from "../genomicLocationUtils";
 
-
-interface UCSCBrowserLocation {
-    chr: string;
-    start: number;
-    end: number;
-}
-interface UCSCBrowserViewMargins{
-    type:"fixed_length" | "absolute" | "percentage";
-    value:number;
-}
 
 //all should be required but have default values
 //will zod take care of this
 interface UCSCBrowserConfig extends BaseConfig {
     src?: string;
-    location?: UCSCBrowserLocation;
-    view_margins?: UCSCBrowserViewMargins;
+    location?: GenomeLocation;
+    view_margins?: GenomeViewMargins;
     highlight_selected_region?: boolean;
 
-}
-
-function getLocation(location:UCSCBrowserLocation, vm:UCSCBrowserViewMargins) : UCSCBrowserLocation  {
-    return applyViewMargins(location, vm);
 }
 
 
@@ -37,9 +24,9 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
         //set defaults - needed to be done before super call
         //is there a better way to this - can you set defaults in Zod schema?
         config.view_margins = config.view_margins || {type:"fixed_length", value:1000};
-        config.src = config.src || "https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg38";
         config.location = config.location || {chr:"chr1", start:1000000, end:1001000};
         config.highlight_selected_region = config.highlight_selected_region ?? false;
+        config.src = config.src || "";
         super(dataStore, div, config, UCSCBrowserComponent);
         this.contentDiv.style.overflowY = "scroll";
     }
@@ -110,10 +97,8 @@ class UCSCBrowser extends BaseReactChart<UCSCBrowserConfig> {
 BaseChart.types["ucsc_browser"] = {
     name: "UCSC Browser",
     class: UCSCBrowser,
-    //params are defined by the genome's genomic_location columns
-    params: [],
     required:(ds)=>{
-        return (ds.genome?.genomic_location || ds.genome?.svs) ;
+        return (ds.genome) ;
     },
     extra_controls: (ds) => {
         return [
@@ -126,15 +111,7 @@ BaseChart.types["ucsc_browser"] = {
     },
     init(config, ds, extraControls) {
         config.src = extraControls.url;
-        if (ds.genome?.genomic_location){
-            const cols = ds.genome?.genomic_location?.columns;
-            config.param = [cols["chr"], cols["start"], cols["end"]];
-        //svs start and end may be on different chromosome
-        } else if (ds.genome?.svs){
-            const cols = ds.genome?.svs?.sv_columns;
-            config.param = [cols["chr1"], cols["pos1"], cols["pos2"], cols["chr2"]];
-        }
     }
 };
-export {getLocation, UCSCBrowserConfig, UCSCBrowserLocation, UCSCBrowserViewMargins};
+export {UCSCBrowserConfig};
 export default UCSCBrowser;

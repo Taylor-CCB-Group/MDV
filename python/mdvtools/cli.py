@@ -107,7 +107,13 @@ def convert_vcf(folder, vcf_filename, zip_output):
 @cli.command()
 @click.argument('folder')
 @click.option('--port', default=5050, help='Port to serve on.')
-def serve(folder, port):
+@click.option(
+    '--track-dir',
+    'track_directories',
+    multiple=True,
+    help='Extra track directory searched by /mytracks. Repeat to add multiple directories.',
+)
+def serve(folder, port, track_directories):
     """Serve MDV project."""
     from .serverlite import serve_project
     from .mdvproject import MDVProject
@@ -116,7 +122,11 @@ def serve(folder, port):
     ds_path = join(folder, "datasources.json")
     if not exists(ds_path):
         raise FileNotFoundError(f"{folder} does not contain a valid MDV project.")
-    serve_project(MDVProject(folder), port=port)
+    serve_project(
+        MDVProject(folder),
+        port=port,
+        track_directories=list(track_directories),
+    )
 
 
 @cli.command("merge-project")

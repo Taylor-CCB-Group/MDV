@@ -1,39 +1,49 @@
+import { useMemo } from "react";
+import { useDataStore } from "@/react/context";
+import { useFieldSpecs } from "@/react/hooks";
+import { DataColumn } from "../charts";
+
+
 export interface GenomeLocation {
     chr: string;
     start: number;
     end: number;
 }
 
-export type GenomeLocationPair = [GenomeLocation] | [GenomeLocation, GenomeLocation];
-export type GenomeLocationValue = GenomeLocation | GenomeLocationPair;
-
 export interface GenomeViewMargins {
     type: "fixed_length" | "absolute" | "percentage";
     value: number;
 }
 
-type ValueGetterSpec = {
-    getValue: (rowIndex: number) => unknown;
+type GenomeMetadataBase = {
+    assembly: string;
+    ucsc_proxy_url?: string;
+    chromosomes?: Record<string, number>;
 };
 
-export function getLocationFieldsFromGenome(genome: any): string[] | null {
-    if (genome?.genomic_location?.columns) {
-        const cols = genome.genomic_location.columns;
-        return [cols.chr, cols.start, cols.end];
-    }
-    if (genome?.svs?.sv_columns) {
-        const cols = genome.svs.sv_columns;
-        const result = [cols.chr1, cols.pos1, cols.pos2, cols.chr2];
-        if (cols.svtype !== undefined) {
-            result.push(cols.svtype);
-        }
-        if (cols.length !== undefined) {
-            result.push(cols.length);
-        }
-        return result;
-    }
-    return null;
-}
+type IntervalGenomeMetadata = GenomeMetadataBase & {
+  type: "interval";
+    columns: {
+        chr: string;
+        start: string;
+        end: string;
+    };
+};
+
+type SvGenomeMetadata = GenomeMetadataBase & {
+    type: "sv";
+    columns: {
+        chr1: string;
+        pos1: string;
+        pos2: string;
+        chr2: string;
+        svtype: string;
+        length: string;
+    };
+};
+
+export type GenomeMetadata = IntervalGenomeMetadata | SvGenomeMetadata;
+
 
 export function applyViewMargins(
     location: GenomeLocation,
@@ -48,11 +58,13 @@ export function applyViewMargins(
         end = tmp;
     }
     switch (vm.type) {
+        //add a fixed number of bases on either side
         case "absolute": {
             start -= vm.value;
             end += vm.value;
             break;
         }
+        //add a percentage of the feature length on either side
         case "percentage": {
             const length = Math.max(1, end - start);
             const margin = Math.round((length * vm.value) / 100);
@@ -60,70 +72,95 @@ export function applyViewMargins(
             end += margin;
             break;
         }
+        //always the same length from the middle of the feature
         case "fixed_length": {
-            start -= vm.value;
-            end += vm.value;
+            const center = Math.round((start + end) / 2);   
+            start = center - vm.value;
+            end = center + vm.value;
             break;
         }
     }
-    return { chr, start: Math.max(0, start), end: Math.max(1, end) };
+    return { chr, start: Math.max(0, start), end: Math.max(start, end) };
 }
 
 export function locationFromFieldValues(
-    values: {
-        chr: string;
-        start: number;
-        end: number;
-        chr2?: string;
-    },
-    isSvs: boolean,
-): GenomeLocationValue | null {
-    const chr = values.chr;
-    const start = values.start;
-    const end = values.end;
+    dataStore:any,
+    index:number,
+    genomicInfo: GenomeMetadata,
+): GenomeLocation[] | null {
   
-    if (isSvs) {
-    
-    const chr2 = values.chr2;
-       //need two locations
-       if (chr2 &&chr2 !== chr) {
-            const loc1: GenomeLocation = {
-                chr,
-                start,
-                end: start
-            };
-            const loc2: GenomeLocation = {
-                chr: chr2,
-                start: end,
-                end: end,
-            };
-            return [loc1, loc2];
+    const cols = Object.values(genomicInfo.columns);
+    const row = dataStore.getRowAsObject(index,cols);
+    if (!row) {
+        return null;
+    } 
+    if (genomicInfo.type === "interval") {
+        const map = genomicInfo.columns ;
+        return [{
+            chr: row[map.chr] as string,
+            start: Number(row[map.start]),
+            end: Number(row[map.end]),
+        }];
+    }
+    else if (genomicInfo.type === "sv") {
+        const map = genomicInfo.columns ;
+        const svtype = row[map.svtype] as string;
+        const pos1 = Number(row[map.pos1]);
+        const pos2 = Number(row[map.pos2])
+        if ((svtype === "BND" || svtype === "TRA") || pos2-pos1 > 1000000){
+            return [
+                {
+                    chr: row[map.chr1] as string,
+                    start: Number(row[map.pos1]),
+                    end: Number(row[map.pos1]),
+                },
+                {
+                    chr: row[map.chr2] as string,
+                    start: Number(row[map.pos2]),
+                    end: Number(row[map.pos2]),
+                }
+            ]
+        } 
+        else {
+            return [{
+                chr: row[map.chr1] as string,
+                start: Number(row[map.pos1]),
+                end: Number(row[map.pos2]),
+             }]
         }
     }
-    return { chr, start, end };
+    return null;
 }
 
-export function highlightedIndexToLocation(
-    highlightedIndex: number,
-    fieldSpecs: ValueGetterSpec[],
-    isSvs: boolean,
-): GenomeLocationValue | null {
-    if (highlightedIndex < 0 || fieldSpecs.length < 3) {
-        return null;
+export function useGenomicInfo() {
+    const dataStore = useDataStore();
+    const genome = dataStore.genome as GenomeMetadata;
+    if (!genome) {
+        throw new Error("No genome metadata found in data store");
     }
-    const chrSpec = fieldSpecs[0];
-    const startSpec = fieldSpecs[1];
-    const endSpec = fieldSpecs[2];
-    if (!chrSpec || !startSpec || !endSpec) {
-        return null;
-    }
-    return locationFromFieldValues(
-        {
-            chr: chrSpec.getValue(highlightedIndex) as string,
-            start: startSpec.getValue(highlightedIndex) as number,
-            end: endSpec.getValue(highlightedIndex) as number,
-            chr2: isSvs && fieldSpecs[3] ? fieldSpecs[3].getValue(highlightedIndex) as string : undefined,
+    const locationFields = useMemo(() => (Object.values(genome.columns)), [genome]);
+    const locationColumns = useFieldSpecs(locationFields);
+    const areColumnsLoaded =
+        locationColumns.length === locationFields.length;
+    const genomicColumns= useMemo(
+        () => {
+            if (areColumnsLoaded) {
+                const names = Object.keys(genome.columns);
+                const columns: Record<string,DataColumn<any>> = {};
+                for (let i=0 ; i <= locationFields.length; i++) {
+                   columns[names[i]] = locationColumns[i];
+                }
+                return columns;
+            }
+            return {};
         },
-        isSvs,
+        [areColumnsLoaded],
     );
+    return {
+        genomicInfo:dataStore.genome,
+        genomicColumns,
+        areColumnsLoaded,
+    };
 }
+
+

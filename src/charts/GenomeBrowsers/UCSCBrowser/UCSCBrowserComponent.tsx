@@ -3,10 +3,13 @@ import { useChart } from "@/react/context";
 import { useEffect, useState, useMemo } from "react";
 import { useDebouncedChartSize } from "@/react/hooks";
 import type UCSCBrowser from "./UCSCBrowser";
-import { getLocation,UCSCBrowserConfig,UCSCBrowserLocation,UCSCBrowserViewMargins } from "./UCSCBrowser";
+import type { UCSCBrowserConfig} from "./UCSCBrowser";
 import { useFieldSpecs } from "@/react/hooks";
 import { useHighlightedIndex } from "@/react/selectionHooks";
-import { highlightedIndexToLocation } from "../genomicLocationUtils";
+import {locationFromFieldValues } from "../genomicLocationUtils";
+import { useGenomicInfo } from "../genomicLocationUtils";
+import {type GenomeLocation,applyViewMargins} from "../genomicLocationUtils";
+import { runInAction } from "mobx";
 
 
 const UCSCBrowserComponent = observer(() => {
@@ -14,16 +17,22 @@ const UCSCBrowserComponent = observer(() => {
     const size = useDebouncedChartSize();
     const config = chart.config as UCSCBrowserConfig;
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [coordInput, setCoordInput] = useState("");
-    const fieldSpecs = useFieldSpecs(chart.config.param);
     const highlightedIndex = useHighlightedIndex();
-    const genome = chart.dataStore?.genome;
-    const url_proxy = chart.dataStore?.genome?.ucsc_proxy_url || "ucsc_proxy";
+ 
 
-    function getHighlightedRegion(): UCSCBrowserLocation | null {
-        const location = highlightedIndexToLocation(highlightedIndex, fieldSpecs, Boolean(genome?.svs));
+
+    const {genomicInfo,areColumnsLoaded} = useGenomicInfo();
+    const url_proxy = genomicInfo.ucsc_proxy_url || "ucsc_proxy";
+
+
+
+    function getHighlightedRegion():GenomeLocation | null {
+        if (!areColumnsLoaded || highlightedIndex == null || highlightedIndex === -1) return null;
+        const location = locationFromFieldValues(chart.dataStore,highlightedIndex, genomicInfo);
         if (!location) return null;
-        return Array.isArray(location) ? location[0] : location;
+        return location[0]; //can only cope with one locus
     }
 
     const handleZoom = (factor: number) => {
@@ -74,12 +83,25 @@ const UCSCBrowserComponent = observer(() => {
         ? `${config.location.chr}:${config.location.start.toLocaleString()}-${config.location.end.toLocaleString()}`
         : "";   
  
+    const trimmedSrc = config.src?.trim();
+    const missingSrcMessage = !trimmedSrc
+        ? "Enter a UCSC session URL to load the browser image."
+        : "Enter a valid UCSC session URL to load the browser image.";
+    
     
     // Calculate src reactively - this will re-run when config.location changes
     const src = useMemo(() => {
-        // Use the base UCSC URL or config.src
-        const baseUrl = config.src || `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${genome?.assembly || "hg38"}`;
-        const url = new URL(baseUrl);
+        const baseUrl = config.src?.trim();
+        if (!baseUrl) {
+            return null;
+        }
+
+        let url: URL;
+        try {
+            url = new URL(baseUrl);
+        } catch {
+            return null;
+        }
 
         // Update or add the position parameter
         if (config.location) {
@@ -100,20 +122,24 @@ const UCSCBrowserComponent = observer(() => {
 
         // Build the proxy URL with all params
         return `${url_proxy}?${url.searchParams.toString()}`;
-    }, [config.src, config.location, size, config.highlight_selected_region, highlightedIndex, fieldSpecs, genome?.svs, url_proxy]);
+    }, [trimmedSrc, config.location, size, config.highlight_selected_region, highlightedIndex]);
 
-    // Set loading to true when src changes
+    // Reset loading/error state when src changes
     useEffect(() => {
-        setLoading(true);
+        setLoadError(null);
+        setLoading(Boolean(src));
     }, [src]);
     //update the location of the browser
     useEffect(() =>{
         if (highlightedIndex !== -1){
             const region = getHighlightedRegion();  
             if (!region) return;
-            config.location = getLocation(region, config.view_margins!);    
+            //run in mobx action to avoid warnings about updating observable state outside of an action
+            runInAction(() => {
+                config.location = applyViewMargins(region, config.view_margins!);    
+            });
         }
-    }, [config.view_margins, highlightedIndex, fieldSpecs, genome?.svs]);
+    }, [config.view_margins, highlightedIndex]);
 
     return (
         <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
@@ -177,7 +203,7 @@ const UCSCBrowserComponent = observer(() => {
             
             {/* Image container */}
             <div style={{ position: "relative", flex: 1, overflow: "auto" }}>
-                {loading && (
+                {loading && !loadError && (
                     <div style={{
                         position: "absolute",
                         top: 0,
@@ -193,17 +219,45 @@ const UCSCBrowserComponent = observer(() => {
                         <div>Loading...</div>
                     </div>
                 )}
-                <img 
-                    src={src} 
-                    title="UCSC Genome Browser"
-                    onLoad={() => setLoading(false)}
-                    onError={() => setLoading(false)}
-                />
+                {!src ? (
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%",
+                        padding: "16px",
+                        color: "#666",
+                        textAlign: "center"
+                    }}>
+                        {missingSrcMessage}
+                    </div>
+                ) : loadError ? (
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%",
+                        padding: "16px",
+                        color: "#b42318",
+                        textAlign: "center"
+                    }}>
+                        {loadError}
+                    </div>
+                ) : (
+                    <img
+                        src={src}
+                        title="UCSC Genome Browser"
+                        onLoad={() => setLoading(false)}
+                        onError={() => {
+                            setLoading(false);
+                            setLoadError("Unable to load the UCSC browser image.");
+                        }}
+                    />
+                )}
             </div>
         </div>
     );
 });
 
 
-export type { UCSCBrowserConfig, UCSCBrowserLocation,UCSCBrowserViewMargins };
 export default UCSCBrowserComponent;

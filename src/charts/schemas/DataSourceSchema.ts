@@ -124,7 +124,16 @@ export const GenomicLocationColumnsSchema = z.object({
     end: z.string().describe("Column name containing genomic end coordinates")
 }).describe("Column mapping for single-locus genomic intervals");
 
-export const GenomicLocationSchema = z.object({
+const GenomeMetadataBaseSchema = z.object({
+    assembly: z.string().describe("Genome build identifier (e.g., 'hg38', 'mm10')"),
+    ucsc_proxy_url: z.string().optional().describe("Optional proxy URL for UCSC genome browser requests - /ucsc_proxy used by default"),
+    chromosomes: z.record(z.string(), z.number().positive())
+        .optional()
+        .describe("Optional chromosome-length dictionary, required by some SV visualizations")
+});
+
+export const GenomicLocationSchema = GenomeMetadataBaseSchema.extend({
+    type: z.literal("interval").describe("Discriminator for interval-based genome metadata"),
     columns: GenomicLocationColumnsSchema.describe("Column mapping for genomic interval rows")
 }).describe("Genome metadata for interval-based rows");
 
@@ -133,30 +142,19 @@ export const SVColumnsSchema = z.object({
     pos1: z.string().describe("Column name containing first breakpoint position"),
     pos2: z.string().describe("Column name containing second breakpoint position"),
     chr2: z.string().describe("Column name containing second breakpoint chromosome"),
-    svtype: z.string().optional().describe("Column name containing structural variant type (optional)"),
-    length: z.string().optional().describe("Column name containing structural variant length (optional)")
+    svtype: z.string().describe("Column name containing structural variant type"),
+    length: z.string().describe("Column name containing structural variant length")
 }).describe("Column mapping for structural variant rows");
 
-export const SvsGenomeSchema = z.object({
-    sv_columns: SVColumnsSchema.describe("Column mapping for structural variant rows")
+export const SvsGenomeSchema = GenomeMetadataBaseSchema.extend({
+    type: z.literal("sv").describe("Discriminator for structural-variant genome metadata"),
+    columns: SVColumnsSchema.describe("Column mapping for structural variant rows")
 }).describe("Genome metadata for structural-variant rows");
 
-export const GenomeMetadataSchema = z.object({
-    assembly: z.string().describe("Genome build identifier (e.g., 'hg38', 'mm10')"),
-    ucsc_proxy_url: z.string().optional().describe("Optional proxy URL for UCSC genome browser requests - /ucsc_proxy used by default"),
-    chromosomes: z.record(z.string(), z.number().positive())
-        .optional()
-        .describe("Optional chromosome-length dictionary, required by some SV visualizations"),
-    genomic_location: GenomicLocationSchema.optional().describe("Genome metadata for interval rows"),
-    svs: SvsGenomeSchema.optional().describe("Genome metadata for structural variant rows")
-})
-    .refine(
-        (value) => Boolean(value.genomic_location || value.svs),
-        {
-            message: "Genome metadata must include either 'genomic_location' or 'svs'",
-        },
-    )
-    .describe("Datasource-level genome metadata used by genome-aware charts");
+export const GenomeMetadataSchema = z.discriminatedUnion("type", [
+    GenomicLocationSchema,
+    SvsGenomeSchema,
+]).describe("Datasource-level genome metadata used by genome-aware charts");
 
 // Genome browser track schema
 export const GenomeBrowserTrackSchema = z.object({

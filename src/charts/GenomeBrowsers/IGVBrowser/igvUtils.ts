@@ -1,16 +1,7 @@
 import {
-    type GenomeLocation,
-    type GenomeLocationValue,
-    type GenomeViewMargins,
-    applyViewMargins,
-    getLocationFieldsFromGenome,
-    locationFromFieldValues,
+    type GenomeMetadata,
 } from "../genomicLocationUtils";
 
-export type IGVBrowserSingleLocation = GenomeLocation;
-export type IGVBrowserLocation = GenomeLocationValue;
-
-export type IGVBrowserViewMargins = GenomeViewMargins;
 
 export interface IGVBaseFeature {
     chr: string;
@@ -18,6 +9,7 @@ export interface IGVBaseFeature {
     end: number;
     id: string;
     color?: string;
+    chr1?: string;
     name?: string;
     chr2?: string;
     pos1?: number;
@@ -33,9 +25,99 @@ export interface IGVStructuralVariantStyle {
     glyph: "capped_line" | "diamond" | "triangle" | "double_bar" | "inversion" | "breakend";
 }
 
-export interface BuildBaseFeaturesResult {
-    features: IGVBaseFeature[];
+
+export function buildBaseFeatures(
+    rows: Record<string, unknown>[],
+    genomicInfo: GenomeMetadata,
+    maxInitialFeatures: number,
+): IGVBaseFeature[] {
+  
+    const maxRows = Math.min(rows.length, maxInitialFeatures);
+    //nice and easy
+    if (genomicInfo.type === "interval") {
+        const map = genomicInfo.columns as Record<string, string>;
+        const features: IGVBaseFeature[] =  new Array(maxRows);
+        for (let i = 0; i < maxRows; i++) {
+            const row = rows[i];
+            features[i]= {
+                chr: String(row[map.chr]),
+                start: Number(row[map.start]),
+                end: Number(row[map.end]),
+                id: String((row.__index__ )),
+            }
+        }
+        return features
+    }
+    else if (genomicInfo.type === "sv") {
+        const map = genomicInfo.columns as  Record<string, string>;
+        //don't know array size upfront because of potential for one or two features per row depending on svtype
+        const features: IGVBaseFeature[] =  [];
+
+        for (let i = 0; i < maxRows; i++) {
+            const row = rows[i];
+          
+            const chr1 = String(row[map.chr1]);
+            const pos1 = Number(row[map.pos1]);
+            const pos2 = Number(row[map.pos2]);
+            const chr2 = String(row[map.chr2]);
+            if (!chr1 || !chr2 || !Number.isFinite(pos1) || !Number.isFinite(pos2)) {
+                continue;
+            }
+            const id = String(row.__index__ );
+            const svtype = String(row[map.svtype]);
+            const length = Number(row[map.length]);
+            const baseFeature = {
+                id,
+                chr2,
+                pos1, 
+                pos2,
+                svtype,
+                length,
+             
+            };
+            if (svtype === "TRA" || svtype === "BND") {
+                features.push({
+                    ...baseFeature,
+                    id,
+                    chr: chr1,
+                    start: pos1,
+                    end: pos1,
+                });
+            
+                if (typeof chr2 === "string") {
+                    features.push({
+                        ...baseFeature,
+                        id,
+                        chr: chr2,
+                        start: pos2,
+                        end: pos2,
+                    });
+                }
+                continue;
+            }
+            if (svtype === "INS") {
+                features.push({
+                    ...baseFeature,
+                    chr: chr1,
+                    start: pos1,
+                    end: pos2,
+                });
+                continue;
+            }
+            features.push({
+                ...baseFeature,
+                chr:chr1,
+                start: Math.min(pos1, pos2),
+                end: Math.max(pos1, pos2),
+            });
+            
+        }
+        return features;
+       
+    }
+    return []; 
 }
+
 
 export function getStructuralVariantStyle(svtype: unknown): IGVStructuralVariantStyle {
     const normalized = typeof svtype === "string" ? svtype.trim().toUpperCase() : "";
@@ -56,101 +138,5 @@ export function getStructuralVariantStyle(svtype: unknown): IGVStructuralVariant
     }
 }
 
-export function buildBaseFeatures(
-    rows: Record<string, unknown>[],
-    locationFields: string[],
-    isSvs: boolean,
-    maxInitialFeatures: number,
-): BuildBaseFeaturesResult {
-    if (locationFields.length < 3) {
-        return { features: [] };
-    }
-
-    const features: IGVBaseFeature[] = [];
-    const maxRows = Math.min(rows.length, maxInitialFeatures);
-
-    for (let i = 0; i < maxRows; i++) {
-        const row = rows[i];
-        if (!row) continue;
-
-        const chr = row[locationFields[0]];
-        const startValue = Number(row[locationFields[1]]);
-        const endValue = Number(row[locationFields[2]]);
-        const rowId = String((row.__index__ ?? i));
-        if (typeof chr !== "string" || !Number.isFinite(startValue) || !Number.isFinite(endValue)) {
-            continue;
-        }
-
-        if (isSvs && locationFields.length >= 4) {
-            const chr2 = row[locationFields[3]];
-            const svTypeField = locationFields[4];
-            const svLengthField = locationFields[5];
-            const svtype = svTypeField && typeof row[svTypeField] === "string" ? row[svTypeField] : undefined;
-            const normalizedSvType = typeof svtype === "string" ? svtype.trim().toUpperCase() : "";
-            const style = getStructuralVariantStyle(normalizedSvType);
-            const length = svLengthField && Number.isFinite(Number(row[svLengthField])) ? Number(row[svLengthField]) : undefined;
-
-            const baseFeature = {
-                id: rowId,
-                chr2: typeof chr2 === "string" ? chr2 : undefined,
-                pos1: startValue,
-                pos2: endValue,
-                svtype,
-                length,
-                name: svtype,
-                color: style.fillStyle,
-            };
-
-            if (normalizedSvType === "TRA" || normalizedSvType === "BND") {
-                features.push({
-                    ...baseFeature,
-                    id: rowId,
-                    chr,
-                    start: startValue,
-                    end: startValue,
-                });
-                if (typeof chr2 === "string") {
-                    features.push({
-                        ...baseFeature,
-                        id: rowId,
-                        chr: chr2,
-                        start: endValue,
-                        end: endValue,
-                    });
-                }
-                continue;
-            }
-
-            if (normalizedSvType === "INS") {
-                features.push({
-                    ...baseFeature,
-                    chr,
-                    start: startValue,
-                    end: startValue,
-                });
-                continue;
-            }
-
-            features.push({
-                ...baseFeature,
-                chr,
-                start: Math.min(startValue, endValue),
-                end: Math.max(startValue, endValue),
-            });
-            continue;
-        }
-
-        features.push({
-            chr,
-            start: Math.min(startValue, endValue),
-            end: Math.max(startValue, endValue),
-            id: rowId,
-        });
-    }
-
-    return { features };
-}
-
-export { applyViewMargins, getLocationFieldsFromGenome, locationFromFieldValues };
 
 
