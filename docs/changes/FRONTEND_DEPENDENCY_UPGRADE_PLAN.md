@@ -95,12 +95,11 @@ This document tracks dependency upgrade work that may be split across multiple P
     `pnpm exec cross-env NODE_OPTIONS="--max-old-space-size=4096" build=dev_pt vite build --outDir ./vite-dist`
 
 
-### PR D: Viv/deck/luma/SpatialData.js alignment
+### PR D: SpatialData.js integration after Viv/deck/luma alignment
 
 - Scope:
-  - update `@hms-dbmi/viv` to the new published version
-  - align `deck.gl`, `@deck.gl/*`, `@deck.gl-community/*`, `@luma.gl/*`, and `@loaders.gl/*`
-  - integrate the first released SpatialData.js packages (`@spatialdata/core@0.1.0` and `@spatialdata/react@0.1.0`) where they replace bespoke SpatialData store access
+  - package alignment for `@hms-dbmi/viv`, `deck.gl`, `@deck.gl/*`, `@deck.gl-community/*`, `@luma.gl/*`, and `@loaders.gl/*` is done in this worktree
+  - continue WIP integration of the first released SpatialData.js packages (`@spatialdata/core@0.1.0` and `@spatialdata/react@0.1.0`) where they replace bespoke SpatialData store access
   - remove temporary overrides that are no longer needed
   - resolve peer-dependency mismatches (especially community layers)
 - Expected code work:
