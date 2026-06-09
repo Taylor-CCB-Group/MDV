@@ -34,7 +34,7 @@ def test_map_sv_genes_breakpoint_and_range_modes(tmp_path):
             "pos2": [180, 410],
             "svtype": ["DEL", "BND"],
         },
-        index=["sv_del", "sv_bnd"],
+        index=pandas.Index(["sv_del", "sv_bnd"]),
     )
 
     result = map_sv_genes(sv_df, genes_bed, window_bp=10).set_index("sv_id")

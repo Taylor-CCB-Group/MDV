@@ -64,7 +64,7 @@ def _read_genes_bed_df(genes_bed_file: str) -> pd.DataFrame:
         sep="\t",
         header=None,
         comment="#",
-        usecols=[0, 1, 2, 3],
+        usecols=range(4),
         names=["Chromosome", "Start", "End", "gene_name"],
     )
     if genes_df.empty:
