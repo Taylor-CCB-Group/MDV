@@ -1,4 +1,3 @@
-import { readZarr, type SpatialData } from "@spatialdata/core";
 import {
     SpatialCanvasProvider,
     createSpatialCanvasStore,
@@ -6,6 +5,7 @@ import {
     type LayerConfig,
     type ViewState as SpatialCanvasViewState,
 } from "@spatialdata/vis";
+import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
 import type { Layer } from "@deck.gl/core";
 import type {
     DeckGLProps,
@@ -81,29 +81,14 @@ type SpatialRegionMetadata = {
     };
 };
 
-type LoadState =
-    | { status: "idle"; spatialData: null; error: null }
-    | { status: "loading"; spatialData: null; error: null }
-    | { status: "loaded"; spatialData: SpatialData; error: null }
-    | { status: "error"; spatialData: null; error: Error };
-
 export type SpatialDataMdvReactConfig = VivMdvReactConfig & {
     spatialLayerStack?: SpatialLayerStackConfig;
 };
 
-const spatialDataCache = new Map<string, Promise<SpatialData>>();
 type SpatialCanvas2DViewState = {
     target: [number, number];
     zoom: number;
 };
-
-function getSpatialData(url: string) {
-    const existing = spatialDataCache.get(url);
-    if (existing) return existing;
-    const promise = readZarr(url);
-    spatialDataCache.set(url, promise);
-    return promise;
-}
 
 function getSpatialRegionMetadata(region: unknown): SpatialRegionMetadata | null {
     if (!region || typeof region !== "object") return null;
@@ -114,45 +99,6 @@ function getSpatialDataUrl(region: SpatialRegionMetadata) {
     const file = region.spatial?.file;
     if (!file) return null;
     return getProjectURL(`spatial/${file}`);
-}
-
-function useSpatialData(region: SpatialRegionMetadata | null) {
-    const url = region ? getSpatialDataUrl(region) : null;
-    const [state, setState] = useState<LoadState>({
-        status: "idle",
-        spatialData: null,
-        error: null,
-    });
-
-    useEffect(() => {
-        if (!url) {
-            setState({ status: "idle", spatialData: null, error: null });
-            return;
-        }
-        let cancelled = false;
-        setState({ status: "loading", spatialData: null, error: null });
-        getSpatialData(url)
-            .then((spatialData) => {
-                if (!cancelled) {
-                    setState({ status: "loaded", spatialData, error: null });
-                }
-            })
-            .catch((error: unknown) => {
-                if (cancelled) return;
-                setState({
-                    status: "error",
-                    spatialData: null,
-                    error: error instanceof Error
-                        ? error
-                        : new Error(String(error)),
-                });
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [url]);
-
-    return { ...state, url };
 }
 
 function toSpatialViewState(
@@ -218,17 +164,22 @@ function SpatialDataChartRoot() {
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    const rawRegion = useRegion();
+    const region = getSpatialRegionMetadata(rawRegion);
+    const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
 
     return (
-        <SpatialAnnotationProvider
-            chart={chart}
-            hoveredFieldId={hoveredField}
-            setHoveredFieldId={setHoveredField}
-        >
-            <SpatialDataViewer
-                setHoveredField={setHoveredField}
-            />
-        </SpatialAnnotationProvider>
+        <SpatialDataProvider source={spatialDataUrl ?? undefined}>
+            <SpatialAnnotationProvider
+                chart={chart}
+                hoveredFieldId={hoveredField}
+                setHoveredFieldId={setHoveredField}
+            >
+                <SpatialDataViewer
+                    setHoveredField={setHoveredField}
+                />
+            </SpatialAnnotationProvider>
+        </SpatialDataProvider>
     );
 });
 
@@ -244,7 +195,7 @@ const SpatialDataViewer = observer(
         const region = getSpatialRegionMetadata(rawRegion);
         const coordinateSystem = region?.spatial?.coordinate_system ?? null;
         const spatialdataPath = region?.spatial?.file ?? null;
-        const { spatialData, status, error } = useSpatialData(region);
+        const { spatialData, loading, error } = useSpatialData();
         const viewerStore = useViewerStoreApi();
         const viewState = useViewerStore((store) => store.viewState);
         const spatialViewState = toSpatialViewState(viewState);
@@ -279,7 +230,7 @@ const SpatialDataViewer = observer(
 
         const stackSeededRef = useRef(false);
         useEffect(() => {
-            if (status !== "loaded" || !coordinateSystem || stackSeededRef.current) return;
+            if (loading || !spatialData || !coordinateSystem || stackSeededRef.current) return;
             stackSeededRef.current = true;
             runInAction(() => {
                 const stack = config.spatialLayerStack;
@@ -291,7 +242,7 @@ const SpatialDataViewer = observer(
                 applySpatialLayerStack(stack, next);
                 chart.updateCanvasLayerState(stack);
             });
-        }, [chart, config, coordinateSystem, spatialData, status]);
+        }, [chart, config, coordinateSystem, loading, spatialData]);
 
         const stack = config.spatialLayerStack;
         const unifiedLayerOrder = useMemo(
@@ -362,7 +313,7 @@ const SpatialDataViewer = observer(
             );
         }
 
-        if (status === "error") {
+        if (error) {
             return (
                 <div className="h-full w-full p-2">
                     Failed to load SpatialData store: {error.message}
