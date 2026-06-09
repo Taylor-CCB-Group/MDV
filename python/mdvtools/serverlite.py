@@ -69,8 +69,11 @@ def create_app(
     app = Flask(__name__)
     app.after_request(add_safe_headers)
     resolved_track_directories = [
-        os.path.abspath(track_directory)
-        for track_directory in (track_directories or [])
+        os.path.abspath(project.trackfolder),
+        *[
+            os.path.abspath(track_directory)
+            for track_directory in (track_directories or [])
+        ],
     ]
 
     @app.route("/")
@@ -168,14 +171,6 @@ def create_app(
     # needs to be returned
     @app.route("/tracks/<path:path>")
     def send_track(path):
-        file_name = safe_join(project.trackfolder, path)
-        range_header = request.headers.get("Range", None)
-        if not range_header:
-            return send_file(file_name)
-        return get_range(file_name, range_header)
-
-    @app.route("/mytracks/<path:path>")
-    def send_external_track(path):
         file_name = _resolve_track_file(path, resolved_track_directories)
         if file_name is None:
             return "File not found", 404
@@ -275,7 +270,7 @@ def serve_project(
         port (int): The port to run the server on. Defaults to 5050.
         open_browser (bool): Whether to open the browser automatically. Defaults to True.
         compress_column_data (bool): Whether to compress column data. Defaults to False.
-        track_directories (list[str] | None): Extra directories to search for /mytracks files.
+        track_directories (list[str] | None): Extra directories searched by /tracks after the default track folder.
     """
     if isinstance(project, str):
         project = MDVProject(project)
@@ -297,7 +292,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--track-dir",
         action="append",
         default=[],
-        help="Extra track directory searched by /mytracks. Repeat to add multiple directories.",
+        help="Extra track directory searched by /tracks after the default track folder. Repeat to add multiple directories.",
     )
     parser.add_argument(
         "--port",

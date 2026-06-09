@@ -111,7 +111,7 @@ def convert_vcf(folder, vcf_filename, zip_output):
     '--track-dir',
     'track_directories',
     multiple=True,
-    help='Extra track directory searched by /mytracks. Repeat to add multiple directories.',
+    help='Extra track directory searched by /tracks after the default track folder. Repeat to add multiple directories.',
 )
 def serve(folder, port, track_directories):
     """Serve MDV project."""
