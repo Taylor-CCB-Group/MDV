@@ -8,11 +8,13 @@
 export type ColorLegendCategoricalItem = {
     color: string;
     name: string;
+    value: string;
 };
 
 export type ColorLegendCategoricalSpec = {
     kind: "categorical";
     label: string;
+    column: string;
     items: ColorLegendCategoricalItem[];
 };
 

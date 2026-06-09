@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import DataStore from "@/datastore/DataStore";
-import { buildColorLegendSpec } from "./buildColorLegendSpec";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 function createStore(
     columns: Record<string, Record<string, unknown>>,
@@ -36,9 +36,10 @@ describe("buildColorLegendSpec", () => {
         expect(spec).toEqual({
             kind: "categorical",
             label: "Cell type",
+            column: "cell_type",
             items: [
-                { color: "#ff0000", name: "A" },
-                { color: "#00ff00", name: "B" },
+                { color: "#ff0000", name: "A", value: "A" },
+                { color: "#00ff00", name: "B", value: "B" },
             ],
         });
     });

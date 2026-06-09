@@ -76,6 +76,15 @@ export const ChartColorConfigSchema = z.object({
             // configs where `color_legend` exists but `display` may be missing/misspelled.
             display: z.boolean().optional().describe("Whether the color legend is visible"),
             pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
+            filter: z
+                .object({
+                    kind: z.literal("categorical"),
+                    column: z.string(),
+                    value: z.string(),
+                })
+                .optional()
+                // Add a numeric range variant when continuous legend filtering is implemented.
+                .describe("Active color legend filter"),
         })
         .optional()
         .describe("Color legend display and position"),

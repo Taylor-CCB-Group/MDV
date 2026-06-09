@@ -11,7 +11,7 @@ import { getRandomString } from "./Utilities";
 
 /**
  * Imperative DOM legend builders used by scale legends (node size, link thickness, etc.).
- * The color_by chart legend uses React: see ColorLegend.tsx and buildColorLegendSpec.ts.
+ * The color_by chart legend uses React: see src/react/components/legend/ColorLegend.tsx and src/react/legend/color_legend/buildColorLegendSpec.ts.
  */
 function getColorLegendCustom(scale, config = {}) {
     const ticks = config.tickValues || scale.ticks(config.ticks || 4);

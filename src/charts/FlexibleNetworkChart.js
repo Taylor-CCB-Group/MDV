@@ -16,7 +16,7 @@ import {
     select,
 } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
-import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 const color_schemes = {

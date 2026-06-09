@@ -39,8 +39,7 @@ const DebugButton = observer(() => {
                 views,
                 state,
                 buildInfo,
-                ...(validationFindings?.hasAny && { validationFindings: validationFindings.snapshot }),
-            });
+            }, undefined, { showValidationSection: true });
         } catch (err) {
             setError(err instanceof Error ? {
                 message: err.message,
@@ -91,4 +90,3 @@ const DebugButton = observer(() => {
 });
 
 export default DebugButton;
-
