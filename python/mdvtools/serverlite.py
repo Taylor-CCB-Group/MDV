@@ -45,7 +45,10 @@ def _resolve_track_file(path: str, track_directories: list[str]) -> str | None:
     for track_directory in track_directories:
         file_name = safe_join(track_directory, path)
         if file_name is not None and os.path.exists(file_name):
-            return file_name
+            real_file = os.path.realpath(file_name)
+            real_dir = os.path.realpath(track_directory)
+            if os.path.isfile(real_file) and real_file.startswith(real_dir + os.sep):
+                return file_name
     return None
 
 

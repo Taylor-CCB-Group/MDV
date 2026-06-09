@@ -96,36 +96,53 @@ export function locationFromFieldValues(
     } 
     if (genomicInfo.type === "interval") {
         const map = genomicInfo.columns ;
+        const chr = typeof row[map.chr] === "string" ? (row[map.chr] as string).trim() : "";
+        const start = Number(row[map.start]);
+        const end = Number(row[map.end]);
+        if (!chr || !Number.isFinite(start) || !Number.isFinite(end)) {
+            return null;
+        }
         return [{
-            chr: row[map.chr] as string,
-            start: Number(row[map.start]),
-            end: Number(row[map.end]),
+            chr,
+            start,
+            end,
         }];
     }
     else if (genomicInfo.type === "sv") {
         const map = genomicInfo.columns ;
-        const svtype = row[map.svtype] as string;
+        const svtype = typeof row[map.svtype] === "string" ? (row[map.svtype] as string).trim() : "";
+        const chr1 = typeof row[map.chr1] === "string" ? (row[map.chr1] as string).trim() : "";
+        const chr2 = typeof row[map.chr2] === "string" ? (row[map.chr2] as string).trim() : "";
         const pos1 = Number(row[map.pos1]);
-        const pos2 = Number(row[map.pos2])
+        const pos2 = Number(row[map.pos2]);
+        if (!svtype || !chr1 || !Number.isFinite(pos1)) {
+            return null;
+        }
         if ((svtype === "BND" || svtype === "TRA") || pos2-pos1 > 1000000){
+            if (!chr2 || !Number.isFinite(pos2)) {
+                return null;
+            }
             return [
                 {
-                    chr: row[map.chr1] as string,
-                    start: Number(row[map.pos1]),
-                    end: Number(row[map.pos1]),
+                    chr: chr1,
+                    start: pos1,
+                    end: pos1,
                 },
                 {
-                    chr: row[map.chr2] as string,
-                    start: Number(row[map.pos2]),
-                    end: Number(row[map.pos2]),
+                    chr: chr2,
+                    start: pos2,
+                    end: pos2,
                 }
             ]
-        } 
+        }
         else {
+            if (!Number.isFinite(pos2)) {
+                return null;
+            }
             return [{
-                chr: row[map.chr1] as string,
-                start: Number(row[map.pos1]),
-                end: Number(row[map.pos2]),
+                chr: chr1,
+                start: pos1,
+                end: pos2,
              }]
         }
     }
@@ -147,14 +164,16 @@ export function useGenomicInfo() {
             if (areColumnsLoaded) {
                 const names = Object.keys(genome.columns);
                 const columns: Record<string,DataColumn<any>> = {};
-                for (let i=0 ; i <= locationFields.length; i++) {
-                   columns[names[i]] = locationColumns[i];
+                for (let i=0 ; i < locationFields.length; i++) {
+                   if (locationColumns[i] !== undefined) {
+                       columns[names[i]] = locationColumns[i];
+                   }
                 }
                 return columns;
             }
             return {};
         },
-        [areColumnsLoaded],
+        [areColumnsLoaded, genome, locationFields, locationColumns],
     );
     return {
         genomicInfo:dataStore.genome,

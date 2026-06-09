@@ -603,6 +603,15 @@ class MdvFeatureTrack extends igv.TrackBase {
     get defaultHeight() {
         return this.height;
     }
+
+    dispose() {
+        if (this._boundTrackDragHandler) {
+            this.browser?.off?.("trackdrag", this._boundTrackDragHandler);
+        }
+        if (this._boundLocusChangeHandler) {
+            this.browser?.off?.("locuschange", this._boundLocusChangeHandler);
+        }
+    }
 }
 
 igv.registerTrackClass("mdv_feature_track", MdvFeatureTrack);

@@ -307,7 +307,7 @@ const SVCircosPlotComponent = observer(() => {
             areColumnsLoaded
                 ? calculateSVs(genomicColumns, chart.dataStore as GenomeDataStore, colorArray)
                 : getEmptyCalculatedSVs(chart.dataStore as GenomeDataStore),
-        [chart.dataStore, genomicColumns],
+        [chart.dataStore, genomicColumns, colorArray],
     );
 
     const outerContainer = useOuterContainer();

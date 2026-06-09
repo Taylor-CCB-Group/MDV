@@ -6,7 +6,7 @@ import { useEffect, useMemo } from "react";
 
 
 export function useChartColors<T extends BaseConfig>(chart: BaseChart<T>) {
-    const colorField = String(chart.config.color_by);
+    const colorField = chart.config.color_by != null && chart.config.color_by !== "" ? String(chart.config.color_by) : undefined;
     const colorColumn = useFieldSpec(colorField);
     const logColorScale = chart.config.log_color_scale;
     const trimColorScale = chart.config.trim_color_scale;

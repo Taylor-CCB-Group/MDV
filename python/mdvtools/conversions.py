@@ -613,8 +613,16 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
                 if not chr2 in chromosomes:
                     continue
             else:
-                logger.warning(f"Could not parse ALT field for BND/TRA record {rec.id}, using CHR2 and POS2 from INFO")
-                continue
+                logger.warning(f"Could not parse ALT field for BND/TRA record {rec.id}, attempting fallback to CHR2 and POS2 from INFO")
+                chr2_fallback = rec.info.get("CHR2")
+                pos2_fallback = rec.info.get("POS2")
+                if chr2_fallback and pos2_fallback and chr2_fallback in chromosomes:
+                    chr2 = chr2_fallback
+                    pos2 = int(pos2_fallback)
+                    logger.info(f"Using fallback CHR2={chr2} and POS2={pos2} for record {rec.id}")
+                else:
+                    logger.warning(f"Fallback CHR2/POS2 missing or invalid for record {rec.id}, skipping record")
+                    continue
         column_dict["chr1"].append(chr1)
         column_dict["pos1"].append(rec.pos)
         column_dict["chr2"].append(chr2)

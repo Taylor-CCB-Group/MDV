@@ -9,14 +9,14 @@ export function useBinaryChartColors<T extends BaseConfig>(
     const colorFunction = useChartColors(chart);
     const stamp  = useRef<number>(1);
 
-    const colorBuffer= useMemo(()=>new Uint8Array(chart.dataStore.size*3), []
+    const colorBuffer= useMemo(()=>new Uint8Array(chart.dataStore.size*3), [chart.dataStore.size]
     )
 
     return useMemo(() => {
         if (colorFunction){
 
             const size = chart.dataStore.size;
-        
+
             for (let i = 0; i < size; i++) {
                 const color = colorFunction(i);
                 const idx = i * 3;
@@ -25,8 +25,8 @@ export function useBinaryChartColors<T extends BaseConfig>(
                 colorBuffer[idx + 2] = color[2];
             }
             stamp.current++;
-        
+
         }
         return [colorBuffer, stamp.current];
-    }, [colorFunction]);
+    }, [colorFunction, colorBuffer]);
 }

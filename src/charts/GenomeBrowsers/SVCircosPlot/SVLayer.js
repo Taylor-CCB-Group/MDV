@@ -180,10 +180,15 @@ class SVLayer extends Layer {
 
     const trig = changeFlags.updateTriggersChanged;
     if (trig) {
-      const instance = trig.getColor ? 'instanceColor' : 'instanceFilter';
       const am = this.getAttributeManager();
-      const attribute = am.attributes[instance];
-      attribute.updateSubBuffer();
+      if (trig.getColor) {
+        const attribute = am.attributes['instanceColor'];
+        attribute.updateSubBuffer();
+      }
+      if (trig.getFilter) {
+        const attribute = am.attributes['instanceFilter'];
+        attribute.updateSubBuffer();
+      }
     }
   }
 

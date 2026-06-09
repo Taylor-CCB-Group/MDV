@@ -43,7 +43,7 @@ BaseChart.types["sv_circos_plot"] = {
     class: SVCircosPlot,
     //check the datasource can support svs
     required:(ds)=>{
-        return ds.genome && ds.genome.type==="sv" && ds.genome.chromosomes
+        return ds.genome && ds.genome.type==="sv" && ds.genome.chromosomes && ds.genome.columns
     },
 }
 

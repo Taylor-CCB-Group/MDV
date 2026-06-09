@@ -24,7 +24,7 @@ const UCSCBrowserComponent = observer(() => {
 
 
     const {genomicInfo,areColumnsLoaded} = useGenomicInfo();
-    const url_proxy = genomicInfo.ucsc_proxy_url || "ucsc_proxy";
+    const url_proxy = genomicInfo.ucsc_proxy_url || "/ucsc_proxy";
 
 
 

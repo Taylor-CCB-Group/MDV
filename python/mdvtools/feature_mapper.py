@@ -31,7 +31,7 @@ try:
     import pyranges as pr
 except ModuleNotFoundError as exc:  # pragma: no cover
     raise ModuleNotFoundError(
-        "pyranges is required for mdvtools.sv_gene_mapper. "
+        "pyranges is required for mdvtools.feature_mapper. "
         "Install with: pip install pyranges"
     ) from exc
 

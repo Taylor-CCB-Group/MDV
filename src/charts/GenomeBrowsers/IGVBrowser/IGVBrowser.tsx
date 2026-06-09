@@ -312,7 +312,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     }
 
     async onDataHighlighted(data: any) {
-        if (data.source ===  !data?.indexes?.length ) {
+        if (data.source === this.source || !data?.indexes?.length ) {
             return;
         }
         const location = locationFromFieldValues(this.dataStore, data.indexes[0], this.genomicInfo);
@@ -387,7 +387,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
                 values: [cols, "name", "field"],
                 current_value: c.feature_label || "_none_",
                 func: (x: string) => {
-                    c.feature_label = x === "_none" ? undefined : x;
+                    c.feature_label = x === "_none_" ? undefined : x;
                 },
             }),
         );
