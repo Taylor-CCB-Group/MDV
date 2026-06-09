@@ -1,7 +1,7 @@
 //! This needs to be in sync with the return type of the /projects api
 // maybe make use of zod schema in future
 export type MockProject = {
-    id: string;
+    id: string | number;
     name: string;
     type: "Editable" | "Read-Only";
     lastModified: string;

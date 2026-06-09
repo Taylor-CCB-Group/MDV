@@ -1,7 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
-import type { Project, ProjectAccessType } from "../utils/projectUtils";
+import type { Project, ProjectAccessType, RecycledProject } from "../utils/projectUtils";
 import { parseErrorResponse } from "../utils/apiUtils";
 import { apiFetch, buildApiUrl } from "@/utils/mdvRouting";
+import {
+    projectMutationResponseSchema,
+    purgeRecycleBinResponseSchema,
+    recycleBinResponseSchema,
+    restoreRecycledProjectResponseSchema,
+} from "../utils/projectSchemas";
 
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -42,7 +48,7 @@ const useProjects = () => {
                 }
 
                 const formattedProjects: Project[] = data.map((item: any) => ({
-                    id: item.id || "",
+                    id: item.id === undefined || item.id === null ? "" : String(item.id),
                     name: item.name || "",
                     type: item.type === "Read-Only" ? "Read-Only" : "Editable",
                     lastModified: item.lastModified || "",
@@ -163,7 +169,7 @@ const useProjects = () => {
 
                 if (response.ok) {
                     setProjects((prevProjects) =>
-                        prevProjects.filter((p) => p.id !== id),
+                        prevProjects.filter((p) => String(p.id) !== String(id)),
                     );
                     return;
                 } else {
@@ -388,6 +394,138 @@ const useProjects = () => {
         }, [handleError, fetchProjects]
     );
 
+    const softDeleteProjects = useCallback(
+        async (projectIds: string[]) => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const parsedProjectIds = projectIds.map((projectId) => Number(projectId));
+                if (parsedProjectIds.some((projectId) => !Number.isInteger(projectId))) {
+                    throw new Error("Invalid project id selected for deletion.");
+                }
+
+                const response = await apiFetch("projects/soft-delete", {
+                    method: "POST",
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ projectIds: parsedProjectIds }),
+                });
+                if (!response.ok) {
+                    throw await parseErrorResponse({
+                        response,
+                        fallbackText: "Error moving projects to the recycle bin.",
+                    });
+                }
+                const data = projectMutationResponseSchema.parse(await response.json());
+                const deletedIds = new Set(data.deletedProjectIds.map(String));
+                setProjects((previousProjects) =>
+                    previousProjects.filter((project) => !deletedIds.has(String(project.id))),
+                );
+                return [...deletedIds];
+            } catch (error) {
+                const errorMessage = error instanceof Error
+                    ? error.message
+                    : "Error moving projects to the recycle bin.";
+                handleError(errorMessage);
+                throw new Error(errorMessage);
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [handleError],
+    );
+
+    const fetchRecycleBin = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await apiFetch("projects/recycle-bin", {
+                headers: { Accept: "application/json" },
+            });
+            if (!response.ok) {
+                throw await parseErrorResponse({
+                    response,
+                    fallbackText: "Error fetching the recycle bin.",
+                });
+            }
+            return recycleBinResponseSchema.parse(await response.json());
+        } catch (error) {
+            const errorMessage = error instanceof Error
+                ? error.message
+                : "Error fetching the recycle bin.";
+            handleError(errorMessage);
+            return [];
+        } finally {
+            setIsLoading(false);
+        }
+    }, [handleError]);
+
+    const purgeRecycleBin = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await apiFetch("projects/recycle-bin", {
+                method: "DELETE",
+                headers: { Accept: "application/json" },
+            });
+            if (!response.ok) {
+                throw await parseErrorResponse({
+                    response,
+                    fallbackText: "Error permanently deleting recycled projects.",
+                });
+            }
+            const data = purgeRecycleBinResponseSchema.parse(await response.json());
+            if (data.failures.length) {
+                handleError(
+                    `Some projects could not be permanently deleted: ${data.failures
+                        .map((failure) => `${failure.projectId}: ${failure.message}`)
+                        .join("; ")}`,
+                );
+            }
+            return data;
+        } catch (error) {
+            const errorMessage = error instanceof Error
+                ? error.message
+                : "Error permanently deleting recycled projects.";
+            handleError(errorMessage);
+            throw new Error(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [handleError]);
+
+    const restoreRecycledProject = useCallback(
+        async (projectId: string) => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const response = await apiFetch(`projects/recycle-bin/${projectId}/restore`, {
+                    method: "POST",
+                    headers: { Accept: "application/json" },
+                });
+                if (!response.ok) {
+                    throw await parseErrorResponse({
+                        response,
+                        fallbackText: "Error restoring recycled project.",
+                    });
+                }
+                await fetchProjects();
+                return restoreRecycledProjectResponseSchema.parse(await response.json());
+            } catch (error) {
+                const errorMessage = error instanceof Error
+                    ? error.message
+                    : "Error restoring recycled project.";
+                handleError(errorMessage);
+                throw new Error(errorMessage);
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [fetchProjects, handleError],
+    );
+
     return {
         projects: filteredAndSortedProjects,
         isLoading,
@@ -397,6 +535,10 @@ const useProjects = () => {
         fetchProjects,
         createProject,
         deleteProject,
+        softDeleteProjects,
+        fetchRecycleBin,
+        purgeRecycleBin,
+        restoreRecycledProject,
         renameProject,
         changeProjectType,
         setFilter,

@@ -10,6 +10,12 @@ from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
 from mdvtools.dbutils.dbmodels import User
+from mdvtools.dbutils.project_manager_service import (
+    get_current_user_id,
+    refresh_auth_cache,
+    restore_deleted_project,
+    soft_delete_projects,
+)
 from mdvtools.auth.authutils import update_cache
 from mdvtools.logging_config import get_logger
 
@@ -352,63 +358,92 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
         @app.route("/delete_project/<int:project_id>", methods=["DELETE"])
         def delete_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
-            #project_removed_from_blueprints = False
-            nonlocal active_projects_cache
             try:
                 logger.info(f"Deleting project '{project_id}'")
-                
-                # Step 2: Check if the user is owner using in-memory cache
-                if ENABLE_AUTH:
-                    if session is None:
-                        raise ValueError("Session not available.")
-                    user = session.get('user')
-                    if not user:
-                        raise ValueError("User not found in session.")
-                    user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
-                        logger.error(f"User does not have ownership of project {project_id}")
-                        return jsonify({"error": "Only the project owner can delete the project."}), 403
-
-
-                # Step 3: Get full project object for access_level check
-                project_obj = ProjectService.get_project_by_id(project_id)
-                if not project_obj:
-                    logger.error(f"Project with ID {project_id} not found in database")
-                    return jsonify({"error": f"Project with ID {project_id} not found in database"}), 404
-
-                # Step 4: Check if project is editable
-                if project_obj.access_level != 'editable':
-                    logger.error(f"Project with ID {project_id} is not editable.")
-                    return jsonify({"error": "This project is not editable and cannot be deleted."}), 403
-
-
-                # Remove the project from the ProjectBlueprint.blueprints dictionary
-                if str(project_id) in ProjectBlueprint.blueprints:
-                    del ProjectBlueprint.blueprints[str(project_id)]
-                    #project_removed_from_blueprints = True  # Mark as removed
-                    logger.info(f"In register_routes - /delete_project : Removed project '{project_id}' from ProjectBlueprint.blueprints")
-                
-                # Soft delete the project
-                delete_status = ProjectService.soft_delete_project(project_id)
-                if not delete_status:
-                    logger.error(f"In delete_project: Error - Failed to soft delete project {project_id} in the database")
-                    return jsonify({"error": "Failed to soft delete project in db"}), 500
-
-                # Step 7: Remove from cache
-                if ENABLE_AUTH:
-                    
-                    active_projects_cache = [p for p in active_projects_cache if p["id"] != project_id]
-                    logger.info(f"Removed project '{project_id}' from in-memory cache")
-
-                # Step 8: Return success response
-                return jsonify({"message": f"Project '{project_id}' deleted successfully."})
-
+                soft_delete_projects([project_id], ENABLE_AUTH)
+                return jsonify({"message": f"Project '{project_id}' moved to recycle bin."})
+            except PermissionError as e:
+                return jsonify({"error": str(e)}), 403
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
             except Exception as e:
                 logger.exception(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
                 return jsonify({"error": str(e)}), 500
 
         logger.info("Route registered: /delete_project/<project_id>")
+
+        @app.route("/projects/soft-delete", methods=["POST"])
+        def batch_soft_delete_projects() -> Union[Response, Tuple[Response, int]]:
+            payload = request.get_json(silent=True)
+            project_ids = payload.get("projectIds") if isinstance(payload, dict) else None
+            if (
+                not isinstance(project_ids, list)
+                or not project_ids
+                or any(not isinstance(project_id, int) or isinstance(project_id, bool) for project_id in project_ids)
+            ):
+                return jsonify({"error": "projectIds must be a non-empty list of integers."}), 400
+            deduplicated_ids = list(dict.fromkeys(project_ids))
+            try:
+                soft_delete_projects(deduplicated_ids, ENABLE_AUTH)
+                return jsonify({"deletedProjectIds": deduplicated_ids})
+            except PermissionError as e:
+                return jsonify({"error": str(e)}), 403
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+            except Exception as e:
+                logger.exception(f"Error soft deleting projects: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/projects/recycle-bin", methods=["GET"])
+        def get_recycle_bin() -> Response:
+            try:
+                projects = ProjectService.get_deleted_projects(get_current_user_id(ENABLE_AUTH))
+                return jsonify([
+                    {
+                        "id": project.id,
+                        "name": project.name,
+                        "deletedTimestamp": project.deleted_timestamp.isoformat() if project.deleted_timestamp else None,
+                    }
+                    for project in projects
+                ])
+            except PermissionError as e:
+                return jsonify({"error": str(e)}), 401
+            except Exception as e:
+                logger.exception(f"Error listing recycled projects: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/projects/recycle-bin", methods=["DELETE"])
+        def purge_recycle_bin() -> Response:
+            try:
+                projects = ProjectService.get_deleted_projects(get_current_user_id(ENABLE_AUTH))
+                deleted_project_ids = []
+                failures = []
+                for project in projects:
+                    success, message = ProjectService.purge_deleted_project(project.id)
+                    if success:
+                        deleted_project_ids.append(project.id)
+                    else:
+                        failures.append({"projectId": project.id, "message": message})
+                refresh_auth_cache(ENABLE_AUTH)
+                return jsonify({"deletedProjectIds": deleted_project_ids, "failures": failures})
+            except PermissionError as e:
+                return jsonify({"error": str(e)}), 401
+            except Exception as e:
+                logger.exception(f"Error purging recycled projects: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/projects/recycle-bin/<int:project_id>/restore", methods=["POST"])
+        def restore_recycle_bin_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
+            try:
+                restore_deleted_project(project_id, ENABLE_AUTH, app)
+                return jsonify({"restoredProjectId": project_id})
+            except PermissionError as e:
+                return jsonify({"error": str(e)}), 403
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+            except Exception as e:
+                logger.exception(f"Error restoring recycled project {project_id}: {e}")
+                return jsonify({"error": str(e)}), 500
 
         @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
         def rename_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
