@@ -136,6 +136,25 @@ function SpatialDataChartRoot() {
     );
 }
 
+function SpatialDataLink() {
+    const { spatialData } = useSpatialData();
+    const spatialDataUrl = spatialData?.url;
+    if (!spatialDataUrl) return null;
+    const demoUrl = `https://taylor-ccb-group.github.io/SpatialData.js/docs/demo/?url=${encodeURIComponent(spatialDataUrl)}`;
+    return (
+        <div className="legend-container pointer-events-auto absolute bottom-2 right-2 z-[4] rounded-tl border-[0.5px] border-current">
+            <a
+                href={demoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-current no-underline hover:underline whitespace-nowrap"
+            >
+                Open in spatialdata.js
+            </a>
+        </div>
+    );
+}
+
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
@@ -334,6 +353,7 @@ const SpatialDataViewer = observer(
                         />
                     </div>
                 </div>
+                <SpatialDataLink />
                 {tooltipPortal}
             </>
         );
