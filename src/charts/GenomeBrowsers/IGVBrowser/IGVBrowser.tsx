@@ -312,7 +312,9 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     }
 
     async onDataHighlighted(data: any) {
-        if (data.source === this.source || !data?.indexes?.length ) {
+        //if highlight originates from this component ot there are 
+        //no highlighted indexes return
+        if (data.source === this || !data?.indexes?.length ) {
             return;
         }
         const location = locationFromFieldValues(this.dataStore, data.indexes[0], this.genomicInfo);
