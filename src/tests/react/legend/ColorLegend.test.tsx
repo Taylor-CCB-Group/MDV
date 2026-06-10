@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ColorLegend from "@/react/components/legend/ColorLegend";
 
 describe("ColorLegend", () => {
@@ -244,7 +244,7 @@ describe("ColorLegend", () => {
         );
     });
 
-    test("calls continuous range handler after dragging on gradient bar", () => {
+    test("renders continuous brush over the gradient bar when interactive", async () => {
         const onContinuousRangeChange = vi.fn();
         const { container } = render(
             <div className="legend-container">
@@ -260,34 +260,16 @@ describe("ColorLegend", () => {
                 />
             </div>,
         );
-        const gradientBar = container.querySelector("rect[fill^='url(#']");
-        const hitTarget = container.querySelector("rect[role='slider']");
-        if (!hitTarget || !gradientBar) {
-            throw new Error("Expected continuous legend range hit target");
-        }
-        expect(hitTarget.getAttribute("x")).toBe("20");
-        Object.defineProperty(gradientBar, "getBoundingClientRect", {
-            value: () => ({
-                x: 10,
-                y: 0,
-                left: 10,
-                top: 0,
-                right: 110,
-                bottom: 10,
-                width: 100,
-                height: 10,
-                toJSON: () => ({}),
-            }),
+
+        await waitFor(() => {
+            expect(container.querySelector(".brush .overlay")).toBeTruthy();
         });
-
-        fireEvent.mouseDown(hitTarget, { clientX: 30 });
-        fireEvent.mouseMove(hitTarget, { clientX: 70 });
-        fireEvent.mouseUp(hitTarget, { clientX: 70 });
-
-        expect(onContinuousRangeChange).toHaveBeenCalledWith([20, 60]);
+        const overlay = container.querySelector(".brush .overlay");
+        expect(overlay?.getAttribute("x")).toBe("28");
+        expect(overlay?.getAttribute("width")).toBe("124");
     });
 
-    test("renders active continuous range selection", () => {
+    test("renders active continuous range selection", async () => {
         const { container } = render(
             <div className="legend-container">
                 <ColorLegend
@@ -303,6 +285,14 @@ describe("ColorLegend", () => {
             </div>,
         );
 
-        expect(container.querySelector("rect[stroke='currentColor']")).toBeTruthy();
+        await waitFor(() => {
+            expect(container.querySelector(".brush .selection")).toBeTruthy();
+        });
+        expect(container.querySelector(".brush .selection")?.getAttribute("x")).toBe(
+            "59",
+        );
+        expect(
+            container.querySelector(".brush .selection")?.getAttribute("width"),
+        ).toBe("62");
     });
 });

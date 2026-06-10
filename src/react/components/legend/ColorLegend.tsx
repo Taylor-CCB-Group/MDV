@@ -1,6 +1,5 @@
 import {
     useCallback,
-    useEffect,
     useLayoutEffect,
     useRef,
     useState,
@@ -12,9 +11,9 @@ import LegendCategoricalSvg, {
     LEGEND_CATEGORICAL_WIDTH,
     legendCategoricalContainerHeight,
 } from "@/react/components/legend/LegendCategoricalSvg";
+import { getContinuousLegendContainerHeight } from "@/react/legend/shared/legendUtils";
 import LegendContinuousSvg, {
     DEFAULT_CONTINUOUS_LEGEND_WIDTH,
-    DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
 } from "@/react/components/legend/LegendContinuousSvg";
 
 export type ColorLegendProps = {
@@ -86,14 +85,14 @@ function ColorLegendCategorical({
     }, [updateTitleTooltip]);
 
     return (
-        <div className="legend-drag-handle h-full w-full overflow-hidden">
+        <div className="h-full w-full overflow-hidden">
             <div
                 ref={titleRef}
                 className="legend-title legend-drag-handle overflow-hidden text-ellipsis font-medium"
                 title={showTitleTooltip ? label : undefined}
                 style={{
                     height: "20px",
-                    whiteSpace: "nowrap"
+                    whiteSpace: "nowrap",
                 }}
             >
                 {label}
@@ -133,11 +132,6 @@ export default function ColorLegend({
     const containerRef = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
-        spec;
-        onLayoutReady?.();
-    }, [spec, onLayoutReady]);
-
-    useEffect(() => {
         const el = containerRef.current?.parentElement;
         if (!el || spec.kind !== "categorical") {
             return;
@@ -145,20 +139,28 @@ export default function ColorLegend({
         const height = legendCategoricalContainerHeight(spec.items.length);
         el.style.width = `${LEGEND_CATEGORICAL_WIDTH}px`;
         el.style.height = `${height}px`;
-        el.style.border = "0.5px solid black";
     }, [spec]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const el = containerRef.current?.parentElement;
         if (!el || spec.kind !== "continuous") {
             return;
         }
         const width = spec.width ?? DEFAULT_CONTINUOUS_LEGEND_WIDTH;
-        const height = spec.height ?? DEFAULT_CONTINUOUS_LEGEND_HEIGHT;
+        const height =
+            spec.height ??
+            getContinuousLegendContainerHeight(spec.range, {
+                width,
+                hasLabel: Boolean(spec.label),
+            });
         el.style.width = `${width}px`;
         el.style.height = `${height}px`;
-        el.style.border = "";
     }, [spec]);
+
+    useLayoutEffect(() => {
+        spec;
+        onLayoutReady?.();
+    }, [spec, onLayoutReady]);
 
     if (spec.kind === "categorical") {
         return (

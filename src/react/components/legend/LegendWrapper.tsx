@@ -69,6 +69,9 @@ export default class LegendWrapper<
                 styles: {
                     position: "absolute",
                     padding: "0.4em",
+                    border: "1px solid rgba(128, 128, 128, 0.65)",
+                    boxShadow:
+                        "0 1px 4px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.16)",
                 },
             },
             this.chart.contentDiv,

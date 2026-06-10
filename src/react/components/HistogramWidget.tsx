@@ -1,16 +1,16 @@
 import * as d3 from "d3";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDebounce } from "use-debounce";
 import { useTheme } from "../hooks";
+import {
+    createBrushScale,
+    useBrushX,
+    type BrushXConfig,
+    type BrushXScaleType,
+    type Range,
+} from "@/react/components/histogram/useBrushX";
 
-type Range = [number, number];
-export type HistogramScaleType = "linear" | "log";
-
-export type HistogramBrushConfig = {
-    value: Range | null;
-    setValue: (value: Range | null) => void;
-    minMax: Range;
-};
+export type HistogramScaleType = BrushXScaleType;
+export type HistogramBrushConfig = BrushXConfig;
 
 export type HistogramLayer = {
     id: string;
@@ -53,95 +53,6 @@ type HistogramWidgetProps = {
 };
 
 const formatBrushValue = d3.format(".4~g");
-
-const createScale = (
-    scaleType: HistogramScaleType,
-    domain: Range,
-    range: Range,
-) =>
-    scaleType === "log"
-        ? d3.scaleSymlog().domain(domain).range(range)
-        : d3.scaleLinear().domain(domain).range(range);
-
-const useBrushX = (
-    ref: React.RefObject<SVGSVGElement | null>,
-    brushConfig: HistogramBrushConfig | undefined,
-    histoWidth: number,
-    histoHeight: number,
-    xScaleType: HistogramScaleType,
-) => {
-    const brushRef = useRef<ReturnType<typeof d3.brushX> | null>(null);
-    const minMax = brushConfig?.minMax;
-    const setValue = brushConfig?.setValue;
-    const dark = useTheme() === "dark";
-
-    useEffect(() => {
-        if (!ref.current || !minMax || !setValue) return;
-
-        const svg = d3.select(ref.current);
-        const xScale = createScale(xScaleType, minMax, [0, histoWidth]);
-        const brush = d3.brushX()
-            .handleSize(1.25)
-            .extent([[0, -2], [histoWidth, histoHeight + 2]])
-            .on("brush end", (event) => {
-                if (!event.sourceEvent) return;
-                if (event.selection) {
-                    const [start, end] = event.selection.map((x: number) =>
-                        xScale.invert(x),
-                    );
-                    setValue([start, end]);
-                } else {
-                    setValue(null);
-                }
-            });
-
-        brushRef.current = brush;
-        const brushGroup = svg.append("g").attr("class", "brush").call(brush);
-        brushGroup
-            .selectAll(".selection")
-            .attr("fill", dark ? "rgba(255, 255, 255, 0.08)" : "rgba(15, 23, 42, 0.08)")
-            .attr("stroke", dark ? "rgba(229, 231, 235, 0.95)" : "rgba(15, 23, 42, 0.7)")
-            .attr("vector-effect", "non-scaling-stroke");
-        brushGroup
-            .selectAll(".handle")
-            .attr("fill", dark ? "rgba(229, 231, 235, 0.92)" : "rgba(15, 23, 42, 0.88)")
-            .attr("stroke", "none")
-            .attr("vector-effect", "non-scaling-stroke");
-
-        return () => {
-            svg.select(".brush").remove();
-        };
-    }, [dark, ref, histoWidth, histoHeight, minMax, setValue, xScaleType]);
-
-    const [debouncedValue] = useDebounce(brushConfig?.value, 100, {
-        equalityFn: (a, b) => {
-            if (!a && !b) return true;
-            if (!a || !b) return false;
-            return a[0] === b[0] && a[1] === b[1];
-        },
-    });
-
-    const setBrushValue = useCallback((value: Range | null | undefined) => {
-        if (!brushRef.current || !ref.current || !minMax) return;
-        const svg = d3.select(ref.current);
-        const xScale = createScale(xScaleType, minMax, [0, histoWidth]);
-
-        if (!value) {
-            // @ts-ignore d3 brush typings are not worth fighting here
-            svg.select(".brush").call(brushRef.current.move, null);
-            return;
-        }
-        const [start, end] = value;
-        const x0 = xScale(start);
-        const x1 = xScale(end);
-        // @ts-ignore d3 brush typings are not worth fighting here
-        svg.select(".brush").call(brushRef.current.move, [x0, x1]);
-    }, [histoWidth, minMax, ref, xScaleType]);
-
-    useEffect(() => {
-        setBrushValue(debouncedValue);
-    }, [debouncedValue, setBrushValue]);
-};
 
 export default function HistogramWidget({
     layers,
@@ -190,7 +101,24 @@ export default function HistogramWidget({
         return () => observer.disconnect();
     }, [onVisibleOnce, hasTriggeredCallback, rootMargin]);
 
-    useBrushX(ref, isVisible ? brush : undefined, width, height, xScaleType);
+    useBrushX(ref, isVisible ? brush : undefined, xScaleType, {
+        layout: {
+            width,
+            height: height + 4,
+            y: -2,
+        },
+        style: {
+            selectionFill: dark
+                ? "rgba(255, 255, 255, 0.08)"
+                : "rgba(15, 23, 42, 0.08)",
+            selectionStroke: dark
+                ? "rgba(229, 231, 235, 0.95)"
+                : "rgba(15, 23, 42, 0.7)",
+            handleFill: dark
+                ? "rgba(229, 231, 235, 0.92)"
+                : "rgba(15, 23, 42, 0.88)",
+        },
+    });
 
     const padding = 2;
     const visibleLayers = useMemo(
@@ -200,12 +128,16 @@ export default function HistogramWidget({
     const maxValue = Math.max(1, ...visibleLayers.flatMap((layer) => layer.data));
     const xDomain = brush?.minMax ?? ([0, bins] as Range);
     const xScale = useMemo(
-        () => createScale(xScaleType, xDomain, [0, width]),
+        () => createBrushScale(xScaleType, xDomain, [0, width]),
         [width, xDomain, xScaleType],
     );
     const yScale = useMemo(
-        () => createScale(yScaleType, [0, maxValue], [height - padding, padding]),
-        [height, maxValue, padding, yScaleType],
+        () =>
+            createBrushScale(yScaleType, [0, maxValue], [
+                height - padding,
+                padding,
+            ]),
+        [height, maxValue, yScaleType],
     );
 
     const resolvedBinEdges = useMemo(() => {
@@ -230,7 +162,7 @@ export default function HistogramWidget({
             width: Math.max(0.5, Math.abs(x1 - x0)),
             height: Math.max(0, height - padding - y),
         };
-    }), [height, padding, resolvedBinEdges, xScale, yScale]);
+    }), [height, resolvedBinEdges, xScale, yScale]);
 
     const brushValueLabel = useMemo(() => {
         if (!brush?.value) return null;
