@@ -67,10 +67,10 @@ export default function LegendContinuousSvg({
     useBrushX(svgRef, brush, "linear", {
         layout: {
             x: layout.barX,
-            y: layout.barY - 4,
+            y: layout.barY - 3,
             width: layout.axisWidth,
-            height: layout.barHeight + 8,
-            handleSize: 6,
+            height: layout.barHeight + 6,
+            handleSize: 5,
         },
         style: {
             selectionFill: "rgba(0, 0, 0, 0.18)",
