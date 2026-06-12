@@ -42,15 +42,22 @@ async function getContinuousColorLegendFilterRuntimeState(page: Page, chartTitle
             dataStoreSize: chart.dataStore.size,
             filterSize: chart.dataStore.filterSize,
             resetDisplay: chart.resetButton?.style?.display ?? "",
-            hasSelectedRange: Boolean(
-                panel?.querySelector('.legend-container rect[stroke="currentColor"]'),
-            ),
+            hasSelectedRange: (() => {
+                const selection = panel?.querySelector(
+                    ".legend-container .brush .selection",
+                );
+                if (!(selection instanceof SVGGraphicsElement)) {
+                    return false;
+                }
+                const box = selection.getBBox();
+                return getComputedStyle(selection).display !== "none" && box.width > 0;
+            })(),
         };
     }, chartTitle);
 }
 
 async function dragContinuousColorLegendRangeOutsideRight(page: Page, chartTitle: string) {
-    const slider = getChartColorLegendHost(page, chartTitle).locator('rect[role="slider"]');
+    const slider = getChartColorLegendHost(page, chartTitle).locator(".brush .overlay");
     await expect(slider).toBeVisible();
     const box = await slider.boundingBox();
     if (!box) {
@@ -67,14 +74,14 @@ async function dragContinuousColorLegendRangeOutsideRight(page: Page, chartTitle
 }
 
 async function clearContinuousColorLegendRange(page: Page, chartTitle: string) {
-    const slider = getChartColorLegendHost(page, chartTitle).locator('rect[role="slider"]');
+    const slider = getChartColorLegendHost(page, chartTitle).locator(".brush .overlay");
     await expect(slider).toBeVisible();
     const box = await slider.boundingBox();
     if (!box) {
         throw new Error(`Continuous color legend slider not found for chart "${chartTitle}"`);
     }
 
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.click(box.x + box.width * 0.05, box.y + box.height / 2);
 }
 
 test.describe("Color legend continuous", () => {

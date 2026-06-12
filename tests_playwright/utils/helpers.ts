@@ -274,8 +274,10 @@ export async function dragChartColorLegend(
     deltaY: number,
 ) {
     const host = getChartColorLegendHost(page, chartTitle);
-    const legendBody = host.locator(".legend-body");
-    const dragTarget = (await legendBody.count()) > 0 ? legendBody : host;
+    const dragHandle = host.locator(
+        ".legend-drag-handle, .legend-continuous-drag-handle",
+    );
+    const dragTarget = (await dragHandle.count()) > 0 ? dragHandle : host;
     const box = await dragTarget.boundingBox();
     if (!box) {
         throw new Error(`Color legend drag target not found for chart "${chartTitle}"`);
