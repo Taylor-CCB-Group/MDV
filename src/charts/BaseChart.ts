@@ -670,7 +670,6 @@ class BaseChart<T extends BaseConfig> {
                   }
                 : {
                       dragHandle: ".legend-continuous-drag-handle",
-                      resizable: true,
                   },
         );
         this.legend = this.colorLegendWrapper.getWrapperElement() ?? undefined;
