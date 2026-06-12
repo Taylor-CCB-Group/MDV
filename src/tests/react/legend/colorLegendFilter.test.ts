@@ -180,7 +180,7 @@ describe("colorLegendFilter", () => {
         expect(chart.setColorLegend).toHaveBeenCalled();
     });
 
-    test("sets and clears continuous filter ranges", () => {
+    test("sets and clears continuous filter ranges without rebuilding the legend", () => {
         const chart = createChart();
 
         setContinuousColorLegendFilter(chart, continuousSpec, [10, 50]);
@@ -188,11 +188,13 @@ describe("colorLegendFilter", () => {
             10,
             50,
         ]);
+        expect(chart.setColorLegend).not.toHaveBeenCalled();
 
         setContinuousColorLegendFilter(chart, continuousSpec, null);
         expect(chart.colorLegendFilter).toBeNull();
         expect(chart.config.color_legend?.filter).toBeUndefined();
         expect(chart.colorLegendFilterDimension?.removeFilter).toHaveBeenCalled();
+        expect(chart.setColorLegend).not.toHaveBeenCalled();
     });
 
     test("restores saved continuous filters that match the current legend spec", () => {

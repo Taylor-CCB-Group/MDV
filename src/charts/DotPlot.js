@@ -102,6 +102,7 @@ class DotPlot extends SVGChart {
         // then when we save state, it will have the appropriate value.
         //this.config.param = [p0, ...fieldNames]; //first is the category column
         this.fieldNames = fieldNames;
+        this.colorLegendRange = undefined;
         // await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
         const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         this.x_scale.domain(yLabels);
@@ -158,13 +159,23 @@ class DotPlot extends SVGChart {
 
     
 
-    setColorFunction() {
+    getColorScaleRange() {
+        if (!this.data?.mean_range) {
+            return undefined;
+        }
+        if (!this.colorLegendRange) {
+            this.colorLegendRange = this.data.mean_range.slice();
+        }
+        return this.colorLegendRange;
+    }
+
+    setColorFunction(updateLegend = true) {
         if (!this.data?.mean_range || !this.fieldNames?.length) {
             return;
         }
         this.updateColorScheme();
         const f = this.fieldNames[0];
-        const mm = this.data.mean_range;
+        const mm = this.getColorScaleRange();
         const conf = {
             useValue: true,
             overideValues: {
@@ -175,12 +186,14 @@ class DotPlot extends SVGChart {
             },
         };
         this.colorFunction = this.dataStore.getColorFunction(f, conf);
-        this.setColorLegend();
+        if (updateLegend) {
+            this.setColorLegend();
+        }
     }
 
     getColorLegendSpec() {
         const cs = this.config.color_scale;
-        const mm = this.data.mean_range;
+        const mm = this.getColorScaleRange();
         const conf = {
             overideValues: {
                 max: mm[1],
@@ -256,7 +269,7 @@ class DotPlot extends SVGChart {
                 this.clusterColumns();
                 //perhaps normalise should be optional
                 this.fractionScale.domain([0, this.data.frac_range[1]]);
-                this.setColorFunction();
+                this.setColorFunction(!this.colorLegendRange || !this.legend);
                 this.drawChart();
             },
             p,
@@ -331,7 +344,7 @@ class DotPlot extends SVGChart {
         const dim = this._getContentDimensions();
         const cWidth = dim.width / (this.fieldNames.length);
         const fa = this.dim.filterMethod;
-        this.setColorFunction();
+        this.setColorFunction(false);
         // is this something we need to review to make sure that changing the category column behaves as expected?
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
         const data = this.data.data.filter((x) => x.count !== 0);

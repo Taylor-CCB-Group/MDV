@@ -636,6 +636,7 @@ class BaseChart<T extends BaseConfig> {
         const spec = this.getColorLegendSpec();
         if (!spec) {
             console.warn("no color legend");
+            this.colorLegendWrapper.unmount();
             this.legend = undefined;
             return;
         }

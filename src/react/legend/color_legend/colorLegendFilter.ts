@@ -178,14 +178,18 @@ export function setContinuousColorLegendFilter(
         return;
     }
     if (range === null) {
-        clearColorLegendFilter(chart);
+        clearColorLegendFilter(chart, false);
         return;
     }
-    applyColorLegendFilter(chart, {
-        kind: "continuous",
-        column: spec.column,
-        range,
-    });
+    applyColorLegendFilter(
+        chart,
+        {
+            kind: "continuous",
+            column: spec.column,
+            range,
+        },
+        false,
+    );
 }
 
 export function restoreColorLegendFilter(
