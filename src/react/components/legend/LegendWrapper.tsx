@@ -102,6 +102,7 @@ export default class LegendWrapper<
         const doc = this.chart.__doc__;
         makeDraggable(wrapper, {
             handle: this.interactions.dragHandle,
+            contain: this.chart.contentDiv,
             doc,
         });
         if (this.interactions.resizable) {
