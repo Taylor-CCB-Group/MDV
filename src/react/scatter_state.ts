@@ -25,7 +25,7 @@ import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName, DataColumn, DataType, FieldName } from "@/charts/charts";
-import type { FeatureCollection } from "@turf/helpers";
+import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getEmptyFeatureCollection } from "./deck_state";
@@ -79,7 +79,7 @@ export type ScatterPlotConfig = {
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
     dimension: "2d" | "3d";
-    selectionFeatureCollection: FeatureCollection;
+    selectionFeatureCollection: SimpleFeatureCollection;
 } & TooltipConfig &
     DualContourLegacyConfig &
     BaseConfig;

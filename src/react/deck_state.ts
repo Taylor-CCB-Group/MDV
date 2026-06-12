@@ -1,4 +1,4 @@
-import type { FeatureCollection } from '@turf/helpers';
+import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import { useViewerStore } from "./components/avivatorish/state";
 import type { DeckScatterConfig } from "./components/DeckScatterReactWrapper";
 import { useConfig } from "./hooks";
@@ -32,4 +32,4 @@ export function useViewState() {
 export const getEmptyFeatureCollection = () => ({
     type: "FeatureCollection",
     features: []
-} as FeatureCollection);
+} as SimpleFeatureCollection);

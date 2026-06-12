@@ -1,9 +1,9 @@
-import type { FeatureCollection } from "@turf/helpers";
+import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 
 export interface Gate {
     id: string;
     name: string;
-    geometry: FeatureCollection;
+    geometry: SimpleFeatureCollection;
     columns: [string, string];
     createdAt: number;
     labelPosition: [number, number];
