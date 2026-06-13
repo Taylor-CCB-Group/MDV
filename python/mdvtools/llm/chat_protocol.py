@@ -1,4 +1,4 @@
-from typing import Optional, Protocol, Any, TypedDict, Union
+from typing import NotRequired, Optional, Protocol, Any, TypedDict, Union
 from mdvtools.mdvproject import MDVProject
 
 
@@ -23,6 +23,7 @@ class ChatRequest(TypedDict):
     conversation_id: str
     room: str
     handle_error: HandleError
+    model_id: NotRequired[str]
 
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
