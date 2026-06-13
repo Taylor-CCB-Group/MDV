@@ -228,6 +228,26 @@ def discover_models() -> DiscoveredModels:
     )
 
 
+def resolve_chat_model_id(model: Optional[str]) -> Optional[str]:
+    """Resolve a CLI/API model selector to a canonical chat model id.
+
+    Accepts full ids (``openai:chat:gpt-4.1``) or bare model names (``gpt-4.1``).
+    Returns ``None`` when ``model`` is empty so callers use ``CHATMDV_DEFAULT_MODEL``
+    / discovery defaults.
+    """
+    if model is None:
+        return None
+    raw = model.strip()
+    if not raw:
+        return None
+    discovered = discover_models()
+    for spec in discovered.chat_models:
+        if spec.id == raw or spec.model == raw:
+            return spec.id
+    available = ", ".join(spec.id for spec in discovered.chat_models) or "(none)"
+    raise ValueError(f"Unknown chat model {raw!r}. Available: {available}")
+
+
 def ensure_any_provider_available() -> None:
     """Raise if neither OpenAI nor Ollama chat models are reachable."""
     discovered = discover_models()

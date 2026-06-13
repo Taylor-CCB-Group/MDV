@@ -125,10 +125,12 @@ def get_createproject_prompt_RAG(
     datasource_name: str,
     final_answer: str,
     question: str,
+    compact: bool = False,
 ) -> str:
     """
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
     Handles both standard and gene-related queries.
+    When ``compact=True``, omits long policy blocks for local models (Ollama).
     """
     # Build markdown context for the selected datasource; fall back to whole project if needed
     try:
@@ -137,6 +139,91 @@ def get_createproject_prompt_RAG(
     except Exception:
         context_md = create_project_markdown(project)
     roles = infer_datasource_roles(project)
+    if compact:
+        expr_lines = ""
+        if roles.expressions:
+            expr_lines = "\n".join(
+                f"- `{e.datasource_name}` (name_column=`{e.name_column}`, default_subgroup=`{e.subgroup_key}`)"
+                for e in roles.expressions
+            )
+        else:
+            expr_lines = "- (none detected)"
+        return (
+            """
+    Project Data Context:
+
+    """
+            + context_md
+            + """
+
+    Datasource roles:
+    - Observation/metadata datasource: `"""
+            + roles.obs_datasource
+            + """`
+    - Expression datasources (feature tables):
+"""
+            + expr_lines
+            + """
+
+    Context: {context}
+
+    The provided scripts demonstrate MDV chart construction patterns. Follow this workflow:
+    1. Use MDVProject(project_path, delete_existing=False) when editing this project — never delete or recreate it.
+    2. Do NOT call `project.add_datasource(...)` for datasources that already exist (e.g. `"""
+            + datasource_name
+            + """`, `"""
+            + roles.obs_datasource
+            + """`). Load existing tables with `project.get_datasource_as_dataframe(...)`.
+    3. Load datasources with **Field ID** values from the context tables.
+    4. Build charts with mdvtools chart classes; set `params` from field ids (not display names).
+    5. Print bounded markdown previews before `project.set_view(...)` when showing tabular results.
+    6. Use injected CHATMDV_* constants when present; do not call `project.get_datasource_roles()`.
+
+    Agent-suggested columns and chart types:
+    """
+            + final_answer
+            + """
+
+    User question: """
+            + question
+            + final_answer
+            + """
+
+    Update these variables in generated code:
+    - project_path = '"""
+            + project.dir
+            + """'
+    - data_path = '"""
+            + path_to_data
+            + """'
+    - datasource_name = '"""
+            + datasource_name
+            + """'
+    - view_name = a descriptive string for the visualization.
+
+    Chart type requirements (use agent-suggested types when valid):
+    - Abundance Box plot: three categorical columns (repeat if fewer available).
+    - Box plot / Violin plot: one categorical + one numerical column.
+    - Density Scatter plot: two numerical + one categorical column.
+    - Dot plot / Heatmap: one categorical + numerical columns.
+    - Histogram: one numerical column.
+    - Multiline chart: one numerical + one categorical column.
+    - Pie Chart / Row Chart / Wordcloud: one categorical column.
+    - Row summary box / Table Plot: any column(s).
+    - Sankey / Stacked row chart: two categorical columns (repeat if only one).
+    - Scatter plot (2D): two numerical + one color column.
+    - Scatter plot (3D): three numerical + one color column.
+    - Selection dialog plot: any column.
+    - Text box plot: text only.
+
+    Output format:
+    - Return only one fenced ```python code block with the complete runnable script.
+    - Do not add markdown narrative before or after the code block.
+    - For chart requests, create the view(s) described above; for text/table-first requests use bounded print(...) calls.
+
+
+"""
+        )
     feature_field_policy = format_feature_table_field_policy(roles)
     marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data)
     table_chart_param_policy = format_obs_table_chart_param_policy()

@@ -36,6 +36,7 @@ from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import (
+    extract_code_from_response,
     extract_explanation_from_response,
     parse_view_name,
     prepare_code,
@@ -176,6 +177,148 @@ def _build_rag_retrieval_query(user_question: str, charts_part: str) -> str:
     if question and charts:
         return f"User question: {question}\nSuggested chart types: {charts}"
     return question or charts
+
+
+_FIELDS_CHARTS_LINE_RE = re.compile(r"^\s*(fields|charts)\s+", re.IGNORECASE | re.MULTILINE)
+
+
+def _agent_fields_charts_output_valid(output: str) -> bool:
+    """True when the pandas agent returned a non-empty fields/charts plan."""
+    text = (output or "").strip()
+    if not text:
+        return False
+    return bool(_FIELDS_CHARTS_LINE_RE.search(text))
+
+
+def _extract_fields_charts_plan(text: str) -> str:
+    """Return fields/charts lines from agent text, ignoring ReAct scaffolding."""
+    lines: list[str] = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        lower = stripped.lower()
+        if lower.startswith("fields ") or lower.startswith("charts "):
+            lines.append(stripped)
+    return "\n".join(lines)
+
+
+def _resolve_agent_plan(response: dict) -> str:
+    """Resolve the agent fields/charts plan from output or ReAct intermediate steps."""
+    output = str(response.get("output", "") or "")
+    if _agent_fields_charts_output_valid(output):
+        plan = _extract_fields_charts_plan(output)
+        return plan or output.strip()
+
+    for step in response.get("intermediate_steps") or []:
+        if not step:
+            continue
+        action = step[0]
+        for candidate in (
+            getattr(action, "log", ""),
+            str(getattr(action, "tool_input", "") or ""),
+        ):
+            if _agent_fields_charts_output_valid(candidate):
+                plan = _extract_fields_charts_plan(candidate)
+                if plan:
+                    return plan
+
+    return output.strip()
+
+
+def _infer_chart_types_from_question(question: str) -> str:
+    """Best-effort chart hints from the user question when the agent plan is missing."""
+    q = question.lower()
+    hints: list[str] = []
+    rules: list[tuple[tuple[str, ...], str]] = [
+        (("heatmap",), "Heatmap"),
+        (("violin",), "Violin plot"),
+        (("histogram",), "Histogram"),
+        (("dot plot", "dotplot"), "Dot plot"),
+        (("box plot", "boxplot"), "Box plot"),
+        (("pca", "3d"), "Scatter plot (3D)"),
+        (("umap", "scatter"), "Scatter plot (2D)"),
+        (("density scatter",), "Density Scatter plot"),
+        (("sankey",), "Sankey plot"),
+        (("pie chart", "pie plot"), "Pie Chart"),
+        (("table", "list", "count", "how many"), "Table Plot"),
+    ]
+    for keywords, chart in rules:
+        if any(k in q for k in keywords) and chart not in hints:
+            hints.append(chart)
+    if not hints:
+        hints.append("Scatter plot (2D)")
+    return ", ".join(hints)
+
+
+def _fallback_agent_plan(question: str) -> str:
+    """Minimal plan stub when datasource agent output is unusable but RAG can proceed."""
+    charts = _infer_chart_types_from_question(question)
+    return (
+        'fields "(infer from Project Data Context — datasource agent plan unavailable)"\n'
+        f'charts "{charts}"'
+    )
+
+
+def _rag_source_doc_names(output_qa: dict) -> str:
+    docs = output_qa.get("source_documents") or []
+    names: list[str] = []
+    for doc in docs:
+        meta = getattr(doc, "metadata", None) or {}
+        url = meta.get("url", "")
+        if url:
+            names.append(os.path.basename(str(url)))
+    return ", ".join(names) if names else "(none)"
+
+
+_RAG_EMPTY_RETRY_SUFFIX = (
+    "\n\nReturn only one fenced ```python code block with the complete runnable script."
+)
+
+
+def _invoke_rag_with_empty_retry(
+    qa_chain,
+    rag_retrieval_query: str,
+    chat_model: ModelSpec,
+    model_id: Optional[str],
+) -> tuple[dict, str]:
+    """Run RAG once; retry once with a short instruction if result is empty."""
+    output_qa = qa_chain.invoke({"query": rag_retrieval_query})
+    result = (output_qa.get("result") or "").strip()
+    if result:
+        return output_qa, result
+
+    chat_debug_logger.warning(
+        "RAG returned empty result (model_id=%s provider=%s model=%s sources=%s); retrying once",
+        model_id or chat_model.id,
+        chat_model.provider,
+        chat_model.model,
+        _rag_source_doc_names(output_qa),
+    )
+    retry_query = rag_retrieval_query + _RAG_EMPTY_RETRY_SUFFIX
+    output_qa_retry = qa_chain.invoke({"query": retry_query})
+    result_retry = (output_qa_retry.get("result") or "").strip()
+    if result_retry:
+        return output_qa_retry, result_retry
+
+    raise ValueError(
+        "Code generation returned empty output "
+        f"(model_id={model_id or chat_model.id}, provider={chat_model.provider}, "
+        f"model={chat_model.model}, sources={_rag_source_doc_names(output_qa_retry)}). "
+        "Try a coding-focused Ollama model (e.g. qwen2.5-coder) or OpenAI."
+    )
+
+
+def _raise_if_no_extracted_code(result: str, final_code: str) -> None:
+    """Raise when prepare_code produced a stub instead of runnable Python."""
+    if "# WARNING:::: No code captured" in final_code:
+        raise ValueError(
+            "Code generation did not produce runnable Python. "
+            "The model returned no fenced ```python block."
+        )
+    if not extract_code_from_response(result):
+        raise ValueError(
+            "Code generation did not produce runnable Python. "
+            "The model returned no fenced ```python block."
+        )
 
 
 class SuggestedQuestions(BaseModel):
@@ -473,14 +616,10 @@ class ProjectChat(ProjectChatProtocol):
             chat_debug_logger.info(f"Original Question: {question}")
             chat_debug_logger.info(f"Standalone Reformulated Question: {standalone_question}")
             chat_debug_logger.info(f"Sending to agent_executor with input: {standalone_question}")
-            try:
-                response = agent_executor.invoke({"input": standalone_question})
-            except Exception as first_error:
-                if provider != "ollama":
-                    raise
+
+            def _run_react_fallback() -> dict:
                 chat_debug_logger.warning(
-                    "Ollama functions agent failed; falling back to ReAct: %s",
-                    first_error,
+                    "Ollama agent falling back to ReAct for datasource inspection"
                 )
                 if on_agent_fallback:
                     on_agent_fallback()
@@ -494,7 +633,26 @@ class ProjectChat(ProjectChatProtocol):
                     verbose,
                     use_react=True,
                 )
-                response = fallback_executor.invoke({"input": standalone_question})
+                return fallback_executor.invoke({"input": standalone_question})
+
+            try:
+                response = agent_executor.invoke({"input": standalone_question})
+            except Exception as first_error:
+                if provider != "ollama":
+                    raise
+                chat_debug_logger.warning(
+                    "Ollama functions agent failed; falling back to ReAct: %s",
+                    first_error,
+                )
+                response = _run_react_fallback()
+            else:
+                if provider == "ollama" and not _agent_fields_charts_output_valid(
+                    _resolve_agent_plan(response)
+                ):
+                    chat_debug_logger.warning(
+                        "Ollama functions agent returned no field/chart plan; falling back to ReAct"
+                    )
+                    response = _run_react_fallback()
             chat_debug_logger.info(f"Agent Raw Response: {response}")
             memory.save_context({"input": question}, {"output": response.get("output", str(response))})
             return response
@@ -516,10 +674,16 @@ class ProjectChat(ProjectChatProtocol):
         discovered = discover_models()
         chat_model = discovered.get_chat_model(model_id)
         embedding_model = resolve_embedding_model(chat_model, discovered)
-        
+
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room, conversation_id)
         log = chat_debug_logger.info
+        request_model_line = (
+            f"model_id={chat_model.id} provider={chat_model.provider} "
+            f"model={chat_model.model} embedding={embedding_model.model}"
+        )
+        chat_debug_logger.info(request_model_line)
+        socket_api.logger.info(request_model_line)
         chat_debug_logger.info("Asking question: %s", question)
 
         if question == "test error":
@@ -555,6 +719,14 @@ class ProjectChat(ProjectChatProtocol):
         def _notify_agent_fallback() -> None:
             socket_api.update_chat_progress(
                 "Local model does not support tool calling; using ReAct agent instead.",
+                id,
+                progress,
+                0,
+            )
+
+        if chat_model.provider == "ollama":
+            socket_api.update_chat_progress(
+                "Local model uses functions agent first; ReAct only if needed.",
                 id,
                 progress,
                 0,
@@ -621,8 +793,25 @@ class ProjectChat(ProjectChatProtocol):
                     step_total=total_steps,
                 )
                 response = agent(question)
-                chat_debug_logger.info(f"Agent Response - output: {response['output']}")
-            
+                agent_plan = _resolve_agent_plan(response)
+                chat_debug_logger.info(f"Agent Response - output: {response.get('output', '')}")
+                chat_debug_logger.info(f"Agent resolved plan: {agent_plan}")
+                if not _agent_fields_charts_output_valid(agent_plan):
+                    if question.strip():
+                        chat_debug_logger.warning(
+                            "Agent returned no field/chart plan; continuing with question-only "
+                            "RAG fallback. Raw response: %r",
+                            response,
+                        )
+                        agent_plan = _fallback_agent_plan(question)
+                        chat_debug_logger.info("Agent fallback plan: %s", agent_plan)
+                    else:
+                        chat_debug_logger.error("Agent returned invalid output: %r", response)
+                        raise ValueError(
+                            "Datasource agent returned no field/chart plan. "
+                            "Try a coding-focused Ollama model (e.g. qwen2.5-coder) or OpenAI."
+                        )
+
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 socket_api.update_chat_progress(
                     _step_message(3, "Preparing analysis context"),
@@ -662,7 +851,14 @@ class ProjectChat(ProjectChatProtocol):
                 # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
-                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], response['input'])
+                prompt_RAG = get_createproject_prompt_RAG(
+                    self.project,
+                    path_to_data,
+                    datasource_names[0],
+                    agent_plan,
+                    response["input"],
+                    compact=chat_model.provider == "ollama",
+                )
                 chat_debug_logger.info(f"=== RAG Base Prompt (before context injection) ===\n{prompt_RAG}\n=== End Base Prompt ===")
 
                 prompt_RAG_template = PromptTemplate(
@@ -680,8 +876,8 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 progress += 60
 
-                match = re.search(r'charts\s+(.*)', response['output'])
-                charts_part = match.group(1) if match else response['output']
+                match = re.search(r'charts\s+(.*)', agent_plan)
+                charts_part = match.group(1) if match else agent_plan
                 rag_retrieval_query = _build_rag_retrieval_query(question, charts_part)
 
                 qa_chain = RetrievalQA.from_llm(
@@ -690,7 +886,12 @@ class ProjectChat(ProjectChatProtocol):
                     retriever=_get_rag_retriever(embedding_model),
                     return_source_documents=True,
                 )
-                output_qa = qa_chain.invoke({"query": rag_retrieval_query})
+                output_qa, result = _invoke_rag_with_empty_retry(
+                    qa_chain,
+                    rag_retrieval_query,
+                    chat_model,
+                    model_id,
+                )
                 # Log the complete prompt after context injection
                 if "source_documents" in output_qa:
                     retrieved_context = "\n".join(doc.page_content for doc in output_qa["source_documents"])
@@ -698,7 +899,6 @@ class ProjectChat(ProjectChatProtocol):
                         context=retrieved_context, question=rag_retrieval_query
                     )
                     chat_debug_logger.info(f"=== Complete RAG Prompt (with injected context) ===\n{complete_prompt}\n=== End Complete Prompt ===")
-                result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time
                 final_code = prepare_code(
@@ -797,6 +997,8 @@ class ProjectChat(ProjectChatProtocol):
                     allowed_wrapper_subgroup_keys=allowed_wrapper_subgroup_keys,
                 )
                 chat_debug_logger.info("Preflight metadata: %s", preflight_meta)
+
+            _raise_if_no_extracted_code(result, final_code)
 
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")

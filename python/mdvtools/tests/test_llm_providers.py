@@ -63,6 +63,36 @@ def test_discover_models_ollama_only(monkeypatch):
     assert discovered.default_model_id == "ollama:chat:llama3.2"
 
 
+def test_resolve_chat_model_id_by_full_id(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    with patch.object(llm_providers, "_fetch_ollama_tags", return_value=[]):
+        assert (
+            llm_providers.resolve_chat_model_id("openai:chat:gpt-4.1")
+            == "openai:chat:gpt-4.1"
+        )
+
+
+def test_resolve_chat_model_id_by_bare_name(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    with patch.object(llm_providers, "_fetch_ollama_tags", return_value=[]):
+        assert llm_providers.resolve_chat_model_id("gpt-4o-mini") == "openai:chat:gpt-4o-mini"
+
+
+def test_resolve_chat_model_id_empty_uses_default(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    with patch.object(llm_providers, "_fetch_ollama_tags", return_value=[]):
+        assert llm_providers.resolve_chat_model_id(None) is None
+        assert llm_providers.resolve_chat_model_id("") is None
+        assert llm_providers.resolve_chat_model_id("   ") is None
+
+
+def test_resolve_chat_model_id_unknown_raises(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    with patch.object(llm_providers, "_fetch_ollama_tags", return_value=[]):
+        with pytest.raises(ValueError, match="Unknown chat model"):
+            llm_providers.resolve_chat_model_id("not-a-real-model")
+
+
 def test_resolve_embedding_model_openai(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     discovered = llm_providers.discover_models()

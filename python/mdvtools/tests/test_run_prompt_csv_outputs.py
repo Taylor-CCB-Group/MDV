@@ -29,13 +29,14 @@ def test_run_prompt_csv_slim_results_and_details_jsonl(tmp_path, monkeypatch):
 
     fake_verification = "## What you can verify\n- chart ok\n"
 
-    def fake_run_chat_once(*, project_path, prompt, output_dir=None, view_name=None):
-        del project_path, prompt, output_dir, view_name
+    def fake_run_chat_once(*, project_path, prompt, output_dir=None, view_name=None, model_id=None):
+        del project_path, prompt, output_dir, view_name, model_id
         return {
             "success": True,
             "message": "Success",
             "captured_output": "Block 'b14' took 1.0 seconds\n",
             "duration_seconds": 3.5,
+            "block_timings": {"block_b14_execute_code_s": 1.0},
             "view_name": "test-view",
             "view_snapshot_present": True,
             "chart_count": 1,
@@ -83,8 +84,23 @@ def test_run_prompt_csv_slim_results_and_details_jsonl(tmp_path, monkeypatch):
 
     assert "exec_success" in fieldnames
     assert "details_jsonl_path" in fieldnames
+    assert "timing_jsonl_path" in fieldnames
+    assert "started_at_utc" in fieldnames
+    assert "finished_at_utc" in fieldnames
+    assert "block_b14_execute_code_s" in fieldnames
     assert rows[0]["exec_success"] == "True"
     assert rows[0]["view_name"] == "test-view"
+    assert float(rows[0]["duration_seconds"]) == 3.5
+
+    timing_files = list(out_dir.glob("timing_*.jsonl"))
+    assert len(timing_files) == 1
+    timing = json.loads(timing_files[0].read_text(encoding="utf-8").strip())
+    assert timing["row_index"] == 1
+    assert timing["duration_seconds"] == 3.5
+    assert timing["block_timings"]["block_b14_execute_code_s"] == 1.0
+    assert timing["started_at_utc"]
+    assert timing["finished_at_utc"]
+    assert timing["row_wall_seconds"] >= 0.0
 
     details_files = list(out_dir.glob("details_*.jsonl"))
     assert len(details_files) == 1
@@ -99,9 +115,58 @@ def test_run_prompt_csv_slim_results_and_details_jsonl(tmp_path, monkeypatch):
     assert len(summary_files) == 1
     summary = json.loads(summary_files[0].read_text(encoding="utf-8"))
     assert summary["run_id"]
+    assert summary["run_model_id"] is None
     assert summary["details_jsonl"] == str(details_files[0])
+    assert summary["timing_jsonl"] == str(timing_files[0])
     assert summary["totals"]["rows"] == 1
     assert "run_benchmark_summary_json_mirror" not in summary
+
+
+def test_run_prompt_csv_records_model_in_summary(tmp_path, monkeypatch):
+    input_csv = tmp_path / "prompts.csv"
+    out_dir = tmp_path / "report"
+    _write_input_csv(input_csv)
+
+    def fake_run_chat_once(*, project_path, prompt, output_dir=None, view_name=None, model_id=None):
+        del project_path, prompt, output_dir, view_name
+        assert model_id == "openai:chat:gpt-4.1"
+        return {
+            "success": True,
+            "message": "Success",
+            "captured_output": "",
+            "duration_seconds": 1.0,
+            "view_name": "v",
+            "view_snapshot_present": True,
+            "chart_count": 1,
+            "verification": "",
+            "needs_refresh": False,
+            "debug_output_dir": "",
+        }, 0
+
+    monkeypatch.setattr(
+        "mdvtools.llm.chat_cli.run_chat_once",
+        fake_run_chat_once,
+    )
+    monkeypatch.setattr(
+        "mdvtools.llm.llm_providers.resolve_chat_model_id",
+        lambda model: "openai:chat:gpt-4.1" if model == "gpt-4.1" else None,
+    )
+
+    argv = [
+        "run_prompt_csv",
+        "--csv",
+        str(input_csv),
+        "--output-dir",
+        str(out_dir),
+        "--in-process-rows",
+        "--model",
+        "gpt-4.1",
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+    assert run_prompt_csv.main() == 0
+
+    summary = json.loads(next(out_dir.glob("benchmark_summary_*.json")).read_text(encoding="utf-8"))
+    assert summary["run_model_id"] == "openai:chat:gpt-4.1"
 
 
 def test_run_prompt_csv_failure_details_in_jsonl_not_csv(tmp_path, monkeypatch):
@@ -109,8 +174,8 @@ def test_run_prompt_csv_failure_details_in_jsonl_not_csv(tmp_path, monkeypatch):
     out_dir = tmp_path / "report"
     _write_input_csv(input_csv)
 
-    def fake_run_chat_once(*, project_path, prompt, output_dir=None, view_name=None):
-        del project_path, prompt, output_dir, view_name
+    def fake_run_chat_once(*, project_path, prompt, output_dir=None, view_name=None, model_id=None):
+        del project_path, prompt, output_dir, view_name, model_id
         return {
             "success": False,
             "message": "ERROR: Code execution failed: traceback here",
@@ -150,6 +215,13 @@ def test_run_prompt_csv_failure_details_in_jsonl_not_csv(tmp_path, monkeypatch):
     detail = json.loads(next(out_dir.glob("details_*.jsonl")).read_text(encoding="utf-8").strip())
     assert "traceback" in detail["failure_reason"]
     assert detail["captured_output_excerpt"]
+    assert detail["duration_seconds"] == 1.0
+    assert detail["started_at_utc"]
+    assert detail["finished_at_utc"]
+
+    timing = json.loads(next(out_dir.glob("timing_*.jsonl")).read_text(encoding="utf-8").strip())
+    assert timing["duration_seconds"] == 1.0
+    assert timing["exec_success"] is False
 
     failures_path = next(out_dir.glob("failures_*.jsonl"))
     failure = json.loads(failures_path.read_text(encoding="utf-8").strip())
