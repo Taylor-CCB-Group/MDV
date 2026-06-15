@@ -45,6 +45,7 @@ export function buildColorLegendSpec(
         return {
             kind: "continuous",
             label: name,
+            column,
             colors,
             range,
         };
