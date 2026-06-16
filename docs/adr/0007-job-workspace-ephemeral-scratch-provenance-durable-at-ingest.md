@@ -1,6 +1,6 @@
 # Job workspace is ephemeral scratch outside the project store; provenance becomes durable at ingest
 
-**Status:** accepted — POC design decision (DGE jobs framework).
+**Status:** accepted — POC design decision (jobs framework).
 
 ## Context & decision
 
@@ -16,7 +16,8 @@ root is provably outside the path the project exporter walks.)
 ## Scratch vs durable — what survives
 
 - **Durable:** the **manifest / provenance** (tool / scanpy / MDV versions, params,
-  `input_filter_hash`, duration, `job_id`), the **`input_filter_hash`** (pins *which* cells),
+  `input_filter_hash`, duration, `job_id`), the **`input_filter_hash`** (pins *which* rows, for
+  subset-taking tools),
   and the **ingested result**.
 - **Scratch (GC'd):** the materialized tray + intermediates.
 

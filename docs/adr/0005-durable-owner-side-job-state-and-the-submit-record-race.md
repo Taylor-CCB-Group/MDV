@@ -1,13 +1,17 @@
 # Durable, owner-side job state: recover on restart, the submit↔record race, and the idempotency dependency
 
-**Status:** accepted — POC design decision (DGE jobs framework).
+**Status:** accepted — POC design decision (jobs framework).
 
 ## Context & decision
 
 A long job must survive an owner reload/deploy, and an HPC job outlives the owner entirely.
 Job state is therefore **durable on disk, owner-side** — a per-job record holding lifecycle
-status, the **executor handle**, params, and the `input_filter_hash`. In-memory state is a
-cache/index. On boot the owner scans records and reconciles anything in flight.
+status, the **executor handle**, params, and — for tools that take a subset — the
+`input_filter_hash` (a hash of the client's **resolved selection** — *which* cells the job ran on;
+the provenance/idempotency anchor also
+used by ADR-0006, and the reason labels for those cells are re-read from the store, never
+trusted from the client). In-memory state is a cache/index. On boot the owner scans records
+and reconciles anything in flight.
 
 Lifecycle: `queued → staging → running → ingesting → done`; off-ramps `failed` / `cancelled`
 / `stale` / `lost`.
