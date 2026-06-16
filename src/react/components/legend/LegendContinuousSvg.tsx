@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { axisBottom } from "d3";
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
+import { useBrushX } from "@/react/components/histogram/useBrushX";
 import {
     DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
     DEFAULT_CONTINUOUS_LEGEND_WIDTH,
@@ -37,6 +38,8 @@ export default function LegendContinuousSvg({
     range,
     width = DEFAULT_CONTINUOUS_LEGEND_WIDTH,
     height = DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
+    activeRange = null,
+    onRangeChange,
 }: LegendContinuousSvgProps) {
     // SVG ids are document-global, and legends may be rendered through separate React roots.
     const gradientIdRef = useRef<string>(createLegendGradientId());
@@ -49,6 +52,33 @@ export default function LegendContinuousSvg({
     const formattedLabel = label
         ? formatLegendLabel(label, layout.labelMaxWidth)
         : null;
+    const brush = useMemo(
+        () =>
+            onRangeChange || activeRange
+                ? {
+                      value: activeRange,
+                      setValue: onRangeChange ?? (() => {}),
+                      minMax: range,
+                  }
+                : undefined,
+        [activeRange, onRangeChange, range],
+    );
+
+    useBrushX(svgRef, brush, "linear", {
+        layout: {
+            x: layout.barX,
+            y: layout.barY - 3,
+            width: layout.axisWidth,
+            height: layout.barHeight + 6,
+            handleSize: 5,
+        },
+        style: {
+            selectionFill: "rgba(0, 0, 0, 0.18)",
+            selectionStroke: "currentColor",
+            handleFill: "currentColor",
+        },
+        updateOn: "end",
+    });
 
     useLayoutEffect(() => {
         const container = svgRef.current?.parentElement;
@@ -102,15 +132,26 @@ export default function LegendContinuousSvg({
         >
             <g>
                 {formattedLabel ? (
-                    <g>
+                    <g className="legend-continuous-drag-handle">
+                        <rect
+                            x={0}
+                            y={0}
+                            width="100%"
+                            height={layout.barY}
+                            style={{
+                                fill: "transparent",
+                                pointerEvents: "all",
+                            }}
+                        />
                         {formattedLabel.truncated ? (
                             <title>{formattedLabel.full}</title>
                         ) : null}
                         <text
                             x={10}
+                            y={3}
                             aria-label={formattedLabel.full}
                             alignmentBaseline="hanging"
-                            className="fill-current text-xs"
+                            className="fill-current text-xs font-bold"
                         >
                             {formattedLabel.display}
                         </text>
