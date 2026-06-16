@@ -5,10 +5,14 @@ This module provides a minimal Flask application that exposes endpoints
 for serving project data, images, configurations, and handling file operations
 with support for HTTP range requests and security headers.
 """
+import argparse
 import json
+import logging
 import os
+import requests
 import sys
 import zlib
+from urllib.parse import urlencode
 from flask import (
     Flask,
     render_template,
@@ -26,7 +30,33 @@ from mdvtools.server_utils import (
     add_safe_headers,
 )
 
-def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
+logger = logging.getLogger(__name__)
+
+ALLOWED_UCSC_HOSTS = {
+    "genome.ucsc.edu",
+    "genome-euro.ucsc.edu",
+    "genome-asia.ucsc.edu",
+}
+
+MAX_UCSC_BYTES = 10 * 1024 * 1024  # 10MB max for UCSC image responses
+
+
+def _resolve_track_file(path: str, track_directories: list[str]) -> str | None:
+    for track_directory in track_directories:
+        file_name = safe_join(track_directory, path)
+        if file_name is not None and os.path.exists(file_name):
+            real_file = os.path.realpath(file_name)
+            real_dir = os.path.realpath(track_directory)
+            if os.path.isfile(real_file) and real_file.startswith(real_dir + os.sep):
+                return file_name
+    return None
+
+
+def create_app(
+    project: MDVProject,
+    compress_column_data: bool = False,
+    track_directories: list[str] | None = None,
+) -> Flask:
     """
     Create and configure a Flask application for serving MDV project data.
 
@@ -38,6 +68,13 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     """
     app = Flask(__name__)
     app.after_request(add_safe_headers)
+    resolved_track_directories = [
+        os.path.abspath(project.trackfolder),
+        *[
+            os.path.abspath(track_directory)
+            for track_directory in (track_directories or [])
+        ],
+    ]
 
     @app.route("/")
     def project_index():
@@ -134,7 +171,9 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     # needs to be returned
     @app.route("/tracks/<path:path>")
     def send_track(path):
-        file_name = safe_join(project.trackfolder, path)
+        file_name = _resolve_track_file(path, resolved_track_directories)
+        if file_name is None:
+            return "File not found", 404
         range_header = request.headers.get("Range", None)
         if not range_header:
             return send_file(file_name)
@@ -157,39 +196,139 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
         except Exception:
             success = False
         return jsonify({"success": success})
-    
+
+    @app.route("/ucsc_proxy")
+    def ucsc_image():
+        """
+        Get a static image from UCSC Genome Browser.
+        Returns a PNG image of the browser view.
+        """
+        try:
+            params = request.args.to_dict()
+            ucsc_host = params.pop("ucscHost", "genome.ucsc.edu")
+            if ucsc_host not in ALLOWED_UCSC_HOSTS:
+                logger.warning(f"Rejected invalid UCSC host: {ucsc_host}")
+                return "Invalid host", 400
+
+            # Use hgRenderTracks for image generation on the selected UCSC mirror.
+            base_url = f"https://{ucsc_host}/cgi-bin/hgRenderTracks"
+            ucsc_url = f"{base_url}?{urlencode(params)}"
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (compatible; MDV-Proxy/1.0)',
+            }
+
+            response = requests.get(ucsc_url, headers=headers, timeout=30, stream=True)
+            response.raise_for_status()
+
+            # Check content type
+            content_type = response.headers.get("Content-Type", "")
+            if not content_type.startswith("image/"):
+                logger.warning(f"Non-image content type from UCSC: {content_type}")
+                response.close()
+                return "Unsupported media type", 415
+
+            # Read response with size limit
+            content_chunks = []
+            total_bytes = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UCSC_BYTES:
+                    logger.warning(f"UCSC response exceeded size limit: {total_bytes} bytes")
+                    response.close()
+                    return "Upstream response too large", 502
+                content_chunks.append(chunk)
+
+            content = b''.join(content_chunks)
+            logger.info(f"Fetched UCSC image from: {ucsc_host}, size: {total_bytes} bytes")
+
+            # Return the image
+            image_response = make_response(content)
+            image_response.headers['Content-Type'] = content_type
+            return image_response
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Upstream fetch failed for UCSC: {e}")
+            return "Upstream fetch failed", 502
+        except Exception as e:
+            logger.exception(f"Internal error in ucsc_image: {e}")
+            return "Internal server error", 500
+        
     return app
 
 
-def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bool = True ,compress_column_data: bool = False):
+def serve_project(
+    project: MDVProject | str,
+    port: int = 5050,
+    open_browser: bool = True,
+    compress_column_data: bool = False,
+    track_directories: list[str] | None = None,
+):
     """Serve an MDV project using a lightweight Flask server. 
     Args:
         project (MDVProject | str): The MDV project instance or path to the project directory.
         port (int): The port to run the server on. Defaults to 5050.
         open_browser (bool): Whether to open the browser automatically. Defaults to True.
         compress_column_data (bool): Whether to compress column data. Defaults to False.
+        track_directories (list[str] | None): Extra directories searched by /tracks after the default track folder.
     """
     if isinstance(project, str):
         project = MDVProject(project)
-    app = create_app(project, compress_column_data=compress_column_data)
+    app = create_app(
+        project,
+        compress_column_data=compress_column_data,
+        track_directories=track_directories,
+    )
     if open_browser:
         import webbrowser
         webbrowser.open(f"http://localhost:{port}/")
     app.run(port=port)
 
 
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Serve an MDV project.")
+    parser.add_argument("path", help="Path to the MDV project directory.")
+    parser.add_argument(
+        "--track-dir",
+        action="append",
+        default=[],
+        help="Extra track directory searched by /tracks after the default track folder. Repeat to add multiple directories.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5050,
+        help="Port to serve on.",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open the browser automatically.",
+    )
+    parser.add_argument(
+        "--compress-column-data",
+        action="store_true",
+        help="Compress column data responses.",
+    )
+    return parser
+
+
 if __name__ == "__main__":
     try:
-        if len(sys.argv) > 1:
-            path = sys.argv[1]
-        else:
-            raise ValueError("No project path provided as a command-line argument.")
+        args = _build_parser().parse_args()
+        path = args.path
         if not os.path.exists(path):
             raise FileNotFoundError(f"{path} not found")
         ds_path = os.path.join(path, "datasources.json")
         if not os.path.exists(ds_path):
             raise FileNotFoundError(f"{path} does not contain a valid MDV project.")
-        serve_project(MDVProject(path))
+        serve_project(
+            MDVProject(path),
+            port=args.port,
+            open_browser=not args.no_browser,
+            compress_column_data=args.compress_column_data,
+            track_directories=args.track_dir,
+        )
 
     except Exception as e:
         print(f"Error: {e}")

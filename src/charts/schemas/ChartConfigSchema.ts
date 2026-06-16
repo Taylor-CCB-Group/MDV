@@ -216,6 +216,12 @@ export const HeatmapConfigSchema = BaseConfigSchema.extend({
     // Additional heatmap specific properties
 }).describe("Configuration for heatmap charts displaying matrix data with color intensity");
 
+export const CategoryHeatmapConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("category_heatmap").describe("Category heatmap chart type"),
+    x_display_categories: z.array(z.string()).optional().describe("Optional x-axis categories to display in the heatmap"),
+    y_display_categories: z.array(z.string()).optional().describe("Optional y-axis categories to display in the heatmap"),
+}).describe("Configuration for category heatmaps showing categorical co-occurrence counts");
+
 export const DotPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("dot_plot").describe("Dot plot chart type"),
     // Additional dot plot specific properties
@@ -349,6 +355,7 @@ registerChartConfigSchema("scatter_plot", ScatterPlotConfigSchema, { version: "1
 registerChartConfigSchema("bar_chart", BarChartConfigSchema, { version: "1" });
 registerChartConfigSchema("histogram", HistogramConfigSchema, { version: "1" });
 registerChartConfigSchema("heatmap", HeatmapConfigSchema, { version: "1" });
+registerChartConfigSchema("category_heatmap", CategoryHeatmapConfigSchema, { version: "1" });
 registerChartConfigSchema("dot_plot", DotPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });

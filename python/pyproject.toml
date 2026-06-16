@@ -41,6 +41,9 @@ dependencies = [
     "spatialdata>=0.7.2,<0.8",
     "spatialdata-io>=0.6.0,<0.7",
     "generate-tiff-offsets>=0.1.7,<0.2",
+    # genomic operations
+    "pysam==0.24.0",
+    "pyranges>=0.1.4,<0.2",
 ]
 
 [project.optional-dependencies]

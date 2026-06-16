@@ -50,8 +50,7 @@ export function hasExplicitDirParam() {
 }
 
 export function isProjectDir(dir: string) {
-    // can be a server serving a page
-    if (dir.startsWith("http")) return true;    
+    if (dir.startsWith("http")) return true;
     return /\/project\/[^/]+\/?$/.test(asUrl(dir).pathname);
 }
 

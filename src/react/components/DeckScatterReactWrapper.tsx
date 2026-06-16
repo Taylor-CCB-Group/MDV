@@ -136,7 +136,6 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             g({
                 type: "button",
                 label: "Center Plot",
-                //@ts-expect-error - no nay `never` no more
                 current_value: null,
                 func: () => {
                     // what should we do to trigger a re-center?

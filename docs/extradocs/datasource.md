@@ -183,6 +183,59 @@ scale - in mm
 
 ```
 
+### genome
+
+This is optional datasource metadata for genome-aware charts. Add it when the datasource represents genomic intervals or structural variants and should be usable in charts such as the IGV/UCSC browser or SV circos plot.
+
+There are currently two supported shapes:
+
+* `genomic_location` for rows with a single genomic interval
+* `svs` for rows describing a structural variant which is more complex than a single location
+* `assembly` the genome build e.g. hg38, mm10 etc. - required 
+* `chromosomes` a dictionary of chromosome name to length - optional , only required for the SVCircosPlot
+* `ucsc_proxy_url` Required for retrieving UCSC genome images and forwarding them to the browser - the serverlite component uses /ucsc_proxy, which is the default
+
+Either `genomic_location` or `svs` must be supplied
+
+
+
+For interval data, provide the column ids for chromosome, start and end:
+
+```json
+{
+    "genome": {
+        "genomic_location": {
+            "columns": {
+                "chr": "chr",
+                "start": "start",
+                "end": "end"
+            }
+        }
+    }
+}
+```
+
+For structural variant data, provide the column ids used for the two loci. `svtype` and `length` are also read when present:
+
+```json
+{
+    "genome": {
+        "svs": {
+            "sv_columns": {
+                "chr1": "chr1",
+                "pos1": "pos1",
+                "pos2": "pos2",
+                "chr2": "chr2",
+                "svtype": "svtype",
+                "length": "length"
+            }
+        }
+    }
+}
+```
+
+This metadata does not itself add a chart. It declares that the datasource can supply genomic location information, which chart-specific configuration can then use.
+
 ### interactions
 
 This is for a dataset that contains information about the interactions of set of objects (cells) for a number of regions/, a pivot column
