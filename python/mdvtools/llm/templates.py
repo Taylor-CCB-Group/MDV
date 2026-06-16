@@ -14,6 +14,7 @@ from mdvtools.llm.datasource_roles import (
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
+    format_targeted_chart_policies,
     format_visualization_consistency_policy,
 )
 prompt_data = """
@@ -140,6 +141,7 @@ def get_createproject_prompt_RAG(
     mdv_first_policy = format_mdv_first_data_access_policy(
         scale, path_to_data, compact=compact
     )
+    chart_policies = format_targeted_chart_policies(compact=compact)
     # Build markdown context for the selected datasource; fall back to whole project if needed
     try:
         ds_meta = project.get_datasource_metadata(datasource_name)
@@ -175,6 +177,10 @@ def get_createproject_prompt_RAG(
 
 """
             + mdv_first_policy
+            + """
+
+"""
+            + chart_policies
             + """
 
     Context: {context}
@@ -276,6 +282,8 @@ def get_createproject_prompt_RAG(
 
         - Marker genes and missing columns (Scanpy last resort only):
 """+marker_gene_policy+"""
+        - Targeted chart recipes (ChatMDV):
+"""+chart_policies+"""
 
     3. Datasource Registration:
         - When modifying an existing project, do **not** call `project.add_datasource(...)` for arbitrary new tables **except**

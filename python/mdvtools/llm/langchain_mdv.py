@@ -521,6 +521,9 @@ class ProjectChat(ProjectChatProtocol):
                     "Only suggest Scanpy in the plan if the question requires marker ranking or DE columns "
                     "not available in MDV metadata.\n"
                     "- Before suggesting columns, decide: obs metadata only, expression wrappers, or Scanpy markers.\n"
+                    "- Question-type routing: proportion / frequency / before-after → StackedRowChart; "
+                    "gene signature / enrichment / ISG genes → DotPlot or Heatmap + wrappers + SelectionDialogPlot.\n"
+                    "- On large projects df1 is a column subset — list every field id codegen will need in `fields`.\n"
                 )
             if roles is not None:
                 exprs = roles.expressions or []
@@ -569,6 +572,7 @@ class ProjectChat(ProjectChatProtocol):
         Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields.
         On large projects, df1/df2 may be column subsets for schema probing — use Project Data Context field ids for planning.
         Prefer MDV chart field ids and expression wrappers; suggest Scanpy only for marker-ranking or DE questions when MDV metadata lacks required columns.
+        Route by question type: proportion/frequency/before-after → StackedRowChart; signature/enrichment/ISG expression → DotPlot or Heatmap with wrappers.
         Use these to correct the column names mentioned by the user.
         Before writing any `project.get_datasource_as_dataframe(datasource_name, columns=[...])` call, you must verify the datasource schema and only request columns that exist on that datasource.
         Never assume a `name` column exists on `cells`; if the task asks for genes/markers, use the expression datasource or explicit marker ranking outputs instead of `cells.name`.

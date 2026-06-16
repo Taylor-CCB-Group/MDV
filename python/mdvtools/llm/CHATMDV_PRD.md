@@ -361,7 +361,13 @@ mkdir -p "$CHATMDV_CSV_EVAL_OUTPUT_DIR"
 | Ollama — **current** (functions + compact + question fallback + guards) | **90%** | **80%** | Run `20260613T102009Z`; 1 preflight failure (row 9, PCA) |
 | OpenAI `gpt-4.1` | 90% | 90% | Run `20260613T084756Z`; 1 runtime failure (row 10, GNLY) |
 
-**TAURUS baseline** (`prompts_TAURUS.csv`, Ollama `qwen3-coder:latest`, run `20260615T170752Z`): 40% exec / 40% charts. Failures included unnecessary `read_h5ad` / full `get_datasource_as_dataframe` on ~988k cells. MDV-first prompt rules target those OOM-class failures.
+**TAURUS baseline** (`prompts_TAURUS.csv`, Ollama `qwen3-coder:latest`):
+
+| Run | `exec_success_rate` | `view_has_charts_rate` | Notes |
+|-----|---------------------|------------------------|-------|
+| `20260615T170752Z` (pre MDV-first) | 40% | 40% | OOM / full h5ad loads |
+| `20260616T050314Z` (MDV-first policies) | 70% | 70% | Rows 5/8/9 still failing |
+| `20260616T054014Z` (MDV-first + chart recipes + import autofix) | **90%** | **90%** | Rows 5/8/9 fixed; row 6 metadata `datatype` regression |
 
 **Design notes from benchmarking:**
 

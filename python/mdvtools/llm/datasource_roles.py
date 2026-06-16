@@ -381,6 +381,79 @@ def format_obs_table_chart_param_policy() -> str:
     )
 
 
+def format_obs_annadata_alignment_policy() -> str:
+    """Prompt text: never align MDV obs tables to AnnData via default DataFrame index."""
+    return (
+        "- **No hybrid MDV + AnnData alignment for chart views:** Do not subset `adata` using "
+        "`get_datasource_as_dataframe(...)` row positions or default `DataFrame.index` — MDV observation "
+        "tables use a positional index, not cell barcodes.\n"
+        "- If a join is unavoidable, use explicit id fields (`cell_id`, `cellbarcode`) present in both "
+        "MDV metadata and `adata.obs`; never use `obs_df.index`.\n"
+        "- Prefer avoiding AnnData entirely on existing MDV projects; use MDV charts and column-subset loads.\n"
+    )
+
+
+def format_gene_signature_chart_policy() -> str:
+    """Prompt text: gene signature / enrichment questions via MDV wrappers, not Scanpy means."""
+    return (
+        "- **Gene signatures / enrichment across cell types:** Use **DotPlot** or **HeatmapPlot** on the "
+        "observation datasource with expression **wrapper** `params` plus a categorical field id "
+        "(e.g. `sub_bucket`, `bucket`, `major`).\n"
+        "- Add **SelectionDialogPlot** filters for `Remission_status`, `Treatment`, `bucket`, or `sub_bucket` "
+        "instead of subsetting AnnData or pandas tables.\n"
+        "- Do **not** compute per-group Scanpy/pandas means solely to populate MDV charts; wrappers read the "
+        "project expression matrix directly.\n"
+        "- Use field ids from Project Data Context / `CHATMDV_CATEGORICAL_FIELD_IDS`; do **not** invent "
+        "category literals (e.g. do not guess `Monocyte` in `bucket` — use real values via selection UI).\n"
+    )
+
+
+def format_proportion_chart_policy() -> str:
+    """Prompt text: proportion / frequency questions via StackedRowChart or PieChart."""
+    return (
+        "- **Proportions, frequencies, relative abundance, before/after comparisons:** Prefer "
+        "**`StackedRowChart`** with two or three categorical field ids in `params` "
+        "(e.g. `Treatment`, `Remission_status`, `sub_bucket`).\n"
+        "- Import: `from mdvtools.charts.stacked_row_plot import StackedRowChart` "
+        "(not `mdvtools.charts.stacked_row_chart`).\n"
+        "- **`PieChart`** uses constructor kwarg **`param=`** (singular), not `params=`.\n"
+        "- Pair with **SelectionDialogPlot** on `major`, `bucket`, or `sub_bucket` to focus a cell type; "
+        "do not compute proportions in pandas/Scanpy when MDV charts aggregate in the view.\n"
+    )
+
+
+def format_column_subset_completeness_policy() -> str:
+    """Prompt text: every referenced field id must be listed in get_datasource_as_dataframe columns."""
+    return (
+        "- **Column-subset completeness:** Every field id you reference (`df['col']`, chart `params`, filters) "
+        "must appear in the `columns=[...]` list passed to `project.get_datasource_as_dataframe(...)`.\n"
+    )
+
+
+def format_targeted_chart_policies(*, compact: bool = False) -> str:
+    """Combined policies for signature, proportion, alignment, and column-subset codegen."""
+    if compact:
+        return (
+            "## Chart recipes (mandatory)\n"
+            "- Proportions / frequency / before-after → `StackedRowChart` from `mdvtools.charts.stacked_row_plot`; "
+            "`PieChart` uses `param=` not `params=`.\n"
+            "- Gene signatures / enrichment → `DotPlot` or `HeatmapPlot` + expression wrappers + "
+            "`SelectionDialogPlot` filters; no Scanpy means for charts.\n"
+            "- Never align `obs_df.index` to AnnData; avoid hybrid h5ad + MDV loads for chart-only views.\n"
+            "- Every `df['field']` used must be listed in `get_datasource_as_dataframe(..., columns=[...])`.\n"
+        )
+    return (
+        "## Observation / AnnData alignment (ChatMDV)\n"
+        + format_obs_annadata_alignment_policy()
+        + "\n## Gene signature / enrichment charts (ChatMDV)\n"
+        + format_gene_signature_chart_policy()
+        + "\n## Proportion / frequency charts (ChatMDV)\n"
+        + format_proportion_chart_policy()
+        + "\n## Column-subset completeness (ChatMDV)\n"
+        + format_column_subset_completeness_policy()
+    )
+
+
 def format_mdv_first_data_access_policy(
     scale: ProjectScale,
     path_to_data: str,
@@ -412,6 +485,12 @@ def format_mdv_first_data_access_policy(
         "- **Scanpy last resort only** when MDV cannot answer: marker ranking (`sc.tl.rank_genes_groups`), "
         "or DE stats missing from the expression feature table, and `data_path` is a `.h5ad` file.\n"
     )
+    hybrid_bans = (
+        "- Do **not** combine `read_h5ad` with `get_datasource_as_dataframe` filtering for chart-only views.\n"
+        "- Do **not** invent `bucket` / `major` / `sub_bucket` category literals — use field ids from context "
+        "and `SelectionDialogPlot` for interactive filtering.\n"
+        "- Gene expression on subsets: expression wrappers + `SelectionDialogPlot`, not AnnData `[:, gene].X.mean()`.\n"
+    )
     if scale.is_large:
         scanpy_last_resort += (
             "  - On large projects use `adata = sc.read_h5ad(data_path, backed='r')`; filter with obs masks "
@@ -433,6 +512,7 @@ def format_mdv_first_data_access_policy(
             "- **3.** Gene expression on embeddings: expression wrapper tokens via `build_expression_wrapper_token`.\n"
             "- **4.** Scanpy only for marker/DE workflows when MDV tables lack required columns.\n"
             + large_rules
+            + hybrid_bans
             + scanpy_last_resort
             + "- Do **not** `add_datasource` for datasources that already exist (except "
             f"`{CHAT_RANK_GENES_DATASOURCE_NAME}` for optional in-view marker tables).\n"
@@ -454,6 +534,7 @@ def format_mdv_first_data_access_policy(
         "- **4. Scanpy last resort:** Use Scanpy only when steps 1–3 cannot answer the question (marker genes, "
         "DE ranking, or expression stats absent from MDV metadata) and a `.h5ad` exists at `data_path`.\n"
         + large_rules
+        + hybrid_bans
         + scanpy_last_resort
         + "- Do **not** call `project.add_datasource(...)` for observation or expression datasources that already "
         "exist in this project.\n"

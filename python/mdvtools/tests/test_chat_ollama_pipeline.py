@@ -236,6 +236,7 @@ def test_compact_rag_prompt_is_shorter_than_full(monkeypatch):
     assert "columns-md" in compact
     assert "Return only one fenced ```python code block" in compact
     assert "MDV-first data access" in compact
+    assert "Chart recipes" in compact
     assert "Visualization vs analysis consistency" not in compact
 
 
@@ -267,4 +268,4 @@ def test_compact_rag_prompt_includes_mdv_first_for_large_scale(monkeypatch):
     )
     assert "987,743" in compact
     assert "backed='r'" in compact
-    assert "Scanpy last resort" in compact
+    assert "Chart recipes" in compact

@@ -11,7 +11,12 @@ from mdvtools.llm.datasource_roles import (
     format_metadata_column_schema_policy,
     format_mdv_first_data_access_policy,
     format_no_hallucination_chart_policy,
+    format_obs_annadata_alignment_policy,
     format_obs_table_chart_param_policy,
+    format_proportion_chart_policy,
+    format_gene_signature_chart_policy,
+    format_column_subset_completeness_policy,
+    format_targeted_chart_policies,
     format_scanpy_hybrid_routing_policy,
     format_visualization_consistency_policy,
     infer_datasource_roles,
@@ -187,6 +192,34 @@ def test_format_marker_ranking_viz_policy():
     assert CHAT_RANK_GENES_DATASOURCE_NAME in text
     assert "project.add_datasource(" in text
     assert "IndentationError" in text
+
+
+def test_format_targeted_chart_policies():
+    compact = format_targeted_chart_policies(compact=True)
+    assert "StackedRowChart" in compact
+    assert "stacked_row_plot" in compact
+    assert "param=" in compact
+    assert "obs_df.index" in compact or "AnnData" in compact
+
+    full = format_targeted_chart_policies(compact=False)
+    assert "Gene signature" in full or "signature" in full.lower()
+    assert format_obs_annadata_alignment_policy()[:20] in full
+    assert "PieChart" in format_proportion_chart_policy()
+
+
+def test_format_mdv_first_includes_hybrid_bans():
+    large = ProjectScale(
+        obs_rows=500_000,
+        obs_columns=40,
+        estimated_obs_df_mb=300.0,
+        available_ram_mb=2048.0,
+        is_large=True,
+        has_h5ad=True,
+        obs_datasource="cells",
+    )
+    text = format_mdv_first_data_access_policy(large, "/data/x.h5ad", compact=True)
+    assert "combine `read_h5ad`" in text
+    assert "invent `bucket`" in text
 
 
 def test_format_marker_gene_scanpy_fallback_with_h5ad():
