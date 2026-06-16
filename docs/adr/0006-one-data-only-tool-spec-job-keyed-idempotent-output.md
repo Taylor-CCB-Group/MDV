@@ -1,6 +1,6 @@
-# One backend-owned, data-only tool spec (params + outputs): GuiSpecType-native, hydrated not serialized, with job-keyed idempotent output
+# One backend-owned, data-only tool spec (params + outputs): GuiSpecType-native, hydrated not serialized, with shape-routed, job-keyed idempotent outputs
 
-**Status:** accepted — POC design decision (DGE jobs framework). ChatMDV-ready, not
+**Status:** accepted — POC design decision (jobs framework). ChatMDV-ready, not
 ChatMDV-integrated.
 
 ## Context & decision
@@ -49,27 +49,88 @@ selects a `tool_id` and fills typed blanks; it **never executes free-form code**
 validation is the gate. (Standard function-calling safety — recorded for completeness, not the
 novel part.)
 
-## Output spec — a list of typed outputs, identified by the job
+## Output spec — shape-routed: outputs are placed by their declared axis
 
-The output spec describes a **list of typed outputs**, each declaring its **shape** (gene
-table / cell columns) and **target** (new datasource / existing `cells`) — not a single fixed
-output. The POC builds the primary output only: a **new standalone datasource per run**, one
-row per gene. (Per-cell `obs` write-back is expressible but deferred.)
+DGE is one job among many to come (annotation, imputation, pathway scoring, cell–cell
+communication, trajectories). So the output spec is **not** a DGE-shaped contract. Each output
+declares the **axis it is keyed by** — *what it is a function of* — and ingest routes it by that
+shape. The framework never special-cases a job type; it only knows shapes.
+
+| Declared shape | Output is a function of | Ingest target |
+|---|---|---|
+| `column(ds, cols)` | a row of an existing datasource | add column(s) to that datasource — `cells` (per-cell), `genes` (per-gene), or any other |
+| `matrix(axisA, axisB, subgroups)` | an (A × B) pair | `rows_as_columns` subgroup(s) on A↔B; materialise axisB as a datasource if new |
+| `new_entity(name, cols)` | a new kind of thing the job invents | a new datasource |
+
+The rule in one line: **existing entity → columns on its datasource; a pair of axes → a matrix; a
+newly-invented entity → a new datasource.** Most jobs are the first row — cell-type labels, QC,
+doublet scores, HVG flags are all plain column writes (`column("cells", …)` / `column("genes",
+…)`), and `concat_columns` is one too, on whichever datasource the user picked. The richer shapes
+are for outputs that aren't single-valued per an existing entity.
+
+### Worked example — `concat_columns` (the POC's first tool)
+
+`concat_columns` joins two columns of a chosen datasource into a new text column on that same
+datasource. Its output is one value per **row of that datasource** — a function of an existing
+entity — so it declares a single output in the column-write shape:
+
+```
+column("cells", ["donor_tissue"])      # or column("genes", …), or any datasource
+```
+
+Ingest adds one `text` column to the named datasource. No new datasource, no matrix — the cheapest
+shape in the table, and the one most future jobs (cell-type labels, QC flags, doublet scores) will
+share.
+
+**DGE (deferred).** DGE is the rich case — one value per *(gene, comparison)*, which needs the
+`matrix` + `new_entity` shapes (a `contrasts` datasource + `genes × contrasts` stat matrices). That
+worked example and the fuller `contrasts` design are **parked with DGE** (see ADR-0003) and are
+out of POC scope. The taxonomy above already
+covers them for when DGE returns.
+
+### Output identity & idempotency (per shape)
 
 **Output identity is the `job_id`, fixed at submit — never a timestamp generated at ingest.**
-Ingest is **replace-or-skip keyed on `job_id`** (never append). This makes ingest
-**idempotent** — the property ADR-0005's recovery depends on: a completion delivered twice
-(re-queue *or* at-least-once Socket.IO) yields **one** datasource. A `job_id` also does the
-original collision-avoidance job **better** than a timestamp (two submissions in the same
-second collide; clock skew/timezones vanish). A human-readable label
-(`dge_<groupby>_<target>_vs_<reference>`) is fine for *display*; any timestamp in it must be
-the **submit time captured once in the manifest** and reused verbatim — "fixed at submit," not
+Ingest is **replace-or-skip keyed on `job_id`** (never append), applied to whichever shape the
+output declared — replace the columns, replace the whole datasource, or replace the subgroup
+matrix. This makes ingest **idempotent** — the property ADR-0005's recovery depends on: a
+completion delivered twice (re-queue *or* at-least-once Socket.IO) yields **one** output, not
+duplicates. A `job_id` also does collision-avoidance **better** than a timestamp (two submissions
+in the same second collide; clock skew/timezones vanish). A human-readable label
+(`dge_<groupby>_<target>_vs_<reference>`) is fine for *display*; any timestamp in it must be the
+**submit time captured once in the manifest** and reused verbatim — "fixed at submit," not
 `now()` at ingest.
+
+For the **`column(ds, cols)`** shape (the POC's only one), "replace" is `remove_column` then
+`add_column_to_group` — the column writer uses `create_dataset`, which errors if the dataset
+already exists, so replace is remove-then-add (verified in `mdvproject.py`).
+
+### Open (deferred with DGE) — the matrix write path is whole-matrix only
+
+`add_rows_as_columns_subgroup` (`mdvproject.py`) writes a **complete** matrix and **refuses to
+overwrite** (`if name in ds: raise ValueError`); there is no per-column append/replace. So
+idempotency is cheap for **batch** matrix outputs (all comparisons from one `rank_genes_groups`
+call → one matrix, replace whole) but **not yet supported for incremental** single-comparison-
+per-job, which would need a subgroup replace/append. Until that exists the incremental case must
+recompute the whole matrix, or fall back to `per_gene` columns / a per-run `new_entity`
+datasource. **Capability gap to close before incremental matrix jobs.**
+
+### Open (deferred with DGE) — the matrix's gene axis (OQ1)
+
+`matrix("genes", …)` keys to the rows of a gene datasource. The `genes` datasource is the HVG
+subset (`var`); DGE on `.raw` covers a *superset*, so genes outside `var` have no row to land in.
+Either restrict DGE to HVG or key the matrix to a dedicated full-gene datasource. This is OQ1
+(`.raw` preservation) resurfacing as a structural constraint — see ADR-0003.
 
 ## Consequences
 
 - One source of truth eliminates the frontend/backend params drift a separate form + validator
   would invite, and makes the later LLM projection mechanical.
+- **Shape-routing keeps the registry job-agnostic.** Adding a tool (annotation, imputation,
+  pathway scoring, …) is *declaring its output shapes*, not writing a bespoke ingest handler.
+  DGE's `contrasts` + matrix is the worked instance; the four shapes
+  (`per_cell` / `per_gene` / `matrix` / `new_entity`) cover the foreseeable jobs, and a new shape
+  is added only when a tool genuinely needs one.
 - **Deferred — content-hash result cache.** A key of `hash(tool + params + cells + layer)`
   (Bazel's action-cache idea) enables *"you've already run this exact analysis — open the
   existing result, or run anyway?"* It is **self-invalidating** (editing cells/params changes
