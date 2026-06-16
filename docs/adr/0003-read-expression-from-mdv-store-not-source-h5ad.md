@@ -1,7 +1,12 @@
 # Read the expression matrix from MDV's CSC store, not the source `.h5ad`
 
-**Status:** accepted — POC design decision (DGE jobs framework); not yet implemented on
-this branch (prior art: PR #352).
+**Status:** Deferred — DGE-specific; out of scope for the first jobs-framework POC. The POC's
+first tool is a trivial concat-columns job, which needs none of this (no expression matrix, no
+CSC read). Revisit when DGE work resumes. Prior art: PR #352.
+
+> Parked 2026-06-11: the jobs-framework POC pivoted away from DGE-first to build the framework
+> against a throwaway concat-columns tool. This decision — along with ADR-0006's DGE worked
+> example, the Stage-3 `contrasts`/matrix design, and OQ1 — is deferred with DGE, not discarded.
 
 ## Context & decision
 
@@ -21,6 +26,10 @@ matrix rows.
   renamed labels.
 - **No cell-identity join** — matrix rows *are* the `cells` datasource rows, in the same
   order; there is no fragile mapping back to an external h5ad.
+- **Labels from the store, never the client** — for the client's resolved selection (*which*
+  cells), the group **labels are re-read from the store**, not trusted from the client.
+  Selecting cells is the client's job; *what those cells are* (their `obs` labels) is the
+  store's. (A corollary of no-drift, and the load-bearing half of the D3 selection contract.)
 
 ## The bulk reader (required consequence)
 
@@ -45,5 +54,6 @@ Do **not** reuse the per-gene path (`get_datasource_as_dataframe` →
   (raw counts vs log-normalized), which never appears on screen. Representation-correctness
   is **OQ1** (open — confirming whether imported `adata.X` is raw or log-normalized), not a
   guarantee of this decision. `rank_genes_groups(method="wilcoxon")` conventionally expects
-  log-normalized input, so OQ1 is a correctness boundary, handled there (layer dropdown +
-  provenance + a raw-counts guard), not here.
+  log-normalized input, so OQ1 is a correctness boundary, handled there (an expression-layer
+  choice recorded in provenance — the validation guard was **dropped**; we trust the input),
+  not here.
