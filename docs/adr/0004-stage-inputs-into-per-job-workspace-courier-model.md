@@ -12,9 +12,24 @@ the owner then **ingests** outputs into the project. The worker behaves as if it
 "across town" — the **courier model**.
 
 The worker always reads a **materialized tray** in its workspace. The word is
-**"materialize," not "copy":** for DGE the staged input is a *derived slice* (selected cells
-× all genes, written as scanpy-loadable AnnData). It does not pre-exist anywhere — the store
-is gene-column CSC, scanpy wants a cells×genes AnnData — so there is nothing to "duplicate."
+**"materialize," not "copy":** the tray is *derived* from the store, not a duplicate of a file
+that already exists.
+
+**The framework fixes the workspace layout, not the tray's format.** Layout is uniform — `input/`
+(the tray the owner writes), `work/` (worker scratch), `output/` (worker results), plus the
+terminal marker (ADR-0007). *What* goes in `input/` and *how it is serialized* is the **tool's
+contract**: the owner's materialize step and the worker's read step are two halves of one tool
+definition, so they agree by construction. That format never leaves the owner↔worker boundary, so
+it is **substitutable** without touching the framework.
+
+**The tray is HDF5** — the format MDV's store (`datafile.h5`) and scanpy (`.h5ad`) both already
+use, so no new dependency. DGE's tray is a scanpy-loadable AnnData (a derived slice: selected cells
+× all genes — the store is gene-column CSC, scanpy wants cells×genes, so there is nothing to
+duplicate). `concat_columns`' tray is a plain `.h5` of the two requested columns. **The owner
+decodes at the boundary:** MDV stores text columns as `uint16` codes + a manifest `values` lookup,
+so the owner resolves them to real values when writing the tray — the worker reads plain typed
+arrays and never imports MDV internals (the rejected "worker reads the store directly" option
+below).
 
 ## Why
 
