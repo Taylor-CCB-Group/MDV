@@ -9,12 +9,14 @@ from mdvtools.llm.datasource_roles import (
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
     format_metadata_column_schema_policy,
+    format_mdv_first_data_access_policy,
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
     format_visualization_consistency_policy,
     infer_datasource_roles,
 )
+from mdvtools.llm.dataset_scale import ProjectScale, assess_project_scale
 
 
 class FakeProject:
@@ -196,6 +198,65 @@ def test_format_marker_gene_scanpy_fallback_with_h5ad():
     assert "**Primary** answer" in text or "Primary" in text
     assert CHAT_RANK_GENES_DATASOURCE_NAME in text
     assert "add_datasource" in text
+
+
+def test_format_marker_gene_scanpy_fallback_large_project_requires_backed():
+    large = ProjectScale(
+        obs_rows=500_000,
+        obs_columns=40,
+        estimated_obs_df_mb=300.0,
+        available_ram_mb=2048.0,
+        is_large=True,
+        has_h5ad=True,
+        obs_datasource="cells",
+    )
+    text = format_marker_gene_scanpy_fallback_policy("/data/adata.h5ad", large)
+    assert "backed='r'" in text
+    assert ".copy()" in text or "copy" in text.lower()
+
+
+def test_format_mdv_first_data_access_policy_large_project():
+    large = ProjectScale(
+        obs_rows=987_743,
+        obs_columns=45,
+        estimated_obs_df_mb=675.0,
+        available_ram_mb=2700.0,
+        is_large=True,
+        has_h5ad=True,
+        obs_datasource="cells",
+    )
+    text = format_mdv_first_data_access_policy(large, "/data/adata.h5ad", compact=False)
+    assert "MDV-first" in text
+    assert "backed='r'" in text
+    assert "columns=[...]" in text
+    assert "Scanpy last resort" in text
+    assert "987,743" in text
+
+    compact = format_mdv_first_data_access_policy(large, "/data/adata.h5ad", compact=True)
+    assert "MDV-first data access" in compact
+    assert "backed='r'" in compact
+    assert "add_datasource" in compact
+
+
+def test_assess_project_scale_marks_large_obs_table():
+    scale = assess_project_scale(FakeProject(), "")
+    assert scale.obs_datasource == "cells"
+    assert scale.obs_rows == 100
+    assert scale.is_large is False
+
+    class LargeProject(FakeProject):
+        def get_datasource_metadata(self, name):
+            if name == "cells":
+                return {
+                    "name": "cells",
+                    "size": 250_000,
+                    "columns": [{"field": f"c{i}", "datatype": "text"} for i in range(10)],
+                }
+            return super().get_datasource_metadata(name)
+
+    large = assess_project_scale(LargeProject(), "/data/x.h5ad")
+    assert large.is_large is True
+    assert large.has_h5ad is True
 
 
 def test_format_marker_gene_scanpy_fallback_without_h5ad():

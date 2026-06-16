@@ -49,6 +49,11 @@ from .column_field_resolve import (
 )
 from .verification import build_verification_summary
 from .datasource_roles import collect_wrapper_subgroup_keys_for_project, infer_datasource_roles
+from .dataset_scale import (
+    assess_project_scale,
+    format_scale_context_block,
+    load_agent_dataframes,
+)
 from .code_execution import execute_code
 from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
@@ -400,6 +405,25 @@ def _get_rag_retriever(embedding_spec: ModelSpec):
     return retriever
 
 
+def _resolve_path_to_data(project_dir: str) -> str:
+    """Prefer .h5ad in the project directory, else .csv, else empty."""
+    csv_file = None
+    h5ad_file = None
+    try:
+        for file in os.listdir(project_dir):
+            if file.endswith(".csv"):
+                csv_file = file
+            elif file.endswith(".h5ad"):
+                h5ad_file = file
+    except OSError:
+        return ""
+    if h5ad_file:
+        return os.path.join(project_dir, h5ad_file)
+    if csv_file:
+        return os.path.join(project_dir, csv_file)
+    return ""
+
+
 class ProjectChat(ProjectChatProtocol):
     def __init__(self, project: MDVProject):
         self.project = project
@@ -436,13 +460,9 @@ class ProjectChat(ProjectChatProtocol):
             # wrapper-capable expression datasources (e.g. rna/protein) linked via rows-as-columns.
             roles = infer_datasource_roles(self.project)
             self.roles = roles
-            df1 = self.project.get_datasource_as_dataframe(roles.obs_datasource)
-            primary_expr = roles.preferred_expression()
-            if primary_expr is not None:
-                df2 = self.project.get_datasource_as_dataframe(primary_expr.datasource_name)
-                self.df_list = [df1, df2]
-            else:
-                self.df_list = [df1]
+            path_to_data = _resolve_path_to_data(self.project.dir)
+            self.scale = assess_project_scale(self.project, path_to_data)
+            self.df_list = load_agent_dataframes(self.project, roles, self.scale)
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
@@ -491,6 +511,17 @@ class ProjectChat(ProjectChatProtocol):
     def _build_role_hint(self) -> str:
         try:
             roles = getattr(self, "roles", None)
+            scale = getattr(self, "scale", None)
+            scale_hint = ""
+            if scale is not None:
+                scale_hint = (
+                    "\n\nProject scale (memory-aware planning):\n"
+                    + format_scale_context_block(scale)
+                    + "\n- For this project size, plan charts using MDV field ids and expression wrappers. "
+                    "Only suggest Scanpy in the plan if the question requires marker ranking or DE columns "
+                    "not available in MDV metadata.\n"
+                    "- Before suggesting columns, decide: obs metadata only, expression wrappers, or Scanpy markers.\n"
+                )
             if roles is not None:
                 exprs = roles.expressions or []
                 if exprs:
@@ -513,6 +544,7 @@ class ProjectChat(ProjectChatProtocol):
                     "- Do not pair other Scanpy summary tables with MDV wrapper-based expression charts for the "
                     "same metric unless values are guaranteed identical; prefer one pipeline (see ChatMDV viz consistency "
                     "in RAG).\n"
+                    + scale_hint
                 )
         except Exception:
             pass
@@ -534,7 +566,9 @@ class ProjectChat(ProjectChatProtocol):
         prompt_data_template = f"""You have access to the following Pandas DataFrames: 
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
         {role_hint}
-        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
+        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields.
+        On large projects, df1/df2 may be column subsets for schema probing — use Project Data Context field ids for planning.
+        Prefer MDV chart field ids and expression wrappers; suggest Scanpy only for marker-ranking or DE questions when MDV metadata lacks required columns.
         Use these to correct the column names mentioned by the user.
         Before writing any `project.get_datasource_as_dataframe(datasource_name, columns=[...])` call, you must verify the datasource schema and only request columns that exist on that datasource.
         Never assume a `name` column exists on `cells`; if the task asks for genes/markers, use the expression datasource or explicit marker ranking outputs instead of `cells.name`.
@@ -822,35 +856,11 @@ class ProjectChat(ProjectChatProtocol):
                     step_total=total_steps,
                 )
                 # List all files in the directory
-                files_in_dir = os.listdir(self.project.dir)
-
-                # Initialize variables
-                csv_file = None
-                h5ad_file = None
-
-                # Identify the CSV or H5AD file (optional)
-                # subject to review...
-                for file in files_in_dir:
-                    if file.endswith(".csv"):
-                        csv_file = file
-                    elif file.endswith(".h5ad"):
-                        h5ad_file = file
-
-                # Determine the path_to_data (optional)
-                if h5ad_file:
-                    path_to_data = os.path.join(self.project.dir, h5ad_file)
-                elif csv_file:
-                    path_to_data = os.path.join(self.project.dir, csv_file)
-                else:
-                    path_to_data = ""  # fallback: no external file; operate on existing project datasources
+                path_to_data = _resolve_path_to_data(self.project.dir)
+                self.scale = assess_project_scale(self.project, path_to_data)
 
                 datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
 
-                #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
-                # we pass a reference to the actual project object and let figuring out the path be an internal implementation detail...
-                # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
-                # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
-                # and the assert in the function is being triggered even though it should be fine
                 prompt_RAG = get_createproject_prompt_RAG(
                     self.project,
                     path_to_data,
@@ -858,6 +868,7 @@ class ProjectChat(ProjectChatProtocol):
                     agent_plan,
                     response["input"],
                     compact=chat_model.provider == "ollama",
+                    scale=self.scale,
                 )
                 chat_debug_logger.info(f"=== RAG Base Prompt (before context injection) ===\n{prompt_RAG}\n=== End Base Prompt ===")
 

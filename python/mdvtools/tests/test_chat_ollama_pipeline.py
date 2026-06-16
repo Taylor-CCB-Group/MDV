@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mdvtools.llm import templates
+from mdvtools.llm.dataset_scale import ProjectScale
 from mdvtools.llm.langchain_mdv import (
     ProjectChat,
     _agent_fields_charts_output_valid,
@@ -234,6 +235,36 @@ def test_compact_rag_prompt_is_shorter_than_full(monkeypatch):
     assert len(compact) < len(full)
     assert "columns-md" in compact
     assert "Return only one fenced ```python code block" in compact
-    assert "Do NOT call `project.add_datasource(...)`" in compact
-    assert "Marker ranking vs DotPlot" not in compact
+    assert "MDV-first data access" in compact
     assert "Visualization vs analysis consistency" not in compact
+
+
+def test_compact_rag_prompt_includes_mdv_first_for_large_scale(monkeypatch):
+    fake_roles = SimpleNamespace(
+        expressions=[],
+        obs_datasource="cells",
+    )
+    monkeypatch.setattr(templates, "infer_datasource_roles", lambda _project: fake_roles)
+    monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
+
+    large_scale = ProjectScale(
+        obs_rows=987_743,
+        obs_columns=45,
+        estimated_obs_df_mb=675.0,
+        available_ram_mb=2700.0,
+        is_large=True,
+        has_h5ad=True,
+        obs_datasource="cells",
+    )
+    compact = templates.get_createproject_prompt_RAG(
+        project=_FakeProject(),
+        path_to_data="/data/TAURUS.h5ad",
+        datasource_name="cells",
+        final_answer='fields "Patient"\ncharts "Scatter plot"',
+        question="UMAP by patient",
+        compact=True,
+        scale=large_scale,
+    )
+    assert "987,743" in compact
+    assert "backed='r'" in compact
+    assert "Scanpy last resort" in compact

@@ -3,12 +3,14 @@ from typing import Any
 from mdvtools.project_protocols import CreateProjectPromptProject
 from mdvtools.mdvproject import MDVProject
 from mdvtools.markdown_utils import create_project_markdown, create_column_markdown
+from mdvtools.llm.dataset_scale import ProjectScale, assess_project_scale
 from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
     format_metadata_column_schema_policy,
+    format_mdv_first_data_access_policy,
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
@@ -126,12 +128,18 @@ def get_createproject_prompt_RAG(
     final_answer: str,
     question: str,
     compact: bool = False,
+    scale: ProjectScale | None = None,
 ) -> str:
     """
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
     Handles both standard and gene-related queries.
     When ``compact=True``, omits long policy blocks for local models (Ollama).
     """
+    if scale is None:
+        scale = assess_project_scale(project, path_to_data)
+    mdv_first_policy = format_mdv_first_data_access_policy(
+        scale, path_to_data, compact=compact
+    )
     # Build markdown context for the selected datasource; fall back to whole project if needed
     try:
         ds_meta = project.get_datasource_metadata(datasource_name)
@@ -165,16 +173,16 @@ def get_createproject_prompt_RAG(
             + expr_lines
             + """
 
+"""
+            + mdv_first_policy
+            + """
+
     Context: {context}
 
     The provided scripts demonstrate MDV chart construction patterns. Follow this workflow:
     1. Use MDVProject(project_path, delete_existing=False) when editing this project — never delete or recreate it.
-    2. Do NOT call `project.add_datasource(...)` for datasources that already exist (e.g. `"""
-            + datasource_name
-            + """`, `"""
-            + roles.obs_datasource
-            + """`). Load existing tables with `project.get_datasource_as_dataframe(...)`.
-    3. Load datasources with **Field ID** values from the context tables.
+    2. Follow the MDV-first data access rules above — do not load `.h5ad` or full datasources for chart-only views.
+    3. Load existing tables with `project.get_datasource_as_dataframe(<ds>, columns=[field_ids...])` when a pandas preview is needed.
     4. Build charts with mdvtools chart classes; set `params` from field ids (not display names).
     5. Print bounded markdown previews before `project.set_view(...)` when showing tabular results.
     6. Use injected CHATMDV_* constants when present; do not call `project.get_datasource_roles()`.
@@ -225,7 +233,7 @@ def get_createproject_prompt_RAG(
 """
         )
     feature_field_policy = format_feature_table_field_policy(roles)
-    marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data)
+    marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data, scale)
     table_chart_param_policy = format_obs_table_chart_param_policy()
     marker_ranking_viz_policy = format_marker_ranking_viz_policy()
     hybrid_routing_policy = format_scanpy_hybrid_routing_policy()
@@ -256,23 +264,17 @@ def get_createproject_prompt_RAG(
         - Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True) when creating a new project.
         - When modifying an existing project (the default in this chat context), do NOT recreate or delete the project.
 
-    2. Data Access (scanpy optional):
-        - If HAS_SCANPY is True and `data_path` points to a valid .h5ad file, you MAY load AnnData:
-            adata = sc.read_h5ad(data_path)
-            data_frame_obs = adata.obs
-            data_frame_var = adata.var.assign(name=adata.var_names.to_list())
-        - Exception: for **marker genes / top genes per cluster** when MDV tables lack needed columns, if `data_path`
-          is a `.h5ad` file, you SHOULD use `sc.read_h5ad` and Scanpy as described under "Marker genes" below.
-        - OTHERWISE (no scanpy or no .h5ad):
-            - DO NOT use scanpy.
-            - Use the existing MDV datasources already registered in the project:
-                - Observation/metadata datasource (df1): `"""+roles.obs_datasource+"""`
-                - Wrapper-capable expression datasources (feature tables): 
+    2. Data Access (MDV-first; Scanpy last resort):
+"""+mdv_first_policy+"""
+        - Observation/metadata datasource: `"""+roles.obs_datasource+"""`
+        - Wrapper-capable expression datasources (feature tables):
 """+expr_lines+"""
-            - Use `project.get_datasource_as_dataframe(<datasource_name>)` to load these tables, or
-              `project.get_datasource_as_dataframe(<datasource_name>, columns=[...])` to load a subset. Each entry may be a metadata **field id** (e.g. cluster column on `cells`) or a **chart FieldName wrapper** string for expression columns on the **observation (row) datasource** (same format as chart `params`, e.g. `rna_expr|GENE(rna_expr)|12`). Do not pass wrappers to the feature-table datasource dataframe.
+        - Use `project.get_datasource_as_dataframe(<datasource_name>, columns=[...])` with only the Field IDs you need.
+          Each entry may be a metadata **field id** (e.g. cluster column on `cells`) or a **chart FieldName wrapper** string
+          for expression columns on the **observation (row) datasource** (same format as chart `params`, e.g.
+          `rna_expr|GENE(rna_expr)|12`). Do not pass wrappers to the feature-table datasource dataframe.
 
-        - Marker genes and missing columns (ChatMDV):
+        - Marker genes and missing columns (Scanpy last resort only):
 """+marker_gene_policy+"""
 
     3. Datasource Registration:

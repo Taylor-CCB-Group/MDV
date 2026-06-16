@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from mdvtools.llm.dataset_scale import ProjectScale
 
 
 @dataclass(frozen=True)
@@ -378,7 +381,89 @@ def format_obs_table_chart_param_policy() -> str:
     )
 
 
-def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
+def format_mdv_first_data_access_policy(
+    scale: ProjectScale,
+    path_to_data: str,
+    *,
+    compact: bool = False,
+) -> str:
+    """
+    Prompt text: MDV-first data access with Scanpy as last resort.
+
+    ``compact=True`` returns a shorter block for Ollama/local models.
+    """
+    from mdvtools.llm.dataset_scale import format_scale_context_block
+
+    scale_block = format_scale_context_block(scale)
+    large_rules = ""
+    if scale.is_large:
+        large_rules = (
+            "- **Large-project rules (mandatory):**\n"
+            "  - Do **not** call `sc.read_h5ad(data_path)` without `backed='r'`.\n"
+            "  - Do **not** call `project.get_datasource_as_dataframe(<name>)` without "
+            "`columns=[...]` listing only the Field IDs you need.\n"
+            "  - Do **not** materialize `pd.DataFrame(adata.obs)` — observation columns already exist on "
+            f"`{scale.obs_datasource}` in the MDV project.\n"
+            "  - Do **not** open `.h5ad` for chart-only questions (scatter/UMAP, proportions, stacked rows, "
+            "selection dialogs).\n"
+        )
+
+    scanpy_last_resort = (
+        "- **Scanpy last resort only** when MDV cannot answer: marker ranking (`sc.tl.rank_genes_groups`), "
+        "or DE stats missing from the expression feature table, and `data_path` is a `.h5ad` file.\n"
+    )
+    if scale.is_large:
+        scanpy_last_resort += (
+            "  - On large projects use `adata = sc.read_h5ad(data_path, backed='r')`; filter with obs masks "
+            "before any heavy step; never `.copy()` the full expression matrix.\n"
+        )
+    else:
+        scanpy_last_resort += (
+            "  - Prefer `backed='r'` when loading AnnData; avoid full in-memory loads unless necessary.\n"
+        )
+
+    if compact:
+        return (
+            "## Project scale and memory\n"
+            + scale_block
+            + "\n\n## MDV-first data access (mandatory)\n"
+            "- **1.** Use `MDVProject(project_path, delete_existing=False)`, chart classes, `CHATMDV_*` wrappers, "
+            "and `SelectionDialogPlot` for filtering — no Scanpy for chart-only views.\n"
+            "- **2.** Load tables with `project.get_datasource_as_dataframe(<ds>, columns=[field_ids...])` only.\n"
+            "- **3.** Gene expression on embeddings: expression wrapper tokens via `build_expression_wrapper_token`.\n"
+            "- **4.** Scanpy only for marker/DE workflows when MDV tables lack required columns.\n"
+            + large_rules
+            + scanpy_last_resort
+            + "- Do **not** `add_datasource` for datasources that already exist (except "
+            f"`{CHAT_RANK_GENES_DATASOURCE_NAME}` for optional in-view marker tables).\n"
+        )
+
+    return (
+        "## Project scale and memory\n"
+        + scale_block
+        + "\n\n## MDV-first data access (default for existing projects)\n"
+        "Follow this priority order before writing any data-loading code:\n"
+        "- **1. MDV chart APIs (preferred):** `MDVProject`, mdvtools chart classes, injected `CHATMDV_*` constants, "
+        "expression wrapper `params`, and `SelectionDialogPlot` for interactive filters. This path is fast and "
+        "memory-efficient on large projects.\n"
+        "- **2. Column-subset MDV tables:** When you need a pandas preview or aggregate, call "
+        "`project.get_datasource_as_dataframe(<datasource>, columns=[<field_id>, ...])` with only the Field IDs "
+        "required for the chart or printout.\n"
+        "- **3. Expression without AnnData:** For gene expression on embeddings, build wrapper tokens with "
+        "`build_expression_wrapper_token` — do not load `.h5ad`.\n"
+        "- **4. Scanpy last resort:** Use Scanpy only when steps 1–3 cannot answer the question (marker genes, "
+        "DE ranking, or expression stats absent from MDV metadata) and a `.h5ad` exists at `data_path`.\n"
+        + large_rules
+        + scanpy_last_resort
+        + "- Do **not** call `project.add_datasource(...)` for observation or expression datasources that already "
+        "exist in this project.\n"
+    )
+
+
+def format_marker_gene_scanpy_fallback_policy(
+    path_to_data: str,
+    scale: ProjectScale | None = None,
+) -> str:
     """
     Prompt text: marker-gene requests must not assume cluster/DE columns exist on the ``genes`` table.
 
@@ -400,14 +485,21 @@ def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
     )
 
     ds = CHAT_RANK_GENES_DATASOURCE_NAME
+    is_large = scale is not None and scale.is_large
+    h5ad_load = (
+        "`adata = sc.read_h5ad(data_path, backed='r')`"
+        if is_large
+        else "`adata = sc.read_h5ad(data_path)` (prefer `backed='r'` on large datasets)"
+    )
     if has_h5ad:
         return (
             semantic
             + "- If the MDV `genes` table lacks columns needed for ranking (or you need full expression), and "
-            "`data_path` is a `.h5ad` file: load `adata = sc.read_h5ad(data_path)`, pick the cluster column from "
+            f"`data_path` is a `.h5ad` file: load {h5ad_load}, pick the cluster column from "
             "`adata.obs.columns`, then compute markers with Scanpy (e.g. `sc.tl.rank_genes_groups` with "
-            "`groupby=<cluster_key>`, or mean expression per group). Print a **bounded** table (top 5 per cluster) "
-            "via `print(...)` as the **primary** answer.\n"
+            "`groupby=<cluster_key>`, or mean expression per group). On large projects filter `adata` with obs "
+            "masks before heavy steps; avoid `.copy()` on the full matrix. Print a **bounded** table (top 5 per "
+            "cluster) via `print(...)` as the **primary** answer.\n"
             + "- **In-view table (optional):** When the user clearly needs the marker table **in the saved view**, you may "
             "call "
             f"`project.add_datasource('{ds}', marker_df, replace_data=True, add_to_view=view_name)` "
