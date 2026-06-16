@@ -41,10 +41,11 @@ detail, no decisions. Decisions that are hard to reverse live in `docs/adr/`.
   dependencies into an environment (e.g. `uv`, `pip`, `poetry`). Produces the lockfile
   (`uv.lock`). Independent of the build backend.
 
-## Running-jobs / DGE terms
+## Running-jobs terms
 
-Vocabulary for the async analysis-jobs work (Differential Gene Expression is the first tool).
-Glossary only — the decisions live in `docs/adr/` (0003–0007).
+Vocabulary for the async analysis-jobs work. The first tool is a trivial **concat-columns** job —
+the framework is the deliverable; DGE is deferred (see ADR-0003/0006). Glossary only — the
+decisions live in `docs/adr/` (0004–0007).
 
 - **cells datasource** — the `obs` table; one row per cell.
 
@@ -56,10 +57,18 @@ Glossary only — the decisions live in `docs/adr/` (0003–0007).
 
 - **filter / subset** — the user's current selection over `cells` rows.
 
-- **job** — one run of a **tool** against a datasource, a set of params, and a **subset**.
+- **resolved selection** — the concrete list of `cells` rows currently selected, computed
+  **on the client** and sent as a **job**'s subset — not a re-evaluable filter expression.
 
-- **tool** — a registry-defined analysis (e.g. `dge_scanpy`) with a params spec and an output
-  spec.
+- **input filter hash** — a hash of the **resolved selection** that pins the exact subset a
+  **job** ran on (the "subset hash" recorded in the **manifest**).
+
+- **job** — one run of a **tool** against a datasource, a set of params, and — for tools that
+  take one — an optional **subset**. (`concat_columns` takes no subset; it runs over the whole
+  datasource.)
+
+- **tool** — a registry-defined analysis with a params spec and an output spec. The first is
+  `concat_columns` (joins two columns into a new text column); `dge_scanpy` is deferred.
 
 - **executor** — the pluggable transport that runs a **job** (local subprocess now, HPC
   later).
@@ -70,7 +79,11 @@ Glossary only — the decisions live in `docs/adr/` (0003–0007).
 - **owner** — the web server; the sole reader/writer of the project store.
 
 - **workspace** — the per-job directory holding the materialized inputs, intermediates, and
-  outputs for one **job**.
+  outputs for one **job**. Fixed layout: `input/`, `work/`, `output/`, terminal marker.
+
+- **tray** — the materialized inputs the **owner** writes into the **workspace**'s `input/` for
+  one **job**. HDF5, with a per-**tool** schema; decoded from the store so the **worker** reads
+  plain arrays, never MDV internals. The format is an owner↔worker contract — substitutable.
 
 - **ingest** — the **owner** step that reads **worker** outputs and writes them into the
   project.
