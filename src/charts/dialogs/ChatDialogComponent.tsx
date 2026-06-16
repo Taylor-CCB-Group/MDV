@@ -1,6 +1,6 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
-import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
+import { type ChatProgress, type ChatMessage, type ChatModelOption, navigateToView } from './ChatAPI';
 import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
@@ -17,6 +17,10 @@ import {
     Divider,
     IconButton,
     InputAdornment,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
     Skeleton,
     TextField,
     Typography,
@@ -450,10 +454,24 @@ export type ChatBotProps = {
     verboseProgress: string[];
     onClose: () => void;
     suggestedQuestions: string[];
+    availableModels: ChatModelOption[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
 };
 
 
-const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose, suggestedQuestions}: ChatBotProps) => {
+const Chatbot = ({
+    messages,
+    isSending,
+    sendAPI,
+    requestProgress,
+    verboseProgress,
+    onClose,
+    suggestedQuestions,
+    availableModels,
+    selectedModelId,
+    onModelChange,
+}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastMessageRef = useRef<HTMLDivElement>(null);
@@ -542,7 +560,29 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 <RobotPandaSVG />
             </Box> */}
             <Divider />
-            <Box className="flex p-4 w-full">
+            <Box className="flex flex-col p-4 w-full gap-2">
+                {availableModels.length > 1 ? (
+                    <FormControl size="small" fullWidth disabled={isSending}>
+                        <InputLabel id="chatmdv-model-label">Model</InputLabel>
+                        <Select
+                            labelId="chatmdv-model-label"
+                            label="Model"
+                            value={selectedModelId}
+                            onChange={(e) => onModelChange(e.target.value)}
+                        >
+                            {availableModels.map((model) => (
+                                <MenuItem key={model.id} value={model.id}>
+                                    {model.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                ) : availableModels.length === 1 ? (
+                    <Typography variant="caption" color="text.secondary">
+                        Model: {availableModels[0].label}
+                    </Typography>
+                ) : null}
+            <Box className="flex w-full">
                 <TextField
                     type="text"
                     // disabled={isSending} //we can still type while it's processing
@@ -570,6 +610,7 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
                     Send
                 </Button>
+            </Box>
             </Box>
         </Box>
     );

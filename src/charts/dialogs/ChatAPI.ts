@@ -100,9 +100,24 @@ const completedChatResponseSchema = z.object({
     // timestamp: z.string(),
     error: z.boolean().optional(),
 });
+const chatModelSchema = z.object({
+    id: z.string(),
+    label: z.string(),
+    provider: z.enum(['openai', 'ollama']),
+    model: z.string(),
+    kind: z.enum(['chat', 'embedding']),
+    available: z.boolean().optional(),
+});
+
+export type ChatModelOption = z.infer<typeof chatModelSchema>;
+
+const CHAT_MODEL_STORAGE_KEY = 'chatmdv-selected-model';
+
 const chatInitResponseSchema = z.object({
     message: z.string(),
     suggested_questions: z.array(z.string()).optional(),
+    models: z.array(chatModelSchema).optional(),
+    default_model_id: z.string().optional().nullable(),
     error: z.boolean().optional(),
 });
 type ChatInitResponse = z.infer<typeof chatInitResponseSchema>;
@@ -197,7 +212,14 @@ const sendChatInitHttp = async (message: string, id: string, route: string, conv
     return parsed;
 };
 
-const sendMessageSocket = async (message: string, id: string, _routeUnused: string, conversationId: string, time?: number) => {
+const sendMessageSocket = async (
+    message: string,
+    id: string,
+    _routeUnused: string,
+    conversationId: string,
+    modelId?: string,
+    time?: number,
+) => {
     // consider refactoring to be a generator function, so that we can yield progress updates
     const socket = window.mdv.chartManager.ipc?.socket;
     if (!socket) return;
@@ -231,7 +253,12 @@ const sendMessageSocket = async (message: string, id: string, _routeUnused: stri
 
         socket.on('chat_response', onChatResponse);
         socket.on('chat_error', onError);
-        socket.emit('chat_request', { message, id, conversation_id: conversationId });
+        socket.emit('chat_request', {
+            message,
+            id,
+            conversation_id: conversationId,
+            ...(modelId ? { model_id: modelId } : {}),
+        });
     });
 
     return response;
@@ -325,6 +352,27 @@ const useChat = () => {
     const [conversationMap, setConversationMap] = useState<ConversationMap>({});
     const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
     const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+    const [availableModels, setAvailableModels] = useState<ChatModelOption[]>([]);
+    const [selectedModelId, setSelectedModelId] = useState<string>('');
+
+    const applyModelSelection = useCallback((models: ChatModelOption[], defaultModelId?: string | null) => {
+        const chatModels = models.filter((m) => m.kind === 'chat');
+        setAvailableModels(chatModels);
+        const stored = localStorage.getItem(CHAT_MODEL_STORAGE_KEY);
+        const storedValid = stored && chatModels.some((m) => m.id === stored);
+        const nextId = storedValid
+            ? stored
+            : (defaultModelId && chatModels.some((m) => m.id === defaultModelId)
+                ? defaultModelId
+                : chatModels[0]?.id ?? '');
+        setSelectedModelId(nextId);
+    }, []);
+
+    const onModelChange = useCallback((modelId: string) => {
+        setSelectedModelId(modelId);
+        localStorage.setItem(CHAT_MODEL_STORAGE_KEY, modelId);
+    }, []);
+
     const socket = useMemo(() => {
         if (!cm.ipc || !cm.ipc.socket) return null;
         return cm.ipc.socket;
@@ -429,6 +477,9 @@ const useChat = () => {
             // todo: Update when the endpoint is ready
             // const suggestedQuestions = await axios.get("");
             if (response?.suggested_questions) setSuggestedQuestions(response?.suggested_questions);
+            if (response?.models) {
+                applyModelSelection(response.models, response.default_model_id);
+            }
         } catch (error: any) {
             const errorMessage = formatChatError(error);
             console.error('Error sending welcome message: ', errorMessage);
@@ -447,7 +498,7 @@ const useChat = () => {
             setIsInit(true);
             setIsLoadingInit(false);
         }
-    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading]);
+    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading, applyModelSelection]);
 
     // Socket connection and Init chat
     useEffect(() => {
@@ -495,7 +546,13 @@ const useChat = () => {
                 conversationId,
             }])
             
-            const response = await sendMessageSocket(input, id, "", conversationId);
+            const response = await sendMessageSocket(
+                input,
+                id,
+                "",
+                conversationId,
+                selectedModelId || undefined,
+            );
 
             if (response) {
                 const allViews = viewManager.all_views;
@@ -531,7 +588,7 @@ const useChat = () => {
             setCurrentRequestId('');
             setRequestProgress(null);
         }
-    }, [conversationId, socket, viewManager]);
+    }, [conversationId, socket, viewManager, selectedModelId]);
 
 
     // Start New Conversation
@@ -554,6 +611,9 @@ const useChat = () => {
                 id: generateId(),
                 conversationId: newConversationId
             }]);
+            if (response?.models) {
+                applyModelSelection(response.models, response.default_model_id);
+            }
         } catch (error: any) {
             const errorMessage = formatChatError(error);
             setMessages([{
@@ -569,7 +629,7 @@ const useChat = () => {
             setCurrentRequestId("");
             setIsSending(false);
         }
-    }, [routeInit]);
+    }, [routeInit, applyModelSelection]);
 
     // Switch conversation
     const switchConversation = useCallback((id: string) => {
@@ -593,6 +653,9 @@ const useChat = () => {
         conversationMap,
         isLoadingInit,
         suggestedQuestions,
+        availableModels,
+        selectedModelId,
+        onModelChange,
     };
 };
 
