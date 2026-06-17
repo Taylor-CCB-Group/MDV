@@ -6,6 +6,7 @@ import type { TableChartReactConfig } from "@/react/components/TableChartReactWr
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
+import SlickGridDataProvider from "@/react/utils/SlickGridDataProvider";
 
 // Mock all the context hooks
 vi.mock("@/react/context", () => ({
@@ -84,6 +85,7 @@ describe("useSlickGridReact", () => {
                 datatype: "integer",
                 data: new Uint32Array([25, 30, 20]),
                 editable: true,
+                getValue: (index: number) => [25, 30, 20][index],
             },
             {
                 field: "name",
@@ -92,6 +94,7 @@ describe("useSlickGridReact", () => {
                 data: new Uint8Array([0, 1, 2]),
                 values: ["Alice", "Bob", "Charlie"],
                 editable: false,
+                getValue: (index: number) => ["Alice", "Bob", "Charlie"][index],
             },
             {
                 field: "id",
@@ -101,6 +104,7 @@ describe("useSlickGridReact", () => {
                 data: new Uint32Array([65, 66, 65, 0]),
                 stringLength: 2,
                 editable: true,
+                getValue: (index: number) => ["AB", "A", "AB"][index],
             }
         ] as any;
 
@@ -350,6 +354,58 @@ describe("useSlickGridReact", () => {
 
             expect(mockGridInstance.slickGrid.setData).toHaveBeenCalled();
             expect(mockGridInstance.slickGrid.render).toHaveBeenCalled();
+        });
+
+        test("should update sorted indices without replacing the data provider", () => {
+            const { result, rerender } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+            const setData = vi.mocked(gridInstance.slickGrid.setData);
+            const invalidate = vi.mocked(gridInstance.slickGrid.invalidate);
+
+            expect(setData).toHaveBeenCalledTimes(1);
+            const dataProvider = setData.mock.calls[0]?.[0];
+            expect(dataProvider).toBeInstanceOf(SlickGridDataProvider);
+            if (!(dataProvider instanceof SlickGridDataProvider)) {
+                throw new Error("Expected SlickGridDataProvider");
+            }
+            expect(dataProvider.getDataIndex(0)).toBe(0);
+
+            const invalidateCallsAfterCreate = invalidate.mock.calls.length;
+            mockSortedIndices = new Uint32Array([2, 1, 0]);
+
+            act(() => {
+                rerender();
+            });
+
+            expect(setData).toHaveBeenCalledTimes(1);
+            expect(invalidate.mock.calls.length).toBeGreaterThan(
+                invalidateCallsAfterCreate,
+            );
+            expect(dataProvider.getDataIndex(0)).toBe(2);
+        });
+
+        test("should update include_index without replacing the data provider", () => {
+            const { result, rerender } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+            const setData = vi.mocked(gridInstance.slickGrid.setData);
+
+            expect(setData).toHaveBeenCalledTimes(1);
+            const dataProvider = setData.mock.calls[0]?.[0];
+            expect(dataProvider).toBeInstanceOf(SlickGridDataProvider);
+            if (!(dataProvider instanceof SlickGridDataProvider)) {
+                throw new Error("Expected SlickGridDataProvider");
+            }
+            expect(dataProvider.getItem(0).__index__).toBeUndefined();
+
+            act(() => {
+                runInAction(() => {
+                    mockConfig.include_index = true;
+                });
+                rerender();
+            });
+
+            expect(setData).toHaveBeenCalledTimes(1);
+            expect(dataProvider.getItem(0).__index__).toBe(1);
         });
 
         test("should open the removal impact dialog when charts use the column", async () => {

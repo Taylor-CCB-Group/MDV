@@ -21,6 +21,17 @@ class SlickGridDataProvider {
         this.selectedRowIds = new Set();
     }
 
+    /** Update row/column state in place so SlickGrid can keep the same provider reference. */
+    update(
+        columns: LoadedDataColumn<DataType>[],
+        indices: Uint32Array,
+        includeIndex = this.includeIndex,
+    ) {
+        this.columns = columns;
+        this.indices = indices;
+        this.includeIndex = includeIndex;
+    }
+
     getLength(): number {
         return this.indices.length;
     }
