@@ -8,27 +8,36 @@ import {
     Typography,
 } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
-
-type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useDebounce } from "use-debounce";
 import { PopoverPicker } from "../ColorPicker";
 import type { ImageLayerSource } from "@/react/spatial_layer_stack";
 
+type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
 type ChannelConfig = NonNullable<ImageLayerConfig["channels"]>;
+type Range = [number, number];
+
+type LoaderDefaults = {
+    colors?: [number, number, number][];
+    contrastLimits?: [number, number][];
+    channelsVisible?: boolean[];
+    selections?: ChannelConfig["selections"];
+};
 
 type Props = {
     layerId: string;
     config: ImageLayerConfig;
     imageSource?: ImageLayerSource;
-    loaderDefaults?: {
-        colors?: [number, number, number][];
-        contrastLimits?: [number, number][];
-        channelsVisible?: boolean[];
-        selections?: ChannelConfig["selections"];
-    };
+    loaderDefaults?: LoaderDefaults;
     channelNames?: string[];
     updateLayer: (updates: Partial<LayerConfig>) => void;
+    patchLayer: (updates: Partial<LayerConfig>) => void;
 };
+
+function copyRange(value: [number, number] | undefined, fallback: Range): Range {
+    if (!value) return fallback;
+    return [value[0], value[1]];
+}
 
 function withChannelValue<T>(values: T[] | undefined, index: number, value: T, fallback: T): T[] {
     const next = [...(values ?? [])];
@@ -39,34 +48,75 @@ function withChannelValue<T>(values: T[] | undefined, index: number, value: T, f
     return next;
 }
 
+function clampContrast(value: Range, domain: Range): Range {
+    const [domainMin, domainMax] = domain;
+    let [low, high] = value;
+    low = Math.max(domainMin, Math.min(low, domainMax));
+    high = Math.max(domainMin, Math.min(high, domainMax));
+    if (low >= high) {
+        if (high < domainMax) {
+            low = Math.max(domainMin, high - 1);
+        } else {
+            high = Math.min(domainMax, low + 1);
+        }
+    }
+    return [low, high];
+}
+
+function getChannelContrast(
+    channels: ChannelConfig,
+    loaderDefaults: LoaderDefaults | undefined,
+    index: number,
+    domain: Range,
+): Range {
+    const fromConfig = channels.contrastLimits?.[index];
+    if (fromConfig) return copyRange(fromConfig, domain);
+    const fromLoader = loaderDefaults?.contrastLimits?.[index];
+    if (fromLoader) return copyRange(fromLoader, domain);
+    return domain;
+}
+
 export default function ImageLayerPanel({
     config,
     imageSource = "spatial",
     loaderDefaults,
     channelNames = [],
     updateLayer,
+    patchLayer,
 }: Props) {
     const channels = config.channels ?? {};
     const colors = channels.colors ?? loaderDefaults?.colors ?? [[255, 0, 0]];
-    const contrastLimits =
-        channels.contrastLimits ?? loaderDefaults?.contrastLimits ?? [[0, 255]];
     const channelsVisible =
         channels.channelsVisible ?? loaderDefaults?.channelsVisible ?? colors.map(() => true);
     const selections = channels.selections ?? loaderDefaults?.selections ?? [{ c: 0 }];
 
-    const channelCount = Math.max(colors.length, contrastLimits.length, channelsVisible.length, 1);
+    const channelCount = Math.max(
+        colors.length,
+        loaderDefaults?.contrastLimits?.length ?? 0,
+        channels.contrastLimits?.length ?? 0,
+        channelsVisible.length,
+        1,
+    );
     const channelIndexes = useMemo(
         () => Array.from({ length: channelCount }, (_, index) => index),
         [channelCount],
     );
 
-    const updateChannels = (patch: Partial<ChannelConfig>) => {
-        updateLayer({
-            channels: {
-                ...channels,
-                ...patch,
-            },
-        });
+    const buildChannels = (patch: Partial<ChannelConfig>): ChannelConfig => ({
+        colors,
+        contrastLimits: channels.contrastLimits,
+        channelsVisible,
+        selections,
+        ...channels,
+        ...patch,
+    });
+
+    const applyChannelPatch = (patch: Partial<ChannelConfig>, persist = false) => {
+        const nextChannels = buildChannels(patch);
+        patchLayer({ channels: nextChannels });
+        if (persist) {
+            updateLayer({ channels: nextChannels });
+        }
     };
 
     return (
@@ -74,41 +124,53 @@ export default function ImageLayerPanel({
             <Typography variant="caption" color="text.secondary">
                 Image source: {imageSource === "spatial" ? "SpatialData zarr" : "OME-TIFF"}
             </Typography>
-            {channelIndexes.map((index) => (
-                <ChannelRow
-                    key={`${config.id}-channel-${index}`}
-                    index={index}
-                    name={channelNames[selections[index]?.c ?? index] ?? `Channel ${index + 1}`}
-                    color={colors[index] ?? [255, 0, 0]}
-                    contrast={contrastLimits[index] ?? [0, 255]}
-                    visible={channelsVisible[index] ?? true}
-                    channelOptions={channelNames}
-                    selectedChannel={selections[index]?.c ?? 0}
-                    onVisibleChange={(visible) => {
-                        updateChannels({
-                            channelsVisible: withChannelValue(channelsVisible, index, visible, true),
-                        });
-                    }}
-                    onColorChange={(color) => {
-                        updateChannels({
-                            colors: withChannelValue(colors, index, color, [255, 0, 0]),
-                        });
-                    }}
-                    onContrastChange={(limits) => {
-                        updateChannels({
-                            contrastLimits: withChannelValue(contrastLimits, index, limits, [0, 255]),
-                        });
-                    }}
-                    onChannelSelect={(channelIndex) => {
-                        const nextSelections = [...selections];
-                        while (nextSelections.length <= index) {
-                            nextSelections.push({ c: 0 });
-                        }
-                        nextSelections[index] = { ...nextSelections[index], c: channelIndex };
-                        updateChannels({ selections: nextSelections });
-                    }}
-                />
-            ))}
+            {channelIndexes.map((index) => {
+                const domain = copyRange(
+                    loaderDefaults?.contrastLimits?.[index],
+                    [0, 255],
+                );
+                return (
+                    <ChannelRow
+                        key={`${config.id}-channel-${index}`}
+                        index={index}
+                        name={channelNames[selections[index]?.c ?? index] ?? `Channel ${index + 1}`}
+                        color={colors[index] ?? [255, 0, 0]}
+                        contrast={getChannelContrast(channels, loaderDefaults, index, domain)}
+                        domain={domain}
+                        visible={channelsVisible[index] ?? true}
+                        channelOptions={channelNames}
+                        selectedChannel={selections[index]?.c ?? 0}
+                        onVisibleChange={(visible) => {
+                            applyChannelPatch({
+                                channelsVisible: withChannelValue(channelsVisible, index, visible, true),
+                            }, true);
+                        }}
+                        onColorChange={(color) => {
+                            applyChannelPatch({
+                                colors: withChannelValue(colors, index, color, [255, 0, 0]),
+                            }, true);
+                        }}
+                        onContrastChange={(limits, persist) => {
+                            applyChannelPatch({
+                                contrastLimits: withChannelValue(
+                                    channels.contrastLimits ?? loaderDefaults?.contrastLimits,
+                                    index,
+                                    limits,
+                                    domain,
+                                ),
+                            }, persist);
+                        }}
+                        onChannelSelect={(channelIndex) => {
+                            const nextSelections = [...selections];
+                            while (nextSelections.length <= index) {
+                                nextSelections.push({ c: 0 });
+                            }
+                            nextSelections[index] = { ...nextSelections[index], c: channelIndex };
+                            applyChannelPatch({ selections: nextSelections }, true);
+                        }}
+                    />
+                );
+            })}
         </div>
     );
 }
@@ -118,6 +180,7 @@ function ChannelRow({
     name,
     color,
     contrast,
+    domain,
     visible,
     channelOptions,
     selectedChannel,
@@ -129,17 +192,35 @@ function ChannelRow({
     index: number;
     name: string;
     color: [number, number, number];
-    contrast: [number, number];
+    contrast: Range;
+    domain: Range;
     visible: boolean;
     channelOptions: string[];
     selectedChannel: number;
     onVisibleChange: (visible: boolean) => void;
     onColorChange: (color: [number, number, number]) => void;
-    onContrastChange: (limits: [number, number]) => void;
+    onContrastChange: (limits: Range, persist: boolean) => void;
     onChannelSelect: (channelIndex: number) => void;
 }) {
     const labelId = useId();
-    const [low, high] = contrast;
+    const [domainMin, domainMax] = domain;
+    const [liveContrast, setLiveContrast] = useState<Range | null>(null);
+    const [debouncedContrast] = useDebounce(liveContrast, 50);
+
+    useEffect(() => {
+        setLiveContrast(null);
+    }, [contrast[0], contrast[1]]);
+
+    useEffect(() => {
+        if (!debouncedContrast) return;
+        if (debouncedContrast[0] === contrast[0] && debouncedContrast[1] === contrast[1]) {
+            return;
+        }
+        onContrastChange(debouncedContrast, true);
+    }, [contrast, debouncedContrast, onContrastChange]);
+
+    const [low, high] = liveContrast ?? contrast;
+    const sliderStep = Math.max(1, Math.round((domainMax - domainMin) / 500));
 
     return (
         <div className="rounded-md border border-[hsl(var(--border))] p-2">
@@ -178,12 +259,14 @@ function ChannelRow({
                     <Slider
                         size="small"
                         value={low}
-                        min={0}
-                        max={high}
+                        min={domainMin}
+                        max={domainMax}
+                        step={sliderStep}
                         onChange={(_, value) => {
-                            if (typeof value === "number") {
-                                onContrastChange([value, high]);
-                            }
+                            if (typeof value !== "number") return;
+                            const next = clampContrast([value, high], domain);
+                            setLiveContrast(next);
+                            onContrastChange(next, false);
                         }}
                     />
                 </div>
@@ -192,12 +275,14 @@ function ChannelRow({
                     <Slider
                         size="small"
                         value={high}
-                        min={low}
-                        max={Math.max(high * 2, low + 1)}
+                        min={domainMin}
+                        max={domainMax}
+                        step={sliderStep}
                         onChange={(_, value) => {
-                            if (typeof value === "number") {
-                                onContrastChange([low, value]);
-                            }
+                            if (typeof value !== "number") return;
+                            const next = clampContrast([low, value], domain);
+                            setLiveContrast(next);
+                            onContrastChange(next, false);
                         }}
                     />
                 </div>

@@ -285,6 +285,75 @@ export function normalizeSpatialLayerStack(
     return { stackOrder, entries, spatialLayers };
 }
 
+export type CanvasLayerState = {
+    layers: Record<string, LayerConfig>;
+    layerOrder: string[];
+};
+
+export function createCanvasLayerState(): CanvasLayerState {
+    return { layers: {}, layerOrder: [] };
+}
+
+/**
+ * Merge stack config into a stable canvas layer state. Reuses existing layer
+ * object references and updates props in place so deck.gl can update uniforms
+ * without re-running spatial data loads.
+ */
+export function patchCanvasLayerProps(
+    target: CanvasLayerState,
+    layerId: string,
+    patch: Partial<LayerConfig>,
+): boolean {
+    const layer = target.layers[layerId];
+    if (!layer) return false;
+
+    if ("channels" in patch && patch.channels && "channels" in layer) {
+        layer.channels = {
+            ...layer.channels,
+            ...patch.channels,
+        };
+    }
+    const rest = { ...patch };
+    if ("channels" in rest) {
+        delete rest.channels;
+    }
+    Object.assign(layer, rest);
+    return true;
+}
+
+export function syncCanvasLayerStateFromStack(
+    stack: SpatialLayerStackConfig,
+    target: CanvasLayerState,
+): void {
+    const next = stackToCanvasState(stack);
+    const nextOrder = next.layerOrder;
+    if (
+        nextOrder.length !== target.layerOrder.length ||
+        nextOrder.some((id, index) => target.layerOrder[index] !== id)
+    ) {
+        target.layerOrder.splice(0, target.layerOrder.length, ...nextOrder);
+    }
+
+    const activeIds = new Set<string>();
+    for (const id of nextOrder) {
+        activeIds.add(id);
+        const nextLayer = next.layers[id];
+        if (!nextLayer) continue;
+        const existing = target.layers[id];
+        if (!existing) {
+            target.layers[id] = nextLayer;
+            continue;
+        }
+        Object.assign(existing, nextLayer);
+    }
+
+    for (const id of Object.keys(target.layers)) {
+        if (!activeIds.has(id)) {
+            delete target.layers[id];
+        }
+    }
+}
+
 export function stackToCanvasState(stack: SpatialLayerStackConfig): {
     layers: Record<string, LayerConfig>;
     layerOrder: string[];

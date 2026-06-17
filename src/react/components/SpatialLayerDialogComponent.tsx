@@ -30,6 +30,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { observer } from "mobx-react-lite";
 import { runInAction } from "mobx";
 import { useCallback, useMemo, useState } from "react";
+import { useDebouncedCallback } from "use-debounce";
 import type { LayerConfig, LayerType } from "@spatialdata/vis";
 import { useChart, useDataStore } from "../context";
 import { useConfig } from "../hooks";
@@ -65,10 +66,12 @@ function LayerDetails({
     stackKey,
     stack,
     onUpdateSpatialLayer,
+    onPatchSpatialLayer,
 }: {
     stackKey: string;
     stack: SpatialLayerStackConfig;
     onUpdateSpatialLayer: (layerId: string, updates: Partial<LayerConfig>) => void;
+    onPatchSpatialLayer: (layerId: string, updates: Partial<LayerConfig>) => void;
 }) {
     const renderer = useOptionalSpatialCanvasRendererContext();
     const dataStore = useDataStore();
@@ -85,12 +88,15 @@ function LayerDetails({
 
     const association = renderer?.inferTableAssociation(layer.elementKey) ?? { status: "none" as const };
     const imageDefaults = renderer?.getImageLayerLoadedData(layer.id);
-    const channelNames =
-        imageDefaults?.loader &&
-        typeof imageDefaults.loader === "object" &&
-        "metadata" in imageDefaults.loader
-            ? []
-            : [];
+    const channelNames = useMemo(() => {
+        if (!imageDefaults) return [];
+        const count = Math.max(
+            imageDefaults.colors?.length ?? 0,
+            imageDefaults.contrastLimits?.length ?? 0,
+            1,
+        );
+        return Array.from({ length: count }, (_, index) => `Channel ${index + 1}`);
+    }, [imageDefaults]);
 
     switch (layer.type) {
         case "image":
@@ -102,6 +108,7 @@ function LayerDetails({
                     loaderDefaults={imageDefaults}
                     channelNames={channelNames}
                     updateLayer={(updates) => onUpdateSpatialLayer(layer.id, updates)}
+                    patchLayer={(updates) => onPatchSpatialLayer(layer.id, updates)}
                 />
             );
         case "shapes":
@@ -141,6 +148,7 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
     onOpacityChange,
     onRemove,
     onUpdateSpatialLayer,
+    onPatchSpatialLayer,
 }: {
     stackKey: string;
     stack: SpatialLayerStackConfig;
@@ -148,6 +156,7 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
     onOpacityChange: (key: string, opacity: number) => void;
     onRemove: (key: string) => void;
     onUpdateSpatialLayer: (layerId: string, updates: Partial<LayerConfig>) => void;
+    onPatchSpatialLayer: (layerId: string, updates: Partial<LayerConfig>) => void;
 }) {
     const {
         attributes,
@@ -244,6 +253,7 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
                     stackKey={stackKey}
                     stack={stack}
                     onUpdateSpatialLayer={onUpdateSpatialLayer}
+                    onPatchSpatialLayer={onPatchSpatialLayer}
                 />
             </AccordionDetails>
         </Accordion>
@@ -275,15 +285,52 @@ const SpatialLayerDialogComponent = observer(() => {
     );
 
     const updateStack = useCallback(
-        (mutator: (current: SpatialLayerStackConfig) => void) => {
+        (mutator: (current: SpatialLayerStackConfig) => void, syncCanvas = false) => {
             runInAction(() => {
                 const current = config.spatialLayerStack;
                 if (!current) return;
                 mutator(current);
-                chart.syncSpatialLayerStack(current);
+                if (syncCanvas) {
+                    chart.updateCanvasLayerState(current);
+                }
             });
         },
         [chart, config],
+    );
+
+    const persistStack = useDebouncedCallback(
+        (mutator: (current: SpatialLayerStackConfig) => void) => {
+            updateStack(mutator);
+        },
+        150,
+    );
+
+    const patchSpatialLayer = useCallback(
+        (layerId: string, updates: Partial<LayerConfig>) => {
+            chart.patchCanvasLayer(layerId, updates);
+        },
+        [chart],
+    );
+
+    const persistSpatialLayer = useCallback(
+        (layerId: string, updates: Partial<LayerConfig>) => {
+            persistStack((current) => {
+                const layer = current.spatialLayers[layerId];
+                if (!layer) return;
+                if ("channels" in updates && updates.channels && "channels" in layer) {
+                    layer.channels = {
+                        ...layer.channels,
+                        ...updates.channels,
+                    };
+                }
+                const rest = { ...updates };
+                if ("channels" in rest) {
+                    delete rest.channels;
+                }
+                Object.assign(layer, rest);
+            });
+        },
+        [persistStack],
     );
 
     const insertOptions = useMemo<InsertOption[]>(() => {
@@ -334,7 +381,7 @@ const SpatialLayerDialogComponent = observer(() => {
                     current.stackOrder.length,
                     ...arrayMove([...current.stackOrder], oldIndex, newIndex),
                 );
-            });
+            }, true);
         },
         [stack.stackOrder, updateStack],
     );
@@ -370,7 +417,7 @@ const SpatialLayerDialogComponent = observer(() => {
                         current.stackOrder.push(key);
                     }
                 }
-            });
+            }, true);
         },
         [updateStack],
     );
@@ -391,27 +438,30 @@ const SpatialLayerDialogComponent = observer(() => {
                             stackKey={stackKey}
                             stack={stack}
                             onToggleVisible={(key, visible) => {
+                                const entry = stack.entries[key];
+                                if (entry?.kind === "spatial") {
+                                    patchSpatialLayer(entry.layerId, { visible });
+                                }
                                 updateStack((current) => {
-                                    const entry = current.entries[key];
-                                    if (!entry) return;
-                                    current.entries[key] = { ...entry, visible };
-                                });
+                                    const currentEntry = current.entries[key];
+                                    if (!currentEntry) return;
+                                    currentEntry.visible = visible;
+                                }, entry?.kind === "deck");
                             }}
                             onOpacityChange={(key, opacity) => {
-                                updateStack((current) => {
-                                    const entry = current.entries[key];
-                                    if (!entry) return;
-                                    current.entries[key] = { ...entry, opacity };
-                                    if (entry.kind === "spatial") {
+                                const entry = stack.entries[key];
+                                if (entry?.kind === "spatial") {
+                                    patchSpatialLayer(entry.layerId, { opacity });
+                                    persistStack((current) => {
+                                        const currentEntry = current.entries[key];
+                                        if (!currentEntry) return;
+                                        currentEntry.opacity = opacity;
                                         const layer = current.spatialLayers[entry.layerId];
                                         if (layer) {
-                                            current.spatialLayers[entry.layerId] = {
-                                                ...layer,
-                                                opacity,
-                                            };
+                                            layer.opacity = opacity;
                                         }
-                                    }
-                                });
+                                    });
+                                }
                             }}
                             onRemove={(key) => {
                                 updateStack((current) => {
@@ -426,18 +476,12 @@ const SpatialLayerDialogComponent = observer(() => {
                                         current.stackOrder.length,
                                         ...nextOrder,
                                     );
-                                });
+                                }, true);
                             }}
                             onUpdateSpatialLayer={(layerId, updates) => {
-                                updateStack((current) => {
-                                    const layer = current.spatialLayers[layerId];
-                                    if (!layer) return;
-                                    current.spatialLayers[layerId] = {
-                                        ...layer,
-                                        ...updates,
-                                    };
-                                });
+                                persistSpatialLayer(layerId, updates);
                             }}
+                            onPatchSpatialLayer={patchSpatialLayer}
                         />
                     ))}
                 </SortableContext>

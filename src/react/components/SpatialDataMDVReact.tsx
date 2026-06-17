@@ -1,10 +1,9 @@
 import { readZarr, type SpatialData } from "@spatialdata/core";
 import {
     SpatialCanvasProvider,
-    SpatialViewer,
     createSpatialCanvasStore,
-    useSpatialCanvasRenderer,
     type SpatialCanvasStoreApi,
+    type LayerConfig,
     type ViewState as SpatialCanvasViewState,
 } from "@spatialdata/vis";
 import type { Layer } from "@deck.gl/core";
@@ -39,7 +38,7 @@ import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend } from "../contour_state";
 import type { DualContourLegacyConfig } from "../contour_state";
 import type { VivMdvReactConfig, VivRoiConfig } from "./VivMDVReact";
-import { useChart, useDataStore } from "../context";
+import { useChart } from "../context";
 import {
     useChartID,
     useChartSize,
@@ -58,21 +57,21 @@ import { useOuterContainer } from "../screen_state";
 import { scatterDefaults } from "../scatter_state";
 import { g, toArray } from "@/lib/utils";
 import {
+    type CanvasLayerState,
     type DeckOverlayId,
     type SpatialLayerStackConfig,
     applySpatialLayerStack,
     canvasLayerOrder,
+    createCanvasLayerState,
     createDefaultSpatialLayerStack,
     deckStackKey,
     isDeckStackKey,
     normalizeSpatialLayerStack,
-    stackToCanvasState,
+    patchCanvasLayerProps,
+    syncCanvasLayerStateFromStack,
 } from "@/react/spatial_layer_stack";
-import { inferTableAssociation } from "@/react/spatial_table_association";
-import {
-    SpatialCanvasRendererProvider,
-    type SpatialCanvasRendererValue,
-} from "@/react/spatial_canvas_renderer_context";
+import type { SpatialCanvasRendererValue } from "@/react/spatial_canvas_renderer_context";
+import { SpatialCanvasDeckView } from "./SpatialCanvasDeckView";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 
 type SpatialRegionMetadata = {
@@ -241,7 +240,6 @@ const SpatialDataViewer = observer(
     }) => {
         const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
         const config = useConfig<SpatialDataMdvReactConfig>();
-        const dataStore = useDataStore();
         const rawRegion = useRegion();
         const region = getSpatialRegionMetadata(rawRegion);
         const coordinateSystem = region?.spatial?.coordinate_system ?? null;
@@ -291,15 +289,15 @@ const SpatialDataViewer = observer(
                         ? createDefaultSpatialLayerStack(spatialData, coordinateSystem)
                         : normalizeSpatialLayerStack(stack, spatialData, coordinateSystem);
                 applySpatialLayerStack(stack, next);
-                chart.syncSpatialLayerStack(stack);
+                chart.updateCanvasLayerState(stack);
             });
         }, [chart, config, coordinateSystem, spatialData, status]);
 
         const stack = config.spatialLayerStack;
-        const { layers, layerOrder } = stack
-            ? stackToCanvasState(stack)
-            : { layers: {}, layerOrder: [] };
-        const unifiedLayerOrder = stack ? canvasLayerOrder(stack) : [];
+        const unifiedLayerOrder = useMemo(
+            () => (stack ? canvasLayerOrder(stack) : []),
+            [stack],
+        );
 
         const deckOverlaySources = useMemo(
             () => ({
@@ -318,67 +316,10 @@ const SpatialDataViewer = observer(
             ],
         );
 
-        const deckLayers = stack
-            ? buildDeckOverlayLayers(stack, deckOverlaySources)
-            : [];
-
-        const renderer = useSpatialCanvasRenderer({
-            spatialData,
-            coordinateSystem,
-            layers,
-            layerOrder,
-            viewState: spatialViewState,
-            onViewStateChange: (nextViewState) => {
-                viewerStore.setState({
-                    viewState: toMdvViewState(
-                        nextViewState,
-                        viewerStore.getState().viewState,
-                    ),
-                });
-            },
-            width,
-            height,
-            deckLayers,
-            autoFit: true,
-        });
-
-        const rendererContextValue = useMemo(
-            () => ({
-                spatialData,
-                coordinateSystem,
-                availableElements: renderer.availableElements,
-                getImageLayerLoadedData: renderer.getImageLayerLoadedData,
-                getLabelsLayerLoadedData: renderer.getLabelsLayerLoadedData,
-                getLayerLoadState: renderer.getLayerLoadState,
-                isLoading: renderer.isLoading,
-                isBlocking: renderer.isBlocking,
-                inferTableAssociation: (elementKey?: string | null) =>
-                    inferTableAssociation({
-                        spatialData,
-                        spatialdataPath,
-                        regionId: config.region,
-                        elementKey,
-                        dataStore,
-                    }),
-            }),
-            [
-                coordinateSystem,
-                config.region,
-                dataStore,
-                renderer.availableElements,
-                renderer.getImageLayerLoadedData,
-                renderer.getLabelsLayerLoadedData,
-                renderer.getLayerLoadState,
-                renderer.isBlocking,
-                renderer.isLoading,
-                spatialData,
-                spatialdataPath,
-            ],
+        const deckLayers = useMemo(
+            () => (stack ? buildDeckOverlayLayers(stack, deckOverlaySources) : []),
+            [deckOverlaySources, stack],
         );
-
-        useEffect(() => {
-            chart.spatialRendererContext = rendererContextValue;
-        }, [chart, rendererContextValue]);
 
         const getTooltipContent = useCallback(
             (info: PickingInfo) => {
@@ -430,7 +371,7 @@ const SpatialDataViewer = observer(
         }
 
         return (
-            <SpatialCanvasRendererProvider value={rendererContextValue}>
+            <>
                 <SelectionOverlay />
                 {showLegend && legendFields.length > 0 && (
                     <FieldContourLegend
@@ -454,41 +395,22 @@ const SpatialDataViewer = observer(
                     }}
                 >
                     <div style={{ width, height, position: "relative" }}>
-                        {renderer.isBlocking && (
-                            <div className="absolute right-2 top-2 rounded bg-black/70 px-2 py-1 text-[11px] text-white">
-                                Loading layer data...
-                            </div>
-                        )}
-                        {!renderer.isBlocking && renderer.isLoading && (
-                            <div className="absolute right-2 top-2 rounded bg-neutral-900/80 px-2 py-1 text-[11px] text-white">
-                                Refreshing layer metadata...
-                            </div>
-                        )}
-                        <SpatialViewer
+                        <SpatialCanvasDeckView
+                            spatialData={spatialData}
+                            coordinateSystem={coordinateSystem}
+                            spatialdataPath={spatialdataPath}
+                            spatialViewState={spatialViewState}
                             width={width}
                             height={height}
-                            viewState={spatialViewState}
-                            onViewStateChange={(nextViewState) => {
-                                viewerStore.setState({
-                                    viewState: toMdvViewState(
-                                        nextViewState,
-                                        viewerStore.getState().viewState,
-                                    ),
-                                });
-                            }}
-                            layers={renderer.deckLayers}
-                            layerOrder={unifiedLayerOrder}
-                            vivLayerProps={
-                                renderer.vivLayerProps.length > 0
-                                    ? renderer.vivLayerProps
-                                    : undefined
-                            }
+                            deckLayers={deckLayers}
+                            unifiedLayerOrder={unifiedLayerOrder}
                             deckProps={deckProps}
+                            toMdvViewState={toMdvViewState}
                         />
                     </div>
                 </div>
                 {tooltipPortal}
-            </SpatialCanvasRendererProvider>
+            </>
         );
     },
 );
@@ -523,6 +445,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     declare dataStore: DataStore;
     vivStores: VivContextType;
     spatialCanvasStore: SpatialCanvasStoreApi;
+    canvasLayerState: CanvasLayerState = createCanvasLayerState();
+    canvasLayerRevision = 0;
     spatialRendererContext: SpatialCanvasRendererValue | null = null;
     layerDialog?: SpatialLayerDialogReactWrapper;
     ignoreStateUpdate = false;
@@ -543,12 +467,15 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             colorBy: observable,
             colorByColumn: action,
             colorByDefault: action,
+            canvasLayerRevision: observable,
             spatialRendererContext: observable.ref,
+            patchCanvasLayer: action,
+            updateCanvasLayerState: action,
         });
         this.vivStores = createVivStores();
         this.spatialCanvasStore = createSpatialCanvasStore();
         if (config.spatialLayerStack) {
-            this.syncSpatialLayerStack(config.spatialLayerStack);
+            this.updateCanvasLayerState(config.spatialLayerStack);
         }
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
             "click",
@@ -561,17 +488,15 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         );
     }
 
-    syncSpatialLayerStack(stack: SpatialLayerStackConfig) {
-        const { layers, layerOrder } = stackToCanvasState(stack);
-        const store = this.spatialCanvasStore.getState();
-        store.reset();
-        for (const layerId of layerOrder) {
-            const layer = layers[layerId];
-            if (layer) {
-                store.addLayer(layer);
-            }
+    patchCanvasLayer(layerId: string, patch: Partial<LayerConfig>) {
+        if (patchCanvasLayerProps(this.canvasLayerState, layerId, patch)) {
+            this.canvasLayerRevision += 1;
         }
-        store.reorderLayers(layerOrder);
+    }
+
+    updateCanvasLayerState(stack: SpatialLayerStackConfig) {
+        syncCanvasLayerStateFromStack(stack, this.canvasLayerState);
+        this.canvasLayerRevision += 1;
     }
 
     colorBy?: (i: number) => [r: number, g: number, b: number];
