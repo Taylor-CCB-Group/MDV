@@ -119,6 +119,12 @@ importers:
       '@slickgrid-universal/common':
         specifier: 10.6.0
         version: 10.6.0
+      '@spatialdata/core':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@spatialdata/vis':
+        specifier: ^0.1.0
+        version: 0.1.0(5fed9fb1d070481f396b27a4e9a53f69)
       '@tanstack/react-query':
         specifier: ^5.80.0
         version: 5.80.6(react@19.2.6)
@@ -1627,6 +1633,9 @@ packages:
   '@petamoriken/float16@3.9.2':
     resolution: {integrity: sha512-VgffxawQde93xKxT3qap3OH+meZf7VaSB5Sqd4Rqc+FP5alWbpOyan/7tRbOAvynjpG3GpdtAuGU/NdhQpmrog==}
 
+  '@petamoriken/float16@3.9.3':
+    resolution: {integrity: sha512-8awtpHXCx/bNpFt4mt2xdkgtgVvKqty8VbjHI/WWWQuEw+KLzFot3f4+LkQY9YmOtq7A5GdOnqoIC8Pdygjk2g==}
+
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
@@ -2188,6 +2197,36 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
+  '@spatialdata/avivatorish@0.1.0':
+    resolution: {integrity: sha512-lP6jPlZDkolg3BB8pVZB00j0hkdHdg2BXTwig+S4beMg0HgUL/p9JT8DAHRl0cUHvWvZw6Dseud27YB3for30Q==}
+    peerDependencies:
+      react: '>=18 <20'
+      react-dom: '>=18 <20'
+
+  '@spatialdata/core@0.1.0':
+    resolution: {integrity: sha512-IFlfhQw5vPvV2SfIIBeDMOVNVkBQ0G0jAUtV12Y1L48BbWv0BjSynZQvciSBerSI7svSO/aofTAOpzRVaelR8A==}
+
+  '@spatialdata/layers@0.1.0':
+    resolution: {integrity: sha512-4o8Niqd8430giDtsQLn6ExoEjLdZvlXeCm6aRZU+5sOyYRO3gLQ8rH7rROt/Ou99KOYQgWEeLFxANMLjwZOwpg==}
+    peerDependencies:
+      deck.gl: ~9.2.9
+
+  '@spatialdata/react@0.1.0':
+    resolution: {integrity: sha512-u1HCNJqApETLBF20fj9xPoMiiHqbJ031BtmnkNsEFBI8+Qee9gYmpsJJHeqR1kM1TCb0+NT0FYlwdP+aH3FDSQ==}
+    peerDependencies:
+      anndata.js: ^0.0.2
+      react: '>=18 <20'
+      react-dom: '>=18 <20'
+      zarrita: ^0.7.1
+
+  '@spatialdata/vis@0.1.0':
+    resolution: {integrity: sha512-hEJrm6lOcVV/gB87u+QtdSI5ashXvM71oAihjOM4XqJ1rUpq+n+EZOG02sSVPesDL5qzXxGpLIQD0ECFo6ZwxQ==}
+    peerDependencies:
+      anndata.js: ^0.0.2
+      react: '>=18 <20'
+      react-dom: '>=18 <20'
+      zarrita: ^0.7.1
+
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
@@ -2644,6 +2683,9 @@ packages:
   '@types/prop-types@15.7.13':
     resolution: {integrity: sha512-hCZTSvwbzWGvhqxp/RqVqwU999pBf2vp7hzIjiYOsl8wqOmUxkQ6ddw1cV3l8811+kdUFus/q4d1Y3E3SyEifA==}
 
+  '@types/rbush@4.0.0':
+    resolution: {integrity: sha512-+N+2H39P8X+Hy1I5mC6awlTX54k3FhiUmvt7HWzGJZvF+syUAAxP/stwppS8JE84YHqFgRMv6fCy31202CMFxQ==}
+
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
     peerDependencies:
@@ -2781,6 +2823,20 @@ packages:
     resolution: {integrity: sha512-UcEslgHBaHYPAisVQcyARDfps7nKyugmUyXcsfE1HiHcVuvZ4tBJ5C93sG1FDeHWJ9skGQ68ec+Xsx086geAfg==}
     engines: {node: '>=16.20.0'}
     hasBin: true
+
+  '@uidotdev/usehooks@2.4.1':
+    resolution: {integrity: sha512-1I+RwWyS+kdv3Mv0Vmc+p0dPYH0DTRAo04HLyXReYBL9AeseDWUJyi4THuksBJcu9F0Pih69Ak150VDnqbVnXg==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
+
+  '@uiw/react-json-view@2.0.0-alpha.39':
+    resolution: {integrity: sha512-D9MHNan56WhtdAsmjtE9x18YLY0JSMnh0a6Ji0/2sVXCF456ZVumYLdx2II7hLQOgRMa4QMaHloytpTUHxsFRw==}
+    peerDependencies:
+      '@babel/runtime': '>=7.10.0'
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
@@ -3243,6 +3299,9 @@ packages:
   '@zarrita/storage@0.1.3':
     resolution: {integrity: sha512-ZyCMYN3LuCNtKxro9876r/KyHyXV+ie2Bhk1qYsJR4Jp+sAjoVRRNNSJPsJxk64ZgFFezayO5S2hCu88/1Odwg==}
 
+  '@zarrita/storage@0.2.0':
+    resolution: {integrity: sha512-855ZXqtnds7spnT8vNvD+MXa3QExP1m2GqShe8yt7uZXHnQLgJHgkpVwFjE1B0KDDRO0ki09hmk6OboTaIfPsQ==}
+
   '@zip.js/zip.js@2.8.23':
     resolution: {integrity: sha512-RB+RLnxPJFPrGvQ9rgO+4JOcsob6lD32OcF0QE0yg24oeW9q8KnTTNlugcDaIveEcCbclobJcZP+fLQ++sH0bw==}
     engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
@@ -3271,6 +3330,9 @@ packages:
   ajv@6.15.0:
     resolution: {integrity: sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw==}
 
+  anndata.js@0.0.2:
+    resolution: {integrity: sha512-26Y9mW7Jho41ydD8loW0rpMKgANEzvcBVn8+QH/6vX5rS5DBs5wBDdtMKQxFGsgE7mLj4/xErIiJyISW8tlQww==}
+
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
     engines: {node: '>=8'}
@@ -3298,6 +3360,10 @@ packages:
     resolution: {integrity: sha512-KMReFUr0B4t+D+OBkjR3KYqvocp2XaSzO55UcB6mgQMd3KbcE+mWTyvVV7D/zsdEbNnV6acZUutkiHQXvTr1Rw==}
     engines: {node: '>= 8'}
 
+  apache-arrow@17.0.0:
+    resolution: {integrity: sha512-X0p7auzdnGuhYMVKYINdQssS4EcKec9TCXyez/qtJt32DrIMGbzqiaMiQ0X6fQlQpw8Fl0Qygcv4dfRAr5Gu9Q==}
+    hasBin: true
+
   apache-arrow@21.1.0:
     resolution: {integrity: sha512-kQrYLxhC+NTVVZ4CCzGF6L/uPVOzJmD1T3XgbiUnP7oTeVFOFgEUu6IKNwCDkpFoBVqDKQivlX4RUFqqnWFlEA==}
     hasBin: true
@@ -3313,6 +3379,10 @@ packages:
 
   aria-query@5.3.0:
     resolution: {integrity: sha512-b0P0sZPKtyu8HkeRAfCq0IfURZK+SuwMjY1UXGBU27wpAiTwQAIlq56IbIO+ytk/JjS1fMR14ee5WBBfKi5J6A==}
+
+  array-back@3.1.0:
+    resolution: {integrity: sha512-TkuxA4UCOvxuDK6NZYXCalszEzj+TLszyASooky+i742l9TqsOdYCMJJupxRic61hwquNtppB3hgcuq9SVSH1Q==}
+    engines: {node: '>=6'}
 
   array-back@6.2.3:
     resolution: {integrity: sha512-SGDvmg6QTYiTxCBkYVmThcoa67uLl35pyzRHdpCGBOcqFy6BtwnphoFPk7LhJshD+Yk1Kt35WGWeZPTgwR4Fhw==}
@@ -3538,6 +3608,10 @@ packages:
 
   comma-separated-tokens@2.0.3:
     resolution: {integrity: sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==}
+
+  command-line-args@5.2.1:
+    resolution: {integrity: sha512-H4UfQhZyakIjC74I9d34fGYDwk3XpSr17QhEd0Q3I9Xq1CETHo4Hcuo87WyWHpAF1aSLjLRf5lD9ZGX2qStUvg==}
+    engines: {node: '>=4.0.0'}
 
   command-line-args@6.0.2:
     resolution: {integrity: sha512-AIjYVxrV9X752LmPDLbVYv8aMCuHPSLZJXEo2qo/xJfv+NYhaZ4sMSF01rM+gHPaMgvPM0l5D/F+Qx+i2WfSmQ==}
@@ -3987,6 +4061,9 @@ packages:
   earcut@2.2.4:
     resolution: {integrity: sha512-/pjZsA1b4RPHbeWZQn66SWS8nZZWLQQ23oE3Eam7aroEFGEvwKAsJfZ9ytiEMycfzXWpca4FA9QIOehf7PocBQ==}
 
+  earcut@3.0.2:
+    resolution: {integrity: sha512-X7hshQbLyMJ/3RPhyObLARM2sNxxmRALLKx1+NVFFnQ9gKzmCrxm9+uLIAdBcvc8FNLpctqlQ2V6AE92Ol9UDQ==}
+
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
 
@@ -4187,6 +4264,10 @@ packages:
     resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
     engines: {node: '>=8'}
 
+  find-replace@3.0.0:
+    resolution: {integrity: sha512-6Tb2myMioCAgv5kfvP5/PkZZ/ntTpVK39fHY7WkWBgvbeE+VHd/tZuZ4mrC+bxh4cfOZeYKVPaJIZtZXV7GNCQ==}
+    engines: {node: '>=4.0.0'}
+
   find-replace@5.0.2:
     resolution: {integrity: sha512-Y45BAiE3mz2QsrN2fb5QEtO4qb44NcS7en/0y9PEVsg351HsLeVclP8QPMH79Le9sH3rs5RSwJu99W0WPZO43Q==}
     engines: {node: '>=14'}
@@ -4206,6 +4287,9 @@ packages:
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
     engines: {node: '>=16'}
+
+  flatbuffers@24.12.23:
+    resolution: {integrity: sha512-dLVCAISd5mhls514keQzmEG6QHmUUsNuWsb4tFafIUwvvgDjXhtfAYSKOzt5SWOy+qByV5pbsDZ+Vb7HUOBEdA==}
 
   flatbuffers@25.9.23:
     resolution: {integrity: sha512-MI1qs7Lo4Syw0EOzUl0xjs2lsoeqFku44KpngfIduHBYvzm8h2+7K8YMQh1JtVVVrUvhLpNwqVi4DERegUJhPQ==}
@@ -4265,6 +4349,14 @@ packages:
 
   geotiff@2.1.3:
     resolution: {integrity: sha512-PT6uoF5a1+kbC3tHmZSUsLHBp2QJlHasxxxxPW47QIY1VBKpFB+FcDvX+MxER6UzgLQZ0xDzJ9s48B9JbOCTqA==}
+    engines: {node: '>=10.19'}
+
+  geotiff@2.1.4-beta.0:
+    resolution: {integrity: sha512-jb6SYvHMyiCqwqgGGLDAxtig9h1g6O+n1wEyNEE4QgVEXOItYaWrEgPg9SAnwdoZm2yx6DpFtilbGG65hvZgpQ==}
+    engines: {node: '>=10.19'}
+
+  geotiff@3.0.5:
+    resolution: {integrity: sha512-OWcL9S9+yDZ6iAlXMt32T1iwUApJM8UiD47xbm6ZP1h33d10fqkPs14EG/ttT5EnefpZSx3G15iDFC5FxUNUwA==}
     engines: {node: '>=10.19'}
 
   get-caller-file@2.0.5:
@@ -5083,6 +5175,10 @@ packages:
   nouislider@15.8.1:
     resolution: {integrity: sha512-93TweAi8kqntHJSPiSWQ1o/uZ29VWOmal9YKb6KKGGlCkugaNfAupT7o1qTHqdJvNQ7S0su5rO6qRFCjP8fxtw==}
 
+  numcodecs@0.2.2:
+    resolution: {integrity: sha512-Y5K8mv80yb4MgVpcElBkUeMZqeE4TrovxRit/dTZvoRl6YkB6WEjY+fiUjGCblITnt3T3fmrDg8yRWu0gOLjhQ==}
+    engines: {node: '>=12'}
+
   numcodecs@0.3.2:
     resolution: {integrity: sha512-6YSPnmZgg0P87jnNhi3s+FVLOcIn3y+1CTIgUulA3IdASzK9fJM87sUFkpyA+be9GibGRaST2wCgkD+6U+fWKw==}
 
@@ -5107,6 +5203,9 @@ packages:
 
   obug@2.1.1:
     resolution: {integrity: sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==}
+
+  ol@10.9.0:
+    resolution: {integrity: sha512-svbbgVQUmEHaKpLQ8kRySojs59Brvgl2zYIrqG9eQNXGfsbi55rQasZIDpwpQzDL6OlzrUb0H4hQaiX9wDoGmA==}
 
   open@11.0.0:
     resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
@@ -5145,6 +5244,9 @@ packages:
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
     engines: {node: '>=6'}
+
+  parquet-wasm@0.6.1:
+    resolution: {integrity: sha512-wTM/9Y4EHny8i0qgcOlL9UHsTXftowwCqDsAD8axaZbHp0Opp3ue8oxexbzTVNhqBjFhyhLiU3MT0rnEYnYU0Q==}
 
   parse-entities@4.0.2:
     resolution: {integrity: sha512-GG2AQYWoLgL877gQIKeRPGO1xF9+eG1ujIb5soS5gPvLQ1y2o8FL90w2QWNdf9I361Mpp7726c+lj3U0qK1uGw==}
@@ -5190,6 +5292,10 @@ packages:
 
   pbf@3.3.0:
     resolution: {integrity: sha512-XDF38WCH3z5OV/OVa8GKUNtLAyneuzbCisx7QUCF8Q6Nutx0WnJrQe5O+kOtBlLfRNUws98Y58Lblp+NJG5T4Q==}
+    hasBin: true
+
+  pbf@4.0.1:
+    resolution: {integrity: sha512-SuLdBvS42z33m8ejRbInMapQe8n0D3vN/Xd5fmWM3tufNgRQFBpaW2YVJxQZV4iPNqb0vEFvssMEo5w9c6BTIA==}
     hasBin: true
 
   pdfmake@0.2.23:
@@ -5369,6 +5475,12 @@ packages:
 
   quickselect@2.0.0:
     resolution: {integrity: sha512-RKJ22hX8mHe3Y6wH/N3wCM6BWtjaxIyyUIkpHOvfFnxdI4yD4tBXEBKSbriGujF6jnSVkJrffuo6vxACiSSxIw==}
+
+  quickselect@3.0.0:
+    resolution: {integrity: sha512-XdjUArbK4Bm5fLLvlm5KpTFOiOThgfWWI4axAZDWg4E/0mKdZyI9tNEfds27qCi1ze/vwTR16kvmmGhRra3c2g==}
+
+  rbush@4.0.1:
+    resolution: {integrity: sha512-IP0UpfeWQujYC8Jg162rMNc01Rf0gWMMAb2Uxus/Q0qOFw4lCcq6ZnQEZwUoJqWyUGJ9th7JjwI4yIWo+uvoAQ==}
 
   react-dom@19.2.6:
     resolution: {integrity: sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==}
@@ -5881,6 +5993,10 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typical@4.0.0:
+    resolution: {integrity: sha512-VAH4IvQ7BDFYglMd7BPRDfLgxZZX4O4TFcRDA6EN5X7erNJJq+McIEp8np9aVtxrCJ6qx4GTYVfOWNjcqwZgRw==}
+    engines: {node: '>=8'}
+
   typical@7.3.0:
     resolution: {integrity: sha512-ya4mg/30vm+DOWfBg4YK3j2WD6TWtRkCbasOJr40CseYENzCUby/7rIvXA99JGsQHeNxLbnXdyLLxKSv3tauFw==}
     engines: {node: '>=12.17'}
@@ -5930,6 +6046,10 @@ packages:
   unzipit@1.4.3:
     resolution: {integrity: sha512-gsq2PdJIWWGhx5kcdWStvNWit9FVdTewm4SEG7gFskWs+XCVaULt9+BwuoBtJiRE8eo3L1IPAOrbByNLtLtIlg==}
     engines: {node: '>=12'}
+
+  unzipit@2.0.0:
+    resolution: {integrity: sha512-DVeVIWUZCAQPNzm5sB0hpsG1GygTTdBnzNtYYEpInkttx5evkyqRgZi6rTczoySqp8hO5jHVKzrH0f23X8FZLg==}
+    engines: {node: '>=18'}
 
   update-browserslist-db@1.2.3:
     resolution: {integrity: sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w==}
@@ -6203,8 +6323,17 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zarrextra@0.1.0:
+    resolution: {integrity: sha512-LS8S5bTGBo1pYQcuRfnBi9gONs9/qQXBQMeRjPtrlWQkINDqrJ0rL9zGdc4mWiC9fdWkik4ygdeUwuYyujyFjw==}
+
+  zarrita@0.5.1:
+    resolution: {integrity: sha512-cyujP70BOl5DiXuLtM+0j9nq/pAov4SKXRYIQQOVnk2TfBg/jopX+FXLbqkq3ULOxFLB5AwkPbSp5KvZXoJrbQ==}
+
   zarrita@0.5.4:
     resolution: {integrity: sha512-i88iN2+HqIQ+uiCEWLfhjbYNXAJD7IrM4h3lFwFclfqEOOhxp10amRWtqmgN5jbuy3+h0LwdyLVVzk4y9rTLgg==}
+
+  zarrita@0.7.3:
+    resolution: {integrity: sha512-wChTQ1Ox75INoQCzKAfLWAfB70JJ4KjdW8Sz5x4ZWrFB4Dw+YZdnxHTL0xSdsrB9EmKSeK7fS1Y+I2ibhfGbkw==}
 
   zod-validation-error@4.0.2:
     resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
@@ -6215,11 +6344,35 @@ packages:
   zod@3.25.49:
     resolution: {integrity: sha512-JMMPMy9ZBk3XFEdbM3iL1brx4NUSejd6xr3ELrrGEfGb355gjhiAWtG3K5o+AViV/3ZfkIrCzXsZn6SbLwTR8Q==}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
   zstd-codec@0.1.5:
     resolution: {integrity: sha512-v3fyjpK8S/dpY/X5WxqTK3IoCnp/ZOLxn144GZVlNUjtwAchzrVo03h+oMATFhCIiJ5KTr4V3vDQQYz4RU684g==}
 
   zstddec@0.1.0:
     resolution: {integrity: sha512-w2NTI8+3l3eeltKAdK8QpiLo/flRAr2p8AGeakfMZOXBxOg9HIu4LVDxBi81sYgVhFhdJjv1OrB5ssI8uFPoLg==}
+
+  zstddec@0.2.0:
+    resolution: {integrity: sha512-oyPnDa1X5c13+Y7mA/FDMNJrn4S8UNBe0KCqtDmor40Re7ALrPN6npFwyYVRRh+PqozZQdeg23QtbcamZnG5rA==}
+
+  zustand@5.0.14:
+    resolution: {integrity: sha512-/8tAspM5LMPr28b3fwLYrtdj77ECpfZviaP75CMTnwO8ISyaE4GDIG/9rDDYq/cH9D2Xw2A2RXglLInmVBQB/g==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
 
   zustand@5.0.6:
     resolution: {integrity: sha512-ihAqNeUVhe0MAD+X8M5UzqyZ9k3FFZLBTtqo6JLPwV53cbRB/mJwBI0PxcIgqhBBHlEs8G45OTDTMq3gNcLq3A==}
@@ -7760,6 +7913,8 @@ snapshots:
 
   '@petamoriken/float16@3.9.2': {}
 
+  '@petamoriken/float16@3.9.3': {}
+
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
@@ -8214,6 +8369,105 @@ snapshots:
   '@slickgrid-universal/utils@10.3.0': {}
 
   '@socket.io/component-emitter@3.1.2': {}
+
+  '@spatialdata/avivatorish@0.1.0(b1235b24ca004e234da3e4c035d43e3a)':
+    dependencies:
+      '@hms-dbmi/viv': 0.21.0(b55db1092d89286dd86a223febb17f6d)
+      '@math.gl/core': 4.1.0
+      geotiff: 2.1.4-beta.0
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+      zustand: 5.0.14(@types/react@19.2.14)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6))
+    transitivePeerDependencies:
+      - '@deck.gl/core'
+      - '@deck.gl/geo-layers'
+      - '@deck.gl/layers'
+      - '@deck.gl/react'
+      - '@luma.gl/constants'
+      - '@luma.gl/core'
+      - '@luma.gl/engine'
+      - '@luma.gl/shadertools'
+      - '@luma.gl/webgl'
+      - '@types/react'
+      - immer
+      - use-sync-external-store
+
+  '@spatialdata/core@0.1.0':
+    dependencies:
+      '@math.gl/core': 4.1.0
+      '@zarrita/storage': 0.2.0
+      anndata.js: 0.0.2
+      apache-arrow: 17.0.0
+      ol: 10.9.0
+      parquet-wasm: 0.6.1
+      zarrextra: 0.1.0
+      zarrita: 0.7.3
+      zod: 4.4.3
+
+  '@spatialdata/layers@0.1.0(4eff8b0fade424b0171a85a804c7311a)':
+    dependencies:
+      '@deck.gl/core': 9.2.9
+      '@hms-dbmi/viv': 0.21.0(b55db1092d89286dd86a223febb17f6d)
+      '@math.gl/core': 4.1.0
+      deck.gl: 9.2.9(@arcgis/core@4.34.8)(@luma.gl/constants@9.2.6)(@luma.gl/gltf@9.2.6(@luma.gl/constants@9.2.6)(@luma.gl/core@9.2.6)(@luma.gl/engine@9.2.6(@luma.gl/core@9.2.6)(@luma.gl/shadertools@9.2.6(@luma.gl/core@9.2.6)))(@luma.gl/shadertools@9.2.6(@luma.gl/core@9.2.6)))(@luma.gl/shadertools@9.2.6(@luma.gl/core@9.2.6))(@luma.gl/webgl@9.2.6(@luma.gl/core@9.2.6))(@math.gl/web-mercator@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - '@75lb/nature'
+      - '@deck.gl/geo-layers'
+      - '@deck.gl/layers'
+      - '@deck.gl/react'
+      - '@luma.gl/constants'
+      - '@luma.gl/core'
+      - '@luma.gl/engine'
+      - '@luma.gl/shadertools'
+      - '@luma.gl/webgl'
+      - react
+
+  '@spatialdata/react@0.1.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)':
+    dependencies:
+      '@spatialdata/core': 0.1.0
+      anndata.js: 0.0.2
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+      zarrita: 0.7.3
+
+  '@spatialdata/vis@0.1.0(5fed9fb1d070481f396b27a4e9a53f69)':
+    dependencies:
+      '@deck.gl/core': 9.2.9
+      '@hms-dbmi/viv': 0.21.0(b55db1092d89286dd86a223febb17f6d)
+      '@luma.gl/core': 9.2.6
+      '@math.gl/core': 4.1.0
+      '@spatialdata/avivatorish': 0.1.0(b1235b24ca004e234da3e4c035d43e3a)
+      '@spatialdata/core': 0.1.0
+      '@spatialdata/layers': 0.1.0(4eff8b0fade424b0171a85a804c7311a)
+      '@spatialdata/react': 0.1.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
+      '@uidotdev/usehooks': 2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@uiw/react-json-view': 2.0.0-alpha.39(@babel/runtime@7.29.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@vivjs/views': 0.21.0(52e8f89f20cb2eb0eb37426ecbefa25b)
+      anndata.js: 0.0.2
+      deck.gl: 9.2.9(@arcgis/core@4.34.8)(@luma.gl/constants@9.2.6)(@luma.gl/gltf@9.2.6(@luma.gl/constants@9.2.6)(@luma.gl/core@9.2.6)(@luma.gl/engine@9.2.6(@luma.gl/core@9.2.6)(@luma.gl/shadertools@9.2.6(@luma.gl/core@9.2.6)))(@luma.gl/shadertools@9.2.6(@luma.gl/core@9.2.6)))(@luma.gl/shadertools@9.2.6(@luma.gl/core@9.2.6))(@luma.gl/webgl@9.2.6(@luma.gl/core@9.2.6))(@math.gl/web-mercator@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      fast-deep-equal: 3.1.3
+      geotiff: 2.1.4-beta.0
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+      zarrita: 0.7.3
+      zustand: 5.0.14(@types/react@19.2.14)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6))
+    transitivePeerDependencies:
+      - '@75lb/nature'
+      - '@arcgis/core'
+      - '@babel/runtime'
+      - '@deck.gl/geo-layers'
+      - '@deck.gl/layers'
+      - '@deck.gl/react'
+      - '@luma.gl/constants'
+      - '@luma.gl/engine'
+      - '@luma.gl/gltf'
+      - '@luma.gl/shadertools'
+      - '@luma.gl/webgl'
+      - '@math.gl/web-mercator'
+      - '@types/react'
+      - immer
+      - use-sync-external-store
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -8895,6 +9149,8 @@ snapshots:
 
   '@types/prop-types@15.7.13': {}
 
+  '@types/rbush@4.0.0': {}
+
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:
       '@types/react': 19.2.14
@@ -9044,6 +9300,17 @@ snapshots:
       '@typescript/native-preview-linux-x64': 7.0.0-dev.20260506.1
       '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260506.1
       '@typescript/native-preview-win32-x64': 7.0.0-dev.20260506.1
+
+  '@uidotdev/usehooks@2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+    dependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+
+  '@uiw/react-json-view@2.0.0-alpha.39(@babel/runtime@7.29.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+    dependencies:
+      '@babel/runtime': 7.29.2
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   '@ungap/structured-clone@1.3.0': {}
 
@@ -9684,6 +9951,11 @@ snapshots:
       reference-spec-reader: 0.2.0
       unzipit: 1.4.3
 
+  '@zarrita/storage@0.2.0':
+    dependencies:
+      reference-spec-reader: 0.2.0
+      unzipit: 2.0.0
+
   '@zip.js/zip.js@2.8.23': {}
 
   '@zip.js/zip.js@2.8.26': {}
@@ -9707,6 +9979,11 @@ snapshots:
       json-schema-traverse: 0.4.1
       uri-js: 4.4.1
 
+  anndata.js@0.0.2:
+    dependencies:
+      numcodecs: 0.2.2
+      zarrita: 0.5.1
+
   ansi-regex@5.0.1: {}
 
   ansi-regex@6.1.0: {}
@@ -9725,6 +10002,18 @@ snapshots:
     dependencies:
       normalize-path: 3.0.0
       picomatch: 2.3.2
+
+  apache-arrow@17.0.0:
+    dependencies:
+      '@swc/helpers': 0.5.21
+      '@types/command-line-args': 5.2.3
+      '@types/command-line-usage': 5.0.4
+      '@types/node': 20.19.37
+      command-line-args: 5.2.1
+      command-line-usage: 7.0.4
+      flatbuffers: 24.12.23
+      json-bignum: 0.0.3
+      tslib: 2.8.1
 
   apache-arrow@21.1.0:
     dependencies:
@@ -9751,6 +10040,8 @@ snapshots:
   aria-query@5.3.0:
     dependencies:
       dequal: 2.0.3
+
+  array-back@3.1.0: {}
 
   array-back@6.2.3: {}
 
@@ -9958,6 +10249,13 @@ snapshots:
       delayed-stream: 1.0.0
 
   comma-separated-tokens@2.0.3: {}
+
+  command-line-args@5.2.1:
+    dependencies:
+      array-back: 3.1.0
+      find-replace: 3.0.0
+      lodash.camelcase: 4.3.0
+      typical: 4.0.0
 
   command-line-args@6.0.2:
     dependencies:
@@ -10429,6 +10727,8 @@ snapshots:
 
   earcut@2.2.4: {}
 
+  earcut@3.0.2: {}
+
   eastasianwidth@0.2.0: {}
 
   electron-to-chromium@1.5.322: {}
@@ -10665,6 +10965,10 @@ snapshots:
     dependencies:
       to-regex-range: 5.0.1
 
+  find-replace@3.0.0:
+    dependencies:
+      array-back: 3.1.0
+
   find-replace@5.0.2: {}
 
   find-root@1.1.0: {}
@@ -10678,6 +10982,8 @@ snapshots:
     dependencies:
       flatted: 3.4.2
       keyv: 4.5.4
+
+  flatbuffers@24.12.23: {}
 
   flatbuffers@25.9.23: {}
 
@@ -10730,6 +11036,28 @@ snapshots:
       web-worker: 1.5.0
       xml-utils: 1.10.2
       zstddec: 0.1.0
+
+  geotiff@2.1.4-beta.0:
+    dependencies:
+      '@petamoriken/float16': 3.9.2
+      lerc: 3.0.0
+      pako: 2.1.0
+      parse-headers: 2.0.6
+      quick-lru: 6.1.2
+      web-worker: 1.5.0
+      xml-utils: 1.10.2
+      zstddec: 0.2.0
+
+  geotiff@3.0.5:
+    dependencies:
+      '@petamoriken/float16': 3.9.3
+      lerc: 3.0.0
+      pako: 2.1.0
+      parse-headers: 2.0.6
+      quick-lru: 6.1.2
+      web-worker: 1.5.0
+      xml-utils: 1.10.2
+      zstddec: 0.2.0
 
   get-caller-file@2.0.5: {}
 
@@ -11767,6 +12095,8 @@ snapshots:
 
   nouislider@15.8.1: {}
 
+  numcodecs@0.2.2: {}
+
   numcodecs@0.3.2:
     dependencies:
       fflate: 0.8.2
@@ -11785,6 +12115,15 @@ snapshots:
   object-keys@1.1.1: {}
 
   obug@2.1.1: {}
+
+  ol@10.9.0:
+    dependencies:
+      '@types/rbush': 4.0.0
+      earcut: 3.0.2
+      geotiff: 3.0.5
+      pbf: 4.0.1
+      rbush: 4.0.1
+      zarrita: 0.7.3
 
   open@11.0.0:
     dependencies:
@@ -11827,6 +12166,8 @@ snapshots:
   parent-module@1.0.1:
     dependencies:
       callsites: 3.1.0
+
+  parquet-wasm@0.6.1: {}
 
   parse-entities@4.0.2:
     dependencies:
@@ -11873,6 +12214,10 @@ snapshots:
   pbf@3.3.0:
     dependencies:
       ieee754: 1.2.1
+      resolve-protobuf-schema: 2.1.0
+
+  pbf@4.0.1:
+    dependencies:
       resolve-protobuf-schema: 2.1.0
 
   pdfmake@0.2.23:
@@ -12032,6 +12377,12 @@ snapshots:
   quick-lru@6.1.2: {}
 
   quickselect@2.0.0: {}
+
+  quickselect@3.0.0: {}
+
+  rbush@4.0.1:
+    dependencies:
+      quickselect: 3.0.0
 
   react-dom@19.2.6(react@19.2.6):
     dependencies:
@@ -12656,6 +13007,8 @@ snapshots:
 
   typescript@6.0.3: {}
 
+  typical@4.0.0: {}
+
   typical@7.3.0: {}
 
   uc.micro@2.1.0: {}
@@ -12716,6 +13069,8 @@ snapshots:
   unzipit@1.4.3:
     dependencies:
       uzip-module: 1.0.3
+
+  unzipit@2.0.0: {}
 
   update-browserslist-db@1.2.3(browserslist@4.28.1):
     dependencies:
@@ -12910,9 +13265,24 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
+  zarrextra@0.1.0:
+    dependencies:
+      zarrita: 0.7.3
+      zod: 4.4.3
+
+  zarrita@0.5.1:
+    dependencies:
+      '@zarrita/storage': 0.1.3
+      numcodecs: 0.3.2
+
   zarrita@0.5.4:
     dependencies:
       '@zarrita/storage': 0.1.3
+      numcodecs: 0.3.2
+
+  zarrita@0.7.3:
+    dependencies:
+      '@zarrita/storage': 0.2.0
       numcodecs: 0.3.2
 
   zod-validation-error@4.0.2(zod@3.25.49):
@@ -12921,10 +13291,20 @@ snapshots:
 
   zod@3.25.49: {}
 
+  zod@4.4.3: {}
+
   zstd-codec@0.1.5:
     optional: true
 
   zstddec@0.1.0: {}
+
+  zstddec@0.2.0: {}
+
+  zustand@5.0.14(@types/react@19.2.14)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6)):
+    optionalDependencies:
+      '@types/react': 19.2.14
+      react: 19.2.6
+      use-sync-external-store: 1.6.0(react@19.2.6)
 
   zustand@5.0.6(@types/react@19.2.14)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6)):
     optionalDependencies:
