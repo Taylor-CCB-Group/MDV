@@ -12,14 +12,16 @@ import type { LayerConfig } from "@spatialdata/vis";
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
 import { useMemo } from "react";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
-import { useConfig } from "@/react/hooks";
-import type { VivMdvReactConfig } from "../VivMDVReact";
 
 type Props = {
     config: ShapesLayerConfig;
     updateLayer: (updates: Partial<ShapesLayerConfig>) => void;
     association: TableAssociation;
     availableFields: string[];
+    /** Chart-level color_by column, for fill-by-column option list.
+     * nb this needs review, not working and also general background issues with colorBy type.
+     */
+    chartColorBy?: string;
 };
 
 function ColorFields({
@@ -59,8 +61,8 @@ export default function ShapesLayerPanel({
     updateLayer,
     association,
     availableFields,
+    chartColorBy,
 }: Props) {
-    const chartConfig = useConfig<VivMdvReactConfig>();
     const fillColor = config.fillColor ?? [200, 200, 200, 120];
     const strokeColor = config.strokeColor ?? [255, 255, 255, 200];
     const tooltipFields = config.tooltipFields ?? [];
@@ -68,13 +70,11 @@ export default function ShapesLayerPanel({
 
     const options = useMemo(() => {
         const set = new Set(availableFields);
-        if (chartConfig.color_by && typeof chartConfig.color_by === "string") {
-            set.add(chartConfig.color_by);
-        }
+        if (chartColorBy) set.add(chartColorBy);
         for (const field of tooltipFields) set.add(field);
         if (fillByColumn) set.add(fillByColumn);
         return [...set].sort();
-    }, [availableFields, chartConfig.color_by, fillByColumn, tooltipFields]);
+    }, [availableFields, chartColorBy, fillByColumn, tooltipFields]);
 
     return (
         <div className="grid gap-3">

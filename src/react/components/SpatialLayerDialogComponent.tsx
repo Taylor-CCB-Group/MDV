@@ -85,7 +85,15 @@ function spatialPropsAsLayerConfig(
     } as LayerConfig;
 }
 
-function LayerDetails({
+/**
+ * MobX observer boundary for per-layer panels.
+ *
+ * Stack entries are mutated in place on `config.renderStack`. Panels stay as plain
+ * controlled components, but this wrapper must re-render when `entry.props` changes.
+ * Wrapping an individual panel in `observer` is not enough — it only receives a
+ * plain `config` snapshot from props, not the live observable entry.
+ */
+const LayerDetails = observer(function LayerDetails({
     entry,
     onPatchProps,
 }: {
@@ -93,7 +101,14 @@ function LayerDetails({
     onPatchProps: (entryId: string, props: Record<string, unknown>, merge?: boolean) => void;
 }) {
     const dataStore = useDataStore();
+    const chartConfig = useConfig<SpatialDataMdvReactConfig>();
     const availableFields = useMemo(() => getAvailableFields(dataStore), [dataStore]);
+    const chartColorBy =
+        typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
+
+    // Subscribe to in-place prop edits (visibility/opacity are read by the accordion).
+    void entry.visible;
+    void entry.props;
 
     if (entry.kind === "host") {
         const deckId = deckIdFromHostLayerId(entry.source.hostLayerId);
@@ -124,6 +139,7 @@ function LayerDetails({
                     config={layer as Extract<LayerConfig, { type: "shapes" }>}
                     association={NO_TABLE_ASSOCIATION}
                     availableFields={availableFields}
+                    chartColorBy={chartColorBy}
                     updateLayer={patchLayer}
                 />
             );
@@ -146,7 +162,7 @@ function LayerDetails({
         default:
             return null;
     }
-}
+});
 
 const SortableLayerAccordion = observer(function SortableLayerAccordion({
     entry,
