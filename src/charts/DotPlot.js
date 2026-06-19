@@ -4,11 +4,12 @@ import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
-import { getColorLegendCustom } from "../utilities/Color.js";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import FractionLegend from "@/react/components/legend/FractionLegend";
+import LegendWrapper from "@/react/components/legend/LegendWrapper";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -55,6 +56,7 @@ class DotPlot extends SVGChart {
         if (!c.fraction_legend) {
             c.fraction_legend = { display: true };
         }
+        this.fractionLegendWrapper = new LegendWrapper(this);
         c.y_axis_order = c.y_axis_order || "data";
         this.fractionScale = scaleSqrt().domain([0, 100]);
         if (!hasCustomXAxis) {
@@ -131,6 +133,7 @@ class DotPlot extends SVGChart {
     // }
 
     remove(notify = true) {
+        this.fractionLegendWrapper.unmount();
         this.dim.destroy(notify);
         super.remove();
     }
@@ -211,37 +214,50 @@ class DotPlot extends SVGChart {
         const c = this.config;
         if (l) {
             c.fraction_legend.position = [l.offsetLeft, l.offsetTop];
-            l.remove();
+            c.fraction_legend.pos = c.fraction_legend.position;
+            this.fractionLegendWrapper.unmount();
         }
         if (!c.fraction_legend.display) {
-            this.nodeFractionLegend = undefined;
+            this.fractionLegend = undefined;
+            this.fractionLegendWrapper.unmount();
             return;
         }
-        const pos = c.fraction_legend.position || [0, 0];
+        const pos = c.fraction_legend.position || c.fraction_legend.pos || [0, 0];
         const tickValues = this.fractionScale
             .ticks(4)
             .filter((x) => x > 0);
-        this.fractionLegend = getColorLegendCustom(this.fractionScale, {
+        const values = tickValues.length
+            ? tickValues
+            : [this.data?.frac_range?.[1] || 1];
+        const spec = {
             label: "fraction",
-            type: "circle",
-            tickValues: tickValues.length ? tickValues : [this.data?.frac_range?.[1] || 1],
-            itemTop: 8,
             width: 100,
-            dynamicCircleSpacing: true,
-            circleGap: 6,
-            circleX: 40,
-            textOffset: 70,
-        });
-        this.contentDiv.append(this.fractionLegend);
-        this.fractionLegend.style.top = `${pos[1]}px`;
-        this.fractionLegend.style.left = `${pos[0]}px`;
+            maxHeight: Math.max(80, this.contentDiv.clientHeight - pos[1] - 8),
+            items: values.map((value) => ({
+                key: String(value),
+                label: String(value),
+                radius: this.fractionScale(value),
+            })),
+        };
+        this.fractionLegendWrapper.render(
+            spec,
+            { left: `${pos[0]}px`, top: `${pos[1]}px` },
+            FractionLegend,
+            {
+                dragHandle: ".legend-drag-handle",
+                resizable: true,
+            },
+        );
+        this.fractionLegend =
+            this.fractionLegendWrapper.getWrapperElement() ?? undefined;
     }
 
     getConfig() {
         const config = super.getConfig();
-        const l = this.linkThicknessLegend;
+        const l = this.fractionLegend;
         if (l) {
             config.fraction_legend.position = [l.offsetLeft, l.offsetTop];
+            config.fraction_legend.pos = config.fraction_legend.position;
         }
         return config;
     }
