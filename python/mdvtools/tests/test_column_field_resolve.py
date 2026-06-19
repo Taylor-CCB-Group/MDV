@@ -1,5 +1,6 @@
 from mdvtools.llm.column_field_resolve import (
     build_expression_wrapper_token,
+    ensure_view_gridstack_layout,
     expression_wrapper_subgroup_key,
     normalize_view_chart_params,
     prune_view_charts_with_invalid_params,
@@ -294,3 +295,25 @@ def test_client_needs_refresh_after_chat():
     assert client_needs_refresh_after_chat("delete_datasource('x')")
     assert not client_needs_refresh_after_chat("print('add_datasource')")
     assert not client_needs_refresh_after_chat("")
+
+
+def test_ensure_view_gridstack_layout_adds_missing_data_sources():
+    view = {
+        "initialCharts": {
+            "qc_field_uniformity": [{"type": "box_plot", "param": ["channel_name", "cv_pct"]}],
+            "qc_runs": [],
+        }
+    }
+    out = ensure_view_gridstack_layout(view)
+    assert out["dataSources"]["qc_field_uniformity"]["layout"] == "gridstack"
+    assert out["dataSources"]["qc_runs"]["layout"] == "gridstack"
+
+
+def test_ensure_view_gridstack_layout_overrides_absolute():
+    view = {
+        "initialCharts": {"cells": [{"type": "scatter_plot", "param": ["x", "y"]}]},
+        "dataSources": {"cells": {"layout": "absolute", "panelWidth": 100}},
+    }
+    out = ensure_view_gridstack_layout(view)
+    assert out["dataSources"]["cells"]["layout"] == "gridstack"
+    assert out["dataSources"]["cells"]["panelWidth"] == 100

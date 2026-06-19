@@ -344,7 +344,7 @@ def get_createproject_prompt_RAG(
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
         - **Before** `project.set_view(...)`, print a concise preview of any table, aggregate, or subset the charts depend on using **GitHub-flavored markdown tables** so the chat UI can render them (for example `print(df_result.head(40).to_markdown(index=False))` or `print(grouped.head(20).to_markdown())`). Do **not** use `DataFrame.to_string()` for chat previews. Keep rows/columns bounded so the output stays readable; this stdout is shown in the chat window.
         - **Before** `project.set_view(...)`, ensure saved charts use the **same data pipeline** as those printed previews (see "Visualization vs analysis consistency" below).
-        - Set the view using `project.set_view(view_name, view_object)`
+        - Set the view using `project.set_view(view_name, view_object)` with `initialCharts` only; ChatMDV applies gridstack layout when saving the view.
         - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`
           or invented filter setters such as `set_background_filter(...)`. Only call `set_*` (and other public) methods
           that exist on the chart class in `mdvtools.charts.*` (preflight validates this before execution).

@@ -44,6 +44,7 @@ from .code_manipulation import (
 )
 from .column_field_resolve import (
     field_set_from_columns,
+    ensure_view_gridstack_layout,
     normalize_view_chart_params,
     prune_view_charts_with_invalid_params,
 )
@@ -1164,6 +1165,7 @@ class ProjectChat(ProjectChatProtocol):
                         pruned, n_dropped = prune_view_charts_with_invalid_params(
                             normalized, self.project
                         )
+                        pruned = ensure_view_gridstack_layout(pruned)
                         if n_dropped:
                             log(
                                 f"pruned {n_dropped} chart(s) with param tokens not in datasource metadata"
