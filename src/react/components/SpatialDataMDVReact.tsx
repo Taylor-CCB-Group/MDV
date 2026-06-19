@@ -46,7 +46,11 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     vivStores: VivContextType;
     layerDialog?: SpatialLayerDialogReactWrapper;
     ignoreStateUpdate = false;
-    /** Bumped when render-stack entries/props change; canvas observer reads this. */
+    /**
+     * Intentional version token for in-place renderStack edits. The adapter reads this
+     * so cosmetic edits can refresh viewer inputs without replacing stack objects and
+     * causing layer/data churn.
+     */
     renderStackGeneration = 0;
 
     get viewerStore() {

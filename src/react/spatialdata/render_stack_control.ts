@@ -1,12 +1,110 @@
-import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
+import type {
+    RenderStack,
+    RenderStackEntry,
+    RenderStackSpatialElementType,
+} from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { runInAction } from "mobx";
 import { useCallback } from "react";
 
-import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
+import type {
+    SpatialDataMdvReact,
+    SpatialDataMdvReactConfig,
+} from "@/react/components/SpatialDataMDVReact";
 import { useChart } from "@/react/context";
 import { useConfig } from "@/react/hooks";
-import { patchRenderStackEntry } from "./render_stack_mutations";
+import {
+    deckHostLayerId,
+    deckIdFromHostLayerId,
+    type DeckOverlayId,
+} from "./host_overlay_ids";
+import { spatialEntryAsLayerConfig } from "./render_stack_adapter";
+import { spatialEntryId } from "./render_stack_defaults";
+
+export function reorderRenderStackEntries(
+    stack: RenderStack,
+    fromIndex: number,
+    toIndex: number,
+): void {
+    const next = [...stack.entries];
+    const [moved] = next.splice(fromIndex, 1);
+    if (!moved) return;
+    next.splice(toIndex, 0, moved);
+    stack.entries = next;
+}
+
+export function patchRenderStackEntry(
+    stack: RenderStack,
+    entryId: string,
+    patch: {
+        visible?: boolean;
+        props?: Record<string, unknown>;
+    },
+): void {
+    const entry = stack.entries.find((item) => item.id === entryId);
+    if (!entry) return;
+    if (patch.visible !== undefined) {
+        entry.visible = patch.visible;
+    }
+    if (patch.props) {
+        for (const [key, value] of Object.entries(patch.props)) {
+            entry.props[key] = value;
+        }
+    }
+}
+
+export function insertSpatialRenderStackEntry(
+    stack: RenderStack,
+    elementType: RenderStackSpatialElementType,
+    elementKey: string,
+    props: Record<string, unknown> = {},
+): boolean {
+    const id = spatialEntryId(elementType, elementKey);
+    if (stack.entries.some((entry) => entry.id === id)) {
+        return false;
+    }
+    stack.entries.push({
+        kind: "spatial",
+        id,
+        visible: true,
+        source: { elementType, elementKey },
+        props: { opacity: 1, ...props },
+    });
+    return true;
+}
+
+export function insertHostRenderStackEntry(
+    stack: RenderStack,
+    deckId: DeckOverlayId,
+): boolean {
+    const id = deckHostLayerId(deckId);
+    if (stack.entries.some((entry) => entry.id === id)) {
+        return false;
+    }
+    stack.entries.push({
+        kind: "host",
+        id,
+        visible: true,
+        source: { hostLayerId: id },
+        props: {},
+    });
+    return true;
+}
+
+export function removeRenderStackEntry(stack: RenderStack, entryId: string): void {
+    stack.entries = stack.entries.filter((entry) => entry.id !== entryId);
+}
+
+export function renderStackEntryIds(stack: RenderStack): string[] {
+    return stack.entries.map((entry) => entry.id);
+}
+
+export function isRemovableRenderStackEntry(entry: RenderStackEntry): boolean {
+    if (entry.kind === "host") {
+        return deckIdFromHostLayerId(entry.source.hostLayerId) !== null;
+    }
+    return entry.kind === "spatial";
+}
 
 /**
  * MobX render-stack control model for the layer dialog and viewer.
@@ -19,20 +117,6 @@ import { patchRenderStackEntry } from "./render_stack_mutations";
  *
  * Call hooks only from `observer` components.
  */
-
-export function spatialEntryAsLayerConfig(
-    entry: Extract<RenderStackEntry, { kind: "spatial" }>,
-): LayerConfig {
-    return {
-        id: entry.id,
-        type: entry.source.elementType,
-        elementKey: entry.source.elementKey,
-        visible: entry.visible,
-        opacity: typeof entry.props.opacity === "number" ? entry.props.opacity : 1,
-        ...entry.props,
-    } as LayerConfig;
-}
-
 export function useRenderStackMutation() {
     const config = useConfig<SpatialDataMdvReactConfig>();
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();

@@ -43,7 +43,7 @@ import { renderStackEntryDisplayName, renderStackOrderLabel } from "@/react/spat
 import {
     useRenderStackEntry,
     useRenderStackMutation,
-} from "@/react/spatialdata/render_stack_entry_state";
+} from "@/react/spatialdata/render_stack_control";
 import {
     insertHostRenderStackEntry,
     insertSpatialRenderStackEntry,
@@ -51,11 +51,11 @@ import {
     removeRenderStackEntry,
     reorderRenderStackEntries,
     renderStackEntryIds,
-} from "@/react/spatialdata/render_stack_mutations";
+} from "@/react/spatialdata/render_stack_control";
 import {
     defaultPropsForSpatialElement,
     listAvailableSpatialEntries,
-} from "@/react/spatialdata/render_stack_seed";
+} from "@/react/spatialdata/render_stack_defaults";
 import { NO_TABLE_ASSOCIATION } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig } from "../hooks";
