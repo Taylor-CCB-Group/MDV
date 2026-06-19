@@ -10,10 +10,12 @@ def run(workspace: str) -> None:
     ws = Path(workspace)
     try:
         with h5py.File(ws / "input" / "tray.h5", "r") as f:
-            a = [
-                x.decode() for x in f["column_a"][:]
-            ]  # dataset string comes back as bytes
-            b = [x.decode() for x in f["column_b"][:]]
+            col_a = f["column_a"]
+            col_b = f["column_b"]
+            assert isinstance(col_a, h5py.Dataset)
+            assert isinstance(col_b, h5py.Dataset)
+            a = [x.decode() for x in col_a[:]]  # dataset string comes back as bytes
+            b = [x.decode() for x in col_b[:]]
             sep = f.attrs["separator"]
             out_name = f.attrs["output_name"]
         joined = [f"{x}{sep}{y}" for x, y in zip(a, b)]

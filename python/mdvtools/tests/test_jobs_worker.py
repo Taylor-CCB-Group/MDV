@@ -25,7 +25,9 @@ def test_worker_joins_column(tmp_path):
     assert ws.read_marker() == "done"
     with h5py.File(ws.output / "result.h5", "r") as f:
         assert f.attrs["output_name"] == "joined"
-        values = [x.decode() for x in f["joined"][:]]
+        ds = f["joined"]
+        assert isinstance(ds, h5py.Dataset)
+        values = [x.decode() for x in ds[:]]
     assert values == ["a-1", "b-2", "c-3"]
     assert (ws.output / "manifest.json").exists()
 
