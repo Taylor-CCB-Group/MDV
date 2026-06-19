@@ -47,7 +47,11 @@ from .column_field_resolve import (
     normalize_view_chart_params,
     prune_view_charts_with_invalid_params,
 )
-from .verification import build_verification_summary
+from .verification import build_verification_summary, parse_datasource_name
+from .guidance import (
+    append_guidance_textbox_to_view,
+    build_response_guidance,
+)
 from .datasource_roles import (
     build_datasource_field_index,
     collect_wrapper_subgroup_keys_for_project,
@@ -826,6 +830,7 @@ class ProjectChat(ProjectChatProtocol):
                 "message": "Success",
                 "verification": None,
                 "data_preview": format_stdout_for_chat(strdout),
+                "guidance": None,
                 "needs_refresh": False,
             }
         
@@ -1172,6 +1177,45 @@ class ProjectChat(ProjectChatProtocol):
                         exc_info=True,
                     )
 
+            guidance_text = ""
+            with time_block("b15d: Analysis summary (guidance TextBox + chat echo)"):
+                try:
+                    guidance_text = build_response_guidance(
+                        self.project,
+                        question,
+                        final_code,
+                        view_name,
+                        agent_plan,
+                        data_preview_text,
+                    )
+                    ds_for_summary = parse_datasource_name(final_code)
+                    if not ds_for_summary and view_name:
+                        try:
+                            view_for_ds = self.project.get_view(view_name)
+                            ic = (
+                                view_for_ds.get("initialCharts")
+                                if isinstance(view_for_ds, dict)
+                                else None
+                            )
+                            if isinstance(ic, dict) and ic:
+                                ds_for_summary = next(iter(ic.keys()), None)
+                        except Exception:
+                            ds_for_summary = None
+                    if view_name and ds_for_summary and guidance_text.strip():
+                        append_guidance_textbox_to_view(
+                            self.project,
+                            view_name,
+                            ds_for_summary,
+                            guidance_text,
+                        )
+                except Exception as guide_ex:
+                    chat_debug_logger.warning(
+                        "build_response_guidance failed for view %s: %s",
+                        view_name,
+                        guide_ex,
+                        exc_info=True,
+                    )
+
             verification_text = ""
             with time_block("b15b: Verification summary"):
                 try:
@@ -1224,6 +1268,7 @@ class ProjectChat(ProjectChatProtocol):
                     view_name=view_name,
                     verification=verification_text or None,
                     data_preview=data_preview_text,
+                    guidance=guidance_text or None,
                 )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
@@ -1242,6 +1287,7 @@ class ProjectChat(ProjectChatProtocol):
                     "message": "Success",
                     "verification": verification_text or None,
                     "data_preview": data_preview_text,
+                    "guidance": guidance_text or None,
                     "needs_refresh": client_needs_refresh_after_chat(final_code),
                 }
         except Exception as e:
@@ -1264,5 +1310,6 @@ class ProjectChat(ProjectChatProtocol):
                 "message": f"ERROR: {error_message}",
                 "verification": None,
                 "data_preview": None,
+                "guidance": None,
                 "needs_refresh": False,
             }

@@ -147,6 +147,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     view,
     verification,
     data_preview,
+    guidance,
     needs_refresh,
     onClose,
     error,
@@ -180,6 +181,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     const handleCopy = async () => {
         try {
             const parts: string[] = [];
+            if (guidance?.trim()) parts.push(guidance.trim());
             if (data_preview?.trim()) parts.push(data_preview.trim());
             if (verification?.trim()) parts.push(verification.trim());
             if (markdownContent) parts.push(markdownContent);
@@ -210,6 +212,14 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                         )}
                     </IconButton>
                 )}
+                {sender === 'bot' && !error && guidance?.trim() && (
+                    <ChatPreviewBlock
+                        variant="data"
+                        title="Analysis summary"
+                        content={guidance.trim()}
+                        defaultExpandedWhenLong
+                    />
+                )}
                 {sender === 'bot' && !error && data_preview?.trim() && (
                     <ChatPreviewBlock
                         variant="data"
@@ -219,14 +229,12 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 )}
                 {sender === 'bot' && !error && verification?.trim() && (
                     <ChatPreviewBlock
-                        //title="What you can verify"
-                        //title='xxxxx'
-                        title=""
+                        title="What you can verify"
                         content={verification.trim()}
                         defaultExpandedWhenLong
                     />
                 )}
-                {sender === 'bot' && !error && (data_preview?.trim() || verification?.trim()) ? (
+                {sender === 'bot' && !error && (guidance?.trim() || data_preview?.trim() || verification?.trim()) ? (
                     <Accordion
                         defaultExpanded={false}
                         disableGutters
@@ -247,7 +255,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 {view && sender === 'bot' && !error && (
                     <Box sx={{ mt: 2 }}>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                            Review the data preview and verification above, then open the view.
+                            Review the analysis summary and data preview above, then open the view.
                         </Typography>
                         <Button
                             variant="contained"
@@ -520,7 +528,7 @@ const Chatbot = ({
         const hasPreview =
             last?.sender === 'bot' &&
             !last?.error &&
-            (Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
+            (Boolean(last.guidance?.trim()) || Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
 
         if (!isSending && hasPreview && lastMessageRef.current) {
             lastMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });

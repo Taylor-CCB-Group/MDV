@@ -42,6 +42,7 @@ class ChatLogItem:
     error: Optional[bool] = None
     verification: Optional[str] = None
     data_preview: Optional[str] = None
+    guidance: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -56,6 +57,7 @@ class ChatLogItem:
             "error": self.error,
             "verification": self.verification,
             "data_preview": self.data_preview,
+            "guidance": self.guidance,
         }
 
     @classmethod
@@ -72,6 +74,7 @@ class ChatLogItem:
             error=data.get("error"),
             verification=data.get("verification"),
             data_preview=data.get("data_preview"),
+            guidance=data.get("guidance"),
         )
 
 class ChatLogger:
@@ -308,6 +311,7 @@ def log_chat_item(
     error: bool = False,
     verification: str | None = None,
     data_preview: str | None = None,
+    guidance: str | None = None,
 ):
     """
     Log a chat interaction to the chat log file.
@@ -319,8 +323,9 @@ def log_chat_item(
         conversation_id: ID to group messages from the same conversation
         context: Context of the response code generated which contains file names
         error: Whether this log is for an error
-        verification: Optional provenance text (same as the view TextBox), omitted on error
+        verification: Optional provenance text, omitted on error
         data_preview: Optional truncated script stdout for chat, omitted on error
+        guidance: Optional analysis summary (same as view TextBox), omitted on error
     """
     # Create a ChatLogger instance for this project
     chat_file = os.path.join(project.dir, "chat_log.json")
@@ -331,6 +336,7 @@ def log_chat_item(
         prompt_template = prompt_template or ""
         verification = None
         data_preview = None
+        guidance = None
 
     # Ensure context is always a non-optional string for ChatLogItem
     context_str: str = context if context is not None else "[]"
@@ -346,5 +352,6 @@ def log_chat_item(
         error=error,
         verification=verification,
         data_preview=data_preview,
+        guidance=guidance,
     )
     chat_logger.log_chat(chat_item)

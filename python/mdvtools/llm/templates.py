@@ -432,6 +432,7 @@ def get_createproject_prompt_RAG(
             (a) the markdown explanation text, and
             (b) bounded script stdout via `print(...)` before any `project.set_view(...)`.
         - Do NOT create `TextBox` or `TablePlot` by default when the user intent is primarily textual/table output.
+        - Do NOT add an analysis-summary `TextBox` in generated code; the ChatMDV orchestrator appends that after execution.
 
     8. Selection dialog usage:
         - Add `SelectionDialogPlot` when interactive filtering materially helps answer the question—for example,

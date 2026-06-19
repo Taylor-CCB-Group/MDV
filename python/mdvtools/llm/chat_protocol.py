@@ -9,6 +9,7 @@ class AskQuestionResult(TypedDict):
     message: str
     verification: Optional[str]
     data_preview: Optional[str]
+    guidance: Optional[str]
     needs_refresh: bool
 
 
@@ -70,6 +71,7 @@ except Exception as e:
                 message=f"Sorry, I can't help you right now\n\n{msg}",
                 verification=None,
                 data_preview=None,
+                guidance=None,
                 needs_refresh=False,
             )
 

@@ -91,10 +91,12 @@ const completedChatResponseSchema = z.object({
      * This should be a string that identifies newly created views.
      */
     view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
-    /** Provenance summary (also embedded as a TextBox in the created view). */
+    /** Provenance summary (technical; not duplicated in the view). */
     verification: z.string().optional().nullable(),
     /** Truncated stdout from executed script (tabular preview). */
     data_preview: z.string().optional().nullable(),
+    /** Analysis summary (same markdown as the view TextBox). */
+    guidance: z.string().optional().nullable(),
     /** Reload the page when opening the view so datasources.json changes are picked up. */
     needs_refresh: z.boolean().optional(),
     // timestamp: z.string(),
@@ -152,6 +154,7 @@ const chatLogItemSchema = z.object({
     error: z.boolean().optional(),
     verification: z.string().optional().nullable(),
     data_preview: z.string().optional().nullable(),
+    guidance: z.string().optional().nullable(),
 });
 // this is possible - may consider it at some point.
 // .transform((data) => ({
@@ -167,10 +170,12 @@ type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 export type ChatMessage = {
     text: string;
     view?: string;
-    /** Provenance summary (same as the view TextBox when present). */
+    /** Provenance summary (technical). */
     verification?: string | null;
     /** Truncated script stdout shown in chat before the main reply. */
     data_preview?: string | null;
+    /** Analysis summary (same as the view TextBox when present). */
+    guidance?: string | null;
     /** When true, "Load view" should reload the app so new/updated datasources load in ChartManager. */
     needs_refresh?: boolean;
     sender: 'user' | 'bot' | 'system';
@@ -310,6 +315,7 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
         view: viewName,
         verification: log?.verification,
         data_preview: log?.data_preview,
+        guidance: log?.guidance,
         error: log?.error,
     };
     
@@ -569,6 +575,7 @@ const useChat = () => {
                     view: response?.view,
                     verification: response?.verification ?? undefined,
                     data_preview: response?.data_preview ?? undefined,
+                    guidance: response?.guidance ?? undefined,
                     needs_refresh: response?.needs_refresh ?? false,
                 }])
             }

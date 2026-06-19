@@ -164,6 +164,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                         "id": id,
                         "verification": result.get("verification"),
                         "data_preview": result.get("data_preview"),
+                        "guidance": result.get("guidance"),
                         "needs_refresh": result.get("needs_refresh", False),
                     }
                     if result["view_name"] is not None:
