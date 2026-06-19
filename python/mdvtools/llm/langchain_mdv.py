@@ -48,7 +48,13 @@ from .column_field_resolve import (
     prune_view_charts_with_invalid_params,
 )
 from .verification import build_verification_summary
-from .datasource_roles import collect_wrapper_subgroup_keys_for_project, infer_datasource_roles
+from .datasource_roles import (
+    build_datasource_field_index,
+    collect_wrapper_subgroup_keys_for_project,
+    format_field_index_hint,
+    infer_datasource_roles,
+    resolve_datasource_from_question,
+)
 from .dataset_scale import (
     assess_project_scale,
     format_scale_context_block,
@@ -443,11 +449,6 @@ class ProjectChat(ProjectChatProtocol):
         self.suggested_questions: list[str] = []
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
-        elif len(project.datasources) > 1: # remove? or make it == 1 ?
-            # tempting to think we should just give the agent all of the datasources here
-            self.log("The project has more than one datasource, only the first one will be used")
-            self.ds_name1 = project.datasources[1]['name'] # maybe comment this out?
-            self.df1 = project.get_datasource_as_dataframe(self.ds_name1) # and maybe comment this out?
 
         self.ds_name = project.datasources[0]['name']
         self.discovered_models: DiscoveredModels = discover_models()
@@ -508,7 +509,7 @@ class ProjectChat(ProjectChatProtocol):
             del self.conversation_memories[conversation_id]
         chat_debug_logger.info(f"Cleared conversation history for conversation {conversation_id}")
 
-    def _build_role_hint(self) -> str:
+    def _build_role_hint(self, *, question_datasource: str | None = None) -> str:
         try:
             roles = getattr(self, "roles", None)
             scale = getattr(self, "scale", None)
@@ -533,7 +534,13 @@ class ProjectChat(ProjectChatProtocol):
                         f"(feature names in column '{exprs[0].name_column}', default subgroup '{exprs[0].subgroup_key}')"
                     )
                 else:
-                    expr_lines = "- No rows-as-columns expression datasource detected for this project."
+                    if question_datasource and question_datasource != roles.obs_datasource:
+                        expr_lines = (
+                            f"- df2 maps to question-resolved datasource '{question_datasource}' "
+                            "(use this table when the user names it or its columns)"
+                        )
+                    else:
+                        expr_lines = "- No rows-as-columns expression datasource detected for this project."
                 return (
                     "\n\nDatasource roles:\n"
                     f"- df1 maps to obs datasource '{roles.obs_datasource}'\n"
@@ -564,8 +571,9 @@ class ProjectChat(ProjectChatProtocol):
         verbose: bool,
         *,
         use_react: bool = False,
+        question_datasource: str | None = None,
     ) -> AgentExecutor:
-        role_hint = self._build_role_hint()
+        role_hint = self._build_role_hint(question_datasource=question_datasource)
         prompt_data_template = f"""You have access to the following Pandas DataFrames: 
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
         {role_hint}
@@ -614,6 +622,7 @@ class ProjectChat(ProjectChatProtocol):
         provider: ProviderKind,
         verbose=False,
         on_agent_fallback=None,
+        question_datasource: str | None = None,
     ):
         """
         Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
@@ -647,6 +656,7 @@ class ProjectChat(ProjectChatProtocol):
             provider,
             verbose,
             use_react=False,
+            question_datasource=question_datasource,
         )
 
         def agent_with_contextualization(question):
@@ -670,6 +680,7 @@ class ProjectChat(ProjectChatProtocol):
                     provider,
                     verbose,
                     use_react=True,
+                    question_datasource=question_datasource,
                 )
                 return fallback_executor.invoke({"input": standalone_question})
 
@@ -750,7 +761,24 @@ class ProjectChat(ProjectChatProtocol):
             )
         # there is a risk that these are out of date by the time we get here...
         # but it's a bit of an expensive operation, so avoiding it for now (in most cases we shouldn't need to refer to them)
-        df_list = self.df_list
+        field_index = build_datasource_field_index(self.project)
+        question_datasource = resolve_datasource_from_question(
+            self.project, question, field_index=field_index
+        )
+        df_list = load_agent_dataframes(
+            self.project,
+            self.roles,
+            self.scale,
+            extra_datasource=question_datasource,
+        )
+        default_datasource = str(self.project.datasources[0]["name"])
+        rag_datasource = question_datasource or default_datasource
+        if question_datasource:
+            chat_debug_logger.info(
+                "Resolved question datasource: %s (default would be %s)",
+                question_datasource,
+                default_datasource,
+            )
         
         progress = 0
 
@@ -780,6 +808,7 @@ class ProjectChat(ProjectChatProtocol):
                 chat_model.provider,
                 verbose=True,
                 on_agent_fallback=_notify_agent_fallback,
+                question_datasource=question_datasource,
             )
 
         total_steps = 6
@@ -868,7 +897,7 @@ class ProjectChat(ProjectChatProtocol):
                 prompt_RAG = get_createproject_prompt_RAG(
                     self.project,
                     path_to_data,
-                    datasource_names[0],
+                    rag_datasource,
                     agent_plan,
                     response["input"],
                     compact=chat_model.provider == "ollama",
@@ -957,38 +986,20 @@ class ProjectChat(ProjectChatProtocol):
                         final_code = final_code_retry
 
             with time_block("b13b: Preflight validate and retry"):
-                datasource_fields: dict[str, set[str]] = {}
-                for ds in self.project.datasources or []:
-                    if not isinstance(ds, dict):
-                        continue
-                    ds_name = ds.get("name")
-                    if not isinstance(ds_name, str):
-                        continue
-                    fields: set[str] = set()
-                    try:
-                        md = self.project.get_datasource_metadata(ds_name)
-                        if isinstance(md, dict):
-                            md_cols = md.get("columns")
-                            if isinstance(md_cols, list):
-                                fields |= field_set_from_columns(md_cols)
-                    except Exception:
-                        pass
-                    cols = ds.get("columns")
-                    if isinstance(cols, list):
-                        for c in cols:
-                            if isinstance(c, dict) and c.get("field"):
-                                fields.add(str(c.get("field")))
-                    if fields:
-                        datasource_fields[ds_name] = fields
+                datasource_fields = field_index or build_datasource_field_index(self.project)
 
                 def _regenerate_for_preflight(issue_text: str) -> str:
+                    field_map_hint = format_field_index_hint(datasource_fields)
                     retry_query = (
                         f"{rag_retrieval_query}\n\n"
                         "Fix this code preflight validation failure and return corrected runnable code only.\n"
                         "If issues mention set_x_axis or set_y_axis on BoxPlot, ViolinPlot, ScatterPlot, or DotPlot, "
                         "replace with set_axis_properties('x', {...}) and set_axis_properties('y', {...}) only.\n"
                         "On ScatterPlot use set_filter, not set_on_filter (set_on_filter is for ScatterPlot3D only).\n"
-                        f"Preflight issues:\n{issue_text}"
+                        "When a column exists on a different datasource, load it from that datasource — "
+                        "do not substitute CHATMDV_OBS_DATASOURCE.\n"
+                        f"Preflight issues:\n{issue_text}\n\n"
+                        f"{field_map_hint}"
                     )
                     output_qa_retry = qa_chain.invoke({"query": retry_query})
                     result_retry = output_qa_retry["result"]

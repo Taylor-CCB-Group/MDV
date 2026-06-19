@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -39,23 +40,174 @@ class InferredDatasourceRoles:
         return self.expressions[0]
 
 
-def _pick_obs_datasource(project: Any) -> str:
-    names = []
+_TABULAR_OBS_FALLBACK_NAMES = ("qc_runs", "qc_sessions", "runs", "sessions", "observations", "metadata")
+
+
+def _project_datasource_names(project: Any) -> list[str]:
     try:
-        names = list(project.get_datasource_names())
+        return list(project.get_datasource_names())
     except Exception:
-        # Fallback: MDVProject.datasources property
         try:
-            names = [ds.get("name") for ds in (project.datasources or []) if ds.get("name")]
+            return [str(ds.get("name")) for ds in (project.datasources or []) if ds.get("name")]
         except Exception:
-            names = []
+            return []
+
+
+def _pick_obs_datasource(project: Any) -> str:
+    names = _project_datasource_names(project)
 
     if "cells" in names:
         return "cells"
-    # last-resort: first datasource
+    if len(names) > 1:
+        names_lower = {n.lower(): n for n in names}
+        for preferred in _TABULAR_OBS_FALLBACK_NAMES:
+            if preferred in names_lower:
+                return names_lower[preferred]
     if names:
         return str(names[0])
     raise ValueError("Project has no datasources; cannot infer roles")
+
+
+def _field_set_from_column_dicts(columns: list[dict[str, Any]]) -> set[str]:
+    out: set[str] = set()
+    for col in columns:
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field", col.get("name"))
+        if field is not None and str(field).strip():
+            out.add(str(field))
+    return out
+
+
+def build_datasource_field_index(project: Any) -> dict[str, set[str]]:
+    """Map each datasource name to its field ids (for preflight and question routing)."""
+    index: dict[str, set[str]] = {}
+    for ds in project.datasources or []:
+        if not isinstance(ds, dict):
+            continue
+        ds_name = ds.get("name")
+        if not isinstance(ds_name, str):
+            continue
+        fields: set[str] = set()
+        try:
+            md = project.get_datasource_metadata(ds_name)
+            if isinstance(md, dict):
+                md_cols = md.get("columns")
+                if isinstance(md_cols, list):
+                    fields |= _field_set_from_column_dicts(md_cols)
+        except Exception:
+            pass
+        cols = ds.get("columns")
+        if isinstance(cols, list):
+            fields |= _field_set_from_column_dicts(cols)
+        if fields:
+            index[ds_name] = fields
+    return index
+
+
+def _question_field_tokens(question: str, field_index: dict[str, set[str]]) -> set[str]:
+    """Field ids mentioned in the question (whole-token match against project fields)."""
+    all_fields = {f for fields in field_index.values() for f in fields}
+    tokens = set(re.findall(r"[\w_]+", question))
+    return {t for t in tokens if t in all_fields}
+
+
+def resolve_datasource_from_question(
+    project: Any,
+    question: str,
+    *,
+    field_index: dict[str, set[str]] | None = None,
+) -> str | None:
+    """
+    Pick the datasource the user is asking about.
+
+    Priority: explicit datasource name in question, then datasource owning the most
+    mentioned field ids.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        return None
+
+    q_lower = question.lower()
+    name_matches = [n for n in names if n.lower() in q_lower]
+    if name_matches:
+        return max(name_matches, key=len)
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    mentioned = _question_field_tokens(question, field_index)
+    if not mentioned:
+        return None
+
+    scores: dict[str, int] = {}
+    for ds_name, fields in field_index.items():
+        overlap = len(mentioned & fields)
+        if overlap > 0:
+            scores[ds_name] = overlap
+    if not scores:
+        return None
+    return max(scores, key=lambda ds: (scores[ds], ds))
+
+
+def find_datasources_for_fields(
+    field_index: dict[str, set[str]],
+    fields: list[str],
+) -> dict[str, list[str]]:
+    """Map each field id to datasource name(s) that contain it."""
+    result: dict[str, list[str]] = {}
+    for field in fields:
+        owners = sorted(ds for ds, flds in field_index.items() if field in flds)
+        if owners:
+            result[field] = owners
+    return result
+
+
+def format_field_index_hint(
+    field_index: dict[str, set[str]],
+    *,
+    fields: list[str] | None = None,
+    max_datasources: int = 12,
+) -> str:
+    """Compact cross-datasource field map for preflight retry prompts."""
+    if not field_index:
+        return ""
+    lines: list[str] = ["Cross-datasource field index (use the datasource that owns each column):"]
+    shown = 0
+    for ds_name in sorted(field_index):
+        if shown >= max_datasources:
+            break
+        ds_fields = field_index[ds_name]
+        if fields is not None:
+            subset = sorted(f for f in fields if f in ds_fields)
+            if not subset:
+                continue
+            lines.append(f"- `{ds_name}`: {subset}")
+        else:
+            preview = sorted(ds_fields)[:20]
+            suffix = "..." if len(ds_fields) > 20 else ""
+            lines.append(f"- `{ds_name}`: {preview}{suffix}")
+        shown += 1
+    return "\n".join(lines)
+
+
+def is_multi_table_tabular_project(project: Any, roles: InferredDatasourceRoles) -> bool:
+    """True when the project has several independent tables and no expression link."""
+    names = _project_datasource_names(project)
+    return len(names) > 2 and "cells" not in names and not roles.expressions
+
+
+def format_multi_table_tabular_policy() -> str:
+    """Prompt text for projects with multiple independent tabular datasources."""
+    return (
+        "- **Multi-table tabular projects:** Each datasource is an independent table. "
+        "When the user names a datasource (e.g. `qc_field_uniformity`, `qc_runs`), use **that** "
+        "datasource for `get_datasource_as_dataframe(...)`, chart `initialCharts` keys, and "
+        "`datasource_name` — do **not** substitute `CHATMDV_OBS_DATASOURCE` or the first project table.\n"
+        "- Match every column in `columns=[...]` and chart `params` to field ids on **the same** "
+        "datasource. If a column is missing on one table, check Project Data Context for which table owns it.\n"
+        "- Do not invent column names (e.g. `assay_type` when the field is `assay` on `qc_runs`).\n"
+    )
 
 
 def _pick_default_subgroup(subgroups: dict[str, Any]) -> tuple[str, str]:

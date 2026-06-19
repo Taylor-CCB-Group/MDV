@@ -11,11 +11,13 @@ from mdvtools.llm.datasource_roles import (
     format_marker_ranking_viz_policy,
     format_metadata_column_schema_policy,
     format_mdv_first_data_access_policy,
+    format_multi_table_tabular_policy,
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
     format_targeted_chart_policies,
     format_visualization_consistency_policy,
+    is_multi_table_tabular_project,
 )
 prompt_data = """
 Your task is to:  
@@ -121,6 +123,36 @@ import sys
 #     return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
 
+def _build_rag_context_markdown(project: CreateProjectPromptProject, datasource_name: str) -> str:
+    """Project Data Context block for RAG prompts."""
+    try:
+        names = list(project.get_datasource_names())
+    except Exception:
+        names = []
+
+    has_cells = "cells" in names
+    if len(names) > 1 and not has_cells:
+        try:
+            ds_meta = project.get_datasource_metadata(datasource_name)
+            primary = (
+                f"## Primary datasource for this question: **{datasource_name}** "
+                f"({ds_meta['size']} rows)\n\n"
+                + create_column_markdown(ds_meta["columns"])
+            )
+        except Exception:
+            primary = f"## Primary datasource for this question: **{datasource_name}**\n\n"
+        all_tables = create_project_markdown(project, wrap_in_details=False)
+        return primary + "\n\n## All project datasources\n\n" + all_tables
+
+    try:
+        ds_meta = project.get_datasource_metadata(datasource_name)
+        return (
+            f"## **{datasource_name}:** ({ds_meta['size']} rows)\n\n"
+            + create_column_markdown(ds_meta["columns"])
+        )
+    except Exception:
+        return create_project_markdown(project)
+
 
 def get_createproject_prompt_RAG(
     project: CreateProjectPromptProject,
@@ -142,13 +174,21 @@ def get_createproject_prompt_RAG(
         scale, path_to_data, compact=compact
     )
     chart_policies = format_targeted_chart_policies(compact=compact)
-    # Build markdown context for the selected datasource; fall back to whole project if needed
-    try:
-        ds_meta = project.get_datasource_metadata(datasource_name)
-        context_md = f"## **{datasource_name}:** ({ds_meta['size']} rows)\n\n" + create_column_markdown(ds_meta["columns"])
-    except Exception:
-        context_md = create_project_markdown(project)
     roles = infer_datasource_roles(project)
+    multi_table_policy = ""
+    if is_multi_table_tabular_project(project, roles):
+        multi_table_policy = format_multi_table_tabular_policy()
+    context_md = _build_rag_context_markdown(project, datasource_name)
+    datasource_name_guidance = (
+        f"- datasource_name = '{datasource_name}'  "
+        "(use this datasource for charts and dataframe loads when it matches the user question; "
+        "do not substitute CHATMDV_OBS_DATASOURCE when the user names a different table)\n"
+    )
+    datasource_name_guidance_indented = (
+        f"            - datasource_name = '{datasource_name}'  "
+        "(use this datasource for charts and dataframe loads when it matches the user question; "
+        "do not substitute CHATMDV_OBS_DATASOURCE when the user names a different table)\n"
+    )
     if compact:
         expr_lines = ""
         if roles.expressions:
@@ -176,6 +216,7 @@ def get_createproject_prompt_RAG(
             + """
 
 """
+            + multi_table_policy
             + mdv_first_policy
             + """
 
@@ -210,10 +251,9 @@ def get_createproject_prompt_RAG(
     - data_path = '"""
             + path_to_data
             + """'
-    - datasource_name = '"""
-            + datasource_name
-            + """'
-    - view_name = a descriptive string for the visualization.
+    """
+            + datasource_name_guidance
+            + """    - view_name = a descriptive string for the visualization.
 
     Chart type requirements (use agent-suggested types when valid):
     - Abundance Box plot: three categorical columns (repeat if fewer available).
@@ -271,7 +311,7 @@ def get_createproject_prompt_RAG(
         - When modifying an existing project (the default in this chat context), do NOT recreate or delete the project.
 
     2. Data Access (MDV-first; Scanpy last resort):
-"""+mdv_first_policy+"""
+"""+mdv_first_policy+multi_table_policy+"""
         - Observation/metadata datasource: `"""+roles.obs_datasource+"""`
         - Wrapper-capable expression datasources (feature tables):
 """+expr_lines+"""
@@ -423,7 +463,7 @@ def get_createproject_prompt_RAG(
             - project_path = '"""+project.dir+"""'
             - data_path = '"""+path_to_data+"""'  # may be empty; if empty or HAS_SCANPY is False, DO NOT use scanpy except for marker-gene workflows when this path is a `.h5ad` file (see section 2).
             - view_name = a string, in double quotes, describing what is being visualized.
-            - datasource_name = '"""+datasource_name+"""'
+            """+datasource_name_guidance_indented+"""
         - The possible charts are given by """+final_answer+""" and should follow the following visualisation guidelines for each type of chart:
             - Abundance Box plot: Requires three categorical columns.  
                 - If only one categorical variable is available, use it three times.  

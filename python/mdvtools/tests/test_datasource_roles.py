@@ -3,8 +3,10 @@ import inspect
 from mdvtools.llm.datasource_roles import (
     CHAT_RANK_GENES_DATASOURCE_NAME,
     build_chatmdv_roles_constants_block,
+    build_datasource_field_index,
     categorical_field_ids_from_metadata,
     column_field_id,
+    find_datasources_for_fields,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
@@ -20,6 +22,8 @@ from mdvtools.llm.datasource_roles import (
     format_scanpy_hybrid_routing_policy,
     format_visualization_consistency_policy,
     infer_datasource_roles,
+    is_multi_table_tabular_project,
+    resolve_datasource_from_question,
 )
 from mdvtools.llm.dataset_scale import ProjectScale, assess_project_scale
 
@@ -324,4 +328,89 @@ def test_format_scanpy_hybrid_routing_policy():
     assert "cluster distribution" in text.lower()
     assert "predicted_cell_type" in text
     assert "Marker table strictness" in text
+
+
+class MicronLikeProject:
+    """Minimal metadata shaped like MICRON-scanr-02 for routing tests."""
+
+    datasources = [
+        {"name": "qc_channels", "columns": [{"field": "channel_name"}, {"field": "run_id"}]},
+        {
+            "name": "qc_field_uniformity",
+            "columns": [{"field": "channel_name"}, {"field": "cv_pct"}, {"field": "uniformity_score"}],
+        },
+        {"name": "qc_runs", "columns": [{"field": "assay"}, {"field": "run_id"}]},
+        {"name": "qc_sessions", "columns": [{"field": "session_id"}]},
+    ]
+
+    dir = "/app/mdv/MICRON-scanr-02"
+
+    def get_datasource_names(self):
+        return [ds["name"] for ds in self.datasources]
+
+    def get_datasource_metadata(self, name):
+        for ds in self.datasources:
+            if ds["name"] == name:
+                return {"name": name, "size": 10, "columns": ds["columns"]}
+        raise KeyError(name)
+
+    def get_links(self, *_a, **_k):
+        return []
+
+
+def test_micron_resolve_datasource_from_question_by_name():
+    project = MicronLikeProject()
+    q = (
+        "What is the distribution of cv_pct across different channel_name values "
+        "in qc_field_uniformity?"
+    )
+    assert resolve_datasource_from_question(project, q) == "qc_field_uniformity"
+
+
+def test_micron_resolve_datasource_from_question_by_fields():
+    project = MicronLikeProject()
+    q = "Show cv_pct and uniformity_score by channel"
+    assert resolve_datasource_from_question(project, q) == "qc_field_uniformity"
+
+
+def test_micron_resolve_datasource_qc_runs():
+    project = MicronLikeProject()
+    q = "What is the breakdown of assay types present in qc_runs?"
+    assert resolve_datasource_from_question(project, q) == "qc_runs"
+
+
+def test_find_datasources_for_fields_maps_cv_pct():
+    project = MicronLikeProject()
+    index = build_datasource_field_index(project)
+    owners = find_datasources_for_fields(index, ["cv_pct"])
+    assert owners["cv_pct"] == ["qc_field_uniformity"]
+
+
+def test_micron_infer_obs_datasource_prefers_qc_runs():
+    project = MicronLikeProject()
+    roles = infer_datasource_roles(project)
+    assert roles.obs_datasource == "qc_runs"
+
+
+def test_is_multi_table_tabular_project_for_micron():
+    project = MicronLikeProject()
+    roles = infer_datasource_roles(project)
+    assert is_multi_table_tabular_project(project, roles) is True
+
+
+def test_rag_prompt_includes_all_tables_and_resolved_datasource():
+    from mdvtools.llm.templates import get_createproject_prompt_RAG
+
+    project = MicronLikeProject()
+    prompt = get_createproject_prompt_RAG(
+        project,
+        "",
+        "qc_field_uniformity",
+        'fields "channel_name", "cv_pct"\ncharts "Violin plot"',
+        "What is the distribution of cv_pct in qc_field_uniformity?",
+        compact=True,
+    )
+    assert "Primary datasource for this question: **qc_field_uniformity**" in prompt
+    assert "qc_runs" in prompt
+    assert "datasource_name = 'qc_field_uniformity'" in prompt
 

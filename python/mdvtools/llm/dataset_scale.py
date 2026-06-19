@@ -143,11 +143,15 @@ def load_agent_dataframes(
     project: Any,
     roles: Any,
     scale: ProjectScale,
+    *,
+    extra_datasource: str | None = None,
 ) -> list[Any]:
     """
     Return [obs_df] or [obs_df, expr_df] for the pandas agent.
 
     Large projects load column subsets only; small projects load full tables.
+    When there is no expression datasource and the project has multiple tabular tables,
+    ``extra_datasource`` (typically question-resolved) is loaded as df2 for agent probing.
     """
     obs_ds = roles.obs_datasource
     if scale.is_large:
@@ -162,6 +166,22 @@ def load_agent_dataframes(
 
     primary_expr = roles.preferred_expression()
     if primary_expr is None:
+        names: list[str] = []
+        try:
+            names = list(project.get_datasource_names())
+        except Exception:
+            pass
+        if (
+            extra_datasource
+            and extra_datasource != obs_ds
+            and len(names) > 2
+            and "cells" not in names
+        ):
+            try:
+                df_extra = project.get_datasource_as_dataframe(extra_datasource)
+                return [df1, df_extra]
+            except Exception:
+                pass
         return [df1]
 
     expr_ds = primary_expr.datasource_name
