@@ -46,9 +46,15 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     vivStores: VivContextType;
     layerDialog?: SpatialLayerDialogReactWrapper;
     ignoreStateUpdate = false;
+    /** Bumped when render-stack entries/props change; canvas observer reads this. */
+    renderStackGeneration = 0;
 
     get viewerStore() {
         return this.vivStores?.viewerStore;
+    }
+
+    bumpRenderStackGeneration() {
+        this.renderStackGeneration++;
     }
 
     constructor(
@@ -63,6 +69,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             colorBy: observable,
             colorByColumn: action,
             colorByDefault: action,
+            renderStackGeneration: observable,
+            bumpRenderStackGeneration: action,
         });
         this.vivStores = createVivStores();
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(

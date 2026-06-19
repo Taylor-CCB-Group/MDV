@@ -26,12 +26,11 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { RenderStack, RenderStackEntry, RenderStackSpatialElementType } from "@spatialdata/layers";
+import type { RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { useSpatialData } from "@spatialdata/react";
 import { observer } from "mobx-react-lite";
-import { runInAction } from "mobx";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import {
     DECK_OVERLAY_IDS,
@@ -42,10 +41,13 @@ import {
 } from "@/react/spatialdata/host_overlay_ids";
 import { renderStackEntryDisplayName, renderStackOrderLabel } from "@/react/spatialdata/render_stack_display";
 import {
+    useRenderStackEntry,
+    useRenderStackMutation,
+} from "@/react/spatialdata/render_stack_entry_state";
+import {
     insertHostRenderStackEntry,
     insertSpatialRenderStackEntry,
     isRemovableRenderStackEntry,
-    patchRenderStackEntry,
     removeRenderStackEntry,
     reorderRenderStackEntries,
     renderStackEntryIds,
@@ -72,43 +74,15 @@ function getAvailableFields(dataStore: ReturnType<typeof useDataStore>): string[
     return Object.keys(dataStore.columnIndex).sort();
 }
 
-function spatialPropsAsLayerConfig(
-    entry: Extract<RenderStackEntry, { kind: "spatial" }>,
-): LayerConfig {
-    return {
-        id: entry.id,
-        type: entry.source.elementType,
-        elementKey: entry.source.elementKey,
-        visible: entry.visible,
-        opacity: typeof entry.props.opacity === "number" ? entry.props.opacity : 1,
-        ...entry.props,
-    } as LayerConfig;
-}
-
-/**
- * MobX observer boundary for per-layer panels.
- *
- * Stack entries are mutated in place on `config.renderStack`. Panels stay as plain
- * controlled components, but this wrapper must re-render when `entry.props` changes.
- * Wrapping an individual panel in `observer` is not enough — it only receives a
- * plain `config` snapshot from props, not the live observable entry.
- */
-const LayerDetails = observer(function LayerDetails({
-    entry,
-    onPatchProps,
-}: {
-    entry: RenderStackEntry;
-    onPatchProps: (entryId: string, props: Record<string, unknown>, merge?: boolean) => void;
-}) {
+const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
     const chartConfig = useConfig<SpatialDataMdvReactConfig>();
+    const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
     const availableFields = useMemo(() => getAvailableFields(dataStore), [dataStore]);
     const chartColorBy =
         typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
 
-    // Subscribe to in-place prop edits (visibility/opacity are read by the accordion).
-    void entry.visible;
-    void entry.props;
+    if (!entry) return null;
 
     if (entry.kind === "host") {
         const deckId = deckIdFromHostLayerId(entry.source.hostLayerId);
@@ -116,12 +90,7 @@ const LayerDetails = observer(function LayerDetails({
         return <DeckOverlayLayerPanel deckId={deckId} />;
     }
 
-    if (entry.kind !== "spatial") return null;
-
-    const layer = spatialPropsAsLayerConfig(entry);
-    const patchLayer = (updates: Partial<LayerConfig>) => {
-        onPatchProps(entry.id, updates as Record<string, unknown>);
-    };
+    if (entry.kind !== "spatial" || !layer) return null;
 
     switch (entry.source.elementType) {
         case "image":
@@ -165,18 +134,13 @@ const LayerDetails = observer(function LayerDetails({
 });
 
 const SortableLayerAccordion = observer(function SortableLayerAccordion({
-    entry,
-    onToggleVisible,
-    onOpacityChange,
+    entryId,
     onRemove,
-    onPatchProps,
 }: {
-    entry: RenderStackEntry;
-    onToggleVisible: (entryId: string, visible: boolean) => void;
-    onOpacityChange: (entryId: string, opacity: number) => void;
+    entryId: string;
     onRemove: (entryId: string) => void;
-    onPatchProps: (entryId: string, props: Record<string, unknown>) => void;
 }) {
+    const { entry, patchEntry, patchProps } = useRenderStackEntry(entryId);
     const {
         attributes,
         listeners,
@@ -184,11 +148,11 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: entry.id });
-    const [isHovered, setIsHovered] = useState(false);
+    } = useSortable({ id: entryId });
 
-    const opacity =
-        typeof entry.props.opacity === "number" ? entry.props.opacity : 1;
+    if (!entry) return null;
+
+    const opacity = typeof entry.props.opacity === "number" ? entry.props.opacity : 1;
     const supportsOpacity = entry.kind === "spatial";
 
     const style = {
@@ -204,15 +168,13 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
             disableGutters
             sx={{ width: "100%", display: "block" }}
             defaultExpanded={entry.kind === "spatial"}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
         >
             <AccordionSummary expandIcon={<ArrowDropDownIcon />}>
                 {isRemovableRenderStackEntry(entry) && (
                     <IconButton
                         onClick={(event) => {
                             event.stopPropagation();
-                            onRemove(entry.id);
+                            onRemove(entryId);
                         }}
                         aria-label="remove layer"
                         size="small"
@@ -220,8 +182,6 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
                             position: "absolute",
                             right: "-18px",
                             top: "-18px",
-                            opacity: isHovered ? 1 : 0,
-                            transition: "opacity 0.3s",
                         }}
                     >
                         <HighlightOffIcon fontSize="small" />
@@ -240,7 +200,9 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
                         size="small"
                         checked={entry.visible}
                         onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => onToggleVisible(entry.id, event.target.checked)}
+                        onChange={(event) =>
+                            patchEntry({ visible: event.target.checked })
+                        }
                     />
                     <Typography variant="subtitle1" className="grow">
                         {renderStackEntryDisplayName(entry)}
@@ -258,7 +220,7 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
                                 value={opacity}
                                 onChange={(_, value) => {
                                     if (typeof value === "number") {
-                                        onOpacityChange(entry.id, value);
+                                        patchProps({ opacity: value });
                                     }
                                 }}
                             />
@@ -267,7 +229,7 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
                 </div>
             </AccordionSummary>
             <AccordionDetails>
-                <LayerDetails entry={entry} onPatchProps={onPatchProps} />
+                <LayerDetails entryId={entryId} />
             </AccordionDetails>
         </Accordion>
     );
@@ -278,30 +240,12 @@ const SpatialLayerDialogComponent = observer(() => {
     const config = useConfig<SpatialDataMdvReactConfig>();
     const { spatialData } = useSpatialData();
     const stack = config.renderStack;
+    const mutateStack = useRenderStackMutation();
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: { distance: 8 },
         }),
-    );
-
-    const updateStack = useCallback(
-        (mutator: (current: RenderStack) => void) => {
-            runInAction(() => {
-                if (!config.renderStack) return;
-                mutator(config.renderStack);
-            });
-        },
-        [config],
-    );
-
-    const onPatchProps = useCallback(
-        (entryId: string, props: Record<string, unknown>) => {
-            updateStack((current) => {
-                patchRenderStackEntry(current, entryId, { props });
-            });
-        },
-        [updateStack],
     );
 
     const insertOptions = useMemo<InsertOption[]>(() => {
@@ -344,17 +288,17 @@ const SpatialLayerDialogComponent = observer(() => {
             const oldIndex = ids.indexOf(String(active.id));
             const newIndex = ids.indexOf(String(over.id));
             if (oldIndex === -1 || newIndex === -1) return;
-            updateStack((current) => {
+            mutateStack((current) => {
                 reorderRenderStackEntries(current, oldIndex, newIndex);
             });
         },
-        [stack, updateStack],
+        [mutateStack, stack],
     );
 
     const onInsert = useCallback(
         (option: InsertOption | null) => {
             if (!option) return;
-            updateStack((current) => {
+            mutateStack((current) => {
                 if (option.kind === "spatial") {
                     insertSpatialRenderStackEntry(
                         current,
@@ -367,7 +311,7 @@ const SpatialLayerDialogComponent = observer(() => {
                 }
             });
         },
-        [updateStack],
+        [mutateStack],
     );
 
     if (!stack?.entries.length) {
@@ -392,28 +336,15 @@ const SpatialLayerDialogComponent = observer(() => {
         >
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <SortableContext items={entryIds} strategy={verticalListSortingStrategy}>
-                    {stack.entries.map((entry) => (
+                    {entryIds.map((entryId) => (
                         <SortableLayerAccordion
-                            key={entry.id}
-                            entry={entry}
-                            onToggleVisible={(entryId, visible) => {
-                                updateStack((current) => {
-                                    patchRenderStackEntry(current, entryId, { visible });
+                            key={entryId}
+                            entryId={entryId}
+                            onRemove={(id) => {
+                                mutateStack((current) => {
+                                    removeRenderStackEntry(current, id);
                                 });
                             }}
-                            onOpacityChange={(entryId, opacity) => {
-                                updateStack((current) => {
-                                    patchRenderStackEntry(current, entryId, {
-                                        props: { opacity },
-                                    });
-                                });
-                            }}
-                            onRemove={(entryId) => {
-                                updateStack((current) => {
-                                    removeRenderStackEntry(current, entryId);
-                                });
-                            }}
-                            onPatchProps={onPatchProps}
                         />
                     ))}
                 </SortableContext>

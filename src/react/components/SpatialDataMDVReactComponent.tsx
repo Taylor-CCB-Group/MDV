@@ -1,4 +1,4 @@
-import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
+import type { RenderStack } from "@spatialdata/layers";
 import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
 import {
     SpatialCanvasViewer,
@@ -16,12 +16,18 @@ import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import type { FieldName } from "@/charts/charts";
 import {
     createMdvHostLayerResolver,
+    renderStackHostFingerprint,
+    resolveCachedHostDeckLayers,
     type MdvDeckOverlayLayers,
 } from "@/react/spatialdata/host_layer_resolver";
 import {
     createDefaultRenderStack,
     normalizeRenderStack,
 } from "@/react/spatialdata/render_stack_seed";
+import {
+    createRenderStackLayerInputsCache,
+    syncRenderStackLayerInputs,
+} from "@/react/spatialdata/render_stack_layer_inputs";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useOuterContainer } from "../screen_state";
@@ -60,35 +66,72 @@ function getSpatialDataUrl(region: SpatialRegionMetadata) {
     return getProjectURL(`spatial/${file}`);
 }
 
-function cloneRenderStackEntry(entry: RenderStackEntry): RenderStackEntry {
-    if (entry.kind === "group") {
-        return {
-            ...entry,
-            props: { ...entry.props },
-            children: [...entry.children],
-        };
+function observeSpatialRenderStack(stack: RenderStack | undefined) {
+    for (const entry of stack?.entries ?? []) {
+        if (entry.kind !== "spatial") continue;
+        void entry.id;
+        void entry.visible;
+        void entry.props;
     }
-    if (entry.kind === "host") {
-        return {
-            ...entry,
-            props: { ...entry.props },
-            source: { ...entry.source },
-        };
-    }
-    return {
-        ...entry,
-        props: { ...entry.props },
-        source: { ...entry.source },
-    };
 }
 
-function toPlainRenderStack(stack: RenderStack | undefined): RenderStack | undefined {
-    if (!stack) return undefined;
-    return {
-        schemaVersion: stack.schemaVersion,
-        entries: stack.entries.map(cloneRenderStackEntry),
-    };
-}
+const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderStack({
+    spatialData,
+    coordinateSystem,
+    spatialViewState,
+    onSpatialViewStateChange,
+    hostLayerResolver,
+    deckProps,
+    onFeatureHover,
+}: {
+    spatialData: NonNullable<ReturnType<typeof useSpatialData>["spatialData"]>;
+    coordinateSystem: string;
+    spatialViewState: ReturnType<typeof toSpatialViewState>;
+    onSpatialViewStateChange: (next: SpatialCanvasViewState) => void;
+    hostLayerResolver: ReturnType<typeof createMdvHostLayerResolver>;
+    deckProps: Partial<DeckGLProps>;
+    onFeatureHover: (event: SpatialFeaturePickEvent) => void;
+}) {
+    const layerInputsCacheRef = useRef(createRenderStackLayerInputsCache());
+    const config = useConfig<SpatialDataMdvReactConfig>();
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const stack = config.renderStack;
+    const generation = chart.renderStackGeneration;
+    void generation;
+    observeSpatialRenderStack(stack);
+
+    const layerInputs = useMemo(() => {
+        if (!stack) return { layers: {}, layerOrder: [] as string[] };
+        return syncRenderStackLayerInputs(stack, layerInputsCacheRef.current);
+    }, [stack, generation]);
+
+    const hostFingerprint = renderStackHostFingerprint(stack);
+    const hostDeckLayers = useMemo(
+        () => resolveCachedHostDeckLayers(stack, hostLayerResolver),
+        [hostFingerprint, hostLayerResolver],
+    );
+
+    if (!stack?.entries.length) {
+        return <div className="h-full w-full p-2">Preparing layer stack…</div>;
+    }
+
+    return (
+        <SpatialCanvasViewer
+            spatialData={spatialData}
+            coordinateSystem={coordinateSystem}
+            layers={layerInputs.layers}
+            layerOrder={layerInputs.layerOrder}
+            deckLayers={hostDeckLayers}
+            viewState={spatialViewState}
+            onViewStateChange={onSpatialViewStateChange}
+            deckProps={deckProps}
+            renderTooltip={false}
+            onFeatureHover={onFeatureHover}
+            autoFit={spatialViewState === null}
+            style={{ width: "100%", height: "100%" }}
+        />
+    );
+});
 
 function SpatialDataChartRoot() {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
@@ -203,19 +246,9 @@ const SpatialDataViewer = observer(
                         ? createDefaultRenderStack(spatialData, coordinateSystem)
                         : normalizeRenderStack(config.renderStack, spatialData, coordinateSystem);
                 config.renderStack = next;
+                chart.bumpRenderStackGeneration();
             });
         }, [config, coordinateSystem, loading, region?.spatial?.file, spatialData]);
-
-        // Dialog mutations patch `config.renderStack` in place (same object reference).
-        // Read nested entry fields during render so MobX re-runs this observer, then pass
-        // a fresh plain copy into SpatialCanvasViewer on every tracked change.
-        const renderStackEntries = config.renderStack?.entries;
-        renderStackEntries?.forEach((entry) => {
-            void entry.id;
-            void entry.visible;
-            void entry.props;
-        });
-        const renderStack = toPlainRenderStack(config.renderStack);
 
         const deckOverlaySources = useMemo<MdvDeckOverlayLayers>(
             () => ({
@@ -348,7 +381,7 @@ const SpatialDataViewer = observer(
             return <div className="h-full w-full p-2">Loading SpatialData store…</div>;
         }
 
-        if (!renderStack?.entries.length) {
+        if (!config.renderStack?.entries.length) {
             return <div className="h-full w-full p-2">Preparing layer stack…</div>;
         }
 
@@ -378,18 +411,14 @@ const SpatialDataViewer = observer(
                     }}
                 >
                     <div style={{ width, height, position: "relative" }}>
-                        <SpatialCanvasViewer
+                        <SpatialCanvasFromRenderStack
                             spatialData={spatialData}
                             coordinateSystem={coordinateSystem}
-                            renderStack={renderStack}
-                            viewState={spatialViewState}
-                            onViewStateChange={onSpatialViewStateChange}
+                            spatialViewState={spatialViewState}
+                            onSpatialViewStateChange={onSpatialViewStateChange}
                             hostLayerResolver={hostLayerResolver}
                             deckProps={deckProps}
-                            renderTooltip={false}
                             onFeatureHover={onFeatureHover}
-                            autoFit={spatialViewState === null}
-                            style={{ width: "100%", height: "100%" }}
                         />
                     </div>
                 </div>

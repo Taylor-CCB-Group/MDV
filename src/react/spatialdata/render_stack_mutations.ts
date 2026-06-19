@@ -29,8 +29,18 @@ export function patchRenderStackEntry(
         entry.visible = patch.visible;
     }
     if (patch.props) {
-        entry.props = { ...entry.props, ...patch.props };
+        for (const [key, value] of Object.entries(patch.props)) {
+            entry.props[key] = value;
+        }
     }
+}
+
+/** New stack shell, same entry objects — invalidates viewer `renderStack` memo without cloning entries. */
+export function refreshRenderStackShell(stack: RenderStack): RenderStack {
+    return {
+        schemaVersion: stack.schemaVersion,
+        entries: stack.entries,
+    };
 }
 
 export function insertSpatialRenderStackEntry(
