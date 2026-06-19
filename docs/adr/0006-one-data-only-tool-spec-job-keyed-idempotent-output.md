@@ -13,7 +13,7 @@ an LLM function-calling schema.
 
 Full tool contract: `id` / `name` / `description` + **input contract** (needs `cells` + an
 expression subgroup) + **params spec** + **output spec** + **worker entrypoint** (the registry
-doubles as the dispatch table `tool_id → entrypoint`).
+doubles as the dispatch table for both halves- `input_shape` -> materializer (in) and `tool_id → entrypoint` (out)).
 
 ## Params spec — GuiSpecType-native, hydrated not serialized
 
@@ -122,6 +122,31 @@ subset (`var`); DGE on `.raw` covers a *superset*, so genes outside `var` have n
 Either restrict DGE to HVG or key the matrix to a dedicated full-gene datasource. This is OQ1
 (`.raw` preservation) resurfacing as a structural constraint — see ADR-0003.
 
+## Input spec — shape-routed: trays are built by the input's declared shape
+
+  The mirror of output-routing, on the way in. A job's inputs are staged into its workspace as a
+  **tray** (ADR-0004) by an **owner-side materializer** that decodes at the boundary (`get_column`
+  → real values, under a read lock) so the worker reads plain arrays and imports no MDV. The
+  materializer is keyed by the input's **declared shape, not by tool** — the same discipline as
+  ingest. Tools that share an input shape share a materializer; the per-tool halves are the
+  **worker** (the computation) and the **spec**.
+
+  | Declared shape | Input is | Materializer produces (the tray) |
+  |---|---|---|
+  | `columns(ds, cols)` | a set of columns of one datasource | one string dataset per `column` param (named by the param), scalar params as attrs |
+  | `matrix(ds, layer, factors)` | an expression matrix + grouping factor(s) | the matrix + the factor arrays |
+
+  The rule in one line: **a set of columns → one dataset per column; a matrix + factors → the
+  matrix plus its grouping.** `concat_columns` is the first row — two `column` params on one
+  datasource — and any later column-input tool (UMAP on chosen columns, a per-column annotation)
+  **reuses the same materializer**; only its worker differs. DGE is the `matrix` row and is parked
+  with DGE (ADR-0003).
+
+  The registry dispatches the materializer by `input_shape` exactly as it dispatches the worker by
+  `entrypoint` — the registry is the dispatch table for **both** halves of the courier (materialise
+  in, run out). Adding a column-input tool adds a `ToolSpec` + a worker; it does **not** add a
+  materializer.
+
 ## Consequences
 
 - One source of truth eliminates the frontend/backend params drift a separate form + validator
@@ -131,6 +156,10 @@ Either restrict DGE to HVG or key the matrix to a dedicated full-gene datasource
   DGE's `contrasts` + matrix is the worked instance; the four shapes
   (`per_cell` / `per_gene` / `matrix` / `new_entity`) cover the foreseeable jobs, and a new shape
   is added only when a tool genuinely needs one.
+- **Input shape-routing keeps materialisation job-agnostic too.** The owner builds trays per
+    *input shape*, not per tool, so the materialiser set is a small fixed table
+    (`columns` / `matrix`) shared across tools — the symmetric twin of output shape-routing. A new
+    column-input tool reuses the `columns` materialiser; only a genuinely new input shape adds one.
 - **Deferred — content-hash result cache.** A key of `hash(tool + params + cells + layer)`
   (Bazel's action-cache idea) enables *"you've already run this exact analysis — open the
   existing result, or run anyway?"* It is **self-invalidating** (editing cells/params changes
