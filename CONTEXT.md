@@ -40,3 +40,15 @@ detail, no decisions. Decisions that are hard to reverse live in `docs/adr/`.
 - **Installer / lockfile manager** — the tool that resolves, locks, and installs
   dependencies into an environment (e.g. `uv`, `pip`, `poetry`). Produces the lockfile
   (`uv.lock`). Independent of the build backend.
+
+## SpatialData.js integration terms
+
+Canonical rendering vocabulary lives in [SpatialData.js CONTEXT.md](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/CONTEXT.md). MDV chart code uses the same terms:
+
+- **Render Stack** — saved draw order on chart config (`renderStack.entries`), not parallel `layerOrder` arrays
+- **Stack Entry** — one ordered item (`kind: spatial | host | group`)
+- **Host Overlay** — MDV deck layer referenced by `hostLayerId` in the stack, resolved at runtime
+- **Runtime Attachment** — `hostLayerResolver`, tooltip hooks, `deckProps`; not serialized in `entry.props`
+- **MobX Control Island** — layer dialog UI that patches `config.renderStack` directly
+
+See [docs/spatialdata-vis-integration.md](docs/spatialdata-vis-integration.md) for MDV-specific integration notes.
