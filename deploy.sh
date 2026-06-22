@@ -110,7 +110,7 @@ prompt_deployment_settings() {
       --filter "label=com.docker.compose.project=${DEPLOYMENT_NAME}" \
       --filter "label=com.docker.compose.service=mdv_app" \
       --format "{{.Ports}}" | head -n 1)
-    local port_pattern='(0\.0\.0\.0|\[::\]|:::):([0-9]+)->5055'
+    local port_pattern='(0\.0\.0\.0|\[::\]|::):([0-9]+)->5055'
     if [[ "$ports_line" =~ $port_pattern ]]; then
       echo "${BASH_REMATCH[2]}"
     fi
