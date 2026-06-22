@@ -119,7 +119,7 @@ If no local image is available, scripts pull from Docker Hub as before.
 To test local code changes:
 
 ```sh
-docker compose -f docker-local.yml build mdv_app
+docker compose -f docker-compose.yml build mdv_app
 ```
 
 Then run your deploy script and choose backend/settings as needed.

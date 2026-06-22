@@ -643,7 +643,7 @@ fi
 
 create_or_validate_env_file
 
-DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/main/docker-local.yml"
+DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/main/docker-compose.yml"
 run_docker_compose "$DOCKER_COMPOSE_URL"
 
 zenity --info --title="Deployment Complete" --text="MDV application deployed successfully!\nClick OK to proceed."
