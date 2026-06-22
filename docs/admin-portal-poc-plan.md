@@ -7,13 +7,31 @@ Related docs:
 - [admin-portal-architecture.md](./admin-portal-architecture.md)
 - [admin-portal-api-contract.md](./admin-portal-api-contract.md)
 
-## 1. POC Goal
+## 1. Overview
+
+The POC should move toward plugin support in stages rather than trying to design the full plugin SDK upfront.
+
+The short-term goal is to make Admin cleaner while it still lives inside MDV: keep the frontend separate, keep routes under `/admin`, and introduce an admin-specific backend boundary before adding write APIs. That boundary lets `AdminExtension` behave like a controller, while admin services hide the current MDV database/model details.
+
+The longer-term path is:
+
+```text
+admin-specific boundary inside MDV
+  -> admin MVP workflows
+  -> identify reusable plugin concepts
+  -> general MDV plugin API/SDK
+  -> external trusted admin plugin package
+```
+
+The admin-specific contracts/services are therefore a stepping stone, not the final generic plugin system.
+
+## 2. POC Goal
 
 Build the Admin Portal in small increments so we can prove the architecture before implementing the full user-management workflow.
 
 The POC does not need real Auth0 integration.
 
-## 2. Increment Overview
+## 3. Increment Overview
 
 ```text
 Increment 1: Admin read-only shell                 Status: implemented baseline
@@ -24,7 +42,7 @@ Increment 4: Auth0-backed user creation            Status: later
 
 Each increment should update this plan before implementation if the scope changes.
 
-## 3. POC Architecture
+## 4. POC Architecture
 
 ```text
 /admin
@@ -45,7 +63,7 @@ Important boundaries:
 - Backend performs all real permission checks.
 - Frontend permission checks are UX only.
 
-## 4. Auth Model For POC
+## 5. Auth Model For POC
 
 For local/demo mode:
 
@@ -71,7 +89,7 @@ POC auth limitations:
 - no production admin bootstrap
 - no production session hardening beyond route-level checks/tests
 
-## 5. Increment 1: Admin Read-Only Shell
+## 6. Increment 1: Admin Read-Only Shell
 
 Status: implemented baseline.
 
@@ -110,7 +128,7 @@ Current Increment 1 success criteria:
 - backend tests pass
 - Vite build emits the admin bundle
 
-## 6. Increment 2: Local User Creation And Assignment
+## 7. Increment 2: Local User Creation And Assignment
 
 Status: next.
 
@@ -137,7 +155,7 @@ Questions to resolve before implementation:
 - should Increment 2 include backend demo-user seeding, or is the local create-user form enough for demos?
 - should local user creation use the same response shape as future Auth0-backed creation?
 
-## 7. Increment 3: Permission Editing And Removal
+## 8. Increment 3: Permission Editing And Removal
 
 Status: later.
 
@@ -161,7 +179,7 @@ Likely scope:
 - remove project access
 - enforce last-owner protection
 
-## 8. Increment 4: Auth0-Backed User Creation
+## 9. Increment 4: Auth0-Backed User Creation
 
 Status: later.
 
@@ -182,7 +200,7 @@ Likely scope:
 - expose clear partial-failure errors if rollback fails
 - keep frontend API shape stable from Increment 2
 
-## 9. Expected POC Limitations
+## 10. Expected POC Limitations
 
 - no Auth0 user creation until Increment 4
 - no first-admin bootstrap
