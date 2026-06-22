@@ -14,7 +14,8 @@ services:
       # Uncomment the line below if you want to use custom extensions:
       # - ./config/user_config.json:/config/user_config.json
     env_file:
-      - .env  # Load environment variables from the .env file
+      - path: .env  # Load environment variables from the .env file (optional; deploy.sh supplies .env.<name> via override)
+        required: false
       # Example .env file content:
       # DB_NAME=mdv_db
       # DB_USER=admin
@@ -42,7 +43,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     env_file:
-      - .env  # Load database credentials from the .env file
+      - path: .env  # Load database credentials from the .env file (optional; deploy.sh supplies .env.<name> via override)
+        required: false
     restart: always
 
 volumes:
