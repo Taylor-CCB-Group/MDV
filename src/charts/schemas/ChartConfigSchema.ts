@@ -70,7 +70,30 @@ export const BaseConfigSchema = GridStackConfigSchema.extend({
 // todo - this should be a union of all the color config options, not applied to all charts
 export const ChartColorConfigSchema = z.object({
     color_by: FieldSpecSchema.optional().describe("Field or column configuration used to determine color mapping"),
-    color_legend: z.record(z.string(), z.unknown()).optional().describe("Custom color legend configuration"),
+    color_legend: z
+        .object({
+            // Keep optional for backwards compatibility with legacy/partially-serialized
+            // configs where `color_legend` exists but `display` may be missing/misspelled.
+            display: z.boolean().optional().describe("Whether the color legend is visible"),
+            pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
+            filter: z
+                .discriminatedUnion("kind", [
+                    z.object({
+                        kind: z.literal("categorical"),
+                        column: z.string(),
+                        value: z.string(),
+                    }),
+                    z.object({
+                        kind: z.literal("continuous"),
+                        column: z.string(),
+                        range: z.tuple([z.number(), z.number()]),
+                    }),
+                ])
+                .optional()
+                .describe("Active color legend filter"),
+        })
+        .optional()
+        .describe("Color legend display and position"),
     log_color_scale: z.boolean().optional().describe("Whether to use logarithmic scaling for color values"),
     trim_color_scale: z.enum(["0.05", "0.01", "0.001", "none"]).optional().describe("Quantile trimming for color scale to handle outliers"),
     color_overlay: z.number().optional().describe("Opacity value for color overlay effects"),

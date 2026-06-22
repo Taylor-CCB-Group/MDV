@@ -26,6 +26,26 @@ def test_parse_explicit_progress_line_malformed_payload():
     assert event is None
 
 
+def test_parse_explicit_progress_line_coerces_noisy_numeric_fields():
+    event = parse_explicit_progress_line(
+        'CHATMDV_PROGRESS:{"stage":"marker_ranking","pct":"72.9","delta":"bad","msg":"ok"}'
+    )
+    assert event is not None
+    assert event.stage == "marker_ranking"
+    assert event.progress == 72
+    assert event.delta == 0
+
+
+def test_parse_explicit_progress_line_non_numeric_progress_defaults_to_zero():
+    event = parse_explicit_progress_line(
+        'CHATMDV_PROGRESS:{"stage":"neighbors","progress":"n/a","delta":-3}'
+    )
+    assert event is not None
+    assert event.stage == "neighbors"
+    assert event.progress == 0
+    assert event.delta == 0
+
+
 def test_infer_progress_rank_genes_groups():
     event = infer_progress_event_from_output("scanpy.tl.rank_genes_groups(adata, 'leiden')")
     assert event is not None

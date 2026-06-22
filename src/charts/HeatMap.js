@@ -6,6 +6,7 @@ import { scaleLinear } from "d3-scale";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { axisLeft } from "d3";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class HeatMap extends SVGChart {
     constructor(dataStore, div, config) {
@@ -125,8 +126,10 @@ class HeatMap extends SVGChart {
         this.setColorLegend();
     }
 
-    getColorLegend() {
+    getColorLegendSpec() {
         const cs = this.config.color_scale;
+        // Match setColorFunction: virtual expression fields must exist before legend min/max lookups.
+        this._ensureExpressionColumn(this.config.param[1]);
         const conf = {
             overideValues: {
                 max: 1,
@@ -149,7 +152,7 @@ class HeatMap extends SVGChart {
             },
             name: "Scale",
         };
-        return this.dataStore.getColorLegend(this.config.param[1], conf);
+        return buildColorLegendSpec(this.dataStore, this.config.param[1], conf);
     }
 
     onDataFiltered(dim) {

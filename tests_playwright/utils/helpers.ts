@@ -194,6 +194,145 @@ export async function saveCurrentView(page: Page) {
     await waitForViewUnsavedState(page, false);
 }
 
+export type ColorLegendItem = {
+    label: string;
+    color: string;
+};
+
+export type ColorLegendState = {
+    columnTitle: string;
+    items: ColorLegendItem[];
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+};
+
+export function getChartColorLegendHost(page: Page, chartTitle: string) {
+    return getChartPanelByTitle(page, chartTitle).locator(".legend-container");
+}
+
+function escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export async function setChartColorBy(page: Page, chartTitle: string, columnName: string) {
+    await openChartSettingsDialog(page, chartTitle);
+    await searchChartSettings(page, "Color By");
+    const colorRow = getSettingRow(page, "Color By");
+    await colorRow.getByRole("combobox").first().click();
+    const rx = new RegExp(`^${escapeRegex(columnName)}(\\b|\\s|\\()`, "i");
+    await page.getByRole("option", { name: rx }).first().click();
+    await closeTopDialog(page);
+    await expect(getChartColorLegendHost(page, chartTitle)).toBeVisible({ timeout: 30_000 });
+}
+
+export async function getChartColorLegendState(page: Page, chartTitle: string): Promise<ColorLegendState> {
+    return await page.evaluate((title) => {
+        const panels = [...document.querySelectorAll(".ciview-chart-panel")];
+        const panel = panels.find((entry) => {
+            const titleNode = entry.querySelector(".ciview-chart-title");
+            return titleNode?.textContent?.trim() === title;
+        });
+        const host = panel?.querySelector(".legend-container");
+        if (!(host instanceof HTMLElement)) {
+            return {
+                columnTitle: "",
+                items: [],
+                left: 0,
+                top: 0,
+                width: 0,
+                height: 0,
+            };
+        }
+
+        const items: ColorLegendItem[] = [];
+        for (const rect of host.querySelectorAll("svg rect[fill]")) {
+            const fill = rect.getAttribute("fill");
+            const label = rect.parentElement?.querySelector("text")?.textContent?.trim() ?? "";
+            if (!fill || fill === "none" || !label) {
+                continue;
+            }
+            items.push({ label, color: fill });
+        }
+
+        return {
+            columnTitle: host.querySelector(".legend-title")?.textContent?.trim() ?? "",
+            items,
+            left: host.offsetLeft,
+            top: host.offsetTop,
+            width: host.offsetWidth,
+            height: host.offsetHeight,
+        };
+    }, chartTitle);
+}
+
+export async function dragChartColorLegend(
+    page: Page,
+    chartTitle: string,
+    deltaX: number,
+    deltaY: number,
+) {
+    const host = getChartColorLegendHost(page, chartTitle);
+    const dragHandle = host.locator(
+        ".legend-drag-handle, .legend-continuous-drag-handle",
+    );
+    let box = await dragHandle.boundingBox();
+    if (!box) {
+        box = await host.boundingBox();
+    }
+    if (!box) {
+        throw new Error(`Color legend drag target not found for chart "${chartTitle}"`);
+    }
+    const startX = box.x + Math.min(16, box.width / 2);
+    const startY = box.y + Math.min(8, box.height / 2);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + deltaX, startY + deltaY);
+    await page.mouse.up();
+}
+
+export async function resizeChartColorLegend(
+    page: Page,
+    chartTitle: string,
+    deltaX: number,
+    deltaY: number,
+) {
+    const handle = getChartColorLegendHost(page, chartTitle).locator(".resizer-se");
+    await expect(handle).toBeVisible();
+    const box = await handle.boundingBox();
+    if (!box) {
+        throw new Error(`Color legend resize handle not found for chart "${chartTitle}"`);
+    }
+    await page.mouse.move(box.x + 4, box.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 4 + deltaX, box.y + 4 + deltaY);
+    await page.mouse.up();
+}
+
+export async function getFirstNumericColorByColumn(page: Page): Promise<string> {
+    return await page.evaluate(() => {
+        const chartManager = (window as any).mdv?.chartManager;
+        const dataSourceName = chartManager?.dsIndex?.cells
+            ? "cells"
+            : Object.keys(chartManager?.dsIndex ?? {})[0];
+        if (!dataSourceName) {
+            throw new Error("No datasource found");
+        }
+        const columns = chartManager.dsIndex[dataSourceName]?.dataStore?.columns ?? [];
+        const numeric = columns.find(
+            (col: { datatype?: string; field?: string }) =>
+                (col.datatype === "integer" || col.datatype === "double") &&
+                typeof col.field === "string" &&
+                col.field !== "__index__",
+        );
+        if (!numeric?.field) {
+            throw new Error("No numeric color_by column found");
+        }
+        return String(numeric.field);
+    });
+}
+
 export async function getCurrentView(page: Page): Promise<string> {
     await page.waitForFunction(() => Boolean((window as any).mdv?.chartManager?.viewManager));
     return await page.evaluate(() => String((window as any).mdv.chartManager.viewManager.current_view));
@@ -406,7 +545,7 @@ export async function setDotPlotXAxisLinkField(
     await expect
         .poll(async () => {
             const fields = await getDotPlotXAxisFields(page, chartTitle);
-            return (fields[0] ?? "").startsWith(`{subgroupKey}|`);
+            return (fields[0] ?? "").startsWith(`${subgroupKey}|`);
         })
         .toBe(true);
     await waitForViewUnsavedState(page, true);

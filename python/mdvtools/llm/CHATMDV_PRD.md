@@ -52,6 +52,22 @@ Responsibilities:
 - Encode high-level constraints for analysis vs visualization behavior
 - Ensure model defaults favor safe, bounded outputs in chat when chart persistence is not valid
 
+#### RAG code corpus
+
+Prompt text lives in `templates.py`; **retrieval** additionally indexes a **local code corpus** of sample MDV scripts so embeddings can surface chart-construction patterns consistent with AnnData-style projects.
+
+- **Location:** `python/mdvtools/test_projects/RAG_examples/`
+  - `ANNDATA_examples/` — default indexed corpus (chart recipes for `.h5ad` / AnnData workflows).
+  - `PBMC3K_examples/`, `TABULAR_examples/`, `TAURUS_examples/` — extra runnable demos; excluded from default ChatMDV indexing unless callers pass another `directory_path` into the crawler.
+
+- **Indexing:** `python/mdvtools/llm/local_files_utils.py` — `crawl_local_repo()` defaults to `python/mdvtools/test_projects/RAG_examples/ANNDATA_examples/`.
+
+- **When loaded:** Importing `langchain_mdv.py` triggers crawling, chunking, and FAISS index construction on startup.
+
+- **Automation:** `python/mdvtools/test_projects/llm_automated_testing.py` uses the same default `crawl_local_repo()`. `llm_automated_testing_command_line.py` points at the same `ANNDATA_examples` folder but duplicates crawl logic with a different ignore list, so indexed files may not match orchestration exactly.
+
+- **Operational impact:** Adding or changing scripts under `ANNDATA_examples/` alters retrieval behavior after process restart / re-embed. Sphinx API generation excludes `**/RAG_examples/**` (`docs/maindocs/conf.py`).
+
 ### 3. Datasource and Field Policy
 
 **Primary file:** `python/mdvtools/llm/datasource_roles.py`
@@ -99,6 +115,19 @@ Responsibilities:
 - Utility transformations and resolver logic
 - Optional post-save validation, such as dropping charts whose unresolved `param` tokens do not map to datasource field IDs
 
+### 7. Runnable CLI Module
+
+**Primary file:** `python/mdvtools/llm/chat_cli.py`
+
+Responsibilities:
+
+- Provide one-shot ChatMDV execution via module invocation (`python -m mdvtools.llm.chat_cli`)
+- Accept required request inputs (`--project`, `--sentence`)
+- Support optional operational controls (`--json`, `--verbose`, `--output-dir`, `--view-name`)
+- Return a stable result contract for terminal and automation use
+- Persist debug artifacts (`generated_code.py`, `result.json`, `view_snapshot.json`) when `--output-dir` is provided
+- Support standalone CLI execution by installing a no-op SocketIO shim when app SocketIO is not initialized
+
 ## End-to-End Request Flow
 
 1. User asks a question in chat.
@@ -108,6 +137,21 @@ Responsibilities:
 5. Chat response includes text/tables and optional persisted chart instructions.
 6. Verification layer summarizes what to check for correctness and consistency.
 7. Optional field/token resolution logic validates persisted chart parameters.
+
+### Runnable Module Flow (`python -m`)
+
+1. User runs `python -m mdvtools.llm.chat_cli --project <path> --sentence "<prompt>"`.
+2. CLI validates project path and datasource availability.
+3. CLI invokes `ProjectChat.ask_question(...)` and receives `AskQuestionResult`.
+4. If `--view-name` is provided, CLI renames the generated view to the requested name.
+5. CLI returns success/failure with:
+   - `success`
+   - `project_path`
+   - `views_file`
+   - `view_name`
+   - `message`
+   - `debug_output_dir`
+6. If `--output-dir` is provided, CLI writes debug artifacts for inspection.
 
 ## Critical Policy Rules
 
@@ -140,6 +184,7 @@ Policy and regression tests should be concentrated in:
 - `python/mdvtools/tests/test_datasource_roles.py`
 - `python/mdvtools/tests/test_column_field_resolve.py`
 - `python/mdvtools/tests/test_code_execution.py`
+- `python/mdvtools/test_projects/llm_automated_testing.py` — end-to-end LLM harness using the same default RAG corpus as orchestration (`RAG_examples/ANNDATA_examples/`).
 
 Add new ChatMDV policy tests in these suites rather than unrelated runtime test areas.
 
@@ -174,3 +219,43 @@ A non-zero exit indicates files changed outside approved ChatMDV boundaries.
 - Relevant policy/regression tests are added or updated.
 - Generated behavior follows datasource-field constraints and marker workflow policy.
 - Verification text accurately reflects what was executed and persisted.
+
+## Runnable Module Specification
+
+### Invocation
+
+```bash
+python -m mdvtools.llm.chat_cli --project <project_path> --sentence "<prompt>"
+```
+
+### Arguments
+
+- Required:
+  - `--project`: MDV project directory
+  - `--sentence`: one-shot natural-language request
+- Optional:
+  - `--output-dir`: write debug artifacts to directory
+  - `--json`: print machine-readable output
+  - `--verbose`: print additional human-readable details
+  - `--view-name`: force final persisted view name
+
+### `--view-name` Semantics
+
+- If provided and different from the auto-generated view name:
+  - copy generated view payload to the requested name
+  - delete original auto-generated view entry
+  - return requested name in output `view_name`
+- Empty/whitespace-only value is invalid.
+
+### Output Contract
+
+```json
+{
+  "success": true,
+  "project_path": "/abs/path/to/project",
+  "views_file": "/abs/path/to/project/views.json",
+  "view_name": "custom_or_generated_view_name",
+  "message": "Success",
+  "debug_output_dir": "/tmp/chatmdv-debug-run1"
+}
+```

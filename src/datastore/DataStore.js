@@ -9,7 +9,6 @@ import "./ValueSetDimension";
 import "./SortableDimension.js";
 import "./DeepToolsDimension.js";
 import { scaleLinear, scaleSymlog } from "d3-scale";
-import { getColorLegend, getColorBar } from "../utilities/Color.js";
 import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
@@ -277,10 +276,11 @@ class DataStore {
     /**
      * Removes all filters from the datastore,
      * More efficient than removing each filter individually
-     * Filters on dimnensions with a noclear property will not
+     * Filters on dimensions with a 'noclear' property will not
      * be removed
      */
     removeAllFilters() {
+        //clear in one go 
         this.filterArray.fill(0);
         const noclear = [];
         for (const dim of this.dimensions) {
@@ -288,22 +288,25 @@ class DataStore {
                 noclear.push(dim);
                 continue;
             }
-            dim.filterArray.fill(0);
-            dim.filterMethod = null;
-            if (dim.bgfArray) {
+            if (dim.bgfData){
                 for (let i = 0; i < this.size; i++) {
-                    if (dim.bgfArray[i] === 0) {
-                        dim.filterArray[i] = 2;
+                    if (dim.filterArray[i] ===1 || dim.filterArray[i] === 3) {
+                        dim.filterArray[i] -=1;
                     }
                 }
             }
+            else{
+                dim.filterArray.fill(0);
+            }
+
+            dim.filterMethod = null;
         }
         this.filterSize = this.size;
         //need to re-add the noclear filters (if any)
         for (const dim of noclear) {
             const f = dim.filterArray;
             for (let n = 0; n < f.length; n++) {
-                if (f[n] === 1) {
+                if (f[n] === 1 || f[n] === 3) {
                     if (++this.filterArray[n] === 1) {
                         this.filterSize--;
                     }
@@ -1596,37 +1599,6 @@ class DataStore {
     }
 
     /**
-     * Makes a color bar/legend based on the give column
-     * @param {string} column - the field/id of the column
-     * @param {object} config - see [here]{@link DataStore#getColorFunction}
-     * @returns {HTMLElement} - a color bar or color legend
-     */
-    getColorLegend(column, config = {}) {
-        const colors = this.getColumnColors(column, config);
-        const c = this.columnIndex[column];
-        const name = config.name || c.name;
-        if (
-            c.datatype === "integer" ||
-            c.datatype === "double" ||
-            c.datatype === "int32"
-        ) {
-            const [min, max] = this.getMinMaxForColumn(column);
-            let range = [min, max];
-            if (config.overideValues) {
-                const ov = config.overideValues;
-                range = [
-                    ov.min == null ? min : ov.min,
-                    ov.max == null ? max : ov.max,
-                ];
-            }
-            return getColorBar(colors, { range: range, label: name });
-        }
-        if (isColumnText(c)) {
-            return getColorLegend(colors, c.values, { label: name });
-        }
-    }
-
-    /**
      * This method returns an object whose keys are categories
      * and values are the colors of the categories
      * @param {string} column The column id(field) (only text/multitext columns)
@@ -1856,7 +1828,11 @@ class DataStore {
             typeof column === "string" &&
             column.includes("|")
         ) {
-            this.addColumnFromField(column);
+            try {
+                this.addColumnFromField(column);
+            } catch (_err) {
+                // Fall through to unified unknown-column error below.
+            }
             c = this.columnIndex[column];
         }
         if (!c) {

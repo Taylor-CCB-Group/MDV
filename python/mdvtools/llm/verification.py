@@ -47,24 +47,6 @@ def _project_datasource_names(project: Any) -> list[str]:
     return [ds["name"] for ds in project.datasources]
 
 
-def _has_genes_table(project: Any) -> bool:
-    for name in _project_datasource_names(project):
-        if name == "genes" or "gene" in name.lower():
-            return True
-    return False
-
-
-def _ensembl_style(token: str) -> bool:
-    t = token.strip()
-    if re.match(r"^ENS[A-Z]*G\d+", t):
-        return True
-    if re.match(r"^ENSMUSG\d+", t):
-        return True
-    if t.startswith("ENS") and len(t) > 6:
-        return True
-    return False
-
-
 def _extract_chart_types(code: str) -> list[str]:
     seen: set[str] = set()
     order: list[str] = []
@@ -259,29 +241,6 @@ def build_verification_summary(
         lines.append("")
         lines.append(charts_md.rstrip())
 
-    w_matches = list(_WRAPPER_RE.finditer(final_code))
-    gene_tokens = [m.group(2).strip() for m in w_matches]
-
-    if w_matches:
-        lines.append("")
-        lines.append("### Wrapper expression parameters")
-        for tok in gene_tokens:
-            kind = (
-                "Ensembl-style ID (heuristic)"
-                if _ensembl_style(tok)
-                else "gene label as in `genes` / `var` `name` column (heuristic: not ENS* )"
-            )
-            lines.append(f"- `{tok}` — {kind}")
-    else:
-        lines.append("")
-        lines.append(
-            "- **Wrapper expression:** not used in this response (no `<subgroup>|…(<subgroup>)|…` parameters detected)."
-        )
-        if _has_genes_table(project) and not gene_tokens:
-            lines.append(
-                "- **Note:** this project includes a genes table; this response does not use wrapper-based gene expression columns."
-            )
-
     fh = _filter_hints(final_code)
 
     lines.append("")
@@ -326,6 +285,7 @@ def build_verification_summary(
 
     # Fallback to code-only details if we couldn't format saved-view charts.
     if not charts_md:
+        gene_tokens = [m.group(2).strip() for m in _WRAPPER_RE.finditer(final_code)]
         lines.append("")
         lines.append("### Columns / outputs (from code)")
         if gene_tokens:

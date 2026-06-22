@@ -11,6 +11,7 @@ import {
     schemeReds,
 } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 const color_schemes = {
     "blue yellow": [
@@ -429,10 +430,10 @@ class CellNetworkChart extends SVGChart {
         this.reCalculate();
     }
 
-    getColorLegend() {
+    getColorLegendSpec() {
         const c = this.config;
         const d = c.link_color.domain;
-        return this.dataStore.getColorLegend(c.param[5], {
+        return buildColorLegendSpec(this.dataStore, c.param[5], {
             overideValues: {
                 min: d[0],
                 max: d[1],

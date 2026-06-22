@@ -1,5 +1,7 @@
-from mdvtools.mdvproject import MDVProject
 from typing import Optional
+
+from mdvtools.project_protocols import CreateProjectPromptProject
+from mdvtools.mdvproject import MDVProject
 import json
 
 def create_error_markdown(message: str, traceback: Optional[str] = None, extra_metadata: Optional[dict] = None) -> str:
@@ -20,7 +22,9 @@ def create_error_markdown(message: str, traceback: Optional[str] = None, extra_m
         markdown += f"<details><summary>Extra Metadata</summary>\n\n```json\n{json.dumps(extra_metadata, indent=2)}\n```\n\n</details>\n\n"
     return markdown
 
-def create_project_markdown(project: MDVProject, wrap_in_details: bool = True) -> str:
+def create_project_markdown(
+    project: CreateProjectPromptProject, wrap_in_details: bool = True
+) -> str:
     """
     Create a markdown representation of the project.
     Args:

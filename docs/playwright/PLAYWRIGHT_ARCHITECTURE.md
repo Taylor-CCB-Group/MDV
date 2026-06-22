@@ -20,11 +20,8 @@ Runner layer:
 
 - `scripts/playwright/run_playwright_cli.mjs`
 - `scripts/playwright/playwright_catalog_runner.mjs`
-- `scripts/playwright/playwright_catalog_ui_runner.mjs`
 - `scripts/playwright/playwright_catalog_dev_runner.mjs`
-- `scripts/playwright/playwright_catalog_dev_ui_runner.mjs`
 - `scripts/playwright/playwright_project_runner.mjs`
-- `scripts/playwright/playwright_project_ui_runner.mjs`
 - `scripts/playwright/playwright_all_runner.mjs`
 - `scripts/playwright/playwright_project_preflight.mjs`
 

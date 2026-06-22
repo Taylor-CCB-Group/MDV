@@ -1,3 +1,6 @@
+"""
+ChatMDV RAG example (ViolinPlot). Use set_axis_properties for axis labels — never set_x_axis / set_y_axis.
+"""
 import os
 import json
 import pandas as pd
@@ -5,7 +8,7 @@ import scanpy as sc
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.violin_plot import ViolinPlot
 
-def create_violin_plot(title, params, size, position):
+def create_violin_plot(title, params, size, position, x_axis_settings, y_axis_settings):
     """Create and configure a ViolinPlot instance with the given parameters."""
     plot = ViolinPlot(
         title=title,
@@ -13,7 +16,8 @@ def create_violin_plot(title, params, size, position):
         size=size,
         position=position
     )
-
+    plot.set_axis_properties("x", x_axis_settings)
+    plot.set_axis_properties("y", y_axis_settings)
     return plot
 
 def convert_plot_to_json(plot):
@@ -49,8 +53,11 @@ def main():
     size = [792, 472]
     position = [10, 10]
     
+    x_axis_settings = {"label": "Category", "textSize": 13, "tickfont": 10}
+    y_axis_settings = {"label": "Value", "textSize": 13, "tickfont": 10}
+
     # Create plot
-    plot = create_violin_plot(title, params, size, position)
+    plot = create_violin_plot(title, params, size, position, x_axis_settings, y_axis_settings)
     
     # Convert plot to JSON and set view
     ViolinPlot_chart_json = convert_plot_to_json(plot)

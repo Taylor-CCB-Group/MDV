@@ -6,6 +6,7 @@ import { scaleBand, scaleLinear } from "d3-scale";
 import { axisLeft } from "d3-axis";
 import BaseChart from "./BaseChart";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class MultiLineChart extends SVGChart {
     constructor(dataStore, div, config) {
@@ -119,8 +120,8 @@ class MultiLineChart extends SVGChart {
         }
     }
 
-    getColorLegend() {
-        return this.dataStore.getColorLegend(this.config.param[1]);
+    getColorLegendSpec() {
+        return buildColorLegendSpec(this.dataStore, this.config.param[1]);
     }
 
     onDataFiltered(dim) {

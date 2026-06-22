@@ -1,3 +1,6 @@
+from mdvtools._optional import require_extra
+require_extra("app", "langchain_openai")
+
 import time
 import logging
 import re
@@ -5,7 +8,7 @@ from contextlib import contextmanager
 import os
 import traceback
 import html
-from typing import List
+from typing import Any, List, Optional
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
@@ -33,10 +36,19 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import parse_view_name, prepare_code, extract_explanation_from_response
-from .column_field_resolve import normalize_view_chart_params, prune_view_charts_with_invalid_params
+from .code_manipulation import (
+    extract_explanation_from_response,
+    parse_view_name,
+    prepare_code,
+    resolve_persisted_view_name,
+)
+from .column_field_resolve import (
+    field_set_from_columns,
+    normalize_view_chart_params,
+    prune_view_charts_with_invalid_params,
+)
 from .verification import build_verification_summary
-from .datasource_roles import infer_datasource_roles
+from .datasource_roles import collect_wrapper_subgroup_keys_for_project, infer_datasource_roles
 from .code_execution import execute_code
 from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
@@ -143,9 +155,18 @@ def _extract_chart_classes(code: str) -> list[str]:
 def _is_text_table_only_code(code: str) -> bool:
     chart_classes = _extract_chart_classes(code)
     if not chart_classes:
-        return False
+        return True
     allowed = {"TextBox", "TablePlot", "SelectionDialogPlot", "RowSummaryBox"}
     return all(c in allowed for c in chart_classes)
+
+
+def _build_rag_retrieval_query(user_question: str, charts_part: str) -> str:
+    """Combine the user question with agent-suggested chart types for RAG retrieval."""
+    question = (user_question or "").strip()
+    charts = (charts_part or "").strip()
+    if question and charts:
+        return f"User question: {question}\nSuggested chart types: {charts}"
+    return question or charts
 
 
 class SuggestedQuestions(BaseModel):
@@ -170,67 +191,71 @@ def time_block(name):
 # but we can call `matplotlib.use('Agg')` before calling the agent (and any other code that might try to draw)
 matplotlib.use('Agg') # this should prevent it making any windows etc
 
-print('# setting keys and variables')
-# .env file should have OPENAI_API_KEY
-load_dotenv()
-# if it isn't set, we raise an error more explicitly to log it
-if not os.getenv("OPENAI_API_KEY"):
-    print("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
-    raise ValueError("OPENAI_API_KEY is not set in the environment variables. Please set it if LLM integration is required.")
-
-print('# Crawl the local repository to get a list of relevant file paths')
-with time_block("b1: Local repo crawling"):
-    code_files_urls = crawl_local_repo()
-
-    # Initialize an empty list to store the extracted code documents
-    code_strings = []
-
-    # populate code_strings with the code from .py & .ipynb files in code_files_urls
-    for i in range(0, len(code_files_urls)):
-        if code_files_urls[i].endswith(".py"):
-            content = extract_python_code_from_py(code_files_urls[i])
-            doc = Document(page_content=content, metadata={"url": code_files_urls[i], "file_index": i})
-            code_strings.append(doc)
-        elif code_files_urls[i].endswith(".ipynb"):
-            content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
-            doc_ipynb = Document(page_content=content_ipynb, metadata={"url": code_files_urls[i], "file_index": i})
-            code_strings.append(doc_ipynb)
-
-print('# Initialize a text splitter for chunking the code strings')
-
-with time_block("b2: Text splitter initialising"):
-    text_splitter = RecursiveCharacterTextSplitter.from_language(
-        language=Language.PYTHON,  # Specify the language as Python
-        chunk_size=20000,           # Set the chunk size to 1500 characters
-        chunk_overlap=2000          # Set the chunk overlap to 150 characters
-    )
-    print('# Split the code documents into chunks using the text splitter')
-    texts = text_splitter.split_documents(code_strings)
-
-print('# Initialize an instance of the OpenAIEmbeddings class')
-with time_block("b3: Embeddings creating"):
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-large"  # Specify the model to use for generating embeddings
-    )
-
-print(embeddings)
-print('# Create an index from the embedded code chunks')
-print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index')
-
-
-with time_block("b4: FAISS database creating"):
-    db = FAISS.from_documents(texts, embeddings)
-
-print("# Initialize the retriever from the FAISS index")
-
-with time_block("b5: Retriever creating"):
-    retriever = db.as_retriever(
-        search_type="similarity",      # Specify the search type as "similarity"
-        search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
-    )
+_rag_retriever: Optional[Any] = None
 
 # ... for testing basic mechanics without invoking the agent
 mock_agent = False
+
+
+def _ensure_openai_api_key() -> None:
+    load_dotenv()
+    if not os.getenv("OPENAI_API_KEY"):
+        raise ValueError(
+            "OPENAI_API_KEY is not set in the environment variables. "
+            "Please set it if LLM integration is required."
+        )
+
+
+def _get_rag_retriever():
+    """Build the code RAG retriever on first use (requires OPENAI_API_KEY)."""
+    global _rag_retriever
+    if _rag_retriever is not None:
+        return _rag_retriever
+
+    _ensure_openai_api_key()
+
+    print('# Crawl the local repository to get a list of relevant file paths')
+    with time_block("b1: Local repo crawling"):
+        code_files_urls = crawl_local_repo()
+
+        code_strings = []
+        for i in range(0, len(code_files_urls)):
+            if code_files_urls[i].endswith(".py"):
+                content = extract_python_code_from_py(code_files_urls[i])
+                doc = Document(
+                    page_content=content,
+                    metadata={"url": code_files_urls[i], "file_index": i},
+                )
+                code_strings.append(doc)
+            elif code_files_urls[i].endswith(".ipynb"):
+                content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
+                doc_ipynb = Document(
+                    page_content=content_ipynb,
+                    metadata={"url": code_files_urls[i], "file_index": i},
+                )
+                code_strings.append(doc_ipynb)
+
+    with time_block("b2: Text splitter initialising"):
+        text_splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.PYTHON,
+            chunk_size=20000,
+            chunk_overlap=2000,
+        )
+        texts = text_splitter.split_documents(code_strings)
+
+    with time_block("b3: Embeddings creating"):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+
+    with time_block("b4: FAISS database creating"):
+        db = FAISS.from_documents(texts, embeddings)
+
+    with time_block("b5: Retriever creating"):
+        _rag_retriever = db.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": 5},
+        )
+
+    return _rag_retriever
 
 
 class ProjectChat(ProjectChatProtocol):
@@ -261,6 +286,7 @@ class ProjectChat(ProjectChatProtocol):
         self.ds_name = project.datasources[0]['name']
         try:
             # raise ValueError("test error")
+            _ensure_openai_api_key()
             self.df = None
             # Prepare dataframes for the agent.
             # ChatMDV historically assumed df1=cells and df2=genes. Many projects instead use
@@ -286,12 +312,12 @@ class ProjectChat(ProjectChatProtocol):
                     self.log(f"Generated suggested questions: {self.suggested_questions}")
             except Exception as e:
                 self.log(f"Could not generate suggested questions: {e}")
-                self.suggested_questions = [str(e)]
+                self.suggested_questions = []
 
             self.init_error = False
         except Exception as e:
-            error_message = f"{str(e)[:500]}\n\n{traceback.format_exc()}"
-            self.log(error_message)
+            error_message = str(e)[:500]
+            self.log(f"{error_message}\n\n{traceback.format_exc()}")
             
             self.error_message = error_message
             self.init_error = True
@@ -299,9 +325,7 @@ class ProjectChat(ProjectChatProtocol):
     def get_suggested_questions(self):
         if self.init_error:
             return []
-        if self.suggested_questions:
-            return self.suggested_questions
-        return ["This should be unreachable"]
+        return self.suggested_questions
     
     def get_or_create_memory(self, conversation_id: str):
         """Get or create conversation memory for a specific conversation"""
@@ -356,7 +380,7 @@ class ProjectChat(ProjectChatProtocol):
             if roles is not None:
                 exprs = roles.expressions or []
                 if exprs:
-                    expr_lines = "\n".join(
+                    expr_lines = (
                         f"- df2 maps to expression datasource '{exprs[0].datasource_name}' "
                         f"(feature names in column '{exprs[0].name_column}', default subgroup '{exprs[0].subgroup_key}')"
                     )
@@ -586,18 +610,21 @@ class ProjectChat(ProjectChatProtocol):
 
                 match = re.search(r'charts\s+(.*)', response['output'])
                 charts_part = match.group(1) if match else response['output']
+                rag_retrieval_query = _build_rag_retrieval_query(question, charts_part)
 
                 qa_chain = RetrievalQA.from_llm(
                     llm=code_llm, 
                     prompt=prompt_RAG_template, 
-                    retriever=retriever,
+                    retriever=_get_rag_retriever(),
                     return_source_documents=True,
                 )
-                output_qa = qa_chain.invoke({"query": charts_part})
+                output_qa = qa_chain.invoke({"query": rag_retrieval_query})
                 # Log the complete prompt after context injection
                 if "source_documents" in output_qa:
                     retrieved_context = "\n".join(doc.page_content for doc in output_qa["source_documents"])
-                    complete_prompt = prompt_RAG_template.format(context=retrieved_context, question=charts_part)
+                    complete_prompt = prompt_RAG_template.format(
+                        context=retrieved_context, question=rag_retrieval_query
+                    )
                     chat_debug_logger.info(f"=== Complete RAG Prompt (with injected context) ===\n{complete_prompt}\n=== End Complete Prompt ===")
                 result = output_qa["result"]
 
@@ -611,12 +638,12 @@ class ProjectChat(ProjectChatProtocol):
                     view_name=question,
                 )
 
-                if _is_text_table_intent(question) and _is_text_table_only_code(final_code):
+                if _is_text_table_intent(question) and not _is_text_table_only_code(final_code):
                     chat_debug_logger.info(
-                        "Detected text/table-first intent with chart-only output; regenerating with chat-first instruction."
+                        "Detected text/table-first intent with chart-heavy output; regenerating with chat-first instruction."
                     )
                     chat_first_query = (
-                        f"{charts_part}\n\n"
+                        f"{rag_retrieval_query}\n\n"
                         "IMPORTANT: This request is text/table-first. "
                         "Prefer chat explanation and concise bounded stdout (`print(...)`) instead of creating "
                         "TextBox/TablePlot/SelectionDialog-only outputs unless the user explicitly requested a chart."
@@ -648,19 +675,32 @@ class ProjectChat(ProjectChatProtocol):
                     if not isinstance(ds, dict):
                         continue
                     ds_name = ds.get("name")
-                    cols = ds.get("columns")
-                    if not isinstance(ds_name, str) or not isinstance(cols, list):
+                    if not isinstance(ds_name, str):
                         continue
-                    datasource_fields[ds_name] = {
-                        str(c.get("field"))
-                        for c in cols
-                        if isinstance(c, dict) and c.get("field")
-                    }
+                    fields: set[str] = set()
+                    try:
+                        md = self.project.get_datasource_metadata(ds_name)
+                        if isinstance(md, dict):
+                            md_cols = md.get("columns")
+                            if isinstance(md_cols, list):
+                                fields |= field_set_from_columns(md_cols)
+                    except Exception:
+                        pass
+                    cols = ds.get("columns")
+                    if isinstance(cols, list):
+                        for c in cols:
+                            if isinstance(c, dict) and c.get("field"):
+                                fields.add(str(c.get("field")))
+                    if fields:
+                        datasource_fields[ds_name] = fields
 
                 def _regenerate_for_preflight(issue_text: str) -> str:
                     retry_query = (
-                        f"{charts_part}\n\n"
+                        f"{rag_retrieval_query}\n\n"
                         "Fix this code preflight validation failure and return corrected runnable code only.\n"
+                        "If issues mention set_x_axis or set_y_axis on BoxPlot, ViolinPlot, ScatterPlot, or DotPlot, "
+                        "replace with set_axis_properties('x', {...}) and set_axis_properties('y', {...}) only.\n"
+                        "On ScatterPlot use set_filter, not set_on_filter (set_on_filter is for ScatterPlot3D only).\n"
                         f"Preflight issues:\n{issue_text}"
                     )
                     output_qa_retry = qa_chain.invoke({"query": retry_query})
@@ -674,11 +714,15 @@ class ProjectChat(ProjectChatProtocol):
                         view_name=question,
                     )
 
+                allowed_wrapper_subgroup_keys = collect_wrapper_subgroup_keys_for_project(
+                    self.project
+                )
                 final_code, preflight_meta = preflight_with_single_retry(
                     initial_code=final_code,
                     regenerate_once=_regenerate_for_preflight,
                     log=chat_debug_logger.info,
                     datasource_fields=datasource_fields,
+                    allowed_wrapper_subgroup_keys=allowed_wrapper_subgroup_keys,
                 )
                 chat_debug_logger.info("Preflight metadata: %s", preflight_meta)
 
@@ -784,15 +828,16 @@ class ProjectChat(ProjectChatProtocol):
                     step_total=total_steps,
                 )
                 # Parse view name from the code
-                view_name = parse_view_name(final_code)
-                if view_name is None:
+                parsed_view_name = parse_view_name(final_code)
+                if parsed_view_name is None:
                     raise Exception("Parsing view name failed")
+                view_name = resolve_persisted_view_name(self.project, parsed_view_name)
                 log(f"view_name: {view_name}")
 
             with time_block("b15c: Normalize chart params (name to field id)"):
                 try:
-                    view_obj = self.project.get_view(view_name)
-                    if view_obj:
+                    view_obj = self.project.get_view(view_name) if view_name is not None else None
+                    if view_obj and view_name is not None:
                         ic = view_obj.get("initialCharts")
                         if isinstance(ic, dict):
                             valid_names = {
@@ -863,7 +908,7 @@ class ProjectChat(ProjectChatProtocol):
                     f"{final_code}\n"
                     "```\n\n"
                     "<br><br>"
-                    f"{html.escape(explanation)}"
+                    f"{explanation}"
                     "\n\n"
                     f"{context_files}"
                 )

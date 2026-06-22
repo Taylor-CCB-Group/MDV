@@ -148,10 +148,13 @@ describe("useSlickGridReact", () => {
             removeColumn: vi.fn(),
             hasColumnMetadata: vi.fn(() => false),
             getAllColumnsMetadata: vi.fn(() =>
-                mockOrderedParamColumns.map((column) => ({
+                (mockDataStore?.columns ?? mockOrderedParamColumns).map((column: LoadedDataColumn<DataType>) => ({
                     field: column.field,
                     name: column.name,
                     datatype: column.datatype,
+                    stringLength: column.stringLength,
+                    delimiter: column.delimiter,
+                    subgroup: column.subgroup,
                 })),
             ),
             renameColumnDisplayName: vi.fn(() => true),
@@ -1043,6 +1046,70 @@ describe("useSlickGridReact", () => {
             });
         });
 
+        test("should create a compound text column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            mockDataStore.columnIndex.surname = {
+                field: "surname",
+                name: "Surname",
+                datatype: "text",
+                data: new Uint8Array([0, 1, 2]),
+                values: ["Jones", "Smith", ""],
+                editable: true,
+            };
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "compound_text",
+                    mode: "compound",
+                    datatype: "text",
+                    sourceColumns: ["name", "surname"],
+                    delimiter: "_",
+                    position: 2,
+                });
+            });
+
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+            const [column] = mockDataStore.addColumn.mock.calls[0];
+            expect(column).toMatchObject({
+                name: "compound_text",
+                field: "compound_text",
+                datatype: "text",
+                editable: true,
+            });
+        });
+
+        test("should create a compound text16 column", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            mockDataStore.columnIndex.surname = {
+                field: "surname",
+                name: "Surname",
+                datatype: "text",
+                data: new Uint8Array([0, 1, 2]),
+                values: ["Jones", "Smith", ""],
+                editable: true,
+            };
+
+            act(() => {
+                result.current.handleAddColumn({
+                    name: "compound_text16",
+                    mode: "compound",
+                    datatype: "text16",
+                    sourceColumns: ["name", "surname"],
+                    delimiter: "_",
+                    position: 2,
+                });
+            });
+
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+            const [column] = mockDataStore.addColumn.mock.calls[0];
+            expect(column).toMatchObject({
+                name: "compound_text16",
+                field: "compound_text16",
+                datatype: "text16",
+                editable: true,
+            });
+        });
+
         test("should load an unloaded real column before cloning it", async () => {
             const { result } = renderHook(() => useSlickGridReact());
 
@@ -1085,6 +1152,115 @@ describe("useSlickGridReact", () => {
                 expect.any(Function),
             );
             expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+        });
+
+        test("should load unloaded source columns before creating a compound column", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            mockDataStore.columnIndex.surname = {
+                field: "surname",
+                name: "Surname",
+                datatype: "text",
+                data: null,
+                values: ["Jones", "Smith", ""],
+                editable: true,
+            };
+            mockChartManager.loadColumnSet = vi.fn((columns: string[], _dsName: string, callback: () => void) => {
+                for (const field of columns) {
+                    mockDataStore.columnIndex[field].data = new Uint8Array([0, 1, 2]);
+                }
+                callback();
+            });
+
+            await act(async () => {
+                await result.current.handleAddColumn({
+                    name: "compound_loaded",
+                    mode: "compound",
+                    datatype: "text",
+                    sourceColumns: ["name", "surname"],
+                    delimiter: "_",
+                    position: 2,
+                });
+            });
+
+            expect(mockChartManager.loadColumnSet).toHaveBeenCalledWith(
+                ["surname"],
+                "test-ds",
+                expect.any(Function),
+            );
+            expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
+        });
+
+        test("should reject compound columns with fewer than 2 source columns", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            await act(async () => {
+                await result.current.handleAddColumn({
+                    name: "compound_invalid",
+                    mode: "compound",
+                    datatype: "text",
+                    sourceColumns: ["age"],
+                    delimiter: "_",
+                    position: 2,
+                });
+            });
+
+            expect(mockDataStore.addColumn).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Add Column Error",
+                    message: "Compound columns require at least 2 source columns",
+                }),
+            );
+        });
+
+        test("should reject invalid datatype for compound columns", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            await act(async () => {
+                await result.current.handleAddColumn({
+                    name: "compound_invalid_type",
+                    mode: "compound",
+                    datatype: "double",
+                    sourceColumns: ["age", "name"],
+                    delimiter: "_",
+                    position: 2,
+                });
+            });
+
+            expect(mockDataStore.addColumn).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Add Column Error",
+                    message: "Compound columns support only text or text16 datatype",
+                }),
+            );
+        });
+
+        test("should reject non-text source columns for compound mode", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+
+            await act(async () => {
+                await result.current.handleAddColumn({
+                    name: "compound_invalid_source",
+                    mode: "compound",
+                    datatype: "text",
+                    sourceColumns: ["age", "name"],
+                    delimiter: "_",
+                    position: 2,
+                });
+            });
+
+            expect(mockDataStore.addColumn).not.toHaveBeenCalled();
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Add Column Error",
+                    message: "Compound source column age must be text or text16",
+                }),
+            );
         });
 
         test("should reject duplicate column names when the field exists in active metadata", () => {

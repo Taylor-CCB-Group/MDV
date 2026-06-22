@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { playwrightSpawnEnv } from "./playwright_env.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../..");
@@ -34,7 +35,7 @@ const { command, commandArgs } = await resolvePlaywrightCommand();
 await new Promise((resolve, reject) => {
     const child = spawn(command, commandArgs, {
         cwd: REPO_ROOT,
-        env: process.env,
+        env: playwrightSpawnEnv(),
         stdio: "inherit",
     });
     child.on("exit", (code) => {

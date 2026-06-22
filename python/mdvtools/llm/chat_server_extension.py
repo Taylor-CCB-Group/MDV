@@ -111,7 +111,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 )
                 socketio.emit(
                     "chat_error",
-                    {"message": markdown},
+                    {"message": error_message},
                     namespace=f"/project/{project.id}",
                     to=room
                 )
@@ -130,6 +130,11 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                 if bot is None:
                     # todo - allow this to be freed at some point if we're not using it anymore.
                     bot = ProjectChat(project)
+                if bot.init_error:
+                    error_msg = bot.error_message or "An unknown error occurred"
+                    handle_error(error_msg)
+                    leave_room(room)
+                    return
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
                 result = bot.ask_question(chat_request)
@@ -144,16 +149,18 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                     leave_room(room)
                     return
                 else:
+                    response = {
+                        "message": result["code"],
+                        "id": id,
+                        "verification": result.get("verification"),
+                        "data_preview": result.get("data_preview"),
+                        "needs_refresh": result.get("needs_refresh", False),
+                    }
+                    if result["view_name"] is not None:
+                        response["view"] = result["view_name"]
                     socketio.emit(
                         "chat_response",
-                        {
-                            "message": result["code"],
-                            "view": result["view_name"],
-                            "id": id,
-                            "verification": result.get("verification"),
-                            "data_preview": result.get("data_preview"),
-                            "needs_refresh": result.get("needs_refresh", False),
-                        },
+                        response,
                         namespace=f"/project/{project.id}",
                         to=room,
                     )

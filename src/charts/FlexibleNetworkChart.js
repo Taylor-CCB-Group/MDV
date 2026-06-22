@@ -16,6 +16,7 @@ import {
     select,
 } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 const color_schemes = {
@@ -603,17 +604,17 @@ class FlexibleNetworkChart extends SVGChart {
         this.reCalculate();
     }
     
-    getColorLegend() {
+    getColorLegendSpec() {
         const c = this.config;
         // Priority: color_by > node type
         if (c.color_by) {
-            return this.dataStore.getColorLegend(c.color_by, {
+            return buildColorLegendSpec(this.dataStore, c.color_by, {
                 name: this.dataStore.getColumnName(c.color_by)
             });
         }
         // Fall back to node type
         if (c.param[7]) {
-            return this.dataStore.getColorLegend(c.param[7], {
+            return buildColorLegendSpec(this.dataStore, c.param[7], {
                 name: this.dataStore.getColumnName(c.param[7])
             });
         }

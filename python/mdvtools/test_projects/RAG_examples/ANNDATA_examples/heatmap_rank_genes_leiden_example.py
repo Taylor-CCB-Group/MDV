@@ -5,6 +5,9 @@ Before `set_view`, discover the rows-as-columns subgroup key from the project (n
 Build wrappers with `mdvtools.llm.column_field_resolve.build_expression_wrapper_token`.
 
 Requires an existing MDV project with `cells` + expression link (e.g. from `convert_scanpy_to_mdv`).
+
+HeatmapPlot uses set_x_axis / set_y_axis / set_axis below — not set_axis_properties. For BoxPlot, ViolinPlot,
+ScatterPlot, DotPlot use set_axis_properties("x", {...}) only.
 """
 from __future__ import annotations
 
@@ -79,6 +82,12 @@ def main():
             except ValueError:
                 label_to_idx[g] = -1
     ordered = [g for g in ordered if label_to_idx.get(g, -1) >= 0]
+    if not ordered:
+        raise ValueError(
+            f"No marker genes resolved to expression wrappers for "
+            f"subgroup_key={subgroup_key!r} and cluster_key={cluster_key!r} "
+            f"(name_column={name_column!r}); check adata.var labels vs var_names."
+        )
 
     gene_params = [
         build_expression_wrapper_token(subgroup_key, g, label_to_idx[g]) for g in ordered

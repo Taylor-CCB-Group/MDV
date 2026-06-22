@@ -787,19 +787,18 @@ const useSlickGridReact = () => {
         chartManager?.changeView?.(viewName);
     }, [chartManager]);
 
-    // Columns to be displayed for cloning
-    const cloneableColumns = useMemo(() => {
-        return dataStore.columns
-            .filter((column) => !column.subgroup)
-            .map((column) => ({
-                field: column.field,
-                name: column.name,
-                datatype: column.datatype,
-                stringLength: column.stringLength,
-                delimiter: column.delimiter,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }, [dataStore.columns]);
+    // Build from live metadata each render: DataStore mutates columns in-place, so
+    // memoizing on the array reference can miss newly-added columns.
+    const cloneableColumns = (dataStore.getAllColumnsMetadata?.() ?? dataStore.columns)
+        .filter((column) => !column.subgroup && !column.deleted)
+        .map((column) => ({
+            field: column.field,
+            name: column.name,
+            datatype: column.datatype,
+            stringLength: column.stringLength,
+            delimiter: column.delimiter,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     const addColumnDefaultPosition = useMemo(() => {
         return config.include_index ? 2 : Math.min(2, orderedParamColumns.length + 1);
@@ -809,6 +808,8 @@ const useSlickGridReact = () => {
         name,
         datatype,
         cloneColumn,
+        sourceColumns,
+        mode,
         position,
         stringLength,
         delimiter,
@@ -840,6 +841,43 @@ const useSlickGridReact = () => {
         }
 
         try {
+            const isCompoundMode = mode === "compound";
+            if (isCompoundMode) {
+                if (datatype !== "text" && datatype !== "text16") {
+                    throw new Error("Compound columns support only text or text16 datatype");
+                }
+                if (!sourceColumns || sourceColumns.length < 2) {
+                    throw new Error("Compound columns require at least 2 source columns");
+                }
+                for (const sourceField of sourceColumns) {
+                    const sourceColumn = dataStore.columnIndex[sourceField];
+                    if (!sourceColumn) {
+                        throw new Error(`Column ${sourceField} not found`);
+                    }
+                    if (sourceColumn.datatype !== "text" && sourceColumn.datatype !== "text16") {
+                        throw new Error(
+                            `Compound source column ${sourceField} must be text or text16`,
+                        );
+                    }
+                }
+                const unloadedSourceColumns = sourceColumns.filter(
+                    (field) => !dataStore.columnIndex[field]?.data,
+                );
+                if (unloadedSourceColumns.length > 0) {
+                    if (!chartManager?.loadColumnSet) {
+                        throw new Error(`Column ${unloadedSourceColumns[0]} not found`);
+                    }
+                    await new Promise<void>((resolve, reject) => {
+                        try {
+                            chartManager.loadColumnSet(unloadedSourceColumns, dataStore.name, () => {
+                                resolve();
+                            });
+                        } catch (error) {
+                            reject(error);
+                        }
+                    });
+                }
+            }
             if (cloneColumn && !dataStore.columnIndex[cloneColumn]?.data) {
                 if (!chartManager?.loadColumnSet) {
                     throw new Error(`Column ${cloneColumn} not found`);
@@ -864,6 +902,8 @@ const useSlickGridReact = () => {
                 name: trimmedName,
                 datatype: datatype,
                 cloneColumn,
+                sourceColumns,
+                mode,
                 stringLength,
                 delimiter,
             });
@@ -957,6 +997,7 @@ const useSlickGridReact = () => {
                 metadata: {
                     columnName: trimmedName,
                     cloneColumn,
+                    sourceColumns,
                     position,
                 },
             });

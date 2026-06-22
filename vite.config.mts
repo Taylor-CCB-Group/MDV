@@ -31,8 +31,8 @@ reactCompiler.rolldown.filter ??= {};
 // (as far as we've noticed)
 reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
 const useReactCompiler =
-    process.env.VITE_USE_REACT_COMPILER === "1" ||
-    process.env.VITE_USE_REACT_COMPILER === "true";
+    process.env.VITE_USE_REACT_COMPILER !== "0" &&
+    process.env.VITE_USE_REACT_COMPILER !== "false";
 const enableBundleAnalysis =
     process.env.VITE_BUNDLE_ANALYZE === "1" ||
     process.env.VITE_BUNDLE_ANALYZE === "true";
@@ -63,12 +63,16 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  */
 function getRollupOptions() {
     if (build === 'production') {
+        const version =process.env.mdv_version ? "-" + process.env.mdv_version : "";
+
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
-                entryFileNames: 'mdv.js',
+
+                entryFileNames: `mdv${version}.js`,
                 assetFileNames: flaskAssetFileNames,
+
             }
         }
     } if (build === 'desktop_pt') {
