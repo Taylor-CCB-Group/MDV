@@ -1,11 +1,9 @@
 from flask import Flask
 from mdvtools.server_extension import MDVServerOptions, MDVProjectServerExtension
 from mdvtools.llm.chat_server_extension import MDVProjectChatServerExtension
-from mdvtools.dbutils.admin_extension import AdminExtension
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 
 extension_classes: dict[str, type[MDVProjectServerExtension]] = {
-    "admin": AdminExtension,
     "chat": MDVProjectChatServerExtension,
     "project_manager": ProjectManagerExtension,
 }
