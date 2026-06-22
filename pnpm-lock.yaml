@@ -120,16 +120,16 @@ importers:
         specifier: 10.6.0
         version: 10.6.0
       '@spatialdata/core':
-        specifier: npm:@spatialdata/core@next
+        specifier: ^0.2.0
         version: 0.2.0
       '@spatialdata/layers':
-        specifier: npm:@spatialdata/layers@next
+        specifier: ^0.2.0
         version: 0.2.0(4eff8b0fade424b0171a85a804c7311a)
       '@spatialdata/react':
-        specifier: npm:@spatialdata/react@next
+        specifier: ^0.2.0
         version: 0.2.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
       '@spatialdata/vis':
-        specifier: npm:@spatialdata/vis@next
+        specifier: ^0.2.0
         version: 0.2.0(5fed9fb1d070481f396b27a4e9a53f69)
       '@tanstack/react-query':
         specifier: ^5.80.0
@@ -359,6 +359,9 @@ importers:
       wordcloud:
         specifier: ^1.2.2
         version: 1.2.2
+      zarrextra:
+        specifier: ^0.2.0
+        version: 0.2.0
       zod:
         specifier: ^3.25.49
         version: 3.25.49
@@ -11077,7 +11080,7 @@ snapshots:
 
   geotiff@2.1.4-beta.0:
     dependencies:
-      '@petamoriken/float16': 3.9.2
+      '@petamoriken/float16': 3.9.3
       lerc: 3.0.0
       pako: 2.1.0
       parse-headers: 2.0.6
