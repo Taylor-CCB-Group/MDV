@@ -421,7 +421,7 @@ def _resolve_path_to_data(project_dir: str) -> str:
     csv_file = None
     h5ad_file = None
     try:
-        for file in os.listdir(project_dir):
+        for file in sorted(os.listdir(project_dir)):
             if file.endswith(".csv"):
                 csv_file = file
             elif file.endswith(".h5ad"):
