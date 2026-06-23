@@ -1,16 +1,30 @@
 from pathlib import Path
+import tempfile
 import h5py
 import numpy as np
 
 MARKER = "STATUS"  # worker writes "done/failed" - the primary completion signal
 
 
-class Workspace:
-    """Fixed per-job layout: input/ (tray), work/ (scratch), output/ (results).
-    jobs_root is a sibling of any project export dir."""
+def default_workspace_root(project) -> Path:
+    """Default ephemeral-scratch root for per-job workspaces (ADR-0007).
 
-    def __init__(self, jobs_root: Path, job_id: str):
-        self.root = Path(jobs_root) / job_id
+    Lives OUTSIDE the project — never under the catalog's projects base_dir — so neither
+    the catalog scan nor the project exporter ever sees it. Namespaced by project so two
+    projects can't collide. Override on HPC to point at `$SCRATCH` / a shared mount the
+    compute node can reach. The per-job dir under it is keyed by job_id, the only link
+    back to the durable owner-side record (which lives inside the project)."""
+    return Path(tempfile.gettempdir()) / "mdv_job_workspaces" / Path(project.dir).name
+
+
+class Workspace:
+    """Fixed per-job layout under the ephemeral scratch root (ADR-0007): input/ (tray),
+    work/ (worker scratch), output/ (results). The scratch root lives OUTSIDE the project
+    — on HPC it is cluster scratch the worker reaches. The per-job dir is keyed by job_id,
+    the sole link to the durable owner-side record."""
+
+    def __init__(self, workspace_root: Path, job_id: str):
+        self.root = Path(workspace_root) / job_id
         self.input = self.root / "input"
         self.work = self.root / "work"
         self.output = self.root / "output"

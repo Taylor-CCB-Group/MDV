@@ -42,19 +42,25 @@ def show_json(obj) -> None:
 
 def main() -> None:
     base = Path(tempfile.mkdtemp(prefix="mdv_jobs_demo_"))
-    proj_dir, jobs_root = base / "proj", base / "jobs"
-
-    rule("0. Where everything lives")
-    print(f"  demo base : {base}")
-    print(f"  project   : {proj_dir}   (datafile.h5 + datasources.json)")
-    print(f"  jobs_root : {jobs_root}   (records/ + per-job workspaces)")
+    proj_dir = base / "proj"
+    scratch_root = base / "scratch"  # stands in for HPC/cluster scratch — OUTSIDE the project
 
     project = MDVProject(str(proj_dir), delete_existing=True)
     project.add_datasource("cells", pd.DataFrame({
         "sample": ["s1", "s2", "s3"],
         "cluster": ["a", "b", "a"],
     }))
-    mgr = JobManager(project, jobs_root, max_concurrent=2)
+    # records_root defaults to <project>/jobs (inside the project); workspace_root is the
+    # ephemeral scratch we point outside the project, as HPC would.
+    mgr = JobManager(project, workspace_root=scratch_root, max_concurrent=2)
+
+    rule("0. Where everything lives  (two SEPARATE roots, linked only by job_id)")
+    print(f"  demo base     : {base}")
+    print(f"  project       : {proj_dir}   (datafile.h5 + datasources.json)")
+    print(f"  job records   : {mgr.records_root}/records   (durable, INSIDE the project — travels with it,")
+    print( "                  the catalog never scans a project's subdir, exporter skips it)")
+    print(f"  job workspaces: {mgr.workspace_root}   (ephemeral scratch, OUTSIDE the project — on HPC: $SCRATCH)")
+    print( "  link          : records/<job_id>.json  <->  <scratch>/<job_id>/   (same job_id, two locations)")
 
     rule("1. submit()  ->  durable record written FIRST (write-ahead), then staged + launched")
     job_id = mgr.submit("concat_columns", {
@@ -64,8 +70,8 @@ def main() -> None:
         "separator": "_",
         "output_name": "sample_cluster",
     })
-    ws = jobs_root / job_id
-    rec_file = jobs_root / "records" / f"{job_id}.json"
+    ws = mgr.workspace_root / job_id
+    rec_file = mgr.records_root / "records" / f"{job_id}.json"
     print(f"  job_id: {job_id}")
     print("\n  records/<job_id>.json  (status RUNNING, handle set, provenance still null):")
     show_json(json.loads(rec_file.read_text()))
@@ -104,9 +110,9 @@ def main() -> None:
     show_json(col)
 
     print(f"\n  Left for inspection: {base}")
-    print(f"   - {jobs_root}/records/{job_id}.json   (record + provenance, durable)")
+    print(f"   - {mgr.records_root}/records/{job_id}.json   (record + provenance, durable, INSIDE the project)")
     print(f"   - {proj_dir}/datasources.json          (the new column)")
-    print("   - the workspace is gone (cleaned on success); its contents are shown above.")
+    print(f"   - {mgr.workspace_root}/{job_id}   is GONE (scratch cleaned on success); its contents shown above.")
 
 if __name__ == "__main__":
     main()

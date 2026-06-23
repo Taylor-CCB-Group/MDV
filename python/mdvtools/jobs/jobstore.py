@@ -40,10 +40,14 @@ ACTIVE = (Status.STAGING.value, Status.RUNNING.value, Status.INGESTING.value)
 
 
 class JobStore:
-    """Durable owner side (ADR0005). One JSON per job; the in-memory record is a cache."""
+    """Durable owner side (ADR0005). One JSON per job; the in-memory record is a cache.
 
-    def __init__(self, jobs_root: Path):
-        self.records_dir = Path(jobs_root) / "records"
+    Records live *inside* the project (`<project>/jobs/records/`) — separate from the
+    ephemeral per-job scratch (ADR-0007), which lives outside the project. The two are
+    linked only by job_id."""
+
+    def __init__(self, records_root: Path):
+        self.records_dir = Path(records_root) / "records"
         self.records_dir.mkdir(parents=True, exist_ok=True)
 
     def new(self, tool_id: str, params: dict) -> JobRecord:

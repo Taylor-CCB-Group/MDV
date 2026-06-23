@@ -26,7 +26,7 @@ def _drive(mgr, timeout=60):
 
 def test_end_to_end_single_job(tmp_path):
     project = _make_project(tmp_path)
-    mgr = JobManager(project, tmp_path / "jobs", max_concurrent=2)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
     mgr.submit(
         "concat_columns",
         {
@@ -45,7 +45,7 @@ def test_end_to_end_single_job(tmp_path):
 
 def test_max_concurrent_holds_extra_jobs_queued(tmp_path):
     project = _make_project(tmp_path)
-    mgr = JobManager(project, tmp_path / "jobs", max_concurrent=2)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
 
     for i in range(3):
         mgr.submit(
@@ -73,8 +73,8 @@ def test_max_concurrent_holds_extra_jobs_queued(tmp_path):
 
 def test_provenance_promoted_and_workspace_cleaned(tmp_path):
     project = _make_project(tmp_path)
-    jobs_root = tmp_path / "jobs"
-    mgr = JobManager(project, jobs_root, max_concurrent=2)
+    workspace_root = tmp_path / "scratch"
+    mgr = JobManager(project, workspace_root=workspace_root, max_concurrent=2)
     job_id = mgr.submit(
         "concat_columns",
         {
@@ -95,4 +95,5 @@ def test_provenance_promoted_and_workspace_cleaned(tmp_path):
     assert prov["params"]["output_name"] == "sample_cluster"
     assert prov["output"] == {"rows": 3}
     assert len(prov["content_hash"]) == 16
-    assert not (jobs_root / job_id).exists()
+    # workspace scratch (keyed by job_id, outside the project) is GC'd on success
+    assert not (workspace_root / job_id).exists()

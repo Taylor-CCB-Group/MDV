@@ -2,9 +2,10 @@ import shutil
 from dataclasses import asdict
 from pathlib import Path
 
+from . import JOBS_DIRNAME
 from .registry import get_tool, validate_params
 from .jobstore import JobStore, Status, ACTIVE
-from .workspace import Workspace, materialize_columns_tray
+from .workspace import Workspace, materialize_columns_tray, default_workspace_root
 from .ingest import ingest_column_output
 from .executor import Executor, LocalSubprocessExecutor
 from .provenance import build_provenance
@@ -15,13 +16,37 @@ INGESTERS = {"column": ingest_column_output}
 
 
 class JobManager:
-    def __init__(self, project, jobs_root, executor=None, max_concurrent=2):
+    """Owner side of the jobs framework. Holds two deliberately separate roots:
+
+    - records_root  — durable owner-side state (ADR-0005), INSIDE the project
+      (`<project>/jobs/`), so the catalog never mistakes it for a project and provenance
+      travels with the project.
+    - workspace_root — ephemeral per-job scratch (ADR-0007), OUTSIDE the project; local
+      temp by default, `$SCRATCH`/shared-FS on HPC, wherever the worker computes.
+
+    The job_id is the *only* link between a record and its (possibly remote) workspace."""
+
+    def __init__(
+        self, project, workspace_root=None, records_root=None, executor=None, max_concurrent=2
+    ):
         self.project = project
-        self.jobs_root = jobs_root
-        self.store = JobStore(self.jobs_root)
+        self.records_root = (
+            Path(records_root) if records_root is not None
+            else Path(project.dir) / JOBS_DIRNAME
+        )
+        self.workspace_root = (
+            Path(workspace_root) if workspace_root is not None
+            else default_workspace_root(project)
+        )
+        self.store = JobStore(self.records_root)
         self.executor: Executor = executor or LocalSubprocessExecutor(max_concurrent)
         self.max_concurrent = max_concurrent
         self.store.reconcile_on_boot()  # ADR0005: recover in-flight jobs at startup
+
+    def _workspace(self, job_id: str) -> Workspace:
+        # job_id is the sole correlation key between the durable record (records_root)
+        # and the ephemeral scratch (workspace_root) — the two roots are separate by design.
+        return Workspace(self.workspace_root, job_id)
 
     def submit(self, tool_id: str, params: dict) -> str:
         spec = get_tool(tool_id)
@@ -43,7 +68,7 @@ class JobManager:
             if not nxt:
                 return
             spec = get_tool(nxt.tool_id)
-            ws = Workspace(self.jobs_root, nxt.job_id)
+            ws = self._workspace(nxt.job_id)
             self.store.set(nxt, Status.STAGING)
             MATERIALIZERS[spec.input_shape](self.project, spec, nxt.params, ws)
             handle = self.executor.submit(
@@ -56,7 +81,7 @@ class JobManager:
         for rec in self.store.load_all():
             if rec.status != Status.RUNNING.value:
                 continue
-            ws = Workspace(self.jobs_root, rec.job_id)
+            ws = self._workspace(rec.job_id)
             marker = ws.read_marker()
             if marker == "done":
                 spec = get_tool(rec.tool_id)
