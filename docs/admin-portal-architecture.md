@@ -2,6 +2,8 @@
 
 Status: Draft for team review
 
+Read first: [admin-portal-mvp-plan.md](./admin-portal-mvp-plan.md)
+
 ## Summary
 
 The Admin Portal is a separate MDV administration surface at `/admin`.
@@ -22,7 +24,7 @@ Related API contract: [admin-portal-api-contract.md](./admin-portal-api-contract
 ## Goals
 
 - Provide a GUI for adding users to an MDV deployment.
-- Require new users to receive access to at least one project during creation/addition.
+- Allow new users to be created with zero or more project assignments.
 - Allow admins to manage project-level permissions: `view`, `edit`, and `owner`.
 - Allow admins to remove a user's access from a project.
 - Keep admin separate from the catalog and project viewer.
@@ -35,7 +37,7 @@ Each MDV deployment/container has its own Auth0 user database and its own MDV da
 
 When a user is added through Auth0 today, that means the user is added to the Auth0 database for a specific deployment. After that, MDV syncs or creates a matching local user row and grants project access permission.
 
-Project access is meaningful only when the user has permission for at least one project in that deployment.
+Project access is meaningful only when the user has permission for at least one project in that deployment, but some deployment users may temporarily exist without project access.
 
 ## Route Ownership
 
@@ -67,6 +69,8 @@ The admin frontend should:
 - manage project permissions through `/admin/api/projects/:projectId/users`
 - show backend validation errors clearly
 - handle empty users/projects/project-members states
+
+This should remain a strict boundary. The Admin frontend should not call catalog or project-manager APIs directly; the Admin backend should expose admin-shaped APIs backed by MDV host services.
 
 The admin frontend should not:
 
@@ -140,9 +144,13 @@ extension/plugin registration through MDV configuration or manifest metadata
 developer hot reload during local development
 ```
 
+The target registration model is startup-time plugin registration with build-time/frontend artifact materialisation for production images. The admin plugin package is installed before MDV starts, MDV reads plugin config/manifest at startup, registers `/admin` and `/admin/api/*`, and serves frontend assets that were already built/copied into a Flask-visible location.
+
 ## Host API Direction
 
 Because the admin plugin should eventually live outside the MDV core repo, it should communicate through stable host APIs instead of importing arbitrary MDV internals.
+
+Admin should not own MDV domain data for MVP. The plugin owns its frontend code, backend route code, and manifest/config needed to attach to MDV. Users, projects, project permissions, auth/session state, and admin markers remain MDV-owned and should be accessed through MDV-provided host APIs/services.
 
 Frontend host API should eventually provide:
 
@@ -159,19 +167,35 @@ Backend host API should eventually provide:
 - project access service
 - plugin config and manifest access
 
+The current service boundary should remain admin-specific until Auth0-backed user creation is proven. After that baseline exists, reusable host-service concepts can be extracted into a generic plugin host API with less guesswork.
+
+Admin should reuse existing MDV services where possible, especially user and project-access services. If current service transaction boundaries prevent the Admin create-user flow from behaving atomically, refactor those services or add transaction-aware variants rather than duplicating business logic in Admin.
+
 ## MVP User Operations
 
-For the MVP, admin supports:
+For the production MVP, admin supports:
 
-- create/add user only when at least one initial project permission is provided
+- create/add user with zero or more initial project permissions
+- list deployment users
+- list existing projects
 - change a user's permission for a project
 - remove a user's access from a project
+
+The user list should show all deployment users, not only users with project access. The UI should distinguish users with no project access, for example with a project-access count or status indicator, so admins can repair incomplete/manual states.
+
+The first production flow can remain project-centric: select a project, then manage users and permissions for that project. A user-centric access view, where an admin selects a user and sees all projects they can access, should be a follow-up after Auth0-backed user creation.
+
+Project lifecycle management is outside MVP. Admin should not create, delete, archive, restore, or edit projects in the first production increment.
+
+For production MVP, Admin write actions should be logged server-side with the actor, action, target user, target project, old/new permission where relevant, timestamp, and success/failure. A dedicated audit-log table/API/UI can come later.
 
 For the MVP, "remove user" means:
 
 ```text
 remove the user's access from a project
 ```
+
+The UI should label this action as "Remove access", not "Remove user" or "Delete user".
 
 In future it could mean:
 
@@ -182,6 +206,14 @@ deactivate the user globally
 ```
 
 Deployment-level removal and Auth0 deletion/deactivation can be designed later as separate operations.
+
+Managing deployment-level admin status is also outside MVP. Admin should not promote or demote other admins in the first production increment; additional admins should come from Auth0 role sync or another approved bootstrap process.
+
+## Post-MVP Bulk User Import
+
+A requested post-MVP feature is a quick paste/import flow where an admin can paste a list of users and create accounts/project access in bulk.
+
+Because existing Auth0 sync code already warns about Management API rate limits, bulk import should probably not be implemented as one long synchronous request. It should be designed as a background job or queued operation with progress, partial-failure reporting, and retry behavior.
 
 ## Permission Model
 
@@ -194,28 +226,33 @@ Project permissions use the existing MDV permission model:
 | `edit`        | `true`   | `true`    | `false`  |
 | `owner`       | `true`   | `true`    | `true`   |
 
+MVP admins can assign `owner` permission. Last-owner protection is still required so a project cannot be left without an owner.
+
+Admin permission changes should take effect immediately for users. In production/auth mode, Admin writes must refresh the user-project cache after changing project access so the user experience does not depend on a manual script or server restart.
 
 ## User Creation Rule
 
-The normal admin flow should not create a user with no project access.
+The admin create-user flow currently allows users with no project access.
 
-Required rule:
+Current rule:
 
 ```text
-Creating/adding a user through the Admin Portal requires at least one initial project permission.
+Creating/adding a user through the Admin Portal accepts zero or more initial project permissions.
 ```
+
+The backend should keep this policy centralized so it can later require at least one initial project permission without changing the API shape.
 
 Reason:
 
 ```text
-A user with no project permission has no useful access inside that MDV deployment.
+Some deployment users may need to exist before project access is assigned. A user with no project permission should be visible in Admin but cannot access projects until permissions are added.
 ```
 
 Recommended flow:
 
 ```text
 1. Admin enters user details.
-2. Admin selects one or more projects.
+2. Admin optionally selects one or more projects.
 3. Admin chooses permission for each selected project.
 4. Backend creates the user in Auth0 for this deployment.
 5. Backend syncs/creates the MDV User row.
@@ -267,6 +304,8 @@ Current/simple representation:
 session["user"]["is_admin"] == True
 ```
 
+This is enough for MVP Admin access.
+
 Future representation may become a richer role model:
 
 ```text
@@ -306,11 +345,13 @@ Acceptable MVP bootstrap approaches:
 - CLI command promotes a synced user to admin
 - deployment config declares first admin email
 
-Current MVP position:
+Preferred MVP position:
 
 ```text
-The first admin may be created outside the Admin Portal through a script, CLI, config, or manual DB seed.
+The first admin should be bootstrapped through existing Auth0 role sync where possible: assign Auth0 role "admin", sync users into MDV, and rely on User.is_admin=true.
 ```
+
+Manual DB seed, CLI promotion, or deployment config can remain fallback options where Auth0 role sync is not available.
 
 ## Failure Handling
 
@@ -336,11 +377,11 @@ This avoids leaving a project with no owner.
 
 If a future global-admin override is needed, it should be designed as a separate flow.
 
-## POC Mode
+## Local Development Mode
 
-The POC should be small and local, and should validate the MDV-side project permission workflow without requiring Auth0.
+Local development should validate the MDV-side project permission workflow without requiring Auth0.
 
-POC summary:
+Local development summary:
 
 - Auth0 is not called.
 - Authentication may be disabled.
@@ -349,24 +390,29 @@ POC summary:
 - Project permission writes use MDV-style `UserProject` rows.
 - API shapes should stay close to the final contract.
 
-Detailed POC implementation plan: [admin-portal-poc-plan.md](./admin-portal-poc-plan.md)
+Detailed MVP implementation plan: [admin-portal-mvp-plan.md](./admin-portal-mvp-plan.md)
 
-## Open Decisions
+## Remaining Architecture Questions
 
-- Should `User.is_admin` be enough, or do we need a role table?
-- Should deleted/archived projects appear in admin project lists?
-- What exact repair path should be used if Auth0 rollback fails after MDV sync/permission creation fails?
-- Should permission changes be audited?
-- Should external plugin registration happen at build time or startup time?
+The read-first source for implementation status and next steps is [admin-portal-mvp-plan.md](./admin-portal-mvp-plan.md).
 
-## Review Questions
+Still open:
 
-The team should review and confirm:
+- Should deleted/archived projects appear in Admin project lists?
+- If an email exists in Auth0 but not in this deployment's configured Auth0 database connection, should Admin reuse that identity, create/add the user in the deployment connection, or reject the operation?
+- Which Auth0 connection should Admin use for user creation?
+- Are Auth0 Management API credentials available inside the MDV app container?
+- When Admin creates a new Auth0 user, should the backend trigger an Auth0 invitation/password-reset email, rely on the normal forgot-password flow, or create the user silently?
 
-- Is the Auth0/MDV responsibility split correct?
-- Is admin status correctly treated as an MDV authorization concept?
-- Is it correct that adding a user requires at least one project permission?
-- Is it correct that MVP "remove user" means remove project access only?
-- Is `/admin` as a separate extension surface the right direction?
-- Is build-time/startup-time plugin registration enough for admin?
+Settled MVP decisions:
 
+- `User.is_admin` is enough for MVP Admin access.
+- Admin status is an MDV authorization concept, while Auth0 proves identity/login.
+- Adding or creating a user through Admin accepts zero or more project permissions; the policy can be tightened later without changing the API shape.
+- MVP "remove user" means remove project access only.
+- `/admin` is a separate extension surface, not a catalog page.
+- Admin is a trusted plugin/extension.
+- Plugin registration target is startup-time, with build-time frontend asset materialisation for production.
+- Admin writes should refresh `user_project_cache` when `ENABLE_AUTH=true`.
+- Last-owner conflicts return `409 Conflict`.
+- Production MVP should start with server-side Admin write logging, not a full audit-log UI/table.

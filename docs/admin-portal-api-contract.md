@@ -2,6 +2,8 @@
 
 Status: Draft for team review
 
+Read first: [admin-portal-mvp-plan.md](./admin-portal-mvp-plan.md)
+
 Related architecture doc: [admin-portal-architecture.md](./admin-portal-architecture.md)
 
 ## Summary
@@ -15,6 +17,14 @@ All Admin Portal APIs live under:
 All responses are JSON.
 
 The admin frontend should use these APIs instead of importing catalog, project-manager, or database internals.
+
+## Open API Questions
+
+- If an email exists in Auth0 but not in this deployment's configured Auth0 database connection, should Admin reuse that identity, create/add the user in the deployment connection, or reject the operation?
+- Which Auth0 connection should Admin use for user creation?
+- Are Auth0 Management API credentials available inside the MDV app container?
+- When Admin creates a new Auth0 user, should the backend trigger an Auth0 invitation/password-reset email, rely on the normal forgot-password flow, or create the user silently?
+- Should deleted or archived projects be returned by `GET /admin/api/projects`?
 
 ## Shared Types
 
@@ -69,17 +79,24 @@ type ProjectAccessInput = {
 };
 ```
 
-### Admin Project User
+### Admin Project Access
 
 ```ts
-type AdminProjectUser = {
-  userId: number;
+type AdminProjectAccess = {
   projectId: number;
-  email: string;
   permission: ProjectPermission;
   canRead: boolean;
   canWrite: boolean;
   isOwner: boolean;
+};
+```
+
+### Admin Project Member
+
+```ts
+type AdminProjectMember = {
+  user: AdminUser;
+  projectAccess: AdminProjectAccess;
 };
 ```
 
@@ -189,11 +206,11 @@ Response:
 }
 ```
 
-POC note:
+Local development note:
 
 ```text
 Without Auth0, this returns local/dev MDV users.
-For demo seeding details, see admin-portal-poc-plan.md.
+For local POC and MVP implementation details, see [admin-portal-mvp-plan.md](./admin-portal-mvp-plan.md).
 ```
 
 ## POST `/admin/api/users`
@@ -201,7 +218,13 @@ For demo seeding details, see admin-portal-poc-plan.md.
 Purpose:
 
 ```text
-Create/add a user for this deployment and assign at least one project permission.
+Create/add a user for this deployment with zero or more initial project permissions.
+```
+
+Implementation note:
+
+```text
+`projectAccess` is an array and may be empty. The backend policy for requiring at least one project assignment is centralized so it can be tightened later without changing the API shape.
 ```
 
 Request:
@@ -215,6 +238,10 @@ Request:
     {
       "projectId": 10,
       "permission": "view"
+    },
+    {
+      "projectId": 12,
+      "permission": "edit"
     }
   ]
 }
@@ -223,16 +250,16 @@ Request:
 Validation:
 
 - `email` is required.
-- `projectAccess` must contain at least one project.
-- every `projectId` must exist in this deployment.
-- every `permission` must be one of `view`, `edit`, or `owner`.
+- `projectAccess` is optional; omitted means an empty list.
+- every `projectAccess[].projectId` must exist in this deployment.
+- every `projectAccess[].permission` must be one of `view`, `edit`, or `owner`.
 
 Production behavior:
 
 ```text
 1. Create user in Auth0 for this deployment, or resolve existing Auth0 user.
 2. Sync/create local MDV User row.
-3. Create UserProject permission rows.
+3. Create the initial UserProject permission rows.
 4. Return user and project access.
 ```
 
@@ -244,12 +271,12 @@ If Auth0 user creation succeeds but MDV sync or permission creation fails, the b
 If rollback fails, the response should make the partial failure explicit.
 ```
 
-POC/local behavior:
+Local development behavior:
 
 ```text
 1. Do not call Auth0.
 2. Create or resolve local/dev MDV user.
-3. Create UserProject permission rows.
+3. Create the initial UserProject permission rows.
 4. Return the same response shape.
 ```
 
@@ -263,20 +290,25 @@ Response:
     "firstName": "New",
     "lastName": "User",
     "isActive": true,
-    "isAdmin": false,
-    "authId": "auth0|abc123"
+    "isAdmin": false
   },
-  "projectUsers": [
+  "projectAccess": [
     {
-      "userId": 5,
       "projectId": 10,
-      "email": "new.user@example.com",
       "permission": "view",
       "canRead": true,
       "canWrite": false,
       "isOwner": false
+    },
+    {
+      "projectId": 12,
+      "permission": "edit",
+      "canRead": true,
+      "canWrite": true,
+      "isOwner": false
     }
-  ]
+  ],
+  "created": true
 }
 ```
 
@@ -289,16 +321,16 @@ Errors:
 | `502` | Auth0 operation failed |
 | `500` | MDV sync or permission write failed; rollback should be attempted if Auth0 user creation already happened |
 
-Open decision:
-
-```text
-If the Auth0 user already exists, should this endpoint return the existing user or return 409?
-```
-
 Recommended behavior:
 
 ```text
 Return the existing/synced user when possible and continue assigning project access.
+```
+
+Post-MVP note:
+
+```text
+Bulk paste/import of users should be handled as a separate API design, probably backed by a background job because Auth0 Management API calls are rate-limited.
 ```
 
 ## GET `/admin/api/projects`
@@ -327,52 +359,35 @@ Response:
 }
 ```
 
-Open decision:
-
-```text
-Should deleted or archived projects be returned by default?
-```
-
 ## GET `/admin/api/projects/:projectId/users`
 
 Purpose:
 
 ```text
-Return users assigned to a project and users available to add.
+Return users assigned to a project.
 ```
 
 Response:
 
 ```json
 {
-  "project": {
-    "id": 10,
-    "name": "Example Project",
-    "path": "/app/mdv/example-project",
-    "accessLevel": "editable",
-    "isPublic": false,
-    "isDeleted": false,
-    "updatedAt": "2026-06-18T12:00:00"
-  },
-  "projectUsers": [
+  "members": [
     {
-      "userId": 1,
-      "projectId": 10,
-      "email": "owner@example.com",
-      "permission": "owner",
-      "canRead": true,
-      "canWrite": true,
-      "isOwner": true
-    }
-  ],
-  "availableUsers": [
-    {
-      "id": 2,
-      "email": "viewer@example.com",
-      "firstName": "",
-      "lastName": "",
-      "isActive": true,
-      "isAdmin": false
+      "user": {
+        "id": 1,
+        "email": "owner@example.com",
+        "firstName": "",
+        "lastName": "",
+        "isActive": true,
+        "isAdmin": false
+      },
+      "projectAccess": {
+        "projectId": 10,
+        "permission": "owner",
+        "canRead": true,
+        "canWrite": true,
+        "isOwner": true
+      }
     }
   ]
 }
@@ -407,10 +422,16 @@ Response:
 
 ```json
 {
-  "projectUser": {
-    "userId": 2,
-    "projectId": 10,
+  "user": {
+    "id": 2,
     "email": "viewer@example.com",
+    "firstName": "",
+    "lastName": "",
+    "isActive": true,
+    "isAdmin": false
+  },
+  "projectAccess": {
+    "projectId": 10,
     "permission": "edit",
     "canRead": true,
     "canWrite": true,
@@ -447,10 +468,16 @@ Response:
 
 ```json
 {
-  "projectUser": {
-    "userId": 2,
-    "projectId": 10,
+  "user": {
+    "id": 2,
     "email": "viewer@example.com",
+    "firstName": "",
+    "lastName": "",
+    "isActive": true,
+    "isAdmin": false
+  },
+  "projectAccess": {
+    "projectId": 10,
     "permission": "owner",
     "canRead": true,
     "canWrite": true,
@@ -494,10 +521,8 @@ It does not deactivate the user globally.
 
 Response:
 
-```json
-{
-  "removed": true
-}
+```text
+204 No Content
 ```
 
 Errors:
