@@ -8,6 +8,7 @@ from typing import Any, Literal, Optional
 
 import requests
 from dotenv import load_dotenv
+from pydantic import SecretStr
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
@@ -307,7 +308,7 @@ def create_chat_llm(
         temperature=0.1,
         model=model.model,
         base_url=base_url,
-        api_key="ollama",
+        api_key=SecretStr("ollama"),
         callbacks=cb,
     )
 
