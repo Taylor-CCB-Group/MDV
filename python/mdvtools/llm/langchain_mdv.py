@@ -126,6 +126,43 @@ chat_debug_handler.setFormatter(formatter)
 # attach the handler
 chat_debug_logger.addHandler(chat_debug_handler)
 
+_REACT_PROMPT_TEMPLATE = (
+    "Answer the following questions as best you can. You have access to the following tools:\n\n"
+    "{tools}\n\n"
+    "Use the following format:\n\n"
+    "Question: the input question you must answer\n"
+    "Thought: you should always think about what to do\n"
+    "Action: the action to take, should be one of [{tool_names}]\n"
+    "Action Input: the input to the action\n"
+    "Observation: the result of the action\n"
+    "... (this Thought/Action/Action Input/Observation can repeat N times)\n"
+    "Thought: I now know the final answer\n"
+    "Final Answer: the final answer to the original input question\n\n"
+    "Begin!\n\n"
+    "Question: {input}\n"
+    "Thought:{agent_scratchpad}"
+)
+_REACT_PROMPT_INPUT_VARIABLES = ["agent_scratchpad", "input", "tool_names", "tools"]
+_react_hub_prompt_cache = None
+
+
+def _get_react_prompt():
+    global _react_hub_prompt_cache
+    if _react_hub_prompt_cache is not None:
+        return _react_hub_prompt_cache
+    try:
+        _react_hub_prompt_cache = hub.pull("hwchase17/react")
+        return _react_hub_prompt_cache
+    except Exception as exc:
+        chat_debug_logger.warning(
+            "Failed to pull ReAct prompt from LangChain Hub; using local template: %s",
+            exc,
+        )
+        return PromptTemplate(
+            template=_REACT_PROMPT_TEMPLATE,
+            input_variables=_REACT_PROMPT_INPUT_VARIABLES,
+        )
+
 
 _CHART_CLASS_RE = re.compile(
     r"\b(DotPlot|ScatterPlot|HeatmapPlot|HistogramPlot|BoxPlot|ViolinPlot|"
@@ -595,7 +632,7 @@ class ProjectChat(ProjectChatProtocol):
 
         tools = [python_tool]
         if use_react:
-            react_prompt = hub.pull("hwchase17/react")
+            react_prompt = _get_react_prompt()
             system_prefix = prompt_data_template + "\n\n"
             if hasattr(react_prompt, "template"):
                 react_prompt.template = system_prefix + react_prompt.template

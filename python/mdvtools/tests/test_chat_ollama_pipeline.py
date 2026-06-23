@@ -9,8 +9,10 @@ from mdvtools.llm import templates
 from mdvtools.llm.dataset_scale import ProjectScale
 from mdvtools.llm.langchain_mdv import (
     ProjectChat,
+    _REACT_PROMPT_INPUT_VARIABLES,
     _agent_fields_charts_output_valid,
     _fallback_agent_plan,
+    _get_react_prompt,
     _infer_chart_types_from_question,
     _invoke_rag_with_empty_retry,
     _raise_if_no_extracted_code,
@@ -70,6 +72,18 @@ def test_infer_chart_types_from_question_heatmap():
     assert "Heatmap" in _infer_chart_types_from_question(
         "Compare NKG7 and GNLY across clusters using a heatmap."
     )
+
+
+def test_get_react_prompt_falls_back_when_hub_unavailable():
+    import mdvtools.llm.langchain_mdv as lcm
+
+    lcm._react_hub_prompt_cache = None
+    with patch.object(lcm.hub, "pull", side_effect=OSError("offline")):
+        prompt = _get_react_prompt()
+
+    assert hasattr(prompt, "template")
+    assert "{tools}" in prompt.template
+    assert prompt.input_variables == _REACT_PROMPT_INPUT_VARIABLES
 
 
 def test_create_custom_pandas_agent_uses_functions_first_for_ollama():
