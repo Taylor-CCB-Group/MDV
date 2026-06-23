@@ -245,6 +245,9 @@ export default defineConfig(async (): Promise<UserConfig> => {
             path.resolve(configDir, 'login_dev.html'),
             path.resolve(configDir, 'catalog_dev.html'),
         ],
+        // zarrextra/workers resolves codec-worker.js via import.meta.url; prebundling
+        // breaks that path and causes stale-cache 504s after package bumps.
+        exclude: ['zarrextra/workers'],
     },
     } as UserConfig;
 });
