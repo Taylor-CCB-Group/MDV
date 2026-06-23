@@ -236,15 +236,22 @@ def test_compact_rag_prompt_is_shorter_than_full(monkeypatch):
     monkeypatch.setattr(templates, "create_column_markdown", lambda _cols: "columns-md")
 
     project = _FakeProject()
-    kwargs = dict(
+    full = templates.get_createproject_prompt_RAG(
         project=project,
         path_to_data="",
         datasource_name="cells",
         final_answer='fields "mean_counts"\ncharts "Histogram"',
         question="Which genes have highest mean_counts?",
+        compact=False,
     )
-    full = templates.get_createproject_prompt_RAG(**kwargs, compact=False)
-    compact = templates.get_createproject_prompt_RAG(**kwargs, compact=True)
+    compact = templates.get_createproject_prompt_RAG(
+        project=project,
+        path_to_data="",
+        datasource_name="cells",
+        final_answer='fields "mean_counts"\ncharts "Histogram"',
+        question="Which genes have highest mean_counts?",
+        compact=True,
+    )
 
     assert len(compact) < len(full)
     assert "columns-md" in compact
