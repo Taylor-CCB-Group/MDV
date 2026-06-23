@@ -5,21 +5,31 @@ import BaseChart from "../../charts/BaseChart";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
-import { scatterDefaults } from "../scatter_state";
+import {
+    type CategoryFilter,
+    type ScatterPlotConfig,
+    scatterDefaults,
+} from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
-import "../../charts/VivScatterPlot";
 import {
     type VivContextType,
-    applyDefaultChannelState,
     createVivStores,
 } from "./avivatorish/state";
-import type { VivMdvReactConfig } from "./VivMDVReact";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
+import {
+    removeSpatialDataRootViv,
+    type SpatialDataSerializableViewState,
+    toSerializableSpatialDataViewState,
+} from "@/react/spatialdata/spatialdata_config";
 
-export type SpatialDataMdvReactConfig = VivMdvReactConfig & {
+export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
+    type: "SpatialDataMdvRegionReact";
+    region: string;
+    background_filter: CategoryFilter;
     renderStack?: RenderStack;
+    viewState?: SpatialDataSerializableViewState | null;
 };
 
 function adaptSpatialDataConfig(
@@ -27,6 +37,7 @@ function adaptSpatialDataConfig(
     dataStore: DataStore,
 ) {
     const config = { ...scatterDefaults, ...originalConfig };
+    removeSpatialDataRootViv(config);
     if (!dataStore.regions) {
         throw new Error("unexpected attempt to load spatial chart with no regions in datasource");
     }
@@ -37,7 +48,6 @@ function adaptSpatialDataConfig(
             config.contourParameter = dataStore.regions.region_field;
         }
     }
-    config.viv = applyDefaultChannelState(config.viv);
     return config;
 }
 
@@ -90,7 +100,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 
     colorBy?: (i: number) => [r: number, g: number, b: number];
 
-    colorByColumn(col?: VivMdvReactConfig["color_by"]) {
+    colorByColumn(col?: SpatialDataMdvReactConfig["color_by"]) {
         if (!col) return this.colorByDefault();
         this.config.color_by = col;
         //@ts-expect-error legacy color_by options are normalised at runtime by BaseChart.
@@ -164,19 +174,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 
     getConfig() {
         const config = super.getConfig();
+        removeSpatialDataRootViv(config);
         if (this.vivStores) {
             const viewer = this.vivStores.viewerStore.getState();
-            config.viv = {
-                ...config.viv,
-                viewerStore: {
-                    viewState: viewer.viewState
-                        ? {
-                              target: viewer.viewState.target,
-                              zoom: viewer.viewState.zoom,
-                          }
-                        : null,
-                },
-            };
+            config.viewState = toSerializableSpatialDataViewState(viewer.viewState);
         }
         if (this.config.renderStack) {
             config.renderStack = this.config.renderStack;
@@ -186,9 +187,25 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 }
 
 BaseChart.types.SpatialDataMdvRegionReact = {
-    ...BaseChart.types.VivMdvRegionReact,
     init: (config, dataStore, extraConfig) => {
-        BaseChart.types.VivMdvRegionReact.init?.(config, dataStore, extraConfig);
+        const regions = dataStore.regions;
+        if (!regions) {
+            throw new Error("unexpected attempt to initialise spatialdata chart with no regions in datasource");
+        }
+        const regionKey = extraConfig.region;
+        config.color_by = regions.default_color;
+        const colorColumn = dataStore.columnIndex[regions.default_color];
+        if (!allNumeric([colorColumn])) {
+            config.contourParameter = config.color_by;
+        }
+        config.param = [...regions.position_fields];
+        config.background_filter = {
+            column: regions.region_field,
+            category: regionKey,
+        };
+        config.color_legend = { display: false };
+        config.region = regionKey;
+        config.title = regionKey;
         config.type = "SpatialDataMdvRegionReact";
     },
     class: SpatialDataMdvReact,

@@ -4,7 +4,7 @@ import {
     type SpatialFeaturePickEvent,
     type ViewState as SpatialCanvasViewState,
 } from "@spatialdata/vis";
-import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
+import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { runInAction } from "mobx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -192,15 +192,15 @@ const SpatialDataViewer = observer(
         useViewStateLink();
 
         useEffect(() => {
-            const saved = config.viv?.viewerStore?.viewState;
-            if (!saved || viewState) return;
+            const saved = config.viewState;
+            if (!saved?.target || viewState) return;
             viewerStore.setState({
                 viewState: {
                     target: [...saved.target],
                     zoom: saved.zoom,
                 } as OrthographicViewState,
             });
-        }, [config.viv?.viewerStore?.viewState, viewState, viewerStore]);
+        }, [config.viewState, viewState, viewerStore]);
 
         useEffect(() => {
             if (scatterProps.viewState) {

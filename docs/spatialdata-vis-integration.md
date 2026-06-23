@@ -10,6 +10,8 @@ Living log for MDV ↔ `@spatialdata/*` integration. Architecture and phased roa
 
 MDV owns `chart.config.renderStack` (MobX observable). `SpatialCanvasViewer` is a controlled renderer: plain `renderStack` + `hostLayerResolver` at the React boundary. No parallel stack maps or periodic whole-stack snapshots.
 
+Chart root config owns chart/view concerns such as region, MDV overlay settings, and `viewState`. Render-stack entries own layer implementation concerns such as image channel settings (`entry.props.channels`). Viv channel/image settings are not part of the SpatialData chart root config.
+
 The main integration concern is the MDV ↔ SpatialData.js render-stack boundary, not the local file count. MDV currently keeps a small adapter layer around that boundary to preserve object identity for spatial layer configs, cache cloned host deck layers, and force viewer refreshes without re-entering expensive geometry loads on cosmetic edits.
 
 For this PR, keep that adapter local to MDV and make its invariants explicit before proposing SpatialData.js API changes. A follow-up SpatialData.js design opportunity is a render-stack adapter/hook that accepts a mutable stack plus a version token and returns identity-stable layer inputs and host deck layers.
