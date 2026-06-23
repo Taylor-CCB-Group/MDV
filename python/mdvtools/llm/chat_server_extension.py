@@ -75,7 +75,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             return {
                 "message": detailed_message,
                 "suggested_questions": suggested_questions,
-                "models": [m.to_dict() for m in discovered.all_models()],
+                "models": [m.to_dict() for m in discovered.chat_models],
                 "default_model_id": discovered.default_model_id,
             }
 
