@@ -590,7 +590,7 @@ class ProjectChat(ProjectChatProtocol):
         Before writing any `project.get_datasource_as_dataframe(datasource_name, columns=[...])` call, you must verify the datasource schema and only request columns that exist on that datasource.
         Never assume a `name` column exists on `cells`; if the task asks for genes/markers, use the expression datasource or explicit marker ranking outputs instead of `cells.name`.
         You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
-        Use `df.info()` or `df.index()`.
+        Use `df.info()` or inspect `df.index`.
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
         tools = [python_tool]
