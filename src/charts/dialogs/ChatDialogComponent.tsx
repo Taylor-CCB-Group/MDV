@@ -214,7 +214,6 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 )}
                 {sender === 'bot' && !error && guidance?.trim() && (
                     <ChatPreviewBlock
-                        variant="data"
                         title="Analysis summary"
                         content={guidance.trim()}
                         defaultExpandedWhenLong
