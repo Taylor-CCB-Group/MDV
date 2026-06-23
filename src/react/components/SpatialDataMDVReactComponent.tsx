@@ -29,6 +29,7 @@ import {
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_layer_inputs";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
+import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useOuterContainer } from "../screen_state";
 import { useViewStateLink } from "../chartLinkHooks";
@@ -168,6 +169,7 @@ const SpatialDataMainChart = observer(() => {
     const rawRegion = useRegion();
     const region = getSpatialRegionMetadata(rawRegion);
     const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
+    ensureChunkWorker();
 
     return (
         <SpatialDataProvider source={spatialDataUrl ?? undefined}>

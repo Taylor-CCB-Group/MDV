@@ -4,6 +4,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
+import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { ChartProvider } from "../context";
 import { useRegion } from "../hooks";
 import SpatialLayerDialogComponent from "./SpatialLayerDialogComponent";
@@ -21,6 +22,7 @@ function getSpatialDataUrl(region: unknown): string | undefined {
 const SpatialLayerDialogReact = observer(function SpatialLayerDialogReact() {
     const rawRegion = useRegion();
     const spatialDataUrl = getSpatialDataUrl(rawRegion);
+    ensureChunkWorker();
     return (
         <SpatialDataProvider source={spatialDataUrl}>
             <SpatialLayerDialogComponent />
