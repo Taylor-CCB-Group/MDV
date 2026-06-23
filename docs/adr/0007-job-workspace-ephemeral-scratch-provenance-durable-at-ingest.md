@@ -9,9 +9,30 @@ It is **ephemeral scratch** under a **dedicated, configurable root**, kept **sep
 durable project store** — one subdirectory per job keyed by `job_id`. (Industry standard:
 Galaxy `job_working_directory`, Nextflow `workDir`.)
 
-The root is a **sibling of — never inside — any project's export directory**, so `project
-export`/zip never sweeps staged copies into the bundle. (Build-time note: verify the chosen
-root is provably outside the path the project exporter walks.)
+The **workspace scratch root** is **outside the project**, so `project export`/zip never
+sweeps staged copies into the bundle, and so the worker can compute wherever it runs.
+(Build-time note: verify the chosen root is provably outside the path the project exporter
+walks.)
+
+> **Revision (2026-06-23) — split the one root in two.** The POC originally placed a single
+> `jobs_root` (records + workspaces together) as a **sibling** of the project. That breaks the
+> catalog: `serve_projects_from_filesystem` / `mdv_desktop` do `os.listdir(base_dir)` and treat
+> every top-level child as a project, so a sibling `jobs/` is mistaken for one. The two things
+> bundled under `jobs_root` have opposite homes, so we separate them:
+>
+> - **Durable records** (ADR-0005) move **inside the project** → `<project>/jobs/records/`.
+>   The catalog never scans a project's *subdir*, so it is no longer mistaken for a project;
+>   provenance now travels with the project; HPC-safe because the owner always has its own
+>   project. The exporter is taught to skip the `jobs/` subtree (`convert_to_static_page`
+>   adds `jobs` to its ignore list), preserving the "never sweep job files into the bundle"
+>   guarantee above.
+> - **Ephemeral workspaces** stay in a **configurable scratch root outside the project**
+>   (local temp by default; `$SCRATCH` / shared FS on HPC) — they must live wherever the
+>   worker computes and must never be forced into the project dir.
+>
+> The **job_id** is the only link between a record (`<project>/jobs/records/<job_id>.json`)
+> and its possibly-remote workspace (`<scratch_root>/<job_id>/`). Both are derived from the
+> same id, so the owner can always correlate a durable record with its scratch.
 
 ## Scratch vs durable — what survives
 
