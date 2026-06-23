@@ -58,6 +58,22 @@ The real discriminator is **shared-filesystem-or-not**, not local-vs-remote — 
 shared scratch also wants the no-copy path; only a *true* no-shared-FS remote must transfer
 bytes.
 
+## Worker entrypoint
+
+The executor launches the worker as a plain subprocess:
+
+```
+python -m mdvtools.jobs.run_worker "module:fn" <workspace>
+```
+
+`run_worker` is a thin shim (no MDV imports): it splits `"module:fn"`, imports the module,
+and calls `fn(<workspace>)` with the per-job workspace path as its only argument. That `fn`
+is the tool's worker half (e.g. `mdvtools.jobs.workers.concat_worker:run`) — it reads the
+materialized tray from `<workspace>/input/`, writes results + a manifest into
+`<workspace>/output/`, and writes the terminal `STATUS` marker (ADR-0007) **last**. The
+contract is the workspace path and nothing else, which is exactly why the same worker runs
+unchanged under a Slurm/HPC executor: swap *how* the process is launched, not *what* it is.
+
 ## Considered and rejected (for the POC)
 
 - **Per-strategy staging now (`symlink`/`none`/in-place locally).** Buys local speed but
