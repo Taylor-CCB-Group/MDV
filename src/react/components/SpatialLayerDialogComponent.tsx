@@ -96,10 +96,8 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
         case "image":
             return (
                 <ImageLayerPanel
-                    layerId={entry.id}
                     config={layer as Extract<LayerConfig, { type: "image" }>}
                     updateLayer={patchLayer}
-                    patchLayer={patchLayer}
                 />
             );
         case "shapes":

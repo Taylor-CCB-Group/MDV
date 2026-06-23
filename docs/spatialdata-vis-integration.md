@@ -52,6 +52,33 @@ Remove the unused `refreshRenderStackShell` helper. Replacing only the stack she
 
 Possible follow-up: consider publishing MDV to npm so SpatialData.js can exercise real MDV integration points without local worktree/link setup. This is an integration enabler, not part of the adapter refactor.
 
+## Avivatorish comparison
+
+MDV currently carries a local `src/react/components/avivatorish` implementation and also depends on `@spatialdata/avivatorish`. Treat the local copy as the integration shim for now, not as a desired long-term fork.
+
+The two implementations are close enough to share vocabulary: `VivProvider`, `createVivStores`, `channelsStore`, `viewerStore`, `imageSettingsStore`, `useImage`, `useLoader`, `useMetadata`, and channel selection/state helpers. Both use Zustand-style stores under React providers, and both model channel state as parallel arrays (`colors`, `contrastLimits`, `domains`, `selections`, `channelsVisible`, etc.).
+
+The important differences for MDV:
+
+- MDV's local version is already wired into MDV chart/view concerns: MobX chart config, chart-link view state, OME-TIFF upload/viewer paths, and the existing Viv scatter/image chart controls.
+- MDV's local channel stats path stores sampled `raster` data in channel state. The old channel histogram UI uses that raster data to draw histograms and brush contrast ranges.
+- `@spatialdata/avivatorish` exposes channel stats helpers, but the current declared stats contract returns `domains` and `contrastLimits`, not the sampled raster data needed by MDV's histogram component.
+- SpatialData.js `SpatialCanvas` image loading exposes loaded image defaults (`colors`, `contrastLimits`, `channelsVisible`, `selections`) for layer panels, but not a public histogram/raster-stat surface for channel-control UI.
+- SpatialData.js image rendering is OME-Zarr oriented. Its image renderer notes that SpatialData image support uses `loadOmeZarr`; MDV still has OME-TIFF paths that are outside that renderer's current scope.
+- MDV's local version has awkward Zustand/MobX mixing because Viv state is runtime UI state while `chart.config.renderStack` is serialized MobX state. This is tolerable as a bridge, but it should not leak Viv root config back into SpatialData chart config.
+
+For the current SpatialData chart, image channel controls may reuse the old MDV channel components only for state that can be faithfully backed by `renderStack.entries[].props.channels`. Until SpatialData.js exposes real channel histogram/raster samples, MDV may render the existing histogram brush over empty raster data so users can still edit `contrastLimits`; replace that placeholder with a SpatialData.js-provided stats API when one exists.
+
+Histogram brush controls are sensitive to state ownership. Keep the brush value controlled by one state source only: the channel store value that will be rendered (`contrastLimits` for image channels, or the equivalent legend range elsewhere). Avoid adding a local/debounced mirror that also writes through MobX or another persistence layer, because d3 brush movement, React re-render, and persistence rehydration can otherwise chase each other and cause drag jumps. If a bridge persists brush changes into another model, skip self-echo rehydration when the incoming persisted value matches the value just written.
+
+Useful SpatialData.js changes before MDV can consider replacing the local `avivatorish` copy:
+
+- Expose a public channel-control adapter or hook that takes a layer-local image channel config and returns editable channel state plus a persistence callback, without requiring root Viv chart config.
+- Expose image channel histogram/stat data, or a lazy per-selection stats API, alongside loaded image defaults.
+- Make the supported image source boundary explicit: either support OME-TIFF in the shared package, or keep OME-TIFF intentionally MDV-local and separate from SpatialData image layers.
+- Clarify whether the shared package supports Viv/deck.gl extensions needed by MDV (`VivContrastExtension`, color palette/colormap extensions, 2D/3D behavior), and expose extension injection where host apps need it.
+- Keep the channel ownership model layer-local: image channel settings belong to image layer configs/render-stack entries, not to the SpatialData chart root.
+
 ## Initial PR scope
 
 | Commit stage | Status |

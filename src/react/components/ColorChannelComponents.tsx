@@ -17,7 +17,6 @@ import {
 } from "@mui/material";
 import * as d3 from "d3";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useDebounce } from "use-debounce";
 import { shallow } from "zustand/shallow";
 import { useTheme } from "../hooks";
 import { PopoverPicker } from "./ColorPicker";
@@ -30,8 +29,10 @@ import {
     useLoader,
     useMetadata,
     useViewerStore,
+    useViewerStoreApi,
 } from "./avivatorish/state";
 import { getSingleSelectionStats } from "./avivatorish/utils";
+import { COLOR_PALLETE } from "./avivatorish/constants";
 import { MAX_CHANNELS } from "@vivjs/constants";
 
 const DEFAULT_BRIGHTNESS_CONTRAST = 0.5;
@@ -100,7 +101,7 @@ const ChannelChooserMUI = ({ index }: { index: number }) => {
 };
 
 const ChannelChooser = ({ index }: { index: number }) => {
-    const channels = useMetadata()?.Pixels.Channels.map((c) => c.Name) as string[];
+    const metadata = useMetadata();
     const { selections, setPropertiesForChannel } = useChannelsStore(
         ({ selections, setPropertiesForChannel }) => ({
             selections,
@@ -109,15 +110,20 @@ const ChannelChooser = ({ index }: { index: number }) => {
         shallow,
     );
     const loader = useLoader();
-    const { setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d } = useViewerStore(
-        ({ setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d }) => ({
+    const { setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d, channelOptions } = useViewerStore(
+        ({ setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d, channelOptions }) => ({
             setIsChannelLoading,
             isChannelLoading,
             removeIsChannelLoading,
             use3d,
+            channelOptions,
         }),
         shallow,
     );
+    const channels =
+        metadata?.Pixels.Channels.map((c, i) => c.Name ?? `Channel ${i + 1}`) ??
+        channelOptions ??
+        selections.map((_, i) => `Channel ${i + 1}`);
 
     return (
         <>
@@ -132,6 +138,11 @@ const ChannelChooser = ({ index }: { index: number }) => {
                             ...selections[index],
                             c: Number.parseInt(e.target.value),
                         };
+                        const data = Array.isArray(loader) ? loader[loader.length - 1] : loader;
+                        if (!data?.getRaster) {
+                            setPropertiesForChannel(index, { selections: selection });
+                            return;
+                        }
                         setIsChannelLoading(index, true);
                         const {
                             domain: domains,
@@ -218,32 +229,15 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const channelsStore = useChannelsStoreApi();
     const dark = useTheme() === "dark";
     const limits = contrastLimits[index] ?? domain;
-    const [liveValue, setLiveValue] = useState<Range | null>(limits);
+    const domainRef = useRef(domain);
+    const limitsRef = useRef(limits);
     const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
     const [yScaleMode, setYScaleMode] = useState<ScaleMode>("auto");
 
     useEffect(() => {
-        setLiveValue(rangesEqual(limits, domain) ? null : limits);
+        domainRef.current = domain;
+        limitsRef.current = limits;
     }, [domain, limits]);
-
-    const [debouncedValue] = useDebounce(liveValue, 10, {
-        equalityFn: (a, b) => {
-            if (!a && !b) return true;
-            if (!a || !b) return false;
-            return a[0] === b[0] && a[1] === b[1];
-        },
-    });
-
-    useEffect(() => {
-        const nextValue = debouncedValue ?? domain;
-        if (nextValue.some((value) => Number.isNaN(value))) return;
-        if (rangesEqual(nextValue, limits)) {
-            return;
-        }
-        const nextContrastLimits = [...channelsStore.getState().contrastLimits];
-        nextContrastLimits[index] = nextValue;
-        channelsStore.setState({ contrastLimits: nextContrastLimits });
-    }, [channelsStore, debouncedValue, domain, index, limits]);
 
     const resolvedXScale = useMemo(
         () => (xScaleMode === "auto" ? resolveAutoHistogramXScaleFromValues(domain, rasterData) : xScaleMode),
@@ -273,23 +267,24 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
     const handleBrushValue = useCallback(
         (value: Range | null) => {
-            if (!value) {
-                setLiveValue(null);
-                return;
-            }
-            const nextValue = sortRange(clampRange(value, domain));
-            setLiveValue(rangesEqual(nextValue, domain) ? null : nextValue);
+            const currentDomain = domainRef.current;
+            const currentLimits = limitsRef.current;
+            const nextValue = value ? sortRange(clampRange(value, currentDomain)) : currentDomain;
+            if (nextValue.some((item) => Number.isNaN(item)) || rangesEqual(nextValue, currentLimits)) return;
+            const nextContrastLimits = [...channelsStore.getState().contrastLimits];
+            nextContrastLimits[index] = nextValue;
+            channelsStore.setState({ contrastLimits: nextContrastLimits });
         },
-        [domain],
+        [channelsStore, index],
     );
 
     const brush = useMemo(
         () => ({
-            value: liveValue,
+            value: rangesEqual(limits, domain) ? null : limits,
             setValue: handleBrushValue,
             minMax: domain,
         }),
-        [domain, handleBrushValue, liveValue],
+        [domain, handleBrushValue, limits],
     );
 
     return (
@@ -393,11 +388,9 @@ const ChannelController = ({ index }: { index: number }) => {
     const channelVisible = useChannelsStore((state) => state.channelsVisible[index]);
     const removeChannel = useChannelsStore((state) => state.removeChannel);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
-    const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
     const [isHovered, setIsHovered] = useState(false);
 
-    if (!metadata) throw "no metadata"; //TODO type metadata
     if (!color) return null;
 
     const hasPendingLoads = isChannelLoading.some(Boolean);
@@ -536,10 +529,15 @@ const AddChannel = () => {
     const [isAddingChannel, setIsAddingChannel] = useState(false);
     // const { labels } = loader[0];
     // const channelsStore = useChannelsStoreApi();
-    const { selections, setPropertiesForChannel } = useChannelsStore(({ selections, setPropertiesForChannel }) => ({
-        selections,
-        setPropertiesForChannel,
-    }));
+    const { selections, domains: channelDomains, contrastLimits: channelContrastLimits, setPropertiesForChannel } = useChannelsStore(
+        ({ selections, domains, contrastLimits, setPropertiesForChannel }) => ({
+            selections,
+            domains,
+            contrastLimits,
+            setPropertiesForChannel,
+        }),
+        shallow,
+    );
     const canAddChannel = selections.length < MAX_CHANNELS;
     const { addChannel, removeChannel } = useChannelsStore((state) => ({
         addChannel: state.addChannel,
@@ -553,6 +551,8 @@ const AddChannel = () => {
         }),
         shallow,
     );
+    const viewerStore = useViewerStoreApi();
+    const canLoadStats = Boolean((Array.isArray(loader) ? loader[loader.length - 1] : loader)?.getRaster);
     return (
         <button
             type="button"
@@ -572,14 +572,26 @@ const AddChannel = () => {
                     const baseSelection = selections[0] ?? {};
                     const selection = {
                         ...baseSelection,
-                        c: baseSelection.c ?? 0,
+                        c: index,
                     };
                     addChannel({
                         selections: selection,
                         ids: String(Math.random()),
                         channelsVisible: true,
+                        colors: COLOR_PALLETE[index % COLOR_PALLETE.length],
+                        domains: channelDomains[index] ?? channelDomains[0] ?? [0, 255],
+                        contrastLimits: channelContrastLimits[index] ?? channelContrastLimits[0] ?? [0, 255],
                     });
+                    viewerStore.setState((state) => ({
+                        channelOptions: Array.from({ length: index + 1 }, (_, i) =>
+                            state.channelOptions[i] ?? `Channel ${i + 1}`,
+                        ),
+                    }));
                     didAddChannel = true;
+                    if (!canLoadStats) {
+                        setIsChannelLoading(index, false);
+                        return;
+                    }
                     const {
                         domain: domains,
                         contrastLimits,
@@ -612,7 +624,7 @@ const AddChannel = () => {
     );
 };
 
-export const Test = () => {
+export const VivChannelList = () => {
     const ids = useChannelsStore(({ ids }) => ids);
     return (
         <div className="w-full space-y-2 bg-[hsl(var(--background))] p-2">
@@ -623,3 +635,5 @@ export const Test = () => {
         </div>
     );
 };
+
+export const Test = VivChannelList;
