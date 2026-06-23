@@ -156,11 +156,12 @@ def load_agent_dataframes(
     obs_ds = roles.obs_datasource
     if scale.is_large:
         obs_cols = agent_probe_columns_from_metadata(project, obs_ds)
-        df1 = (
-            project.get_datasource_as_dataframe(obs_ds, columns=obs_cols)
-            if obs_cols
-            else project.get_datasource_as_dataframe(obs_ds)
-        )
+        if not obs_cols:
+            raise ValueError(
+                f"Large project: no probe columns for obs datasource {obs_ds!r}; "
+                "refusing full table load"
+            )
+        df1 = project.get_datasource_as_dataframe(obs_ds, columns=obs_cols)
     else:
         df1 = project.get_datasource_as_dataframe(obs_ds)
 
@@ -178,7 +179,17 @@ def load_agent_dataframes(
             and "cells" not in names
         ):
             try:
-                df_extra = project.get_datasource_as_dataframe(extra_datasource)
+                if scale.is_large:
+                    extra_cols = agent_probe_columns_from_metadata(
+                        project, extra_datasource
+                    )
+                    if not extra_cols:
+                        return [df1]
+                    df_extra = project.get_datasource_as_dataframe(
+                        extra_datasource, columns=extra_cols
+                    )
+                else:
+                    df_extra = project.get_datasource_as_dataframe(extra_datasource)
                 return [df1, df_extra]
             except Exception:
                 pass
@@ -189,11 +200,9 @@ def load_agent_dataframes(
         expr_cols = agent_expression_probe_columns(
             project, expr_ds, primary_expr.name_column
         )
-        df2 = (
-            project.get_datasource_as_dataframe(expr_ds, columns=expr_cols)
-            if expr_cols
-            else project.get_datasource_as_dataframe(expr_ds)
-        )
+        if not expr_cols:
+            return [df1]
+        df2 = project.get_datasource_as_dataframe(expr_ds, columns=expr_cols)
     else:
         df2 = project.get_datasource_as_dataframe(expr_ds)
     return [df1, df2]
