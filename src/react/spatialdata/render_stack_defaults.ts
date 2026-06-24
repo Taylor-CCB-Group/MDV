@@ -106,6 +106,13 @@ function firstImageSpatialEntry(
     return spatialEntry("image", firstKey);
 }
 
+export function createHostOnlyRenderStack(): RenderStack {
+    return {
+        schemaVersion: RENDER_STACK_SCHEMA_VERSION,
+        entries: DECK_OVERLAY_IDS.map((deckId) => hostEntry(deckId)),
+    };
+}
+
 export function createDefaultRenderStack(
     spatialData: SpatialData,
     coordinateSystem: string,
@@ -122,28 +129,54 @@ export function createDefaultRenderStack(
     };
 }
 
-export function normalizeRenderStack(
-    stack: RenderStack | undefined,
+/** Insert the first available image layer when the stack has no image entries yet. */
+export function insertDefaultImageLayer(
+    stack: RenderStack,
     spatialData: SpatialData,
     coordinateSystem: string,
-): RenderStack {
-    const defaults = createDefaultRenderStack(spatialData, coordinateSystem);
+): boolean {
+    const hasImage = stack.entries.some(
+        (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
+    );
+    if (hasImage) return false;
+
+    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem);
+    if (!imageEntry) return false;
+
+    const firstHostIndex = stack.entries.findIndex((entry) => entry.kind === "host");
+    if (firstHostIndex === -1) {
+        stack.entries.push(imageEntry);
+    } else {
+        stack.entries.splice(firstHostIndex, 0, imageEntry);
+    }
+    return true;
+}
+
+/**
+ * Ensure required host overlay entries exist. Never injects spatial layers —
+ * persisted stacks with zero spatial layers stay as saved.
+ */
+export function normalizeRenderStack(stack: RenderStack | undefined): RenderStack {
     if (!stack?.entries?.length) {
-        return defaults;
+        return createHostOnlyRenderStack();
     }
 
     const entriesById = new Map<string, RenderStackEntry>();
-    for (const entry of defaults.entries) {
-        entriesById.set(entry.id, entry);
-    }
     for (const entry of stack.entries) {
         entriesById.set(entry.id, entry);
     }
+    for (const deckId of DECK_OVERLAY_IDS) {
+        const id = deckHostLayerId(deckId);
+        if (!entriesById.has(id)) {
+            entriesById.set(id, hostEntry(deckId));
+        }
+    }
 
     const order = stack.entries.map((entry) => entry.id);
-    for (const entry of defaults.entries) {
-        if (!order.includes(entry.id)) {
-            order.push(entry.id);
+    for (const deckId of DECK_OVERLAY_IDS) {
+        const id = deckHostLayerId(deckId);
+        if (!order.includes(id)) {
+            order.push(id);
         }
     }
 
@@ -153,4 +186,21 @@ export function normalizeRenderStack(
             .map((id) => entriesById.get(id))
             .filter((entry): entry is RenderStackEntry => entry !== undefined),
     };
+}
+
+export function mergeHostOverlayEntriesInPlace(stack: RenderStack): boolean {
+    const normalized = normalizeRenderStack(stack);
+    const beforeIds = stack.entries.map((entry) => entry.id).join("\0");
+    const afterIds = normalized.entries.map((entry) => entry.id).join("\0");
+    if (beforeIds === afterIds) {
+        return false;
+    }
+
+    const existingById = new Map(stack.entries.map((entry) => [entry.id, entry]));
+    const mergedEntries = normalized.entries.map(
+        (entry) => existingById.get(entry.id) ?? entry,
+    );
+    stack.schemaVersion = normalized.schemaVersion;
+    stack.entries.splice(0, stack.entries.length, ...mergedEntries);
+    return true;
 }

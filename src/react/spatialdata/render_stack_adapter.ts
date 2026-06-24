@@ -13,6 +13,7 @@ import {
 import { useMemo, useRef } from "react";
 
 import { deckIdFromHostLayerId, type DeckOverlayId } from "./host_overlay_ids";
+import { touchRenderStack, renderStackSpatialRevision } from "./render_stack_observe";
 
 export type MdvDeckOverlayLayers = Record<DeckOverlayId, Layer | null>;
 
@@ -134,13 +135,9 @@ export function resolveCachedHostDeckLayers(
     return layers;
 }
 
-function observeSpatialRenderStack(stack: RenderStack | undefined) {
-    for (const entry of stack?.entries ?? []) {
-        if (entry.kind !== "spatial") continue;
-        void entry.id;
-        void entry.visible;
-        void entry.props;
-    }
+function observeRenderStack(stack: RenderStack | undefined) {
+    touchRenderStack(stack);
+    void renderStackSpatialRevision(stack);
 }
 
 export function useRenderStackAdapter({
@@ -153,17 +150,21 @@ export function useRenderStackAdapter({
     hostLayerResolver: ReturnType<typeof createMdvHostLayerResolver>;
 }) {
     const layerInputsCacheRef = useRef(createRenderStackLayerInputsCache());
-    observeSpatialRenderStack(stack);
+    observeRenderStack(stack);
+    void generation;
 
-    const layerInputs = useMemo(() => {
-        if (!stack) return { layers: {}, layerOrder: [] as string[] };
-        return syncRenderStackLayerInputs(stack, layerInputsCacheRef.current);
-    }, [stack, generation]);
+    const synced = !stack
+        ? { layers: {}, layerOrder: [] as string[] }
+        : syncRenderStackLayerInputs(stack, layerInputsCacheRef.current);
+    const layerInputs = {
+        layers: { ...synced.layers },
+        layerOrder: synced.layerOrder,
+    };
 
     const hostFingerprint = renderStackHostFingerprint(stack);
     const deckLayers = useMemo(
         () => resolveCachedHostDeckLayers(stack, hostLayerResolver),
-        [stack, hostFingerprint, hostLayerResolver],
+        [stack, hostFingerprint, hostLayerResolver, generation],
     );
 
     return {

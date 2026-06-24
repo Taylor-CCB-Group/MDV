@@ -4,7 +4,7 @@ import type {
     RenderStackSpatialElementType,
 } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
-import { runInAction } from "mobx";
+import { isObservable, runInAction, set } from "mobx";
 import { useCallback } from "react";
 
 import type {
@@ -13,24 +13,30 @@ import type {
 } from "@/react/components/SpatialDataMDVReact";
 import { useChart } from "@/react/context";
 import { useConfig } from "@/react/hooks";
+import type { SpatialData } from "@spatialdata/core";
 import {
     deckHostLayerId,
     deckIdFromHostLayerId,
     type DeckOverlayId,
 } from "./host_overlay_ids";
 import { spatialEntryAsLayerConfig } from "./render_stack_adapter";
-import { spatialEntryId } from "./render_stack_defaults";
+import {
+    createDefaultRenderStack,
+    createHostOnlyRenderStack,
+    insertDefaultImageLayer,
+    mergeHostOverlayEntriesInPlace,
+    spatialEntryId,
+} from "./render_stack_defaults";
+import { touchRenderStackEntry } from "./render_stack_observe";
 
 export function reorderRenderStackEntries(
     stack: RenderStack,
     fromIndex: number,
     toIndex: number,
 ): void {
-    const next = [...stack.entries];
-    const [moved] = next.splice(fromIndex, 1);
+    const [moved] = stack.entries.splice(fromIndex, 1);
     if (!moved) return;
-    next.splice(toIndex, 0, moved);
-    stack.entries = next;
+    stack.entries.splice(toIndex, 0, moved);
 }
 
 export function patchRenderStackEntry(
@@ -48,7 +54,11 @@ export function patchRenderStackEntry(
     }
     if (patch.props) {
         for (const [key, value] of Object.entries(patch.props)) {
-            entry.props[key] = value;
+            if (isObservable(entry.props)) {
+                set(entry.props, key, value);
+            } else {
+                entry.props[key] = value;
+            }
         }
     }
 }
@@ -92,11 +102,52 @@ export function insertHostRenderStackEntry(
 }
 
 export function removeRenderStackEntry(stack: RenderStack, entryId: string): void {
-    stack.entries = stack.entries.filter((entry) => entry.id !== entryId);
+    const index = stack.entries.findIndex((entry) => entry.id === entryId);
+    if (index === -1) return;
+    stack.entries.splice(index, 1);
 }
 
 export function renderStackEntryIds(stack: RenderStack): string[] {
     return stack.entries.map((entry) => entry.id);
+}
+
+/**
+ * Ensure host overlays exist and, only for brand-new charts, insert the default image layer.
+ * Persisted stacks (including host-only with zero spatial layers) are left unchanged.
+ */
+export function seedRenderStackFromSpatialData(
+    config: SpatialDataMdvReactConfig,
+    spatialData: SpatialData,
+    coordinateSystem: string,
+    chart?: SpatialDataMdvReact,
+): void {
+    if (!config.renderStack) {
+        runInAction(() => {
+            config.renderStack = chart?.seedDefaultSpatialLayers
+                ? createDefaultRenderStack(spatialData, coordinateSystem)
+                : createHostOnlyRenderStack();
+            chart?.finishDefaultSpatialLayerSeed();
+            chart?.bumpRenderStackGeneration();
+        });
+        return;
+    }
+
+    runInAction(() => {
+        let changed = false;
+        if (chart?.seedDefaultSpatialLayers) {
+            changed =
+                insertDefaultImageLayer(
+                    config.renderStack!,
+                    spatialData,
+                    coordinateSystem,
+                ) || changed;
+            chart.finishDefaultSpatialLayerSeed();
+        }
+        changed = mergeHostOverlayEntriesInPlace(config.renderStack!) || changed;
+        if (changed) {
+            chart?.bumpRenderStackGeneration();
+        }
+    });
 }
 
 export function isRemovableRenderStackEntry(entry: RenderStackEntry): boolean {
@@ -137,6 +188,7 @@ export function useRenderStackEntry(entryId: string) {
     const config = useConfig<SpatialDataMdvReactConfig>();
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const entry = config.renderStack?.entries.find((item) => item.id === entryId);
+    touchRenderStackEntry(entry);
 
     const patchEntry = useCallback(
         (patch: Parameters<typeof patchRenderStackEntry>[2]) => {

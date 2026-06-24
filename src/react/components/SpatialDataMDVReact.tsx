@@ -17,6 +17,7 @@ import {
 } from "./avivatorish/state";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import {
@@ -38,9 +39,14 @@ function adaptSpatialDataConfig(
     dataStore: DataStore,
 ) {
     const config = { ...scatterDefaults, ...originalConfig };
-    removeSpatialDataRootViv(config);
+    //removeSpatialDataRootViv(config); //only needed on charts saved during dev, we shouldn't keep this.
     if (!dataStore.regions) {
         throw new Error("unexpected attempt to load spatial chart with no regions in datasource");
+    }
+    // Host-only stack must exist before makeAutoObservable(config) so in-place
+    // entry edits stay reactive. Only synthesise a stack when the config never had one.
+    if (config.renderStack === undefined) {
+        config.renderStack = createHostOnlyRenderStack();
     }
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
@@ -63,6 +69,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
      * causing layer/data churn.
      */
     renderStackGeneration = 0;
+    /** True only until the first default image layer seed runs for a brand-new chart. */
+    seedDefaultSpatialLayers: boolean;
 
     get viewerStore() {
         return this.vivStores?.viewerStore;
@@ -70,6 +78,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 
     bumpRenderStackGeneration() {
         this.renderStackGeneration++;
+    }
+
+    finishDefaultSpatialLayerSeed() {
+        this.seedDefaultSpatialLayers = false;
     }
 
     imageLayerRegistry?: ImageLayerRegistry;
@@ -82,8 +94,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         div: HTMLDivElement,
         originalConfig: SpatialDataMdvReactConfig,
     ) {
+        const seedDefaultSpatialLayers = originalConfig.renderStack === undefined;
         const config = adaptSpatialDataConfig(originalConfig, dataStore);
         super(dataStore, div, config, SpatialDataChartRoot);
+        this.seedDefaultSpatialLayers = seedDefaultSpatialLayers;
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,
@@ -91,6 +105,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             colorByDefault: action,
             renderStackGeneration: observable,
             bumpRenderStackGeneration: action,
+            seedDefaultSpatialLayers: observable,
+            finishDefaultSpatialLayerSeed: action,
             imageLayerRegistry: observable.ref,
             setImageLayerRegistry: action,
         });
@@ -232,6 +248,8 @@ BaseChart.types.SpatialDataMdvRegionReact = {
         config.region = regionKey;
         config.title = regionKey;
         config.type = "SpatialDataMdvRegionReact";
+        // nb, we're not initialising config.renderStack here, and it will need to be done during chart initialisation
+        // but this means that if e.g. ChatMDV was generating a config object, it wouldn't necessarily need to fill in all those details
     },
     class: SpatialDataMdvReact,
     name: "SpatialData.js Image Viewer (experimental)",

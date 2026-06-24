@@ -30,7 +30,7 @@ import type { RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { useSpatialData } from "@spatialdata/react";
 import { observer } from "mobx-react-lite";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import {
     DECK_OVERLAY_IDS,
@@ -41,22 +41,22 @@ import {
 } from "@/react/spatialdata/host_overlay_ids";
 import { renderStackEntryDisplayName, renderStackOrderLabel } from "@/react/spatialdata/render_stack_display";
 import {
-    useRenderStackEntry,
-    useRenderStackMutation,
-} from "@/react/spatialdata/render_stack_control";
-import {
     insertHostRenderStackEntry,
     insertSpatialRenderStackEntry,
     isRemovableRenderStackEntry,
     removeRenderStackEntry,
     reorderRenderStackEntries,
     renderStackEntryIds,
+    seedRenderStackFromSpatialData,
+    useRenderStackEntry,
+    useRenderStackMutation,
 } from "@/react/spatialdata/render_stack_control";
 import {
     defaultPropsForSpatialElement,
     listAvailableSpatialEntries,
 } from "@/react/spatialdata/render_stack_defaults";
 import { NO_TABLE_ASSOCIATION } from "@/react/spatialdata/table_association";
+import { useImageLayerPanelDefaults } from "@/react/spatialdata/use_image_layer_panel_defaults";
 import { useChart, useDataStore } from "../context";
 import { useConfig } from "../hooks";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
@@ -83,6 +83,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
     const chartColorBy =
         typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
     const elementKey = entry?.kind === "spatial" ? entry.source.elementKey : undefined;
+    const { channelNames, loaderDefaults } = useImageLayerPanelDefaults(spatialData, elementKey);
 
     if (!entry) return null;
 
@@ -98,9 +99,9 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
         case "image":
             return (
                 <ImageLayerPanel
-                    config={layer as Extract<LayerConfig, { type: "image" }>}
-                    elementKey={entry.source.elementKey}
-                    updateLayer={patchLayer}
+                    entryId={entryId}
+                    channelNames={channelNames}
+                    loaderDefaults={loaderDefaults}
                 />
             );
         case "shapes":
@@ -242,6 +243,14 @@ const SpatialLayerDialogComponent = observer(() => {
     const { spatialData } = useSpatialData();
     const stack = config.renderStack;
     const mutateStack = useRenderStackMutation();
+    const coordinateSystem = //todo datasources schema including spatial regions when referring to dataStore here.
+        (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })
+            ?.spatial?.coordinate_system ?? null;
+
+    useEffect(() => {
+        if (!spatialData || !coordinateSystem) return;
+        seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
+    }, [chart, config, coordinateSystem, spatialData]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -252,9 +261,6 @@ const SpatialLayerDialogComponent = observer(() => {
     const insertOptions = useMemo<InsertOption[]>(() => {
         if (!stack || !spatialData) return [];
         const options: InsertOption[] = [];
-        const coordinateSystem =
-            (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })
-                ?.spatial?.coordinate_system ?? null;
         if (coordinateSystem) {
             const available = listAvailableSpatialEntries(spatialData, coordinateSystem);
             for (const entry of available) {
@@ -278,7 +284,7 @@ const SpatialLayerDialogComponent = observer(() => {
             });
         }
         return options.sort((a, b) => a.label.localeCompare(b.label));
-    }, [chart.dataStore.regions?.all_regions, config.region, spatialData, stack]);
+    }, [coordinateSystem, spatialData, stack]);
 
     const onDragEnd = useCallback(
         (event: DragEndEvent) => {
@@ -322,7 +328,7 @@ const SpatialLayerDialogComponent = observer(() => {
                 style={{ display: "block", alignItems: "stretch" }}
             >
                 <Typography color="text.secondary">
-                    Layer stack is loading. Open this dialog again after spatial data has loaded.
+                    Layer stack is loading…
                 </Typography>
             </div>
         );

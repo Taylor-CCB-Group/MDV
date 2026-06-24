@@ -35,12 +35,13 @@ import {
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_adapter";
 import {
-    createDefaultRenderStack,
+    createHostOnlyRenderStack,
     normalizeRenderStack,
 } from "@/react/spatialdata/render_stack_defaults";
 import {
     patchRenderStackEntry,
     removeRenderStackEntry,
+    seedRenderStackFromSpatialData,
 } from "@/react/spatialdata/render_stack_control";
 import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 
@@ -180,7 +181,79 @@ describe("render stack control", () => {
 });
 
 describe("render stack defaults", () => {
-    test("normalizes defaults without replacing saved entries", () => {
+    test("createHostOnlyRenderStack seeds host overlay entries", () => {
+        const stack = createHostOnlyRenderStack();
+        expect(stack.entries.length).toBeGreaterThan(0);
+        expect(stack.entries.every((entry) => entry.kind === "host")).toBe(true);
+    });
+
+    test("seedRenderStackFromSpatialData adds the first image layer for brand-new charts", () => {
+        const config = {
+            type: "SpatialDataMdvRegionReact",
+            renderStack: createHostOnlyRenderStack(),
+        } as const;
+        const chart = {
+            seedDefaultSpatialLayers: true,
+            bumpRenderStackGeneration: vi.fn(),
+            finishDefaultSpatialLayerSeed: vi.fn(),
+        };
+        seedRenderStackFromSpatialData(
+            config as never,
+            fakeSpatialData(),
+            "global",
+            chart as never,
+        );
+        expect(
+            config.renderStack?.entries.some(
+                (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
+            ),
+        ).toBe(true);
+        expect(chart.finishDefaultSpatialLayerSeed).toHaveBeenCalled();
+    });
+
+    test("seedRenderStackFromSpatialData keeps persisted host-only stacks spatial-free", () => {
+        const config = {
+            type: "SpatialDataMdvRegionReact",
+            renderStack: createHostOnlyRenderStack(),
+        } as const;
+        const chart = {
+            seedDefaultSpatialLayers: false,
+            bumpRenderStackGeneration: vi.fn(),
+            finishDefaultSpatialLayerSeed: vi.fn(),
+        };
+        seedRenderStackFromSpatialData(
+            config as never,
+            fakeSpatialData(),
+            "global",
+            chart as never,
+        );
+        expect(
+            config.renderStack?.entries.every((entry) => entry.kind === "host"),
+        ).toBe(true);
+        expect(chart.finishDefaultSpatialLayerSeed).not.toHaveBeenCalled();
+    });
+
+    test("seedRenderStackFromSpatialData keeps the same renderStack object", () => {
+        const config = {
+            type: "SpatialDataMdvRegionReact",
+            renderStack: createHostOnlyRenderStack(),
+        } as const;
+        const stackBefore = config.renderStack;
+        const chart = {
+            seedDefaultSpatialLayers: true,
+            bumpRenderStackGeneration: vi.fn(),
+            finishDefaultSpatialLayerSeed: vi.fn(),
+        };
+        seedRenderStackFromSpatialData(
+            config as never,
+            fakeSpatialData(),
+            "global",
+            chart as never,
+        );
+        expect(config.renderStack).toBe(stackBefore);
+    });
+
+    test("normalizeRenderStack adds missing host overlays without injecting spatial layers", () => {
         const savedImage = spatialEntry({
             id: "spatialdata-image-imageB",
             elementKey: "imageB",
@@ -188,17 +261,12 @@ describe("render stack defaults", () => {
         });
         const savedStack = renderStack([savedImage]);
 
-        const normalized = normalizeRenderStack(
-            savedStack,
-            fakeSpatialData(),
-            "global",
-        );
-        const defaultStack = createDefaultRenderStack(fakeSpatialData(), "global");
+        const normalized = normalizeRenderStack(savedStack);
 
         expect(normalized.entries[0]).toBe(savedImage);
-        expect(normalized.entries.map((entry) => entry.id)).toEqual([
-            "spatialdata-image-imageB",
-            ...defaultStack.entries.map((entry) => entry.id),
-        ]);
+        expect(normalized.entries.some((entry) => entry.kind === "host")).toBe(true);
+        expect(
+            normalized.entries.filter((entry) => entry.kind === "spatial").length,
+        ).toBe(1);
     });
 });

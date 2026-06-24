@@ -1,33 +1,25 @@
-import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
 import {
-    SpatialViewer,
-    useSpatialCanvasRenderer,
+    SpatialCanvasViewer,
     type SpatialFeaturePickEvent,
     type ViewState as SpatialCanvasViewState,
 } from "@spatialdata/vis";
 import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
-import { runInAction } from "mobx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import type { FieldName } from "@/charts/charts";
 import {
     createMdvHostLayerResolver,
+    useRenderStackAdapter,
     type MdvDeckOverlayLayers,
 } from "@/react/spatialdata/render_stack_adapter";
-import {
-    createDefaultRenderStack,
-    normalizeRenderStack,
-} from "@/react/spatialdata/render_stack_defaults";
-import { RENDER_STACK_SCHEMA_VERSION, type RenderStack } from "@spatialdata/layers";
+import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
 import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
-import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useOuterContainer } from "../screen_state";
 import { useViewStateLink } from "../chartLinkHooks";
@@ -85,107 +77,31 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const config = useConfig<SpatialDataMdvReactConfig>();
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const stack = config.renderStack;
-    const renderStackGeneration = chart.renderStackGeneration;
-    const [width, height] = useChartSize();
-
-    const renderStack = useMemo((): RenderStack => {
-        if (!stack?.entries.length) {
-            return { schemaVersion: RENDER_STACK_SCHEMA_VERSION, entries: [] };
-        }
-        // New object reference when generation bumps so useSpatialCanvasRenderer
-        // re-reads in-place entry.props (e.g. channel edits) without replacing stack.
-        void renderStackGeneration;
-        return { ...stack, entries: stack.entries };
-    }, [stack, renderStackGeneration]);
-
-    const vivExtensions = useMemo(
-        () => [new ColorPaletteExtension(), new VivContrastExtension()],
-        [],
-    );
-
-    const renderer = useSpatialCanvasRenderer({
-        spatialData,
-        coordinateSystem,
-        renderStack,
-        viewState: spatialViewState,
-        onViewStateChange: onSpatialViewStateChange,
-        width,
-        height,
+    void chart.renderStackGeneration;
+    const { layers, layerOrder, deckLayers } = useRenderStackAdapter({
+        stack,
+        generation: chart.renderStackGeneration,
         hostLayerResolver,
-        autoFit: spatialViewState === null,
-        vivImageExtensionResolver: () => vivExtensions,
     });
-
-    const rendererRef = useRef(renderer);
-    rendererRef.current = renderer;
-
-    const imageLayerRegistry = useMemo(
-        () =>
-            createImageLayerRegistry(
-                renderStack,
-                (elementKey) => rendererRef.current.getImageLoadedDataByElementKey(elementKey),
-                (layerId) => rendererRef.current.getLayerLoadState(layerId),
-            ),
-        [renderStack],
-    );
-
-    useEffect(() => {
-        if (!stack?.entries.length) {
-            chart.setImageLayerRegistry(undefined);
-            return;
-        }
-        chart.setImageLayerRegistry(imageLayerRegistry);
-        return () => {
-            chart.setImageLayerRegistry(undefined);
-        };
-    }, [chart, imageLayerRegistry, stack?.entries.length]);
-
-    const handleHover = useCallback(
-        (info: PickingInfo) => {
-            if (!info.picked || typeof info.x !== "number" || typeof info.y !== "number") {
-                return;
-            }
-            const rawLayerId = typeof info.layer?.id === "string" ? info.layer.id : "";
-            const normalizedLayerId = rawLayerId.replace(/-#.*#$/, "");
-            const featurePickEvent = renderer.getFeaturePickEvent(normalizedLayerId, {
-                index: info.index,
-                object: info.object,
-            });
-            if (featurePickEvent) {
-                onFeatureHover({
-                    ...featurePickEvent,
-                    coordinateSystem,
-                    spatialData,
-                    pickInfo: info,
-                });
-            }
-        },
-        [coordinateSystem, onFeatureHover, renderer, spatialData],
-    );
 
     if (!stack?.entries.length) {
         return <div className="h-full w-full p-2">Preparing layer stack…</div>;
     }
 
-    if (!renderer.hasRenderableInputs) {
-        return <div className="h-full w-full p-2">No layers to display</div>;
-    }
-
-    if (spatialViewState === null && renderer.hasEnabledLayers && renderer.isBlocking) {
-        return <div className="h-full w-full p-2">Loading layer data…</div>;
-    }
-
     return (
-        <SpatialViewer
-            width={width}
-            height={height}
+        <SpatialCanvasViewer
+            spatialData={spatialData}
+            coordinateSystem={coordinateSystem}
+            layers={layers}
+            layerOrder={layerOrder}
+            deckLayers={deckLayers}
             viewState={spatialViewState}
             onViewStateChange={onSpatialViewStateChange}
-            layers={renderer.deckLayers}
-            layerOrder={renderer.layerOrder}
-            vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
-            onHover={handleHover}
             deckProps={deckProps}
+            renderTooltip={false}
+            onFeatureHover={onFeatureHover}
+            autoFit={spatialViewState === null}
+            style={{ width: "100%", height: "100%" }}
         />
     );
 });
@@ -258,7 +174,6 @@ const SpatialDataViewer = observer(
         const [width, height] = useChartSize();
         const id = useChartID();
         const deckContainerRef = useRef<HTMLDivElement | null>(null);
-        const stackSeededRef = useRef<string | null>(null);
         const { scatterProps, selectionLayer } = useSpatialLayers();
         const {
             scatterplotLayer,
@@ -293,20 +208,8 @@ const SpatialDataViewer = observer(
 
         useEffect(() => {
             if (loading || !spatialData || !coordinateSystem) return;
-            const seedKey = `${region?.spatial?.file ?? ""}:${coordinateSystem}`;
-            if (stackSeededRef.current === seedKey && config.renderStack?.entries.length) {
-                return;
-            }
-            stackSeededRef.current = seedKey;
-            runInAction(() => {
-                const next =
-                    !config.renderStack?.entries.length
-                        ? createDefaultRenderStack(spatialData, coordinateSystem)
-                        : normalizeRenderStack(config.renderStack, spatialData, coordinateSystem);
-                config.renderStack = next;
-                chart.bumpRenderStackGeneration();
-            });
-        }, [chart, config, coordinateSystem, loading, region?.spatial?.file, spatialData]);
+            seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
+        }, [chart, config, coordinateSystem, loading, spatialData]);
 
         const deckOverlaySources = useMemo<MdvDeckOverlayLayers>(
             () => ({
