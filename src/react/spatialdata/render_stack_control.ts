@@ -1,3 +1,4 @@
+import type { LayerChannelConfig } from "@spatialdata/avivatorish";
 import type {
     RenderStack,
     RenderStackEntry,
@@ -29,6 +30,82 @@ import {
 } from "./render_stack_defaults";
 import { touchRenderStackEntry } from "./render_stack_observe";
 
+const CHANNEL_CONFIG_KEYS = [
+    "channelIds",
+    "colors",
+    "contrastLimits",
+    "channelsVisible",
+    "selections",
+] as const satisfies readonly (keyof LayerChannelConfig)[];
+
+function patchRecordInPlace(
+    existing: Record<string, unknown>,
+    next: Record<string, unknown>,
+): void {
+    for (const [key, value] of Object.entries(next)) {
+        if (isObservable(existing)) {
+            set(existing, key, value);
+        } else {
+            existing[key] = value;
+        }
+    }
+}
+
+function patchChannelsInPlace(
+    existing: Record<string, unknown>,
+    next: LayerChannelConfig,
+): void {
+    for (const key of CHANNEL_CONFIG_KEYS) {
+        const value = next[key];
+        if (value === undefined) continue;
+        if (isObservable(existing)) {
+            set(existing, key, value);
+        } else {
+            existing[key] = value;
+        }
+    }
+}
+
+export function patchRenderStackEntryPropsInPlace(
+    props: Record<string, unknown>,
+    patch: Record<string, unknown>,
+): void {
+    for (const [key, value] of Object.entries(patch)) {
+        if (value === undefined) continue;
+        if (
+            key === "channels" &&
+            value &&
+            typeof value === "object" &&
+            props.channels &&
+            typeof props.channels === "object"
+        ) {
+            patchChannelsInPlace(
+                props.channels as Record<string, unknown>,
+                value as LayerChannelConfig,
+            );
+            continue;
+        }
+        if (
+            key === "vivLayerProps" &&
+            value &&
+            typeof value === "object" &&
+            props.vivLayerProps &&
+            typeof props.vivLayerProps === "object"
+        ) {
+            patchRecordInPlace(
+                props.vivLayerProps as Record<string, unknown>,
+                value as Record<string, unknown>,
+            );
+            continue;
+        }
+        if (isObservable(props)) {
+            set(props, key, value);
+        } else {
+            props[key] = value;
+        }
+    }
+}
+
 export function reorderRenderStackEntries(
     stack: RenderStack,
     fromIndex: number,
@@ -53,13 +130,7 @@ export function patchRenderStackEntry(
         entry.visible = patch.visible;
     }
     if (patch.props) {
-        for (const [key, value] of Object.entries(patch.props)) {
-            if (isObservable(entry.props)) {
-                set(entry.props, key, value);
-            } else {
-                entry.props[key] = value;
-            }
-        }
+        patchRenderStackEntryPropsInPlace(entry.props, patch.props);
     }
 }
 
@@ -161,8 +232,10 @@ export function isRemovableRenderStackEntry(entry: RenderStackEntry): boolean {
  * MobX render-stack control model for the layer dialog and viewer.
  *
  * - `config.renderStack` stays a stable object; entries and props are patched in place.
- * - `chart.renderStackGeneration` bumps on commit so the canvas can refresh without
- *   replacing `config.renderStack` (which would re-render the whole dialog list).
+ * - `chart.renderStackGeneration` bumps only for entry-level changes (e.g. visibility)
+ *   that need a coarse canvas refresh. In-place `props` edits rely on MobX field
+ *   observation (`touchRenderStackEntry` / `renderStackSpatialRevision`) so cosmetic
+ *   channel/tone/opacity edits do not reset spatial renderer passthrough.
  * - UI rows use `useRenderStackEntry(entryId)` inside `observer` components so each row
  *   subscribes only to its own entry. Panels receive plain derived props at the boundary.
  *
@@ -195,7 +268,11 @@ export function useRenderStackEntry(entryId: string) {
             runInAction(() => {
                 if (!config.renderStack) return;
                 patchRenderStackEntry(config.renderStack, entryId, patch);
-                chart.bumpRenderStackGeneration();
+                // Props-only in-place edits are observed via touchRenderStackEntry /
+                // renderStackSpatialRevision; avoid bumping generation or viv passthrough resets.
+                if (patch.visible !== undefined) {
+                    chart.bumpRenderStackGeneration();
+                }
             });
         },
         [chart, config, entryId],

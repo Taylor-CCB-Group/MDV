@@ -70,6 +70,32 @@ The important differences for MDV:
 
 Histogram brush controls are sensitive to state ownership. Keep the brush value controlled by one state source only: the channel store value that will be rendered (`contrastLimits` for image channels, or the equivalent legend range elsewhere). Avoid adding a local/debounced mirror that also writes through MobX or another persistence layer, because d3 brush movement, React re-render, and persistence rehydration can otherwise chase each other and cause drag jumps. If a bridge persists brush changes into another model, skip self-echo rehydration when the incoming persisted value matches the value just written.
 
+### Image channel controls — state ownership (SpatialData chart)
+
+Channel histogram brush, contrast limits, and tone sliders must respond **immediately** without debouncing. If controls feel laggy or the brush fights itself, that indicates broken wiring — not a need for debounce.
+
+**Persistence (MobX, drives the canvas):**
+
+| Field | Storage | Writer |
+|-------|---------|--------|
+| `contrastLimits`, colors, visibility, selections | `entry.props.channels` | `useLayerChannelState` → `setChannels` → `patchLayer` |
+| Tone (`brightness[]`, `contrast[]`) | `entry.props.vivLayerProps` | `patchToneAtIndex` → `patchVivLayerProps` → `patchLayer` |
+
+`patchRenderStackEntry` patches `channels` and `vivLayerProps` **in place** (field-level MobX `set`) so contrast/tone edits do not replace whole prop objects or invalidate layer-input cache identity.
+
+**Panel UI (zustand, dialog only):** `image_layer_runtime.ts` projects MobX/hook state one-way into per-panel `VivProvider` stores for histograms and Avivatorish controls. Zustand is not a second persistence path.
+
+**Control flow:**
+
+1. Spatial panel controls call the hook write API (`setChannels`, `patchToneAtIndex`) so MobX updates immediately and the viewer receives new `layerConfig.channels` / `vivLayerProps`.
+2. Runtime projection syncs hook → zustand for panel display (including `contrastLimitsKey` / `vivToneKey` deps).
+3. Do **not** debounce channel/tone writes as a workaround. Do **not** write zustand first and persist later for contrast limits — the hook/MobX path is the single source of truth for the canvas.
+4. Tone sliders may update zustand in the same handler as `patchToneAtIndex` for immediate thumb feedback; persistence still goes through `vivLayerProps`.
+
+**Render Stack Adapter:** Keep stable per-layer config object identity (`syncRenderStackLayerInputs` mutates configs in place so image loaders are not re-entered). When `renderStackSpatialRevision` changes, shallow-copy the layers **record** (`{ ...cache.layers }`) so upstream `useLayerData` invalidates — it memoizes Viv props on the record reference, not deep field changes.
+
+**`renderStackGeneration`:** Narrow refresh token for entry-level stack edits (e.g. visibility). In-place `props` patches (`channels`, `vivLayerProps`, `opacity`) must **not** bump generation — MobX field observation and stable `vivImagePropsResolver` identity are enough. Bumping generation on every cosmetic edit recreates `vivPassthrough` and re-initializes the spatial renderer (lag).
+
 Useful follow-up SpatialData.js changes (not blocking this PR):
 
 - Array-of-structs `ChannelConfig` (deferred upstream ADR).
@@ -114,6 +140,58 @@ SpatialData.js `ChannelConfig` has an open TODO for channel-related extension pr
 
 MDV root `config.viv` is **not** an upstream concern.
 
+## Upstream integration gaps
+
+MDV workarounds today and what a **single larger SpatialData.js PR** should replace. Written after local integration works in-browser.
+
+### Why MDV composes the renderer
+
+`SpatialCanvasViewer` does not expose registry getters or composed-renderer hooks to host apps. MDV uses `useSpatialCanvasRendererFromLayerInputs` + `SpatialViewer` so it can:
+
+- Publish `chart.imageLayerRegistry` (`getImageLoadedDataByElementKey`, `getLayerLoadState`)
+- Wire `vivImagePropsResolver` / `vivImageExtensionResolver` for MDV `VivContrastExtension`
+- Keep deck/scatter tooltips MDV-owned
+
+### Workarounds
+
+| Gap | MDV workaround | Delete when upstream ships |
+|-----|----------------|---------------------------|
+| `useSpatialCanvasRendererFromLayerInputs` not in `@spatialdata/vis` root exports | [`patches/@spatialdata__vis@0.2.3.patch`](../patches/@spatialdata__vis@0.2.3.patch) (`Ya` exists in bundle) | Root export |
+| `ImageLayerContextProvider` not in `@spatialdata/vis` root exports | [`patches/@spatialdata__vis@0.2.3.patch`](../patches/@spatialdata__vis@0.2.3.patch) (`fa` in bundle) | Root export |
+| `LayerLoadState` type not in root exports | [`tsconfig.json`](../tsconfig.json) path `@spatialdata/vis/spatial-canvas/*` | Root or documented subpath in `package.json` `exports` |
+| Panel outside viewer React tree | [`image_layer_registry.ts`](../src/react/spatialdata/image_layer_registry.ts) on chart + colocated provider on panel | Registry callback on composed renderer **or** documented standalone provider contract |
+| Dual Zustand (`useLayerChannelState` + MDV `VivProvider`) | [`image_layer_runtime.ts`](../src/react/spatialdata/image_layer_runtime.ts) one-way projection + stats cache | `ImageChannelPanelProvider` (extension-flexible) |
+| Histogram raster | MDV calls `getSingleSelectionStats({ includeRaster: true })` in runtime hook | Optional `useChannelSelectionStats` in `@spatialdata/avivatorish` |
+
+### Proposed upstream larger PR (copy-paste starting point)
+
+**Problem:** Host apps render layer panels outside the viewer tree but need loader, channel state, histogram stats, and extension props on the same contract as the canvas.
+
+**Deliverables:**
+
+1. Export `useSpatialCanvasRendererFromLayerInputs`, `ImageLayerContextProvider`, `LayerLoadState` / registry types from `@spatialdata/vis` root.
+2. Document registry accessor on composed renderer (or fix misleading “must be within SpatialCanvasViewer” error when provider is used standalone).
+3. Add `ImageChannelPanelProvider` in `@spatialdata/avivatorish` — wraps `useLayerChannelState`, auto `includeRaster` stats, projects to Avivator zustand for UI; host persists via `onChannelsChange` + open `extensionProps` callbacks (`Record<string, unknown[]>` for `vivImagePropsResolver` keys).
+
+**MDV migration after upstream:**
+
+- Bump `@spatialdata/*`, remove pnpm patch and tsconfig deep imports.
+- Delete `image_layer_runtime.ts`; shrink spatial branches in `ColorChannelComponents`.
+- Keep MobX `renderStack` + `vivLayerProps` on entries; keep MDV `VivContrastExtension` via resolver.
+
+### Browser verification checklist
+
+Manual acceptance (spatial chart with multi-channel zarr image):
+
+- [ ] Open layer dialog — no spurious default image on persisted stack
+- [ ] Add channel — unused image channel name, not `Channel N`
+- [ ] Remove channel — row gone; count does not snap back on reopen
+- [ ] Change channel A selection — channel B unchanged
+- [ ] Histogram shows data; brush updates contrast on canvas
+- [ ] Brightness/contrast sliders affect canvas immediately
+- [ ] Close dialog, reopen — channels, selections, tone, opacity persist
+- [ ] Opacity/visibility responsive (no lag vs duplicated charts)
+
 ## Initial PR scope
 
 | Commit stage | Status |
@@ -122,7 +200,7 @@ MDV root `config.viv` is **not** an upstream concern.
 | 2 | `SpatialDataMdvRegionReact` — composed renderer + host overlays + Image Layer Registry |
 | 3 | Layer dialog — `renderStack` list + dnd-kit reorder |
 | 4 | Visibility + opacity per stack entry |
-| 5+ | Image layer panel — registry, `useLayerChannelState`, runtime bridge, `vivLayerProps` tone |
+| 5+ | Image layer panel — registry, `useLayerChannelState`, runtime bridge, `vivLayerProps` tone | Done |
 
 Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData*`.
 

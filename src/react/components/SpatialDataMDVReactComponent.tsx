@@ -1,8 +1,12 @@
+import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
 import {
-    SpatialCanvasViewer,
+    SpatialViewer,
+    useSpatialCanvasRendererFromLayerInputs,
     type SpatialFeaturePickEvent,
     type ViewState as SpatialCanvasViewState,
+    type VivImageLayerContext,
+    type VivImagePropsResolver,
 } from "@spatialdata/vis";
 import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
@@ -12,6 +16,7 @@ import { createPortal } from "react-dom";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import type { FieldName } from "@/charts/charts";
+import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import {
     createMdvHostLayerResolver,
     useRenderStackAdapter,
@@ -21,6 +26,7 @@ import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
 import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
+import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useOuterContainer } from "../screen_state";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
@@ -62,7 +68,11 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     coordinateSystem,
     spatialViewState,
     onSpatialViewStateChange,
-    hostLayerResolver,
+    deckLayers: hostDeckLayers,
+    layers,
+    layerOrder,
+    width,
+    height,
     deckProps,
     onFeatureHover,
 }: {
@@ -70,7 +80,11 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     coordinateSystem: string;
     spatialViewState: ReturnType<typeof toSpatialViewState>;
     onSpatialViewStateChange: (next: SpatialCanvasViewState) => void;
-    hostLayerResolver: ReturnType<typeof createMdvHostLayerResolver>;
+    deckLayers: ReturnType<typeof useRenderStackAdapter>["deckLayers"];
+    layers: ReturnType<typeof useRenderStackAdapter>["layers"];
+    layerOrder: ReturnType<typeof useRenderStackAdapter>["layerOrder"];
+    width: number;
+    height: number;
     deckProps: Partial<DeckGLProps>;
     onFeatureHover: (event: SpatialFeaturePickEvent) => void;
 }) {
@@ -78,30 +92,130 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const stack = config.renderStack;
     void chart.renderStackGeneration;
-    const { layers, layerOrder, deckLayers } = useRenderStackAdapter({
-        stack,
-        generation: chart.renderStackGeneration,
-        hostLayerResolver,
+
+    const extensions = useMemo(
+        () => [new ColorPaletteExtension(), new VivContrastExtension()],
+        [],
+    );
+
+    const vivImagePropsResolver = useCallback<VivImagePropsResolver>(
+        (ctx: VivImageLayerContext) => {
+            if (!stack) return undefined;
+            const entry = stack.entries.find((item) => item.id === ctx.layerId);
+            if (!entry || entry.kind !== "spatial") return undefined;
+            const saved = entry.props.vivLayerProps;
+            if (!saved || typeof saved !== "object") return undefined;
+            return saved as Record<string, unknown>;
+        },
+        [stack],
+    );
+
+    const vivPassthrough = useMemo(
+        () => ({
+            vivImageExtensions: extensions,
+            vivImageExtensionResolver: () => extensions,
+            vivImagePropsResolver,
+        }),
+        [extensions, vivImagePropsResolver],
+    );
+
+    const renderer = useSpatialCanvasRendererFromLayerInputs({
+        spatialData,
+        coordinateSystem,
+        layerInputs: { layers, layerOrder },
+        renderOrder: layerOrder,
+        viewState: spatialViewState,
+        onViewStateChange: onSpatialViewStateChange,
+        width,
+        height,
+        hostDeckLayers,
+        sortDeckLayers: true,
+        autoFit: spatialViewState === null,
+        vivPassthrough,
     });
+
+    useEffect(() => {
+        if (!stack) {
+            chart.setImageLayerRegistry(undefined);
+            return;
+        }
+        chart.setImageLayerRegistry(
+            createImageLayerRegistry(
+                stack,
+                renderer.getImageLoadedDataByElementKey,
+                renderer.getLayerLoadState,
+            ),
+        );
+        return () => chart.setImageLayerRegistry(undefined);
+    }, [
+        chart,
+        stack,
+        chart.renderStackGeneration,
+        renderer.getImageLoadedDataByElementKey,
+        renderer.getLayerLoadState,
+        renderer.isBlocking,
+        renderer.isLoading,
+    ]);
+
+    const handleHover = useCallback(
+        (info: PickingInfo) => {
+            if (!info.picked || typeof info.x !== "number" || typeof info.y !== "number") {
+                return;
+            }
+            const layerId = (typeof info.layer?.id === "string" ? info.layer.id : "").replace(
+                /-#.*#$/,
+                "",
+            );
+            const event = renderer.getFeaturePickEvent(layerId, {
+                index: info.index,
+                object: info.object,
+            });
+            if (event) {
+                onFeatureHover({
+                    ...event,
+                    coordinateSystem,
+                    spatialData,
+                    pickInfo: info,
+                });
+            }
+        },
+        [coordinateSystem, onFeatureHover, renderer, spatialData],
+    );
+
+    const mergedDeckProps = useMemo(
+        () => ({
+            ...deckProps,
+            onHover: handleHover,
+        }),
+        [deckProps, handleHover],
+    );
 
     if (!stack?.entries.length) {
         return <div className="h-full w-full p-2">Preparing layer stack…</div>;
     }
 
+    if (spatialViewState === null && renderer.hasEnabledLayers) {
+        return (
+            <div className="h-full w-full p-2">
+                {renderer.isBlocking ? "Loading layer data…" : "Framing view…"}
+            </div>
+        );
+    }
+
+    if (!renderer.hasRenderableInputs) {
+        return <div className="h-full w-full p-2">No layers to display</div>;
+    }
+
     return (
-        <SpatialCanvasViewer
-            spatialData={spatialData}
-            coordinateSystem={coordinateSystem}
-            layers={layers}
-            layerOrder={layerOrder}
-            deckLayers={deckLayers}
+        <SpatialViewer
+            width={width}
+            height={height}
             viewState={spatialViewState}
             onViewStateChange={onSpatialViewStateChange}
-            deckProps={deckProps}
-            renderTooltip={false}
-            onFeatureHover={onFeatureHover}
-            autoFit={spatialViewState === null}
-            style={{ width: "100%", height: "100%" }}
+            layers={renderer.deckLayers}
+            layerOrder={renderer.layerOrder}
+            vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
+            deckProps={mergedDeckProps}
         />
     );
 });
@@ -232,6 +346,12 @@ const SpatialDataViewer = observer(
             () => createMdvHostLayerResolver(deckOverlaySources),
             [deckOverlaySources],
         );
+
+        const { layers, layerOrder, deckLayers } = useRenderStackAdapter({
+            stack: config.renderStack,
+            generation: chart.renderStackGeneration,
+            hostLayerResolver,
+        });
 
         const onSpatialViewStateChange = useCallback(
             (next: SpatialCanvasViewState) => {
@@ -377,7 +497,11 @@ const SpatialDataViewer = observer(
                             coordinateSystem={coordinateSystem}
                             spatialViewState={spatialViewState}
                             onSpatialViewStateChange={onSpatialViewStateChange}
-                            hostLayerResolver={hostLayerResolver}
+                            deckLayers={deckLayers}
+                            layers={layers}
+                            layerOrder={layerOrder}
+                            width={width}
+                            height={height}
                             deckProps={deckProps}
                             onFeatureHover={onFeatureHover}
                         />

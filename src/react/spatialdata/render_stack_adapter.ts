@@ -151,15 +151,20 @@ export function useRenderStackAdapter({
 }) {
     const layerInputsCacheRef = useRef(createRenderStackLayerInputsCache());
     observeRenderStack(stack);
+    const spatialRevision = renderStackSpatialRevision(stack);
     void generation;
 
     const synced = !stack
         ? { layers: {}, layerOrder: [] as string[] }
         : syncRenderStackLayerInputs(stack, layerInputsCacheRef.current);
-    const layerInputs = {
-        layers: { ...synced.layers },
-        layerOrder: synced.layerOrder,
-    };
+
+    // useLayerData (upstream) memoizes Viv props on the layers *record* reference.
+    // In-place config mutation keeps that reference stable, so shallow-copy the map
+    // when spatial revision changes to invalidate Viv without replacing layer configs.
+    const layers = useMemo(
+        () => ({ ...synced.layers }),
+        [spatialRevision, synced.layers],
+    );
 
     const hostFingerprint = renderStackHostFingerprint(stack);
     const deckLayers = useMemo(
@@ -168,8 +173,8 @@ export function useRenderStackAdapter({
     );
 
     return {
-        layers: layerInputs.layers,
-        layerOrder: layerInputs.layerOrder,
+        layers,
+        layerOrder: synced.layerOrder,
         deckLayers,
     };
 }

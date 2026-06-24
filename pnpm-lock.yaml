@@ -21,7 +21,7 @@ overrides:
 
 patchedDependencies:
   '@spatialdata/vis@0.2.3':
-    hash: ea8fee60640682be520371875ae9dc6bb9613359997d6d173b72dbc981f936f8
+    hash: dd7d293ff23a44daec23d28ec804016ba8ac8d1693d0a18c539135c37a2bd85f
     path: patches/@spatialdata__vis@0.2.3.patch
 
 importers:
@@ -138,7 +138,7 @@ importers:
         version: 0.2.3(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
       '@spatialdata/vis':
         specifier: ^0.2.3
-        version: 0.2.3(patch_hash=ea8fee60640682be520371875ae9dc6bb9613359997d6d173b72dbc981f936f8)(5fed9fb1d070481f396b27a4e9a53f69)
+        version: 0.2.3(patch_hash=dd7d293ff23a44daec23d28ec804016ba8ac8d1693d0a18c539135c37a2bd85f)(5fed9fb1d070481f396b27a4e9a53f69)
       '@tanstack/react-query':
         specifier: ^5.80.0
         version: 5.80.6(react@19.2.6)
@@ -8480,7 +8480,7 @@ snapshots:
       react-dom: 19.2.6(react@19.2.6)
       zarrita: 0.7.3
 
-  '@spatialdata/vis@0.2.3(patch_hash=ea8fee60640682be520371875ae9dc6bb9613359997d6d173b72dbc981f936f8)(5fed9fb1d070481f396b27a4e9a53f69)':
+  '@spatialdata/vis@0.2.3(patch_hash=dd7d293ff23a44daec23d28ec804016ba8ac8d1693d0a18c539135c37a2bd85f)(5fed9fb1d070481f396b27a4e9a53f69)':
     dependencies:
       '@deck.gl/core': 9.2.9
       '@hms-dbmi/viv': 0.21.0(b55db1092d89286dd86a223febb17f6d)

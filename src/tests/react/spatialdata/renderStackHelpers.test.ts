@@ -44,6 +44,10 @@ import {
     seedRenderStackFromSpatialData,
 } from "@/react/spatialdata/render_stack_control";
 import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
+import {
+    renderStackSpatialRevision,
+    touchRenderStackEntry,
+} from "@/react/spatialdata/render_stack_observe";
 
 type SpatialEntry = Extract<RenderStackEntry, { kind: "spatial" }>;
 type HostEntry = Extract<RenderStackEntry, { kind: "host" }>;
@@ -138,6 +142,47 @@ describe("render stack adapter", () => {
 
         expect(next.layers["image-a"]).toBeUndefined();
         expect(next.layerOrder).toEqual(["image-b"]);
+    });
+
+    test("spatial revision changes when image props change in place", () => {
+        const imageEntry = spatialEntry({
+            id: "image-a",
+            elementKey: "imageA",
+            props: {
+                channels: {
+                    contrastLimits: [[0, 255]],
+                    colors: [[255, 0, 0]],
+                    channelsVisible: [true],
+                    selections: [{ c: 0 }],
+                },
+            },
+        });
+        const stack = renderStack([imageEntry]);
+        touchRenderStackEntry(imageEntry);
+        const before = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "image-a", {
+            props: {
+                channels: {
+                    contrastLimits: [[10, 200]],
+                    colors: [[255, 0, 0]],
+                    channelsVisible: [true],
+                    selections: [{ c: 0 }],
+                },
+                vivLayerProps: { brightness: [0.5], contrast: [0.6] },
+            },
+        });
+        touchRenderStackEntry(imageEntry);
+        const afterChannels = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "image-a", {
+            props: { vivLayerProps: { brightness: [0.7], contrast: [0.6] } },
+        });
+        touchRenderStackEntry(imageEntry);
+        const afterTone = renderStackSpatialRevision(stack);
+
+        expect(afterChannels).not.toBe(before);
+        expect(afterTone).not.toBe(afterChannels);
     });
 
     test("resolves only visible host entries and reuses host clones", () => {

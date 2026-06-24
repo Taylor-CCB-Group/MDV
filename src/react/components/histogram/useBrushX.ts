@@ -1,6 +1,5 @@
 import * as d3 from "d3";
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { useDebounce } from "use-debounce";
 
 export type Range = [number, number];
 export type BrushXScaleType = "linear" | "log";
@@ -47,6 +46,7 @@ export function useBrushX(
     options: BrushXOptions,
 ) {
     const brushRef = useRef<ReturnType<typeof d3.brushX> | null>(null);
+    const isUserBrushingRef = useRef(false);
     const minMax = brushConfig?.minMax;
     const setValue = brushConfig?.setValue;
     const {
@@ -73,6 +73,13 @@ export function useBrushX(
             .extent([[x, y], [x + width, y + height]])
             .on("brush end", (event) => {
                 if (!event.sourceEvent) return;
+                if (event.type === "brush") {
+                    isUserBrushingRef.current = true;
+                } else if (event.type === "end") {
+                    requestAnimationFrame(() => {
+                        isUserBrushingRef.current = false;
+                    });
+                }
                 if (updateOn === "end" && event.type !== "end") return;
                 if (event.selection) {
                     const [start, end] = event.selection.map((position: number) =>
@@ -117,13 +124,7 @@ export function useBrushX(
         y,
     ]);
 
-    const [debouncedValue] = useDebounce(brushConfig?.value, 100, {
-        equalityFn: (a, b) => {
-            if (!a && !b) return true;
-            if (!a || !b) return false;
-            return a[0] === b[0] && a[1] === b[1];
-        },
-    });
+    const brushValue = brushConfig?.value;
 
     const setBrushValue = useCallback(
         (value: Range | null | undefined) => {
@@ -146,6 +147,7 @@ export function useBrushX(
     );
 
     useEffect(() => {
-        setBrushValue(debouncedValue);
-    }, [debouncedValue, setBrushValue]);
+        if (isUserBrushingRef.current) return;
+        setBrushValue(brushValue);
+    }, [brushValue, setBrushValue]);
 }
