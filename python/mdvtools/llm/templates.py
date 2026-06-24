@@ -123,6 +123,21 @@ import sys
 #     return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
 
+def _datasource_context_section(
+    project: CreateProjectPromptProject,
+    ds_name: str,
+    heading: str,
+) -> str:
+    try:
+        ds_meta = project.get_datasource_metadata(ds_name)
+        return (
+            f"## {heading}: **{ds_name}** ({ds_meta['size']} rows)\n\n"
+            + create_column_markdown(ds_meta["columns"])
+        )
+    except Exception:
+        return f"## {heading}: **{ds_name}**\n\n"
+
+
 def _build_rag_context_markdown(project: CreateProjectPromptProject, datasource_name: str) -> str:
     """Project Data Context block for RAG prompts."""
     try:
@@ -132,26 +147,37 @@ def _build_rag_context_markdown(project: CreateProjectPromptProject, datasource_
 
     has_cells = "cells" in names
     if len(names) > 1 and not has_cells:
-        try:
-            ds_meta = project.get_datasource_metadata(datasource_name)
-            primary = (
-                f"## Primary datasource for this question: **{datasource_name}** "
-                f"({ds_meta['size']} rows)\n\n"
-                + create_column_markdown(ds_meta["columns"])
-            )
-        except Exception:
-            primary = f"## Primary datasource for this question: **{datasource_name}**\n\n"
+        primary = _datasource_context_section(
+            project,
+            datasource_name,
+            "Primary datasource for this question",
+        )
         all_tables = create_project_markdown(project, wrap_in_details=False)
         return primary + "\n\n## All project datasources\n\n" + all_tables
 
-    try:
-        ds_meta = project.get_datasource_metadata(datasource_name)
-        return (
-            f"## **{datasource_name}:** ({ds_meta['size']} rows)\n\n"
-            + create_column_markdown(ds_meta["columns"])
+    if has_cells and len(names) > 1:
+        roles = infer_datasource_roles(project)
+        obs = roles.obs_datasource
+        sections: list[str] = []
+        if datasource_name != obs:
+            sections.append(
+                _datasource_context_section(
+                    project,
+                    obs,
+                    "Observation datasource (cell metadata — use for leiden, QC metrics, embeddings)",
+                )
+            )
+        primary_heading = (
+            "Primary datasource for this question"
+            if datasource_name != obs
+            else "Observation datasource"
         )
-    except Exception:
-        return create_project_markdown(project)
+        sections.append(
+            _datasource_context_section(project, datasource_name, primary_heading)
+        )
+        return "\n\n".join(sections)
+
+    return _datasource_context_section(project, datasource_name, datasource_name)
 
 
 def get_createproject_prompt_RAG(

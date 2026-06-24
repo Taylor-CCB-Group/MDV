@@ -379,6 +379,39 @@ def test_micron_resolve_datasource_qc_runs():
     assert resolve_datasource_from_question(project, q) == "qc_runs"
 
 
+def test_resolve_datasource_n_genes_does_not_match_genes_substring():
+    """``genes`` must not match inside the field token ``n_genes``."""
+
+    class PbmcLikeProject:
+        datasources = [{"name": "cells"}, {"name": "genes"}]
+
+        def get_datasource_names(self):
+            return ["cells", "genes"]
+
+        def get_datasource_metadata(self, name):
+            if name == "cells":
+                return {
+                    "name": "cells",
+                    "size": 2700,
+                    "columns": [
+                        {"field": "leiden", "name": "leiden", "datatype": "text"},
+                        {"field": "n_genes", "name": "n genes", "datatype": "integer"},
+                    ],
+                }
+            return {
+                "name": "genes",
+                "size": 1838,
+                "columns": [
+                    {"field": "gene_ids", "name": "gene ids", "datatype": "text"},
+                    {"field": "n_cells_by_counts", "name": "n cells", "datatype": "integer"},
+                ],
+            }
+
+    project = PbmcLikeProject()
+    q = "What is the distribution of n_genes across different leiden clusters?"
+    assert resolve_datasource_from_question(project, q) == "cells"
+
+
 def test_find_datasources_for_fields_maps_cv_pct():
     project = MicronLikeProject()
     index = build_datasource_field_index(project)

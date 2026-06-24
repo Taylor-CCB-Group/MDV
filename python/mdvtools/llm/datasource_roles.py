@@ -105,11 +105,58 @@ def build_datasource_field_index(project: Any) -> dict[str, set[str]]:
     return index
 
 
+def _question_word_tokens(question: str) -> set[str]:
+    """Lowercased whole-word tokens from the question (underscore names stay one token)."""
+    return {t.lower() for t in re.findall(r"[\w_]+", question)}
+
+
+def _datasource_names_mentioned_in_question(
+    names: list[str], question: str
+) -> list[str]:
+    """
+    Datasource names explicitly mentioned as whole tokens in the question.
+
+    Uses token boundaries so ``genes`` does not match inside ``n_genes``.
+    """
+    tokens = _question_word_tokens(question)
+    return [n for n in names if n.lower() in tokens]
+
+
 def _question_field_tokens(question: str, field_index: dict[str, set[str]]) -> set[str]:
     """Field ids mentioned in the question (whole-token match against project fields)."""
     all_fields = {f for fields in field_index.values() for f in fields}
     tokens = set(re.findall(r"[\w_]+", question))
     return {t for t in tokens if t in all_fields}
+
+
+def _resolve_by_field_overlap(
+    project: Any,
+    mentioned: set[str],
+    field_index: dict[str, set[str]],
+) -> str | None:
+    """Pick datasource from field-id overlap; prefer tables that own all mentioned fields."""
+    full_matches = [
+        ds for ds, fields in field_index.items() if mentioned <= fields
+    ]
+    if full_matches:
+        if len(full_matches) == 1:
+            return full_matches[0]
+        try:
+            obs = infer_datasource_roles(project).obs_datasource
+            if obs in full_matches:
+                return obs
+        except Exception:
+            pass
+        return max(full_matches, key=lambda ds: (len(mentioned & field_index[ds]), ds))
+
+    scores: dict[str, int] = {}
+    for ds_name, fields in field_index.items():
+        overlap = len(mentioned & fields)
+        if overlap > 0:
+            scores[ds_name] = overlap
+    if not scores:
+        return None
+    return max(scores, key=lambda ds: (scores[ds], ds))
 
 
 def resolve_datasource_from_question(
@@ -121,33 +168,25 @@ def resolve_datasource_from_question(
     """
     Pick the datasource the user is asking about.
 
-    Priority: explicit datasource name in question, then datasource owning the most
-    mentioned field ids.
+    Priority: explicit datasource name (whole-token match), then a datasource that
+    contains all mentioned field ids, then partial field overlap.
     """
     names = _project_datasource_names(project)
     if not names:
         return None
 
-    q_lower = question.lower()
-    name_matches = [n for n in names if n.lower() in q_lower]
-    if name_matches:
-        return max(name_matches, key=len)
-
     if field_index is None:
         field_index = build_datasource_field_index(project)
+
+    name_matches = _datasource_names_mentioned_in_question(names, question)
+    if name_matches:
+        return max(name_matches, key=len)
 
     mentioned = _question_field_tokens(question, field_index)
     if not mentioned:
         return None
 
-    scores: dict[str, int] = {}
-    for ds_name, fields in field_index.items():
-        overlap = len(mentioned & fields)
-        if overlap > 0:
-            scores[ds_name] = overlap
-    if not scores:
-        return None
-    return max(scores, key=lambda ds: (scores[ds], ds))
+    return _resolve_by_field_overlap(project, mentioned, field_index)
 
 
 def find_datasources_for_fields(
