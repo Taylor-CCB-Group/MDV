@@ -8,7 +8,7 @@ Living log for MDV ↔ `@spatialdata/*` integration. Architecture and phased roa
 
 ## State model
 
-MDV owns `chart.config.renderStack` (MobX observable). `SpatialCanvasViewer` is a controlled renderer: plain `renderStack` + `hostLayerResolver` at the React boundary. No parallel stack maps or periodic whole-stack snapshots.
+MDV owns `chart.config.renderStack` (MobX observable). The spatial chart composes rendering from `useSpatialCanvasRendererFromLayerInputs` + `SpatialViewer` (not the `SpatialCanvasViewer` black box) so MDV can publish the **Image Layer Registry** and wire **App Viv Extensions**. Tooltips remain MDV-owned (`renderTooltip={false}`); do not re-expose upstream internal tooltip paths that are not yet correct for MDV.
 
 Chart root config owns chart/view concerns such as region, MDV overlay settings, and `viewState`. Render-stack entries own layer implementation concerns such as image channel settings (`entry.props.channels`). Viv channel/image settings are not part of the SpatialData chart root config.
 
@@ -24,11 +24,12 @@ Keep the Render Stack Adapter read-side only. Stack editing remains in the rende
 
 Keep layer panels type-specific for this PR. A later pass can consolidate repeated panel controls, but this pass focuses on state adapters and helper boundaries around render-stack control and viewer input adaptation.
 
-Organize `src/react/spatialdata` helpers around three responsibilities:
+Organize `src/react/spatialdata` helpers around these responsibilities:
 
 - **Render Stack Adapter** — read-side hook for SpatialData.js viewer inputs; owns layer-input cache, host fingerprinting, host clone caching, and generation-based refreshes.
 - **Render Stack Control** — MobX-facing mutation hooks plus pure edit operations; owns patch/insert/remove/reorder behavior for `config.renderStack`.
 - **Render Stack Defaults** — stack creation, normalization, available spatial entries, and default layer props. Prefer "defaults" over "seed" in names because it describes the domain role more directly.
+- **Image Layer Runtime Bridge** — runtime-only helpers (`image_layer_runtime.ts`): `channelId`-keyed histogram stats, viewer UI array sync, tone → `vivLayerProps` mapping. Persistence is `useLayerChannelState` (upstream), not a local MobX bridge.
 
 Leave orthogonal helpers separate: host overlay IDs, view-state bridging, spatial feature tooltip formatting, and table association placeholders.
 
@@ -62,41 +63,54 @@ The important differences for MDV:
 
 - MDV's local version is already wired into MDV chart/view concerns: MobX chart config, chart-link view state, OME-TIFF upload/viewer paths, and the existing Viv scatter/image chart controls.
 - MDV's local channel stats path stores sampled `raster` data in channel state. The old channel histogram UI uses that raster data to draw histograms and brush contrast ranges.
-- `@spatialdata/avivatorish` exposes channel stats helpers, but the current declared stats contract returns `domains` and `contrastLimits`, not the sampled raster data needed by MDV's histogram component.
-- SpatialData.js `SpatialCanvas` image loading exposes loaded image defaults (`colors`, `contrastLimits`, `channelsVisible`, `selections`) for layer panels, but not a public histogram/raster-stat surface for channel-control UI.
-- SpatialData.js image rendering is OME-Zarr oriented. Its image renderer notes that SpatialData image support uses `loadOmeZarr`; MDV still has OME-TIFF paths that are outside that renderer's current scope.
-- MDV's local version has awkward Zustand/MobX mixing because Viv state is runtime UI state while `chart.config.renderStack` is serialized MobX state. This is tolerable as a bridge, but it should not leak Viv root config back into SpatialData chart config.
-
-For the current SpatialData chart, image channel controls may reuse the old MDV channel components only for state that can be faithfully backed by `renderStack.entries[].props.channels`. Until SpatialData.js exposes real channel histogram/raster samples, MDV may render the existing histogram brush over empty raster data so users can still edit `contrastLimits`; replace that placeholder with a SpatialData.js-provided stats API when one exists.
+- `@spatialdata/avivatorish` ships `useLayerChannelState`, `mergeLayerChannelState`, and `getSingleSelectionStats({ includeRaster: true })`.
+- SpatialData.js exposes `useImageLayerContext`, `ImageLayerContextProvider`, and Viv extension passthrough on the composed renderer path.
+- SpatialData.js image rendering is OME-Zarr oriented. MDV still has OME-TIFF paths on the legacy Viv chart, outside SpatialData image layers.
+- MDV's local avivatorish copy remains the UI shim for histogram/tone controls on legacy `VivMdvReact`. The SpatialData chart uses upstream persistence hooks plus a thin runtime bridge.
 
 Histogram brush controls are sensitive to state ownership. Keep the brush value controlled by one state source only: the channel store value that will be rendered (`contrastLimits` for image channels, or the equivalent legend range elsewhere). Avoid adding a local/debounced mirror that also writes through MobX or another persistence layer, because d3 brush movement, React re-render, and persistence rehydration can otherwise chase each other and cause drag jumps. If a bridge persists brush changes into another model, skip self-echo rehydration when the incoming persisted value matches the value just written.
 
-Useful SpatialData.js changes before MDV can consider replacing the local `avivatorish` copy:
+Useful follow-up SpatialData.js changes (not blocking this PR):
 
-- Expose a public channel-control adapter or hook that takes a layer-local image channel config and returns editable channel state plus a persistence callback, without requiring root Viv chart config.
-- Expose image channel histogram/stat data, or a lazy per-selection stats API, alongside loaded image defaults.
-- Make the supported image source boundary explicit: either support OME-TIFF in the shared package, or keep OME-TIFF intentionally MDV-local and separate from SpatialData image layers.
-- Clarify whether the shared package supports Viv/deck.gl extensions needed by MDV (`VivContrastExtension`, color palette/colormap extensions, 2D/3D behavior), and expose extension injection where host apps need it.
-- Keep the channel ownership model layer-local: image channel settings belong to image layer configs/render-stack entries, not to the SpatialData chart root.
+- Array-of-structs `ChannelConfig` (deferred upstream ADR).
+- Optional `onImageLayerRegistry` callback on `SpatialCanvasViewer` if MDV ever returns to the black-box viewer (MDV composes the renderer directly for now).
 
-### Image layer channel bridge (MDV local)
+### Image layer panel pattern (MDV)
 
-MDV's [`ImageLayerPanel`](src/react/components/spatialLayers/ImageLayerPanel.tsx) wraps `VivChannelList` in a per-panel `VivProvider` and syncs avivatorish `channelsStore` ↔ `renderStack.entries[].props.channels` via [`image_layer_channel_bridge.ts`](src/react/spatialdata/image_layer_channel_bridge.ts). Stable opaque `channelIds` splice on add/remove; `channelCount` derives from persisted arrays only (loader/image defaults apply on initial seed).
+Dependencies: pin `@spatialdata/{core,layers,react,vis,avivatorish}` at **0.2.3**.
 
-Histogram brush (`contrastLimits`) persists and affects SpatialData rendering. Tone brightness/contrast sliders update avivatorish store only — they do **not** persist on `ChannelConfig` and do **not** reach `VivSpatialViewer` until extension passthrough lands upstream (see below). This is acceptable for now; the legacy Viv chart (`VivMdvReact`) continues to use root `config.viv.channelsStore` for tone props.
+**Viewer (chart tree)**
 
-### Upstream: Viv extension injection (`SpatialData.ts`)
+1. `useRenderStackAdapter` → layer inputs (unchanged read-side cache).
+2. `useSpatialCanvasRendererFromLayerInputs` + `SpatialViewer` — single load path; publish **Image Layer Registry** on `SpatialDataMdvReact` (`getImageLoadedDataByElementKey`, load state).
+3. `vivImageExtensionResolver` / `vivImagePropsResolver` — `ColorPaletteExtension` + MDV `VivContrastExtension`; tone arrays from saved `entry.props.vivLayerProps`.
+4. External tooltips only (`renderTooltip={false}`, MDV deck/feature tooltip portals). Do not wire upstream internal tooltip aggregation.
+
+**Dialog (portal tree)**
+
+[`ImageLayerPanel`](src/react/components/spatialLayers/ImageLayerPanel.tsx) per image stack entry:
+
+1. `ImageLayerContextProvider` from chart registry + `elementKey` (provider colocated on panel, not dialog root).
+2. `useImageLayerContext(elementKey)` — loader, defaults, `channelNames`, `selectionAxisSizes`. If `undefined`, show loading placeholder (no OME-metadata fallback).
+3. `useLayerChannelState` — persistence to `entry.props.channels` via `patchLayer` / echo-safe hydrate.
+4. Per-panel `VivProvider` — zustand projection for histogram/runtime only (`domains`, `raster`, loading flags).
+5. **Spatial Image Panel Context** — exposes hook write API to `VivChannelList`; persisted edits (`colors`, `contrastLimits`, add/remove) go through the hook, not `channelsStore`.
+6. [`image_layer_runtime.ts`](src/react/spatialdata/image_layer_runtime.ts) — `channelId`-keyed stats cache; rebuild index-aligned zustand arrays when hook state changes; tone sliders persist via `patchLayer({ vivLayerProps })`.
+
+Delete `image_layer_channel_bridge.ts` and `use_image_layer_panel_defaults.ts` (replaced by upstream hook + registry).
+
+**Legacy `VivMdvReact`** — unchanged; `ColorChannelComponents` branches on presence of Spatial Image Panel Context.
+
+### Viv extension passthrough (landed upstream @0.2.3)
 
 SpatialData.js `ChannelConfig` has an open TODO for channel-related extension props ([`packages/vis/src/SpatialCanvas/types.ts`](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/packages/vis/src/SpatialCanvas/types.ts)). `VivSpatialViewer` must pass `extensions`, `brightness`, and `contrast` through `detailView.getLayers({ props })` without spreading `layer.props` afterward (drops non-enumerable extension props).
 
 **Design split (same as host overlays):**
 
-- **Serializable** on `ChannelConfig`: `toneBrightness[]`, `toneContrast[]`, optional `colormap` / `renderingMode` (names TBD).
-- **Runtime** on `SpatialCanvasViewer`: `vivImageExtensions[]` or `vivImageExtensionResolver(ctx)` — host app supplies `LayerExtension` instances. Viewer-global v1; resolver shape should accept `{ layerId, elementKey, channelCount }` for future per-layer overrides.
+- **Serializable** on image stack entry: `channels` (core Viv fields via `useLayerChannelState`); `vivLayerProps` for tone (`brightness[]`, `contrast[]`) and other extension props.
+- **Runtime** on composed renderer: `vivImageExtensionResolver` / `vivImagePropsResolver` — MDV supplies `LayerExtension` instances.
 
-**`useLayerData.getVivLayerProps()`** should map saved tone arrays + resolved extensions into runtime image layer props. **`getSingleSelectionStats`** should optionally return histogram `raster` samples (MDV local utils already do; upstream 2D path does not).
-
-**Other upstream requests:** `useLayerChannelState` hook, export `ImageChannelPanel` + `useImageLayerContext`, array-of-structs `ChannelConfig` ADR (deferred).
+**Other upstream (done or deferred):** `useLayerChannelState`, `useImageLayerContext`, `includeRaster` stats — **0.2.3**. Array-of-structs `ChannelConfig` deferred.
 
 MDV root `config.viv` is **not** an upstream concern.
 
@@ -104,11 +118,11 @@ MDV root `config.viv` is **not** an upstream concern.
 
 | Commit stage | Status |
 |--------------|--------|
-| 1 | `@spatialdata/*@next` deps + CONTEXT + this doc |
-| 2 | `SpatialDataMdvRegionReact` chart — `SpatialCanvasViewer` + host overlays |
+| 1 | `@spatialdata/*@0.2.3` deps + CONTEXT + this doc |
+| 2 | `SpatialDataMdvRegionReact` — composed renderer + host overlays + Image Layer Registry |
 | 3 | Layer dialog — `renderStack` list + dnd-kit reorder |
 | 4 | Visibility + opacity per stack entry |
-| 5+ | Type panels; shapes/labels/points added via dialog only |
+| 5+ | Image layer panel — registry, `useLayerChannelState`, runtime bridge, `vivLayerProps` tone |
 
 Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData*`.
 
