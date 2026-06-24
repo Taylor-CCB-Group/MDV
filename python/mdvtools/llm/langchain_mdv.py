@@ -776,7 +776,7 @@ class ProjectChat(ProjectChatProtocol):
             f"model={chat_model.model} embedding={embedding_model.model}"
         )
         chat_debug_logger.info(request_model_line)
-        socket_api.logger.info(request_model_line)
+        socket_api.log_file_only(request_model_line)
         chat_debug_logger.info("Asking question: %s", question)
 
         if question == "test error":

@@ -164,6 +164,21 @@ class ChatSocketAPI:
 
     def log(self, msg: str):
         self.logger.info(msg)
+
+    def log_file_only(self, msg: str) -> None:
+        """Write to file handlers only; omit from the socket chat stream."""
+        record = logging.LogRecord(
+            name=self.logger.name,
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg=msg,
+            args=(),
+            exc_info=None,
+        )
+        for handler in self.logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                handler.handle(record)
     
     def update_chat_progress(
         self,
