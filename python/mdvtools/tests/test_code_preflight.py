@@ -13,6 +13,7 @@ def main():
     assert res.ok is False
     msgs = " | ".join(i.message for i in res.issues)
     assert "Unknown chart class `MultilineChart`" in msgs
+    assert "did you mean `MultiLinePlot`?" in msgs
 
 
 def test_preflight_rejects_unknown_chart_class():
@@ -23,6 +24,18 @@ def main():
     res = validate_generated_code_preflight(code)
     assert res.ok is False
     assert any(i.code == "unknown_chart_class" for i in res.issues)
+
+
+def test_preflight_rejects_multiline_chart_camelcase_alias():
+    code = """
+def main():
+    c = MultiLineChart(title="x", params=["a", "b"])
+"""
+    res = validate_generated_code_preflight(code)
+    assert res.ok is False
+    msgs = " | ".join(i.message for i in res.issues)
+    assert "Unknown chart class `MultiLineChart`" in msgs
+    assert "did you mean `MultiLinePlot`?" in msgs
 
 
 def test_preflight_rejects_unknown_histogram_alias():

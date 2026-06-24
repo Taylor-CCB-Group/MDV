@@ -51,7 +51,7 @@ Your task is to:
     - Dot plot: Requires only one categorical column and any number of numerical columns.  
     - Heatmap: Requires only one categorical column and any number of numerical columns.  
     - Histogram: Requires one numerical column.  
-    - Multiline chart: Requires one numerical column and one categorical column.  
+    - Multiline chart (`MultiLinePlot`): Requires one numerical column and one categorical column.  
     - Pie Chart: Requires one categorical column.  
     - Row Chart: Requires one categorical column.  
     - Row summary box: Requires any column(s).  
@@ -287,7 +287,7 @@ def get_createproject_prompt_RAG(
     - Density Scatter plot: two numerical + one categorical column.
     - Dot plot / Heatmap: one categorical + numerical columns.
     - Histogram: one numerical column.
-    - Multiline chart: one numerical + one categorical column.
+    - Multiline chart (`MultiLinePlot`): one numerical + one categorical column.
     - Pie Chart / Row Chart / Wordcloud: one categorical column.
     - Row summary box / Table Plot: any column(s).
     - Sankey / Stacked row chart: two categorical columns (repeat if only one).
@@ -500,7 +500,7 @@ def get_createproject_prompt_RAG(
             - Dot plot: Requires only one categorical column and any number of numerical columns.  
             - Heatmap: Requires only one categorical column and any number of numerical columns.  
             - Histogram: Requires one numerical column.  
-            - Multiline chart: Requires one numerical column and one categorical column.  
+            - Multiline chart (`MultiLinePlot`): Requires one numerical column and one categorical column.  
             - Pie Chart: Requires one categorical column.  
             - Row Chart: Requires one categorical column.  
             - Row summary box: Requires any column(s).  

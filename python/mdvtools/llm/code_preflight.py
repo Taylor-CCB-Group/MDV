@@ -62,6 +62,7 @@ _CHART_LIKE_SUFFIXES = ("Chart", "Plot", "Box")
 _CHART_NAME_HINTS: dict[str, str] = {
     "Histogram": "HistogramPlot",
     "MultilineChart": "MultiLinePlot",
+    "MultiLineChart": "MultiLinePlot",
 }
 
 
