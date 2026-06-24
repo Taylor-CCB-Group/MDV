@@ -1,6 +1,8 @@
 from mdvtools._optional import require_extra
 require_extra("app", "langchain_openai")
 
+import langchain_openai
+
 import time
 import logging
 import re
