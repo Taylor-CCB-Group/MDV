@@ -1,125 +1,203 @@
 import { Typography } from "@mui/material";
-import type { LayerConfig } from "@spatialdata/vis";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { LayerChannelConfig, LayerChannelDefaults, LayerChannelSelection } from "@spatialdata/avivatorish";
+import { mergeLayerChannelState, useLayerChannelState } from "@spatialdata/vis";
+import type { ImageLoaderData, LayerConfig } from "@spatialdata/vis";
+import { observer } from "mobx-react-lite";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { VivChannelList } from "../ColorChannelComponents";
+import { useChart } from "../../context";
 import {
-    buildChannelDefaultsFromConfig,
     channelStateKey,
-    mergeHydrateChannelsState,
+    patchVivToneArrays,
+    pruneRuntimeCache,
+    projectRuntimeCacheToArrays,
+    readVivToneArrays,
     syncViewerChannelArraysFromStore,
-    serializeChannelsFromStore,
-    type ChannelConfig,
-    type LoaderDefaults,
-} from "@/react/spatialdata/image_layer_channel_bridge";
+    toVivSelection,
+    type ChannelRuntimeCache,
+} from "@/react/spatialdata/image_layer_runtime";
 import {
     createVivStores,
     VivProvider,
     useChannelsStoreApi,
     useViewerStoreApi,
 } from "../avivatorish/state";
+import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "../SpatialDataMDVReact";
 
 type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
 
-export const ImageLayerChannelContext = createContext<{ layerId: string } | null>(null);
+export type SpatialImagePanelContextValue = {
+    isSpatialPanel: true;
+    layerId: string;
+    elementKey: string;
+    channelNames: string[];
+    setChannels: (patch: Partial<LayerChannelConfig>) => void;
+    addChannel: () => void;
+    removeChannel: (index: number) => void;
+    updateTone: (index: number, patch: { brightness?: number; contrast?: number }) => void;
+    runtimeCacheRef: RefObject<ChannelRuntimeCache>;
+    bumpRuntimeProjection: () => void;
+};
+
+const SpatialImagePanelContext = createContext<SpatialImagePanelContextValue | null>(null);
 
 export function useImageLayerChannelContext() {
-    return useContext(ImageLayerChannelContext);
+    return useContext(SpatialImagePanelContext);
 }
 
 type Props = {
     config: ImageLayerConfig;
-    imageSource?: "spatial" | "ome_tiff";
-    loaderDefaults?: LoaderDefaults;
-    channelNames?: string[];
+    elementKey: string;
     updateLayer: (updates: Partial<LayerConfig>) => void;
 };
 
-function ImageLayerChannelBridge({
+function useStableImageLoaderData(imageData: ImageLoaderData | undefined) {
+    const stableRef = useRef<ImageLoaderData | undefined>(undefined);
+    if (!imageData) {
+        stableRef.current = undefined;
+        return undefined;
+    }
+    if (stableRef.current?.loader !== imageData.loader) {
+        stableRef.current = imageData;
+    }
+    return stableRef.current;
+}
+
+const ImageLayerPanelContent = function ImageLayerPanelContent({
     config,
-    imageSource = "spatial",
-    loaderDefaults,
-    channelNames = [],
+    elementKey,
+    imageData,
     updateLayer,
-}: Props) {
+}: Props & { imageData: ImageLoaderData }) {
     const channelsStore = useChannelsStoreApi();
     const viewerStore = useViewerStoreApi();
-    const hydratingRef = useRef(false);
-    const persistedKeyRef = useRef("");
-    const channelsRef = useRef<ChannelConfig>({});
-    const channels = config.channels ?? {};
-    channelsRef.current = channels;
+    const runtimeCacheRef = useRef<ChannelRuntimeCache>(new Map());
+    const [runtimeRevision, setRuntimeRevision] = useState(0);
+    const bumpRuntimeProjection = useCallback(() => {
+        setRuntimeRevision((revision) => revision + 1);
+    }, []);
 
-    const defaults = useMemo(
-        () =>
-            buildChannelDefaultsFromConfig({
-                layerId: config.id,
-                channels,
-                loaderDefaults,
-                channelNames,
-            }),
-        [channels, config.id, loaderDefaults, channelNames],
+    const loaderDefaults = useMemo((): LayerChannelDefaults => ({
+        colors: imageData.colors,
+        contrastLimits: imageData.contrastLimits,
+        channelsVisible: imageData.channelsVisible,
+        selections: imageData.selections,
+        selectionAxisSizes: imageData.selectionAxisSizes,
+    }), [
+        imageData.colors,
+        imageData.contrastLimits,
+        imageData.channelsVisible,
+        imageData.selections,
+        imageData.selectionAxisSizes,
+    ]);
+
+    const channelState = useLayerChannelState({
+        config: config.channels ?? {},
+        defaults: loaderDefaults,
+        layerId: config.id,
+        onChannelsChange: (next: LayerChannelConfig) => updateLayer({ channels: next }),
+    });
+
+    const mergedChannels = useMemo(
+        () => mergeLayerChannelState(config.channels ?? {}, loaderDefaults, config.id),
+        [config.channels, config.id, loaderDefaults],
     );
 
-    useEffect(() => {
-        return channelsStore.subscribe((state) => {
-            if (hydratingRef.current) return;
-            const nextChannels = serializeChannelsFromStore(state, channelsRef.current);
-            const nextKey = channelStateKey(nextChannels);
-            if (nextKey === persistedKeyRef.current) return;
-            persistedKeyRef.current = nextKey;
-            channelsRef.current = nextChannels;
+    const channelNames = imageData.channelNames ?? [];
 
-            const viewer = viewerStore.getState();
-            viewerStore.setState({
-                ...syncViewerChannelArraysFromStore(state, viewer, channelNames),
-                isViewerLoading: false,
+    const updateTone = useCallback(
+        (index: number, patch: { brightness?: number; contrast?: number }) => {
+            const nextVivLayerProps = patchVivToneArrays(
+                config.vivLayerProps,
+                channelState.channelCount,
+                index,
+                patch,
+            );
+            updateLayer({ vivLayerProps: nextVivLayerProps });
+            const tone = readVivToneArrays(nextVivLayerProps, channelState.channelCount);
+            channelsStore.setState({
+                brightness: tone.brightness,
+                contrast: tone.contrast,
             });
-            updateLayer({ channels: nextChannels });
+        },
+        [channelState.channelCount, channelsStore, config.vivLayerProps, updateLayer],
+    );
+
+    const spatialContext = useMemo((): SpatialImagePanelContextValue => ({
+        isSpatialPanel: true,
+        layerId: config.id,
+        elementKey,
+        channelNames,
+        setChannels: channelState.setChannels,
+        addChannel: channelState.addChannel,
+        removeChannel: channelState.removeChannel,
+        updateTone,
+        runtimeCacheRef,
+        bumpRuntimeProjection,
+    }), [
+        bumpRuntimeProjection,
+        channelNames,
+        channelState.addChannel,
+        channelState.removeChannel,
+        channelState.setChannels,
+        config.id,
+        elementKey,
+        updateTone,
+    ]);
+
+    const channelSyncKey = useMemo(() => {
+        const tone = readVivToneArrays(config.vivLayerProps, mergedChannels.channelCount);
+        return JSON.stringify({
+            channels: channelStateKey({
+                channelIds: mergedChannels.channelIds,
+                colors: mergedChannels.colors,
+                contrastLimits: mergedChannels.contrastLimits,
+                channelsVisible: mergedChannels.channelsVisible,
+                selections: mergedChannels.selections,
+            }),
+            tone,
+            runtimeRevision,
         });
-    }, [channelNames, channelsStore, updateLayer, viewerStore]);
+    }, [mergedChannels, config.vivLayerProps, runtimeRevision]);
 
     useEffect(() => {
-        const nextChannels: ChannelConfig = {
-            ...channels,
-            channelIds: defaults.ids,
-            colors: defaults.colors,
-            contrastLimits: defaults.contrastLimits,
-            channelsVisible: defaults.channelsVisible,
-            selections: defaults.selections.map((selection) => ({
-                z: selection.z,
-                c: selection.c,
-                t: selection.t,
-            })),
-        };
-        const nextKey = channelStateKey(nextChannels);
-        if (nextKey === persistedKeyRef.current) return;
-
-        const existing = channelsStore.getState();
-        const storeKey = channelStateKey(
-            serializeChannelsFromStore(existing, channelsRef.current),
+        pruneRuntimeCache(runtimeCacheRef.current, mergedChannels.channelIds);
+        const { domains, raster } = projectRuntimeCacheToArrays(
+            mergedChannels.channelIds,
+            runtimeCacheRef.current,
+            mergedChannels.contrastLimits,
         );
-        if (storeKey === persistedKeyRef.current && nextKey !== storeKey) {
-            return;
-        }
+        const tone = readVivToneArrays(config.vivLayerProps, mergedChannels.channelCount);
+        const selections = mergedChannels.selections.map((selection: LayerChannelSelection, index: number) =>
+            toVivSelection(selection, index),
+        );
 
-        hydratingRef.current = true;
-        persistedKeyRef.current = nextKey;
-        channelsRef.current = nextChannels;
+        channelsStore.setState({
+            ids: [...mergedChannels.channelIds],
+            colors: mergedChannels.colors.map((color: [number, number, number]) => [...color] as [number, number, number]),
+            contrastLimits: mergedChannels.contrastLimits.map((limits: [number, number]) => [...limits] as [number, number]),
+            channelsVisible: [...mergedChannels.channelsVisible],
+            selections,
+            domains,
+            raster,
+            brightness: tone.brightness,
+            contrast: tone.contrast,
+            loader: imageData.loader,
+        });
 
-        const merged = mergeHydrateChannelsState(defaults, existing);
-        const fullReplace =
-            defaults.ids.length !== existing.ids.length ||
-            defaults.ids.some((id, index) => id !== existing.ids[index]);
-        channelsStore.setState(merged);
         const viewer = viewerStore.getState();
+        const existing = channelsStore.getState();
+        const fullReplace =
+            mergedChannels.channelIds.length !== existing.ids.length ||
+            mergedChannels.channelIds.some((id: string, index: number) => id !== existing.ids[index]);
         const viewerArrays = syncViewerChannelArraysFromStore(
             {
-                ids: merged.ids,
-                colors: merged.colors,
-                contrastLimits: merged.contrastLimits,
-                channelsVisible: merged.channelsVisible,
-                selections: merged.selections,
+                ids: mergedChannels.channelIds,
+                colors: mergedChannels.colors,
+                contrastLimits: mergedChannels.contrastLimits,
+                channelsVisible: mergedChannels.channelsVisible,
+                selections,
             },
             viewer,
             channelNames,
@@ -128,32 +206,47 @@ function ImageLayerChannelBridge({
             ...viewerArrays,
             ...(fullReplace
                 ? {
-                      isChannelLoading: merged.ids.map(() => false),
-                      pixelValues: merged.ids.map(() => Number.NaN),
+                      isChannelLoading: mergedChannels.channelIds.map(() => false),
+                      pixelValues: mergedChannels.channelIds.map(() => Number.NaN),
                   }
                 : {}),
             isViewerLoading: false,
         });
-        hydratingRef.current = false;
-    }, [channelNames, channels, channelsStore, defaults, viewerStore]);
+    }, [channelNames, channelSyncKey, channelsStore, imageData.loader, mergedChannels, viewerStore]);
 
     return (
-        <ImageLayerChannelContext.Provider value={{ layerId: config.id }}>
+        <SpatialImagePanelContext.Provider value={spatialContext}>
             <div className="space-y-2">
                 <Typography variant="caption" color="text.secondary">
-                    Image source: {imageSource === "spatial" ? "SpatialData zarr" : "OME-TIFF"}
+                    Image source: SpatialData zarr
                 </Typography>
                 <VivChannelList />
             </div>
-        </ImageLayerChannelContext.Provider>
+        </SpatialImagePanelContext.Provider>
     );
-}
+};
+
+const ImageLayerPanelBody = observer(function ImageLayerPanelBody(props: Props) {
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const rawImageData = chart.imageLayerRegistry?.getImageLoadedDataByElementKey(props.elementKey);
+    const imageData = useStableImageLoaderData(rawImageData);
+
+    if (!chart.imageLayerRegistry || !imageData) {
+        return (
+            <Typography variant="body2" color="text.secondary">
+                Loading image channel data…
+            </Typography>
+        );
+    }
+
+    return <ImageLayerPanelContent {...props} imageData={imageData} />;
+});
 
 export default function ImageLayerPanel(props: Props) {
     const [vivStores] = useState(createVivStores);
     return (
         <VivProvider vivStores={vivStores}>
-            <ImageLayerChannelBridge {...props} />
+            <ImageLayerPanelBody {...props} />
         </VivProvider>
     );
 }

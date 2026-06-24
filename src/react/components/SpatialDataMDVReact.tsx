@@ -16,6 +16,7 @@ import {
     createVivStores,
 } from "./avivatorish/state";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
+import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import {
@@ -71,6 +72,11 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.renderStackGeneration++;
     }
 
+    imageLayerRegistry?: ImageLayerRegistry;
+    setImageLayerRegistry(registry: ImageLayerRegistry | undefined) {
+        this.imageLayerRegistry = registry;
+    }
+
     constructor(
         dataStore: DataStore,
         div: HTMLDivElement,
@@ -85,6 +91,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             colorByDefault: action,
             renderStackGeneration: observable,
             bumpRenderStackGeneration: action,
+            imageLayerRegistry: observable.ref,
+            setImageLayerRegistry: action,
         });
         this.vivStores = createVivStores();
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
