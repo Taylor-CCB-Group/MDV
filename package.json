@@ -252,6 +252,9 @@
       "@biomejs/biome",
       "@vaadin/vaadin-usage-statistics",
       "esbuild"
-    ]
+    ],
+    "patchedDependencies": {
+      "@spatialdata/vis@0.2.3": "patches/@spatialdata__vis@0.2.3.patch"
+    }
   }
 }
