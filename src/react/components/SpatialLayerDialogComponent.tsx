@@ -57,6 +57,7 @@ import {
     listAvailableSpatialEntries,
 } from "@/react/spatialdata/render_stack_defaults";
 import { NO_TABLE_ASSOCIATION } from "@/react/spatialdata/table_association";
+import { useImageLayerPanelDefaults } from "@/react/spatialdata/use_image_layer_panel_defaults";
 import { useChart, useDataStore } from "../context";
 import { useConfig } from "../hooks";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
@@ -77,10 +78,13 @@ function getAvailableFields(dataStore: ReturnType<typeof useDataStore>): string[
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
     const chartConfig = useConfig<SpatialDataMdvReactConfig>();
+    const { spatialData } = useSpatialData();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
     const availableFields = useMemo(() => getAvailableFields(dataStore), [dataStore]);
     const chartColorBy =
         typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
+    const elementKey = entry?.kind === "spatial" ? entry.source.elementKey : undefined;
+    const { channelNames, loaderDefaults } = useImageLayerPanelDefaults(spatialData, elementKey);
 
     if (!entry) return null;
 
@@ -97,6 +101,8 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
             return (
                 <ImageLayerPanel
                     config={layer as Extract<LayerConfig, { type: "image" }>}
+                    channelNames={channelNames}
+                    loaderDefaults={loaderDefaults}
                     updateLayer={patchLayer}
                 />
             );

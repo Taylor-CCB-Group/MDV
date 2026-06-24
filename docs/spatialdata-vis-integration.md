@@ -79,6 +79,27 @@ Useful SpatialData.js changes before MDV can consider replacing the local `aviva
 - Clarify whether the shared package supports Viv/deck.gl extensions needed by MDV (`VivContrastExtension`, color palette/colormap extensions, 2D/3D behavior), and expose extension injection where host apps need it.
 - Keep the channel ownership model layer-local: image channel settings belong to image layer configs/render-stack entries, not to the SpatialData chart root.
 
+### Image layer channel bridge (MDV local)
+
+MDV's [`ImageLayerPanel`](src/react/components/spatialLayers/ImageLayerPanel.tsx) wraps `VivChannelList` in a per-panel `VivProvider` and syncs avivatorish `channelsStore` ↔ `renderStack.entries[].props.channels` via [`image_layer_channel_bridge.ts`](src/react/spatialdata/image_layer_channel_bridge.ts). Stable opaque `channelIds` splice on add/remove; `channelCount` derives from persisted arrays only (loader/image defaults apply on initial seed).
+
+Histogram brush (`contrastLimits`) persists and affects SpatialData rendering. Tone brightness/contrast sliders update avivatorish store only — they do **not** persist on `ChannelConfig` and do **not** reach `VivSpatialViewer` until extension passthrough lands upstream (see below). This is acceptable for now; the legacy Viv chart (`VivMdvReact`) continues to use root `config.viv.channelsStore` for tone props.
+
+### Upstream: Viv extension injection (`SpatialData.ts`)
+
+SpatialData.js `ChannelConfig` has an open TODO for channel-related extension props ([`packages/vis/src/SpatialCanvas/types.ts`](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/packages/vis/src/SpatialCanvas/types.ts)). `VivSpatialViewer` must pass `extensions`, `brightness`, and `contrast` through `detailView.getLayers({ props })` without spreading `layer.props` afterward (drops non-enumerable extension props).
+
+**Design split (same as host overlays):**
+
+- **Serializable** on `ChannelConfig`: `toneBrightness[]`, `toneContrast[]`, optional `colormap` / `renderingMode` (names TBD).
+- **Runtime** on `SpatialCanvasViewer`: `vivImageExtensions[]` or `vivImageExtensionResolver(ctx)` — host app supplies `LayerExtension` instances. Viewer-global v1; resolver shape should accept `{ layerId, elementKey, channelCount }` for future per-layer overrides.
+
+**`useLayerData.getVivLayerProps()`** should map saved tone arrays + resolved extensions into runtime image layer props. **`getSingleSelectionStats`** should optionally return histogram `raster` samples (MDV local utils already do; upstream 2D path does not).
+
+**Other upstream requests:** `useLayerChannelState` hook, export `ImageChannelPanel` + `useImageLayerContext`, array-of-structs `ChannelConfig` ADR (deferred).
+
+MDV root `config.viv` is **not** an upstream concern.
+
 ## Initial PR scope
 
 | Commit stage | Status |

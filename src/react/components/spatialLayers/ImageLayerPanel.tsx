@@ -1,29 +1,31 @@
 import { Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { VivChannelList } from "../ColorChannelComponents";
 import {
+    buildChannelDefaultsFromConfig,
+    channelStateKey,
+    mergeHydrateChannelsState,
+    syncViewerChannelArraysFromStore,
+    serializeChannelsFromStore,
+    type ChannelConfig,
+    type LoaderDefaults,
+} from "@/react/spatialdata/image_layer_channel_bridge";
+import {
     createVivStores,
-    type ChannelsState,
     VivProvider,
     useChannelsStoreApi,
     useViewerStoreApi,
 } from "../avivatorish/state";
 
 type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
-type ChannelConfig = NonNullable<ImageLayerConfig["channels"]>;
-type SpatialSelection = NonNullable<ChannelConfig["selections"]>[number];
-type VivSelection = ChannelsState["selections"][number];
-type Range = [number, number];
-type Rgb = [number, number, number];
 
-type LoaderDefaults = {
-    colors?: [number, number, number][];
-    contrastLimits?: [number, number][];
-    channelsVisible?: boolean[];
-    selections?: ChannelConfig["selections"];
-};
+export const ImageLayerChannelContext = createContext<{ layerId: string } | null>(null);
+
+export function useImageLayerChannelContext() {
+    return useContext(ImageLayerChannelContext);
+}
 
 type Props = {
     config: ImageLayerConfig;
@@ -32,61 +34,6 @@ type Props = {
     channelNames?: string[];
     updateLayer: (updates: Partial<LayerConfig>) => void;
 };
-
-function fillArray<T>(values: T[] | undefined, count: number, fallback: (index: number) => T): T[] {
-    return Array.from({ length: count }, (_, index) => values?.[index] ?? fallback(index));
-}
-
-function toVivSelection(selection: SpatialSelection | undefined, index: number): VivSelection {
-    return {
-        z: selection?.z ?? 0,
-        c: selection?.c ?? index,
-        t: selection?.t ?? 0,
-    };
-}
-
-function fromVivSelection(selection: VivSelection): SpatialSelection {
-    return {
-        z: selection.z,
-        c: selection.c,
-        t: selection.t,
-    };
-}
-
-function channelCount(
-    channels: ChannelConfig,
-    loaderDefaults: LoaderDefaults | undefined,
-    channelNames: string[],
-) {
-    return Math.max(
-        channels.channelIds?.length ?? 0,
-        channels.colors?.length ?? 0,
-        channels.contrastLimits?.length ?? 0,
-        channels.channelsVisible?.length ?? 0,
-        channels.selections?.length ?? 0,
-        loaderDefaults?.colors?.length ?? 0,
-        loaderDefaults?.contrastLimits?.length ?? 0,
-        loaderDefaults?.channelsVisible?.length ?? 0,
-        loaderDefaults?.selections?.length ?? 0,
-        channelNames.length,
-        1,
-    );
-}
-
-function channelStateKey(channels: ChannelConfig) {
-    return JSON.stringify({
-        channelIds: channels.channelIds,
-        colors: channels.colors,
-        contrastLimits: channels.contrastLimits,
-        channelsVisible: channels.channelsVisible,
-        selections: channels.selections,
-    });
-}
-
-function fallbackDomain(limits: Range | undefined): Range {
-    if (!limits) return [0, 255];
-    return [Math.min(0, limits[0]), Math.max(255, limits[1])];
-}
 
 function ImageLayerChannelBridge({
     config,
@@ -99,47 +46,38 @@ function ImageLayerChannelBridge({
     const viewerStore = useViewerStoreApi();
     const hydratingRef = useRef(false);
     const persistedKeyRef = useRef("");
+    const channelsRef = useRef<ChannelConfig>({});
     const channels = config.channels ?? {};
-    const count = channelCount(channels, loaderDefaults, channelNames);
+    channelsRef.current = channels;
 
-    const defaults = useMemo(() => {
-        const colors = fillArray<Rgb>(
-            channels.colors,
-            count,
-            (index) => loaderDefaults?.colors?.[index] ?? [255, 255, 255],
-        );
-        const contrastLimits = fillArray(
-            channels.contrastLimits,
-            count,
-            (index) => loaderDefaults?.contrastLimits?.[index] ?? [0, 255] as Range,
-        );
-        const domains = fillArray(
-            loaderDefaults?.contrastLimits,
-            count,
-            (index) => fallbackDomain(contrastLimits[index]),
-        );
-        const selections = Array.from({ length: count }, (_, index) =>
-            toVivSelection(channels.selections?.[index] ?? loaderDefaults?.selections?.[index], index),
-        );
-        return {
-            ids: fillArray(channels.channelIds, count, (index) => `${config.id}-channel-${index}`),
-            colors,
-            contrastLimits,
-            domains,
-            channelsVisible: fillArray(
-                channels.channelsVisible,
-                count,
-                (index) => loaderDefaults?.channelsVisible?.[index] ?? true,
-            ),
-            selections,
-            raster: fillArray(undefined, count, () => ({
-                width: 0,
-                height: 0,
-                data: new Float32Array(),
-            })),
-            channelOptions: fillArray(channelNames, count, (index) => `Channel ${index + 1}`),
-        };
-    }, [channels, config.id, count, loaderDefaults, channelNames]);
+    const defaults = useMemo(
+        () =>
+            buildChannelDefaultsFromConfig({
+                layerId: config.id,
+                channels,
+                loaderDefaults,
+                channelNames,
+            }),
+        [channels, config.id, loaderDefaults, channelNames],
+    );
+
+    useEffect(() => {
+        return channelsStore.subscribe((state) => {
+            if (hydratingRef.current) return;
+            const nextChannels = serializeChannelsFromStore(state, channelsRef.current);
+            const nextKey = channelStateKey(nextChannels);
+            if (nextKey === persistedKeyRef.current) return;
+            persistedKeyRef.current = nextKey;
+            channelsRef.current = nextChannels;
+
+            const viewer = viewerStore.getState();
+            viewerStore.setState({
+                ...syncViewerChannelArraysFromStore(state, viewer, channelNames),
+                isViewerLoading: false,
+            });
+            updateLayer({ channels: nextChannels });
+        });
+    }, [channelNames, channelsStore, updateLayer, viewerStore]);
 
     useEffect(() => {
         const nextChannels: ChannelConfig = {
@@ -148,55 +86,66 @@ function ImageLayerChannelBridge({
             colors: defaults.colors,
             contrastLimits: defaults.contrastLimits,
             channelsVisible: defaults.channelsVisible,
-            selections: defaults.selections.map(fromVivSelection),
+            selections: defaults.selections.map((selection) => ({
+                z: selection.z,
+                c: selection.c,
+                t: selection.t,
+            })),
         };
         const nextKey = channelStateKey(nextChannels);
         if (nextKey === persistedKeyRef.current) return;
+
+        const existing = channelsStore.getState();
+        const storeKey = channelStateKey(
+            serializeChannelsFromStore(existing, channelsRef.current),
+        );
+        if (storeKey === persistedKeyRef.current && nextKey !== storeKey) {
+            return;
+        }
+
         hydratingRef.current = true;
         persistedKeyRef.current = nextKey;
-        channelsStore.setState({
-            ids: defaults.ids,
-            colors: defaults.colors,
-            contrastLimits: defaults.contrastLimits,
-            domains: defaults.domains,
-            channelsVisible: defaults.channelsVisible,
-            selections: defaults.selections,
-            raster: defaults.raster,
-        });
+        channelsRef.current = nextChannels;
+
+        const merged = mergeHydrateChannelsState(defaults, existing);
+        const fullReplace =
+            defaults.ids.length !== existing.ids.length ||
+            defaults.ids.some((id, index) => id !== existing.ids[index]);
+        channelsStore.setState(merged);
+        const viewer = viewerStore.getState();
+        const viewerArrays = syncViewerChannelArraysFromStore(
+            {
+                ids: merged.ids,
+                colors: merged.colors,
+                contrastLimits: merged.contrastLimits,
+                channelsVisible: merged.channelsVisible,
+                selections: merged.selections,
+            },
+            viewer,
+            channelNames,
+        );
         viewerStore.setState({
-            channelOptions: defaults.channelOptions,
-            isChannelLoading: defaults.ids.map(() => false),
-            pixelValues: defaults.ids.map(() => Number.NaN),
+            ...viewerArrays,
+            ...(fullReplace
+                ? {
+                      isChannelLoading: merged.ids.map(() => false),
+                      pixelValues: merged.ids.map(() => Number.NaN),
+                  }
+                : {}),
             isViewerLoading: false,
         });
         hydratingRef.current = false;
-    }, [channels, channelsStore, defaults, viewerStore]);
-
-    useEffect(() => {
-        return channelsStore.subscribe((state) => {
-            if (hydratingRef.current) return;
-            const nextChannels: ChannelConfig = {
-                ...channels,
-                channelIds: state.ids,
-                colors: state.colors,
-                contrastLimits: state.contrastLimits,
-                channelsVisible: state.channelsVisible,
-                selections: state.selections.map(fromVivSelection),
-            };
-            const nextKey = channelStateKey(nextChannels);
-            if (nextKey === persistedKeyRef.current) return;
-            persistedKeyRef.current = nextKey;
-            updateLayer({ channels: nextChannels });
-        });
-    }, [channels, channelsStore, updateLayer]);
+    }, [channelNames, channels, channelsStore, defaults, viewerStore]);
 
     return (
-        <div className="space-y-2">
-            <Typography variant="caption" color="text.secondary">
-                Image source: {imageSource === "spatial" ? "SpatialData zarr" : "OME-TIFF"}
-            </Typography>
-            <VivChannelList />
-        </div>
+        <ImageLayerChannelContext.Provider value={{ layerId: config.id }}>
+            <div className="space-y-2">
+                <Typography variant="caption" color="text.secondary">
+                    Image source: {imageSource === "spatial" ? "SpatialData zarr" : "OME-TIFF"}
+                </Typography>
+                <VivChannelList />
+            </div>
+        </ImageLayerChannelContext.Provider>
     );
 }
 

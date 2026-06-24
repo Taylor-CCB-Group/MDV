@@ -34,6 +34,8 @@ import {
 import { getSingleSelectionStats } from "./avivatorish/utils";
 import { COLOR_PALLETE } from "./avivatorish/constants";
 import { MAX_CHANNELS } from "@vivjs/constants";
+import { createStableChannelId } from "@/react/spatialdata/image_layer_channel_bridge";
+import { useImageLayerChannelContext } from "./spatialLayers/ImageLayerPanel";
 
 const DEFAULT_BRIGHTNESS_CONTRAST = 0.5;
 
@@ -386,6 +388,7 @@ const BrightnessContrast = ({ index }: { index: number }) => {
 const ChannelController = ({ index }: { index: number }) => {
     const color = useChannelsStore((state) => state.colors[index]);
     const channelVisible = useChannelsStore((state) => state.channelsVisible[index]);
+    const channelIds = useChannelsStore((state) => state.ids);
     const removeChannel = useChannelsStore((state) => state.removeChannel);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const channelsStore = useChannelsStoreApi();
@@ -394,6 +397,7 @@ const ChannelController = ({ index }: { index: number }) => {
     if (!color) return null;
 
     const hasPendingLoads = isChannelLoading.some(Boolean);
+    const canRemoveChannel = channelIds.length > 1;
 
     return (
         <Accordion
@@ -483,7 +487,7 @@ const ChannelController = ({ index }: { index: number }) => {
                     </div>
                 </div>
                 <IconButton
-                    disabled={hasPendingLoads}
+                    disabled={hasPendingLoads || !canRemoveChannel}
                     onClick={(event) => {
                         event.stopPropagation();
                         removeChannel(index);
@@ -525,6 +529,7 @@ const ChannelController = ({ index }: { index: number }) => {
 
 const AddChannel = () => {
     const loader = useLoader();
+    const layerContext = useImageLayerChannelContext();
     const isAddingChannelRef = useRef(false);
     const [isAddingChannel, setIsAddingChannel] = useState(false);
     // const { labels } = loader[0];
@@ -574,9 +579,12 @@ const AddChannel = () => {
                         ...baseSelection,
                         c: index,
                     };
+                    const channelId = layerContext
+                        ? createStableChannelId(layerContext.layerId)
+                        : createStableChannelId("channel");
                     addChannel({
                         selections: selection,
-                        ids: String(Math.random()),
+                        ids: channelId,
                         channelsVisible: true,
                         colors: COLOR_PALLETE[index % COLOR_PALLETE.length],
                         domains: channelDomains[index] ?? channelDomains[0] ?? [0, 255],
@@ -585,6 +593,12 @@ const AddChannel = () => {
                     viewerStore.setState((state) => ({
                         channelOptions: Array.from({ length: index + 1 }, (_, i) =>
                             state.channelOptions[i] ?? `Channel ${i + 1}`,
+                        ),
+                        isChannelLoading: Array.from({ length: index + 1 }, (_, i) =>
+                            i === index ? true : (state.isChannelLoading[i] ?? false),
+                        ),
+                        pixelValues: Array.from({ length: index + 1 }, (_, i) =>
+                            state.pixelValues[i] ?? Number.NaN,
                         ),
                     }));
                     didAddChannel = true;

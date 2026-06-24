@@ -50,5 +50,6 @@ Canonical rendering vocabulary lives in [SpatialData.js CONTEXT.md](https://gith
 - **Host Overlay** — MDV deck layer referenced by `hostLayerId` in the stack, resolved at runtime
 - **Runtime Attachment** — `hostLayerResolver`, tooltip hooks, `deckProps`; not serialized in `entry.props`
 - **MobX Control Island** — layer dialog UI that patches `config.renderStack` directly
-
-See [docs/spatialdata-vis-integration.md](docs/spatialdata-vis-integration.md) for MDV-specific integration notes.
+- **Layer Channel Config** — serializable image channel state on `renderStack.entries[].props.channels` (`ChannelConfig` in `@spatialdata/vis`): colors, contrast limits, visibility, selections, and extension-related data fields (e.g. tone brightness/contrast). Distinct from runtime UI state in avivatorish stores.
+- **Root Viv Config** — MDV-only legacy path where `VivMdvReact` serializes `config.viv.channelsStore` on the chart root. Not used by the SpatialData chart; not an upstream SpatialData.js concern.
+- **App Viv Extensions** — runtime attachment: host app supplies Viv `LayerExtension` instances (and passes related props into the renderer). Extension classes are not serialized; extension data may live on Layer Channel Config when persistence is needed.
