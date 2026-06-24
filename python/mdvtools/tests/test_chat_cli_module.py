@@ -1,6 +1,7 @@
 import json
 
 from mdvtools.llm import chat_cli
+from mdvtools.llm.chat_protocol import ChatRequest
 from mdvtools.mdvproject import MDVProject
 
 
@@ -141,7 +142,7 @@ def test_run_chat_once_installs_socketio_shim_when_missing(tmp_path, monkeypatch
 
 def test_run_chat_once_passes_model_id_to_ask_question(tmp_path, monkeypatch):
     project = _make_project(tmp_path)
-    captured: dict[str, object] = {}
+    captured: dict[str, ChatRequest] = {}
 
     class FakeProjectChat:
         def __init__(self, incoming_project):
@@ -174,7 +175,7 @@ def test_run_chat_once_passes_model_id_to_ask_question(tmp_path, monkeypatch):
     )
 
     assert exit_code == 0
-    assert captured["chat_request"]["model_id"] == "openai:chat:gpt-4o-mini"
+    assert captured["chat_request"].get("model_id") == "openai:chat:gpt-4o-mini"
     assert result["model_id"] == "openai:chat:gpt-4o-mini"
 
 
