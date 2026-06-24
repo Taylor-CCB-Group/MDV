@@ -137,13 +137,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             });
         });
         const dataStore = this.dataStore;
-        const imageRegionKeys = Object.keys(dataStore.regions?.all_regions ?? {}).filter(
-            (regionKey) => dataStore.regions?.all_regions[regionKey].spatial,
-        );
-        const images = imageRegionKeys.map((regionKey) => ({
-            name: regionKey,
-            value: regionKey,
-        }));
+        const images = spatialRegionOptions(dataStore);
 
         return settings.concat([
             g({
@@ -186,13 +180,36 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     }
 }
 
+function spatialRegionOptions(dataStore: DataStore) {
+    return Object.keys(dataStore.regions?.all_regions ?? {})
+        .filter((regionKey) => dataStore.regions?.all_regions[regionKey].spatial)
+        .map((regionKey) => ({ name: regionKey, value: regionKey }));
+}
+
 BaseChart.types.SpatialDataMdvRegionReact = {
+    required: (dataStore) => spatialRegionOptions(dataStore).length > 0,
+    extra_controls: (dataStore) => {
+        const regions = dataStore.regions;
+        if (!regions) return [];
+        return [
+            {
+                type: "dropdown",
+                name: "region",
+                label: dataStore.getColumnName(regions.region_field) ?? regions.region_field,
+                values: spatialRegionOptions(dataStore),
+            },
+        ];
+    },
     init: (config, dataStore, extraConfig) => {
         const regions = dataStore.regions;
         if (!regions) {
             throw new Error("unexpected attempt to initialise spatialdata chart with no regions in datasource");
         }
-        const regionKey = extraConfig.region;
+        const regionKey =
+            extraConfig.region ?? spatialRegionOptions(dataStore)[0]?.value;
+        if (!regionKey) {
+            throw new Error("unexpected attempt to initialise spatialdata chart with no spatial regions in datasource");
+        }
         config.color_by = regions.default_color;
         const colorColumn = dataStore.columnIndex[regions.default_color];
         if (!allNumeric([colorColumn])) {
