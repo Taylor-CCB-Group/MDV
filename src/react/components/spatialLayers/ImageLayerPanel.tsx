@@ -1,5 +1,9 @@
 import { Typography } from "@mui/material";
-import { serializeChannelConfig, type LayerChannelConfig } from "@spatialdata/avivatorish";
+import {
+    pickDefaultSelectionForAdd,
+    serializeChannelConfig,
+    type LayerChannelConfig,
+} from "@spatialdata/avivatorish";
 import {
     ImageLayerContextProvider,
     useImageLayerContext,
@@ -19,7 +23,6 @@ import {
 import { useChart } from "@/react/context";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
 import {
-    pickDefaultSelectionForAdd,
     toneFromVivLayerProps,
     useImageLayerRuntime,
 } from "@/react/spatialdata/image_layer_runtime";
