@@ -15,26 +15,35 @@ type RasterSlice = { width: number; height: number; data: ArrayLike<number> };
 
 const EMPTY_RASTER: RasterSlice = { width: 0, height: 0, data: new Float32Array() };
 
+function padTone(raw: unknown, count: number): number[] {
+    return Array.from({ length: count }, (_, index) =>
+        Array.isArray(raw) && typeof raw[index] === "number" ? raw[index] : DEFAULT_TONE,
+    );
+}
+
+/**
+ * Build padded tone arrays from the raw `brightness` / `contrast` values.
+ *
+ * Takes the arrays directly (not the enclosing `vivLayerProps` object) so a
+ * caller in render can key off them: `vivLayerProps` is patched **in place**, so
+ * its object ref is stable while the inner arrays are replaced on each tone edit.
+ * Depending on the arrays is what lets the React Compiler memoize this correctly
+ * without a hand-written `useMemo`.
+ */
+export function toneFromArrays(
+    brightnessRaw: unknown,
+    contrastRaw: unknown,
+    count: number,
+): { brightness: number[]; contrast: number[] } {
+    return { brightness: padTone(brightnessRaw, count), contrast: padTone(contrastRaw, count) };
+}
+
+/** Convenience wrapper that reads tone off a `vivLayerProps` object (for event handlers). */
 export function toneFromVivLayerProps(
     vivLayerProps: Record<string, unknown> | undefined,
     count: number,
 ): { brightness: number[]; contrast: number[] } {
-    const brightnessRaw = vivLayerProps?.brightness;
-    const contrastRaw = vivLayerProps?.contrast;
-    return {
-        brightness: Array.from({ length: count }, (_, index) => {
-            if (Array.isArray(brightnessRaw) && typeof brightnessRaw[index] === "number") {
-                return brightnessRaw[index];
-            }
-            return DEFAULT_TONE;
-        }),
-        contrast: Array.from({ length: count }, (_, index) => {
-            if (Array.isArray(contrastRaw) && typeof contrastRaw[index] === "number") {
-                return contrastRaw[index];
-            }
-            return DEFAULT_TONE;
-        }),
-    };
+    return toneFromArrays(vivLayerProps?.brightness, vivLayerProps?.contrast, count);
 }
 
 function channelOptionsForSelections(
@@ -83,10 +92,10 @@ export function useImageLayerRuntime({
         fallbackDomains: hookState.contrastLimits,
     });
 
-    const channelIdsKey = hookState.channelIds.join("\0");
-    const selectionsKey = JSON.stringify(hookState.selections);
-    const contrastLimitsKey = JSON.stringify(hookState.contrastLimits);
-
+    // `hookState.channelIds` / `selections` / `contrastLimits` are stable array
+    // refs from `useLayerChannelState`'s store — they only change identity on an
+    // actual channel edit — so they work directly as effect deps (no string-key
+    // proxy needed), which keeps the dependency list honest for the linter.
     useLayoutEffect(() => {
         channelsStore.setState({
             domains: hookState.channelIds.map(
@@ -113,13 +122,13 @@ export function useImageLayerRuntime({
             isViewerLoading: false,
         });
     }, [
-        channelIdsKey,
         channelNames,
         channelsStore,
-        contrastLimitsKey,
+        hookState.channelIds,
+        hookState.contrastLimits,
+        hookState.selections,
         loader,
         loadingByChannelId,
-        selectionsKey,
         statsByIndex,
         viewerStore,
     ]);

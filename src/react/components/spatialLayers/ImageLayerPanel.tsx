@@ -15,7 +15,6 @@ import {
     createContext,
     useCallback,
     useContext,
-    useMemo,
     useRef,
     useState,
 } from "react";
@@ -23,6 +22,7 @@ import {
 import { useChart } from "@/react/context";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
 import {
+    toneFromArrays,
     toneFromVivLayerProps,
     useImageLayerRuntime,
 } from "@/react/spatialdata/image_layer_runtime";
@@ -153,13 +153,11 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
     });
 
     const channelCount = hookState.channelIds.length;
-    const tone = useMemo(
-        () => toneFromVivLayerProps(vivLayerProps, channelCount),
-        // `vivLayerProps` is patched in place (stable ref), so key off the tone
-        // array refs, which are replaced on each patch.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [brightnessRaw, contrastRaw, channelCount],
-    );
+    // `vivLayerProps` is patched in place (stable object ref); `brightnessRaw` /
+    // `contrastRaw` are the inner arrays, replaced on each tone edit. Computing
+    // tone from them (not the object) lets the React Compiler memoize this — no
+    // hand-written `useMemo`, and the in-place patch still recomputes correctly.
+    const tone = toneFromArrays(brightnessRaw, contrastRaw, channelCount);
 
     const hookStateRef = useRef(hookState);
     hookStateRef.current = hookState;
@@ -206,48 +204,30 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         });
     }, [addChannel, layerContext.channelNames, setChannels]);
 
-    const panelContext = useMemo<SpatialImagePanelContextValue>(
-        () => ({
-            layerId: config.id,
-            loader: layerContext.loader,
-            channelNames: layerContext.channelNames,
-            channelIds: hookState.channelIds,
-            colors: hookState.colors,
-            contrastLimits: hookState.contrastLimits,
-            channelsVisible: hookState.channelsVisible,
-            brightness: tone.brightness,
-            contrast: tone.contrast,
-            selections: hookState.selections.map((selection: (typeof hookState.selections)[number]) => ({
-                z: selection.z ?? 0,
-                c: selection.c ?? 0,
-                t: selection.t ?? 0,
-            })),
-            setChannels: hookState.setChannels,
-            addChannel: hookState.addChannel,
-            addChannelWithSelection,
-            removeChannel: hookState.removeChannel,
-            patchVivLayerProps,
-            patchToneAtIndex,
-        }),
-        [
-            addChannelWithSelection,
-            config.id,
-            hookState.channelIds,
-            hookState.channelsVisible,
-            hookState.colors,
-            hookState.contrastLimits,
-            tone.brightness,
-            tone.contrast,
-            hookState.addChannel,
-            hookState.removeChannel,
-            hookState.selections,
-            hookState.setChannels,
-            layerContext.channelNames,
-            layerContext.loader,
-            patchToneAtIndex,
-            patchVivLayerProps,
-        ],
-    );
+    // Plain object — the React Compiler memoizes it (and its reactive inputs)
+    // without a hand-maintained dependency list.
+    const panelContext: SpatialImagePanelContextValue = {
+        layerId: config.id,
+        loader: layerContext.loader,
+        channelNames: layerContext.channelNames,
+        channelIds: hookState.channelIds,
+        colors: hookState.colors,
+        contrastLimits: hookState.contrastLimits,
+        channelsVisible: hookState.channelsVisible,
+        brightness: tone.brightness,
+        contrast: tone.contrast,
+        selections: hookState.selections.map((selection: (typeof hookState.selections)[number]) => ({
+            z: selection.z ?? 0,
+            c: selection.c ?? 0,
+            t: selection.t ?? 0,
+        })),
+        setChannels: hookState.setChannels,
+        addChannel: hookState.addChannel,
+        addChannelWithSelection,
+        removeChannel: hookState.removeChannel,
+        patchVivLayerProps,
+        patchToneAtIndex,
+    };
 
     return (
         <SpatialImagePanelContext.Provider value={panelContext}>
