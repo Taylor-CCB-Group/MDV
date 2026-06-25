@@ -10,13 +10,14 @@ import {
 } from "@spatialdata/vis";
 import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import type { FieldName } from "@/charts/charts";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import {
     createMdvHostLayerResolver,
     useRenderStackAdapter,
@@ -467,7 +468,7 @@ const SpatialDataViewer = observer(
         }
 
         return (
-            <>
+            <Profiler id="spatial.viewer" onRender={onSpatialProfilerRender}>
                 <SelectionOverlay />
                 {showLegend && legendFields.length > 0 && (
                     <FieldContourLegend
@@ -492,25 +493,27 @@ const SpatialDataViewer = observer(
                     }}
                 >
                     <div style={{ width, height, position: "relative" }}>
-                        <SpatialCanvasFromRenderStack
-                            spatialData={spatialData}
-                            coordinateSystem={coordinateSystem}
-                            spatialViewState={spatialViewState}
-                            onSpatialViewStateChange={onSpatialViewStateChange}
-                            deckLayers={deckLayers}
-                            layers={layers}
-                            layerOrder={layerOrder}
-                            width={width}
-                            height={height}
-                            deckProps={deckProps}
-                            onFeatureHover={onFeatureHover}
-                        />
+                        <Profiler id="spatial.canvas" onRender={onSpatialProfilerRender}>
+                            <SpatialCanvasFromRenderStack
+                                spatialData={spatialData}
+                                coordinateSystem={coordinateSystem}
+                                spatialViewState={spatialViewState}
+                                onSpatialViewStateChange={onSpatialViewStateChange}
+                                deckLayers={deckLayers}
+                                layers={layers}
+                                layerOrder={layerOrder}
+                                width={width}
+                                height={height}
+                                deckProps={deckProps}
+                                onFeatureHover={onFeatureHover}
+                            />
+                        </Profiler>
                     </div>
                 </div>
                 <SpatialDataLink />
                 {tooltipPortal}
                 {featureTooltipPortal}
-            </>
+            </Profiler>
         );
     },
 );

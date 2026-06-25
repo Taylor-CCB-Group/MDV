@@ -14,6 +14,7 @@ import { useMemo, useRef } from "react";
 
 import { deckIdFromHostLayerId, type DeckOverlayId } from "./host_overlay_ids";
 import { touchRenderStack, renderStackSpatialRevision } from "./render_stack_observe";
+import { measureSpatial } from "./perf";
 
 export type MdvDeckOverlayLayers = Record<DeckOverlayId, Layer | null>;
 
@@ -150,13 +151,20 @@ export function useRenderStackAdapter({
     hostLayerResolver: ReturnType<typeof createMdvHostLayerResolver>;
 }) {
     const layerInputsCacheRef = useRef(createRenderStackLayerInputsCache());
-    observeRenderStack(stack);
-    const spatialRevision = renderStackSpatialRevision(stack);
+    // `measureSpatial` is a no-op unless localStorage.MDV_SPATIAL_PERF === "1".
+    // The `count` of these labels == number of adapter renders during a capture,
+    // i.e. how often a cosmetic image edit re-renders SpatialDataViewer.
+    measureSpatial("adapter.observe", () => observeRenderStack(stack));
+    const spatialRevision = measureSpatial("adapter.revision", () =>
+        renderStackSpatialRevision(stack),
+    );
     void generation;
 
-    const synced = !stack
-        ? { layers: {}, layerOrder: [] as string[] }
-        : syncRenderStackLayerInputs(stack, layerInputsCacheRef.current);
+    const synced = measureSpatial("adapter.sync", () =>
+        !stack
+            ? { layers: {}, layerOrder: [] as string[] }
+            : syncRenderStackLayerInputs(stack, layerInputsCacheRef.current),
+    );
 
     // useLayerData (upstream) memoizes Viv props on the layers *record* reference.
     // In-place config mutation keeps that reference stable, so shallow-copy the map
