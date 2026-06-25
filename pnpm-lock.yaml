@@ -120,19 +120,19 @@ importers:
         specifier: 10.6.0
         version: 10.6.0
       '@spatialdata/avivatorish':
-        specifier: ^0.2.4
+        specifier: next
         version: 0.2.4(b1235b24ca004e234da3e4c035d43e3a)
       '@spatialdata/core':
-        specifier: ^0.2.4
+        specifier: next
         version: 0.2.4
       '@spatialdata/layers':
-        specifier: ^0.2.4
+        specifier: next
         version: 0.2.4(4eff8b0fade424b0171a85a804c7311a)
       '@spatialdata/react':
-        specifier: ^0.2.4
+        specifier: next
         version: 0.2.4(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
       '@spatialdata/vis':
-        specifier: ^0.2.4
+        specifier: next
         version: 0.2.4(5fed9fb1d070481f396b27a4e9a53f69)
       '@tanstack/react-query':
         specifier: ^5.80.0
