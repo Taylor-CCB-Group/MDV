@@ -2232,7 +2232,7 @@ packages:
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
   '@spatialdata/avivatorish@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz':
-    resolution: {integrity: sha512-OZbEJRro0JyeChpf44UyG4Pjs1a9eDehOLXJppvRSAnpq7CifLH3RUBDKin02h/EdSJaJxi1csgifU2qINJeTQ==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz}
+    resolution: {integrity: sha512-lfYcoa9KbTR+jIxeIz7DYffhcKgpOxjwh9WkeFko2jTh374a7evXs6joBzmcstgrcIkbyaWqSmk+wNtd1VrPjg==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz}
     version: 0.2.3
     peerDependencies:
       react: '>=18 <20'
@@ -2258,7 +2258,7 @@ packages:
       zarrita: ^0.7.1
 
   '@spatialdata/vis@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz':
-    resolution: {integrity: sha512-PZVZi0ZIWODc2cW8bsQtR8IgEKHrX8lFisczpIIPOVcNyc9vd7K7RjQ5lPTElgt+hQQBOcqYILuyhsZ3yiCQSw==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz}
+    resolution: {integrity: sha512-eJiTg8mNQjc3oTmCV1jo/HJx/X6zAiZfS6TcGDPRZwA03RcNYZioLusAGFLD2EWXmtZvtEDPKMaYYs7F4mRhOw==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz}
     version: 0.2.3
     peerDependencies:
       anndata.js: ^0.0.2
