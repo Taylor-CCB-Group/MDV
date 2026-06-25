@@ -93,20 +93,22 @@ type RuntimeInput = {
     hookState: UseLayerChannelStateResult;
     loader: unknown;
     channelNames: string[];
-    vivLayerProps?: Record<string, unknown>;
     channelsStore: StoreApi<ChannelsState>;
     viewerStore: StoreApi<ViewerState>;
 };
 
 /**
- * One-way projection from `useLayerChannelState` + stats cache into per-panel Avivator zustand stores.
- * Never writes MobX; never subscribes zustand → persistence.
+ * One-way projection of **stats + flags only** into per-panel Avivator zustand
+ * stores: histogram `domains`/`raster`, the `loader`, and viewer flags
+ * (`channelOptions`, `pixelValues`, loading state). Channel config
+ * (colors/contrast/visibility/selections) and tone are NOT mirrored here — they
+ * live in the canonical render-stack entry and the UI reads them through the
+ * panel context. Never writes MobX; never subscribes zustand → persistence.
  */
 export function useImageLayerRuntime({
     hookState,
     loader,
     channelNames,
-    vivLayerProps,
     channelsStore,
     viewerStore,
 }: RuntimeInput) {
@@ -115,14 +117,8 @@ export function useImageLayerRuntime({
     const completedSelectionKeysRef = useRef<string[]>([]);
 
     const channelIdsKey = hookState.channelIds.join("\0");
-    const colorsKey = JSON.stringify(hookState.colors);
-    const channelsVisibleKey = JSON.stringify(hookState.channelsVisible);
     const selectionsKey = JSON.stringify(hookState.selections);
     const contrastLimitsKey = JSON.stringify(hookState.contrastLimits);
-    const vivToneKey = JSON.stringify({
-        brightness: vivLayerProps?.brightness,
-        contrast: vivLayerProps?.contrast,
-    });
 
     const selectionSignature = buildSelectionStatsKeys(
         hookState.channelIds,
@@ -131,8 +127,6 @@ export function useImageLayerRuntime({
     const channelCount = hookState.channelIds.length;
 
     useLayoutEffect(() => {
-        const count = hookState.channelIds.length;
-        const tone = toneFromVivLayerProps(vivLayerProps, count);
         const statsCache = statsCacheRef.current;
         const selectionKeys = buildSelectionStatsKeys(
             hookState.channelIds,
@@ -140,17 +134,6 @@ export function useImageLayerRuntime({
         );
 
         channelsStore.setState({
-            ids: [...hookState.channelIds],
-            colors: hookState.colors.map((color) => [...color] as [number, number, number]),
-            contrastLimits: hookState.contrastLimits.map((limits) => [...limits] as Range),
-            channelsVisible: [...hookState.channelsVisible],
-            selections: hookState.selections.map((selection) => ({
-                z: selection.z ?? 0,
-                c: selection.c ?? 0,
-                t: selection.t ?? 0,
-            })),
-            brightness: tone.brightness,
-            contrast: tone.contrast,
             domains: selectionKeys.map((key, index) => {
                 const cached = statsCache.get(key);
                 return cached?.domains ?? hookState.contrastLimits[index] ?? ([0, 255] as Range);
@@ -174,13 +157,10 @@ export function useImageLayerRuntime({
         channelIdsKey,
         channelNames,
         channelsStore,
-        channelsVisibleKey,
-        colorsKey,
         contrastLimitsKey,
         loader,
         selectionsKey,
         viewerStore,
-        vivToneKey,
     ]);
 
     useEffect(() => {

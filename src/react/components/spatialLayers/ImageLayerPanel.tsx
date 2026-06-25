@@ -1,5 +1,5 @@
 import { Typography } from "@mui/material";
-import type { LayerChannelConfig } from "@spatialdata/avivatorish";
+import { serializeChannelConfig, type LayerChannelConfig } from "@spatialdata/avivatorish";
 import {
     ImageLayerContextProvider,
     useImageLayerContext,
@@ -20,6 +20,7 @@ import { useChart } from "@/react/context";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
 import {
     pickDefaultSelectionForAdd,
+    toneFromVivLayerProps,
     useImageLayerRuntime,
 } from "@/react/spatialdata/image_layer_runtime";
 import { useRenderStackEntry } from "@/react/spatialdata/render_stack_control";
@@ -41,6 +42,9 @@ export type SpatialImagePanelContextValue = {
     colors: [number, number, number][];
     contrastLimits: [number, number][];
     channelsVisible: boolean[];
+    /** Tone, derived from the entry's `vivLayerProps` (host-owned sibling of `channels`). */
+    brightness: number[];
+    contrast: number[];
     selections: Array<{ z: number; c: number; t: number }>;
     setChannels: ReturnType<typeof useLayerChannelState>["setChannels"];
     addChannel: () => void;
@@ -65,7 +69,7 @@ export function useImageLayerChannelContext() {
 }
 
 function channelConfigKey(channels: LayerChannelConfig): string {
-    return JSON.stringify(channels);
+    return serializeChannelConfig(channels);
 }
 
 const ImageLayerPanelLoaded = observer(function ImageLayerPanelLoaded({
@@ -114,6 +118,11 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         config.vivLayerProps && typeof config.vivLayerProps === "object"
             ? (config.vivLayerProps as Record<string, unknown>)
             : undefined;
+    // Read the tone arrays during render so this `observer` subscribes to the
+    // in-place `vivLayerProps` patches (see render_stack_observe.touchVivLayerProps).
+    // Tone is canonical here — the slider thumbs read it through the panel context.
+    const brightnessRaw = vivLayerProps?.brightness;
+    const contrastRaw = vivLayerProps?.contrast;
 
     const onChannelsChange = useCallback(
         (next: LayerChannelConfig) => {
@@ -136,13 +145,23 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         hookState,
         loader: layerContext.loader,
         channelNames: layerContext.channelNames,
-        vivLayerProps,
         channelsStore,
         viewerStore,
     });
 
+    const channelCount = hookState.channelIds.length;
+    const tone = useMemo(
+        () => toneFromVivLayerProps(vivLayerProps, channelCount),
+        // `vivLayerProps` is patched in place (stable ref), so key off the tone
+        // array refs, which are replaced on each patch.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [brightnessRaw, contrastRaw, channelCount],
+    );
+
     const hookStateRef = useRef(hookState);
     hookStateRef.current = hookState;
+    const vivLayerPropsRef = useRef(vivLayerProps);
+    vivLayerPropsRef.current = vivLayerProps;
 
     const patchVivLayerProps = useCallback(
         (patch: Record<string, unknown>) => {
@@ -153,21 +172,15 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
 
     const patchToneAtIndex = useCallback(
         (index: number, key: "brightness" | "contrast", value: number) => {
+            // Read base tone from the canonical `vivLayerProps`, not the runtime
+            // store — there is a single source of truth for tone.
             const count = hookStateRef.current.channelIds.length;
-            const { brightness: storeBrightness, contrast: storeContrast } = channelsStore.getState();
-            const brightness = [...storeBrightness];
-            const contrast = [...storeContrast];
-            while (brightness.length < count) brightness.push(0.5);
-            while (contrast.length < count) contrast.push(0.5);
-            if (key === "brightness") {
-                brightness[index] = value;
-                patchVivLayerProps({ brightness });
-            } else {
-                contrast[index] = value;
-                patchVivLayerProps({ contrast });
-            }
+            const current = toneFromVivLayerProps(vivLayerPropsRef.current, count);
+            const next = key === "brightness" ? [...current.brightness] : [...current.contrast];
+            next[index] = value;
+            patchVivLayerProps({ [key]: next });
         },
-        [channelsStore, patchVivLayerProps],
+        [patchVivLayerProps],
     );
 
     const { addChannel, setChannels } = hookState;
@@ -199,6 +212,8 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
             colors: hookState.colors,
             contrastLimits: hookState.contrastLimits,
             channelsVisible: hookState.channelsVisible,
+            brightness: tone.brightness,
+            contrast: tone.contrast,
             selections: hookState.selections.map((selection: (typeof hookState.selections)[number]) => ({
                 z: selection.z ?? 0,
                 c: selection.c ?? 0,
@@ -218,6 +233,8 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
             hookState.channelsVisible,
             hookState.colors,
             hookState.contrastLimits,
+            tone.brightness,
+            tone.contrast,
             hookState.addChannel,
             hookState.removeChannel,
             hookState.selections,

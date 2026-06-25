@@ -256,7 +256,9 @@ const buildHistogram = (
 const ChannelHistogram = ({ index }: { index: number }) => {
     const spatial = useSpatialImagePanelContext();
     const contrastLimits = useChannelsStore((state) => state.contrastLimits);
-    const color = useChannelsStore((state) => state.colors[index] ?? [37, 99, 235]);
+    const storeColor = useChannelsStore((state) => state.colors[index] ?? [37, 99, 235]);
+    // Spatial mode: color is canonical channel config, read from the panel context.
+    const color = spatial ? (spatial.colors[index] ?? storeColor) : storeColor;
     const currentDomain = useChannelsStore((state) => state.domains[index]);
     const domain = currentDomain ?? ([0, 1] as Range);
     const rasterData = useChannelsStore((state) => state.raster[index]?.data);
@@ -377,7 +379,10 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
 const BrightnessContrast = ({ index }: { index: number }) => {
     const spatial = useSpatialImagePanelContext();
-    const { contrast, brightness } = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
+    const storeTone = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
+    // Spatial mode: tone is canonical (entry `vivLayerProps`), read from the panel context.
+    const contrast = spatial ? spatial.contrast : storeTone.contrast;
+    const brightness = spatial ? spatial.brightness : storeTone.brightness;
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const contrastValue = contrast[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
@@ -398,7 +403,6 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                     onChange={(_, v) => {
                         if (isArray(v)) return;
                         if (spatial) {
-                            channelsStore.setState({ contrast: withChannelValue(contrast, index, v) });
                             spatial.patchToneAtIndex(index, "contrast", v);
                             return;
                         }
@@ -431,7 +435,6 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                     onChange={(_, v) => {
                         if (isArray(v)) return;
                         if (spatial) {
-                            channelsStore.setState({ brightness: withChannelValue(brightness, index, v) });
                             spatial.patchToneAtIndex(index, "brightness", v);
                             return;
                         }
@@ -456,8 +459,11 @@ const BrightnessContrast = ({ index }: { index: number }) => {
 
 const ChannelController = ({ index }: { index: number }) => {
     const spatial = useSpatialImagePanelContext();
-    const color = useChannelsStore((state) => state.colors[index]);
-    const channelVisible = useChannelsStore((state) => state.channelsVisible[index]);
+    const storeColor = useChannelsStore((state) => state.colors[index]);
+    const storeChannelVisible = useChannelsStore((state) => state.channelsVisible[index]);
+    // Spatial mode: color + visibility are canonical channel config, read from the panel context.
+    const color = spatial ? spatial.colors[index] : storeColor;
+    const channelVisible = spatial ? spatial.channelsVisible[index] : storeChannelVisible;
     const channelIds = useChannelsStore((state) => state.ids);
     const removeChannel = useChannelsStore((state) => state.removeChannel);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
@@ -739,7 +745,10 @@ const AddChannel = () => {
 };
 
 export const VivChannelList = () => {
-    const ids = useChannelsStore(({ ids }) => ids);
+    const spatial = useSpatialImagePanelContext();
+    const storeIds = useChannelsStore(({ ids }) => ids);
+    // Spatial mode: the channel list is driven by canonical channel ids.
+    const ids = spatial ? spatial.channelIds : storeIds;
     return (
         <div className="w-full space-y-2 bg-[hsl(var(--background))] p-2">
             {ids.map((id, i) => (
