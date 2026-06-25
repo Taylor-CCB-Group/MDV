@@ -5,12 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@spatialdata/avivatorish': file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz
-  '@spatialdata/core': file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz
-  '@spatialdata/layers': file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz
-  '@spatialdata/react': file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz
-  '@spatialdata/vis': file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz
-  zarrextra: file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz
   '@deck.gl/mesh-layers': 9.2.9
   '@luma.gl/gltf': 9.2.6
   lodash: 4.18.1
@@ -126,20 +120,20 @@ importers:
         specifier: 10.6.0
         version: 10.6.0
       '@spatialdata/avivatorish':
-        specifier: file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz
-        version: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz(b1235b24ca004e234da3e4c035d43e3a)
+        specifier: ^0.2.4
+        version: 0.2.4(b1235b24ca004e234da3e4c035d43e3a)
       '@spatialdata/core':
-        specifier: file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz
-        version: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz
+        specifier: ^0.2.4
+        version: 0.2.4
       '@spatialdata/layers':
-        specifier: file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz
-        version: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz(4eff8b0fade424b0171a85a804c7311a)
+        specifier: ^0.2.4
+        version: 0.2.4(4eff8b0fade424b0171a85a804c7311a)
       '@spatialdata/react':
-        specifier: file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz
-        version: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
+        specifier: ^0.2.4
+        version: 0.2.4(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
       '@spatialdata/vis':
-        specifier: file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz
-        version: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz(5fed9fb1d070481f396b27a4e9a53f69)
+        specifier: ^0.2.4
+        version: 0.2.4(5fed9fb1d070481f396b27a4e9a53f69)
       '@tanstack/react-query':
         specifier: ^5.80.0
         version: 5.80.6(react@19.2.6)
@@ -369,8 +363,8 @@ importers:
         specifier: ^1.2.2
         version: 1.2.2
       zarrextra:
-        specifier: file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz
-        version: file:../../../../code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz
+        specifier: ^0.2.2
+        version: 0.2.2
       zod:
         specifier: ^3.25.49
         version: 3.25.49
@@ -2231,35 +2225,30 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@spatialdata/avivatorish@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz':
-    resolution: {integrity: sha512-lfYcoa9KbTR+jIxeIz7DYffhcKgpOxjwh9WkeFko2jTh374a7evXs6joBzmcstgrcIkbyaWqSmk+wNtd1VrPjg==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz}
-    version: 0.2.3
+  '@spatialdata/avivatorish@0.2.4':
+    resolution: {integrity: sha512-LOtW01ZIAgdkNfVdD+UYW5toMt1ww8VXah8GEfQcx09PTYqtF9Qhe7zbbfxEx5S9iHetRCt3PMrErBDVwjjaVg==}
     peerDependencies:
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@spatialdata/core@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz':
-    resolution: {integrity: sha512-srDvFDvJ0CZ0Hig8hWhhLfbHobsh6bv22AFfOd/+tFDqAYTX+vBJPXulvuLAuh87Ne4C1YCSLNaKaP7uKplGUw==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz}
-    version: 0.2.3
+  '@spatialdata/core@0.2.4':
+    resolution: {integrity: sha512-X0806/unXVuqo9O7SgMD7epKXC6xX2oz2erqqZBwT9fDUjhDljnentF4S2YlqAYVJjUetklzdYKufQ+BnB86Aw==}
 
-  '@spatialdata/layers@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz':
-    resolution: {integrity: sha512-lxCv4K+EOKPLSolZKWkUUp/CngfU4I0Yolvmsf0o42gIEzyB6+m2otnRmbONseunCTLXuTY5N+ocF9E8euobPQ==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz}
-    version: 0.2.3
+  '@spatialdata/layers@0.2.4':
+    resolution: {integrity: sha512-VB3B6UCJxdsRXnnEMzlCbUydpQUMxMcPTAhdQoJaJyRbM8ZNQwVGpWIfL/HsYo0XC7Pd4oAu9oekS511Gwnplw==}
     peerDependencies:
       deck.gl: ~9.2.9
 
-  '@spatialdata/react@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz':
-    resolution: {integrity: sha512-VLz6YNuHFNTLjY/Ygjc2qKhAtf+f+k8Qys+K3ZBfdowbHHUe9fgvdo5AiN6Y1OQhqgrSRqRVQ8L4D1EL1iB15w==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz}
-    version: 0.2.3
+  '@spatialdata/react@0.2.4':
+    resolution: {integrity: sha512-NuUad2wl/ZqWOjzOkCDzoYJkC4pYqjMmCcdtUgWzf/bMo5h3fHHfc70BtNnOT20R9a5+cXkfGvdGcVDL+UkGPQ==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
       react-dom: '>=18 <20'
       zarrita: ^0.7.1
 
-  '@spatialdata/vis@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz':
-    resolution: {integrity: sha512-eJiTg8mNQjc3oTmCV1jo/HJx/X6zAiZfS6TcGDPRZwA03RcNYZioLusAGFLD2EWXmtZvtEDPKMaYYs7F4mRhOw==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz}
-    version: 0.2.3
+  '@spatialdata/vis@0.2.4':
+    resolution: {integrity: sha512-XmbwsnOajh+3cKuSF635+BOY6m2ALatdFkvJqe85Asfodeuh9d+CeHl0ONWPitwZ1qjF0Jn4D1HcSuzf7I/oKg==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
@@ -6362,9 +6351,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zarrextra@file:../../../../code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz:
-    resolution: {integrity: sha512-pis+O1tmZPnQYdzOddTTChQUhI/e1QpBXZ+XP4ybW+f8PaYX8D58N5xOKtGli7CnAbbYtdzwX1t1GgFGH4qN0g==, tarball: file:../../../../code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz}
-    version: 0.2.2
+  zarrextra@0.2.2:
+    resolution: {integrity: sha512-pis+O1tmZPnQYdzOddTTChQUhI/e1QpBXZ+XP4ybW+f8PaYX8D58N5xOKtGli7CnAbbYtdzwX1t1GgFGH4qN0g==}
 
   zarrita@0.5.1:
     resolution: {integrity: sha512-cyujP70BOl5DiXuLtM+0j9nq/pAov4SKXRYIQQOVnk2TfBg/jopX+FXLbqkq3ULOxFLB5AwkPbSp5KvZXoJrbQ==}
@@ -8425,14 +8413,14 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@spatialdata/avivatorish@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz(b1235b24ca004e234da3e4c035d43e3a)':
+  '@spatialdata/avivatorish@0.2.4(b1235b24ca004e234da3e4c035d43e3a)':
     dependencies:
       '@hms-dbmi/viv': 0.21.0(b55db1092d89286dd86a223febb17f6d)
       '@math.gl/core': 4.1.0
       geotiff: 2.1.4-beta.0
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
-      zarrextra: file:../../../../code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz
+      zarrextra: 0.2.2
       zustand: 5.0.14(@types/react@19.2.14)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6))
     transitivePeerDependencies:
       - '@deck.gl/core'
@@ -8448,7 +8436,7 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@spatialdata/core@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz':
+  '@spatialdata/core@0.2.4':
     dependencies:
       '@math.gl/core': 4.1.0
       '@zarrita/storage': 0.2.0
@@ -8456,11 +8444,11 @@ snapshots:
       apache-arrow: 17.0.0
       ol: 10.9.0
       parquet-wasm: 0.6.1
-      zarrextra: file:../../../../code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz
+      zarrextra: 0.2.2
       zarrita: 0.7.3
       zod: 4.4.3
 
-  '@spatialdata/layers@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz(4eff8b0fade424b0171a85a804c7311a)':
+  '@spatialdata/layers@0.2.4(4eff8b0fade424b0171a85a804c7311a)':
     dependencies:
       '@deck.gl/core': 9.2.9
       '@hms-dbmi/viv': 0.21.0(b55db1092d89286dd86a223febb17f6d)
@@ -8479,24 +8467,24 @@ snapshots:
       - '@luma.gl/webgl'
       - react
 
-  '@spatialdata/react@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)':
+  '@spatialdata/react@0.2.4(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)':
     dependencies:
-      '@spatialdata/core': file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz
+      '@spatialdata/core': 0.2.4
       anndata.js: 0.0.2
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
       zarrita: 0.7.3
 
-  '@spatialdata/vis@file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz(5fed9fb1d070481f396b27a4e9a53f69)':
+  '@spatialdata/vis@0.2.4(5fed9fb1d070481f396b27a4e9a53f69)':
     dependencies:
       '@deck.gl/core': 9.2.9
       '@hms-dbmi/viv': 0.21.0(b55db1092d89286dd86a223febb17f6d)
       '@luma.gl/core': 9.2.6
       '@math.gl/core': 4.1.0
-      '@spatialdata/avivatorish': file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz(b1235b24ca004e234da3e4c035d43e3a)
-      '@spatialdata/core': file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz
-      '@spatialdata/layers': file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz(4eff8b0fade424b0171a85a804c7311a)
-      '@spatialdata/react': file:../../../../code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
+      '@spatialdata/avivatorish': 0.2.4(b1235b24ca004e234da3e4c035d43e3a)
+      '@spatialdata/core': 0.2.4
+      '@spatialdata/layers': 0.2.4(4eff8b0fade424b0171a85a804c7311a)
+      '@spatialdata/react': 0.2.4(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
       '@uidotdev/usehooks': 2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uiw/react-json-view': 2.0.0-alpha.39(@babel/runtime@7.29.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@vivjs/views': 0.21.0(52e8f89f20cb2eb0eb37426ecbefa25b)
@@ -13321,7 +13309,7 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zarrextra@file:../../../../code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz:
+  zarrextra@0.2.2:
     dependencies:
       zarrita: 0.7.3
       zod: 4.4.3
