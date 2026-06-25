@@ -1,6 +1,5 @@
 import type { RenderStack } from "@spatialdata/layers";
-import type { ImageLoaderData } from "@spatialdata/vis";
-import type { LayerLoadState } from "@spatialdata/vis/spatial-canvas/useLayerData";
+import type { ImageLoaderData, LayerLoadState } from "@spatialdata/vis";
 
 export type ImageLayerRegistry = {
     getImageLoadedDataByElementKey: (elementKey: string) => ImageLoaderData | undefined;

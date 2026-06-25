@@ -156,9 +156,7 @@ MDV workarounds today and what a **single larger SpatialData.js PR** should repl
 
 | Gap | MDV workaround | Delete when upstream ships |
 |-----|----------------|---------------------------|
-| `useSpatialCanvasRendererFromLayerInputs` not in `@spatialdata/vis` root exports | [`patches/@spatialdata__vis@0.2.3.patch`](../patches/@spatialdata__vis@0.2.3.patch) (`Ya` exists in bundle) | Root export |
-| `ImageLayerContextProvider` not in `@spatialdata/vis` root exports | [`patches/@spatialdata__vis@0.2.3.patch`](../patches/@spatialdata__vis@0.2.3.patch) (`fa` in bundle) | Root export |
-| `LayerLoadState` type not in root exports | [`tsconfig.json`](../tsconfig.json) path `@spatialdata/vis/spatial-canvas/*` | Root or documented subpath in `package.json` `exports` |
+| ~~`useSpatialCanvasRendererFromLayerInputs` / `ImageLayerContextProvider` / `LayerLoadState` not in `@spatialdata/vis` root exports~~ | **Resolved (Track A):** all three are now re-exported from the `@spatialdata/vis` root entry, so the pnpm patch and the deep `spatial-canvas` subpath tsconfig alias have been removed; MDV imports them directly from `@spatialdata/vis`. | done |
 | Panel outside viewer React tree | [`image_layer_registry.ts`](../src/react/spatialdata/image_layer_registry.ts) on chart + colocated provider on panel | Registry callback on composed renderer **or** documented standalone provider contract |
 | Dual Zustand (`useLayerChannelState` + MDV `VivProvider`) | [`image_layer_runtime.ts`](../src/react/spatialdata/image_layer_runtime.ts) one-way projection + stats cache | `ImageChannelPanelProvider` (extension-flexible) |
 | Histogram raster | MDV calls `getSingleSelectionStats({ includeRaster: true })` in runtime hook | Optional `useChannelSelectionStats` in `@spatialdata/avivatorish` |

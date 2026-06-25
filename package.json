@@ -234,6 +234,12 @@
   },
   "pnpm": {
     "overrides": {
+      "@spatialdata/avivatorish": "file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-avivatorish-0.2.3.tgz",
+      "@spatialdata/core": "file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-core-0.2.3.tgz",
+      "@spatialdata/layers": "file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-layers-0.2.3.tgz",
+      "@spatialdata/react": "file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-react-0.2.3.tgz",
+      "@spatialdata/vis": "file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/spatialdata-vis-0.2.3.tgz",
+      "zarrextra": "file:/Users/ptodd/code/www/SpatialData.ts/.local-pack/zarrextra-0.2.2.tgz",
       "@deck.gl/mesh-layers": "9.2.9",
       "@luma.gl/gltf": "9.2.6",
       "lodash": "4.18.1",
@@ -252,9 +258,6 @@
       "@biomejs/biome",
       "@vaadin/vaadin-usage-statistics",
       "esbuild"
-    ],
-    "patchedDependencies": {
-      "@spatialdata/vis@0.2.3": "patches/@spatialdata__vis@0.2.3.patch"
-    }
+    ]
   }
 }

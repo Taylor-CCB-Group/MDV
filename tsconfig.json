@@ -19,8 +19,7 @@
         "noEmit": false,
         "skipLibCheck": true,
         "paths": {
-            "@/*": ["./src/*"],
-            "@spatialdata/vis/spatial-canvas/*": ["./node_modules/@spatialdata/vis/dist/SpatialCanvas/*"]
+            "@/*": ["./src/*"]
         },
         "types": [
             "vite-plugin-glsl/ext"
