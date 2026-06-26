@@ -369,6 +369,7 @@ describe("useSlickGridReact", () => {
                 throw new Error("Expected SlickGridDataProvider");
             }
             expect(dataProvider.getDataIndex(0)).toBe(0);
+            dataProvider.setSelectedIds([0, 2]);
 
             const invalidateCallsAfterCreate = invalidate.mock.calls.length;
             mockSortedIndices = new Uint32Array([2, 1, 0]);
@@ -382,6 +383,17 @@ describe("useSlickGridReact", () => {
                 invalidateCallsAfterCreate,
             );
             expect(dataProvider.getDataIndex(0)).toBe(2);
+            expect(dataProvider.getAllSelectedIds()).toEqual([0, 2]);
+            expect(dataProvider.getAllSelectedFilteredIds()).toEqual([0, 2]);
+
+            mockSortedIndices = new Uint32Array([2, 1]);
+
+            act(() => {
+                rerender();
+            });
+
+            expect(dataProvider.getAllSelectedIds()).toEqual([2]);
+            expect(dataProvider.getAllSelectedFilteredIds()).toEqual([2]);
         });
 
         test("should update include_index without replacing the data provider", () => {

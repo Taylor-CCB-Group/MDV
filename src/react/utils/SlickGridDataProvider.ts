@@ -30,6 +30,7 @@ class SlickGridDataProvider {
         this.columns = columns;
         this.indices = indices;
         this.includeIndex = includeIndex;
+        this.reconcileSelectedRowIds();
     }
 
     getLength(): number {
@@ -92,7 +93,8 @@ class SlickGridDataProvider {
 
     // Required by GridStateService for filtered selection
     getAllSelectedFilteredIds(): number[] {
-        return Array.from(this.selectedRowIds);
+        const visibleIds = new Set(this.indices);
+        return Array.from(this.selectedRowIds).filter((id) => visibleIds.has(id));
     }
 
     // Set selected row IDs
@@ -120,6 +122,19 @@ class SlickGridDataProvider {
     reSort() {}
 
     refresh() {}
+
+    private reconcileSelectedRowIds() {
+        if (this.selectedRowIds.size === 0) {
+            return;
+        }
+
+        const visibleIds = new Set(this.indices);
+        for (const id of this.selectedRowIds) {
+            if (!visibleIds.has(id)) {
+                this.selectedRowIds.delete(id);
+            }
+        }
+    }
 }
 
 export default SlickGridDataProvider;
