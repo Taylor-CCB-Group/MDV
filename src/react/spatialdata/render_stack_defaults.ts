@@ -24,7 +24,8 @@ export function spatialEntryId(
     elementType: RenderStackSpatialElementType,
     elementKey: string,
 ) {
-    return `spatialdata-${elementType}-${elementKey}`;
+    const id = Math.random().toString(36).substring(2, 4+2);
+    return `spatialdata-${elementType}-${elementKey}-#${id}`;
 }
 
 function spatialEntry(

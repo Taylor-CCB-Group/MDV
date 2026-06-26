@@ -266,7 +266,12 @@ const SpatialLayerDialogComponent = observer(() => {
             const available = listAvailableSpatialEntries(spatialData, coordinateSystem);
             for (const entry of available) {
                 if (entry.kind !== "spatial") continue;
-                if (stack.entries.some((item) => item.id === entry.id)) continue;
+                // multiple entries for the same element are explicitly allowed
+                // (also, stack is a stable mobx reference and I think removed 
+                // elements weren't added back to insertOptions before)
+                // now that the id is more unique rather than, determined by elementKind&Key
+                // this wouldn't prevent multiple instances of the object anyway.
+                // if (stack.entries.some((item) => item.id === entry.id)) continue;
                 options.push({
                     kind: "spatial",
                     type: entry.source.elementType,
