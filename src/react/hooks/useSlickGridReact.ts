@@ -140,6 +140,9 @@ const useSlickGridReact = () => {
     const suppressSortSyncRef = useRef(false); // Flag to prevent feedback loops during sort sync
     const cleanupRef = useRef<(() => void) | null>(null); // Cleanup event handlers
     const isEditModeRef = useRef(isEditMode);
+    const dataProviderRef = useRef(
+        new SlickGridDataProvider(orderedParamColumns, sortedFilteredIndices, config.include_index),
+    );
 
     // Single instance of data model used in many places
     const dataModel = useMemo(() => 
@@ -320,32 +323,25 @@ const useSlickGridReact = () => {
     }, [config.include_index, orderedParamColumns, initialWidths, isEditMode]);
 
     /**
-     * A new data provider gets created whenever any of the dependencies change which
-     * will trigger an update to the grid
-     * 
-     * Creation of a new data provider isn't expensive according to LLM
-     */
-    const dataProvider = useMemo(() => {
-        return new SlickGridDataProvider(orderedParamColumns, sortedFilteredIndices, config.include_index);
-    }, [orderedParamColumns, sortedFilteredIndices, config.include_index]);
-
-    /**
-     * This useEffect is called whenever there is an update in dataProvider
-     * (sorting, filtering, editing, etc)
+     * Keep one SlickGridDataProvider instance and mutate it when indices/columns change.
+     * The grid holds a stable reference; invalidate() is enough after update().
      */
     useEffect(() => {
+        dataProviderRef.current.update(
+            orderedParamColumns,
+            sortedFilteredIndices,
+            config.include_index,
+        );
+
         const grid = gridRef.current?.slickGrid;
-        if (grid && dataProvider) {
-            // Skip update if selectionSourceRef is not empty
-            if (selectionSourceRef.current !== null) {
-                console.log("Skipping grid update during user selection");
-                return;
-            }
-            grid.setData(dataProvider, true);
-            grid.invalidate();
-            console.log("Grid updated");
+        if (!grid) {
+            return;
         }
-    }, [dataProvider]);
+        if (selectionSourceRef.current !== null) {
+            return;
+        }
+        grid.invalidate();
+    }, [orderedParamColumns, sortedFilteredIndices, config.include_index]);
 
     /**
      * This function handles grid creation, attaching data provider to the grid
@@ -355,30 +351,36 @@ const useSlickGridReact = () => {
      */
     const handleGridCreated = useCallback(
         (e: CustomEvent<SlickgridReactInstance>) => {
-            console.log("Grid created");
             gridRef.current = e.detail;
-            
+
             // Store gridRef in chart instance for getConfig() access
             chart.setGridRef(gridRef);
 
             const grid = e.detail.slickGrid;
-            if (grid && dataProvider) {
-                grid.setData(dataProvider, true);
-                grid.render();
-                
-                // Apply initial sort if config.sort is set
-                // we need this because the useEffect for sort sync won't run if grid is null
-                // and it won't rerun if we don't initially set the config.sort
-                if (config.sort) {
-                    suppressSortSyncRef.current = true;
-                    grid.setSortColumn(config.sort.columnId, config.sort.ascending);
-                    suppressSortSyncRef.current = false;
-                }
-
-                attachEventHandlers(e.detail);
+            if (!grid) {
+                return;
             }
+
+            dataProviderRef.current.update(
+                orderedParamColumnsRef.current,
+                sortedFilteredIndicesRef.current,
+                config.include_index,
+            );
+            grid.setData(dataProviderRef.current, true);
+            grid.render();
+
+            // Apply initial sort if config.sort is set
+            // we need this because the useEffect for sort sync won't run if grid is null
+            // and it won't rerun if we don't initially set the config.sort
+            if (config.sort) {
+                suppressSortSyncRef.current = true;
+                grid.setSortColumn(config.sort.columnId, config.sort.ascending);
+                suppressSortSyncRef.current = false;
+            }
+
+            attachEventHandlers(e.detail);
         },
-        [dataProvider, chart, config.sort],
+        [chart, config.sort, config.include_index],
     );
 
     /**
@@ -426,7 +428,6 @@ const useSlickGridReact = () => {
                 const configSortStr = JSON.stringify(config.sort);
                 
                 const isSame = currentSortStr === configSortStr;
-                console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
                 // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
                 // if not, then the type of config.sort.ascending should be optional.
                 // casting `as bool` just means that we make the types lie.
@@ -597,7 +598,7 @@ const useSlickGridReact = () => {
         const grid = gridRef.current?.slickGrid;
         if (!grid) return;
 
-        if (!dataProvider || !sortedFilteredIndices || sortedFilteredIndices.length === 0) {
+        if (!sortedFilteredIndices || sortedFilteredIndices.length === 0) {
             return;
         }
 
@@ -642,7 +643,7 @@ const useSlickGridReact = () => {
         } catch (err) {
             console.error("Error highlighting the rows in the table", err);
         }
-    }, [highlightedIndices, dataProvider, sortedFilteredIndices]);
+    }, [highlightedIndices, sortedFilteredIndices]);
 
     const isColumnEditable = useMemo(() => {
         const column = orderedParamColumns.find((col) => col.field === searchColumn);
