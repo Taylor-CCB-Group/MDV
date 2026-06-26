@@ -24,6 +24,18 @@ type Props = {
     chartColorBy?: string;
 };
 
+const toHex = (value: [number, number, number, number]) =>
+    `#${value
+        .slice(0, 3)
+        .map((channel) => Math.max(0, Math.min(255, channel)).toString(16).padStart(2, "0"))
+        .join("")}`;
+
+const fromHex = (hex: string): [number, number, number] => [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+];
+
 function ColorFields({
     label,
     value,
@@ -36,22 +48,14 @@ function ColorFields({
     return (
         <div className="grid gap-2">
             <Typography variant="caption">{label}</Typography>
-            <div className="grid grid-cols-4 gap-2">
-                {(["R", "G", "B", "A"] as const).map((channel, index) => (
-                    <TextField
-                        key={channel}
-                        size="small"
-                        type="number"
-                        label={channel}
-                        value={value[index] ?? 0}
-                        onChange={(event) => {
-                            const next = [...value] as [number, number, number, number];
-                            next[index] = Number(event.target.value);
-                            onChange(next);
-                        }}
-                    />
-                ))}
-            </div>
+            <input
+                type="color"
+                value={toHex(value)}
+                onChange={(event) => {
+                    const [r, g, b] = fromHex(event.target.value);
+                    onChange([r, g, b, value[3] ?? 255]);
+                }}
+            />
         </div>
     );
 }
@@ -95,8 +99,10 @@ export default function ShapesLayerPanel({
                 <Slider
                     size="small"
                     min={0}
-                    max={8}
-                    step={0.5}
+                    //nb seems like this is being capped by a default config.strokeWidthMaxPixels = 1
+                    //we should change that (could overwrite it ourselves) but for now limit this range
+                    max={1}
+                    step={0.1}
                     value={config.strokeWidth ?? 1}
                     onChange={(_, value) => {
                         if (typeof value === "number") {
