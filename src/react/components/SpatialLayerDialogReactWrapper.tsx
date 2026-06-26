@@ -47,7 +47,7 @@ class SpatialLayerDialogReactWrapper extends BaseDialog {
         }
         const config = {
             width: 560,
-            maxHeight: 720,
+            height: 700,
             title: `Layers (${parent.config.title})`,
             doc: parent.__doc__ || document,
             onclose: () => {
