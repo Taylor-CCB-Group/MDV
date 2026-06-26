@@ -31,6 +31,8 @@ import type { LayerConfig } from "@spatialdata/vis";
 import { useSpatialData } from "@spatialdata/react";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+
 
 import {
     DECK_OVERLAY_IDS,
@@ -64,6 +66,7 @@ import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
 import LabelsLayerPanel from "./spatialLayers/LabelsLayerPanel";
 import PointsLayerPanel from "./spatialLayers/PointsLayerPanel";
 import ShapesLayerPanel from "./spatialLayers/ShapesLayerPanel";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 type InsertOption =
     | { kind: "spatial"; type: RenderStackSpatialElementType; elementKey: string; label: string }
@@ -221,7 +224,15 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
                 </div>
             </AccordionSummary>
             <AccordionDetails>
-                <LayerDetails entryId={entryId} />
+                <ErrorBoundary FallbackComponent={({error}) => (
+                    <ErrorComponentReactWrapper
+                        error={{message: error.message, stack: error.stack}}
+                        title={`Error in ${entry.id}`}
+                        extraMetaData={entry}
+                    />
+                )}>
+                    <LayerDetails entryId={entryId} />
+                </ErrorBoundary>
             </AccordionDetails>
         </Accordion>
     );
