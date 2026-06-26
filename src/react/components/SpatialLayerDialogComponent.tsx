@@ -340,7 +340,8 @@ const SpatialLayerDialogComponent = observer(() => {
         );
     }
 
-    const entryIds = renderStackEntryIds(stack);
+    // crude bypass of MDV layers in dialog for now.
+    const entryIds = renderStackEntryIds(stack).filter(id => !id.startsWith("deck:"));
 
     return (
         <div
