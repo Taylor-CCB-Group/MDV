@@ -82,9 +82,12 @@ def create_flask_app(config_name=None):
     try:
         logger.info("Creating tables")
         with app.app_context():
-            logger.info("Waiting for DB to set up")
-            if config_name != 'test':
+            db_backend = app.config.get('DB_BACKEND', 'sqlite')
+            if config_name != 'test' and db_backend == 'postgres':
+                logger.info("Waiting for PostgreSQL to set up")
                 wait_for_database(app)
+            elif config_name != 'test':
+                logger.info("SQLite backend selected; skipping PostgreSQL readiness checks")
             if not tables_exist():
                 logger.info("Creating database tables")
                 db.create_all()
@@ -181,6 +184,7 @@ def wait_for_database(app):
         os.getenv('DB_HOST'),
         db_name
     )
+    db_schema = (os.getenv('DB_SCHEMA') or '').strip()
     
     # Update the database URI in the app config (this is the same as the initial URI from load_config)
     app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
@@ -219,6 +223,17 @@ def wait_for_database(app):
             # The engine should already be valid since the URI hasn't changed
             test_connection = None
             try:
+                if db_schema:
+                    schema_engine = create_engine(target_uri, isolation_level="AUTOCOMMIT")
+                    schema_connection = None
+                    try:
+                        schema_connection = schema_engine.connect()
+                        schema_connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{db_schema}"'))
+                        logger.info(f"Ensured database schema exists: {db_schema}")
+                    finally:
+                        if schema_connection:
+                            schema_connection.close()
+                        schema_engine.dispose()
                 test_connection = db.engine.connect()
                 test_connection.execute(text('SELECT 1'))
                 logger.info("Successfully connected to target database")
@@ -300,18 +315,37 @@ def load_config(app, config_name=None, enable_auth=False):
         if config_name == 'test':
             app.config['PREFERRED_URL_SCHEME'] = 'http'
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+            app.config['DB_BACKEND'] = 'sqlite'
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
-            
-            db_user = os.getenv('DB_USER') or read_secret('db_user')
-            db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
-            db_name = os.getenv('DB_NAME') or read_secret('db_name')
-            db_host = os.getenv('DB_HOST') or app.config.get('db_host')
+            db_backend = (os.getenv('DB_BACKEND') or 'sqlite').strip().lower()
+            if db_backend not in ['sqlite', 'postgres']:
+                logger.warning(f"Unknown DB_BACKEND '{db_backend}', defaulting to sqlite")
+                db_backend = 'sqlite'
 
-            if not all([db_user, db_password, db_name, db_host]):
-                raise ValueError("Error: One or more required secrets or configurations are missing.")
-            
-            app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+            app.config['DB_BACKEND'] = db_backend
+
+            if db_backend == 'sqlite':
+                sqlite_db_path = (os.getenv('SQLITE_DB_PATH') or '/app/mdv/mdv.sqlite3').strip()
+                app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_db_path}'
+                logger.info(f"Database backend selected: sqlite (path: {sqlite_db_path})")
+            else:
+                db_user = os.getenv('DB_USER') or read_secret('db_user')
+                db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
+                db_name = os.getenv('DB_NAME') or read_secret('db_name')
+                db_host = os.getenv('DB_HOST') or app.config.get('db_host')
+                db_schema = (os.getenv('DB_SCHEMA') or '').strip()
+
+                if not all([db_user, db_password, db_name, db_host]):
+                    raise ValueError("Error: One or more required secrets or configurations are missing.")
+                
+                app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+                if db_schema:
+                    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+                        'connect_args': {'options': f'-csearch_path={db_schema}'}
+                    }
+                    logger.info(f"Using database schema: {db_schema}")
+                logger.info(f"Database backend selected: postgres (host: {db_host}, db: {db_name})")
 
 
             # Only configure Auth0 if ENABLE_AUTH is True
