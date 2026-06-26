@@ -205,16 +205,19 @@ export function seedRenderStackFromSpatialData(
 
     runInAction(() => {
         let changed = false;
+        if (!config.renderStack) {
+            throw new Error(`Unexpected config with no renderStack ${config }`);
+        }
         if (chart?.seedDefaultSpatialLayers) {
             changed =
                 insertDefaultImageLayer(
-                    config.renderStack!,
+                    config.renderStack,
                     spatialData,
                     coordinateSystem,
                 ) || changed;
             chart.finishDefaultSpatialLayerSeed();
         }
-        changed = mergeHostOverlayEntriesInPlace(config.renderStack!) || changed;
+        changed = mergeHostOverlayEntriesInPlace(config.renderStack) || changed;
         if (changed) {
             chart?.bumpRenderStackGeneration();
         }
