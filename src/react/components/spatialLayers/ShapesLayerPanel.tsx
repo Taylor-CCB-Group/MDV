@@ -48,14 +48,28 @@ function ColorFields({
     return (
         <div className="grid gap-2">
             <Typography variant="caption">{label}</Typography>
-            <input
-                type="color"
-                value={toHex(value)}
-                onChange={(event) => {
-                    const [r, g, b] = fromHex(event.target.value);
-                    onChange([r, g, b, value[3] ?? 255]);
-                }}
-            />
+            <div className="flex items-center gap-3">
+                <input
+                    type="color"
+                    value={toHex(value)}
+                    onChange={(event) => {
+                        const [r, g, b] = fromHex(event.target.value);
+                        onChange([r, g, b, value[3] ?? 255]);
+                    }}
+                />
+                <Slider
+                    size="small"
+                    min={0}
+                    max={255}
+                    step={1}
+                    value={value[3] ?? 255}
+                    onChange={(_, next) => {
+                        if (typeof next === "number") {
+                            onChange([value[0], value[1], value[2], next]);
+                        }
+                    }}
+                />
+            </div>
         </div>
     );
 }
