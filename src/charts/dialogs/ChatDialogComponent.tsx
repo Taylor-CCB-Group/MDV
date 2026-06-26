@@ -1,6 +1,6 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
-import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
+import { type ChatProgress, type ChatMessage, type ChatModelOption, navigateToView } from './ChatAPI';
 import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
@@ -17,6 +17,10 @@ import {
     Divider,
     IconButton,
     InputAdornment,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
     Skeleton,
     TextField,
     Typography,
@@ -143,6 +147,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     view,
     verification,
     data_preview,
+    guidance,
     needs_refresh,
     onClose,
     error,
@@ -176,6 +181,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     const handleCopy = async () => {
         try {
             const parts: string[] = [];
+            if (guidance?.trim()) parts.push(guidance.trim());
             if (data_preview?.trim()) parts.push(data_preview.trim());
             if (verification?.trim()) parts.push(verification.trim());
             if (markdownContent) parts.push(markdownContent);
@@ -206,6 +212,13 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                         )}
                     </IconButton>
                 )}
+                {sender === 'bot' && !error && guidance?.trim() && (
+                    <ChatPreviewBlock
+                        title="Analysis summary"
+                        content={guidance.trim()}
+                        defaultExpandedWhenLong
+                    />
+                )}
                 {sender === 'bot' && !error && data_preview?.trim() && (
                     <ChatPreviewBlock
                         variant="data"
@@ -215,14 +228,12 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 )}
                 {sender === 'bot' && !error && verification?.trim() && (
                     <ChatPreviewBlock
-                        //title="What you can verify"
-                        //title='xxxxx'
-                        title=""
+                        title="What you can verify"
                         content={verification.trim()}
                         defaultExpandedWhenLong
                     />
                 )}
-                {sender === 'bot' && !error && (data_preview?.trim() || verification?.trim()) ? (
+                {sender === 'bot' && !error && (guidance?.trim() || data_preview?.trim() || verification?.trim()) ? (
                     <Accordion
                         defaultExpanded={false}
                         disableGutters
@@ -243,7 +254,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 {view && sender === 'bot' && !error && (
                     <Box sx={{ mt: 2 }}>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                            Review the data preview and verification above, then open the view.
+                            Review the analysis summary and data preview above, then open the view.
                         </Typography>
                         <Button
                             variant="contained"
@@ -450,10 +461,24 @@ export type ChatBotProps = {
     verboseProgress: string[];
     onClose: () => void;
     suggestedQuestions: string[];
+    availableModels: ChatModelOption[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
 };
 
 
-const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose, suggestedQuestions}: ChatBotProps) => {
+const Chatbot = ({
+    messages,
+    isSending,
+    sendAPI,
+    requestProgress,
+    verboseProgress,
+    onClose,
+    suggestedQuestions,
+    availableModels,
+    selectedModelId,
+    onModelChange,
+}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastMessageRef = useRef<HTMLDivElement>(null);
@@ -502,7 +527,7 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         const hasPreview =
             last?.sender === 'bot' &&
             !last?.error &&
-            (Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
+            (Boolean(last.guidance?.trim()) || Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
 
         if (!isSending && hasPreview && lastMessageRef.current) {
             lastMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -542,7 +567,29 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 <RobotPandaSVG />
             </Box> */}
             <Divider />
-            <Box className="flex p-4 w-full">
+            <Box className="flex flex-col p-4 w-full gap-2">
+                {availableModels.length > 1 ? (
+                    <FormControl size="small" fullWidth disabled={isSending}>
+                        <InputLabel id="chatmdv-model-label">Model</InputLabel>
+                        <Select
+                            labelId="chatmdv-model-label"
+                            label="Model"
+                            value={selectedModelId}
+                            onChange={(e) => onModelChange(e.target.value)}
+                        >
+                            {availableModels.map((model) => (
+                                <MenuItem key={model.id} value={model.id}>
+                                    {model.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                ) : availableModels.length === 1 ? (
+                    <Typography variant="caption" color="text.secondary">
+                        Model: {availableModels[0].label}
+                    </Typography>
+                ) : null}
+            <Box className="flex w-full">
                 <TextField
                     type="text"
                     // disabled={isSending} //we can still type while it's processing
@@ -570,6 +617,7 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
                     Send
                 </Button>
+            </Box>
             </Box>
         </Box>
     );

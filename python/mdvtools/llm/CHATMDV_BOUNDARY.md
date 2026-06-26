@@ -11,7 +11,7 @@ Chat-generated behavior (prompting, code policy, execution wrappers, verificatio
 | Datasource hints for LLM | [`datasource_roles.py`](datasource_roles.py) |
 | Subprocess execution wrapper | [`code_execution.py`](code_execution.py) |
 | Chat verification summaries | [`verification.py`](verification.py) |
-| Supporting LLM helpers | Other modules in this directory (e.g. `code_manipulation.py`, `column_field_resolve.py`) |
+| Supporting LLM helpers | Other modules in this directory (e.g. `code_manipulation.py`, `column_field_resolve.py`, `dataset_scale.py`) |
 
 ## Tests (regression / policy)
 
@@ -37,6 +37,8 @@ If the UI errors on a bad chart `param` (e.g. wrong field id), **fix prompts / f
 **Visualization vs analysis consistency:** Use `format_visualization_consistency_policy()` in [`datasource_roles.py`](datasource_roles.py). Saved MDV charts must reflect the same pipeline as printed tables—do not mix Scanpy/AnnData outputs with unrelated wrapper-based expression heatmaps for the same quantitative claim.
 
 **`rank_genes_groups` vs DotPlot/Heatmap on `cells`:** Use `format_marker_ranking_viz_policy()` and `CHAT_RANK_GENES_DATASOURCE_NAME` in [`datasource_roles.py`](datasource_roles.py). Do not use wrapper-based DotPlot or Heatmap on the **observation** datasource as a substitute for the full Scanpy marker **statistics table**. Prefer **bounded `print`**, or persist the long-format `DataFrame` with `add_datasource('chat_rank_genes_result', ..., replace_data=True, add_to_view=...)`; avoid `set_view` that overwrites `initialCharts` and drops the scratch table.
+
+**MDV-first / Scanpy last resort (large projects):** Use [`dataset_scale.py`](dataset_scale.py) (`assess_project_scale`, `load_agent_dataframes`) and `format_mdv_first_data_access_policy()` in [`datasource_roles.py`](datasource_roles.py). Prompts and the pandas agent should compare project row count and available RAM, prefer MDV chart APIs and column-subset `get_datasource_as_dataframe`, and treat Scanpy (with `backed='r'` on large `.h5ad`) as last resort for marker/DE workflows only—not for chart-only views. Enforcement is prompt/agent guidance only (no preflight blocks).
 
 ## Pre-merge drift check
 

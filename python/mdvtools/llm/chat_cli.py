@@ -13,6 +13,7 @@ from typing import Any, Optional
 from urllib.parse import urlparse
 
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChat
+from mdvtools.llm.llm_providers import resolve_chat_model_id
 from mdvtools.mdvproject import MDVProject
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -52,6 +53,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Print extra diagnostic context in human-readable mode.",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Chat model to use (canonical id or bare name, e.g. "
+            "openai:chat:gpt-4.1 or gpt-4o-mini). Defaults to CHATMDV_DEFAULT_MODEL "
+            "or the first discovered model."
+        ),
     )
     return parser
 
@@ -178,11 +188,13 @@ def run_chat_once(
     prompt: str,
     output_dir: Optional[str] = None,
     view_name: Optional[str] = None,
+    model_id: Optional[str] = None,
 ) -> tuple[dict[str, Any], int]:
     abs_project = str(Path(project_path).expanduser().resolve())
     views_file = str(Path(abs_project) / "views.json")
     debug_output_dir: Optional[str] = None
     timing_capture_start = time.perf_counter()
+    resolved_model_id = resolve_chat_model_id(model_id)
 
     try:
         captured_output = ""
@@ -215,6 +227,8 @@ def run_chat_once(
             "room": "chat-cli",
             "handle_error": _handle_error,
         }
+        if resolved_model_id:
+            chat_request["model_id"] = resolved_model_id
         from io import StringIO
         from contextlib import redirect_stdout, redirect_stderr
         out_stream = StringIO()
@@ -251,6 +265,7 @@ def run_chat_once(
         _ver = ask_result.get("verification")
         normalized["verification"] = _ver if isinstance(_ver, str) else ""
         normalized["needs_refresh"] = bool(ask_result.get("needs_refresh", False))
+        normalized["model_id"] = resolved_model_id
 
         if output_dir:
             debug_output_dir = _write_debug_artifacts(
@@ -278,6 +293,7 @@ def run_chat_once(
             "chart_count": 0,
             "verification": "",
             "needs_refresh": False,
+            "model_id": resolved_model_id,
         }
         if output_dir:
             try:
@@ -356,6 +372,7 @@ def run_batch_prompts(
     csv_log: str,
     base_url: str,
     output_dir: Optional[str] = None,
+    model_id: Optional[str] = None,
 ) -> tuple[list[dict[str, Any]], int]:
     prompts = _load_prompts(prompt_file)
     rows: list[dict[str, Any]] = []
@@ -374,6 +391,7 @@ def run_batch_prompts(
             prompt=prompt,
             output_dir=str(run_out) if run_out else None,
             view_name=None,
+            model_id=model_id,
         )
         finished = datetime.now(timezone.utc)
         if exit_code != 0:
@@ -411,9 +429,17 @@ def _print_human_result(result: dict[str, Any], *, verbose: bool = False) -> Non
     status = "SUCCESS" if result["success"] else "FAILED"
     print(status)
     print(f"Message: {result['message']}")
+    print(f"Duration: {float(result.get('duration_seconds', 0.0)):.3f}s")
     print(f"Project: {result['project_path']}")
     print(f"Views file: {result['views_file']}")
     print(f"View: {result['view_name']}")
+    if result.get("model_id"):
+        print(f"Model: {result['model_id']}")
+    block_timings = result.get("block_timings") or {}
+    if verbose and isinstance(block_timings, dict) and block_timings:
+        print("Block timings:")
+        for key in sorted(block_timings):
+            print(f"  {key}: {float(block_timings[key]):.3f}s")
     if result.get("debug_output_dir"):
         print(f"Debug output dir: {result['debug_output_dir']}")
     elif verbose:
@@ -425,6 +451,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         args = parser.parse_args(argv)
         _validate_mode_args(args)
+        try:
+            resolve_chat_model_id(args.model)
+        except ValueError as exc:
+            print(f"Argument error: {exc}", file=sys.stderr)
+            return 2
         if args.prompt_file:
             rows, exit_code = run_batch_prompts(
                 project_path=args.project,
@@ -432,6 +463,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 csv_log=args.csv_log,
                 base_url=args.base_url,
                 output_dir=args.output_dir,
+                model_id=args.model,
             )
             summary = {
                 "batch_count": len(rows),
@@ -451,6 +483,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             prompt=args.prompt,
             output_dir=args.output_dir,
             view_name=args.view_name,
+            model_id=args.model,
         )
 
         if args.json_output:

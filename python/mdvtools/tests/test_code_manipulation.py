@@ -2,8 +2,10 @@ from mdvtools.llm.code_manipulation import (
     parse_view_name,
     patch_viewname,
     resolve_persisted_view_name,
+    _autofix_generated_code,
 )
 from mdvtools.llm.code_manipulation import prepare_code, _defines_function_named_main
+from mdvtools.llm.code_preflight import validate_generated_code_preflight
 
 
 class _FakeProjectViews:
@@ -81,6 +83,18 @@ def test_resolve_persisted_view_name_omits_missing_view():
 
     assert resolve_persisted_view_name(project, "Saved view") == "Saved view"
     assert resolve_persisted_view_name(project, "Print-only answer") is None
+
+
+def test_autofix_stacked_row_chart_import_path():
+    code = (
+        "from mdvtools.charts.stacked_row_chart import StackedRowChart\n"
+        "chart = StackedRowChart(title='t', params=['a', 'b'], size=[100, 100], position=[0, 0])\n"
+    )
+    fixed = _autofix_generated_code(code, log=lambda _m: None)
+    assert "mdvtools.charts.stacked_row_plot" in fixed
+    assert "mdvtools.charts.stacked_row_chart" not in fixed
+    result = validate_generated_code_preflight(fixed)
+    assert result.ok
 
 
 def test_prepare_code_does_not_append_else_when_llm_includes_else_main(tmp_path):

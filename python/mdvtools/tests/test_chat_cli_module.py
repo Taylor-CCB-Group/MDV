@@ -1,6 +1,7 @@
 import json
 
 from mdvtools.llm import chat_cli
+from mdvtools.llm.chat_protocol import ChatRequest
 from mdvtools.mdvproject import MDVProject
 
 
@@ -137,6 +138,67 @@ def test_run_chat_once_installs_socketio_shim_when_missing(tmp_path, monkeypatch
     assert exit_code == 0
     assert result["success"] is True
     assert mdv_websocket.socketio is not None
+
+
+def test_run_chat_once_passes_model_id_to_ask_question(tmp_path, monkeypatch):
+    project = _make_project(tmp_path)
+    captured: dict[str, ChatRequest] = {}
+
+    class FakeProjectChat:
+        def __init__(self, incoming_project):
+            self.project = incoming_project
+            self.init_error = False
+
+        def ask_question(self, chat_request):
+            captured["chat_request"] = chat_request
+            return {
+                "code": "```python\nprint('ok')\n```",
+                "view_name": "v_model",
+                "error": False,
+                "message": "Success",
+                "verification": None,
+                "data_preview": None,
+                "needs_refresh": False,
+            }
+
+    monkeypatch.setattr(chat_cli, "ProjectChat", FakeProjectChat)
+    monkeypatch.setattr(
+        chat_cli,
+        "resolve_chat_model_id",
+        lambda model: "openai:chat:gpt-4o-mini" if model == "gpt-4o-mini" else None,
+    )
+
+    result, exit_code = chat_cli.run_chat_once(
+        project_path=str(project.dir),
+        prompt="run",
+        model_id="gpt-4o-mini",
+    )
+
+    assert exit_code == 0
+    assert captured["chat_request"].get("model_id") == "openai:chat:gpt-4o-mini"
+    assert result["model_id"] == "openai:chat:gpt-4o-mini"
+
+
+def test_main_rejects_unknown_model(tmp_path, monkeypatch, capsys):
+    project = _make_project(tmp_path)
+    monkeypatch.setattr(
+        chat_cli,
+        "resolve_chat_model_id",
+        lambda _model: (_ for _ in ()).throw(ValueError("Unknown chat model 'bad'")),
+    )
+
+    exit_code = chat_cli.main(
+        [
+            "--project",
+            str(project.dir),
+            "--prompt",
+            "run",
+            "--model",
+            "bad",
+        ]
+    )
+    assert exit_code == 2
+    assert "Unknown chat model" in capsys.readouterr().err
 
 
 def test_run_chat_once_renames_view_with_view_name(tmp_path, monkeypatch):
