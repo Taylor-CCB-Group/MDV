@@ -11,7 +11,6 @@ let chunkWorkerEnabled = false;
 export function ensureChunkWorker(options?: EnableWorkerChunkDecodeOptions) {
     if (chunkWorkerEnabled) return;
     // we should get rid of this and let spatialdata enable by default.
-    // enableWorkerChunkDecode(options);
-    console.log("redundant call to enableWorkerChunkDecode which should now be done by default")
+    enableWorkerChunkDecode(options);
     chunkWorkerEnabled = true;
 }
