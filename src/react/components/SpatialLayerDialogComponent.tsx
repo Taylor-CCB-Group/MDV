@@ -1,12 +1,11 @@
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
     Autocomplete,
     Checkbox,
+    Collapse,
     IconButton,
     Slider,
     TextField,
@@ -30,7 +29,7 @@ import type { RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { useSpatialData } from "@spatialdata/react";
 import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 
@@ -41,7 +40,7 @@ import {
     deckIdFromHostLayerId,
     type DeckOverlayId,
 } from "@/react/spatialdata/host_overlay_ids";
-import { renderStackEntryDisplayName, renderStackOrderLabel } from "@/react/spatialdata/render_stack_display";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import {
     insertHostRenderStackEntry,
     insertSpatialRenderStackEntry,
@@ -128,12 +127,18 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
     }
 });
 
-const SortableLayerAccordion = observer(function SortableLayerAccordion({
+const LayerTreeRow = observer(function LayerTreeRow({
     entryId,
+    selected,
+    onSelect,
     onRemove,
+    indent,
 }: {
     entryId: string;
+    selected: boolean;
+    onSelect: (entryId: string) => void;
     onRemove: (entryId: string) => void;
+    indent?: boolean;
 }) {
     const { entry, patchEntry, patchProps } = useRenderStackEntry(entryId);
     const {
@@ -147,7 +152,7 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
 
     if (!entry) return null;
 
-    const opacity = typeof entry.props.opacity === "number" ? entry.props.opacity : 1;
+    const layerOpacity = typeof entry.props.opacity === "number" ? entry.props.opacity : 1;
     const supportsOpacity = entry.kind === "spatial";
 
     const style = {
@@ -157,84 +162,62 @@ const SortableLayerAccordion = observer(function SortableLayerAccordion({
     };
 
     return (
-        <Accordion
+        <div
             ref={setNodeRef}
             style={style}
-            disableGutters
-            sx={{ width: "100%", display: "block" }}
-            defaultExpanded={entry.kind === "spatial"}
+            className={`flex items-center gap-1 py-0.5 cursor-pointer rounded ${indent ? "pl-5 pr-1" : "px-1"} ${selected ? "bg-blue-100 dark:bg-blue-900/30" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+            onClick={() => onSelect(entryId)}
         >
-            <AccordionSummary expandIcon={<ArrowDropDownIcon />}>
-                {isRemovableRenderStackEntry(entry) && (
-                    <IconButton
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onRemove(entryId);
+            <IconButton
+                {...attributes}
+                {...listeners}
+                size="small"
+                sx={{ cursor: "grab", flexShrink: 0 }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <DragIndicatorIcon fontSize="small" />
+            </IconButton>
+            <Checkbox
+                size="small"
+                checked={entry.visible}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => patchEntry({ visible: e.target.checked })}
+                sx={{ p: 0.25, flexShrink: 0 }}
+            />
+            <Typography variant="body2" className="grow truncate select-none">
+                {renderStackEntryDisplayName(entry)}
+            </Typography>
+            {supportsOpacity && (
+                <div
+                    className="w-20 px-1 flex-shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Slider
+                        size="small"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={layerOpacity}
+                        onChange={(_, value) => {
+                            if (typeof value === "number") patchProps({ opacity: value });
                         }}
-                        aria-label="remove layer"
-                        size="small"
-                        sx={{
-                            position: "absolute",
-                            right: "-18px",
-                            top: "-18px",
-                        }}
-                    >
-                        <HighlightOffIcon fontSize="small" />
-                    </IconButton>
-                )}
-                <div className="flex w-full items-center gap-2">
-                    <IconButton
-                        {...attributes}
-                        {...listeners}
-                        size="small"
-                        sx={{ cursor: "grab" }}
-                    >
-                        <DragIndicatorIcon fontSize="small" />
-                    </IconButton>
-                    <Checkbox
-                        size="small"
-                        checked={entry.visible}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) =>
-                            patchEntry({ visible: event.target.checked })
-                        }
                     />
-                    <Typography variant="subtitle1" className="grow">
-                        {renderStackEntryDisplayName(entry)}
-                    </Typography>
-                    {supportsOpacity && (
-                        <div
-                            className="w-32 px-2"
-                            onClick={(event) => event.stopPropagation()}
-                        >
-                            <Slider
-                                size="small"
-                                min={0}
-                                max={1}
-                                step={0.01}
-                                value={opacity}
-                                onChange={(_, value) => {
-                                    if (typeof value === "number") {
-                                        patchProps({ opacity: value });
-                                    }
-                                }}
-                            />
-                        </div>
-                    )}
                 </div>
-            </AccordionSummary>
-            <AccordionDetails>
-                <ErrorBoundary FallbackComponent={({error}) => (
-                    <ErrorComponentReactWrapper
-                        error={{message: error.message, stack: error.stack}}
-                        title={`Error in ${entry.id}`}
-                        extraMetaData={entry}
-                    />
-                )}>
-                    <LayerDetails entryId={entryId} />
-                </ErrorBoundary>
-            </AccordionDetails>
-        </Accordion>
+            )}
+            {isRemovableRenderStackEntry(entry) && (
+                <IconButton
+                    size="small"
+                    sx={{ flexShrink: 0 }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(entryId);
+                    }}
+                    aria-label="remove layer"
+                >
+                    <HighlightOffIcon fontSize="small" />
+                </IconButton>
+            )}
+        </div>
     );
 });
 
@@ -244,6 +227,9 @@ const SpatialLayerDialogComponent = observer(() => {
     const { spatialData } = useSpatialData();
     const stack = config.renderStack;
     const mutateStack = useRenderStackMutation();
+    const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+    const [spatialCollapsed, setSpatialCollapsed] = useState(false);
+    const [deckCollapsed, setDeckCollapsed] = useState(false);
     const coordinateSystem = //todo datasources schema including spatial regions when referring to dataStore here.
         (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })
             ?.spatial?.coordinate_system ?? null;
@@ -267,7 +253,7 @@ const SpatialLayerDialogComponent = observer(() => {
             for (const entry of available) {
                 if (entry.kind !== "spatial") continue;
                 // multiple entries for the same element are explicitly allowed
-                // (also, stack is a stable mobx reference and I think removed 
+                // (also, stack is a stable mobx reference and I think removed
                 // elements weren't added back to insertOptions before)
                 // now that the id is more unique rather than, determined by elementKind&Key
                 // this wouldn't prevent multiple instances of the object anyway.
@@ -292,7 +278,7 @@ const SpatialLayerDialogComponent = observer(() => {
         return options.sort((a, b) => a.label.localeCompare(b.label));
     }, [coordinateSystem, spatialData, stack]);
 
-    const onDragEnd = useCallback(
+    const makeOnDragEnd = useCallback(
         (event: DragEndEvent) => {
             if (!stack) return;
             const { active, over } = event;
@@ -327,12 +313,17 @@ const SpatialLayerDialogComponent = observer(() => {
         [mutateStack],
     );
 
+    const onRemove = useCallback(
+        (id: string) => {
+            mutateStack((current) => removeRenderStackEntry(current, id));
+            if (selectedEntryId === id) setSelectedEntryId(null);
+        },
+        [mutateStack, selectedEntryId],
+    );
+
     if (!stack?.entries.length) {
         return (
-            <div
-                className="block w-full p-3"
-                style={{ display: "block", alignItems: "stretch" }}
-            >
+            <div className="block w-full p-3">
                 <Typography color="text.secondary">
                     Layer stack is loading…
                 </Typography>
@@ -341,29 +332,100 @@ const SpatialLayerDialogComponent = observer(() => {
     }
 
     // crude bypass of MDV layers in dialog for now.
-    const entryIds = renderStackEntryIds(stack).filter(id => !id.startsWith("deck:"));
+    const entryIds = renderStackEntryIds(stack);//.filter(id => !id.startsWith("deck:"));
+    const spatialEntryIds = entryIds.filter(id => !id.startsWith("deck:"));
+    const hostEntryIds = entryIds.filter(id => id.startsWith("deck:"));
 
     return (
-        <div
-            className="block w-full space-y-2 overflow-y-auto p-3"
-            style={{ display: "block", alignItems: "stretch" }}
-        >
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-                <SortableContext items={entryIds} strategy={verticalListSortingStrategy}>
-                    {entryIds.map((entryId) => (
-                        <SortableLayerAccordion
-                            key={entryId}
-                            entryId={entryId}
-                            onRemove={(id) => {
-                                mutateStack((current) => {
-                                    removeRenderStackEntry(current, id);
-                                });
-                            }}
-                        />
-                    ))}
-                </SortableContext>
-            </DndContext>
-            <div className="mt-4">
+        <div className="flex flex-col w-full h-full">
+            {/* Layer tree */}
+            <div className="flex-none overflow-y-auto border-b border-gray-200 dark:border-gray-700" style={{ maxHeight: "40%" }}>
+                {spatialEntryIds.length > 0 && (
+                    <>
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => setSpatialCollapsed(c => !c)}
+                        >
+                            {spatialCollapsed ? <ChevronRightIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                            <Typography variant="caption" color="text.secondary" className="font-semibold uppercase tracking-wide select-none">
+                                Spatial elements
+                            </Typography>
+                        </button>
+                        <Collapse in={!spatialCollapsed}>
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={makeOnDragEnd}>
+                                <SortableContext items={spatialEntryIds} strategy={verticalListSortingStrategy}>
+                                    {spatialEntryIds.map((id) => (
+                                        <LayerTreeRow
+                                            key={id}
+                                            entryId={id}
+                                            selected={selectedEntryId === id}
+                                            onSelect={setSelectedEntryId}
+                                            onRemove={onRemove}
+                                            indent
+                                        />
+                                    ))}
+                                </SortableContext>
+                            </DndContext>
+                        </Collapse>
+                    </>
+                )}
+                {hostEntryIds.length > 0 && (
+                    <>
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => setDeckCollapsed(c => !c)}
+                        >
+                            {deckCollapsed ? <ChevronRightIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                            <Typography variant="caption" color="text.secondary" className="font-semibold uppercase tracking-wide select-none">
+                                Deck overlays
+                            </Typography>
+                        </button>
+                        <Collapse in={!deckCollapsed}>
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={makeOnDragEnd}>
+                                <SortableContext items={hostEntryIds} strategy={verticalListSortingStrategy}>
+                                    {hostEntryIds.map((id) => (
+                                        <LayerTreeRow
+                                            key={id}
+                                            entryId={id}
+                                            selected={selectedEntryId === id}
+                                            onSelect={setSelectedEntryId}
+                                            onRemove={onRemove}
+                                            indent
+                                        />
+                                    ))}
+                                </SortableContext>
+                            </DndContext>
+                        </Collapse>
+                    </>
+                )}
+            </div>
+
+            {/* Properties pane */}
+            <div className="flex-1 overflow-y-auto p-2 min-h-0">
+                {selectedEntryId ? (
+                    <ErrorBoundary
+                        key={selectedEntryId}
+                        FallbackComponent={({ error }) => (
+                            <ErrorComponentReactWrapper
+                                error={{ message: error.message, stack: error.stack }}
+                                title={`Error in ${selectedEntryId}`}
+                                extraMetaData={{}}
+                            />
+                        )}
+                    >
+                        <LayerDetails entryId={selectedEntryId} />
+                    </ErrorBoundary>
+                ) : (
+                    <Typography color="text.secondary" variant="body2">
+                        Select a layer to view its properties.
+                    </Typography>
+                )}
+            </div>
+
+            {/* Insert layer */}
+            <div className="flex-none p-2 border-t border-gray-200 dark:border-gray-700">
                 <Autocomplete
                     size="small"
                     options={insertOptions}
@@ -381,9 +443,6 @@ const SpatialLayerDialogComponent = observer(() => {
                     )}
                 />
             </div>
-            <Typography variant="caption" color="text.secondary" className="mt-2 block">
-                Layer order: {renderStackOrderLabel(stack)}
-            </Typography>
         </div>
     );
 });
