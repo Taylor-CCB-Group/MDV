@@ -135,7 +135,8 @@ export default function ShapesLayerPanel({
                 value={strokeColor}
                 onChange={(next) => updateLayer({ strokeColor: next })}
             />
-            <Autocomplete
+            {/* tooltip & fillColor not working yet here */}
+            {/* <Autocomplete
                 multiple
                 size="small"
                 options={options}
@@ -177,7 +178,7 @@ export default function ShapesLayerPanel({
                         {field}
                     </MenuItem>
                 ))}
-            </Select>
+            </Select> */}
         </div>
     );
 }

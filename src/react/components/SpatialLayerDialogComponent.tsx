@@ -114,13 +114,13 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
                 />
             );
         case "labels":
-            return (
-                <LabelsLayerPanel
-                    config={layer as Extract<LayerConfig, { type: "labels" }>}
-                    association={NO_TABLE_ASSOCIATION}
-                    availableFields={availableFields}
-                    updateLayer={patchLayer}
-                />
+            return ( null //nothing useful here at the moment.
+                // <LabelsLayerPanel
+                //     config={layer as Extract<LayerConfig, { type: "labels" }>}
+                //     association={NO_TABLE_ASSOCIATION}
+                //     availableFields={availableFields}
+                //     updateLayer={patchLayer}
+                // />
             );
         default:
             return null;
