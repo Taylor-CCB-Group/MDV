@@ -1,4 +1,4 @@
-from typing import Optional, Protocol, Any, TypedDict, Union
+from typing import NotRequired, Optional, Protocol, Any, TypedDict, Union
 from mdvtools.mdvproject import MDVProject
 
 
@@ -9,6 +9,7 @@ class AskQuestionResult(TypedDict):
     message: str
     verification: Optional[str]
     data_preview: Optional[str]
+    guidance: Optional[str]
     needs_refresh: bool
 
 
@@ -23,6 +24,7 @@ class ChatRequest(TypedDict):
     conversation_id: str
     room: str
     handle_error: HandleError
+    model_id: NotRequired[str]
 
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
@@ -69,6 +71,7 @@ except Exception as e:
                 message=f"Sorry, I can't help you right now\n\n{msg}",
                 verification=None,
                 data_preview=None,
+                guidance=None,
                 needs_refresh=False,
             )
 

@@ -13,6 +13,7 @@ def main():
     assert res.ok is False
     msgs = " | ".join(i.message for i in res.issues)
     assert "Unknown chart class `MultilineChart`" in msgs
+    assert "did you mean `MultiLinePlot`?" in msgs
 
 
 def test_preflight_rejects_unknown_chart_class():
@@ -23,6 +24,18 @@ def main():
     res = validate_generated_code_preflight(code)
     assert res.ok is False
     assert any(i.code == "unknown_chart_class" for i in res.issues)
+
+
+def test_preflight_rejects_multiline_chart_camelcase_alias():
+    code = """
+def main():
+    c = MultiLineChart(title="x", params=["a", "b"])
+"""
+    res = validate_generated_code_preflight(code)
+    assert res.ok is False
+    msgs = " | ".join(i.message for i in res.issues)
+    assert "Unknown chart class `MultiLineChart`" in msgs
+    assert "did you mean `MultiLinePlot`?" in msgs
 
 
 def test_preflight_rejects_unknown_histogram_alias():
@@ -124,6 +137,27 @@ def main():
     assert res.ok is False
     assert any(i.code == "unknown_datasource_column" for i in res.issues)
     assert any("Datasource `cells` does not contain column(s) ['name']" in i.message for i in res.issues)
+
+
+def test_preflight_hints_owner_datasource_for_missing_column():
+    code = """
+from mdvtools.mdvproject import MDVProject
+
+def main():
+    project = MDVProject("/tmp/project", delete_existing=False)
+    df = project.get_datasource_as_dataframe("qc_channels", columns=["channel_name", "cv_pct"])
+"""
+    res = validate_generated_code_preflight(
+        code,
+        datasource_fields={
+            "qc_channels": {"channel_name", "run_id"},
+            "qc_field_uniformity": {"channel_name", "cv_pct", "uniformity_score"},
+        },
+    )
+    assert res.ok is False
+    msgs = " | ".join(i.message for i in res.issues)
+    assert "cv_pct" in msgs
+    assert "qc_field_uniformity" in msgs
 
 
 def test_preflight_rejects_set_row_indices_on_scatter_plot():
