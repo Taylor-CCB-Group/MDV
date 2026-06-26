@@ -1,11 +1,51 @@
 from typing import cast
 
+import re
+
+from mdvtools.llm.datasource_roles import InferredDatasourceRoles, RowsAsColumnsExpression
 from mdvtools.llm.langchain_mdv import (
     ProjectChat,
     _is_text_table_intent,
     _is_text_table_only_code,
 )
+from mdvtools.llm.templates import prompt_data
 from mdvtools.mdvproject import MDVProject
+
+_LANGCHAIN_AGENT_VARS = frozenset(
+    {"input", "chat_history", "agent_scratchpad", "tools", "tool_names"}
+)
+
+
+def _single_brace_placeholders(text: str) -> set[str]:
+    return set(re.findall(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})", text))
+
+
+def test_prompt_data_has_no_stray_langchain_variables():
+    assert _single_brace_placeholders(prompt_data).isdisjoint(_LANGCHAIN_AGENT_VARS)
+
+
+def test_build_role_hint_selected_datasources_has_no_stray_langchain_variables():
+    class _StubChat:
+        roles = InferredDatasourceRoles(
+            obs_datasource="cells",
+            expressions=[
+                RowsAsColumnsExpression(
+                    datasource_name="rna",
+                    name_column="name",
+                    subgroup_key="rna_expr",
+                    subgroup_label="rna_expr",
+                )
+            ],
+        )
+        scale = None
+
+    hint = ProjectChat._build_role_hint(
+        _StubChat(),
+        primary_datasource="cells",
+        selected_datasources=["cells", "rna"],
+    )
+    stray = _single_brace_placeholders(hint)
+    assert stray.isdisjoint(_LANGCHAIN_AGENT_VARS), f"unexpected placeholders: {stray}"
 
 
 def test_is_text_table_only_code_print_only():

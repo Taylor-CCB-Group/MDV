@@ -159,6 +159,127 @@ def _resolve_by_field_overlap(
     return max(scores, key=lambda ds: (scores[ds], ds))
 
 
+@dataclass(frozen=True)
+class ResolvedDatasources:
+    """Datasource routing for a single ChatMDV request."""
+
+    primary: str
+    selected: list[str]
+    source: str  # "user" | "question" | "default"
+
+
+def _datasource_role_for_name(
+    name: str,
+    roles: InferredDatasourceRoles,
+    expression_names: set[str],
+) -> str:
+    if name == roles.obs_datasource:
+        return "obs"
+    if name in expression_names:
+        return "expression"
+    return "table"
+
+
+def build_chat_datasource_catalog(project: Any) -> dict[str, Any]:
+    """
+    Structured datasource list for ChatMDV init (UI picker) and default selection.
+    """
+    roles = infer_datasource_roles(project)
+    names = _project_datasource_names(project)
+    expression_names = {e.datasource_name for e in roles.expressions}
+    datasources: list[dict[str, Any]] = []
+    for name in names:
+        row_count: int | None = None
+        try:
+            md = project.get_datasource_metadata(name)
+            if isinstance(md, dict) and md.get("size") is not None:
+                row_count = int(md["size"])
+        except Exception:
+            pass
+        datasources.append(
+            {
+                "name": name,
+                "role": _datasource_role_for_name(name, roles, expression_names),
+                "row_count": row_count,
+            }
+        )
+
+    if len(names) == 1:
+        default_names = [names[0]]
+    elif "cells" in names:
+        default_names = [roles.obs_datasource]
+        expr = roles.preferred_expression()
+        if expr is not None:
+            default_names.append(expr.datasource_name)
+    else:
+        default_names = [roles.obs_datasource]
+
+    return {
+        "datasources": datasources,
+        "default_datasource_names": default_names,
+    }
+
+
+def resolve_datasources_for_request(
+    project: Any,
+    *,
+    question: str,
+    user_datasource_names: list[str] | None = None,
+    field_index: dict[str, set[str]] | None = None,
+) -> ResolvedDatasources:
+    """
+    Resolve primary and selected datasources for a chat request.
+
+    User selection takes precedence; otherwise fall back to question-based routing,
+    then the first project datasource.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        raise ValueError("Project has no datasources")
+
+    if user_datasource_names:
+        valid = [n for n in user_datasource_names if n in names]
+        if not valid:
+            raise ValueError(
+                f"No valid datasources in {user_datasource_names!r}; "
+                f"available: {names}"
+            )
+        return ResolvedDatasources(primary=valid[0], selected=valid, source="user")
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    resolved = resolve_datasource_from_question(
+        project, question, field_index=field_index
+    )
+    if resolved is not None:
+        return ResolvedDatasources(
+            primary=resolved, selected=[resolved], source="question"
+        )
+
+    default = str(names[0])
+    return ResolvedDatasources(primary=default, selected=[default], source="default")
+
+
+def format_selected_datasources_cross_table_policy(
+    selected_datasources: list[str],
+) -> str:
+    """Prompt text when the user selected multiple datasources for one analysis."""
+    if len(selected_datasources) < 2:
+        return ""
+    names = ", ".join(f"`{n}`" for n in selected_datasources)
+    primary = selected_datasources[0]
+    return (
+        "- **User-selected datasources:** "
+        f"{names}. Primary chart target: `{primary}` (first selected).\n"
+        "- Load each table with `project.get_datasource_as_dataframe(<datasource>, columns=[...])` "
+        "using only field ids from that datasource's metadata.\n"
+        "- For cross-table questions, merge in pandas on shared keys (`run_id`, `cell_id`, etc.) "
+        "discovered from Project Data Context — do not invent join columns.\n"
+        "- Chart `initialCharts` keys and `params` must use field ids from the datasource that owns each column.\n"
+    )
+
+
 def resolve_datasource_from_question(
     project: Any,
     question: str,
@@ -375,16 +496,27 @@ def collect_wrapper_subgroup_keys_for_project(project: Any) -> set[str]:
     return keys
 
 
-def build_chatmdv_roles_constants_block(project: Any) -> str:
+def build_chatmdv_roles_constants_block(
+    project: Any,
+    *,
+    selected_datasources: list[str] | None = None,
+) -> str:
     """
     Python source injected into ChatMDV-generated scripts so the LLM does not
     rediscover rows-as-columns metadata at runtime.
     """
     roles = infer_datasource_roles(project)
     expr = roles.preferred_expression()
+    primary = (
+        selected_datasources[0]
+        if selected_datasources
+        else roles.obs_datasource
+    )
     lines = [
         "# --- ChatMDV project roles (derived from project metadata; do not edit) ---",
         f"CHATMDV_OBS_DATASOURCE = {json.dumps(roles.obs_datasource)}",
+        f"CHATMDV_PRIMARY_DATASOURCE = {json.dumps(primary)}",
+        f"CHATMDV_SELECTED_DATASOURCES = {json.dumps(selected_datasources or [])}",
     ]
     if expr is None:
         lines.extend(

@@ -1,7 +1,10 @@
 import inspect
 
+import pytest
+
 from mdvtools.llm.datasource_roles import (
     CHAT_RANK_GENES_DATASOURCE_NAME,
+    build_chat_datasource_catalog,
     build_chatmdv_roles_constants_block,
     build_datasource_field_index,
     categorical_field_ids_from_metadata,
@@ -24,6 +27,7 @@ from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
     is_multi_table_tabular_project,
     resolve_datasource_from_question,
+    resolve_datasources_for_request,
 )
 from mdvtools.llm.dataset_scale import ProjectScale, assess_project_scale
 
@@ -446,4 +450,81 @@ def test_rag_prompt_includes_all_tables_and_resolved_datasource():
     assert "Primary datasource for this question: **qc_field_uniformity**" in prompt
     assert "qc_runs" in prompt
     assert "datasource_name = 'qc_field_uniformity'" in prompt
+
+
+def test_build_chat_datasource_catalog_micron():
+    project = MicronLikeProject()
+    catalog = build_chat_datasource_catalog(project)
+    names = {d["name"] for d in catalog["datasources"]}
+    assert names == {"qc_channels", "qc_field_uniformity", "qc_runs", "qc_sessions"}
+    roles = {d["name"]: d["role"] for d in catalog["datasources"]}
+    assert roles["qc_runs"] == "obs"
+    assert catalog["default_datasource_names"] == ["qc_runs"]
+
+
+def test_build_chat_datasource_catalog_single_cell_defaults():
+    project = FakeProject()
+    catalog = build_chat_datasource_catalog(project)
+    assert catalog["default_datasource_names"] == ["cells", "rna"]
+
+
+def test_resolve_datasources_for_request_user_selection():
+    project = MicronLikeProject()
+    resolved = resolve_datasources_for_request(
+        project,
+        question="ignored",
+        user_datasource_names=["qc_runs", "qc_field_uniformity"],
+    )
+    assert resolved.source == "user"
+    assert resolved.primary == "qc_runs"
+    assert resolved.selected == ["qc_runs", "qc_field_uniformity"]
+
+
+def test_resolve_datasources_for_request_invalid_user_names():
+    project = MicronLikeProject()
+    with pytest.raises(ValueError, match="No valid datasources"):
+        resolve_datasources_for_request(
+            project,
+            question="x",
+            user_datasource_names=["not_a_table"],
+        )
+
+
+def test_resolve_datasources_for_request_question_fallback():
+    project = MicronLikeProject()
+    resolved = resolve_datasources_for_request(
+        project,
+        question="Show cv_pct by channel",
+        user_datasource_names=None,
+    )
+    assert resolved.source == "question"
+    assert resolved.primary == "qc_field_uniformity"
+
+
+def test_build_chatmdv_roles_constants_block_selected_datasources():
+    block = build_chatmdv_roles_constants_block(
+        FakeProject(),
+        selected_datasources=["cells", "rna"],
+    )
+    assert 'CHATMDV_PRIMARY_DATASOURCE = "cells"' in block
+    assert 'CHATMDV_SELECTED_DATASOURCES = ["cells", "rna"]' in block
+
+
+def test_rag_prompt_includes_multiple_selected_datasources():
+    from mdvtools.llm.templates import get_createproject_prompt_RAG
+
+    project = MicronLikeProject()
+    prompt = get_createproject_prompt_RAG(
+        project,
+        "",
+        "qc_runs",
+        'fields "assay"\ncharts "Row Chart"',
+        "Compare assay types with cv_pct",
+        compact=True,
+        datasource_names=["qc_runs", "qc_field_uniformity"],
+    )
+    assert "Primary datasource for this question: **qc_runs**" in prompt
+    assert "Additional selected datasource: qc_field_uniformity" in prompt
+    assert "user_selected_datasources" in prompt
+    assert "User-selected datasources" in prompt
 

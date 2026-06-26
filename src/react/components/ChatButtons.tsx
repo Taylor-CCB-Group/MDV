@@ -43,6 +43,9 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
         availableModels,
         selectedModelId,
         onModelChange,
+        availableDatasources,
+        selectedDatasourceNames,
+        onDatasourcesChange,
     } = useChat();
 
     const chatDialogProps = {
@@ -61,6 +64,9 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
         availableModels,
         selectedModelId,
         onModelChange,
+        availableDatasources,
+        selectedDatasourceNames,
+        onDatasourcesChange,
     };
 
     const dialog = (

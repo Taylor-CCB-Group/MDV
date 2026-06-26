@@ -25,6 +25,7 @@ class ChatRequest(TypedDict):
     room: str
     handle_error: HandleError
     model_id: NotRequired[str]
+    datasource_names: NotRequired[list[str]]
 
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...

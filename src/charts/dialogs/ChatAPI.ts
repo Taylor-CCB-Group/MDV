@@ -114,12 +114,23 @@ const chatModelSchema = z.object({
 export type ChatModelOption = z.infer<typeof chatModelSchema>;
 
 const CHAT_MODEL_STORAGE_KEY = 'chatmdv-selected-model';
+const CHAT_DATASOURCE_STORAGE_KEY = 'chatmdv-selected-datasources';
+
+const chatDatasourceSchema = z.object({
+    name: z.string(),
+    role: z.enum(['obs', 'expression', 'table']),
+    row_count: z.number().nullable().optional(),
+});
+
+export type ChatDatasourceOption = z.infer<typeof chatDatasourceSchema>;
 
 const chatInitResponseSchema = z.object({
     message: z.string(),
     suggested_questions: z.array(z.string()).optional(),
     models: z.array(chatModelSchema).optional(),
     default_model_id: z.string().optional().nullable(),
+    datasources: z.array(chatDatasourceSchema).optional(),
+    default_datasource_names: z.array(z.string()).optional(),
     error: z.boolean().optional(),
 });
 type ChatInitResponse = z.infer<typeof chatInitResponseSchema>;
@@ -178,6 +189,8 @@ export type ChatMessage = {
     guidance?: string | null;
     /** When true, "Load view" should reload the app so new/updated datasources load in ChartManager. */
     needs_refresh?: boolean;
+    /** Datasources scoped for this user message (when manually selected). */
+    datasource_names?: string[];
     sender: 'user' | 'bot' | 'system';
     id: string;
     conversationId: string;
@@ -224,6 +237,7 @@ const sendMessageSocket = async (
     conversationId: string,
     modelId?: string,
     time?: number,
+    datasourceNames?: string[],
 ) => {
     // consider refactoring to be a generator function, so that we can yield progress updates
     const socket = window.mdv.chartManager.ipc?.socket;
@@ -263,6 +277,9 @@ const sendMessageSocket = async (
             id,
             conversation_id: conversationId,
             ...(modelId ? { model_id: modelId } : {}),
+            ...(datasourceNames && datasourceNames.length > 0
+                ? { datasource_names: datasourceNames }
+                : {}),
         });
     });
 
@@ -360,6 +377,43 @@ const useChat = () => {
     const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
     const [availableModels, setAvailableModels] = useState<ChatModelOption[]>([]);
     const [selectedModelId, setSelectedModelId] = useState<string>('');
+    const [availableDatasources, setAvailableDatasources] = useState<ChatDatasourceOption[]>([]);
+    const [selectedDatasourceNames, setSelectedDatasourceNames] = useState<string[]>([]);
+
+    const datasourceStorageKey = `${CHAT_DATASOURCE_STORAGE_KEY}:${projectName}`;
+
+    const applyDatasourceSelection = useCallback((
+        datasources: ChatDatasourceOption[],
+        defaultNames?: string[],
+    ) => {
+        setAvailableDatasources(datasources);
+        if (datasources.length <= 1) {
+            setSelectedDatasourceNames(datasources.map((d) => d.name));
+            return;
+        }
+        const validNames = new Set(datasources.map((d) => d.name));
+        let stored: string[] = [];
+        try {
+            const raw = sessionStorage.getItem(datasourceStorageKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    stored = parsed.filter((n): n is string => typeof n === 'string' && validNames.has(n));
+                }
+            }
+        } catch {
+            stored = [];
+        }
+        const defaults = (defaultNames ?? []).filter((n) => validNames.has(n));
+        const next = stored.length > 0 ? stored : (defaults.length > 0 ? defaults : [datasources[0].name]);
+        setSelectedDatasourceNames(next);
+    }, [datasourceStorageKey]);
+
+    const onDatasourcesChange = useCallback((names: string[]) => {
+        if (names.length === 0) return;
+        setSelectedDatasourceNames(names);
+        sessionStorage.setItem(datasourceStorageKey, JSON.stringify(names));
+    }, [datasourceStorageKey]);
 
     const applyModelSelection = useCallback((models: ChatModelOption[], defaultModelId?: string | null) => {
         const chatModels = models.filter((m) => m.kind === 'chat');
@@ -486,6 +540,9 @@ const useChat = () => {
             if (response?.models) {
                 applyModelSelection(response.models, response.default_model_id);
             }
+            if (response?.datasources) {
+                applyDatasourceSelection(response.datasources, response.default_datasource_names);
+            }
         } catch (error: any) {
             const errorMessage = formatChatError(error);
             console.error('Error sending welcome message: ', errorMessage);
@@ -504,7 +561,7 @@ const useChat = () => {
             setIsInit(true);
             setIsLoadingInit(false);
         }
-    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading, applyModelSelection]);
+    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading, applyModelSelection, applyDatasourceSelection]);
 
     // Socket connection and Init chat
     useEffect(() => {
@@ -550,6 +607,7 @@ const useChat = () => {
                 sender: 'user',
                 id: generateId(),
                 conversationId,
+                datasource_names: selectedDatasourceNames.length > 0 ? [...selectedDatasourceNames] : undefined,
             }])
             
             const response = await sendMessageSocket(
@@ -558,6 +616,8 @@ const useChat = () => {
                 "",
                 conversationId,
                 selectedModelId || undefined,
+                undefined,
+                selectedDatasourceNames,
             );
 
             if (response) {
@@ -595,7 +655,7 @@ const useChat = () => {
             setCurrentRequestId('');
             setRequestProgress(null);
         }
-    }, [conversationId, socket, viewManager, selectedModelId]);
+    }, [conversationId, socket, viewManager, selectedModelId, selectedDatasourceNames]);
 
 
     // Start New Conversation
@@ -621,6 +681,9 @@ const useChat = () => {
             if (response?.models) {
                 applyModelSelection(response.models, response.default_model_id);
             }
+            if (response?.datasources) {
+                applyDatasourceSelection(response.datasources, response.default_datasource_names);
+            }
         } catch (error: any) {
             const errorMessage = formatChatError(error);
             setMessages([{
@@ -636,7 +699,7 @@ const useChat = () => {
             setCurrentRequestId("");
             setIsSending(false);
         }
-    }, [routeInit, applyModelSelection]);
+    }, [routeInit, applyModelSelection, applyDatasourceSelection]);
 
     // Switch conversation
     const switchConversation = useCallback((id: string) => {
@@ -663,6 +726,9 @@ const useChat = () => {
         availableModels,
         selectedModelId,
         onModelChange,
+        availableDatasources,
+        selectedDatasourceNames,
+        onDatasourcesChange,
     };
 };
 

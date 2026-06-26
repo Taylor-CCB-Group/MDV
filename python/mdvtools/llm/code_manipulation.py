@@ -82,9 +82,16 @@ def _autofix_generated_code(code: str, log=print) -> str:
     return code
 
 
-def _prepend_chatmdv_roles_block(code: str, project: Any) -> str:
+def _prepend_chatmdv_roles_block(
+    code: str,
+    project: Any,
+    *,
+    selected_datasources: list[str] | None = None,
+) -> str:
     try:
-        roles_block = build_chatmdv_roles_constants_block(project)
+        roles_block = build_chatmdv_roles_constants_block(
+            project, selected_datasources=selected_datasources
+        )
     except Exception:
         return code
     if not roles_block.strip():
@@ -106,6 +113,8 @@ def prepare_code(
     log=print,
     modify_existing_project=False,
     view_name="default",
+    *,
+    selected_datasources: list[str] | None = None,
 ):
     """Given a response from the LLM, extract the code and post-process it, 
     attempting to ensure that 
@@ -162,7 +171,9 @@ if __name__ == "__main__":
     else:
         body = captured_lines
     final_code = f"{packages_functions}\n{body}"
-    final_code = _prepend_chatmdv_roles_block(final_code, project)
+    final_code = _prepend_chatmdv_roles_block(
+        final_code, project, selected_datasources=selected_datasources
+    )
     final_code = _autofix_generated_code(final_code, log=log)
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:

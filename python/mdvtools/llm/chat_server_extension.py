@@ -15,6 +15,7 @@ from flask import Flask, request
 from flask_socketio import join_room, leave_room
 from mdvtools.logging_config import get_logger
 from mdvtools.llm.chatlog import log_chat_item
+from mdvtools.llm.datasource_roles import build_chat_datasource_catalog
 from mdvtools.llm.llm_providers import discover_models
 from mdvtools.server_extension import MDVProjectServerExtension
 from mdvtools.auth.authutils import is_authenticated
@@ -72,11 +73,14 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             suggested_questions = bot.get_suggested_questions()
             logger.info(f"Suggested questions: {suggested_questions}")
             discovered = discover_models()
+            ds_catalog = build_chat_datasource_catalog(project)
             return {
                 "message": detailed_message,
                 "suggested_questions": suggested_questions,
                 "models": [m.to_dict() for m in discovered.chat_models],
                 "default_model_id": discovered.default_model_id,
+                "datasources": ds_catalog["datasources"],
+                "default_datasource_names": ds_catalog["default_datasource_names"],
             }
 
         @socketio.on("chat_request", namespace=f"/project/{project.id}")
@@ -93,6 +97,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             id = data.get("id")
             conversation_id = data.get("conversation_id")
             model_id = data.get("model_id")
+            datasource_names = data.get("datasource_names")
             room = f"{sid}_{id}"
             join_room(room)
             def handle_error(error: Union[str, Exception], *, extra_metadata: Optional[dict] = None):
@@ -136,6 +141,10 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             }
             if model_id:
                 chat_request["model_id"] = model_id
+            if datasource_names and isinstance(datasource_names, list):
+                chat_request["datasource_names"] = [
+                    str(n) for n in datasource_names if n
+                ]
             try:
                 if bot is None:
                     # todo - allow this to be freed at some point if we're not using it anymore.

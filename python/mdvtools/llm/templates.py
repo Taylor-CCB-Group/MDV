@@ -6,6 +6,7 @@ from mdvtools.markdown_utils import create_project_markdown, create_column_markd
 from mdvtools.llm.dataset_scale import ProjectScale, assess_project_scale
 from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
+    categorical_field_ids_from_metadata,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
@@ -15,31 +16,30 @@ from mdvtools.llm.datasource_roles import (
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
+    format_selected_datasources_cross_table_policy,
     format_targeted_chart_policies,
     format_visualization_consistency_policy,
     is_multi_table_tabular_project,
 )
 prompt_data = """
 Your task is to:  
-1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the DataFrames provided.
-2. Use only the two DataFrames provided:
-   - df1: observation/metadata table (e.g. cells)
-   - df2: linked feature table for wrapper-based expression (e.g. rna/genes/protein). The gene/feature label column may be `name`, `gene_ids`, or another id — inspect `df2.columns`; do not assume `name` unless present.
+1. Identify the type of data the user needs (e.g., categorical, numerical, etc.) by inspecting the preloaded DataFrames.
+2. Use only the DataFrames provided — each is keyed by its MDV datasource name (e.g. `cells`, `rna`, `qc_runs`). Inspect every selected table with `<datasource_key>.columns` before planning fields.
 3. Column selection logic:
-   - For non-expression queries: select columns from df1 only. Inspect df1, using df1.columns
+   - For non-expression queries: select columns from the observation/metadata datasource when present; otherwise from the datasource that owns the requested fields.
    - For expression-related queries (e.g., expression of a gene/protein, comparison of features, highest expressing features):
-       a. Resolve the feature-label column from `df2.columns` (see Datasource roles / name_column when available). Use ONLY values from that column for feature identifiers — do NOT use unrelated metadata columns unless explicitly instructed.
+       a. Resolve the feature-label column from the expression datasource dataframe columns (see Datasource roles / name_column when available). Use ONLY values from that column for feature identifiers — do NOT use unrelated metadata columns unless explicitly instructed.
        b. If a specific feature is mentioned by the user, check if it exists in that label column.
-           - If it does not exist, assume the user provided a synonym and the label column may use different ids (e.g. Ensembl). Attempt mapping or lookup within `df2` only.
+           - If it does not exist, assume the user provided a synonym and the label column may use different ids (e.g. Ensembl). Attempt mapping or lookup within the expression table only.
            - If a match is found, return that label value.
-           - If no match is found, ignore the requested gene and select from available labels in `df2`.
-       c. If no feature is mentioned, select one or more feature labels from `df2`.
-       d. Only use the resolved label column from df2 for feature strings — do not invent column names.
+           - If no match is found, ignore the requested gene and select from available labels in the expression table.
+       c. If no feature is mentioned, select one or more feature labels from the expression table.
+       d. Only use the resolved label column from the expression datasource for feature strings — do not invent column names.
 4. Always return the list of required columns as a quoted comma-separated string, like:
    - "col1", "col2"
-   - Or for expression-related: "col", "feature_name"   (make sure "col" is from df1) 
+   - Or for expression-related: "col", "feature_name"   (make sure "col" is from the obs/metadata table) 
 5. For expression-related queries:
-   - Return both df1 columns and the selected feature name (from the resolved df2 label column).
+   - Return both obs/metadata columns and the selected feature name (from the resolved expression label column).
    - Only return the name as a string (e.g., "gene_name")—do not wrap it.
 6. NEVER create new DataFrames or modify existing ones.
 7. Ensure that the selected columns match the visualization requirements:  
@@ -107,6 +107,7 @@ from mdvtools.charts.sankey_plot import SankeyPlot
 from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
     categorical_field_ids_from_metadata,
+    format_selected_datasources_cross_table_policy,
 )
 from mdvtools.llm.column_field_resolve import build_expression_wrapper_token
 
@@ -138,27 +139,60 @@ def _datasource_context_section(
         return f"## {heading}: **{ds_name}**\n\n"
 
 
-def _build_rag_context_markdown(project: CreateProjectPromptProject, datasource_name: str) -> str:
+def _build_rag_context_markdown(
+    project: CreateProjectPromptProject,
+    datasource_names: list[str],
+) -> str:
     """Project Data Context block for RAG prompts."""
+    if not datasource_names:
+        try:
+            datasource_names = [str(project.datasources[0]["name"])]  # type: ignore[index]
+        except Exception:
+            return ""
+
+    primary = datasource_names[0]
     try:
         names = list(project.get_datasource_names())
     except Exception:
         names = []
 
     has_cells = "cells" in names
+    sections: list[str] = []
+
+    if len(datasource_names) > 1:
+        sections.append(
+            _datasource_context_section(
+                project,
+                primary,
+                "Primary datasource for this question",
+            )
+        )
+        for ds_name in datasource_names[1:]:
+            sections.append(
+                _datasource_context_section(
+                    project,
+                    ds_name,
+                    f"Additional selected datasource: {ds_name}",
+                )
+            )
+        if len(names) > len(datasource_names) and not has_cells:
+            all_tables = create_project_markdown(project, wrap_in_details=False)
+            sections.append("## All project datasources\n\n" + all_tables)
+        return "\n\n".join(sections)
+
+    datasource_name = primary
     if len(names) > 1 and not has_cells:
-        primary = _datasource_context_section(
+        primary_section = _datasource_context_section(
             project,
             datasource_name,
             "Primary datasource for this question",
         )
         all_tables = create_project_markdown(project, wrap_in_details=False)
-        return primary + "\n\n## All project datasources\n\n" + all_tables
+        return primary_section + "\n\n## All project datasources\n\n" + all_tables
 
     if has_cells and len(names) > 1:
         roles = infer_datasource_roles(project)
         obs = roles.obs_datasource
-        sections: list[str] = []
         if datasource_name != obs:
             sections.append(
                 _datasource_context_section(
@@ -188,6 +222,8 @@ def get_createproject_prompt_RAG(
     question: str,
     compact: bool = False,
     scale: ProjectScale | None = None,
+    *,
+    datasource_names: list[str] | None = None,
 ) -> str:
     """
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
@@ -196,22 +232,30 @@ def get_createproject_prompt_RAG(
     """
     if scale is None:
         scale = assess_project_scale(project, path_to_data)
+    resolved_names = datasource_names if datasource_names else [datasource_name]
+    primary_datasource = resolved_names[0]
     mdv_first_policy = format_mdv_first_data_access_policy(
         scale, path_to_data, compact=compact
     )
     chart_policies = format_targeted_chart_policies(compact=compact)
     roles = infer_datasource_roles(project)
     multi_table_policy = ""
-    if is_multi_table_tabular_project(project, roles):
+    if is_multi_table_tabular_project(project, roles) or len(resolved_names) > 1:
         multi_table_policy = format_multi_table_tabular_policy()
-    context_md = _build_rag_context_markdown(project, datasource_name)
+    cross_table_policy = format_selected_datasources_cross_table_policy(resolved_names)
+    context_md = _build_rag_context_markdown(project, resolved_names)
     datasource_name_guidance = (
-        f"- datasource_name = '{datasource_name}'  "
+        f"- datasource_name = '{primary_datasource}'  "
         "(use this datasource for charts and dataframe loads when it matches the user question; "
         "do not substitute CHATMDV_OBS_DATASOURCE when the user names a different table)\n"
     )
+    if len(resolved_names) > 1:
+        datasource_name_guidance += (
+            f"- user_selected_datasources = {resolved_names!r}  "
+            "(scope analysis and joins to these tables; primary chart target is the first)\n"
+        )
     datasource_name_guidance_indented = (
-        f"            - datasource_name = '{datasource_name}'  "
+        f"            - datasource_name = '{primary_datasource}'  "
         "(use this datasource for charts and dataframe loads when it matches the user question; "
         "do not substitute CHATMDV_OBS_DATASOURCE when the user names a different table)\n"
     )
@@ -243,6 +287,7 @@ def get_createproject_prompt_RAG(
 
 """
             + multi_table_policy
+            + cross_table_policy
             + mdv_first_policy
             + """
 
@@ -337,7 +382,7 @@ def get_createproject_prompt_RAG(
         - When modifying an existing project (the default in this chat context), do NOT recreate or delete the project.
 
     2. Data Access (MDV-first; Scanpy last resort):
-"""+mdv_first_policy+multi_table_policy+"""
+"""+mdv_first_policy+multi_table_policy+cross_table_policy+"""
         - Observation/metadata datasource: `"""+roles.obs_datasource+"""`
         - Wrapper-capable expression datasources (feature tables):
 """+expr_lines+"""

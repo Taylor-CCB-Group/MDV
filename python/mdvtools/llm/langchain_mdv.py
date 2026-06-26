@@ -60,7 +60,7 @@ from .datasource_roles import (
     collect_wrapper_subgroup_keys_for_project,
     format_field_index_hint,
     infer_datasource_roles,
-    resolve_datasource_from_question,
+    resolve_datasources_for_request,
 )
 from .dataset_scale import (
     assess_project_scale,
@@ -507,7 +507,7 @@ class ProjectChat(ProjectChatProtocol):
             self.roles = roles
             path_to_data = _resolve_path_to_data(self.project.dir)
             self.scale = assess_project_scale(self.project, path_to_data)
-            self.df_list = load_agent_dataframes(self.project, roles, self.scale)
+            self.df_map = load_agent_dataframes(self.project, roles, self.scale)
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
@@ -553,7 +553,12 @@ class ProjectChat(ProjectChatProtocol):
             del self.conversation_memories[conversation_id]
         chat_debug_logger.info(f"Cleared conversation history for conversation {conversation_id}")
 
-    def _build_role_hint(self, *, question_datasource: str | None = None) -> str:
+    def _build_role_hint(
+        self,
+        *,
+        primary_datasource: str | None = None,
+        selected_datasources: list[str] | None = None,
+    ) -> str:
         try:
             roles = getattr(self, "roles", None)
             scale = getattr(self, "scale", None)
@@ -568,29 +573,50 @@ class ProjectChat(ProjectChatProtocol):
                     "- Before suggesting columns, decide: obs metadata only, expression wrappers, or Scanpy markers.\n"
                     "- Question-type routing: proportion / frequency / before-after → StackedRowChart; "
                     "gene signature / enrichment / ISG genes → DotPlot or Heatmap + wrappers + SelectionDialogPlot.\n"
-                    "- On large projects df1 is a column subset — list every field id codegen will need in `fields`.\n"
+                    "- On large projects probe dataframes are column subsets — list every field id codegen will need in `fields`.\n"
                 )
             if roles is not None:
-                exprs = roles.expressions or []
-                if exprs:
-                    expr_lines = (
-                        f"- df2 maps to expression datasource '{exprs[0].datasource_name}' "
-                        f"(feature names in column '{exprs[0].name_column}', default subgroup '{exprs[0].subgroup_key}')"
+                selected = selected_datasources or []
+                primary = primary_datasource or roles.obs_datasource
+                if selected:
+                    inspect_cmds = ", ".join(f"`{n}.columns`" for n in selected)
+                    df_lines = "\n".join(
+                        f"- `{ds_name}`: preloaded pandas probe dataframe keyed as `{ds_name}`"
+                        for ds_name in selected
+                    )
+                    selection_lines = (
+                        f"- User-selected datasources for this request: {selected!r}\n"
+                        f"- Primary chart target (first selected): `{primary}`\n"
+                        f"{df_lines}\n"
+                        f"- Run {inspect_cmds} for every selected datasource before planning fields.\n"
                     )
                 else:
-                    if question_datasource and question_datasource != roles.obs_datasource:
+                    exprs = roles.expressions or []
+                    if exprs:
                         expr_lines = (
-                            f"- df2 maps to question-resolved datasource '{question_datasource}' "
-                            "(use this table when the user names it or its columns)"
+                            f"- Expression datasource '{exprs[0].datasource_name}' "
+                            f"(feature names in column '{exprs[0].name_column}', "
+                            f"default subgroup '{exprs[0].subgroup_key}')"
+                        )
+                    elif primary_datasource and primary_datasource != roles.obs_datasource:
+                        expr_lines = (
+                            f"- Additional table '{primary_datasource}' "
+                            "(use when the user names it or its columns)"
                         )
                     else:
-                        expr_lines = "- No rows-as-columns expression datasource detected for this project."
+                        expr_lines = (
+                            "- No rows-as-columns expression datasource detected for this project."
+                        )
+                    selection_lines = (
+                        f"- Observation datasource '{roles.obs_datasource}' is preloaded when available.\n"
+                        f"{expr_lines}\n"
+                    )
                 return (
                     "\n\nDatasource roles:\n"
-                    f"- df1 maps to obs datasource '{roles.obs_datasource}'\n"
-                    f"{expr_lines}\n"
-                    "- For any chart `params` on the **feature table datasource** (df2), use **Field ID** strings from "
-                    "`df2.columns` / project metadata for **that** datasource (e.g. `gene_ids` when listed for `genes`); "
+                    f"- Project observation datasource: '{roles.obs_datasource}'\n"
+                    f"{selection_lines}"
+                    "- For chart `params` on a **feature table datasource**, use **Field ID** strings from "
+                    "that datasource's metadata (e.g. `gene_ids` when listed for `genes`); "
                     "do not use those ids as `params` on charts bound to **cells** unless `cells` lists the same Field ID.\n"
                     "- Do not pair Scanpy `rank_genes_groups` tables with DotPlot/Heatmap on cells using wrapper `params` "
                     "as a substitute for that table (see ChatMDV \"Marker ranking vs DotPlot\" in RAG); optional "
@@ -615,14 +641,22 @@ class ProjectChat(ProjectChatProtocol):
         verbose: bool,
         *,
         use_react: bool = False,
-        question_datasource: str | None = None,
+        primary_datasource: str | None = None,
+        selected_datasources: list[str] | None = None,
     ) -> AgentExecutor:
-        role_hint = self._build_role_hint(question_datasource=question_datasource)
+        role_hint = self._build_role_hint(
+            primary_datasource=primary_datasource,
+            selected_datasources=selected_datasources,
+        )
+        df_keys = ", ".join(f"`{k}`" for k in dfs.keys())
+        inspect_hint = (
+            f"Before answering any user question, run `.columns` on each preloaded dataframe: {df_keys}."
+        )
         prompt_data_template = f"""You have access to the following Pandas DataFrames: 
-        {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
+        {', '.join(dfs.keys())}. These are preloaded and keyed by MDV datasource name — do not redefine them.
         {role_hint}
-        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields.
-        On large projects, df1/df2 may be column subsets for schema probing — use Project Data Context field ids for planning.
+        {inspect_hint}
+        On large projects these may be column subsets for schema probing — use Project Data Context field ids for planning.
         Prefer MDV chart field ids and expression wrappers; suggest Scanpy only for marker-ranking or DE questions when MDV metadata lacks required columns.
         Route by question type: proportion/frequency/before-after → StackedRowChart; signature/enrichment/ISG expression → DotPlot or Heatmap with wrappers.
         Use these to correct the column names mentioned by the user.
@@ -666,7 +700,8 @@ class ProjectChat(ProjectChatProtocol):
         provider: ProviderKind,
         verbose=False,
         on_agent_fallback=None,
-        question_datasource: str | None = None,
+        primary_datasource: str | None = None,
+        selected_datasources: list[str] | None = None,
     ):
         """
         Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
@@ -700,7 +735,8 @@ class ProjectChat(ProjectChatProtocol):
             provider,
             verbose,
             use_react=False,
-            question_datasource=question_datasource,
+            primary_datasource=primary_datasource,
+            selected_datasources=selected_datasources,
         )
 
         def agent_with_contextualization(question):
@@ -724,7 +760,8 @@ class ProjectChat(ProjectChatProtocol):
                     provider,
                     verbose,
                     use_react=True,
-                    question_datasource=question_datasource,
+                    primary_datasource=primary_datasource,
+                    selected_datasources=selected_datasources,
                 )
                 return fallback_executor.invoke({"input": standalone_question})
 
@@ -763,6 +800,7 @@ class ProjectChat(ProjectChatProtocol):
         question = chat_request["message"]
         handle_error = chat_request["handle_error"]
         model_id = chat_request.get("model_id")
+        user_datasource_names = chat_request.get("datasource_names")
 
         discovered = discover_models()
         chat_model = discovered.get_chat_model(model_id)
@@ -806,23 +844,39 @@ class ProjectChat(ProjectChatProtocol):
         # there is a risk that these are out of date by the time we get here...
         # but it's a bit of an expensive operation, so avoiding it for now (in most cases we shouldn't need to refer to them)
         field_index = build_datasource_field_index(self.project)
-        question_datasource = resolve_datasource_from_question(
-            self.project, question, field_index=field_index
+        try:
+            resolved_ds = resolve_datasources_for_request(
+                self.project,
+                question=question,
+                user_datasource_names=user_datasource_names,
+                field_index=field_index,
+            )
+        except ValueError as exc:
+            handle_error(str(exc))
+            return AskQuestionResult(
+                code=None,
+                view_name=None,
+                error=True,
+                message=str(exc),
+                verification=None,
+                data_preview=None,
+                guidance=None,
+                needs_refresh=False,
+            )
+        selected_datasources = resolved_ds.selected
+        rag_datasource = resolved_ds.primary
+        chat_debug_logger.info(
+            "Resolved datasources: primary=%s selected=%s source=%s",
+            resolved_ds.primary,
+            resolved_ds.selected,
+            resolved_ds.source,
         )
-        df_list = load_agent_dataframes(
+        df_map = load_agent_dataframes(
             self.project,
             self.roles,
             self.scale,
-            extra_datasource=question_datasource,
+            selected_datasources=selected_datasources,
         )
-        default_datasource = str(self.project.datasources[0]["name"])
-        rag_datasource = question_datasource or default_datasource
-        if question_datasource:
-            chat_debug_logger.info(
-                "Resolved question datasource: %s (default would be %s)",
-                question_datasource,
-                default_datasource,
-            )
         
         progress = 0
 
@@ -845,14 +899,15 @@ class ProjectChat(ProjectChatProtocol):
         # Create agent with local LLM and memory
         with time_block("b8: Pandas agent creating"):
             agent = self.create_custom_pandas_agent(
-                dataframe_llm, 
-                {"df1": df_list[0], "df2": df_list[1] if len(df_list) > 1 else df_list[0]}, 
-                prompt_data, 
+                dataframe_llm,
+                df_map,
+                prompt_data,
                 memory,
                 chat_model.provider,
                 verbose=True,
                 on_agent_fallback=_notify_agent_fallback,
-                question_datasource=question_datasource,
+                primary_datasource=rag_datasource,
+                selected_datasources=selected_datasources,
             )
 
         total_steps = 6
@@ -937,8 +992,6 @@ class ProjectChat(ProjectChatProtocol):
                 path_to_data = _resolve_path_to_data(self.project.dir)
                 self.scale = assess_project_scale(self.project, path_to_data)
 
-                datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
-
                 prompt_RAG = get_createproject_prompt_RAG(
                     self.project,
                     path_to_data,
@@ -947,6 +1000,7 @@ class ProjectChat(ProjectChatProtocol):
                     response["input"],
                     compact=chat_model.provider == "ollama",
                     scale=self.scale,
+                    datasource_names=selected_datasources,
                 )
                 chat_debug_logger.info(f"=== RAG Base Prompt (before context injection) ===\n{prompt_RAG}\n=== End Base Prompt ===")
 
@@ -997,6 +1051,7 @@ class ProjectChat(ProjectChatProtocol):
                     chat_debug_logger.info,
                     modify_existing_project=True,
                     view_name=question,
+                    selected_datasources=selected_datasources,
                 )
 
                 if _is_text_table_intent(question) and not _is_text_table_only_code(final_code):
@@ -1018,6 +1073,7 @@ class ProjectChat(ProjectChatProtocol):
                         chat_debug_logger.info,
                         modify_existing_project=True,
                         view_name=question,
+                        selected_datasources=selected_datasources,
                     )
                     if not _is_text_table_only_code(final_code_retry):
                         output_qa = output_qa_retry
@@ -1055,6 +1111,7 @@ class ProjectChat(ProjectChatProtocol):
                         chat_debug_logger.info,
                         modify_existing_project=True,
                         view_name=question,
+                        selected_datasources=selected_datasources,
                     )
 
                 allowed_wrapper_subgroup_keys = collect_wrapper_subgroup_keys_for_project(

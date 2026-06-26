@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import pytest
 
 from mdvtools.llm.dataset_scale import (
@@ -60,7 +58,7 @@ def test_load_agent_dataframes_large_obs_uses_column_subset():
 
     result = load_agent_dataframes(project, roles, _LARGE_SCALE)
 
-    assert result == ["df:cells"]
+    assert result == {"cells": "df:cells"}
     assert project.loads == [("cells", ["leiden"])]
 
 
@@ -77,7 +75,7 @@ def test_load_agent_dataframes_large_extra_skips_when_no_probe_columns():
         project, roles, _LARGE_SCALE, extra_datasource="table_b"
     )
 
-    assert result == ["df:cells"]
+    assert result == {"cells": "df:cells"}
     assert project.loads == [("cells", ["leiden"])]
 
 
@@ -102,5 +100,26 @@ def test_load_agent_dataframes_large_expr_skips_when_no_probe_columns():
 
     result = load_agent_dataframes(project, roles, _LARGE_SCALE)
 
-    assert result == ["df:cells"]
+    assert result == {"cells": "df:cells"}
     assert project.loads == [("cells", ["leiden"])]
+
+
+def test_load_agent_dataframes_selected_datasources_multi_table():
+    project = _ScaleProject(
+        metadata_by_name={
+            "table_a": {"columns": _OBS_COLUMNS},
+            "table_b": {"columns": [{"field": "assay", "datatype": "text"}]},
+        }
+    )
+    roles = InferredDatasourceRoles(obs_datasource="table_a", expressions=[])
+
+    result = load_agent_dataframes(
+        project,
+        roles,
+        _LARGE_SCALE,
+        selected_datasources=["table_a", "table_b"],
+    )
+
+    assert result == {"table_a": "df:table_a", "table_b": "df:table_b"}
+    assert ("table_a", ["leiden"]) in project.loads
+    assert ("table_b", ["assay"]) in project.loads

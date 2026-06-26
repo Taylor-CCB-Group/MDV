@@ -139,73 +139,101 @@ def agent_expression_probe_columns(
     return picked or ([name_column] if name_column else [])
 
 
+_AGENT_PROBE_CAP = 6
+
+
+def _load_probe_df_for_datasource(
+    project: Any,
+    datasource_name: str,
+    scale: ProjectScale,
+    roles: Any,
+) -> Any | None:
+    """Load one probe dataframe for the pandas agent (column subset on large projects)."""
+    expr_names = {e.datasource_name for e in (roles.expressions or [])}
+    primary_expr = roles.preferred_expression()
+    is_expression = datasource_name in expr_names
+
+    if scale.is_large:
+        if is_expression and primary_expr and datasource_name == primary_expr.datasource_name:
+            cols = agent_expression_probe_columns(
+                project, datasource_name, primary_expr.name_column
+            )
+        else:
+            cols = agent_probe_columns_from_metadata(project, datasource_name)
+        if not cols:
+            return None
+        return project.get_datasource_as_dataframe(datasource_name, columns=cols)
+
+    return project.get_datasource_as_dataframe(datasource_name)
+
+
 def load_agent_dataframes(
     project: Any,
     roles: Any,
     scale: ProjectScale,
     *,
     extra_datasource: str | None = None,
-) -> list[Any]:
+    selected_datasources: list[str] | None = None,
+) -> dict[str, Any]:
     """
-    Return [obs_df] or [obs_df, expr_df] for the pandas agent.
+    Return datasource-name-keyed probe DataFrames for the pandas agent.
 
     Large projects load column subsets only; small projects load full tables.
-    When there is no expression datasource and the project has multiple tabular tables,
-    ``extra_datasource`` (typically question-resolved) is loaded as df2 for agent probing.
+    When ``selected_datasources`` is set, load up to ``_AGENT_PROBE_CAP`` tables.
+    Legacy ``extra_datasource`` is used only when ``selected_datasources`` is absent.
     """
+    if selected_datasources:
+        out: dict[str, Any] = {}
+        for ds_name in selected_datasources[:_AGENT_PROBE_CAP]:
+            try:
+                df = _load_probe_df_for_datasource(project, ds_name, scale, roles)
+            except Exception:
+                continue
+            if df is not None:
+                out[ds_name] = df
+        if out:
+            return out
+
     obs_ds = roles.obs_datasource
-    if scale.is_large:
-        obs_cols = agent_probe_columns_from_metadata(project, obs_ds)
-        if not obs_cols:
+    df_obs = _load_probe_df_for_datasource(project, obs_ds, scale, roles)
+    if df_obs is None:
+        if scale.is_large:
             raise ValueError(
                 f"Large project: no probe columns for obs datasource {obs_ds!r}; "
                 "refusing full table load"
             )
-        df1 = project.get_datasource_as_dataframe(obs_ds, columns=obs_cols)
-    else:
-        df1 = project.get_datasource_as_dataframe(obs_ds)
+        df_obs = project.get_datasource_as_dataframe(obs_ds)
+
+    out = {obs_ds: df_obs}
 
     primary_expr = roles.preferred_expression()
-    if primary_expr is None:
-        names: list[str] = []
+    if primary_expr is not None:
+        expr_ds = primary_expr.datasource_name
+        df_expr = _load_probe_df_for_datasource(project, expr_ds, scale, roles)
+        if df_expr is not None:
+            out[expr_ds] = df_expr
+        return out
+
+    names: list[str] = []
+    try:
+        names = list(project.get_datasource_names())
+    except Exception:
+        pass
+    if (
+        extra_datasource
+        and extra_datasource != obs_ds
+        and len(names) > 2
+        and "cells" not in names
+    ):
         try:
-            names = list(project.get_datasource_names())
+            df_extra = _load_probe_df_for_datasource(
+                project, extra_datasource, scale, roles
+            )
+            if df_extra is not None:
+                out[extra_datasource] = df_extra
         except Exception:
             pass
-        if (
-            extra_datasource
-            and extra_datasource != obs_ds
-            and len(names) > 2
-            and "cells" not in names
-        ):
-            try:
-                if scale.is_large:
-                    extra_cols = agent_probe_columns_from_metadata(
-                        project, extra_datasource
-                    )
-                    if not extra_cols:
-                        return [df1]
-                    df_extra = project.get_datasource_as_dataframe(
-                        extra_datasource, columns=extra_cols
-                    )
-                else:
-                    df_extra = project.get_datasource_as_dataframe(extra_datasource)
-                return [df1, df_extra]
-            except Exception:
-                pass
-        return [df1]
-
-    expr_ds = primary_expr.datasource_name
-    if scale.is_large:
-        expr_cols = agent_expression_probe_columns(
-            project, expr_ds, primary_expr.name_column
-        )
-        if not expr_cols:
-            return [df1]
-        df2 = project.get_datasource_as_dataframe(expr_ds, columns=expr_cols)
-    else:
-        df2 = project.get_datasource_as_dataframe(expr_ds)
-    return [df1, df2]
+    return out
 
 
 def format_scale_context_block(scale: ProjectScale) -> str:
