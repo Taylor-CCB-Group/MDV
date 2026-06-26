@@ -457,6 +457,10 @@ const useChat = () => {
         setVerboseProgress(v => [...v, msg].slice(-5));
     }, []);
 
+    const resetVerboseProgress = useCallback(() => {
+        setVerboseProgress([]);
+    }, []);
+
     // Initiate chat function
     const chatInit = useCallback(async () => {
         if (isSending || isInit || isChatLogLoading) return;
@@ -545,6 +549,7 @@ const useChat = () => {
         try {
             setIsSending(true);
             setCurrentRequestId(id);
+            resetVerboseProgress();
             setMessages(prev => [...prev, {
                 text: input,
                 sender: 'user',
@@ -594,8 +599,9 @@ const useChat = () => {
             setIsSending(false);
             setCurrentRequestId('');
             setRequestProgress(null);
+            resetVerboseProgress();
         }
-    }, [conversationId, socket, viewManager, selectedModelId]);
+    }, [conversationId, socket, viewManager, selectedModelId, resetVerboseProgress]);
 
 
     // Start New Conversation
