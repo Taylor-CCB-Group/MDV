@@ -200,7 +200,14 @@ create_or_validate_env_file() {
   fi
 
   # Source existing .env file to retain values
-  [ -f "$env_file" ] && source "$env_file"
+  if [ -f "$env_file" ]; then
+    # Windows CRLF line endings break `source` (": command not found")
+    if grep -q $'\r' "$env_file" 2>/dev/null; then
+      sed -i.bak $'s/\r$//' "$env_file"
+    fi
+    # shellcheck disable=SC1090
+    source "$env_file"
+  fi
   PREV_DB_BACKEND="${DB_BACKEND:-}"
   PREV_DB_HOST="${DB_HOST:-}"
   PREV_DB_SCHEMA="${DB_SCHEMA:-}"
