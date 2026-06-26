@@ -228,7 +228,9 @@ const SpatialLayerDialogComponent = observer(() => {
     const stack = config.renderStack;
     const mutateStack = useRenderStackMutation();
     const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+    // note that we'll want a proper arbitrary nested tree with groups, not the specialised state we have here
     const [spatialCollapsed, setSpatialCollapsed] = useState(false);
+    // actually, just hidden in this UI for now.
     const [deckCollapsed, setDeckCollapsed] = useState(false);
     const coordinateSystem = //todo datasources schema including spatial regions when referring to dataStore here.
         (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })
@@ -334,7 +336,7 @@ const SpatialLayerDialogComponent = observer(() => {
     // crude bypass of MDV layers in dialog for now.
     const entryIds = renderStackEntryIds(stack);//.filter(id => !id.startsWith("deck:"));
     const spatialEntryIds = entryIds.filter(id => !id.startsWith("deck:"));
-    const hostEntryIds = entryIds.filter(id => id.startsWith("deck:"));
+    const hostEntryIds = [] satisfies string[];//entryIds.filter(id => id.startsWith("deck:"));
 
     return (
         <div className="flex flex-col w-full h-full">
