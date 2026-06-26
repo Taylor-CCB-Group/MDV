@@ -63,13 +63,10 @@ export function useSpatialImagePanelContext() {
     return useContext(SpatialImagePanelContext);
 }
 
-/** @deprecated Use `useSpatialImagePanelContext` */
-export const ImageLayerChannelContext = createContext<{ layerId: string } | null>(null);
-
-/** @deprecated Use `useSpatialImagePanelContext` */
-export function useImageLayerChannelContext() {
-    return useContext(ImageLayerChannelContext);
-}
+// Stable identity for a layer with no persisted channel config yet. A fresh `{}`
+// per render would change the `config` prop of `useLayerChannelState` every render,
+// refiring its sync effect → setState → re-render loop (stack overflow on new layers).
+const EMPTY_CHANNELS: LayerChannelConfig = Object.freeze({});
 
 function channelConfigKey(channels: LayerChannelConfig): string {
     return serializeChannelConfig(channels);
@@ -116,7 +113,7 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
     const persistedKeyRef = useRef("");
 
     const config = layer;
-    const channels = config.channels ?? {};
+    const channels = config.channels ?? EMPTY_CHANNELS;
     const vivLayerProps =
         config.vivLayerProps && typeof config.vivLayerProps === "object"
             ? (config.vivLayerProps as Record<string, unknown>)
@@ -231,14 +228,12 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
 
     return (
         <SpatialImagePanelContext.Provider value={panelContext}>
-            <ImageLayerChannelContext.Provider value={{ layerId: config.id }}>
-                <div className="space-y-2">
-                    <Typography variant="caption" color="text.secondary">
-                        Image source: SpatialData zarr
-                    </Typography>
-                    <VivChannelList />
-                </div>
-            </ImageLayerChannelContext.Provider>
+            <div className="space-y-2">
+                <Typography variant="caption" color="text.secondary">
+                    Image source: SpatialData zarr
+                </Typography>
+                <VivChannelList />
+            </div>
         </SpatialImagePanelContext.Provider>
     );
 });
