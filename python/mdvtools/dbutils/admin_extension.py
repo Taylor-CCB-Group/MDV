@@ -118,6 +118,15 @@ def _parse_permission_input(payload: Any) -> AdminPermission:
     return permission
 
 
+def _safe_session_user(user: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": user.get("id"),
+        "email": user.get("email"),
+        "is_admin": bool(user.get("is_admin")),
+        "synthetic": bool(user.get("synthetic", False)),
+    }
+
+
 class AdminExtension(MDVProjectServerExtension):
     extension_id = "admin"
 
@@ -161,7 +170,7 @@ class AdminExtension(MDVProjectServerExtension):
                 return error
             return jsonify({
                 "authEnabled": enable_auth,
-                "user": user,
+                "user": _safe_session_user(user),
                 "isAdmin": True,
                 "permissions": ADMIN_PERMISSIONS,
             })

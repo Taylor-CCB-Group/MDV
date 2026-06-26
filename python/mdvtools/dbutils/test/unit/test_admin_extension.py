@@ -214,6 +214,7 @@ def test_local_dev_can_access_session(app):
     body = response.get_json()
     assert body["authEnabled"] is False
     assert body["isAdmin"] is True
+    assert set(body["user"].keys()) == {"id", "email", "is_admin", "synthetic"}
     assert body["user"]["synthetic"] is True
 
 

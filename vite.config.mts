@@ -156,7 +156,12 @@ const adminDevHtmlMiddleware: Plugin = {
     configureServer(server) {
         server.middlewares.use((req, _res, next) => {
             const url = req.url ?? "";
-            if (url === "/admin" || url.startsWith("/admin?")) {
+            if (
+                url === "/admin" ||
+                url === "/admin/" ||
+                url.startsWith("/admin?") ||
+                url.startsWith("/admin/?")
+            ) {
                 req.url = url.replace(/^\/admin/, "/admin_dev.html");
             }
             next();

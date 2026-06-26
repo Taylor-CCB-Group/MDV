@@ -40,6 +40,7 @@ async function requestJson<T>(
     });
 
     if (!response.ok) {
+        // Admin API errors are expected to follow { "error": "..." }.
         const body = await response.json().catch(() => undefined);
         const parsed = adminErrorResponseSchema.safeParse(body);
         const message = parsed.success
@@ -113,6 +114,7 @@ export const adminApi = {
         }).then((response) => {
             if (!response.ok) {
                 return response.json().then((body: unknown) => {
+                    // Admin API errors are expected to follow { "error": "..." }.
                     const parsed = adminErrorResponseSchema.safeParse(body);
                     const message = parsed.success
                         ? parsed.data.error

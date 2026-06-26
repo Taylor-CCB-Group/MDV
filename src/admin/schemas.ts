@@ -5,6 +5,7 @@ export const adminPermissionSchema = z.enum(["view", "edit", "owner"]);
 export const adminUserSchema = z.object({
     id: z.number(),
     email: z.string(),
+    authId: z.string().optional(),
     firstName: z.string(),
     lastName: z.string(),
     isActive: z.boolean(),
