@@ -34,8 +34,8 @@ def test_batch_prompts_continue_on_error_and_write_csv(tmp_path, monkeypatch):
 
     calls = {"n": 0}
 
-    def fake_run_chat_once(*, project_path, prompt, output_dir=None, view_name=None):
-        del project_path, view_name
+    def fake_run_chat_once(*, project_path, prompt, output_dir=None, view_name=None, model_id=None):
+        del project_path, view_name, model_id
         calls["n"] += 1
         if output_dir is None:
             raise ValueError("output_dir is required")

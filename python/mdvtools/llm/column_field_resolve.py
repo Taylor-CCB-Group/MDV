@@ -371,3 +371,30 @@ def normalize_view_chart_params(
                 _normalize_chart_dict(ch, field_set, name_map)
                 _normalize_marker_alias_tokens(ch, ds_name, field_set)
     return out
+
+
+def ensure_view_gridstack_layout(view: dict[str, Any]) -> dict[str, Any]:
+    """
+    Ensure each datasource panel in a saved view uses gridstack layout.
+
+    ChatMDV-generated views often only set ``initialCharts``; the frontend defaults
+    missing layout to absolute positioning.
+    """
+    out = copy.deepcopy(view)
+    initial = out.get("initialCharts")
+    if not isinstance(initial, dict):
+        return out
+
+    data_sources = out.get("dataSources")
+    if not isinstance(data_sources, dict):
+        data_sources = {}
+        out["dataSources"] = data_sources
+
+    for ds_name in initial:
+        panel = data_sources.get(ds_name)
+        if not isinstance(panel, dict):
+            panel = {}
+            data_sources[ds_name] = panel
+        panel["layout"] = "gridstack"
+
+    return out
