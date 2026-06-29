@@ -88,5 +88,28 @@ decisions live in `docs/adr/` (0004–0007).
 - **ingest** — the **owner** step that reads **worker** outputs and writes them into the
   project.
 
-- **manifest / provenance** — the recorded metadata about a **job** run (tool / scanpy / MDV
-  versions, params, subset hash, duration).
+- **job record** — the durable owner-side file for one **job**
+  (`<project>/jobs/records/<job_id>.json`): status, params, and — once the job reaches DONE —
+  its **provenance**. The single source of truth for a run (ADR-0005).
+
+- **manifest** — the output stats the **worker** writes into its **workspace**
+  (`output/manifest.json`): rows produced and similar facts the owner cannot know until compute
+  finishes. Read back at **ingest** and embedded into **provenance**; never the durable archive
+  itself (the scratch may be purged — ADR-0007).
+
+- **provenance** — the full lineage of an output, built by the **owner** at **ingest** and stored
+  as a field on the **job record**: `job_id`, `tool_id`, `params`, **input filter hash**,
+  **content hash**, submit/complete times, and the embedded **manifest**. Stamped onto the
+  **job record** AND, by reference, onto the output column (ADR-0007).
+  _Avoid_: lineage, audit record.
+
+- **content hash** — `hash(tool_id, params, input filter hash)`: the **analysis identity** — *which
+  analysis*, not *which run* (that is the `job_id`). Two different **jobs** of the same analysis
+  share a content hash. It keys the deferred result cache (ADR-0006); it is **not** a hash of input
+  *values*, so it is an analysis/cache key, not a data-freshness guarantee.
+  _Avoid_: job hash, cache key (when ambiguous with **input filter hash**).
+
+- **provenance pointer** — the denormalized reference stamped on an **output column** in
+  `datasources.json`: `kind` / `job_id` / `tool_id` / `content hash`. It is **not** a copy of the
+  **provenance**; it dereferences to the **job record** by `job_id` (ADR-0009). Lets a UI label the
+  column without opening the record.
