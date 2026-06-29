@@ -1865,8 +1865,8 @@ class MDVProject:
         fdir = split(os.path.abspath(__file__))[0]
         # consider adding an option to do a js build here
         tdir = join(fdir, "templates")
-        # copy everything except the data (todo options for images etc)
-        copytree(self.dir, outdir, ignore=ignore_patterns(*("*.h5", "*.ome.tiff")))
+        # copy everything except the data, jobs (todo options for images etc)
+        copytree(self.dir, outdir, ignore=ignore_patterns(*("*.h5", "*.ome.tiff", "jobs")))
         # copy the js and images
         self.copy_images(outdir)
         copytree(join(fdir, "static"), join(outdir, "static"))
