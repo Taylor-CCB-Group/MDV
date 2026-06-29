@@ -36,11 +36,11 @@ walks.)
 
 ## Scratch vs durable — what survives
 
-- **Durable:** the **manifest / provenance** (tool / scanpy / MDV versions, params,
-  `input_filter_hash`, duration, `job_id`), the **`input_filter_hash`** (pins *which* rows, for
-  subset-taking tools),
-  and the **ingested result**.
-- **Scratch (GC'd):** the materialized tray + intermediates.
+- **Durable:** the **provenance** (tool / scanpy / MDV versions, params, `input_filter_hash`,
+  duration, `job_id`) — which **embeds the worker's manifest** read back at ingest — the
+  **`input_filter_hash`** (pins *which* rows, for subset-taking tools), and the **ingested result**.
+- **Scratch (GC'd):** the materialized tray + intermediates — **including the manifest *file***;
+  it survives only as the copy embedded in durable provenance.
 
 This **downgrades ADR-0004's wording**: the workspace is *not* "the reproducibility record."
 Reproducibility = **manifest + `input_filter_hash` + result**. Exact re-run is possible only
@@ -60,6 +60,10 @@ owner-side job log (ADR-0005). **Lineage is proven from the result, never from t
 
 Do this **uniformly** in local and HPC — local must not "cheat" by leaving the manifest in
 `jobs-root` forever, because that breaks the one-design rule and HPC cannot do it anyway.
+
+The **datasource-side** stamp is a *pointer* to the job record (keyed by `job_id`), not an inline
+copy of the provenance — the mechanism, the read/write seams, and the dangling-on-purge contract
+are recorded in **ADR-0009**.
 
 ## Cleanup & consequences
 
