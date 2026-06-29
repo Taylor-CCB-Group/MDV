@@ -5,6 +5,7 @@ from typing import Any
 
 from mdvtools.dbutils.admin_contracts import (
     AdminConflictError,
+    AdminExternalServiceError,
     AdminInputError,
     AdminNotFoundError,
     AdminPermission,
@@ -16,9 +17,17 @@ from mdvtools.dbutils.admin_contracts import (
     CreateAdminUserResult,
     ProjectMemberInput,
 )
+from mdvtools.dbutils.admin_identity import (
+    AdminIdentityInput,
+    AdminIdentityProvider,
+    AdminIdentityResult,
+    LocalAdminIdentityProvider,
+)
+from mdvtools.logging_config import get_logger
 
 
 VALID_PERMISSIONS: set[AdminPermission] = {"view", "edit", "owner"}
+logger = get_logger(__name__)
 
 
 def _serialize_datetime(value: Any) -> str | None:
@@ -36,6 +45,9 @@ class MDVAdminServices:
     of querying MDV models directly.
     """
 
+    def __init__(self, identity_provider: AdminIdentityProvider | None = None):
+        self.identity_provider = identity_provider or LocalAdminIdentityProvider()
+
     def list_users(self) -> list[AdminUser]:
         _Project, User = self._get_models()
         return [self._to_admin_user(user) for user in User.query.all()]
@@ -48,14 +60,18 @@ class MDVAdminServices:
         self,
         data: CreateAdminUserInput,
     ) -> CreateAdminUserResult:
-        email = data.email.strip().lower()
-        if not email:
-            raise AdminInputError("Email is required.")
-        if "@" not in email:
-            raise AdminInputError("A valid email address is required.")
         for access in data.project_access:
             if access.permission not in VALID_PERMISSIONS:
                 raise AdminInputError("Permission must be one of: view, edit, owner.")
+
+        identity = self.identity_provider.create_or_resolve_user(
+            AdminIdentityInput(
+                email=data.email,
+                first_name=data.first_name,
+                last_name=data.last_name,
+            )
+        )
+        email = identity.email
 
         Project, User, UserProject, db = self._get_write_models()
         try:
@@ -64,7 +80,7 @@ class MDVAdminServices:
             if user is None:
                 user = User()
                 user.email = email
-                user.auth_id = f"local:{email}"
+                user.auth_id = identity.auth_id
                 user.first_name = data.first_name.strip()
                 user.last_name = data.last_name.strip()
                 user.confirmed_at = datetime.now()
@@ -81,6 +97,8 @@ class MDVAdminServices:
                     user.first_name = first_name
                 if last_name:
                     user.last_name = last_name
+                if identity.auth_id and getattr(user, "auth_id", "") != identity.auth_id:
+                    user.auth_id = identity.auth_id
 
             project_memberships: list[AdminProjectMembership] = []
             for access in data.project_access:
@@ -124,9 +142,14 @@ class MDVAdminServices:
             )
         except (AdminInputError, AdminNotFoundError, AdminConflictError):
             db.session.rollback()
+            self._rollback_created_identity(identity)
+            raise
+        except AdminExternalServiceError:
+            db.session.rollback()
             raise
         except Exception:
             db.session.rollback()
+            self._rollback_created_identity(identity)
             raise
 
     def list_project_members(self, project_id: int) -> list[AdminProjectMember]:
@@ -306,6 +329,21 @@ class MDVAdminServices:
         ).first()
         if excluded_owner is not None and owner_count <= 1:
             raise AdminConflictError("Cannot remove or demote the last project owner.")
+
+    def _rollback_created_identity(self, identity: AdminIdentityResult) -> None:
+        if not identity.created:
+            return None
+        try:
+            self.identity_provider.rollback_created_user(identity.auth_id)
+        except Exception as exc:
+            logger.error(
+                "Failed to roll back created admin identity %s after MDV write failure.",
+                identity.auth_id,
+            )
+            raise AdminExternalServiceError(
+                "MDV user creation failed after Auth0 user creation; Auth0 rollback failed. "
+                "Manual repair is required."
+            ) from exc
 
     def _to_admin_project_member(self, user: Any, membership: Any) -> AdminProjectMember:
         permission = self._permission_from_membership(membership)

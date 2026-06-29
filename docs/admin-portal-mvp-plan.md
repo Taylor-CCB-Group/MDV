@@ -23,6 +23,7 @@ We have a local Admin Portal POC that proves the MDV-side project-access workflo
 AdminExtension
   -> admin contracts
   -> MDVAdminServices
+  -> AdminIdentityProvider
   -> MDV DB models: User, Project, UserProject
 ```
 
@@ -31,14 +32,15 @@ Implemented locally:
 - list projects
 - list users
 - create/reuse local user
-- require initial project access
+- allow user creation with zero or more initial project assignments
 - view project members
 - add existing user to project
 - change permission: `view`, `edit`, `owner`
 - remove project access
 - protect last project owner with `409 Conflict`
+- identity provider boundary for local/Auth0 user create-or-resolve behavior
 
-This confirms the local MDV database workflow. It does not confirm Auth0 user creation, production login, catalog filtering for newly-created users, or production Admin authorization.
+This confirms the local MDV database workflow and the backend boundary where Auth0 creation will attach. It does not yet confirm real Auth0 user creation against a deployment, production login, catalog filtering for newly-created users, or production Admin authorization.
 
 ## 2. MVP Scope
 
@@ -91,11 +93,11 @@ Out of scope for MVP:
 | Create-user flow requires project access | No, but the backend rule is centralized so this can be tightened later |
 | Implemented create-user `projectAccess` shape | Array, may be empty |
 | Auth0 create/resolve user | Decided |
-| Auth0 invite/password setup flow | Open |
-| Auth0 existing email outside deployment connection behavior | Open |
-| Auth0 connection name/source | Open |
-| Auth0 Management API credentials in app container | Open |
-| Deleted/archived project visibility | Open |
+| Auth0 invite/password setup flow | Generated password, no exposed password, no new email automation in MVP |
+| Auth0 existing email outside deployment connection behavior | Create/add in `AUTH0_DB_CONNECTION` |
+| Auth0 connection name/source | `AUTH0_DB_CONNECTION` |
+| Auth0 Management API credentials in app container | Use existing Auth0 client credentials first; optional M2M override later |
+| Deleted/archived project visibility | Exclude deleted projects by default |
 | Bulk paste/import | Post-MVP |
 
 ## 4. Increment Ledger
@@ -106,7 +108,8 @@ Increment 2: Local user creation and assignment    Status: implemented baseline
 Increment 3A: Project members view                 Status: implemented baseline
 Increment 3B: Permission editing/removal           Status: implemented baseline
 Increment 3C: Create-user API array shape          Status: implemented baseline
-Increment 4: Auth0-backed user creation            Status: planned
+Increment 4A: Identity provider boundary           Status: implemented baseline
+Increment 4B: Auth0-backed user creation E2E       Status: planned
 ```
 
 Implemented Admin endpoints:
@@ -152,7 +155,23 @@ Scope:
 - backend parser, service, and tests use the array shape
 - local/no-auth behavior remains supported
 
-### Increment 4: Auth0-Backed User Creation
+### Increment 4A: Identity Provider Boundary
+
+Status: implemented baseline.
+
+Goal: make user creation go through a small identity-provider contract instead of hardcoding local `auth_id` generation inside MDV DB writes.
+
+Scope:
+
+- `AdminIdentityProvider` contract for create-or-resolve user identity behavior
+- local provider for `ENABLE_AUTH=false`
+- Auth0 provider shape for `ENABLE_AUTH=true`
+- Auth0 provider resolves users only in `AUTH0_DB_CONNECTION`
+- Auth0 provider creates users with a generated password and no exposed password
+- rollback hook for Auth0 users created before a later MDV write failure
+- mocked tests for Auth0 create/resolve behavior
+
+### Increment 4B: Auth0-Backed User Creation E2E
 
 Goal: replace local-only user creation with production Auth0 create/resolve behavior.
 
@@ -214,14 +233,17 @@ Decided:
 - Admin should create or resolve users immediately because avoiding manual Auth0 work is the core pain point.
 - For MVP production authorization, `User.is_admin` is the Admin access marker.
 - First admin bootstrap should use existing Auth0 role sync where possible: assign Auth0 role `admin`, sync users into MDV, and rely on `User.is_admin=true`.
+- Auth0 user metadata such as `{"role": "admin"}` is not used for MVP Admin authorization unless the existing sync code changes later.
+- MVP Auth0 Management API calls should use the existing `AUTH0_CLIENT_ID` and `AUTH0_CLIENT_SECRET`, matching current `sync_users_to_db()` behavior. Later deployments may provide separate M2M credentials via optional override env vars.
+- Admin should create/resolve Auth0 users only in the configured `AUTH0_DB_CONNECTION` for the current MDV deployment.
+- If an email exists in Auth0 but not in the configured `AUTH0_DB_CONNECTION`, Admin should create/add the user in `AUTH0_DB_CONNECTION` rather than reusing a different connection identity.
+- MVP creates Auth0 users with a generated random password, does not expose the password in Admin, and does not add new invitation/password-reset email automation.
 - Admin writes should refresh `user_project_cache` immediately when `ENABLE_AUTH=true`.
+- Admin project lists should exclude deleted projects by default. Deleted/archived visibility can be added later through an explicit filter.
 
 Still open:
 
-- If an email exists in Auth0 but not in this deployment's configured Auth0 database connection, should Admin reuse that identity, create/add the user in the deployment connection, or reject the operation?
-- Which Auth0 connection should Admin create users in?
-- Are Auth0 Management API credentials available inside the MDV app container?
-- If Admin creates a new Auth0 user, what exact account-setup flow should be used: Auth0 invitation, Auth0 password-reset ticket/email, normal forgot-password flow, or no email?
+- Should post-MVP add explicit Auth0 invitation/password-reset email automation?
 
 ## 8. Module Map
 
@@ -240,9 +262,12 @@ Still open:
 - `python/mdvtools/dbutils/admin_contracts.py`
   - Admin domain interface module.
   - Defines user, project, project-access, and project-member shapes.
+- `python/mdvtools/dbutils/admin_identity.py`
+  - Admin identity-provider boundary.
+  - Defines local and Auth0 create-or-resolve behavior for user identity.
 - `python/mdvtools/dbutils/admin_services.py`
   - MDV adapter at the Admin seam.
-  - Uses MDV `User`, `Project`, and `UserProject`.
+  - Uses `AdminIdentityProvider` plus MDV `User`, `Project`, and `UserProject`.
 - `python/mdvtools/auth/auth0_provider.py`
   - Auth0 login/sync module.
   - Existing sync pulls Auth0 users into MDV and updates `User.is_admin`.

@@ -33,6 +33,10 @@ class AdminNotFoundError(AdminServiceError):
     pass
 
 
+class AdminExternalServiceError(AdminServiceError):
+    pass
+
+
 @dataclass(frozen=True)
 class AdminUser:
     id: int

@@ -18,13 +18,17 @@ All responses are JSON.
 
 The admin frontend should use these APIs instead of importing catalog, project-manager, or database internals.
 
-## Open API Questions
+## API Assumptions
 
-- If an email exists in Auth0 but not in this deployment's configured Auth0 database connection, should Admin reuse that identity, create/add the user in the deployment connection, or reject the operation?
-- Which Auth0 connection should Admin use for user creation?
-- Are Auth0 Management API credentials available inside the MDV app container?
-- When Admin creates a new Auth0 user, should the backend trigger an Auth0 invitation/password-reset email, rely on the normal forgot-password flow, or create the user silently?
-- Should deleted or archived projects be returned by `GET /admin/api/projects`?
+- Auth0 user creation uses the current deployment's `AUTH0_DB_CONNECTION`.
+- Existing Auth0 emails are resolved only inside `AUTH0_DB_CONNECTION`; if not present there, Admin creates/adds the user in that connection.
+- Auth0 Management API calls use existing Auth0 application credentials for MVP, with optional dedicated M2M credentials later.
+- MVP Auth0 user creation uses a generated password, does not expose it in Admin, and does not add new email automation.
+- `GET /admin/api/projects` excludes deleted projects by default.
+
+Open post-MVP question:
+
+- Should Admin add explicit Auth0 invitation/password-reset email automation later?
 
 ## Shared Types
 

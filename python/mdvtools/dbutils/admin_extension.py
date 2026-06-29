@@ -6,6 +6,7 @@ from flask import Flask, Response, jsonify, render_template, request, session
 
 from mdvtools.dbutils.admin_contracts import (
     AdminConflictError,
+    AdminExternalServiceError,
     AdminHostServices,
     AdminInputError,
     AdminNotFoundError,
@@ -15,6 +16,7 @@ from mdvtools.dbutils.admin_contracts import (
     ProjectMemberInput,
     REQUIRE_INITIAL_PROJECT_ACCESS,
 )
+from mdvtools.dbutils.admin_identity import ConfiguredAuth0AdminIdentityProvider
 from mdvtools.dbutils.admin_services import MDVAdminServices
 from mdvtools.logging_config import get_logger
 from mdvtools.mdvproject import MDVProject
@@ -131,7 +133,7 @@ class AdminExtension(MDVProjectServerExtension):
     extension_id = "admin"
 
     def __init__(self, services: AdminHostServices | None = None):
-        self.services = services or MDVAdminServices()
+        self.services = services
 
     def get_session_config(self) -> dict[str, Any]:
         return {
@@ -141,6 +143,12 @@ class AdminExtension(MDVProjectServerExtension):
 
     def register_global_routes(self, app: Flask, config: dict):
         enable_auth = bool(app.config.get("ENABLE_AUTH", False))
+        if self.services is None:
+            identity_provider = ConfiguredAuth0AdminIdentityProvider(app.config) if enable_auth else None
+            self.services = MDVAdminServices(identity_provider=identity_provider)
+        services = self.services
+        if services is None:
+            raise RuntimeError("Admin services were not configured.")
 
         def require_admin() -> tuple[dict[str, Any], None] | tuple[None, tuple[Response, int]]:
             if not enable_auth:
@@ -180,7 +188,7 @@ class AdminExtension(MDVProjectServerExtension):
             _user, error = require_admin()
             if error is not None:
                 return error
-            users = self.services.list_users()
+            users = services.list_users()
             return jsonify({"users": [user.to_response() for user in users]})
 
         @app.route("/admin/api/users", methods=["POST"])
@@ -190,7 +198,7 @@ class AdminExtension(MDVProjectServerExtension):
                 return error
             try:
                 data = _parse_create_user_input(request.get_json(silent=True))
-                result = self.services.create_local_user_with_project_access(data)
+                result = services.create_local_user_with_project_access(data)
                 return jsonify(result.to_response()), 201 if result.created else 200
             except AdminInputError as exc:
                 return _json_error(str(exc), 400)
@@ -198,13 +206,15 @@ class AdminExtension(MDVProjectServerExtension):
                 return _json_error(str(exc), 409)
             except AdminNotFoundError as exc:
                 return _json_error(str(exc), 404)
+            except AdminExternalServiceError as exc:
+                return _json_error(str(exc), 502)
 
         @app.route("/admin/api/projects", methods=["GET"])
         def admin_projects():
             _user, error = require_admin()
             if error is not None:
                 return error
-            projects = self.services.list_projects()
+            projects = services.list_projects()
             return jsonify({"projects": [project.to_response() for project in projects]})
 
         @app.route("/admin/api/projects/<int:project_id>/users", methods=["GET"])
@@ -213,7 +223,7 @@ class AdminExtension(MDVProjectServerExtension):
             if error is not None:
                 return error
             try:
-                members = self.services.list_project_members(project_id)
+                members = services.list_project_members(project_id)
                 return jsonify({"members": [member.to_response() for member in members]})
             except AdminNotFoundError as exc:
                 return _json_error(str(exc), 404)
@@ -225,7 +235,7 @@ class AdminExtension(MDVProjectServerExtension):
                 return error
             try:
                 data = _parse_project_member_input(request.get_json(silent=True))
-                member = self.services.add_project_member(project_id, data)
+                member = services.add_project_member(project_id, data)
                 return jsonify(member.to_response()), 201
             except AdminInputError as exc:
                 return _json_error(str(exc), 400)
@@ -241,7 +251,7 @@ class AdminExtension(MDVProjectServerExtension):
                 return error
             try:
                 permission = _parse_permission_input(request.get_json(silent=True))
-                member = self.services.update_project_member_permission(
+                member = services.update_project_member_permission(
                     project_id,
                     user_id,
                     permission,
@@ -260,7 +270,7 @@ class AdminExtension(MDVProjectServerExtension):
             if error is not None:
                 return error
             try:
-                self.services.remove_project_member(project_id, user_id)
+                services.remove_project_member(project_id, user_id)
                 return "", 204
             except AdminInputError as exc:
                 return _json_error(str(exc), 400)

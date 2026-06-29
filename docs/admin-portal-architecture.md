@@ -162,12 +162,13 @@ Frontend host API should eventually provide:
 Backend host API should eventually provide:
 
 - auth/session helpers
+- identity provider/user create-or-resolve service
 - user service
 - project service
 - project access service
 - plugin config and manifest access
 
-The current service boundary should remain admin-specific until Auth0-backed user creation is proven. After that baseline exists, reusable host-service concepts can be extracted into a generic plugin host API with less guesswork.
+The current service boundary should remain admin-specific until Auth0-backed user creation is proven. The current implementation already splits Admin database operations from an `AdminIdentityProvider` boundary, so local dev and Auth0-backed identity behavior can differ without changing Admin route handlers. After the Auth0 baseline exists, reusable host-service concepts can be extracted into a generic plugin host API with less guesswork.
 
 Admin should reuse existing MDV services where possible, especially user and project-access services. If current service transaction boundaries prevent the Admin create-user flow from behaving atomically, refactor those services or add transaction-aware variants rather than duplicating business logic in Admin.
 
@@ -286,6 +287,14 @@ Auth0 proves who the user is.
 MDV decides whether that user is an admin and which projects they can access.
 ```
 
+For MVP, Admin should use the existing Auth0 application credentials for Management API calls, matching current `sync_users_to_db()` behavior. A later deployment can add optional dedicated M2M credentials if stronger separation is required.
+
+Admin should create or resolve Auth0 users only in the current deployment's configured `AUTH0_DB_CONNECTION`.
+
+If an email exists elsewhere in Auth0 but not in the configured `AUTH0_DB_CONNECTION`, Admin should create/add the user in `AUTH0_DB_CONNECTION` rather than reusing an identity from another connection.
+
+For MVP, newly-created Auth0 users should receive a generated random password. Admin should not expose that password and should not add new invitation/password-reset email automation. Users can use the existing password reset/forgot-password path if needed; explicit setup-email automation can be added later.
+
 This means admin permission should not depend only on Auth0. An authenticated user should also be marked as an admin in MDV for that deployment.
 
 ## Admin Authorization
@@ -305,6 +314,8 @@ session["user"]["is_admin"] == True
 ```
 
 This is enough for MVP Admin access.
+
+Existing MDV Auth0 sync code sets `User.is_admin` from an Auth0 role named `admin`. Some deployment notes mention user metadata such as `{"role": "admin"}`, but MVP Admin authorization should follow the current code path and should not treat metadata as authoritative.
 
 Future representation may become a richer role model:
 
@@ -398,11 +409,7 @@ The read-first source for implementation status and next steps is [admin-portal-
 
 Still open:
 
-- Should deleted/archived projects appear in Admin project lists?
-- If an email exists in Auth0 but not in this deployment's configured Auth0 database connection, should Admin reuse that identity, create/add the user in the deployment connection, or reject the operation?
-- Which Auth0 connection should Admin use for user creation?
-- Are Auth0 Management API credentials available inside the MDV app container?
-- When Admin creates a new Auth0 user, should the backend trigger an Auth0 invitation/password-reset email, rely on the normal forgot-password flow, or create the user silently?
+- Should post-MVP add explicit Auth0 invitation/password-reset email automation?
 
 Settled MVP decisions:
 
@@ -413,6 +420,11 @@ Settled MVP decisions:
 - `/admin` is a separate extension surface, not a catalog page.
 - Admin is a trusted plugin/extension.
 - Plugin registration target is startup-time, with build-time frontend asset materialisation for production.
+- Auth0 Management API calls use existing Auth0 application credentials for MVP, with optional dedicated M2M credentials later.
+- Auth0 user creation uses the current deployment's `AUTH0_DB_CONNECTION`.
+- Existing Auth0 emails are resolved only inside `AUTH0_DB_CONNECTION`; if not present there, Admin creates/adds the user in that connection.
+- MVP Auth0 user creation uses a generated password, does not expose it in Admin, and does not add new email automation.
+- Admin project lists exclude deleted projects by default; deleted/archived visibility can be added later through an explicit filter.
 - Admin writes should refresh `user_project_cache` when `ENABLE_AUTH=true`.
 - Last-owner conflicts return `409 Conflict`.
 - Production MVP should start with server-side Admin write logging, not a full audit-log UI/table.

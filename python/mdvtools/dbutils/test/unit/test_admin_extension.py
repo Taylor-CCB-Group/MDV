@@ -10,6 +10,7 @@ from flask import Flask
 
 from mdvtools.dbutils.admin_contracts import (
     AdminConflictError,
+    AdminExternalServiceError,
     AdminInputError,
     AdminNotFoundError,
     AdminProject,
@@ -21,6 +22,7 @@ from mdvtools.dbutils.admin_contracts import (
     ProjectMemberInput,
 )
 from mdvtools.dbutils.admin_extension import AdminExtension
+from mdvtools.dbutils.admin_identity import AdminIdentityInput, Auth0AdminIdentityProvider
 
 
 @dataclass
@@ -477,6 +479,25 @@ def test_create_local_user_maps_missing_project_errors():
     assert response.get_json()["error"] == "Project not found."
 
 
+def test_create_user_maps_external_identity_errors():
+    class FailingIdentityAdminServices(FakeAdminServices):
+        def create_local_user_with_project_access(self, data: CreateAdminUserInput):
+            raise AdminExternalServiceError("Auth0 operation failed.")
+
+    flask_app = Flask(__name__)
+    flask_app.secret_key = "test-secret"
+    flask_app.config["ENABLE_AUTH"] = False
+    AdminExtension(services=FailingIdentityAdminServices()).register_global_routes(flask_app, {})
+
+    response = flask_app.test_client().post(
+        "/admin/api/users",
+        json={"email": "new.user@example.com"},
+    )
+
+    assert response.status_code == 502
+    assert response.get_json()["error"] == "Auth0 operation failed."
+
+
 def test_project_members_endpoint_lists_assigned_users():
     flask_app = Flask(__name__)
     flask_app.secret_key = "test-secret"
@@ -605,3 +626,104 @@ def test_remove_project_member_maps_last_owner_errors():
 
     assert response.status_code == 409
     assert response.get_json()["error"] == "Cannot remove or demote the last project owner."
+
+
+class FakeAuth0Response:
+    def __init__(self, payload: Any):
+        self.payload = payload
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self.payload
+
+
+def test_auth0_identity_provider_reuses_user_in_target_connection(monkeypatch):
+    import requests
+
+    def fake_post(url: str, **kwargs: Any):
+        if url == "https://example.auth0.com/oauth/token":
+            return FakeAuth0Response({"access_token": "management-token"})
+        raise AssertionError(f"Unexpected POST {url}")
+
+    def fake_get(url: str, **kwargs: Any):
+        assert url == "https://example.auth0.com/api/v2/users-by-email"
+        return FakeAuth0Response([
+            {
+                "user_id": "auth0|existing",
+                "identities": [{"connection": "Username-Password-Authentication"}],
+            }
+        ])
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    provider = Auth0AdminIdentityProvider(
+        domain="example.auth0.com",
+        client_id="client-id",
+        client_secret="client-secret",
+        connection="Username-Password-Authentication",
+    )
+
+    result = provider.create_or_resolve_user(
+        AdminIdentityInput(
+            email=" Existing.User@Example.com ",
+            first_name="Existing",
+            last_name="User",
+        )
+    )
+
+    assert result.email == "existing.user@example.com"
+    assert result.auth_id == "auth0|existing"
+    assert result.created is False
+
+
+def test_auth0_identity_provider_creates_user_in_target_connection(monkeypatch):
+    import requests
+
+    post_calls: list[tuple[str, dict[str, Any]]] = []
+
+    def fake_post(url: str, **kwargs: Any):
+        post_calls.append((url, kwargs))
+        if url == "https://example.auth0.com/oauth/token":
+            return FakeAuth0Response({"access_token": "management-token"})
+        if url == "https://example.auth0.com/api/v2/users":
+            return FakeAuth0Response({"user_id": "auth0|created"})
+        raise AssertionError(f"Unexpected POST {url}")
+
+    def fake_get(url: str, **kwargs: Any):
+        assert url == "https://example.auth0.com/api/v2/users-by-email"
+        return FakeAuth0Response([
+            {
+                "user_id": "google-oauth2|existing",
+                "identities": [{"connection": "google-oauth2"}],
+            }
+        ])
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    provider = Auth0AdminIdentityProvider(
+        domain="example.auth0.com",
+        client_id="client-id",
+        client_secret="client-secret",
+        connection="Username-Password-Authentication",
+    )
+
+    result = provider.create_or_resolve_user(
+        AdminIdentityInput(
+            email="new.user@example.com",
+            first_name="New",
+            last_name="User",
+        )
+    )
+
+    create_payload = post_calls[1][1]["json"]
+    assert result.auth_id == "auth0|created"
+    assert result.created is True
+    assert create_payload["connection"] == "Username-Password-Authentication"
+    assert create_payload["email"] == "new.user@example.com"
+    assert create_payload["email_verified"] is True
+    assert isinstance(create_payload["password"], str)
+    assert len(create_payload["password"]) == 16
