@@ -165,7 +165,134 @@ class ResolvedDatasources:
 
     primary: str
     selected: list[str]
-    source: str  # "user" | "question" | "default"
+    source: str  # "user" | "auto" | "question" | "default"
+
+
+_EXPRESSION_QUESTION_KEYWORDS = frozenset(
+    {
+        "gene",
+        "genes",
+        "marker",
+        "markers",
+        "expression",
+        "express",
+        "protein",
+        "rna",
+        "enrichment",
+        "signature",
+        "deg",
+        "degs",
+        "differential",
+    }
+)
+
+
+def _order_datasources(names: list[str], selected: set[str]) -> list[str]:
+    """Stable catalog order for a subset of datasource names."""
+    return [n for n in names if n in selected]
+
+
+def _pick_primary_datasource(
+    project: Any,
+    selected: list[str],
+    *,
+    mentioned_fields: set[str],
+    field_index: dict[str, set[str]],
+) -> str:
+    if not selected:
+        raise ValueError("Cannot pick primary from empty selection")
+    if len(selected) == 1:
+        return selected[0]
+    scores = {
+        ds: len(mentioned_fields & field_index.get(ds, set()))
+        for ds in selected
+    }
+    best_score = max(scores.values())
+    top = [ds for ds in selected if scores[ds] == best_score]
+    if len(top) == 1:
+        return top[0]
+    try:
+        obs = infer_datasource_roles(project).obs_datasource
+        if obs in top:
+            return obs
+    except Exception:
+        pass
+    return top[0]
+
+
+def _question_suggests_expression(question: str) -> bool:
+    tokens = _question_word_tokens(question)
+    return bool(tokens & _EXPRESSION_QUESTION_KEYWORDS)
+
+
+def resolve_datasources_from_question_auto(
+    project: Any,
+    question: str,
+    *,
+    field_index: dict[str, set[str]] | None = None,
+) -> ResolvedDatasources:
+    """
+    Infer one or more datasources from the question text and project field metadata.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        raise ValueError("Project has no datasources")
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    name_matches = _datasource_names_mentioned_in_question(names, question)
+    if name_matches:
+        ordered = sorted(name_matches, key=len, reverse=True)
+        primary = ordered[0]
+        stable = _order_datasources(names, set(ordered))
+        return ResolvedDatasources(primary=primary, selected=stable, source="auto")
+
+    mentioned = _question_field_tokens(question, field_index)
+    if mentioned:
+        owners_by_field = find_datasources_for_fields(field_index, sorted(mentioned))
+        owner_set = {ds for owners in owners_by_field.values() for ds in owners}
+        if owner_set:
+            stable = _order_datasources(names, owner_set)
+            primary = _pick_primary_datasource(
+                project,
+                stable,
+                mentioned_fields=mentioned,
+                field_index=field_index,
+            )
+            # Primary first in selected list for RAG/chart default.
+            if primary in stable:
+                stable = [primary] + [ds for ds in stable if ds != primary]
+            return ResolvedDatasources(
+                primary=primary, selected=stable, source="auto"
+            )
+
+    if "cells" in names and _question_suggests_expression(question):
+        roles = infer_datasource_roles(project)
+        expr = roles.preferred_expression()
+        if expr is not None:
+            selected = _order_datasources(
+                names, {roles.obs_datasource, expr.datasource_name}
+            )
+            return ResolvedDatasources(
+                primary=roles.obs_datasource,
+                selected=selected,
+                source="auto",
+            )
+
+    catalog = build_chat_datasource_catalog(project)
+    default_names = [
+        n for n in catalog.get("default_datasource_names", []) if n in names
+    ]
+    if default_names:
+        return ResolvedDatasources(
+            primary=default_names[0],
+            selected=default_names,
+            source="auto",
+        )
+
+    default = str(names[0])
+    return ResolvedDatasources(primary=default, selected=[default], source="default")
 
 
 def _datasource_role_for_name(
@@ -249,29 +376,29 @@ def resolve_datasources_for_request(
     if field_index is None:
         field_index = build_datasource_field_index(project)
 
-    resolved = resolve_datasource_from_question(
+    return resolve_datasources_from_question_auto(
         project, question, field_index=field_index
     )
-    if resolved is not None:
-        return ResolvedDatasources(
-            primary=resolved, selected=[resolved], source="question"
-        )
-
-    default = str(names[0])
-    return ResolvedDatasources(primary=default, selected=[default], source="default")
 
 
 def format_selected_datasources_cross_table_policy(
     selected_datasources: list[str],
+    *,
+    auto_resolved: bool = False,
 ) -> str:
-    """Prompt text when the user selected multiple datasources for one analysis."""
+    """Prompt text when multiple datasources are in scope for one analysis."""
     if len(selected_datasources) < 2:
         return ""
     names = ", ".join(f"`{n}`" for n in selected_datasources)
     primary = selected_datasources[0]
+    scope_label = (
+        "Auto-resolved datasources"
+        if auto_resolved
+        else "Selected datasources"
+    )
     return (
-        "- **User-selected datasources:** "
-        f"{names}. Primary chart target: `{primary}` (first selected).\n"
+        f"- **{scope_label}:** "
+        f"{names}. Primary chart target: `{primary}` (first in scope).\n"
         "- Load each table with `project.get_datasource_as_dataframe(<datasource>, columns=[...])` "
         "using only field ids from that datasource's metadata.\n"
         "- For cross-table questions, merge in pandas on shared keys (`run_id`, `cell_id`, etc.) "

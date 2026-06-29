@@ -224,6 +224,7 @@ def get_createproject_prompt_RAG(
     scale: ProjectScale | None = None,
     *,
     datasource_names: list[str] | None = None,
+    auto_resolved: bool = False,
 ) -> str:
     """
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
@@ -242,7 +243,9 @@ def get_createproject_prompt_RAG(
     multi_table_policy = ""
     if is_multi_table_tabular_project(project, roles) or len(resolved_names) > 1:
         multi_table_policy = format_multi_table_tabular_policy()
-    cross_table_policy = format_selected_datasources_cross_table_policy(resolved_names)
+    cross_table_policy = format_selected_datasources_cross_table_policy(
+        resolved_names, auto_resolved=auto_resolved
+    )
     context_md = _build_rag_context_markdown(project, resolved_names)
     datasource_name_guidance = (
         f"- datasource_name = '{primary_datasource}'  "

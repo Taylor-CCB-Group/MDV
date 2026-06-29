@@ -28,6 +28,7 @@ from mdvtools.llm.datasource_roles import (
     is_multi_table_tabular_project,
     resolve_datasource_from_question,
     resolve_datasources_for_request,
+    resolve_datasources_from_question_auto,
 )
 from mdvtools.llm.dataset_scale import ProjectScale, assess_project_scale
 
@@ -497,8 +498,51 @@ def test_resolve_datasources_for_request_question_fallback():
         question="Show cv_pct by channel",
         user_datasource_names=None,
     )
-    assert resolved.source == "question"
+    assert resolved.source == "auto"
     assert resolved.primary == "qc_field_uniformity"
+    assert resolved.selected == ["qc_field_uniformity"]
+
+
+def test_resolve_datasources_auto_cross_table_fields():
+    project = MicronLikeProject()
+    resolved = resolve_datasources_from_question_auto(
+        project,
+        "Show cv_pct and assay breakdown",
+    )
+    assert resolved.source == "auto"
+    assert set(resolved.selected) == {"qc_field_uniformity", "qc_runs"}
+    assert resolved.primary in resolved.selected
+
+
+def test_resolve_datasources_auto_expression_heuristic():
+    class CellsRnaProject(FakeProject):
+        datasources = [{"name": "cells"}, {"name": "rna"}, {"name": "protein"}]
+
+    project = CellsRnaProject()
+    resolved = resolve_datasources_from_question_auto(
+        project,
+        "What are the top marker genes by cluster?",
+    )
+    assert resolved.source == "auto"
+    assert resolved.selected == ["cells", "rna"]
+    assert resolved.primary == "cells"
+
+
+def test_rag_prompt_auto_resolved_cross_table_policy():
+    from mdvtools.llm.templates import get_createproject_prompt_RAG
+
+    project = MicronLikeProject()
+    prompt = get_createproject_prompt_RAG(
+        project,
+        "",
+        "qc_runs",
+        'fields "assay"\ncharts "Row Chart"',
+        "Compare assay types with cv_pct",
+        compact=True,
+        datasource_names=["qc_runs", "qc_field_uniformity"],
+        auto_resolved=True,
+    )
+    assert "Auto-resolved datasources" in prompt
 
 
 def test_build_chatmdv_roles_constants_block_selected_datasources():
@@ -526,5 +570,5 @@ def test_rag_prompt_includes_multiple_selected_datasources():
     assert "Primary datasource for this question: **qc_runs**" in prompt
     assert "Additional selected datasource: qc_field_uniformity" in prompt
     assert "user_selected_datasources" in prompt
-    assert "User-selected datasources" in prompt
+    assert "Selected datasources" in prompt
 

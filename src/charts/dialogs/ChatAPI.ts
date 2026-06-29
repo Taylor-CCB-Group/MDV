@@ -99,6 +99,7 @@ const completedChatResponseSchema = z.object({
     guidance: z.string().optional().nullable(),
     /** Reload the page when opening the view so datasources.json changes are picked up. */
     needs_refresh: z.boolean().optional(),
+    resolved_datasource_names: z.array(z.string()).optional().nullable(),
     // timestamp: z.string(),
     error: z.boolean().optional(),
 });
@@ -115,6 +116,9 @@ export type ChatModelOption = z.infer<typeof chatModelSchema>;
 
 const CHAT_MODEL_STORAGE_KEY = 'chatmdv-selected-model';
 const CHAT_DATASOURCE_STORAGE_KEY = 'chatmdv-selected-datasources';
+const CHAT_DATASOURCE_MODE_STORAGE_KEY = 'chatmdv-datasource-mode';
+
+export type DatasourceMode = 'auto' | 'manual';
 
 const chatDatasourceSchema = z.object({
     name: z.string(),
@@ -189,8 +193,11 @@ export type ChatMessage = {
     guidance?: string | null;
     /** When true, "Load view" should reload the app so new/updated datasources load in ChartManager. */
     needs_refresh?: boolean;
-    /** Datasources scoped for this user message (when manually selected). */
+    /** Datasources scoped for this user message (manual mode). */
     datasource_names?: string[];
+    datasource_mode?: DatasourceMode;
+    /** Datasources inferred by the backend (auto mode). */
+    resolved_datasource_names?: string[];
     sender: 'user' | 'bot' | 'system';
     id: string;
     conversationId: string;
@@ -237,6 +244,7 @@ const sendMessageSocket = async (
     conversationId: string,
     modelId?: string,
     time?: number,
+    datasourceMode: DatasourceMode = 'auto',
     datasourceNames?: string[],
 ) => {
     // consider refactoring to be a generator function, so that we can yield progress updates
@@ -277,7 +285,8 @@ const sendMessageSocket = async (
             id,
             conversation_id: conversationId,
             ...(modelId ? { model_id: modelId } : {}),
-            ...(datasourceNames && datasourceNames.length > 0
+            datasource_mode: datasourceMode,
+            ...(datasourceMode === 'manual' && datasourceNames && datasourceNames.length > 0
                 ? { datasource_names: datasourceNames }
                 : {}),
         });
@@ -379,8 +388,28 @@ const useChat = () => {
     const [selectedModelId, setSelectedModelId] = useState<string>('');
     const [availableDatasources, setAvailableDatasources] = useState<ChatDatasourceOption[]>([]);
     const [selectedDatasourceNames, setSelectedDatasourceNames] = useState<string[]>([]);
+    const [datasourceMode, setDatasourceMode] = useState<DatasourceMode>('auto');
 
     const datasourceStorageKey = `${CHAT_DATASOURCE_STORAGE_KEY}:${projectName}`;
+    const datasourceModeStorageKey = `${CHAT_DATASOURCE_MODE_STORAGE_KEY}:${projectName}`;
+
+    const applyDatasourceMode = useCallback(() => {
+        try {
+            const stored = sessionStorage.getItem(datasourceModeStorageKey);
+            if (stored === 'manual' || stored === 'auto') {
+                setDatasourceMode(stored);
+            } else {
+                setDatasourceMode('auto');
+            }
+        } catch {
+            setDatasourceMode('auto');
+        }
+    }, [datasourceModeStorageKey]);
+
+    const onDatasourceModeChange = useCallback((mode: DatasourceMode) => {
+        setDatasourceMode(mode);
+        sessionStorage.setItem(datasourceModeStorageKey, mode);
+    }, [datasourceModeStorageKey]);
 
     const applyDatasourceSelection = useCallback((
         datasources: ChatDatasourceOption[],
@@ -543,6 +572,7 @@ const useChat = () => {
             if (response?.datasources) {
                 applyDatasourceSelection(response.datasources, response.default_datasource_names);
             }
+            applyDatasourceMode();
         } catch (error: any) {
             const errorMessage = formatChatError(error);
             console.error('Error sending welcome message: ', errorMessage);
@@ -561,7 +591,7 @@ const useChat = () => {
             setIsInit(true);
             setIsLoadingInit(false);
         }
-    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading, applyModelSelection, applyDatasourceSelection]);
+    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading, applyModelSelection, applyDatasourceSelection, applyDatasourceMode]);
 
     // Socket connection and Init chat
     useEffect(() => {
@@ -607,7 +637,8 @@ const useChat = () => {
                 sender: 'user',
                 id: generateId(),
                 conversationId,
-                datasource_names: selectedDatasourceNames.length > 0 ? [...selectedDatasourceNames] : undefined,
+                datasource_mode: datasourceMode,
+                datasource_names: datasourceMode === 'manual' ? [...selectedDatasourceNames] : undefined,
             }])
             
             const response = await sendMessageSocket(
@@ -617,6 +648,7 @@ const useChat = () => {
                 conversationId,
                 selectedModelId || undefined,
                 undefined,
+                datasourceMode,
                 selectedDatasourceNames,
             );
 
@@ -637,6 +669,7 @@ const useChat = () => {
                     data_preview: response?.data_preview ?? undefined,
                     guidance: response?.guidance ?? undefined,
                     needs_refresh: response?.needs_refresh ?? false,
+                    resolved_datasource_names: response?.resolved_datasource_names ?? undefined,
                 }])
             }
         } catch (error: any) {
@@ -655,7 +688,7 @@ const useChat = () => {
             setCurrentRequestId('');
             setRequestProgress(null);
         }
-    }, [conversationId, socket, viewManager, selectedModelId, selectedDatasourceNames]);
+    }, [conversationId, socket, viewManager, selectedModelId, selectedDatasourceNames, datasourceMode]);
 
 
     // Start New Conversation
@@ -684,6 +717,7 @@ const useChat = () => {
             if (response?.datasources) {
                 applyDatasourceSelection(response.datasources, response.default_datasource_names);
             }
+            applyDatasourceMode();
         } catch (error: any) {
             const errorMessage = formatChatError(error);
             setMessages([{
@@ -699,7 +733,7 @@ const useChat = () => {
             setCurrentRequestId("");
             setIsSending(false);
         }
-    }, [routeInit, applyModelSelection, applyDatasourceSelection]);
+    }, [routeInit, applyModelSelection, applyDatasourceSelection, applyDatasourceMode]);
 
     // Switch conversation
     const switchConversation = useCallback((id: string) => {
@@ -729,6 +763,8 @@ const useChat = () => {
         availableDatasources,
         selectedDatasourceNames,
         onDatasourcesChange,
+        datasourceMode,
+        onDatasourceModeChange,
     };
 };
 

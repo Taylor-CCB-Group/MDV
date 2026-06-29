@@ -800,7 +800,12 @@ class ProjectChat(ProjectChatProtocol):
         question = chat_request["message"]
         handle_error = chat_request["handle_error"]
         model_id = chat_request.get("model_id")
-        user_datasource_names = chat_request.get("datasource_names")
+        datasource_mode = chat_request.get("datasource_mode", "auto")
+        user_datasource_names = (
+            chat_request.get("datasource_names")
+            if datasource_mode == "manual"
+            else None
+        )
 
         discovered = discover_models()
         chat_model = discovered.get_chat_model(model_id)
@@ -862,6 +867,7 @@ class ProjectChat(ProjectChatProtocol):
                 data_preview=None,
                 guidance=None,
                 needs_refresh=False,
+                resolved_datasource_names=None,
             )
         selected_datasources = resolved_ds.selected
         rag_datasource = resolved_ds.primary
@@ -1001,6 +1007,7 @@ class ProjectChat(ProjectChatProtocol):
                     compact=chat_model.provider == "ollama",
                     scale=self.scale,
                     datasource_names=selected_datasources,
+                    auto_resolved=resolved_ds.source == "auto",
                 )
                 chat_debug_logger.info(f"=== RAG Base Prompt (before context injection) ===\n{prompt_RAG}\n=== End Base Prompt ===")
 
@@ -1387,6 +1394,7 @@ class ProjectChat(ProjectChatProtocol):
                     "data_preview": data_preview_text,
                     "guidance": guidance_text or None,
                     "needs_refresh": client_needs_refresh_after_chat(final_code),
+                    "resolved_datasource_names": selected_datasources,
                 }
         except Exception as e:
             # Log general error
@@ -1410,4 +1418,5 @@ class ProjectChat(ProjectChatProtocol):
                 "data_preview": None,
                 "guidance": None,
                 "needs_refresh": False,
+                "resolved_datasource_names": None,
             }

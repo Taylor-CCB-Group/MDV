@@ -97,6 +97,7 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             id = data.get("id")
             conversation_id = data.get("conversation_id")
             model_id = data.get("model_id")
+            datasource_mode = data.get("datasource_mode")
             datasource_names = data.get("datasource_names")
             room = f"{sid}_{id}"
             join_room(room)
@@ -141,7 +142,13 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
             }
             if model_id:
                 chat_request["model_id"] = model_id
-            if datasource_names and isinstance(datasource_names, list):
+            if datasource_mode in ("auto", "manual"):
+                chat_request["datasource_mode"] = datasource_mode
+            if (
+                datasource_mode == "manual"
+                and datasource_names
+                and isinstance(datasource_names, list)
+            ):
                 chat_request["datasource_names"] = [
                     str(n) for n in datasource_names if n
                 ]
@@ -175,6 +182,9 @@ class MDVProjectChatServerExtension(MDVProjectServerExtension):
                         "data_preview": result.get("data_preview"),
                         "guidance": result.get("guidance"),
                         "needs_refresh": result.get("needs_refresh", False),
+                        "resolved_datasource_names": result.get(
+                            "resolved_datasource_names"
+                        ),
                     }
                     if result["view_name"] is not None:
                         response["view"] = result["view_name"]

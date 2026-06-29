@@ -190,11 +190,18 @@ def _write_debug_artifacts(
     return str(out)
 
 
-def _parse_datasource_names(raw: Optional[str]) -> list[str] | None:
+def _parse_datasource_cli_args(
+    raw: Optional[str],
+) -> tuple[str, list[str] | None]:
+    """Return (datasource_mode, names) for CLI --datasources."""
     if not raw or not str(raw).strip():
-        return None
+        return "auto", None
+    if str(raw).strip().lower() == "auto":
+        return "auto", None
     names = [part.strip() for part in str(raw).split(",") if part.strip()]
-    return names or None
+    if not names:
+        return "auto", None
+    return "manual", names
 
 
 def run_chat_once(
@@ -204,6 +211,7 @@ def run_chat_once(
     output_dir: Optional[str] = None,
     view_name: Optional[str] = None,
     model_id: Optional[str] = None,
+    datasource_mode: str = "auto",
     datasource_names: list[str] | None = None,
 ) -> tuple[dict[str, Any], int]:
     abs_project = str(Path(project_path).expanduser().resolve())
@@ -245,7 +253,8 @@ def run_chat_once(
         }
         if resolved_model_id:
             chat_request["model_id"] = resolved_model_id
-        if datasource_names:
+        chat_request["datasource_mode"] = datasource_mode
+        if datasource_mode == "manual" and datasource_names:
             chat_request["datasource_names"] = datasource_names
         from io import StringIO
         from contextlib import redirect_stdout, redirect_stderr
@@ -391,6 +400,7 @@ def run_batch_prompts(
     base_url: str,
     output_dir: Optional[str] = None,
     model_id: Optional[str] = None,
+    datasource_mode: str = "auto",
     datasource_names: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     prompts = _load_prompts(prompt_file)
@@ -411,6 +421,7 @@ def run_batch_prompts(
             output_dir=str(run_out) if run_out else None,
             view_name=None,
             model_id=model_id,
+            datasource_mode=datasource_mode,
             datasource_names=datasource_names,
         )
         finished = datetime.now(timezone.utc)
@@ -476,7 +487,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         except ValueError as exc:
             print(f"Argument error: {exc}", file=sys.stderr)
             return 2
-        datasource_names = _parse_datasource_names(args.datasources)
+        datasource_mode, datasource_names = _parse_datasource_cli_args(args.datasources)
         if args.prompt_file:
             rows, exit_code = run_batch_prompts(
                 project_path=args.project,
@@ -485,6 +496,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 base_url=args.base_url,
                 output_dir=args.output_dir,
                 model_id=args.model,
+                datasource_mode=datasource_mode,
                 datasource_names=datasource_names,
             )
             summary = {
@@ -506,6 +518,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             output_dir=args.output_dir,
             view_name=args.view_name,
             model_id=args.model,
+            datasource_mode=datasource_mode,
             datasource_names=datasource_names,
         )
 
