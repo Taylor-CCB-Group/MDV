@@ -19,6 +19,12 @@ vi.mock("@spatialdata/vis", () => ({
             .filter((entry) => entry.kind === "spatial")
             .map((entry) => entry.id),
     }),
+    renderStackOrder: (stack: RenderStack | undefined, fallback: string[]) =>
+        stack
+            ? stack.entries
+                  .filter((entry) => entry.kind === "spatial")
+                  .map((entry) => entry.id)
+            : fallback,
 }));
 
 vi.mock("@/react/context", () => ({

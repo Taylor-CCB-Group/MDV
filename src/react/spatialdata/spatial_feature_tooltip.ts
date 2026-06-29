@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import type { SpatialFeatureTooltipData } from "@spatialdata/vis";
 
 export function formatSpatialFeatureTooltipHtml(tooltip: SpatialFeatureTooltipData): string {
@@ -21,7 +22,9 @@ export function formatSpatialFeatureTooltipHtml(tooltip: SpatialFeatureTooltipDa
             `<div>${escapeHtml(item.label)}: ${escapeHtml(String(item.value ?? ""))}</div>`,
         );
     }
-    return lines.join("");
+    // Central sanitization of the assembled markup is the actual XSS guard for the
+    // `innerHTML`-bound tooltip; `escapeHtml` below stays as defence in depth on each field.
+    return DOMPurify.sanitize(lines.join(""));
 }
 
 function escapeHtml(value: string): string {

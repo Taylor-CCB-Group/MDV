@@ -6,7 +6,7 @@ import type {
 } from "@spatialdata/layers";
 import {
     layerConfig,
-    renderStackToLayerInputs,
+    renderStackOrder,
     type LayerConfig,
     type RenderStackLayerInputs,
 } from "@spatialdata/vis";
@@ -79,7 +79,7 @@ export function syncRenderStackLayerInputs(
         }
     }
 
-    const nextOrder = renderStackToLayerInputs(stack).layerOrder;
+    const nextOrder = renderStackOrder(stack, cache.layerOrder);
     if (nextOrder.join("\0") !== cache.layerOrder.join("\0")) {
         cache.layerOrder = nextOrder;
     }

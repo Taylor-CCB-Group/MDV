@@ -6,6 +6,8 @@ import {
     type RenderStackSpatialElementType,
 } from "@spatialdata/layers";
 
+import { getRandomString } from "@/utilities/Utilities";
+
 import {
     DECK_OVERLAY_IDS,
     deckHostLayerId,
@@ -24,8 +26,12 @@ export function spatialEntryId(
     elementType: RenderStackSpatialElementType,
     elementKey: string,
 ) {
-    const id = Math.random().toString(36).substring(2, 4+2);
-    return `spatialdata-${elementType}-${elementKey}-#${id}`;
+    // The same element can appear in multiple stack entries (different roles /
+    // blend modes), so each entry needs its own id. The random suffix only has to
+    // be unique within a single stack — a smaller scope than the project-wide
+    // chart ids that already use the 6-char `getRandomString()` — so that length
+    // is ample here while keeping the id readable in saved JSON.
+    return `spatialdata-${elementType}-${elementKey}-#${getRandomString()}`;
 }
 
 function spatialEntry(

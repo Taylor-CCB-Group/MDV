@@ -3,11 +3,6 @@ export type SpatialDataSerializableViewState = {
     zoom?: number;
 };
 
-export function removeSpatialDataRootViv<T extends object>(config: T): T {
-    delete (config as T & { viv?: unknown }).viv;
-    return config;
-}
-
 export function toSerializableSpatialDataViewState(
     viewState: SpatialDataSerializableViewState | null | undefined,
 ): SpatialDataSerializableViewState | null {

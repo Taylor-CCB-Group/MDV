@@ -136,6 +136,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     });
 
     useEffect(() => {
+        chart.renderStackGeneration; //explicitly add dependency for side-effects
         if (!stack) {
             chart.setImageLayerRegistry(undefined);
             return;
@@ -154,8 +155,6 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         chart.renderStackGeneration,
         renderer.getImageLoadedDataByElementKey,
         renderer.getLayerLoadState,
-        renderer.isBlocking,
-        renderer.isLoading,
     ]);
 
     const handleHover = useCallback(
@@ -256,7 +255,9 @@ const SpatialDataMainChart = observer(() => {
     const rawRegion = useRegion();
     const region = getSpatialRegionMetadata(rawRegion);
     const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
-    ensureChunkWorker();
+    useEffect(() => {
+        ensureChunkWorker();
+    }, []);
 
     return (
         <SpatialDataProvider source={spatialDataUrl ?? undefined}>
@@ -424,6 +425,7 @@ const SpatialDataViewer = observer(
                               fontSize: 12,
                               color: "#f5f5f5",
                           }}
+                          // biome-ignore lint/security/noDangerouslySetInnerHtml: html is sanitized with DOMPurify in formatSpatialFeatureTooltipHtml
                           dangerouslySetInnerHTML={{ __html: featureTooltip.html }}
                       />,
                       outerContainer,

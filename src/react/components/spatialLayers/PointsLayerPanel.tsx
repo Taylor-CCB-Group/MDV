@@ -41,7 +41,10 @@ export default function PointsLayerPanel({ config, updateLayer }: Props) {
                         value={color[index] ?? 0}
                         onChange={(event) => {
                             const next = [...color] as [number, number, number, number];
-                            next[index] = Number(event.target.value);
+                            const parsed = Number(event.target.value);
+                            next[index] = Number.isFinite(parsed)
+                                ? Math.max(0, Math.min(255, parsed))
+                                : 0;
                             updateLayer({ color: next });
                         }}
                     />

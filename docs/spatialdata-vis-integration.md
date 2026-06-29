@@ -192,12 +192,12 @@ Manual acceptance (spatial chart with multi-channel zarr image):
 
 ## Initial PR scope
 
-| Commit stage | Status |
-|--------------|--------|
-| 1 | `@spatialdata/*@0.2.3` deps + CONTEXT + this doc |
-| 2 | `SpatialDataMdvRegionReact` — composed renderer + host overlays + Image Layer Registry |
-| 3 | Layer dialog — `renderStack` list + dnd-kit reorder |
-| 4 | Visibility + opacity per stack entry |
+| Commit stage | Scope | Status |
+|--------------|-------|--------|
+| 1 | `@spatialdata/*@0.2.3` deps + CONTEXT + this doc | |
+| 2 | `SpatialDataMdvRegionReact` — composed renderer + host overlays + Image Layer Registry | |
+| 3 | Layer dialog — `renderStack` list + dnd-kit reorder | |
+| 4 | Visibility + opacity per stack entry | |
 | 5+ | Image layer panel — registry, `useLayerChannelState`, runtime bridge, `vivLayerProps` tone | Done |
 
 Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData*`.

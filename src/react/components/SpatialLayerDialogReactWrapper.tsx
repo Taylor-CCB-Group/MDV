@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
 import { SpatialDataProvider } from "@spatialdata/react";
 import { BaseDialog } from "../../utilities/Dialog";
@@ -22,7 +23,9 @@ function getSpatialDataUrl(region: unknown): string | undefined {
 const SpatialLayerDialogReact = observer(function SpatialLayerDialogReact() {
     const rawRegion = useRegion();
     const spatialDataUrl = getSpatialDataUrl(rawRegion);
-    ensureChunkWorker();
+    useEffect(() => {
+        ensureChunkWorker();
+    }, []);
     return (
         <SpatialDataProvider source={spatialDataUrl}>
             <SpatialLayerDialogComponent />

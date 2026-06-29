@@ -21,7 +21,6 @@ import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defa
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import {
-    removeSpatialDataRootViv,
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
 } from "@/react/spatialdata/spatialdata_config";
@@ -39,7 +38,6 @@ function adaptSpatialDataConfig(
     dataStore: DataStore,
 ) {
     const config = { ...scatterDefaults, ...originalConfig };
-    //removeSpatialDataRootViv(config); //only needed on charts saved during dev, we shouldn't keep this.
     if (!dataStore.regions) {
         throw new Error("unexpected attempt to load spatial chart with no regions in datasource");
     }
@@ -192,7 +190,6 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 
     getConfig() {
         const config = super.getConfig();
-        removeSpatialDataRootViv(config);
         if (this.vivStores) {
             const viewer = this.vivStores.viewerStore.getState();
             config.viewState = toSerializableSpatialDataViewState(viewer.viewState);
