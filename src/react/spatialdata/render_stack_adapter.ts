@@ -158,7 +158,6 @@ export function useRenderStackAdapter({
     const spatialRevision = measureSpatial("adapter.revision", () =>
         renderStackSpatialRevision(stack),
     );
-    void generation;
 
     const synced = measureSpatial("adapter.sync", () =>
         !stack
@@ -169,16 +168,17 @@ export function useRenderStackAdapter({
     // useLayerData (upstream) memoizes Viv props on the layers *record* reference.
     // In-place config mutation keeps that reference stable, so shallow-copy the map
     // when spatial revision changes to invalidate Viv without replacing layer configs.
-    const layers = useMemo(
-        () => ({ ...synced.layers }),
-        [spatialRevision, synced.layers],
-    );
+    const layers = useMemo(() => {
+        void spatialRevision; // trigger-only dep: re-shallow-copy to invalidate the upstream Viv memo
+        return { ...synced.layers };
+    }, [spatialRevision, synced.layers]);
 
     const hostFingerprint = renderStackHostFingerprint(stack);
-    const deckLayers = useMemo(
-        () => resolveCachedHostDeckLayers(stack, hostLayerResolver),
-        [stack, hostFingerprint, hostLayerResolver, generation],
-    );
+    const deckLayers = useMemo(() => {
+        void hostFingerprint; // trigger-only dep: re-clone host layers when host visibility changes
+        void generation; // trigger-only dep: re-clone on coarse render-stack generation bumps
+        return resolveCachedHostDeckLayers(stack, hostLayerResolver);
+    }, [stack, hostFingerprint, hostLayerResolver, generation]);
 
     return {
         layers,
