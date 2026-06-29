@@ -167,5 +167,17 @@ Either restrict DGE to HVG or key the matrix to a dedicated full-gene datasource
   silent swap** (preserve "I clicked Submit, I got a result"). Recorded in provenance now; not
   wired up in the POC.
 
+  **`content_hash` semantics — analysis identity, not data freshness.** `content_hash` answers
+  *which analysis*, never *which run* (`job_id` answers that). Two different jobs of the same
+  analysis share a `content_hash` and differ in `job_id` — this is exactly why both are
+  denormalized onto the output column (ADR-0009). Today the hash is **recorded but never read
+  back**: a re-run is always a **new `job_id`, fresh compute**; the reuse-vs-new-job choice is the
+  deferred cache's job and, by the offer-not-swap rule above, **the human's by design**. Honest
+  scope of the POC hash: `content_hash(tool_id, params, input_filter_hash)` (`provenance.py`) — for
+  `concat_columns` `input_filter_hash` is `None`, so it is **just the params**. It is **not** a hash
+  of input *values*, so it will not notice an edit to underlying column data with unchanged params.
+  It is an analysis/cache key, not a data-freshness guarantee; the future key tightens this by
+  adding `cells + layer`.
+
 Prior art: [MCP tools (JSON Schema)](https://modelcontextprotocol.io/specification/2025-06-18/server/tools),
 Galaxy tool XML (`<conditional>` / `data_column`), [Stripe idempotency keys](https://docs.stripe.com/webhooks).
