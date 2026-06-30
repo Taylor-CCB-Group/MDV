@@ -144,13 +144,22 @@ export function insertSpatialRenderStackEntry(
     if (stack.entries.some((entry) => entry.id === id)) {
         return false;
     }
-    stack.entries.push({
+    const entry: RenderStackEntry = {
         kind: "spatial",
         id,
         visible: true,
         source: { elementType, elementKey },
         props: { opacity: 1, ...props },
-    });
+    };
+    // Host overlays are excluded from ordering and always render on top, so a
+    // newly inserted spatial layer goes before the first host entry (matching
+    // insertDefaultImageLayer), not appended after them.
+    const firstHostIndex = stack.entries.findIndex((e) => e.kind === "host");
+    if (firstHostIndex === -1) {
+        stack.entries.push(entry);
+    } else {
+        stack.entries.splice(firstHostIndex, 0, entry);
+    }
     return true;
 }
 
