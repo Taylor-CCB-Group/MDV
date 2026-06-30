@@ -15,6 +15,7 @@ import {
     createContext,
     useCallback,
     useContext,
+    useMemo,
     useRef,
     useState,
 } from "react";
@@ -149,12 +150,31 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         viewerStore,
     });
 
-    const channelCount = hookState.channelIds.length;
+    // Destructure the stable store refs into locals: their identity only changes
+    // on a real channel edit, so they are honest useMemo/useCallback deps (and the
+    // hooks linter accepts the locals, where `hookState.x` member access would make
+    // it demand the whole — freshly-allocated — `hookState` object).
+    const {
+        channelIds,
+        colors,
+        contrastLimits,
+        channelsVisible,
+        selections,
+        setChannels,
+        addChannel,
+        removeChannel,
+    } = hookState;
+
+    const channelCount = channelIds.length;
     // `vivLayerProps` is patched in place (stable object ref); `brightnessRaw` /
-    // `contrastRaw` are the inner arrays, replaced on each tone edit. Computing
-    // tone from them (not the object) lets the React Compiler memoize this — no
-    // hand-written `useMemo`, and the in-place patch still recomputes correctly.
-    const tone = toneFromArrays(brightnessRaw, contrastRaw, channelCount);
+    // `contrastRaw` are the inner arrays, replaced on each tone edit. Reading them
+    // above subscribes this observer to those patches; depend on them here so the
+    // memo recomputes exactly when tone changes. (This component is observer()-
+    // wrapped, so the React Compiler does not memoize it — the useMemo is manual.)
+    const tone = useMemo(
+        () => toneFromArrays(brightnessRaw, contrastRaw, channelCount),
+        [brightnessRaw, contrastRaw, channelCount],
+    );
 
     const hookStateRef = useRef(hookState);
     hookStateRef.current = hookState;
@@ -181,8 +201,6 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         [patchVivLayerProps],
     );
 
-    const { addChannel, setChannels } = hookState;
-
     const addChannelWithSelection = useCallback(() => {
         const current = hookStateRef.current;
         const nextC = pickDefaultSelectionForAdd(
@@ -201,30 +219,54 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         });
     }, [addChannel, layerContext.channelNames, setChannels]);
 
-    // Plain object — the React Compiler memoizes it (and its reactive inputs)
-    // without a hand-maintained dependency list.
-    const panelContext: SpatialImagePanelContextValue = {
-        layerId: config.id,
-        loader: layerContext.loader,
-        channelNames: layerContext.channelNames,
-        channelIds: hookState.channelIds,
-        colors: hookState.colors,
-        contrastLimits: hookState.contrastLimits,
-        channelsVisible: hookState.channelsVisible,
-        brightness: tone.brightness,
-        contrast: tone.contrast,
-        selections: hookState.selections.map((selection: (typeof hookState.selections)[number]) => ({
-            z: selection.z ?? 0,
-            c: selection.c ?? 0,
-            t: selection.t ?? 0,
-        })),
-        setChannels: hookState.setChannels,
-        addChannel: hookState.addChannel,
-        addChannelWithSelection,
-        removeChannel: hookState.removeChannel,
-        patchVivLayerProps,
-        patchToneAtIndex,
-    };
+    // Memoized by hand: this component is observer()-wrapped, so the React Compiler
+    // does not optimize it. Without the useMemo this object — the context Provider
+    // value below — gets a fresh identity on every render, re-rendering every
+    // channel-row consumer of useSpatialImagePanelContext() each time.
+    const panelContext: SpatialImagePanelContextValue = useMemo(
+        () => ({
+            layerId: config.id,
+            loader: layerContext.loader,
+            channelNames: layerContext.channelNames,
+            channelIds,
+            colors,
+            contrastLimits,
+            channelsVisible,
+            brightness: tone.brightness,
+            contrast: tone.contrast,
+            selections: selections.map(
+                (selection: (typeof selections)[number]) => ({
+                    z: selection.z ?? 0,
+                    c: selection.c ?? 0,
+                    t: selection.t ?? 0,
+                }),
+            ),
+            setChannels,
+            addChannel,
+            addChannelWithSelection,
+            removeChannel,
+            patchVivLayerProps,
+            patchToneAtIndex,
+        }),
+        [
+            config.id,
+            layerContext.loader,
+            layerContext.channelNames,
+            channelIds,
+            colors,
+            contrastLimits,
+            channelsVisible,
+            selections,
+            setChannels,
+            addChannel,
+            removeChannel,
+            tone.brightness,
+            tone.contrast,
+            addChannelWithSelection,
+            patchVivLayerProps,
+            patchToneAtIndex,
+        ],
+    );
 
     return (
         <SpatialImagePanelContext.Provider value={panelContext}>

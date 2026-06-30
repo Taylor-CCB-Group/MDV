@@ -27,8 +27,9 @@ function padTone(raw: unknown, count: number): number[] {
  * Takes the arrays directly (not the enclosing `vivLayerProps` object) so a
  * caller in render can key off them: `vivLayerProps` is patched **in place**, so
  * its object ref is stable while the inner arrays are replaced on each tone edit.
- * Depending on the arrays is what lets the React Compiler memoize this correctly
- * without a hand-written `useMemo`.
+ * Depending on the inner arrays gives the caller's `useMemo` an honest dependency
+ * that recomputes exactly when tone changes. (The image panel is observer-wrapped,
+ * so the React Compiler does not memoize it — the caller memoizes by hand.)
  */
 export function toneFromArrays(
     brightnessRaw: unknown,
