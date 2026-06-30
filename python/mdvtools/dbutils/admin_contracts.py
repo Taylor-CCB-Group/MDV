@@ -150,7 +150,7 @@ class AdminHostServices(Protocol):
     def list_projects(self) -> list[AdminProject]:
         ...
 
-    def create_local_user_with_project_access(
+    def create_user_with_project_access(
         self,
         data: CreateAdminUserInput,
     ) -> CreateAdminUserResult:

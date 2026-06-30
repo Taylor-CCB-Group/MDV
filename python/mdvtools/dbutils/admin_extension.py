@@ -129,6 +129,11 @@ def _safe_session_user(user: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _actor_email(user: dict[str, Any]) -> str:
+    email = user.get("email")
+    return email if isinstance(email, str) and email else "unknown"
+
+
 class AdminExtension(MDVProjectServerExtension):
     extension_id = "admin"
 
@@ -145,7 +150,10 @@ class AdminExtension(MDVProjectServerExtension):
         enable_auth = bool(app.config.get("ENABLE_AUTH", False))
         if self.services is None:
             identity_provider = ConfiguredAuth0AdminIdentityProvider(app.config) if enable_auth else None
-            self.services = MDVAdminServices(identity_provider=identity_provider)
+            self.services = MDVAdminServices(
+                identity_provider=identity_provider,
+                enable_auth=enable_auth,
+            )
         services = self.services
         if services is None:
             raise RuntimeError("Admin services were not configured.")
@@ -193,20 +201,38 @@ class AdminExtension(MDVProjectServerExtension):
 
         @app.route("/admin/api/users", methods=["POST"])
         def admin_create_user():
-            _user, error = require_admin()
+            actor, error = require_admin()
             if error is not None:
                 return error
             try:
                 data = _parse_create_user_input(request.get_json(silent=True))
-                result = services.create_local_user_with_project_access(data)
+                logger.info(
+                    "admin.user.create_requested actor=%s target_email=%s assignments=%d",
+                    _actor_email(actor),
+                    data.email,
+                    len(data.project_access),
+                )
+                result = services.create_user_with_project_access(data)
+                logger.info(
+                    "admin.user.create_succeeded actor=%s target_user_id=%s target_email=%s created=%s assignments=%d",
+                    _actor_email(actor),
+                    result.user.id,
+                    result.user.email,
+                    result.created,
+                    len(result.project_access),
+                )
                 return jsonify(result.to_response()), 201 if result.created else 200
             except AdminInputError as exc:
+                logger.warning("admin.user.create_rejected actor=%s error=%s", _actor_email(actor), exc)
                 return _json_error(str(exc), 400)
             except AdminConflictError as exc:
+                logger.warning("admin.user.create_conflict actor=%s error=%s", _actor_email(actor), exc)
                 return _json_error(str(exc), 409)
             except AdminNotFoundError as exc:
+                logger.warning("admin.user.create_not_found actor=%s error=%s", _actor_email(actor), exc)
                 return _json_error(str(exc), 404)
             except AdminExternalServiceError as exc:
+                logger.error("admin.user.create_external_failed actor=%s error=%s", _actor_email(actor), exc)
                 return _json_error(str(exc), 502)
 
         @app.route("/admin/api/projects", methods=["GET"])
@@ -230,53 +256,102 @@ class AdminExtension(MDVProjectServerExtension):
 
         @app.route("/admin/api/projects/<int:project_id>/users", methods=["POST"])
         def admin_add_project_user(project_id: int):
-            _user, error = require_admin()
+            actor, error = require_admin()
             if error is not None:
                 return error
             try:
                 data = _parse_project_member_input(request.get_json(silent=True))
+                logger.info(
+                    "admin.project_access.add_requested actor=%s project_id=%s user_id=%s permission=%s",
+                    _actor_email(actor),
+                    project_id,
+                    data.user_id,
+                    data.permission,
+                )
                 member = services.add_project_member(project_id, data)
+                logger.info(
+                    "admin.project_access.add_succeeded actor=%s project_id=%s user_id=%s permission=%s",
+                    _actor_email(actor),
+                    project_id,
+                    member.user.id,
+                    member.project_access.permission,
+                )
                 return jsonify(member.to_response()), 201
             except AdminInputError as exc:
+                logger.warning("admin.project_access.add_rejected actor=%s project_id=%s error=%s", _actor_email(actor), project_id, exc)
                 return _json_error(str(exc), 400)
             except AdminConflictError as exc:
+                logger.warning("admin.project_access.add_conflict actor=%s project_id=%s error=%s", _actor_email(actor), project_id, exc)
                 return _json_error(str(exc), 409)
             except AdminNotFoundError as exc:
+                logger.warning("admin.project_access.add_not_found actor=%s project_id=%s error=%s", _actor_email(actor), project_id, exc)
                 return _json_error(str(exc), 404)
 
         @app.route("/admin/api/projects/<int:project_id>/users/<int:user_id>", methods=["PATCH"])
         def admin_update_project_user(project_id: int, user_id: int):
-            _user, error = require_admin()
+            actor, error = require_admin()
             if error is not None:
                 return error
             try:
                 permission = _parse_permission_input(request.get_json(silent=True))
+                logger.info(
+                    "admin.project_access.update_requested actor=%s project_id=%s user_id=%s permission=%s",
+                    _actor_email(actor),
+                    project_id,
+                    user_id,
+                    permission,
+                )
                 member = services.update_project_member_permission(
                     project_id,
                     user_id,
                     permission,
                 )
+                logger.info(
+                    "admin.project_access.update_succeeded actor=%s project_id=%s user_id=%s permission=%s",
+                    _actor_email(actor),
+                    project_id,
+                    user_id,
+                    member.project_access.permission,
+                )
                 return jsonify(member.to_response())
             except AdminInputError as exc:
+                logger.warning("admin.project_access.update_rejected actor=%s project_id=%s user_id=%s error=%s", _actor_email(actor), project_id, user_id, exc)
                 return _json_error(str(exc), 400)
             except AdminConflictError as exc:
+                logger.warning("admin.project_access.update_conflict actor=%s project_id=%s user_id=%s error=%s", _actor_email(actor), project_id, user_id, exc)
                 return _json_error(str(exc), 409)
             except AdminNotFoundError as exc:
+                logger.warning("admin.project_access.update_not_found actor=%s project_id=%s user_id=%s error=%s", _actor_email(actor), project_id, user_id, exc)
                 return _json_error(str(exc), 404)
 
         @app.route("/admin/api/projects/<int:project_id>/users/<int:user_id>", methods=["DELETE"])
         def admin_delete_project_user(project_id: int, user_id: int):
-            _user, error = require_admin()
+            actor, error = require_admin()
             if error is not None:
                 return error
             try:
+                logger.info(
+                    "admin.project_access.remove_requested actor=%s project_id=%s user_id=%s",
+                    _actor_email(actor),
+                    project_id,
+                    user_id,
+                )
                 services.remove_project_member(project_id, user_id)
+                logger.info(
+                    "admin.project_access.remove_succeeded actor=%s project_id=%s user_id=%s",
+                    _actor_email(actor),
+                    project_id,
+                    user_id,
+                )
                 return "", 204
             except AdminInputError as exc:
+                logger.warning("admin.project_access.remove_rejected actor=%s project_id=%s user_id=%s error=%s", _actor_email(actor), project_id, user_id, exc)
                 return _json_error(str(exc), 400)
             except AdminConflictError as exc:
+                logger.warning("admin.project_access.remove_conflict actor=%s project_id=%s user_id=%s error=%s", _actor_email(actor), project_id, user_id, exc)
                 return _json_error(str(exc), 409)
             except AdminNotFoundError as exc:
+                logger.warning("admin.project_access.remove_not_found actor=%s project_id=%s user_id=%s error=%s", _actor_email(actor), project_id, user_id, exc)
                 return _json_error(str(exc), 404)
 
         logger.info("AdminExtension registered /admin and /admin/api routes")

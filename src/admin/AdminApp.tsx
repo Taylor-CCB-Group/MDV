@@ -18,6 +18,7 @@ import {
     Typography,
 } from "@mui/material";
 import {
+    AdminApiError,
     adminApi,
     type AdminPermission,
     type AdminProject,
@@ -36,6 +37,23 @@ type InitialProjectAccess = {
     permission: AdminPermission;
 };
 
+type AdminAccessState = "login_required" | "admin_required" | null;
+
+function getAccessState(err: unknown): AdminAccessState {
+    if (err instanceof AdminApiError) {
+        if (err.status === 401) return "login_required";
+        if (err.status === 403) return "admin_required";
+    }
+    return null;
+}
+
+function permissionFromValue(value: string): AdminPermission | null {
+    if (value === "view" || value === "edit" || value === "owner") {
+        return value;
+    }
+    return null;
+}
+
 export default function AdminApp() {
     const [session, setSession] = useState<AdminSession | null>(null);
     const [users, setUsers] = useState<AdminUser[]>([]);
@@ -45,6 +63,7 @@ export default function AdminApp() {
     const [membersLoading, setMembersLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [memberAction, setMemberAction] = useState<string | null>(null);
+    const [accessState, setAccessState] = useState<AdminAccessState>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [email, setEmail] = useState("");
@@ -59,6 +78,7 @@ export default function AdminApp() {
 
     const memberUserIds = new Set(projectMembers.map((member) => member.user.id));
     const availableProjectUsers = users.filter((user) => !memberUserIds.has(user.id));
+    const selectedMemberProject = projects.find((project) => String(project.id) === memberProjectId);
 
     const loadAdminData = useCallback(async () => {
         const [sessionResult, usersResult, projectsResult] = await Promise.all([
@@ -103,12 +123,18 @@ export default function AdminApp() {
         async function loadInitialState() {
             setLoading(true);
             setError(null);
+            setAccessState(null);
             try {
                 await loadAdminData();
                 if (cancelled) return;
             } catch (err) {
                 if (!cancelled) {
-                    setError(err instanceof Error ? err.message : "Failed to load admin data");
+                    const nextAccessState = getAccessState(err);
+                    if (nextAccessState) {
+                        setAccessState(nextAccessState);
+                    } else {
+                        setError(err instanceof Error ? err.message : "Failed to load admin data");
+                    }
                 }
             } finally {
                 if (!cancelled) {
@@ -126,6 +152,11 @@ export default function AdminApp() {
     useEffect(() => {
         void loadProjectMembers(memberProjectId);
     }, [loadProjectMembers, memberProjectId]);
+
+    function handlePermissionChange(value: string, setter: (next: AdminPermission) => void) {
+        const parsed = permissionFromValue(value);
+        if (parsed) setter(parsed);
+    }
 
     function handleAddInitialProjectAccess() {
         setError(null);
@@ -204,9 +235,7 @@ export default function AdminApp() {
                 userId: numericUserId,
                 permission: addMemberPermission,
             });
-            setSuccess(
-                `${result.user.email} added with ${result.projectAccess.permission} access`,
-            );
+            setSuccess(`${result.user.email} added with ${result.projectAccess.permission} access`);
             setAddMemberUserId("");
             await loadProjectMembers(memberProjectId);
         } catch (err) {
@@ -216,10 +245,7 @@ export default function AdminApp() {
         }
     }
 
-    async function handleUpdateProjectMember(
-        userId: number,
-        nextPermission: AdminPermission,
-    ) {
+    async function handleUpdateProjectMember(userId: number, nextPermission: AdminPermission) {
         setError(null);
         setSuccess(null);
         const numericProjectId = Number(memberProjectId);
@@ -233,9 +259,7 @@ export default function AdminApp() {
             const result = await adminApi.updateProjectMember(numericProjectId, userId, {
                 permission: nextPermission,
             });
-            setSuccess(
-                `${result.user.email} changed to ${result.projectAccess.permission} access`,
-            );
+            setSuccess(`${result.user.email} changed to ${result.projectAccess.permission} access`);
             await loadProjectMembers(memberProjectId);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to update permission");
@@ -266,16 +290,8 @@ export default function AdminApp() {
     }
 
     return (
-        <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-            <Box
-                component="header"
-                sx={{
-                    bgcolor: "background.paper",
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    py: 2,
-                }}
-            >
+        <Box className="admin-showcase-page">
+            <Box component="header" className="admin-showcase-header">
                 <Container maxWidth="xl">
                     <Stack
                         direction={{ xs: "column", md: "row" }}
@@ -284,9 +300,9 @@ export default function AdminApp() {
                         alignItems={{ xs: "flex-start", md: "center" }}
                     >
                         <Box>
-                            <Typography variant="h5">MDV Admin</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Read-only deployment overview
+                            <Typography variant="h4">MDV Admin Portal</Typography>
+                            <Typography variant="body2">
+                                Manage deployment users and project-level permissions
                             </Typography>
                         </Box>
                         {session ? (
@@ -297,7 +313,7 @@ export default function AdminApp() {
                                     size="small"
                                 />
                                 <Chip
-                                    label={session.authEnabled ? "Auth enabled" : "Local dev auth"}
+                                    label={session.authEnabled ? "Auth0 enabled" : "Local dev mode"}
                                     size="small"
                                 />
                                 <Chip label={session.user.email} size="small" />
@@ -308,449 +324,376 @@ export default function AdminApp() {
             </Box>
 
             <Container maxWidth="xl" sx={{ py: 3 }}>
-                <Stack spacing={2}>
+                <Stack spacing={2.5}>
                     {error ? <Alert severity="error">{error}</Alert> : null}
                     {success ? <Alert severity="success">{success}</Alert> : null}
                     {loading ? (
                         <Stack alignItems="center" sx={{ py: 8 }}>
                             <CircularProgress />
                         </Stack>
+                    ) : accessState ? (
+                        <Paper className="admin-showcase-panel" variant="outlined">
+                            <Stack spacing={1.5}>
+                                <Typography variant="h6">
+                                    {accessState === "login_required"
+                                        ? "Sign in required"
+                                        : "Admin access required"}
+                                </Typography>
+                                <Typography color="text.secondary">
+                                    {accessState === "login_required"
+                                        ? "You need to sign in before using the MDV Admin Portal."
+                                        : "Your account is signed in, but it is not marked as an MDV admin for this deployment."}
+                                </Typography>
+                                <Alert severity={accessState === "login_required" ? "info" : "warning"}>
+                                    {accessState === "login_required"
+                                        ? "After signing in, reload this page to continue."
+                                        : "Ask an existing admin or deployment owner to grant admin access before continuing."}
+                                </Alert>
+                            </Stack>
+                        </Paper>
                     ) : (
-                        <Stack
-                            direction={{ xs: "column", lg: "row" }}
-                            spacing={2}
-                            alignItems="flex-start"
-                        >
-                            <Paper
-                                component="form"
-                                onSubmit={handleCreateUser}
-                                sx={{ p: 2, width: { xs: "100%", lg: 360 }, flexShrink: 0 }}
+                        <>
+                            <Stack
+                                direction={{ xs: "column", lg: "row" }}
+                                spacing={2.5}
+                                alignItems="stretch"
                             >
-                                <Stack spacing={2}>
-                                    <Typography variant="h6">Create Local User</Typography>
-                                    <TextField
-                                        label="Email"
-                                        value={email}
-                                        onChange={(event) => setEmail(event.target.value)}
-                                        required
-                                        size="small"
-                                        type="email"
-                                    />
-                                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                                        <TextField
-                                            label="First name"
-                                            value={firstName}
-                                            onChange={(event) => setFirstName(event.target.value)}
-                                            size="small"
-                                            fullWidth
-                                        />
-                                        <TextField
-                                            label="Last name"
-                                            value={lastName}
-                                            onChange={(event) => setLastName(event.target.value)}
-                                            size="small"
-                                            fullWidth
-                                        />
-                                    </Stack>
-                                    <TextField
-                                        select
-                                        label="Project to add"
-                                        value={projectId}
-                                        onChange={(event) => setProjectId(event.target.value)}
-                                        size="small"
-                                        disabled={projects.length === 0}
-                                    >
-                                        {projects.map((project) => (
-                                            <MenuItem key={project.id} value={String(project.id)}>
-                                                {project.name}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                    <TextField
-                                        select
-                                        label="Permission"
-                                        value={permission}
-                                        onChange={(event) => {
-                                            const value = event.target.value;
-                                            if (
-                                                value === "view" ||
-                                                value === "edit" ||
-                                                value === "owner"
-                                            ) {
-                                                setPermission(value);
-                                            }
-                                        }}
-                                        required
-                                        size="small"
-                                    >
-                                        <MenuItem value="view">View</MenuItem>
-                                        <MenuItem value="edit">Edit</MenuItem>
-                                        <MenuItem value="owner">Owner</MenuItem>
-                                    </TextField>
-                                    {projects.length === 0 ? (
-                                        <Alert severity="info">
-                                            No projects are available. The user can still be
-                                            created without project access.
-                                        </Alert>
-                                    ) : null}
-                                    <Button
-                                        type="button"
-                                        variant="outlined"
-                                        disabled={projects.length === 0}
-                                        onClick={handleAddInitialProjectAccess}
-                                    >
-                                        Add initial access
-                                    </Button>
-                                    {initialProjectAccess.length === 0 ? (
-                                        <Alert severity="info">
-                                            This user will be created without project access.
-                                        </Alert>
-                                    ) : (
-                                        <Stack spacing={1}>
-                                            {initialProjectAccess.map((access) => {
-                                                const project = projects.find(
-                                                    (item) => item.id === access.projectId,
-                                                );
-                                                return (
-                                                    <Stack
-                                                        key={access.projectId}
-                                                        direction="row"
-                                                        spacing={1}
-                                                        alignItems="center"
-                                                        justifyContent="space-between"
-                                                    >
-                                                        <Typography variant="body2">
-                                                            {project?.name ?? access.projectId} -{" "}
-                                                            {access.permission}
-                                                        </Typography>
-                                                        <Button
-                                                            type="button"
-                                                            size="small"
-                                                            color="error"
-                                                            onClick={() =>
-                                                                handleRemoveInitialProjectAccess(
-                                                                    access.projectId,
-                                                                )
-                                                            }
-                                                        >
-                                                            Remove
-                                                        </Button>
-                                                    </Stack>
-                                                );
-                                            })}
-                                        </Stack>
-                                    )}
-                                    <Button
-                                        type="submit"
-                                        variant="contained"
-                                        disabled={saving}
-                                    >
-                                        {saving ? "Creating..." : "Create user"}
-                                    </Button>
-                                </Stack>
-                            </Paper>
-
-                            <Paper sx={{ p: 2, flex: 1, width: "100%" }}>
-                                <Stack spacing={2}>
-                                    <Stack
-                                        direction="row"
-                                        justifyContent="space-between"
-                                        alignItems="center"
-                                    >
-                                        <Typography variant="h6">Projects</Typography>
-                                        <Chip label={projects.length} size="small" />
-                                    </Stack>
-                                    {projects.length === 0 ? (
-                                        <Alert severity="info">
-                                            No projects found in the MDV database.
-                                        </Alert>
-                                    ) : (
-                                        <Table size="small">
-                                            <TableHead>
-                                                <TableRow>
-                                                    <TableCell>Name</TableCell>
-                                                    <TableCell>ID</TableCell>
-                                                    <TableCell>Access</TableCell>
-                                                    <TableCell>Status</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {projects.map((project) => (
-                                                    <TableRow key={project.id}>
-                                                        <TableCell>{project.name}</TableCell>
-                                                        <TableCell>{project.id}</TableCell>
-                                                        <TableCell>
-                                                            {project.accessLevel || "unknown"}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {project.isDeleted
-                                                                ? "Deleted"
-                                                                : "Active"}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    )}
-                                </Stack>
-                            </Paper>
-
-                            <Paper sx={{ p: 2, flex: 1, width: "100%" }}>
-                                <Stack spacing={2}>
-                                    <Stack
-                                        direction="row"
-                                        justifyContent="space-between"
-                                        alignItems="center"
-                                    >
-                                        <Typography variant="h6">Users</Typography>
-                                        <Chip label={users.length} size="small" />
-                                    </Stack>
-                                    {users.length === 0 ? (
-                                        <Alert severity="info">
-                                            No users found in the MDV database yet.
-                                        </Alert>
-                                    ) : (
-                                        <Table size="small">
-                                            <TableHead>
-                                                <TableRow>
-                                                    <TableCell>User</TableCell>
-                                                    <TableCell>Email</TableCell>
-                                                    <TableCell>Status</TableCell>
-                                                    <TableCell>Admin</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {users.map((user) => (
-                                                    <TableRow key={user.id}>
-                                                        <TableCell>{formatUserName(user)}</TableCell>
-                                                        <TableCell>{user.email}</TableCell>
-                                                        <TableCell>
-                                                            {user.isActive ? "Active" : "Inactive"}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {user.isAdmin ? "Yes" : "No"}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    )}
-                                </Stack>
-                            </Paper>
-                        </Stack>
-                    )}
-                    {!loading ? (
-                        <Paper sx={{ p: 2 }}>
-                            <Stack spacing={2}>
-                                <Stack
-                                    direction={{ xs: "column", md: "row" }}
-                                    spacing={2}
-                                    justifyContent="space-between"
-                                    alignItems={{ xs: "stretch", md: "center" }}
+                                <Paper
+                                    component="form"
+                                    onSubmit={handleCreateUser}
+                                    className="admin-showcase-panel admin-create-panel"
+                                    variant="outlined"
                                 >
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <Typography variant="h6">Project Members</Typography>
-                                        <Chip label={projectMembers.length} size="small" />
-                                    </Stack>
-                                    <TextField
-                                        select
-                                        label="Project"
-                                        value={memberProjectId}
-                                        onChange={(event) =>
-                                            setMemberProjectId(event.target.value)
-                                        }
-                                        size="small"
-                                        disabled={projects.length === 0}
-                                        sx={{ minWidth: { xs: "100%", md: 280 } }}
-                                    >
-                                        {projects.map((project) => (
-                                            <MenuItem key={project.id} value={String(project.id)}>
-                                                {project.name}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                </Stack>
-                                {projects.length === 0 ? (
-                                    <Alert severity="info">
-                                        No projects found in the MDV database.
-                                    </Alert>
-                                ) : (
-                                    <Paper
-                                        component="form"
-                                        variant="outlined"
-                                        onSubmit={handleAddProjectMember}
-                                        sx={{ p: 2 }}
-                                    >
-                                        <Stack
-                                            direction={{ xs: "column", md: "row" }}
-                                            spacing={1}
-                                            alignItems={{ xs: "stretch", md: "center" }}
-                                        >
+                                    <Stack spacing={2}>
+                                        <Box>
+                                            <Typography variant="h5">Create Deployment User</Typography>
+                                            <Typography variant="body2">
+                                                Create or resolve a deployment user and grant project access.
+                                            </Typography>
+                                        </Box>
+                                        <TextField
+                                            label="Email"
+                                            value={email}
+                                            onChange={(event) => setEmail(event.target.value)}
+                                            required
+                                            size="small"
+                                            type="email"
+                                        />
+                                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                                            <TextField
+                                                label="First name"
+                                                value={firstName}
+                                                onChange={(event) => setFirstName(event.target.value)}
+                                                size="small"
+                                                fullWidth
+                                            />
+                                            <TextField
+                                                label="Last name"
+                                                value={lastName}
+                                                onChange={(event) => setLastName(event.target.value)}
+                                                size="small"
+                                                fullWidth
+                                            />
+                                        </Stack>
+                                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                                             <TextField
                                                 select
-                                                label="Existing user"
-                                                value={addMemberUserId}
-                                                onChange={(event) =>
-                                                    setAddMemberUserId(event.target.value)
-                                                }
+                                                label="Project"
+                                                value={projectId}
+                                                onChange={(event) => setProjectId(event.target.value)}
                                                 size="small"
-                                                disabled={availableProjectUsers.length === 0}
-                                                sx={{ minWidth: { md: 260 } }}
+                                                disabled={projects.length === 0}
+                                                fullWidth
                                             >
-                                                {availableProjectUsers.map((user) => (
-                                                    <MenuItem
-                                                        key={user.id}
-                                                        value={String(user.id)}
-                                                    >
-                                                        {user.email}
+                                                {projects.map((project) => (
+                                                    <MenuItem key={project.id} value={String(project.id)}>
+                                                        {project.name}
                                                     </MenuItem>
                                                 ))}
                                             </TextField>
                                             <TextField
                                                 select
                                                 label="Permission"
-                                                value={addMemberPermission}
-                                                onChange={(event) => {
-                                                    const value = event.target.value;
-                                                    if (
-                                                        value === "view" ||
-                                                        value === "edit" ||
-                                                        value === "owner"
-                                                    ) {
-                                                        setAddMemberPermission(value);
-                                                    }
-                                                }}
+                                                value={permission}
+                                                onChange={(event) => handlePermissionChange(event.target.value, setPermission)}
+                                                required
                                                 size="small"
-                                                sx={{ minWidth: { md: 140 } }}
+                                                sx={{ minWidth: { sm: 150 } }}
                                             >
                                                 <MenuItem value="view">View</MenuItem>
                                                 <MenuItem value="edit">Edit</MenuItem>
                                                 <MenuItem value="owner">Owner</MenuItem>
                                             </TextField>
-                                            <Button
-                                                type="submit"
-                                                variant="outlined"
-                                                disabled={
-                                                    memberAction === "add" ||
-                                                    !addMemberUserId ||
-                                                    availableProjectUsers.length === 0
-                                                }
-                                            >
-                                                {memberAction === "add" ? "Adding..." : "Add"}
-                                            </Button>
                                         </Stack>
-                                        {availableProjectUsers.length === 0 ? (
-                                            <Alert severity="info" sx={{ mt: 1 }}>
-                                                Every known user already has access to this
-                                                project.
+                                        <Button
+                                            type="button"
+                                            variant="outlined"
+                                            disabled={projects.length === 0}
+                                            onClick={handleAddInitialProjectAccess}
+                                        >
+                                            Add initial access
+                                        </Button>
+                                        {initialProjectAccess.length === 0 ? (
+                                            <Alert severity="info">
+                                                User will be created without project access unless an assignment is added.
                                             </Alert>
-                                        ) : null}
-                                    </Paper>
-                                )}
-                                {projects.length === 0 ? null : membersLoading ? (
-                                    <Stack alignItems="center" sx={{ py: 4 }}>
-                                        <CircularProgress size={24} />
+                                        ) : (
+                                            <Stack spacing={1}>
+                                                {initialProjectAccess.map((access) => {
+                                                    const project = projects.find((item) => item.id === access.projectId);
+                                                    return (
+                                                        <Box key={access.projectId} className="admin-showcase-access-pill">
+                                                            <Typography variant="body2">
+                                                                {project?.name ?? access.projectId} - {access.permission}
+                                                            </Typography>
+                                                            <Button
+                                                                type="button"
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => handleRemoveInitialProjectAccess(access.projectId)}
+                                                            >
+                                                                Remove
+                                                            </Button>
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Stack>
+                                        )}
+                                        <Button type="submit" variant="contained" disabled={saving}>
+                                            {saving ? "Creating..." : "Create user"}
+                                        </Button>
                                     </Stack>
-                                ) : projectMembers.length === 0 ? (
-                                    <Alert severity="info">
-                                        No users are assigned to this project yet.
-                                    </Alert>
-                                ) : (
-                                    <Table size="small">
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>User</TableCell>
-                                                <TableCell>Email</TableCell>
-                                                <TableCell>Permission</TableCell>
-                                                <TableCell>Read</TableCell>
-                                                <TableCell>Write</TableCell>
-                                                <TableCell>Owner</TableCell>
-                                                <TableCell align="right">Actions</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {projectMembers.map((member) => (
-                                                <TableRow
-                                                    key={`${member.projectAccess.projectId}-${member.user.id}`}
+                                </Paper>
+
+                                <Paper className="admin-showcase-panel admin-members-panel" variant="outlined">
+                                    <Stack spacing={2}>
+                                        <Stack
+                                            direction={{ xs: "column", md: "row" }}
+                                            spacing={2}
+                                            justifyContent="space-between"
+                                            alignItems={{ xs: "stretch", md: "center" }}
+                                        >
+                                            <Box>
+                                                <Typography variant="h5">Project Access Management</Typography>
+                                                <Typography variant="body2">
+                                                    {selectedMemberProject
+                                                        ? `Managing permissions for ${selectedMemberProject.name}`
+                                                        : "Select a project to manage access"}
+                                                </Typography>
+                                            </Box>
+                                            <TextField
+                                                select
+                                                label="Project"
+                                                value={memberProjectId}
+                                                onChange={(event) => setMemberProjectId(event.target.value)}
+                                                size="small"
+                                                disabled={projects.length === 0}
+                                                sx={{ minWidth: { md: 280 } }}
+                                            >
+                                                {projects.map((project) => (
+                                                    <MenuItem key={project.id} value={String(project.id)}>
+                                                        {project.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </TextField>
+                                        </Stack>
+
+                                        <Paper
+                                            component="form"
+                                            variant="outlined"
+                                            onSubmit={handleAddProjectMember}
+                                            className="admin-showcase-inline-form"
+                                        >
+                                            <Stack
+                                                direction={{ xs: "column", md: "row" }}
+                                                spacing={1}
+                                                alignItems={{ xs: "stretch", md: "center" }}
+                                            >
+                                                <TextField
+                                                    select
+                                                    label="Existing user"
+                                                    value={addMemberUserId}
+                                                    onChange={(event) => setAddMemberUserId(event.target.value)}
+                                                    size="small"
+                                                    disabled={availableProjectUsers.length === 0}
+                                                    sx={{ minWidth: { md: 260 }, flex: 1 }}
                                                 >
-                                                    <TableCell>
-                                                        {formatUserName(member.user)}
-                                                    </TableCell>
-                                                    <TableCell>{member.user.email}</TableCell>
-                                                    <TableCell>
-                                                        <TextField
-                                                            select
-                                                            value={
-                                                                member.projectAccess.permission
-                                                            }
-                                                            onChange={(event) => {
-                                                                const value =
-                                                                    event.target.value;
-                                                                if (
-                                                                    value === "view" ||
-                                                                    value === "edit" ||
-                                                                    value === "owner"
-                                                                ) {
-                                                                    void handleUpdateProjectMember(
-                                                                        member.user.id,
-                                                                        value,
-                                                                    );
-                                                                }
-                                                            }}
-                                                            size="small"
-                                                            disabled={
-                                                                memberAction ===
-                                                                `update-${member.user.id}`
-                                                            }
-                                                        >
-                                                            <MenuItem value="view">View</MenuItem>
-                                                            <MenuItem value="edit">Edit</MenuItem>
-                                                            <MenuItem value="owner">
-                                                                Owner
-                                                            </MenuItem>
-                                                        </TextField>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {member.projectAccess.canRead ? "Yes" : "No"}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {member.projectAccess.canWrite
-                                                            ? "Yes"
-                                                            : "No"}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {member.projectAccess.isOwner
-                                                            ? "Yes"
-                                                            : "No"}
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                        <Button
-                                                            color="error"
-                                                            size="small"
-                                                            disabled={
-                                                                memberAction ===
-                                                                `remove-${member.user.id}`
-                                                            }
-                                                            onClick={() =>
-                                                                void handleRemoveProjectMember(
-                                                                    member.user.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            {memberAction ===
-                                                            `remove-${member.user.id}`
-                                                                ? "Removing..."
-                                                                : "Remove"}
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
+                                                    {availableProjectUsers.map((user) => (
+                                                        <MenuItem key={user.id} value={String(user.id)}>
+                                                            {user.email}
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
+                                                <TextField
+                                                    select
+                                                    label="Permission"
+                                                    value={addMemberPermission}
+                                                    onChange={(event) => handlePermissionChange(event.target.value, setAddMemberPermission)}
+                                                    size="small"
+                                                    sx={{ minWidth: { md: 140 } }}
+                                                >
+                                                    <MenuItem value="view">View</MenuItem>
+                                                    <MenuItem value="edit">Edit</MenuItem>
+                                                    <MenuItem value="owner">Owner</MenuItem>
+                                                </TextField>
+                                                <Button
+                                                    type="submit"
+                                                    variant="contained"
+                                                    disabled={memberAction === "add" || !addMemberUserId || availableProjectUsers.length === 0}
+                                                >
+                                                    {memberAction === "add" ? "Adding..." : "Add access"}
+                                                </Button>
+                                            </Stack>
+                                        </Paper>
+
+                                        {projects.length === 0 ? (
+                                            <Alert severity="info">No projects found in the MDV database.</Alert>
+                                        ) : membersLoading ? (
+                                            <Stack alignItems="center" sx={{ py: 4 }}>
+                                                <CircularProgress size={24} />
+                                            </Stack>
+                                        ) : projectMembers.length === 0 ? (
+                                            <Alert severity="info">No users are assigned to this project yet.</Alert>
+                                        ) : (
+                                            <Box className="admin-showcase-table-wrap">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>User</TableCell>
+                                                            <TableCell>Permission</TableCell>
+                                                            <TableCell>Read</TableCell>
+                                                            <TableCell>Write</TableCell>
+                                                            <TableCell>Owner</TableCell>
+                                                            <TableCell align="right">Actions</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {projectMembers.map((member) => (
+                                                            <TableRow key={`${member.projectAccess.projectId}-${member.user.id}`}>
+                                                                <TableCell>
+                                                                    <Typography variant="body2">{formatUserName(member.user)}</Typography>
+                                                                    <Typography variant="caption">{member.user.email}</Typography>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <TextField
+                                                                        select
+                                                                        value={member.projectAccess.permission}
+                                                                        onChange={(event) => {
+                                                                            const nextPermission = permissionFromValue(event.target.value);
+                                                                            if (nextPermission) {
+                                                                                void handleUpdateProjectMember(member.user.id, nextPermission);
+                                                                            }
+                                                                        }}
+                                                                        size="small"
+                                                                        disabled={memberAction === `update-${member.user.id}`}
+                                                                    >
+                                                                        <MenuItem value="view">View</MenuItem>
+                                                                        <MenuItem value="edit">Edit</MenuItem>
+                                                                        <MenuItem value="owner">Owner</MenuItem>
+                                                                    </TextField>
+                                                                </TableCell>
+                                                                <TableCell>{member.projectAccess.canRead ? "Yes" : "No"}</TableCell>
+                                                                <TableCell>{member.projectAccess.canWrite ? "Yes" : "No"}</TableCell>
+                                                                <TableCell>{member.projectAccess.isOwner ? "Yes" : "No"}</TableCell>
+                                                                <TableCell align="right">
+                                                                    <Button
+                                                                        color="error"
+                                                                        size="small"
+                                                                        disabled={memberAction === `remove-${member.user.id}`}
+                                                                        onClick={() => void handleRemoveProjectMember(member.user.id)}
+                                                                    >
+                                                                        {memberAction === `remove-${member.user.id}` ? "Removing..." : "Remove"}
+                                                                    </Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
+                                        )}
+                                    </Stack>
+                                </Paper>
                             </Stack>
-                        </Paper>
-                    ) : null}
+
+                            <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5}>
+                                <Paper className="admin-showcase-panel" variant="outlined">
+                                    <Stack spacing={2}>
+                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                            <Box>
+                                                <Typography variant="h5">Deployment Users</Typography>
+                                                <Typography variant="body2">Users known to this MDV deployment</Typography>
+                                            </Box>
+                                            <Chip label={users.length} size="small" />
+                                        </Stack>
+                                        {users.length === 0 ? (
+                                            <Alert severity="info">No users found in the MDV database yet.</Alert>
+                                        ) : (
+                                            <Box className="admin-showcase-table-wrap">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>User</TableCell>
+                                                            <TableCell>Email</TableCell>
+                                                            <TableCell>Status</TableCell>
+                                                            <TableCell>Admin</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {users.map((user) => (
+                                                            <TableRow key={user.id}>
+                                                                <TableCell>{formatUserName(user)}</TableCell>
+                                                                <TableCell>{user.email}</TableCell>
+                                                                <TableCell>{user.isActive ? "Active" : "Inactive"}</TableCell>
+                                                                <TableCell>{user.isAdmin ? "Yes" : "No"}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
+                                        )}
+                                    </Stack>
+                                </Paper>
+
+                                <Paper className="admin-showcase-panel" variant="outlined">
+                                    <Stack spacing={2}>
+                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                            <Box>
+                                                <Typography variant="h5">Projects</Typography>
+                                                <Typography variant="body2">Existing projects available for assignment</Typography>
+                                            </Box>
+                                            <Chip label={projects.length} size="small" />
+                                        </Stack>
+                                        {projects.length === 0 ? (
+                                            <Alert severity="info">No projects found in the MDV database.</Alert>
+                                        ) : (
+                                            <Box className="admin-showcase-table-wrap">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>Name</TableCell>
+                                                            <TableCell>ID</TableCell>
+                                                            <TableCell>Access</TableCell>
+                                                            <TableCell>Status</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {projects.map((project) => (
+                                                            <TableRow key={project.id}>
+                                                                <TableCell>{project.name}</TableCell>
+                                                                <TableCell>{project.id}</TableCell>
+                                                                <TableCell>{project.accessLevel || "unknown"}</TableCell>
+                                                                <TableCell>{project.isDeleted ? "Deleted" : "Active"}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
+                                        )}
+                                    </Stack>
+                                </Paper>
+                            </Stack>
+                        </>
+                    )}
                 </Stack>
             </Container>
         </Box>

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from mdvtools.dbutils.admin_contracts import (
     AdminConflictError,
@@ -45,8 +45,15 @@ class MDVAdminServices:
     of querying MDV models directly.
     """
 
-    def __init__(self, identity_provider: AdminIdentityProvider | None = None):
+    def __init__(
+        self,
+        identity_provider: AdminIdentityProvider | None = None,
+        enable_auth: bool = False,
+        refresh_auth_cache: Callable[[bool], None] | None = None,
+    ):
         self.identity_provider = identity_provider or LocalAdminIdentityProvider()
+        self.enable_auth = enable_auth
+        self.refresh_auth_cache = refresh_auth_cache or self._refresh_auth_cache
 
     def list_users(self) -> list[AdminUser]:
         _Project, User = self._get_models()
@@ -54,9 +61,13 @@ class MDVAdminServices:
 
     def list_projects(self) -> list[AdminProject]:
         Project, _User = self._get_models()
-        return [self._to_admin_project(project) for project in Project.query.all()]
+        return [
+            self._to_admin_project(project)
+            for project in Project.query.all()
+            if not bool(getattr(project, "is_deleted", False))
+        ]
 
-    def create_local_user_with_project_access(
+    def create_user_with_project_access(
         self,
         data: CreateAdminUserInput,
     ) -> CreateAdminUserResult:
@@ -135,11 +146,6 @@ class MDVAdminServices:
                 )
 
             db.session.commit()
-            return CreateAdminUserResult(
-                user=self._to_admin_user(user),
-                project_access=project_memberships,
-                created=created,
-            )
         except (AdminInputError, AdminNotFoundError, AdminConflictError):
             db.session.rollback()
             self._rollback_created_identity(identity)
@@ -151,6 +157,12 @@ class MDVAdminServices:
             db.session.rollback()
             self._rollback_created_identity(identity)
             raise
+        self._refresh_cache_after_write()
+        return CreateAdminUserResult(
+            user=self._to_admin_user(user),
+            project_access=project_memberships,
+            created=created,
+        )
 
     def list_project_members(self, project_id: int) -> list[AdminProjectMember]:
         Project, User, UserProject = self._get_membership_models()
@@ -212,13 +224,14 @@ class MDVAdminServices:
                 membership.is_owner = permission["is_owner"]
 
             db.session.commit()
-            return self._to_admin_project_member(user, membership)
         except (AdminInputError, AdminNotFoundError, AdminConflictError):
             db.session.rollback()
             raise
         except Exception:
             db.session.rollback()
             raise
+        self._refresh_cache_after_write()
+        return self._to_admin_project_member(user, membership)
 
     def update_project_member_permission(
         self,
@@ -252,13 +265,14 @@ class MDVAdminServices:
             membership.is_owner = permission_flags["is_owner"]
 
             db.session.commit()
-            return self._to_admin_project_member(user, membership)
         except (AdminInputError, AdminNotFoundError, AdminConflictError):
             db.session.rollback()
             raise
         except Exception:
             db.session.rollback()
             raise
+        self._refresh_cache_after_write()
+        return self._to_admin_project_member(user, membership)
 
     def remove_project_member(self, project_id: int, user_id: int) -> None:
         Project, User, UserProject, db = self._get_write_models()
@@ -286,6 +300,7 @@ class MDVAdminServices:
         except Exception:
             db.session.rollback()
             raise
+        self._refresh_cache_after_write()
 
     def _get_models(self):
         from mdvtools.dbutils.dbmodels import Project, User
@@ -301,6 +316,16 @@ class MDVAdminServices:
         from mdvtools.dbutils.dbmodels import Project, User, UserProject
 
         return Project, User, UserProject
+
+    def _refresh_cache_after_write(self) -> None:
+        if not self.enable_auth:
+            return None
+        self.refresh_auth_cache(self.enable_auth)
+
+    def _refresh_auth_cache(self, enable_auth: bool) -> None:
+        from mdvtools.dbutils.project_manager_service import refresh_auth_cache
+
+        refresh_auth_cache(enable_auth)
 
     def _permission_flags(self, permission: AdminPermission) -> dict[str, bool]:
         return {

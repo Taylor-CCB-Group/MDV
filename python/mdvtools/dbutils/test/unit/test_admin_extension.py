@@ -23,6 +23,7 @@ from mdvtools.dbutils.admin_contracts import (
 )
 from mdvtools.dbutils.admin_extension import AdminExtension
 from mdvtools.dbutils.admin_identity import AdminIdentityInput, Auth0AdminIdentityProvider
+from mdvtools.dbutils.admin_services import MDVAdminServices
 
 
 @dataclass
@@ -54,6 +55,68 @@ class FakeQuery:
     def all(self):
         return list(self.rows)
 
+    def get(self, row_id: int):
+        return next((row for row in self.rows if row.id == row_id), None)
+
+    def filter_by(self, **filters: Any):
+        return FakeQuery([
+            row
+            for row in self.rows
+            if all(getattr(row, key) == value for key, value in filters.items())
+        ])
+
+    def first(self):
+        return self.rows[0] if self.rows else None
+
+    def count(self):
+        return len(self.rows)
+
+
+class FakeSession:
+    def __init__(self):
+        self.added: list[Any] = []
+        self.deleted: list[Any] = []
+        self.commits = 0
+        self.rollbacks = 0
+
+    def add(self, row: Any):
+        self.added.append(row)
+
+    def flush(self):
+        return None
+
+    def commit(self):
+        self.commits += 1
+
+    def rollback(self):
+        self.rollbacks += 1
+
+    def delete(self, row: Any):
+        self.deleted.append(row)
+
+
+class FakeDb:
+    def __init__(self):
+        self.session = FakeSession()
+
+
+class FakeUserProject:
+    query: FakeQuery
+
+    def __init__(
+        self,
+        user_id: int,
+        project_id: int,
+        is_owner: bool,
+        can_read: bool,
+        can_write: bool,
+    ):
+        self.user_id = user_id
+        self.project_id = project_id
+        self.is_owner = is_owner
+        self.can_read = can_read
+        self.can_write = can_write
+
 
 class FakeAdminServices:
     def __init__(self):
@@ -78,7 +141,7 @@ class FakeAdminServices:
             )
         ]
 
-    def create_local_user_with_project_access(self, data: CreateAdminUserInput):
+    def create_user_with_project_access(self, data: CreateAdminUserInput):
         self.create_user_input = data
         return CreateAdminUserResult(
             user=AdminUser(
@@ -183,6 +246,7 @@ def fake_db_modules(monkeypatch):
     projects = [
         FakeProject(id=10, name="Alpha", path="/projects/10"),
         FakeProject(id=20, name="Beta", path="/projects/20"),
+        FakeProject(id=30, name="Deleted", path="/projects/30", is_deleted=True),
     ]
 
     FakeUser.query = FakeQuery(users)
@@ -260,7 +324,8 @@ def test_admin_session_can_list_users_and_projects(fake_db_modules):
     assert users_response.status_code == 200
     assert projects_response.status_code == 200
     assert users_response.get_json()["users"][0]["email"] == "owner@example.com"
-    assert projects_response.get_json()["projects"][0]["name"] == "Alpha"
+    project_names = [project["name"] for project in projects_response.get_json()["projects"]]
+    assert project_names == ["Alpha", "Beta"]
 
 
 def test_users_endpoint_can_return_empty_list(monkeypatch):
@@ -301,6 +366,64 @@ def test_projects_endpoint_can_return_empty_list(monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json()["projects"] == []
+
+
+def test_admin_project_list_excludes_deleted_projects(fake_db_modules):
+    service = MDVAdminServices()
+
+    projects = service.list_projects()
+
+    assert [project.name for project in projects] == ["Alpha", "Beta"]
+
+
+def test_admin_write_refreshes_auth_cache_when_auth_enabled(monkeypatch):
+    FakeUser.query = FakeQuery([FakeUser(id=3, email="member@example.com")])
+    FakeProject.query = FakeQuery([FakeProject(id=10, name="Alpha", path="/projects/10")])
+    FakeUserProject.query = FakeQuery([])
+    fake_db = FakeDb()
+
+    dbmodels = ModuleType("mdvtools.dbutils.dbmodels")
+    dbmodels.User = FakeUser
+    dbmodels.Project = FakeProject
+    dbmodels.UserProject = FakeUserProject
+    dbmodels.db = fake_db
+    monkeypatch.setitem(sys.modules, "mdvtools.dbutils.dbmodels", dbmodels)
+
+    refresh_calls: list[bool] = []
+    service = MDVAdminServices(
+        enable_auth=True,
+        refresh_auth_cache=refresh_calls.append,
+    )
+
+    service.add_project_member(10, ProjectMemberInput(user_id=3, permission="edit"))
+
+    assert fake_db.session.commits == 1
+    assert refresh_calls == [True]
+
+
+def test_admin_write_skips_auth_cache_refresh_when_auth_disabled(monkeypatch):
+    FakeUser.query = FakeQuery([FakeUser(id=3, email="member@example.com")])
+    FakeProject.query = FakeQuery([FakeProject(id=10, name="Alpha", path="/projects/10")])
+    FakeUserProject.query = FakeQuery([])
+    fake_db = FakeDb()
+
+    dbmodels = ModuleType("mdvtools.dbutils.dbmodels")
+    dbmodels.User = FakeUser
+    dbmodels.Project = FakeProject
+    dbmodels.UserProject = FakeUserProject
+    dbmodels.db = fake_db
+    monkeypatch.setitem(sys.modules, "mdvtools.dbutils.dbmodels", dbmodels)
+
+    refresh_calls: list[bool] = []
+    service = MDVAdminServices(
+        enable_auth=False,
+        refresh_auth_cache=refresh_calls.append,
+    )
+
+    service.add_project_member(10, ProjectMemberInput(user_id=3, permission="edit"))
+
+    assert fake_db.session.commits == 1
+    assert refresh_calls == []
 
 
 def test_create_local_user_accepts_project_access_array():
@@ -427,7 +550,7 @@ def test_create_local_user_rejects_duplicate_project_access_entries():
 
 def test_create_local_user_maps_service_validation_errors():
     class RejectingAdminServices(FakeAdminServices):
-        def create_local_user_with_project_access(self, data: CreateAdminUserInput):
+        def create_user_with_project_access(self, data: CreateAdminUserInput):
             raise AdminInputError("A valid email address is required.")
 
     flask_app = Flask(__name__)
@@ -454,7 +577,7 @@ def test_create_local_user_maps_service_validation_errors():
 
 def test_create_local_user_maps_missing_project_errors():
     class MissingProjectAdminServices(FakeAdminServices):
-        def create_local_user_with_project_access(self, data: CreateAdminUserInput):
+        def create_user_with_project_access(self, data: CreateAdminUserInput):
             raise AdminNotFoundError("Project not found.")
 
     flask_app = Flask(__name__)
@@ -481,7 +604,7 @@ def test_create_local_user_maps_missing_project_errors():
 
 def test_create_user_maps_external_identity_errors():
     class FailingIdentityAdminServices(FakeAdminServices):
-        def create_local_user_with_project_access(self, data: CreateAdminUserInput):
+        def create_user_with_project_access(self, data: CreateAdminUserInput):
             raise AdminExternalServiceError("Auth0 operation failed.")
 
     flask_app = Flask(__name__)

@@ -39,6 +39,8 @@ Implemented locally:
 - remove project access
 - protect last project owner with `409 Conflict`
 - identity provider boundary for local/Auth0 user create-or-resolve behavior
+- server-side logging for Admin write actions
+- Admin frontend access states for sign-in-required and admin-required responses
 
 This confirms the local MDV database workflow and the backend boundary where Auth0 creation will attach. It does not yet confirm real Auth0 user creation against a deployment, production login, catalog filtering for newly-created users, or production Admin authorization.
 
@@ -110,6 +112,7 @@ Increment 3B: Permission editing/removal           Status: implemented baseline
 Increment 3C: Create-user API array shape          Status: implemented baseline
 Increment 4A: Identity provider boundary           Status: implemented baseline
 Increment 4B: Auth0-backed user creation E2E       Status: planned
+Admin write logging/access UX                     Status: implemented baseline
 ```
 
 Implemented Admin endpoints:
@@ -191,7 +194,6 @@ User creation should be atomic from the API caller's point of view. If MDV user/
 ### Later Slices
 
 - verify production auth/session behavior with `ENABLE_AUTH=true`
-- add server-side structured logging for Admin writes
 - add user access count/status in the users list
 - add user-centric "projects for this user" view
 - design bulk paste/import as a background job

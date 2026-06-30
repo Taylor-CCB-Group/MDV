@@ -29,6 +29,16 @@ export type {
     CreateAdminUserResult,
 };
 
+export class AdminApiError extends Error {
+    status: number;
+
+    constructor(message: string, status: number) {
+        super(message);
+        this.name = "AdminApiError";
+        this.status = status;
+    }
+}
+
 async function requestJson<T>(
     path: string,
     schema: z.ZodType<T>,
@@ -46,7 +56,7 @@ async function requestJson<T>(
         const message = parsed.success
             ? parsed.data.error
             : `Request failed with ${response.status}`;
-        throw new Error(message);
+        throw new AdminApiError(message, response.status);
     }
 
     return schema.parse(await response.json());
@@ -119,7 +129,7 @@ export const adminApi = {
                     const message = parsed.success
                         ? parsed.data.error
                         : `Request failed with ${response.status}`;
-                    throw new Error(message);
+                    throw new AdminApiError(message, response.status);
                 });
             }
         }),
