@@ -29,7 +29,7 @@ import type { RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { useSpatialData } from "@spatialdata/react";
 import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 
@@ -79,7 +79,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
     const dataStore = useDataStore();
     const chartConfig = useConfig<SpatialDataMdvReactConfig>();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
-    const availableFields = useMemo(() => getAvailableFields(dataStore), [dataStore]);
+    const availableFields = getAvailableFields(dataStore);
     const chartColorBy =
         typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
 
@@ -280,48 +280,40 @@ const SpatialLayerDialogComponent = observer(() => {
         return options.sort((a, b) => a.label.localeCompare(b.label));
     }, [coordinateSystem, spatialData, stack]);
 
-    const makeOnDragEnd = useCallback(
-        (event: DragEndEvent) => {
-            if (!stack) return;
-            const { active, over } = event;
-            if (!over || active.id === over.id) return;
-            const ids = renderStackEntryIds(stack);
-            const oldIndex = ids.indexOf(String(active.id));
-            const newIndex = ids.indexOf(String(over.id));
-            if (oldIndex === -1 || newIndex === -1) return;
-            mutateStack((current) => {
-                reorderRenderStackEntries(current, oldIndex, newIndex);
-            });
-        },
-        [mutateStack, stack],
-    );
+    // Plain handlers — the React Compiler memoizes their identity.
+    const makeOnDragEnd = (event: DragEndEvent) => {
+        if (!stack) return;
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const ids = renderStackEntryIds(stack);
+        const oldIndex = ids.indexOf(String(active.id));
+        const newIndex = ids.indexOf(String(over.id));
+        if (oldIndex === -1 || newIndex === -1) return;
+        mutateStack((current) => {
+            reorderRenderStackEntries(current, oldIndex, newIndex);
+        });
+    };
 
-    const onInsert = useCallback(
-        (option: InsertOption | null) => {
-            if (!option) return;
-            mutateStack((current) => {
-                if (option.kind === "spatial") {
-                    insertSpatialRenderStackEntry(
-                        current,
-                        option.type,
-                        option.elementKey,
-                        defaultPropsForSpatialElement(option.type),
-                    );
-                } else {
-                    insertHostRenderStackEntry(current, option.deckId);
-                }
-            });
-        },
-        [mutateStack],
-    );
+    const onInsert = (option: InsertOption | null) => {
+        if (!option) return;
+        mutateStack((current) => {
+            if (option.kind === "spatial") {
+                insertSpatialRenderStackEntry(
+                    current,
+                    option.type,
+                    option.elementKey,
+                    defaultPropsForSpatialElement(option.type),
+                );
+            } else {
+                insertHostRenderStackEntry(current, option.deckId);
+            }
+        });
+    };
 
-    const onRemove = useCallback(
-        (id: string) => {
-            mutateStack((current) => removeRenderStackEntry(current, id));
-            if (selectedEntryId === id) setSelectedEntryId(null);
-        },
-        [mutateStack, selectedEntryId],
-    );
+    const onRemove = (id: string) => {
+        mutateStack((current) => removeRenderStackEntry(current, id));
+        if (selectedEntryId === id) setSelectedEntryId(null);
+    };
 
     if (!stack?.entries.length) {
         return (
