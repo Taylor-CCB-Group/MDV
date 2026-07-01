@@ -61,11 +61,13 @@ let stateHandlerContainer: HTMLElement | null = null;
 let stateHandlerRoot: Root | null = null;
 
 function expectsInitialViewLoadedEvent(config: any) {
-    const allViews = config?.all_views;
-    if (Array.isArray(allViews)) {
-        return allViews.length > 0;
-    }
-    return Boolean(config?.only_view);
+    console.log('expectsInitialViewLoaded is always false now, avoid issue with stuck loading screen...');
+    return false;
+    // const allViews = config?.all_views;
+    // if (Array.isArray(allViews)) {
+    //     return allViews.length > 0;
+    // }
+    // return Boolean(config?.only_view);
 }
 
 function LoadState({
@@ -245,6 +247,7 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
                         listener,
                     );
                     if (!expectsInitialViewLoadedEvent(runtime.config)) {
+                        //^^
                         setInitialViewLoaded(true);
                     }
                     setInitialised(true);
