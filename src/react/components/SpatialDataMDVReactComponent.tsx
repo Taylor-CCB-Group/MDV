@@ -1,4 +1,5 @@
 import { ColorPaletteExtension } from "@hms-dbmi/viv";
+import { viewStateFromBounds } from "@spatialdata/core";
 import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
 import {
     SpatialViewer,
@@ -131,9 +132,42 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         height,
         hostDeckLayers,
         sortDeckLayers: true,
-        autoFit: spatialViewState === null,
+        // Auto-fit is driven by MDV below, not the library's built-in one — see the
+        // effect for why (the built-in can commit a degenerate view before bounds load).
+        autoFit: false,
         vivPassthrough,
     });
+
+    // Fit the view to the image extent when no viewState is set. We drive this
+    // ourselves instead of the library's `autoFit`: the built-in fires the moment
+    // `isBlocking` clears and, if the visible layers' world bounds aren't populated
+    // at that instant, commits a degenerate `{target:[0,0], zoom:0}` that then sticks
+    // (viewState is no longer null, so it never re-fits). Gating on `hasLayersDrawn`
+    // guarantees the bounds are available before we commit; while they aren't we
+    // leave viewState null so this retries on the re-renders that happen as data loads.
+    const {
+        getWorldBoundsForVisibleLayers,
+        hasEnabledLayers,
+        hasLayersDrawn,
+        isBlocking,
+    } = renderer;
+    useEffect(() => {
+        if (spatialViewState !== null) return;
+        if (!hasEnabledLayers || isBlocking || !hasLayersDrawn) return;
+        if (width <= 0 || height <= 0) return;
+        const bounds = getWorldBoundsForVisibleLayers();
+        if (!bounds) return;
+        onSpatialViewStateChange(viewStateFromBounds(bounds, width, height));
+    }, [
+        spatialViewState,
+        hasEnabledLayers,
+        hasLayersDrawn,
+        isBlocking,
+        getWorldBoundsForVisibleLayers,
+        width,
+        height,
+        onSpatialViewStateChange,
+    ]);
 
     useEffect(() => {
         chart.renderStackGeneration; //explicitly add dependency for side-effects
