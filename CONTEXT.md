@@ -40,3 +40,19 @@ detail, no decisions. Decisions that are hard to reverse live in `docs/adr/`.
 - **Installer / lockfile manager** — the tool that resolves, locks, and installs
   dependencies into an environment (e.g. `uv`, `pip`, `poetry`). Produces the lockfile
   (`uv.lock`). Independent of the build backend.
+
+## SpatialData.js integration terms
+
+Canonical rendering vocabulary lives in [SpatialData.js CONTEXT.md](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/CONTEXT.md). MDV chart code uses the same terms:
+
+- **Render Stack** — saved draw order on chart config (`renderStack.entries`), not parallel `layerOrder` arrays
+- **Stack Entry** — one ordered item (`kind: spatial | host | group`)
+- **Host Overlay** — MDV deck layer referenced by `hostLayerId` in the stack, resolved at runtime
+- **Runtime Attachment** — `hostLayerResolver`, tooltip hooks, `deckProps`; not serialized in `entry.props`
+- **Image Layer Registry** — chart-owned runtime attachment (`SpatialDataMdvReact`): callbacks that expose loaded Viv image data (`getImageLoadedDataByElementKey`, load state) from the spatial renderer. The viewer populates it; the layer dialog consumes it via `ImageLayerContextProvider`. Bridges separate React trees (chart vs dialog portal) without duplicating image load paths.
+- **Spatial Image Panel Context** — React context on [`ImageLayerPanel`](src/react/components/spatialLayers/ImageLayerPanel.tsx): wraps `ImageLayerContextProvider` (upstream loaded-image defaults) and exposes `useLayerChannelState` write API (`setChannels`, `addChannel`, `removeChannel`) to channel UI. Persisted field edits go through the hook, not zustand `channelsStore`.
+- **Image Layer Runtime Bridge** — pure helpers in `image_layer_runtime.ts`: `channelId`-keyed stats cache (`domains`, `raster`), viewer parallel-array sync (`channelOptions`, loading flags), and tone → `vivLayerProps` helpers. Not a second MobX persistence bridge.
+- **MobX Control Island** — layer dialog UI that patches `config.renderStack` directly
+- **Layer Channel Config** — serializable image channel state on `renderStack.entries[].props.channels` (`ChannelConfig` in `@spatialdata/vis`): colors, contrast limits, visibility, selections, and extension-related data fields. Tone (brightness/contrast) is **not** part of `channels`; it persists in `entry.props.vivLayerProps`. Distinct from runtime UI state in avivatorish stores.
+- **Root Viv Config** — MDV-only legacy path where `VivMdvReact` serializes `config.viv.channelsStore` on the chart root. Not used by the SpatialData chart; not an upstream SpatialData.js concern.
+- **App Viv Extensions** — runtime attachment: host app supplies Viv `LayerExtension` instances (and passes related props into the renderer). Extension classes are not serialized; extension data may live on Layer Channel Config when persistence is needed.

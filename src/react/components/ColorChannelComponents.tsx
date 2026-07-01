@@ -17,7 +17,6 @@ import {
 } from "@mui/material";
 import * as d3 from "d3";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useDebounce } from "use-debounce";
 import { shallow } from "zustand/shallow";
 import { useTheme } from "../hooks";
 import { PopoverPicker } from "./ColorPicker";
@@ -30,11 +29,22 @@ import {
     useLoader,
     useMetadata,
     useViewerStore,
+    useViewerStoreApi,
 } from "./avivatorish/state";
 import { getSingleSelectionStats } from "./avivatorish/utils";
+import { COLOR_PALLETE } from "./avivatorish/constants";
 import { MAX_CHANNELS } from "@vivjs/constants";
+import { useSpatialImagePanelContext } from "./spatialLayers/ImageLayerPanel";
 
 const DEFAULT_BRIGHTNESS_CONTRAST = 0.5;
+
+function createStableChannelId(layerId: string): string {
+    const suffix =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID().slice(0, 8)
+            : Math.random().toString(36).slice(2, 10);
+    return `${layerId}-ch-${suffix}`;
+}
 
 function withChannelValue(values: number[], index: number, value: number) {
     return Array.from({ length: Math.max(values.length, index + 1) }, (_, i) =>
@@ -100,7 +110,8 @@ const ChannelChooserMUI = ({ index }: { index: number }) => {
 };
 
 const ChannelChooser = ({ index }: { index: number }) => {
-    const channels = useMetadata()?.Pixels.Channels.map((c) => c.Name) as string[];
+    const spatial = useSpatialImagePanelContext();
+    const metadata = useMetadata();
     const { selections, setPropertiesForChannel } = useChannelsStore(
         ({ selections, setPropertiesForChannel }) => ({
             selections,
@@ -109,15 +120,45 @@ const ChannelChooser = ({ index }: { index: number }) => {
         shallow,
     );
     const loader = useLoader();
-    const { setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d } = useViewerStore(
-        ({ setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d }) => ({
+    const { setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d, channelOptions } = useViewerStore(
+        ({ setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d, channelOptions }) => ({
             setIsChannelLoading,
             isChannelLoading,
             removeIsChannelLoading,
             use3d,
+            channelOptions,
         }),
         shallow,
     );
+    const channels =
+        spatial?.channelNames ??
+        metadata?.Pixels.Channels.map((c, i) => c.Name ?? `Channel ${i + 1}`) ??
+        channelOptions ??
+        selections.map((_, i) => `Channel ${i + 1}`);
+
+    if (spatial) {
+        return (
+            <select
+                disabled={isChannelLoading[index]}
+                value={spatial.selections[index]?.c ?? 0}
+                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-sm outline-none transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
+                onChange={(e) => {
+                    const c = Number.parseInt(e.target.value, 10);
+                    if (Number.isNaN(c)) return;
+                    const nextSelections = spatial.selections.map((selection, i) =>
+                        i === index ? { ...selection, c } : selection,
+                    );
+                    spatial.setChannels({ selections: nextSelections });
+                }}
+            >
+                {channels.map((c, i) => (
+                    <option key={`${i}_${c}`} value={i}>
+                        {c}
+                    </option>
+                ))}
+            </select>
+        );
+    }
 
     return (
         <>
@@ -132,6 +173,11 @@ const ChannelChooser = ({ index }: { index: number }) => {
                             ...selections[index],
                             c: Number.parseInt(e.target.value),
                         };
+                        const data = Array.isArray(loader) ? loader[loader.length - 1] : loader;
+                        if (!data?.getRaster) {
+                            setPropertiesForChannel(index, { selections: selection });
+                            return;
+                        }
                         setIsChannelLoading(index, true);
                         const {
                             domain: domains,
@@ -208,42 +254,32 @@ const buildHistogram = (
 };
 
 const ChannelHistogram = ({ index }: { index: number }) => {
+    const spatial = useSpatialImagePanelContext();
     const contrastLimits = useChannelsStore((state) => state.contrastLimits);
-    const color = useChannelsStore((state) => state.colors[index] ?? [37, 99, 235]);
+    const storeColor = useChannelsStore((state) => state.colors[index] ?? [37, 99, 235]);
+    // Spatial mode: color is canonical channel config, read from the panel context.
+    const color = spatial ? (spatial.colors[index] ?? storeColor) : storeColor;
     const currentDomain = useChannelsStore((state) => state.domains[index]);
     const domain = currentDomain ?? ([0, 1] as Range);
     const rasterData = useChannelsStore((state) => state.raster[index]?.data);
     const pixelValue = useViewerStore((state) => state.pixelValues[index]);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const channelsStore = useChannelsStoreApi();
+    const spatialRef = useRef(spatial);
+    spatialRef.current = spatial;
     const dark = useTheme() === "dark";
-    const limits = contrastLimits[index] ?? domain;
-    const [liveValue, setLiveValue] = useState<Range | null>(limits);
+    const limits = spatial
+        ? (spatial.contrastLimits[index] ?? domain)
+        : (contrastLimits[index] ?? domain);
+    const domainRef = useRef(domain);
+    const limitsRef = useRef(limits);
     const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
     const [yScaleMode, setYScaleMode] = useState<ScaleMode>("auto");
 
     useEffect(() => {
-        setLiveValue(rangesEqual(limits, domain) ? null : limits);
+        domainRef.current = domain;
+        limitsRef.current = limits;
     }, [domain, limits]);
-
-    const [debouncedValue] = useDebounce(liveValue, 10, {
-        equalityFn: (a, b) => {
-            if (!a && !b) return true;
-            if (!a || !b) return false;
-            return a[0] === b[0] && a[1] === b[1];
-        },
-    });
-
-    useEffect(() => {
-        const nextValue = debouncedValue ?? domain;
-        if (nextValue.some((value) => Number.isNaN(value))) return;
-        if (rangesEqual(nextValue, limits)) {
-            return;
-        }
-        const nextContrastLimits = [...channelsStore.getState().contrastLimits];
-        nextContrastLimits[index] = nextValue;
-        channelsStore.setState({ contrastLimits: nextContrastLimits });
-    }, [channelsStore, debouncedValue, domain, index, limits]);
 
     const resolvedXScale = useMemo(
         () => (xScaleMode === "auto" ? resolveAutoHistogramXScaleFromValues(domain, rasterData) : xScaleMode),
@@ -269,27 +305,40 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         ];
     }, [color, histogram.counts, index]);
 
-    const isHistogramLoading = !currentDomain || !contrastLimits[index] || isChannelLoading[index];
+    const isHistogramLoading =
+        !currentDomain ||
+        !(spatial ? spatial.contrastLimits[index] : contrastLimits[index]) ||
+        isChannelLoading[index];
 
     const handleBrushValue = useCallback(
         (value: Range | null) => {
-            if (!value) {
-                setLiveValue(null);
+            const currentDomain = domainRef.current;
+            const currentLimits = limitsRef.current;
+            const nextValue = value ? sortRange(clampRange(value, currentDomain)) : currentDomain;
+            if (nextValue.some((item) => Number.isNaN(item)) || rangesEqual(nextValue, currentLimits)) return;
+            limitsRef.current = nextValue;
+            const panel = spatialRef.current;
+            if (panel) {
+                const nextContrastLimits = panel.contrastLimits.map((limits, i) =>
+                    i === index ? nextValue : limits,
+                );
+                panel.setChannels({ contrastLimits: nextContrastLimits });
                 return;
             }
-            const nextValue = sortRange(clampRange(value, domain));
-            setLiveValue(rangesEqual(nextValue, domain) ? null : nextValue);
+            const nextContrastLimits = [...channelsStore.getState().contrastLimits];
+            nextContrastLimits[index] = nextValue;
+            channelsStore.setState({ contrastLimits: nextContrastLimits });
         },
-        [domain],
+        [channelsStore, index],
     );
 
     const brush = useMemo(
         () => ({
-            value: liveValue,
+            value: rangesEqual(limits, domain) ? null : limits,
             setValue: handleBrushValue,
             minMax: domain,
         }),
-        [domain, handleBrushValue, liveValue],
+        [domain, handleBrushValue, limits],
     );
 
     return (
@@ -329,7 +378,11 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 };
 
 const BrightnessContrast = ({ index }: { index: number }) => {
-    const { contrast, brightness } = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
+    const spatial = useSpatialImagePanelContext();
+    const storeTone = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
+    // Spatial mode: tone is canonical (entry `vivLayerProps`), read from the panel context.
+    const contrast = spatial ? spatial.contrast : storeTone.contrast;
+    const brightness = spatial ? spatial.brightness : storeTone.brightness;
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const contrastValue = contrast[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
@@ -349,10 +402,18 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                     step={0.01}
                     onChange={(_, v) => {
                         if (isArray(v)) return;
+                        if (spatial) {
+                            spatial.patchToneAtIndex(index, "contrast", v);
+                            return;
+                        }
                         channelsStore.setState({ contrast: withChannelValue(contrast, index, v) });
                     }}
                     onClick={(e) => {
                         if (e.detail === 2) {
+                            if (spatial) {
+                                spatial.patchToneAtIndex(index, "contrast", DEFAULT_BRIGHTNESS_CONTRAST);
+                                return;
+                            }
                             channelsStore.setState({
                                 contrast: withChannelValue(contrast, index, DEFAULT_BRIGHTNESS_CONTRAST),
                             });
@@ -373,10 +434,18 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                     step={0.01}
                     onChange={(_, v) => {
                         if (isArray(v)) return;
+                        if (spatial) {
+                            spatial.patchToneAtIndex(index, "brightness", v);
+                            return;
+                        }
                         channelsStore.setState({ brightness: withChannelValue(brightness, index, v) });
                     }}
                     onClick={(e) => {
                         if (e.detail === 2) {
+                            if (spatial) {
+                                spatial.patchToneAtIndex(index, "brightness", DEFAULT_BRIGHTNESS_CONTRAST);
+                                return;
+                            }
                             channelsStore.setState({
                                 brightness: withChannelValue(brightness, index, DEFAULT_BRIGHTNESS_CONTRAST),
                             });
@@ -389,18 +458,22 @@ const BrightnessContrast = ({ index }: { index: number }) => {
 };
 
 const ChannelController = ({ index }: { index: number }) => {
-    const color = useChannelsStore((state) => state.colors[index]);
-    const channelVisible = useChannelsStore((state) => state.channelsVisible[index]);
+    const spatial = useSpatialImagePanelContext();
+    const storeColor = useChannelsStore((state) => state.colors[index]);
+    const storeChannelVisible = useChannelsStore((state) => state.channelsVisible[index]);
+    // Spatial mode: color + visibility are canonical channel config, read from the panel context.
+    const color = spatial ? spatial.colors[index] : storeColor;
+    const channelVisible = spatial ? spatial.channelsVisible[index] : storeChannelVisible;
+    const channelIds = useChannelsStore((state) => state.ids);
     const removeChannel = useChannelsStore((state) => state.removeChannel);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
-    const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
     const [isHovered, setIsHovered] = useState(false);
 
-    if (!metadata) throw "no metadata"; //TODO type metadata
     if (!color) return null;
 
     const hasPendingLoads = isChannelLoading.some(Boolean);
+    const canRemoveChannel = spatial ? spatial.channelIds.length > 1 : channelIds.length > 1;
 
     return (
         <Accordion
@@ -458,6 +531,13 @@ const ChannelController = ({ index }: { index: number }) => {
                                     onClick={stopAccordionToggle}
                                     onFocus={stopAccordionToggle}
                                     onChange={() => {
+                                        if (spatial) {
+                                            const visible = spatial.channelsVisible.map((value, i) =>
+                                                i === index ? !channelVisible : value,
+                                            );
+                                            spatial.setChannels({ channelsVisible: visible });
+                                            return;
+                                        }
                                         const channelsVisible = channelsStore.getState().channelsVisible;
                                         const visible = [...channelsVisible];
                                         visible[index] = !channelVisible;
@@ -472,6 +552,13 @@ const ChannelController = ({ index }: { index: number }) => {
                                     <PopoverPicker
                                         color={color}
                                         onChange={(c) => {
+                                            if (spatial) {
+                                                const colors = spatial.colors.map((value, i) =>
+                                                    i === index ? c : value,
+                                                );
+                                                spatial.setChannels({ colors });
+                                                return;
+                                            }
                                             const colors = channelsStore.getState().colors;
                                             const newColors = [...colors];
                                             newColors[index] = c;
@@ -490,9 +577,13 @@ const ChannelController = ({ index }: { index: number }) => {
                     </div>
                 </div>
                 <IconButton
-                    disabled={hasPendingLoads}
+                    disabled={hasPendingLoads || !canRemoveChannel}
                     onClick={(event) => {
                         event.stopPropagation();
+                        if (spatial) {
+                            spatial.removeChannel(index);
+                            return;
+                        }
                         removeChannel(index);
                     }}
                     size="small"
@@ -531,16 +622,24 @@ const ChannelController = ({ index }: { index: number }) => {
 };
 
 const AddChannel = () => {
+    const spatial = useSpatialImagePanelContext();
     const loader = useLoader();
     const isAddingChannelRef = useRef(false);
     const [isAddingChannel, setIsAddingChannel] = useState(false);
     // const { labels } = loader[0];
     // const channelsStore = useChannelsStoreApi();
-    const { selections, setPropertiesForChannel } = useChannelsStore(({ selections, setPropertiesForChannel }) => ({
-        selections,
-        setPropertiesForChannel,
-    }));
-    const canAddChannel = selections.length < MAX_CHANNELS;
+    const { selections, domains: channelDomains, contrastLimits: channelContrastLimits, setPropertiesForChannel } = useChannelsStore(
+        ({ selections, domains, contrastLimits, setPropertiesForChannel }) => ({
+            selections,
+            domains,
+            contrastLimits,
+            setPropertiesForChannel,
+        }),
+        shallow,
+    );
+    const canAddChannel = spatial
+        ? spatial.channelIds.length < MAX_CHANNELS
+        : selections.length < MAX_CHANNELS;
     const { addChannel, removeChannel } = useChannelsStore((state) => ({
         addChannel: state.addChannel,
         removeChannel: state.removeChannel,
@@ -553,12 +652,26 @@ const AddChannel = () => {
         }),
         shallow,
     );
+    const viewerStore = useViewerStoreApi();
+    const canLoadStats = Boolean((Array.isArray(loader) ? loader[loader.length - 1] : loader)?.getRaster);
     return (
         <button
             type="button"
             className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-sm transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canAddChannel || isAddingChannel}
             onClick={async () => {
+                if (spatial) {
+                    if (isAddingChannelRef.current) return;
+                    isAddingChannelRef.current = true;
+                    setIsAddingChannel(true);
+                    try {
+                        spatial.addChannelWithSelection();
+                    } finally {
+                        isAddingChannelRef.current = false;
+                        setIsAddingChannel(false);
+                    }
+                    return;
+                }
                 if (isAddingChannelRef.current) {
                     return;
                 }
@@ -572,14 +685,33 @@ const AddChannel = () => {
                     const baseSelection = selections[0] ?? {};
                     const selection = {
                         ...baseSelection,
-                        c: baseSelection.c ?? 0,
+                        c: index,
                     };
+                    const channelId = createStableChannelId("channel");
                     addChannel({
                         selections: selection,
-                        ids: String(Math.random()),
+                        ids: channelId,
                         channelsVisible: true,
+                        colors: COLOR_PALLETE[index % COLOR_PALLETE.length],
+                        domains: channelDomains[index] ?? channelDomains[0] ?? [0, 255],
+                        contrastLimits: channelContrastLimits[index] ?? channelContrastLimits[0] ?? [0, 255],
                     });
+                    viewerStore.setState((state) => ({
+                        channelOptions: Array.from({ length: index + 1 }, (_, i) =>
+                            state.channelOptions[i] ?? `Channel ${i + 1}`,
+                        ),
+                        isChannelLoading: Array.from({ length: index + 1 }, (_, i) =>
+                            i === index ? true : (state.isChannelLoading[i] ?? false),
+                        ),
+                        pixelValues: Array.from({ length: index + 1 }, (_, i) =>
+                            state.pixelValues[i] ?? Number.NaN,
+                        ),
+                    }));
                     didAddChannel = true;
+                    if (!canLoadStats) {
+                        setIsChannelLoading(index, false);
+                        return;
+                    }
                     const {
                         domain: domains,
                         contrastLimits,
@@ -612,8 +744,11 @@ const AddChannel = () => {
     );
 };
 
-export const Test = () => {
-    const ids = useChannelsStore(({ ids }) => ids);
+export const VivChannelList = () => {
+    const spatial = useSpatialImagePanelContext();
+    const storeIds = useChannelsStore(({ ids }) => ids);
+    // Spatial mode: the channel list is driven by canonical channel ids.
+    const ids = spatial ? spatial.channelIds : storeIds;
     return (
         <div className="w-full space-y-2 bg-[hsl(var(--background))] p-2">
             {ids.map((id, i) => (
@@ -623,3 +758,5 @@ export const Test = () => {
         </div>
     );
 };
+
+export const Test = VivChannelList;
