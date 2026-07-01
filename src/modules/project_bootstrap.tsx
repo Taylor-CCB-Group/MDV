@@ -60,14 +60,6 @@ type BootstrapStatus =
 let stateHandlerContainer: HTMLElement | null = null;
 let stateHandlerRoot: Root | null = null;
 
-function expectsInitialViewLoadedEvent(config: any) {
-    const allViews = config?.all_views;
-    if (Array.isArray(allViews)) {
-        return allViews.length > 0;
-    }
-    return Boolean(config?.only_view);
-}
-
 function LoadState({
     status,
     detail,
@@ -148,8 +140,9 @@ function LoadState({
 function BootstrapApp({ onComplete }: { onComplete: () => void }) {
     const context = useMemo(() => getProjectBootstrapContext(), []);
     const [status, setStatus] = useState<BootstrapStatus>({ kind: "loading" });
+    // nb no longer separately tracking isInitialViewLoaded, 
+    // we can re-introduce that if e.g. we have more lazy charts (probably not)
     const [initialised, setInitialised] = useState(false);
-    const [initialViewLoaded, setInitialViewLoaded] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
     const completeCalledRef = useRef(false);
     const detail = useMemo(() => {
@@ -232,7 +225,6 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
                         }
                         if (type === "view_loaded") {
                             changeURLParam("view", cm.viewManager.current_view);
-                            setInitialViewLoaded(true);
                         }
                     };
 
@@ -244,9 +236,6 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
                         runtime.config,
                         listener,
                     );
-                    if (!expectsInitialViewLoadedEvent(runtime.config)) {
-                        setInitialViewLoaded(true);
-                    }
                     setInitialised(true);
                 },
             )
@@ -262,10 +251,10 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
     }, [status, initialised]);
 
     useEffect(() => {
-        if (status.kind !== "error" && initialised && initialViewLoaded) {
+        if (status.kind !== "error" && initialised) {
             setIsClosing(true);
         }
-    }, [status, initialised, initialViewLoaded]);
+    }, [status, initialised]);
 
     useEffect(() => {
         if (!isClosing) return;
