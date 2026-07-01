@@ -79,10 +79,12 @@ class BaseDialog {
             this.outer,
         );
 
+        const stack = { group: "dialog", baseZ: 1100 };
         //... needs fixing in popout / when doc changes
         //(if this was more react-y it should just work)
         makeResizable(this.outer, {
             doc: config.doc,
+            stack: stack,
             onresizeend: (x, y) => {
                 this.onResize(x, y);
             },
@@ -91,6 +93,7 @@ class BaseDialog {
             doc: config.doc,
             handle: ".ciview-dlg-header",
             snapback: true,
+            stack: stack,
         });
 
         if (config.columns) {
@@ -172,10 +175,12 @@ class BaseDialog {
         // need to makeResizable and makeDraggable work with this
         removeResizable(this.outer);
         removeDraggable(this.outer);
+        const dialogStack = { group: "dialog", baseZ: 1100 };
         if (parent) {
             parent.append(this.outer);
             makeResizable(this.outer, {
                 doc: parent.ownerDocument, //is ownerDocument a safe bet? What if we're fullscreen? then we can't resize anyway.
+                stack: dialogStack,
                 onresizeend: (x, y) => {
                     this.onResize(x, y);
                 },
@@ -184,11 +189,13 @@ class BaseDialog {
                 doc: parent.ownerDocument,
                 handle: ".ciview-dlg-header",
                 snapback: true,
+                stack: dialogStack,
             });
         } else {
             this.getDialogContainer().append(this.outer);
             makeResizable(this.outer, {
                 doc: this.config.doc,
+                stack: dialogStack,
                 onresizeend: (x, y) => {
                     this.onResize(x, y);
                 },
@@ -197,6 +204,7 @@ class BaseDialog {
                 doc: this.config.doc,
                 handle: ".ciview-dlg-header",
                 snapback: true,
+                stack: dialogStack,
             });
         }
     }
