@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ast
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
@@ -84,6 +85,70 @@ def _to_param_list(p: Any) -> list[Any]:
     return [p]
 
 
+# Stable role labels for saved-view chart params (by persisted `chart['type']`).
+CHART_PARAM_ROLE_MAP: dict[str, list[str]] = {
+    "wgl_scatter_plot": ["X", "Y"],
+    "density_scatter_plot": ["X", "Y", "Category"],
+    "box_plot": ["Category", "Value"],
+    "violin_plot": ["Category", "Value"],
+}
+
+
+@dataclass(frozen=True)
+class SavedViewChart:
+    """One non-text-box chart from a saved view, with resolved param tokens."""
+
+    datasource_name: str
+    title: str
+    chart_type: str
+    param_tokens: tuple[str, ...]
+    color_by: str | None
+
+
+def format_chart_param_display(project: Any, datasource_name: str, token: Any) -> str:
+    """Public alias for user-facing param token formatting."""
+    return _format_param_value(project, datasource_name, token)
+
+
+def collect_saved_view_charts(project: Any, view: dict[str, Any]) -> list[SavedViewChart]:
+    """Return structured chart metadata from a saved view (skips text-box charts)."""
+    initial = view.get("initialCharts")
+    if not isinstance(initial, dict) or not initial:
+        return []
+
+    out: list[SavedViewChart] = []
+    for ds_name, charts in initial.items():
+        if not isinstance(charts, list):
+            continue
+        for chart in charts:
+            if not isinstance(chart, dict):
+                continue
+            ctype = chart.get("type")
+            if not isinstance(ctype, str) or ctype == "text_box_chart":
+                continue
+            title = (chart.get("title") or "").strip() or ctype
+            param_list = _to_param_list(chart.get("param"))
+            tokens = tuple(
+                str(p).strip() for p in param_list if p is not None and str(p).strip()
+            )
+            color_by = chart.get("color_by")
+            color_str = (
+                str(color_by).strip()
+                if isinstance(color_by, str) and color_by.strip()
+                else None
+            )
+            out.append(
+                SavedViewChart(
+                    datasource_name=str(ds_name),
+                    title=title,
+                    chart_type=ctype,
+                    param_tokens=tokens,
+                    color_by=color_str,
+                )
+            )
+    return out
+
+
 def _format_param_value(project: Any, datasource_name: str, token: Any) -> str:
     """
     Format a saved-view param token for display.
@@ -125,13 +190,7 @@ def format_charts_from_saved_view(
     if not isinstance(initial, dict) or not initial:
         return "", False
 
-    # Stable simplified role labels based on persisted `chart['type']`.
-    role_map: dict[str, list[str]] = {
-        "wgl_scatter_plot": ["X", "Y"],
-        "density_scatter_plot": ["X", "Y", "Category"],
-        "box_plot": ["Category", "Value"],
-        "violin_plot": ["Category", "Value"],
-    }
+    role_map = CHART_PARAM_ROLE_MAP
 
     has_selection_dialog = False
     out: list[str] = ["### Charts (from saved view)"]
