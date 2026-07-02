@@ -22,7 +22,12 @@ from mdvtools.dbutils.admin_contracts import (
     ProjectMemberInput,
 )
 from mdvtools.dbutils.admin_extension import AdminExtension
-from mdvtools.dbutils.admin_identity import AdminIdentityInput, Auth0AdminIdentityProvider
+from mdvtools.dbutils.admin_identity import (
+    AdminIdentityInput,
+    Auth0AdminIdentityProvider,
+    ConfiguredAuth0AdminIdentityProvider,
+    LocalAdminIdentityProvider,
+)
 from mdvtools.dbutils.admin_services import MDVAdminServices
 
 
@@ -307,6 +312,32 @@ def test_auth_enabled_rejects_non_admin_session(fake_db_modules):
     response = client.get("/admin/api/session")
 
     assert response.status_code == 403
+
+
+def test_dummy_auth_uses_local_admin_identity_provider(fake_db_modules):
+    flask_app = Flask(__name__)
+    flask_app.secret_key = "test-secret"
+    flask_app.config["ENABLE_AUTH"] = True
+    flask_app.config["DEFAULT_AUTH_METHOD"] = "dummy"
+    extension = AdminExtension()
+
+    extension.register_global_routes(flask_app, {})
+
+    assert isinstance(extension.services, MDVAdminServices)
+    assert isinstance(extension.services.identity_provider, LocalAdminIdentityProvider)
+
+
+def test_auth0_auth_uses_configured_admin_identity_provider(fake_db_modules):
+    flask_app = Flask(__name__)
+    flask_app.secret_key = "test-secret"
+    flask_app.config["ENABLE_AUTH"] = True
+    flask_app.config["DEFAULT_AUTH_METHOD"] = "auth0"
+    extension = AdminExtension()
+
+    extension.register_global_routes(flask_app, {})
+
+    assert isinstance(extension.services, MDVAdminServices)
+    assert isinstance(extension.services.identity_provider, ConfiguredAuth0AdminIdentityProvider)
 
 
 def test_admin_session_can_list_users_and_projects(fake_db_modules):

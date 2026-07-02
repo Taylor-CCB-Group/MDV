@@ -31,6 +31,15 @@ ADMIN_PERMISSIONS = [
     "admin:projects:manage",
 ]
 
+# Use the auth method provided instead of using auth0 when auth is enabled
+def _admin_identity_provider_for_config(app: Flask, enable_auth: bool):
+    if not enable_auth:
+        return None
+    auth_method = str(app.config.get("DEFAULT_AUTH_METHOD", "")).lower()
+    if auth_method == "auth0":
+        return ConfiguredAuth0AdminIdentityProvider(app.config)
+    return None
+
 
 def _json_error(message: str, status: int):
     return jsonify({"error": message}), status
@@ -149,7 +158,7 @@ class AdminExtension(MDVProjectServerExtension):
     def register_global_routes(self, app: Flask, config: dict):
         enable_auth = bool(app.config.get("ENABLE_AUTH", False))
         if self.services is None:
-            identity_provider = ConfiguredAuth0AdminIdentityProvider(app.config) if enable_auth else None
+            identity_provider = _admin_identity_provider_for_config(app, enable_auth)
             self.services = MDVAdminServices(
                 identity_provider=identity_provider,
                 enable_auth=enable_auth,
