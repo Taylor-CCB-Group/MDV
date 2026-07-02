@@ -1,4 +1,4 @@
-import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
+import { defineConfig, type Plugin, type ProxyOptions, type UserConfig } from 'vite';
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { babel as rollupBabel } from '@rollup/plugin-babel';
@@ -43,6 +43,7 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
     if (name.includes('index.css')) return 'assets/mdv.css';
     if (name === 'mdv.css') return 'assets/mdv.css';
     if (name === 'catalog.css') return 'assets/catalog.css';
+    if (name === 'admin.css') return 'assets/admin.css';
     if (name === 'desktop_index.css') return 'assets/mdv.css';
     if (process.env.VITE_ENTRYPOINT) {
         const { name: entryBase } = path.parse(process.env.VITE_ENTRYPOINT);
@@ -83,6 +84,7 @@ function getRollupOptions() {
                 'mdv': 'src/modules/project_bootstrap.tsx',
                 'catalog': 'src/catalog/catalog_index.tsx',
                 'login': 'src/login/login_index.tsx',
+                'admin': 'src/admin/admin_index.tsx',
             },
             output: {
                 entryFileNames: 'js/[name].js',
@@ -136,6 +138,7 @@ const proxy = [
     '/rescan_projects',
     '/login_dev',
     '/secondary_logo',
+    '/admin/api',
 // biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config
 ].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {}) as Record<string, ProxyOptions>;
 // (failed) attempt to let this proxy without cors_allowed_origins wildcard on server
@@ -147,6 +150,24 @@ proxy['/socket.io'] = {
     // rewriteWsOrigin: true, // copilot says this is not needed in the current version of socket.io
     // ^^ not helping either way...
 }
+
+const adminDevHtmlMiddleware: Plugin = {
+    name: "mdv-admin-dev-html",
+    configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+            const url = req.url ?? "";
+            if (
+                url === "/admin" ||
+                url === "/admin/" ||
+                url.startsWith("/admin?") ||
+                url.startsWith("/admin/?")
+            ) {
+                req.url = url.replace(/^\/admin/, "/admin_dev.html");
+            }
+            next();
+        });
+    },
+};
 
 export default defineConfig(async (): Promise<UserConfig> => {
     // For local development, try to get Git info. This is guarded by a check for the .git directory
@@ -193,6 +214,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
         },
     },
     plugins: [
+        adminDevHtmlMiddleware,
         glsl(),
         rollupBabel({
             babelHelpers: 'bundled',
@@ -244,6 +266,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
             path.resolve(configDir, 'src/obvios.html'),
             path.resolve(configDir, 'login_dev.html'),
             path.resolve(configDir, 'catalog_dev.html'),
+            path.resolve(configDir, 'admin_dev.html'),
         ],
         // zarrextra/workers resolves codec-worker.js via import.meta.url; prebundling
         // at some point broke that path causing stale-cache 504s after package bumps.
