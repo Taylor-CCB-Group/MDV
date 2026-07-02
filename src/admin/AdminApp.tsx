@@ -6,6 +6,11 @@ import {
     Chip,
     CircularProgress,
     Container,
+    Drawer,
+    List,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
     MenuItem,
     Paper,
     Stack,
@@ -17,6 +22,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import { FolderKanban, UserPlus, UserRound, type LucideIcon } from "lucide-react";
 import {
     AdminApiError,
     adminApi,
@@ -38,6 +44,43 @@ type InitialProjectAccess = {
 };
 
 type AdminAccessState = "login_required" | "admin_required" | null;
+type AdminRoute = "users" | "projects" | "profile";
+
+const adminRoutes: Array<{ id: AdminRoute; label: string; description: string; icon: LucideIcon }> = [
+    {
+        id: "users",
+        label: "Manage Users",
+        description: "Create deployment users and review account status",
+        icon: UserPlus,
+    },
+    {
+        id: "projects",
+        label: "Manage Projects",
+        description: "Manage project membership and permission levels",
+        icon: FolderKanban,
+    },
+    {
+        id: "profile",
+        label: "Profile",
+        description: "Review the current admin session",
+        icon: UserRound,
+    },
+];
+
+function getRouteFromHash(): AdminRoute {
+    const hash = window.location.hash.replace(/^#\/?/, "");
+    if (hash === "projects") return "projects";
+    if (hash === "profile") return "profile";
+    return "users";
+}
+
+function getRouteDescription(route: AdminRoute) {
+    return adminRoutes.find((item) => item.id === route)?.description ?? adminRoutes[0].description;
+}
+
+function getRouteLabel(route: AdminRoute) {
+    return adminRoutes.find((item) => item.id === route)?.label ?? adminRoutes[0].label;
+}
 
 function getAccessState(err: unknown): AdminAccessState {
     if (err instanceof AdminApiError) {
@@ -55,6 +98,7 @@ function permissionFromValue(value: string): AdminPermission | null {
 }
 
 export default function AdminApp() {
+    const [activeRoute, setActiveRoute] = useState<AdminRoute>(() => getRouteFromHash());
     const [session, setSession] = useState<AdminSession | null>(null);
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [projects, setProjects] = useState<AdminProject[]>([]);
@@ -79,6 +123,19 @@ export default function AdminApp() {
     const memberUserIds = new Set(projectMembers.map((member) => member.user.id));
     const availableProjectUsers = users.filter((user) => !memberUserIds.has(user.id));
     const selectedMemberProject = projects.find((project) => String(project.id) === memberProjectId);
+
+    useEffect(() => {
+        function handleHashChange() {
+            setActiveRoute(getRouteFromHash());
+        }
+
+        if (!window.location.hash) {
+            window.location.hash = "/users";
+        }
+        window.addEventListener("hashchange", handleHashChange);
+        handleHashChange();
+        return () => window.removeEventListener("hashchange", handleHashChange);
+    }, []);
 
     const loadAdminData = useCallback(async () => {
         const [sessionResult, usersResult, projectsResult] = await Promise.all([
@@ -289,79 +346,110 @@ export default function AdminApp() {
         }
     }
 
+    function navigateAdmin(route: AdminRoute) {
+        window.location.hash = `/${route}`;
+        setActiveRoute(route);
+    }
+
     return (
         <Box className="admin-showcase-page">
-            <Box component="header" className="admin-showcase-header">
-                <Container maxWidth="xl">
-                    <Stack
-                        direction={{ xs: "column", md: "row" }}
-                        spacing={2}
-                        justifyContent="space-between"
-                        alignItems={{ xs: "flex-start", md: "center" }}
-                    >
-                        <Box>
-                            <Typography variant="h4">MDV Admin Portal</Typography>
-                            <Typography variant="body2">
-                                Manage deployment users and project-level permissions
-                            </Typography>
-                        </Box>
-                        {session ? (
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                <Chip
-                                    color={session.isAdmin ? "success" : "default"}
-                                    label={session.isAdmin ? "Admin session" : "No admin access"}
-                                    size="small"
-                                />
-                                <Chip
-                                    label={session.authEnabled ? "Auth0 enabled" : "Local dev mode"}
-                                    size="small"
-                                />
-                                <Chip label={session.user.email} size="small" />
-                            </Stack>
-                        ) : null}
-                    </Stack>
-                </Container>
-            </Box>
+            <Drawer
+                variant="permanent"
+                anchor="left"
+                className="admin-drawer"
+                PaperProps={{ className: "admin-drawer-paper" }}
+            >
+                <Box className="admin-drawer-content">
+                    <Box className="admin-drawer-brand">
+                        <Typography variant="h5">MDV Admin Portal</Typography>
+                    </Box>
+                    <List className="admin-drawer-list" disablePadding>
+                        {adminRoutes.map((route) => {
+                            const Icon = route.icon;
+                            return (
+                                <ListItemButton
+                                    key={route.id}
+                                    selected={activeRoute === route.id}
+                                    onClick={() => navigateAdmin(route.id)}
+                                >
+                                    <ListItemIcon>
+                                        <Icon size={18} strokeWidth={2.1} />
+                                    </ListItemIcon>
+                                    <ListItemText primary={route.label} />
+                                </ListItemButton>
+                            );
+                        })}
+                    </List>
+                </Box>
+            </Drawer>
 
-            <Container maxWidth="xl" sx={{ py: 3 }}>
-                <Stack spacing={2.5}>
-                    {error ? <Alert severity="error">{error}</Alert> : null}
-                    {success ? <Alert severity="success">{success}</Alert> : null}
-                    {loading ? (
-                        <Stack alignItems="center" sx={{ py: 8 }}>
-                            <CircularProgress />
+            <Box className="admin-main">
+                <Box component="header" className="admin-showcase-header">
+                    <Container maxWidth="xl">
+                        <Stack
+                            direction={{ xs: "column", md: "row" }}
+                            spacing={2}
+                            justifyContent="space-between"
+                            alignItems={{ xs: "flex-start", md: "center" }}
+                        >
+                            <Box>
+                                <Typography variant="h4">{getRouteLabel(activeRoute)}</Typography>
+                                <Typography variant="body2">
+                                    {getRouteDescription(activeRoute)}
+                                </Typography>
+                            </Box>
+                            {session ? (
+                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                    <Chip
+                                        label={session.authEnabled ? "Auth0" : "Local"}
+                                        size="small"
+                                    />
+                                    <Chip
+                                        color={session.isAdmin ? "success" : "default"}
+                                        label={session.isAdmin ? "Admin" : "No admin access"}
+                                        size="small"
+                                    />
+                                    <Chip className="admin-profile-chip" label={session.user.email} size="small" />
+                                </Stack>
+                            ) : null}
                         </Stack>
-                    ) : accessState ? (
-                        <Paper className="admin-showcase-panel" variant="outlined">
-                            <Stack spacing={1.5}>
-                                <Typography variant="h6">
-                                    {accessState === "login_required"
-                                        ? "Sign in required"
-                                        : "Admin access required"}
-                                </Typography>
-                                <Typography color="text.secondary">
-                                    {accessState === "login_required"
-                                        ? "You need to sign in before using the MDV Admin Portal."
-                                        : "Your account is signed in, but it is not marked as an MDV admin for this deployment."}
-                                </Typography>
-                                <Alert severity={accessState === "login_required" ? "info" : "warning"}>
-                                    {accessState === "login_required"
-                                        ? "After signing in, reload this page to continue."
-                                        : "Ask an existing admin or deployment owner to grant admin access before continuing."}
-                                </Alert>
+                    </Container>
+                </Box>
+
+                <Container maxWidth="xl" className="admin-content" sx={{ py: 3 }}>
+                    <Stack spacing={2.5}>
+                        {error ? <Alert severity="error">{error}</Alert> : null}
+                        {success ? <Alert severity="success">{success}</Alert> : null}
+                        {loading ? (
+                            <Stack alignItems="center" sx={{ py: 8 }}>
+                                <CircularProgress />
                             </Stack>
-                        </Paper>
-                    ) : (
-                        <>
-                            <Stack
-                                direction={{ xs: "column", lg: "row" }}
-                                spacing={2.5}
-                                alignItems="stretch"
-                            >
+                        ) : accessState ? (
+                            <Paper className="admin-showcase-panel" variant="outlined">
+                                <Stack spacing={1.5}>
+                                    <Typography variant="h6">
+                                        {accessState === "login_required"
+                                            ? "Sign in required"
+                                            : "Admin access required"}
+                                    </Typography>
+                                    <Typography color="text.secondary">
+                                        {accessState === "login_required"
+                                            ? "You need to sign in before using the MDV Admin Portal."
+                                            : "Your account is signed in, but it is not marked as an MDV admin for this deployment."}
+                                    </Typography>
+                                    <Alert severity={accessState === "login_required" ? "info" : "warning"}>
+                                        {accessState === "login_required"
+                                            ? "After signing in, reload this page to continue."
+                                            : "Ask an existing admin or deployment owner to grant admin access before continuing."}
+                                    </Alert>
+                                </Stack>
+                            </Paper>
+                        ) : activeRoute === "users" ? (
+                            <Stack spacing={2.5}>
                                 <Paper
                                     component="form"
                                     onSubmit={handleCreateUser}
-                                    className="admin-showcase-panel admin-create-panel"
+                                    className="admin-showcase-panel admin-compact-panel"
                                     variant="outlined"
                                 >
                                     <Stack spacing={2}>
@@ -465,6 +553,46 @@ export default function AdminApp() {
                                     </Stack>
                                 </Paper>
 
+                                <Paper className="admin-showcase-panel" variant="outlined">
+                                    <Stack spacing={2}>
+                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                            <Box>
+                                                <Typography variant="h5">Deployment Users</Typography>
+                                                <Typography variant="body2">Users known to this MDV deployment</Typography>
+                                            </Box>
+                                            <Chip label={users.length} size="small" />
+                                        </Stack>
+                                        {users.length === 0 ? (
+                                            <Alert severity="info">No users found in the MDV database yet.</Alert>
+                                        ) : (
+                                            <Box className="admin-showcase-table-wrap">
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>User</TableCell>
+                                                            <TableCell>Email</TableCell>
+                                                            <TableCell>Status</TableCell>
+                                                            <TableCell>Admin</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {users.map((user) => (
+                                                            <TableRow key={user.id}>
+                                                                <TableCell>{formatUserName(user)}</TableCell>
+                                                                <TableCell>{user.email}</TableCell>
+                                                                <TableCell>{user.isActive ? "Active" : "Inactive"}</TableCell>
+                                                                <TableCell>{user.isAdmin ? "Yes" : "No"}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
+                                        )}
+                                    </Stack>
+                                </Paper>
+                            </Stack>
+                        ) : activeRoute === "projects" ? (
+                            <Stack spacing={2.5}>
                                 <Paper className="admin-showcase-panel admin-members-panel" variant="outlined">
                                     <Stack spacing={2}>
                                         <Stack
@@ -613,46 +741,6 @@ export default function AdminApp() {
                                         )}
                                     </Stack>
                                 </Paper>
-                            </Stack>
-
-                            <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5}>
-                                <Paper className="admin-showcase-panel" variant="outlined">
-                                    <Stack spacing={2}>
-                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                            <Box>
-                                                <Typography variant="h5">Deployment Users</Typography>
-                                                <Typography variant="body2">Users known to this MDV deployment</Typography>
-                                            </Box>
-                                            <Chip label={users.length} size="small" />
-                                        </Stack>
-                                        {users.length === 0 ? (
-                                            <Alert severity="info">No users found in the MDV database yet.</Alert>
-                                        ) : (
-                                            <Box className="admin-showcase-table-wrap">
-                                                <Table size="small">
-                                                    <TableHead>
-                                                        <TableRow>
-                                                            <TableCell>User</TableCell>
-                                                            <TableCell>Email</TableCell>
-                                                            <TableCell>Status</TableCell>
-                                                            <TableCell>Admin</TableCell>
-                                                        </TableRow>
-                                                    </TableHead>
-                                                    <TableBody>
-                                                        {users.map((user) => (
-                                                            <TableRow key={user.id}>
-                                                                <TableCell>{formatUserName(user)}</TableCell>
-                                                                <TableCell>{user.email}</TableCell>
-                                                                <TableCell>{user.isActive ? "Active" : "Inactive"}</TableCell>
-                                                                <TableCell>{user.isAdmin ? "Yes" : "No"}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </Box>
-                                        )}
-                                    </Stack>
-                                </Paper>
 
                                 <Paper className="admin-showcase-panel" variant="outlined">
                                     <Stack spacing={2}>
@@ -692,10 +780,44 @@ export default function AdminApp() {
                                     </Stack>
                                 </Paper>
                             </Stack>
-                        </>
-                    )}
-                </Stack>
-            </Container>
+                        ) : (
+                            <Paper className="admin-showcase-panel admin-profile-panel" variant="outlined">
+                                <Stack spacing={2.5}>
+                                    <Box>
+                                        <Typography variant="h5">Admin Profile</Typography>
+                                        <Typography variant="body2">
+                                            Mock profile details for the current admin session.
+                                        </Typography>
+                                    </Box>
+                                    {session ? (
+                                        <Stack spacing={1.5}>
+                                            <Box className="admin-profile-row">
+                                                <Typography variant="body2">Email</Typography>
+                                                <Typography>{session.user.email}</Typography>
+                                            </Box>
+                                            <Box className="admin-profile-row">
+                                                <Typography variant="body2">Role</Typography>
+                                                <Typography>{session.isAdmin ? "Admin" : "No admin access"}</Typography>
+                                            </Box>
+                                            <Box className="admin-profile-row">
+                                                <Typography variant="body2">Authentication</Typography>
+                                                <Typography>{session.authEnabled ? "Auth0 enabled" : "Local dev mode"}</Typography>
+                                            </Box>
+                                            <Box className="admin-profile-row">
+                                                <Typography variant="body2">Assigned workspace</Typography>
+                                                <Typography>MDV deployment administrator</Typography>
+                                            </Box>
+                                            <Alert severity="info">
+                                                Profile data is mocked for now and can be connected to real account metadata later.
+                                            </Alert>
+                                        </Stack>
+                                    ) : null}
+                                </Stack>
+                            </Paper>
+                        )}
+                    </Stack>
+                </Container>
+            </Box>
         </Box>
     );
 }
