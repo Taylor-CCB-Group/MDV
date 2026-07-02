@@ -19,6 +19,7 @@ from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 from auth0.management import Auth0
 from auth0.authentication import GetToken
 from auth0.exceptions import RateLimitError
+from auth0.rest import RestClientOptions
 import random
 
 # Add JWKS cache with thread-safe access
@@ -30,6 +31,8 @@ JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 # Rate limiting and retry parameters
 BASE_DELAY = 1  # Base delay in seconds
 MAX_DELAY = 8  # Maximum delay in seconds
+# auth0-python defaults to 5s; Docker dev networks to Auth0 can exceed that.
+AUTH0_API_TIMEOUT = 30.0
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -67,7 +70,7 @@ class Auth0Provider(AuthProvider):
             server_metadata_url = f'https://{self.domain}/.well-known/openid-configuration'
 
             # Attempt to fetch metadata to ensure it's accessible
-            response = requests.get(server_metadata_url)
+            response = requests.get(server_metadata_url, timeout=AUTH0_API_TIMEOUT)
             if response.status_code != 200:
                 logging.error(f"Failed to fetch OpenID configuration from {server_metadata_url}: {response.text}")
                 raise RuntimeError(f"Unable to fetch OpenID Connect metadata from {server_metadata_url}")
@@ -689,9 +692,15 @@ class Auth0Provider(AuthProvider):
             audience = f"https://{auth0_domain}/api/v2/"
 
             # Get Auth0 Management API token
-            get_token = GetToken(domain=auth0_domain, client_id=client_id, client_secret=client_secret)
+            auth0_rest_options = RestClientOptions(timeout=AUTH0_API_TIMEOUT)
+            get_token = GetToken(
+                domain=auth0_domain,
+                client_id=client_id,
+                client_secret=client_secret,
+                timeout=AUTH0_API_TIMEOUT,
+            )
             mgmt_api_token = get_token.client_credentials(audience=audience)["access_token"]
-            auth0 = Auth0(auth0_domain, mgmt_api_token)
+            auth0 = Auth0(auth0_domain, mgmt_api_token, rest_options=auth0_rest_options)
 
             # Get initial database statistics
             from mdvtools.dbutils.dbmodels import User
