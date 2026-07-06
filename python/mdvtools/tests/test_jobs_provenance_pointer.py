@@ -2,6 +2,7 @@ import h5py
 import time
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from mdvtools.mdvproject import MDVProject
 from mdvtools.jobs.workspace import Workspace
@@ -84,3 +85,41 @@ def test_ingester_reports_outputs(tmp_path):
     assert result is not None  # to avoid basepyright error
     assert result["outputs"] == [("cells", "donor_tissue")]
     assert "manifest" in result  # present even when no manifest.json was written (None)
+
+
+def test_get_column_provenance_resolves_record(tmp_path):
+    project = _make_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
+    job_id = _submit_concat(mgr)
+    _drive(mgr)
+
+    prov = project.get_column_provenance("cells", "sample_cluster")
+    assert prov is not None
+    assert prov["_resolved"] is True
+    assert prov["job_id"] == job_id
+    assert prov["params"]["output_name"] == "sample_cluster"
+
+
+def test_get_column_provenance_absent_returns_none(tmp_path):
+    project = _make_project(tmp_path)
+    # 'sample' came from add_datasource, never produced by a job -> no pointer
+    assert project.get_column_provenance("cells", "sample") is None
+
+
+def test_get_column_provenance_dangling_when_record_purged(tmp_path):
+    project = _make_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
+    job_id = _submit_concat(mgr)
+    _drive(mgr)
+
+    # purge the durable record, leaving the column pointer dangling
+    (Path(project.dir) / "jobs" / "records" / f"{job_id}.json").unlink()
+
+    prov = project.get_column_provenance("cells", "sample_cluster")
+    assert prov["resolved"] is False
+    # denormalized still describes the column when the record is gone
+    assert prov["job_id"] == job_id
+    assert prov["tool_id"] == "concat_columns"
+    assert len(prov["content_hash"]) == 16
+    # ...but the full-record-only fields are not present
+    assert "params" not in prov
