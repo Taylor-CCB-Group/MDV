@@ -27,15 +27,22 @@ class JobManager:
     The job_id is the *only* link between a record and its (possibly remote) workspace."""
 
     def __init__(
-        self, project, workspace_root=None, records_root=None, executor=None, max_concurrent=2
+        self,
+        project,
+        workspace_root=None,
+        records_root=None,
+        executor=None,
+        max_concurrent=2,
     ):
         self.project = project
         self.records_root = (
-            Path(records_root) if records_root is not None
+            Path(records_root)
+            if records_root is not None
             else Path(project.dir) / JOBS_DIRNAME
         )
         self.workspace_root = (
-            Path(workspace_root) if workspace_root is not None
+            Path(workspace_root)
+            if workspace_root is not None
             else default_workspace_root(project)
         )
         self.store = JobStore(self.records_root)
@@ -86,10 +93,22 @@ class JobManager:
             if marker == "done":
                 spec = get_tool(rec.tool_id)
                 self.store.set(rec, Status.INGESTING)
-                manifest = INGESTERS[spec.output.shape](
+                result = INGESTERS[spec.output.shape](
                     self.project, rec.params, ws
-                )  # idempotent
-                provenance = build_provenance(rec, manifest)
+                )  # idempotent; {"manifest": ..., "outputs": [(ds, col)]}
+                assert result is not None
+                provenance = build_provenance(rec, result["manifest"])
+                pointer = {
+                    "kind": "job",
+                    "job_id": rec.job_id,
+                    "tool_id": rec.tool_id,
+                    "content_hash": provenance["content_hash"],
+                }
+
+                for ds, col in result["outputs"]:
+                    self.project.set_column_metadata(ds, col, "provenance", pointer)
+
+                # commit last: pointer + column data are written while status is still "INGESTING"
                 self.store.set(rec, Status.DONE, provenance=provenance)
                 shutil.rmtree(ws.root, ignore_errors=True)
             elif marker == "failed":
