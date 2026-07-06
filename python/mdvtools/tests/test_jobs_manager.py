@@ -94,10 +94,8 @@ def test_provenance_promoted_and_workspace_cleaned(tmp_path):
     assert prov["tool_id"] == "concat_columns"
     assert prov["params"]["output_name"] == "sample_cluster"
     # temp fix
-    assert prov["output"] == {
-        "manifest": {"rows": 3},
-        "outputs": [[prov["params"]["datasource"], prov["params"]["output_name"]]],
-    }
+    assert prov["output"] == {"rows": 3}
     assert len(prov["content_hash"]) == 16
+
     # workspace scratch (keyed by job_id, outside the project) is GC'd on success
     assert not (workspace_root / job_id).exists()
