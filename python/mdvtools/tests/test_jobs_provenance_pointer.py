@@ -116,10 +116,34 @@ def test_get_column_provenance_dangling_when_record_purged(tmp_path):
     (Path(project.dir) / "jobs" / "records" / f"{job_id}.json").unlink()
 
     prov = project.get_column_provenance("cells", "sample_cluster")
-    assert prov["resolved"] is False
+    assert prov is not None
+    assert prov["_resolved"] is False
     # denormalized still describes the column when the record is gone
     assert prov["job_id"] == job_id
     assert prov["tool_id"] == "concat_columns"
     assert len(prov["content_hash"]) == 16
     # ...but the full-record-only fields are not present
     assert "params" not in prov
+
+
+def test_ingest_points_to_newest_job(tmp_path):
+    project = _make_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
+    first = _submit_concat(mgr)
+    _drive(mgr)
+    second = _submit_concat(mgr)
+    _drive(mgr)
+
+    assert first != second
+    # the column pointer is the newest run (last writer wins)
+    pointer = project.get_column_metadata("cells", "sample_cluster")["provenance"]
+    assert pointer["job_id"] == second
+    second_prov = project.get_column_provenance("cells", "sample_cluster")
+    assert second_prov is not None
+    assert second_prov["job_id"] == second
+
+    # history is preserved: both records still exist as separate files (ADR0009 -
+    # records are append-only history; the column pointer is the current truth)
+    records = Path(project.dir) / "jobs" / "records"
+    assert (records / f"{first}.json").exists()
+    assert (records / f"{second}.json").exists()
