@@ -2,7 +2,7 @@ import h5py
 import json
 
 
-def ingest_column_output(project, params: dict, ws) -> dict | None:
+def ingest_column_output(project, params: dict, ws) -> dict:
     """Output shape column (ds, cols): write the worker's result column on to the datasouce
     set_column is idempotent - it deletes any existing column of the same name before adding, and updates-or-appends
     the metadata entry. So re-ingesting the same output_name REPLACES rather than duplicates (ADR0006).
