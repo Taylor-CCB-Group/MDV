@@ -1,4 +1,5 @@
 """Demo / inspection for the jobs framework (concat_columns)."""
+
 import json
 import tempfile
 import time
@@ -43,13 +44,20 @@ def show_json(obj) -> None:
 def main() -> None:
     base = Path(tempfile.mkdtemp(prefix="mdv_jobs_demo_"))
     proj_dir = base / "proj"
-    scratch_root = base / "scratch"  # stands in for HPC/cluster scratch — OUTSIDE the project
+    scratch_root = (
+        base / "scratch"
+    )  # stands in for HPC/cluster scratch — OUTSIDE the project
 
     project = MDVProject(str(proj_dir), delete_existing=True)
-    project.add_datasource("cells", pd.DataFrame({
-        "sample": ["s1", "s2", "s3"],
-        "cluster": ["a", "b", "a"],
-    }))
+    project.add_datasource(
+        "cells",
+        pd.DataFrame(
+            {
+                "sample": ["s1", "s2", "s3"],
+                "cluster": ["a", "b", "a"],
+            }
+        ),
+    )
     # records_root defaults to <project>/jobs (inside the project); workspace_root is the
     # ephemeral scratch we point outside the project, as HPC would.
     mgr = JobManager(project, workspace_root=scratch_root, max_concurrent=2)
@@ -57,27 +65,44 @@ def main() -> None:
     rule("0. Where everything lives  (two SEPARATE roots, linked only by job_id)")
     print(f"  demo base     : {base}")
     print(f"  project       : {proj_dir}   (datafile.h5 + datasources.json)")
-    print(f"  job records   : {mgr.records_root}/records   (durable, INSIDE the project — travels with it,")
-    print( "                  the catalog never scans a project's subdir, exporter skips it)")
-    print(f"  job workspaces: {mgr.workspace_root}   (ephemeral scratch, OUTSIDE the project — on HPC: $SCRATCH)")
-    print( "  link          : records/<job_id>.json  <->  <scratch>/<job_id>/   (same job_id, two locations)")
+    print(
+        f"  job records   : {mgr.records_root}/records   (durable, INSIDE the project — travels with it,"
+    )
+    print(
+        "                  the catalog never scans a project's subdir, exporter skips it)"
+    )
+    print(
+        f"  job workspaces: {mgr.workspace_root}   (ephemeral scratch, OUTSIDE the project — on HPC: $SCRATCH)"
+    )
+    print(
+        "  link          : records/<job_id>.json  <->  <scratch>/<job_id>/   (same job_id, two locations)"
+    )
 
-    rule("1. submit()  ->  durable record written FIRST (write-ahead), then staged + launched")
-    job_id = mgr.submit("concat_columns", {
-        "datasource": "cells",
-        "column_a": "sample",
-        "column_b": "cluster",
-        "separator": "_",
-        "output_name": "sample_cluster",
-    })
+    rule(
+        "1. submit()  ->  durable record written FIRST (write-ahead), then staged + launched"
+    )
+    job_id = mgr.submit(
+        "concat_columns",
+        {
+            "datasource": "cells",
+            "column_a": "sample",
+            "column_b": "cluster",
+            "separator": "_",
+            "output_name": "sample_cluster",
+        },
+    )
     ws = mgr.workspace_root / job_id
     rec_file = mgr.records_root / "records" / f"{job_id}.json"
     print(f"  job_id: {job_id}")
-    print("\n  records/<job_id>.json  (status RUNNING, handle set, provenance still null):")
+    print(
+        "\n  records/<job_id>.json  (status RUNNING, handle set, provenance still null):"
+    )
     show_json(json.loads(rec_file.read_text()))
     print(f"\n  workspace {ws}:")
     tree(ws)
-    print("\n  input/tray.h5  — the owner staged this (columns already decoded to real values):")
+    print(
+        "\n  input/tray.h5  — the owner staged this (columns already decoded to real values):"
+    )
     dump_h5(ws / "input" / "tray.h5")
 
     rule("2. wait for the worker subprocess  (owner has NOT touched the project yet)")
@@ -94,25 +119,56 @@ def main() -> None:
     print("    " + (ws / "output" / "manifest.json").read_text())
 
     mgr.tick()
-    print(f"  workspace after success: {'GONE — cleaned (ADR-0007)' if not ws.exists() else 'STILL THERE'}")
+    print(
+        f"  workspace after success: {'GONE — cleaned (ADR-0007)' if not ws.exists() else 'STILL THERE'}"
+    )
     rec = json.loads(rec_file.read_text())
     print(f"\n  records/<job_id>.json  (status {rec['status']!r}).")
     print("  >>> PROVENANCE LIVES HERE — in the JSON record, not a .txt file:")
     show_json(rec["provenance"])
 
-    rule("3. tick()  ->  ingest, promote provenance into the record, clean the workspace")
-    rule("4. the output column, now part of the project")
-    print(f"  get_column('cells', 'sample_cluster') -> {project.get_column('cells', 'sample_cluster')}")
-    col = next(c for c in project.get_datasource_metadata("cells")["columns"]
-               if c["field"] == "sample_cluster")
-    print("\n  its entry in datasources.json (note: NO provenance on the column yet — that's the")
-    print("  open discussion item; provenance currently lives ONLY in the job record above):")
+    rule(
+        "3. tick()  ->  ingest, promote provenance into the record, clean the workspace"
+    )
+    rule("4. the output column, now carrying a provenance POINTER (ADR-0009)")
+    print(
+        f"  get_column('cells', 'sample_cluster') -> {project.get_column('cells', 'sample_cluster')}"
+    )
+    col = next(
+        c
+        for c in project.get_datasource_metadata("cells")["columns"]
+        if c["field"] == "sample_cluster"
+    )
+    print(
+        "\n  its entry in datasources.json — note the 'provenance' key: a POINTER, not a copy"
+    )
+    print(
+        "  ({kind, job_id, tool_id, content_hash}); the job record stays the single source of truth:"
+    )
     show_json(col)
+    resolved = project.get_column_provenance("cells", "sample_cluster")
+    print(
+        "\n  get_column_provenance() dereferences job_id -> the FULL record (_resolved True)."
+    )
+    print(
+        "  The SAME content_hash is on both the column and the record — one hash, not two:"
+    )
+    print(f"    column   content_hash: {col['provenance']['content_hash']!r}")
+    print(
+        f"    resolved content_hash: {resolved['provenance']['content_hash']!r}   (_resolved={resolved['_resolved']})"
+    )
 
     print(f"\n  Left for inspection: {base}")
-    print(f"   - {mgr.records_root}/records/{job_id}.json   (record + provenance, durable, INSIDE the project)")
-    print(f"   - {proj_dir}/datasources.json          (the new column)")
-    print(f"   - {mgr.workspace_root}/{job_id}   is GONE (scratch cleaned on success); its contents shown above.")
+    print(
+        f"   - {mgr.records_root}/records/{job_id}.json   (record + provenance, durable, INSIDE the project)"
+    )
+    print(
+        f"   - {proj_dir}/datasources.json          (the new column + its provenance pointer)"
+    )
+    print(
+        f"   - {mgr.workspace_root}/{job_id}   is GONE (scratch cleaned on success); its contents shown above."
+    )
+
 
 if __name__ == "__main__":
     main()
