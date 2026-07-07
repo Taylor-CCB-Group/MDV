@@ -96,7 +96,6 @@ class JobManager:
                 result = INGESTERS[spec.output.shape](
                     self.project, rec.params, ws
                 )  # idempotent; {"manifest": ..., "outputs": [(ds, col)]}
-                assert result is not None
                 provenance = build_provenance(rec, result["manifest"])
                 pointer = {
                     "kind": "job",
