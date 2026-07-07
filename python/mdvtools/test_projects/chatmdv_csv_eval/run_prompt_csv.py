@@ -21,6 +21,7 @@ Create it reproducibly with::
   python mdvtools/test_projects/chatmdv_csv_eval/setup_pbmc3k_chat.py
 
 Environment: same as Chat MDV (e.g. ``OPENAI_API_KEY`` in ``.env`` if used).
+Use ``--model`` (or env ``CHATMDV_DEFAULT_MODEL``) to select the chat model for the run.
 
 Default report directory for outputs: ``$TMPDIR/chatmdv_csv_eval`` (on Linux usually
 under ``/tmp``). Override with ``--output-dir /path``, env ``CHATMDV_CSV_EVAL_OUTPUT_DIR``,
@@ -41,11 +42,15 @@ Outputs
   compact per-row metrics only:
 
   - ``exec_success``, ``exit_code``, ``duration_seconds``
+  - ``started_at_utc``, ``finished_at_utc``, ``timing_jsonl_path``
   - ``view_name``, ``view_snapshot_present``, ``chart_count``, ``view_has_charts``,
     ``needs_refresh``
   - ``details_jsonl_path`` — path to the sidecar details file for this run
+  - optional ``block_*_s`` columns when ChatMDV block timings are captured
 
-  Verbose fields are **not** in the results CSV (see details JSONL below).
+- **Timing JSONL** (``timing_<stem>_<timestamp>.jsonl``): one JSON object per processed row
+  with ``duration_seconds``, ``row_wall_seconds``, ``started_at_utc``, ``finished_at_utc``,
+  ``block_timings``, and row identity fields.
 
 - **Details JSONL** (``details_<stem>_<timestamp>.jsonl``): one JSON object per processed
   row with ``failure_reason``, ``captured_output_excerpt``, ``captured_output``,
@@ -118,12 +123,15 @@ SLIM_RESULT_FIELDS = [
     "exec_success",
     "exit_code",
     "duration_seconds",
+    "started_at_utc",
+    "finished_at_utc",
     "view_name",
     "view_snapshot_present",
     "chart_count",
     "view_has_charts",
     "needs_refresh",
     "details_jsonl_path",
+    "timing_jsonl_path",
 ]
 
 
@@ -176,6 +184,10 @@ def _row_detail_payload(
     exec_success: bool,
     exit_code: int,
     duration_seconds: float,
+    row_wall_seconds: float,
+    started_at_utc: str,
+    finished_at_utc: str,
+    block_timings: dict[str, float],
     failure_reason: str,
     captured_output: str,
     captured_output_excerpt: str,
@@ -196,6 +208,10 @@ def _row_detail_payload(
         "exec_success": exec_success,
         "exit_code": exit_code,
         "duration_seconds": duration_seconds,
+        "row_wall_seconds": row_wall_seconds,
+        "started_at_utc": started_at_utc,
+        "finished_at_utc": finished_at_utc,
+        "block_timings": block_timings,
         "failure_reason": failure_reason,
         "captured_output_excerpt": captured_output_excerpt,
         "captured_output": captured_output,
@@ -207,6 +223,76 @@ def _row_detail_payload(
         "needs_refresh": needs_refresh,
         "debug_output_dir": debug_output_dir,
     }
+
+
+def _timing_record_payload(
+    *,
+    row_index: int,
+    dataset: str,
+    question: str,
+    complexity_score: str,
+    exec_success: bool,
+    exit_code: int,
+    duration_seconds: float,
+    row_wall_seconds: float,
+    started_at_utc: str,
+    finished_at_utc: str,
+    block_timings: dict[str, float],
+) -> dict[str, object]:
+    return {
+        "row_index": row_index,
+        "dataset": dataset,
+        "question": question,
+        "complexity_score": complexity_score,
+        "exec_success": exec_success,
+        "exit_code": exit_code,
+        "duration_seconds": duration_seconds,
+        "row_wall_seconds": row_wall_seconds,
+        "started_at_utc": started_at_utc,
+        "finished_at_utc": finished_at_utc,
+        "block_timings": block_timings,
+    }
+
+
+def _normalize_block_timings(raw: object) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        return {}
+    timings: dict[str, float] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key.startswith("block_") or not key.endswith("_s"):
+            continue
+        try:
+            timings[key] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return timings
+
+
+def _collect_block_timing_keys(rows: list[dict[str, object]]) -> list[str]:
+    keys: set[str] = set()
+    for row in rows:
+        for key in row:
+            if isinstance(key, str) and key.startswith("block_") and key.endswith("_s"):
+                keys.add(key)
+    return sorted(keys)
+
+
+def _log_row_timing(
+    *,
+    row_index: int,
+    n_rows: int,
+    exit_code: int,
+    exec_success: bool,
+    duration_seconds: float,
+    row_wall_seconds: float,
+) -> None:
+    status = "OK" if exec_success else "FAIL"
+    print(
+        f"[{status}] row={row_index}/{n_rows} exit={exit_code} "
+        f"duration={duration_seconds:.3f}s wall={row_wall_seconds:.3f}s",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -267,6 +353,14 @@ def _parse_args() -> argparse.Namespace:
         help=(
             "Per-row worker subprocess wall-clock timeout (default: ROW_TIMEOUT_SECONDS "
             f"env or {ROW_TIMEOUT_SECONDS:g}s). Ignored with --in-process-rows."
+        ),
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Chat model for every row (canonical id or bare name, e.g. "
+            "openai:chat:gpt-4.1). Defaults to CHATMDV_DEFAULT_MODEL or discovery."
         ),
     )
     return parser.parse_args()
@@ -345,6 +439,8 @@ def _csv_eval_worker_main() -> int:
     prompt = str(payload.get("prompt") or "")
     output_dir = payload.get("output_dir")
     out_dir: str | None = str(output_dir) if output_dir else None
+    model_id = payload.get("model_id")
+    resolved_model_id: str | None = str(model_id) if model_id else None
 
     from mdvtools.llm.chat_cli import run_chat_once
 
@@ -354,6 +450,7 @@ def _csv_eval_worker_main() -> int:
             prompt=prompt,
             output_dir=out_dir,
             view_name=None,
+            model_id=resolved_model_id,
         )
     except Exception as exc:
         sys.stdout.write(
@@ -380,6 +477,7 @@ def _run_chat_row_subprocess(
     prompt: str,
     output_dir: str | None,
     timeout_seconds: float | None = None,
+    model_id: str | None = None,
 ) -> tuple[dict[str, object], int, str]:
     """Run ``run_chat_once`` in a child process.
 
@@ -388,7 +486,12 @@ def _run_chat_row_subprocess(
     (common for Linux OOM), ``\"signal_other\"`` for another fatal signal, or
     ``\"timeout\"`` when the worker exceeded ``timeout_seconds``.
     """
-    payload = {"project_path": project_path, "prompt": prompt, "output_dir": output_dir}
+    payload = {
+        "project_path": project_path,
+        "prompt": prompt,
+        "output_dir": output_dir,
+        "model_id": model_id,
+    }
     cmd = [sys.executable, str(_SCRIPT_PATH), "--csv-eval-worker"]
     run_kwargs: dict[str, object] = {
         "input": json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -519,6 +622,14 @@ def main() -> int:
         args.row_timeout if args.row_timeout is not None else ROW_TIMEOUT_SECONDS
     )
 
+    from mdvtools.llm.llm_providers import resolve_chat_model_id
+
+    try:
+        resolved_model_id = resolve_chat_model_id(args.model)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
     csv_path = args.csv.expanduser().resolve()
     if not csv_path.is_file():
         print(f"Not found: {csv_path}", file=sys.stderr)
@@ -544,6 +655,9 @@ def main() -> int:
         details_log_path = details_log_path.expanduser().resolve()
     details_log_path.parent.mkdir(parents=True, exist_ok=True)
     details_log_path_str = str(details_log_path)
+
+    timing_log_path = results_path.parent / f"timing_{stem}_{utc_now}.jsonl"
+    timing_log_path_str = str(timing_log_path)
 
     failure_log_path = args.failure_log
     if failure_log_path is None:
@@ -573,6 +687,7 @@ def main() -> int:
 
     result_rows: list[dict[str, object]] = []
     detail_records: list[dict[str, object]] = []
+    timing_records: list[dict[str, object]] = []
     complexity_pairs: dict[str, list[tuple[bool, bool]]] = defaultdict(list)
     failure_count = 0
     failure_payloads: list[dict[str, object]] = []
@@ -592,8 +707,13 @@ def main() -> int:
         file=sys.stderr,
         flush=True,
     )
+    if resolved_model_id:
+        print(f"Using chat model: {resolved_model_id}", file=sys.stderr, flush=True)
 
     for idx, row in enumerate(rows_in, start=1):
+        row_started_at = datetime.now(timezone.utc)
+        row_t0 = time.perf_counter()
+
         path = _resolve_row_field(row, "path")
         question = _resolve_row_field(row, "question")
         dataset = _resolve_row_field(row, "dataset") or ""
@@ -607,8 +727,11 @@ def main() -> int:
         )
 
         if not path or not question:
+            row_finished_at = datetime.now(timezone.utc)
+            row_wall_seconds = round(time.perf_counter() - row_t0, 6)
+            started_iso = row_started_at.isoformat()
+            finished_iso = row_finished_at.isoformat()
             msg = f"missing Path or Question (path={path!r}, question={question!r})"
-            print(f"[FAIL] row={idx} {msg}", file=sys.stderr, flush=True)
             detail = _row_detail_payload(
                 row_index=idx,
                 path=path or "",
@@ -618,6 +741,10 @@ def main() -> int:
                 exec_success=False,
                 exit_code=2,
                 duration_seconds=0.0,
+                row_wall_seconds=row_wall_seconds,
+                started_at_utc=started_iso,
+                finished_at_utc=finished_iso,
+                block_timings={},
                 failure_reason=f"Row {idx}: {msg}",
                 captured_output="",
                 captured_output_excerpt="",
@@ -630,23 +757,50 @@ def main() -> int:
                 debug_output_dir="",
             )
             detail_records.append(detail)
+            timing_records.append(
+                _timing_record_payload(
+                    row_index=idx,
+                    dataset=dataset,
+                    question=question or "",
+                    complexity_score=complexity_val,
+                    exec_success=False,
+                    exit_code=2,
+                    duration_seconds=0.0,
+                    row_wall_seconds=row_wall_seconds,
+                    started_at_utc=started_iso,
+                    finished_at_utc=finished_iso,
+                    block_timings={},
+                )
+            )
             out_row = {
                 **{k: row.get(k, "") for k in raw_fieldnames},
                 "exec_success": False,
                 "exit_code": 2,
                 "duration_seconds": 0.0,
+                "started_at_utc": started_iso,
+                "finished_at_utc": finished_iso,
                 "view_name": "",
                 "view_snapshot_present": False,
                 "chart_count": 0,
                 "view_has_charts": False,
                 "needs_refresh": False,
                 "details_jsonl_path": details_log_path_str,
+                "timing_jsonl_path": timing_log_path_str,
             }
             result_rows.append(out_row)
             failure_count += 1
             if complexity_val:
                 complexity_pairs[complexity_val].append((False, False))
             failure_payloads.append(detail)
+            _log_row_timing(
+                row_index=idx,
+                n_rows=n_rows,
+                exit_code=2,
+                exec_success=False,
+                duration_seconds=0.0,
+                row_wall_seconds=row_wall_seconds,
+            )
+            print(f"       reason: {msg}", file=sys.stderr, flush=True)
             continue
 
         run_out = None
@@ -662,6 +816,7 @@ def main() -> int:
                 prompt=question,
                 output_dir=out_dir_str,
                 timeout_seconds=row_timeout,
+                model_id=resolved_model_id,
             )
             if term_tag == "timeout":
                 print(
@@ -693,11 +848,18 @@ def main() -> int:
                 prompt=question,
                 output_dir=out_dir_str,
                 view_name=None,
+                model_id=resolved_model_id,
             )
+        row_finished_at = datetime.now(timezone.utc)
+        row_wall_seconds = round(time.perf_counter() - row_t0, 6)
+        started_iso = row_started_at.isoformat()
+        finished_iso = row_finished_at.isoformat()
+
         success = bool(result.get("success"))
         message = str(result.get("message", ""))
         cap = str(result.get("captured_output", ""))
         duration = float(result.get("duration_seconds", 0.0))
+        block_timings = _normalize_block_timings(result.get("block_timings"))
         view_name = result.get("view_name") or ""
         debug_dir = result.get("debug_output_dir") or ""
         view_snapshot_present = bool(result.get("view_snapshot_present", False))
@@ -719,6 +881,10 @@ def main() -> int:
             exec_success=success,
             exit_code=exit_code,
             duration_seconds=duration,
+            row_wall_seconds=row_wall_seconds,
+            started_at_utc=started_iso,
+            finished_at_utc=finished_iso,
+            block_timings=block_timings,
             failure_reason=failure_reason,
             captured_output=cap,
             captured_output_excerpt=excerpt,
@@ -731,39 +897,65 @@ def main() -> int:
             debug_output_dir=str(debug_dir) if debug_dir else "",
         )
         detail_records.append(detail)
+        timing_records.append(
+            _timing_record_payload(
+                row_index=idx,
+                dataset=dataset,
+                question=question,
+                complexity_score=complexity_val,
+                exec_success=success,
+                exit_code=exit_code,
+                duration_seconds=duration,
+                row_wall_seconds=row_wall_seconds,
+                started_at_utc=started_iso,
+                finished_at_utc=finished_iso,
+                block_timings=block_timings,
+            )
+        )
 
         out_row = {
             **{k: row.get(k, "") for k in raw_fieldnames},
             "exec_success": success,
             "exit_code": exit_code,
             "duration_seconds": duration,
+            "started_at_utc": started_iso,
+            "finished_at_utc": finished_iso,
             "view_name": view_name,
             "view_snapshot_present": view_snapshot_present,
             "chart_count": chart_count,
             "view_has_charts": view_has_charts,
             "needs_refresh": needs_refresh,
             "details_jsonl_path": details_log_path_str,
+            "timing_jsonl_path": timing_log_path_str,
+            **block_timings,
         }
         result_rows.append(out_row)
 
         if complexity_val:
             complexity_pairs[complexity_val].append((success, view_has_charts))
 
+        _log_row_timing(
+            row_index=idx,
+            n_rows=n_rows,
+            exit_code=exit_code,
+            exec_success=success,
+            duration_seconds=duration,
+            row_wall_seconds=row_wall_seconds,
+        )
         if success:
             view_bit = f" view={view_name!r}" if view_name else ""
             charts_bit = f" charts={chart_count}" if view_has_charts else ""
-            print(
-                f"[OK] row={idx}/{n_rows} exit={exit_code} duration={duration:.1f}s"
-                f"{view_bit}{charts_bit}",
-                file=sys.stderr,
-                flush=True,
-            )
+            if view_bit or charts_bit:
+                print(
+                    f"       {view_bit.strip()}{charts_bit}".strip(),
+                    file=sys.stderr,
+                    flush=True,
+                )
         else:
             failure_count += 1
             q_short = question[:120] + ("..." if len(question) > 120 else "")
             print(
-                f"[FAIL] row={idx}/{n_rows} exit={exit_code} path={path} q={q_short!r}\n"
-                f"       reason: {failure_reason}",
+                f"       path={path} q={q_short!r}\n       reason: {failure_reason}",
                 file=sys.stderr,
                 flush=True,
             )
@@ -772,6 +964,10 @@ def main() -> int:
     with details_log_path.open("w", encoding="utf-8") as dlog:
         for record in detail_records:
             dlog.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    with timing_log_path.open("w", encoding="utf-8") as tlog:
+        for record in timing_records:
+            tlog.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     if failure_payloads:
         with failure_log_path.open("w", encoding="utf-8") as flog:
@@ -804,10 +1000,12 @@ def main() -> int:
         "run_completed_at_utc": completion_iso,
         "run_wall_seconds_total": wall_seconds,
         "run_cli_limit": args.limit,
+        "run_model_id": resolved_model_id,
         "run_artifacts_base_dir": str(base_artifacts) if base_artifacts else None,
         "input_csv": str(csv_path),
         "results_csv": str(results_path),
         "details_jsonl": str(details_log_path),
+        "timing_jsonl": str(timing_log_path),
         "failure_log": str(failure_log_path) if failure_count > 0 else None,
         "benchmark_summary": str(benchmark_summary_path),
         "totals": {
@@ -826,6 +1024,9 @@ def main() -> int:
     for f in SLIM_RESULT_FIELDS:
         if f not in out_fieldnames:
             out_fieldnames.append(f)
+    for block_key in _collect_block_timing_keys(result_rows):
+        if block_key not in out_fieldnames:
+            out_fieldnames.append(block_key)
 
     with results_path.open("w", newline="", encoding="utf-8") as wf:
         w = csv.DictWriter(wf, fieldnames=out_fieldnames, extrasaction="ignore")
@@ -852,6 +1053,7 @@ def main() -> int:
     print(f"  {report_dir}")
     print("Files written:")
     print(f"  results_csv               {results_path}")
+    print(f"  timing_jsonl              {timing_log_path}")
     print(f"  details_jsonl             {details_log_path}")
     print(f"  benchmark_summary_json    {benchmark_summary_path}")
     if failure_count:
@@ -864,12 +1066,14 @@ def main() -> int:
         print("  artifacts_dir             (none — pass --artifacts-dir for per-row debug dirs)")
     print("")
     print(
-        "During the run: [START]/[OK]/[FAIL] lines on stderr (flushed per row)."
+        "During the run: [START]/[OK|FAIL] timing lines on stderr (flushed per row)."
         + (
-            f' Verbose per-row fields: see details_jsonl ("{details_log_path.name}").'
+            f' Per-row timings: see timing_jsonl ("{timing_log_path.name}").'
+            f' Verbose fields: details_jsonl ("{details_log_path.name}").'
             f' Failed-row payloads also in failures_jsonl ("{failure_log_path.name}").'
             if failure_count
-            else f' Verbose per-row fields: see details_jsonl ("{details_log_path.name}").'
+            else f' Per-row timings: see timing_jsonl ("{timing_log_path.name}").'
+            f' Verbose fields: details_jsonl ("{details_log_path.name}").'
         )
     )
 

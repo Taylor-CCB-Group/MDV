@@ -35,16 +35,7 @@ class ViolinPlot extends WGLChart {
         //this appears problematic with active color column selection
         const colorFunc = this.afterAppCreation();
         this.colorFunc = colorFunc;
-        const len = this.dataStore.size;
-        this.xPosBuff = new SharedArrayBuffer(len * 4);
-        this.xPos = new Float32Array(this.xPosBuff);
-
-        this.values = this.dataStore.getColumnValues(c.param[0]);
-        const cats = this.dataStore.getRawColumn(c.param[0]);
-        //jitter x position
-        for (let i = 0; i < len; i++) {
-            this.xPos[i] = cats[i] * 50 + 4 + Math.random() * 42;
-        }
+        this.setCategoryField(c.param[0]);
 
         this.dim = this.dataStore.getDimension("catrange_dimension");
         this.x_scale.domain(this.values);
@@ -65,6 +56,21 @@ class ViolinPlot extends WGLChart {
         this.app.setPointOpacity(this.config.opacity);
         this.data = [];
         this.setValueField(c.param[1]);
+    }
+    setCategoryField(field) {
+        if (!field) {
+            console.warn("No field provided for setCategoryField");
+            return;
+        }
+        const len = this.dataStore.size;
+        this.xPosBuff = new SharedArrayBuffer(len * 4);
+        this.xPos = new Float32Array(this.xPosBuff);
+        this.values = this.dataStore.getColumnValues(field);
+        const cats = this.dataStore.getRawColumn(field);
+        // jitter x position
+        for (let i = 0; i < len; i++) {
+            this.xPos[i] = cats[i] * 50 + 4 + Math.random() * 42;
+        }
     }
     @loadColumnData
     colorByColumn(column) {
@@ -129,7 +135,19 @@ class ViolinPlot extends WGLChart {
     // }
     @loadColumnData
     setParams(params) {
+        const oldXName = this.dataStore.getColumnName(this.config.param[0]);
+        const oldYName = this.dataStore.getColumnName(this.config.param[1]);
+        const oldDefaultTitle = `${oldXName} x ${oldYName}`;
+        const xName = this.dataStore.getColumnName(params[0]);
+        const yName = this.dataStore.getColumnName(params[1]);
         this.config.param = params;
+        this.config.axis.x.label = xName;
+        if (this.useDefaultTitle || this.config.title === oldDefaultTitle) {
+            this.useDefaultTitle = true;
+            this.config.title = `${xName} x ${yName}`;
+            this.title.textContent = this.config.title;
+        }
+        this.setCategoryField(params[0]);
         this.setValueField(params[1]);
     }
 

@@ -3,16 +3,21 @@ from typing import Any
 from mdvtools.project_protocols import CreateProjectPromptProject
 from mdvtools.mdvproject import MDVProject
 from mdvtools.markdown_utils import create_project_markdown, create_column_markdown
+from mdvtools.llm.dataset_scale import ProjectScale, assess_project_scale
 from mdvtools.llm.datasource_roles import (
     infer_datasource_roles,
     format_feature_table_field_policy,
     format_marker_gene_scanpy_fallback_policy,
     format_marker_ranking_viz_policy,
     format_metadata_column_schema_policy,
+    format_mdv_first_data_access_policy,
+    format_multi_table_tabular_policy,
     format_no_hallucination_chart_policy,
     format_obs_table_chart_param_policy,
     format_scanpy_hybrid_routing_policy,
+    format_targeted_chart_policies,
     format_visualization_consistency_policy,
+    is_multi_table_tabular_project,
 )
 prompt_data = """
 Your task is to:  
@@ -46,7 +51,7 @@ Your task is to:
     - Dot plot: Requires only one categorical column and any number of numerical columns.  
     - Heatmap: Requires only one categorical column and any number of numerical columns.  
     - Histogram: Requires one numerical column.  
-    - Multiline chart: Requires one numerical column and one categorical column.  
+    - Multiline chart (`MultiLinePlot`): Requires one numerical column and one categorical column.  
     - Pie Chart: Requires one categorical column.  
     - Row Chart: Requires one categorical column.  
     - Row summary box: Requires any column(s).  
@@ -118,6 +123,62 @@ import sys
 #     return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
 
+def _datasource_context_section(
+    project: CreateProjectPromptProject,
+    ds_name: str,
+    heading: str,
+) -> str:
+    try:
+        ds_meta = project.get_datasource_metadata(ds_name)
+        return (
+            f"## {heading}: **{ds_name}** ({ds_meta['size']} rows)\n\n"
+            + create_column_markdown(ds_meta["columns"])
+        )
+    except Exception:
+        return f"## {heading}: **{ds_name}**\n\n"
+
+
+def _build_rag_context_markdown(project: CreateProjectPromptProject, datasource_name: str) -> str:
+    """Project Data Context block for RAG prompts."""
+    try:
+        names = list(project.get_datasource_names())
+    except Exception:
+        names = []
+
+    has_cells = "cells" in names
+    if len(names) > 1 and not has_cells:
+        primary = _datasource_context_section(
+            project,
+            datasource_name,
+            "Primary datasource for this question",
+        )
+        all_tables = create_project_markdown(project, wrap_in_details=False)
+        return primary + "\n\n## All project datasources\n\n" + all_tables
+
+    if has_cells and len(names) > 1:
+        roles = infer_datasource_roles(project)
+        obs = roles.obs_datasource
+        sections: list[str] = []
+        if datasource_name != obs:
+            sections.append(
+                _datasource_context_section(
+                    project,
+                    obs,
+                    "Observation datasource (cell metadata — use for leiden, QC metrics, embeddings)",
+                )
+            )
+        primary_heading = (
+            "Primary datasource for this question"
+            if datasource_name != obs
+            else "Observation datasource"
+        )
+        sections.append(
+            _datasource_context_section(project, datasource_name, primary_heading)
+        )
+        return "\n\n".join(sections)
+
+    return _datasource_context_section(project, datasource_name, datasource_name)
+
 
 def get_createproject_prompt_RAG(
     project: CreateProjectPromptProject,
@@ -125,20 +186,126 @@ def get_createproject_prompt_RAG(
     datasource_name: str,
     final_answer: str,
     question: str,
+    compact: bool = False,
+    scale: ProjectScale | None = None,
 ) -> str:
     """
     Constructs a RAG prompt to guide LLM code generation for creating MDV plots.
     Handles both standard and gene-related queries.
+    When ``compact=True``, omits long policy blocks for local models (Ollama).
     """
-    # Build markdown context for the selected datasource; fall back to whole project if needed
-    try:
-        ds_meta = project.get_datasource_metadata(datasource_name)
-        context_md = f"## **{datasource_name}:** ({ds_meta['size']} rows)\n\n" + create_column_markdown(ds_meta["columns"])
-    except Exception:
-        context_md = create_project_markdown(project)
+    if scale is None:
+        scale = assess_project_scale(project, path_to_data)
+    mdv_first_policy = format_mdv_first_data_access_policy(
+        scale, path_to_data, compact=compact
+    )
+    chart_policies = format_targeted_chart_policies(compact=compact)
     roles = infer_datasource_roles(project)
+    multi_table_policy = ""
+    if is_multi_table_tabular_project(project, roles):
+        multi_table_policy = format_multi_table_tabular_policy()
+    context_md = _build_rag_context_markdown(project, datasource_name)
+    datasource_name_guidance = (
+        f"- datasource_name = '{datasource_name}'  "
+        "(use this datasource for charts and dataframe loads when it matches the user question; "
+        "do not substitute CHATMDV_OBS_DATASOURCE when the user names a different table)\n"
+    )
+    datasource_name_guidance_indented = (
+        f"            - datasource_name = '{datasource_name}'  "
+        "(use this datasource for charts and dataframe loads when it matches the user question; "
+        "do not substitute CHATMDV_OBS_DATASOURCE when the user names a different table)\n"
+    )
+    if compact:
+        expr_lines = ""
+        if roles.expressions:
+            expr_lines = "\n".join(
+                f"- `{e.datasource_name}` (name_column=`{e.name_column}`, default_subgroup=`{e.subgroup_key}`)"
+                for e in roles.expressions
+            )
+        else:
+            expr_lines = "- (none detected)"
+        return (
+            """
+    Project Data Context:
+
+    """
+            + context_md
+            + """
+
+    Datasource roles:
+    - Observation/metadata datasource: `"""
+            + roles.obs_datasource
+            + """`
+    - Expression datasources (feature tables):
+"""
+            + expr_lines
+            + """
+
+"""
+            + multi_table_policy
+            + mdv_first_policy
+            + """
+
+"""
+            + chart_policies
+            + """
+
+    Context: {context}
+
+    The provided scripts demonstrate MDV chart construction patterns. Follow this workflow:
+    1. Use MDVProject(project_path, delete_existing=False) when editing this project — never delete or recreate it.
+    2. Follow the MDV-first data access rules above — do not load `.h5ad` or full datasources for chart-only views.
+    3. Load existing tables with `project.get_datasource_as_dataframe(<ds>, columns=[field_ids...])` when a pandas preview is needed.
+    4. Build charts with mdvtools chart classes; set `params` from field ids (not display names).
+    5. Print bounded markdown previews before `project.set_view(...)` when showing tabular results.
+    6. Use injected CHATMDV_* constants when present; do not call `project.get_datasource_roles()`.
+
+    Agent-suggested columns and chart types:
+    """
+            + final_answer
+            + """
+
+    User question: """
+            + question
+            + final_answer
+            + """
+
+    Update these variables in generated code:
+    - project_path = '"""
+            + project.dir
+            + """'
+    - data_path = '"""
+            + path_to_data
+            + """'
+    """
+            + datasource_name_guidance
+            + """    - view_name = a descriptive string for the visualization.
+
+    Chart type requirements (use agent-suggested types when valid):
+    - Abundance Box plot: three categorical columns (repeat if fewer available).
+    - Box plot / Violin plot: one categorical + one numerical column.
+    - Density Scatter plot: two numerical + one categorical column.
+    - Dot plot / Heatmap: one categorical + numerical columns.
+    - Histogram: one numerical column.
+    - Multiline chart (`MultiLinePlot`): one numerical + one categorical column.
+    - Pie Chart / Row Chart / Wordcloud: one categorical column.
+    - Row summary box / Table Plot: any column(s).
+    - Sankey / Stacked row chart: two categorical columns (repeat if only one).
+    - Scatter plot (2D): two numerical + one color column.
+    - Scatter plot (3D): three numerical + one color column.
+    - Selection dialog plot: any column.
+    - Text box plot: text only.
+
+    Output format:
+    - Return only one fenced ```python code block with the complete runnable script.
+    - Do not add markdown narrative before or after the code block.
+    - For chart requests, create the view(s) described above; for text/table-first requests use bounded print(...) calls.
+
+
+"""
+        )
     feature_field_policy = format_feature_table_field_policy(roles)
-    marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data)
+    marker_gene_policy = format_marker_gene_scanpy_fallback_policy(path_to_data, scale)
     table_chart_param_policy = format_obs_table_chart_param_policy()
     marker_ranking_viz_policy = format_marker_ranking_viz_policy()
     hybrid_routing_policy = format_scanpy_hybrid_routing_policy()
@@ -169,24 +336,20 @@ def get_createproject_prompt_RAG(
         - Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True) when creating a new project.
         - When modifying an existing project (the default in this chat context), do NOT recreate or delete the project.
 
-    2. Data Access (scanpy optional):
-        - If HAS_SCANPY is True and `data_path` points to a valid .h5ad file, you MAY load AnnData:
-            adata = sc.read_h5ad(data_path)
-            data_frame_obs = adata.obs
-            data_frame_var = adata.var.assign(name=adata.var_names.to_list())
-        - Exception: for **marker genes / top genes per cluster** when MDV tables lack needed columns, if `data_path`
-          is a `.h5ad` file, you SHOULD use `sc.read_h5ad` and Scanpy as described under "Marker genes" below.
-        - OTHERWISE (no scanpy or no .h5ad):
-            - DO NOT use scanpy.
-            - Use the existing MDV datasources already registered in the project:
-                - Observation/metadata datasource (df1): `"""+roles.obs_datasource+"""`
-                - Wrapper-capable expression datasources (feature tables): 
+    2. Data Access (MDV-first; Scanpy last resort):
+"""+mdv_first_policy+multi_table_policy+"""
+        - Observation/metadata datasource: `"""+roles.obs_datasource+"""`
+        - Wrapper-capable expression datasources (feature tables):
 """+expr_lines+"""
-            - Use `project.get_datasource_as_dataframe(<datasource_name>)` to load these tables, or
-              `project.get_datasource_as_dataframe(<datasource_name>, columns=[...])` to load a subset. Each entry may be a metadata **field id** (e.g. cluster column on `cells`) or a **chart FieldName wrapper** string for expression columns on the **observation (row) datasource** (same format as chart `params`, e.g. `rna_expr|GENE(rna_expr)|12`). Do not pass wrappers to the feature-table datasource dataframe.
+        - Use `project.get_datasource_as_dataframe(<datasource_name>, columns=[...])` with only the Field IDs you need.
+          Each entry may be a metadata **field id** (e.g. cluster column on `cells`) or a **chart FieldName wrapper** string
+          for expression columns on the **observation (row) datasource** (same format as chart `params`, e.g.
+          `rna_expr|GENE(rna_expr)|12`). Do not pass wrappers to the feature-table datasource dataframe.
 
-        - Marker genes and missing columns (ChatMDV):
+        - Marker genes and missing columns (Scanpy last resort only):
 """+marker_gene_policy+"""
+        - Targeted chart recipes (ChatMDV):
+"""+chart_policies+"""
 
     3. Datasource Registration:
         - When modifying an existing project, do **not** call `project.add_datasource(...)` for arbitrary new tables **except**
@@ -207,7 +370,7 @@ def get_createproject_prompt_RAG(
         - Convert the chart to JSON using `convert_plot_to_json(plot)`
         - **Before** `project.set_view(...)`, print a concise preview of any table, aggregate, or subset the charts depend on using **GitHub-flavored markdown tables** so the chat UI can render them (for example `print(df_result.head(40).to_markdown(index=False))` or `print(grouped.head(20).to_markdown())`). Do **not** use `DataFrame.to_string()` for chat previews. Keep rows/columns bounded so the output stays readable; this stdout is shown in the chat window.
         - **Before** `project.set_view(...)`, ensure saved charts use the **same data pipeline** as those printed previews (see "Visualization vs analysis consistency" below).
-        - Set the view using `project.set_view(view_name, view_object)`
+        - Set the view using `project.set_view(view_name, view_object)` with `initialCharts` only; ChatMDV applies gridstack layout when saving the view.
         - IMPORTANT: Chart objects (including `TablePlot`) do not support row-subsetting methods like `set_row_indices(...)`
           or invented filter setters such as `set_background_filter(...)`. Only call `set_*` (and other public) methods
           that exist on the chart class in `mdvtools.charts.*` (preflight validates this before execution).
@@ -295,6 +458,7 @@ def get_createproject_prompt_RAG(
             (a) the markdown explanation text, and
             (b) bounded script stdout via `print(...)` before any `project.set_view(...)`.
         - Do NOT create `TextBox` or `TablePlot` by default when the user intent is primarily textual/table output.
+        - Do NOT add an analysis-summary `TextBox` in generated code; the ChatMDV orchestrator appends that after execution.
 
     8. Selection dialog usage:
         - Add `SelectionDialogPlot` when interactive filtering materially helps answer the question—for example,
@@ -326,7 +490,7 @@ def get_createproject_prompt_RAG(
             - project_path = '"""+project.dir+"""'
             - data_path = '"""+path_to_data+"""'  # may be empty; if empty or HAS_SCANPY is False, DO NOT use scanpy except for marker-gene workflows when this path is a `.h5ad` file (see section 2).
             - view_name = a string, in double quotes, describing what is being visualized.
-            - datasource_name = '"""+datasource_name+"""'
+            """+datasource_name_guidance_indented+"""
         - The possible charts are given by """+final_answer+""" and should follow the following visualisation guidelines for each type of chart:
             - Abundance Box plot: Requires three categorical columns.  
                 - If only one categorical variable is available, use it three times.  
@@ -336,7 +500,7 @@ def get_createproject_prompt_RAG(
             - Dot plot: Requires only one categorical column and any number of numerical columns.  
             - Heatmap: Requires only one categorical column and any number of numerical columns.  
             - Histogram: Requires one numerical column.  
-            - Multiline chart: Requires one numerical column and one categorical column.  
+            - Multiline chart (`MultiLinePlot`): Requires one numerical column and one categorical column.  
             - Pie Chart: Requires one categorical column.  
             - Row Chart: Requires one categorical column.  
             - Row summary box: Requires any column(s).  

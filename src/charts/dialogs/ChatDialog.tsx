@@ -13,7 +13,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import type { ChatMessage, ChatProgress, ConversationMap } from "./ChatAPI";
+import type { ChatMessage, ChatModelOption, ChatProgress, ConversationMap } from "./ChatAPI";
 import {
     Close as CloseIcon,
     Launch as LaunchIcon,
@@ -40,6 +40,9 @@ export type ChatDialogProps = {
     conversationMap: ConversationMap;
     conversationId: string;
     suggestedQuestions: string[];
+    availableModels: ChatModelOption[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
     onPopout?: () => void;
     isPopout?: boolean;
     fullscreen?: boolean;
@@ -60,6 +63,9 @@ const ChatDialog = ({
     conversationMap,
     conversationId,
     suggestedQuestions,
+    availableModels,
+    selectedModelId,
+    onModelChange,
     onPopout,
     isPopout,
     fullscreen = false,
@@ -258,6 +264,9 @@ const ChatDialog = ({
                                     verboseProgress={verboseProgress}
                                     onClose={onClose}
                                     suggestedQuestions={suggestedQuestions}
+                                    availableModels={availableModels}
+                                    selectedModelId={selectedModelId}
+                                    onModelChange={onModelChange}
                                 />
                             </Suspense>
                         )}
