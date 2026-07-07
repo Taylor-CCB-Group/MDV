@@ -58,6 +58,15 @@ export const createAdminUserResultSchema = z.object({
     created: z.boolean(),
 });
 
+export const adminUserSyncResultSchema = z.object({
+    synced: z.boolean(),
+    message: z.string(),
+    usersBefore: z.number(),
+    usersAfter: z.number(),
+    adminsBefore: z.number(),
+    adminsAfter: z.number(),
+});
+
 export const adminProjectMemberSchema = z.object({
     user: adminUserSchema,
     projectAccess: adminProjectAccessSchema,
@@ -94,4 +103,5 @@ export type AdminProject = z.infer<typeof adminProjectSchema>;
 export type AdminSession = z.infer<typeof adminSessionSchema>;
 export type CreateAdminUserPayload = z.infer<typeof createAdminUserPayloadSchema>;
 export type CreateAdminUserResult = z.infer<typeof createAdminUserResultSchema>;
+export type AdminUserSyncResult = z.infer<typeof adminUserSyncResultSchema>;
 export type AdminProjectMember = z.infer<typeof adminProjectMemberSchema>;

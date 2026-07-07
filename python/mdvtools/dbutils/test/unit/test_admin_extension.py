@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from mdvtools.dbutils.admin_contracts import (
+from mdvtools.dbutils.admin.contracts import (
     AdminConflictError,
     AdminExternalServiceError,
     AdminInputError,
@@ -17,18 +17,19 @@ from mdvtools.dbutils.admin_contracts import (
     AdminProjectMember,
     AdminProjectMembership,
     AdminUser,
+    AdminUserSyncResult,
     CreateAdminUserInput,
     CreateAdminUserResult,
     ProjectMemberInput,
 )
-from mdvtools.dbutils.admin_extension import AdminExtension
-from mdvtools.dbutils.admin_identity import (
+from mdvtools.dbutils.admin.extension import AdminExtension
+from mdvtools.dbutils.admin.identity import (
     AdminIdentityInput,
     Auth0AdminIdentityProvider,
     ConfiguredAuth0AdminIdentityProvider,
     LocalAdminIdentityProvider,
 )
-from mdvtools.dbutils.admin_services import MDVAdminServices
+from mdvtools.dbutils.admin.services import MDVAdminServices
 
 
 @dataclass
@@ -129,6 +130,7 @@ class FakeAdminServices:
         self.add_member_input: ProjectMemberInput | None = None
         self.updated_member: tuple[int, int, str] | None = None
         self.removed_member: tuple[int, int] | None = None
+        self.sync_users_called = False
 
     def list_users(self):
         return []
@@ -168,6 +170,17 @@ class FakeAdminServices:
                 for access in data.project_access
             ],
             created=True,
+        )
+
+    def sync_users_from_identity_provider(self):
+        self.sync_users_called = True
+        return AdminUserSyncResult(
+            synced=True,
+            message="Users synced from Auth0 to the MDV database.",
+            users_before=2,
+            users_after=3,
+            admins_before=1,
+            admins_after=1,
         )
 
     def list_project_members(self, project_id: int):
@@ -650,6 +663,39 @@ def test_create_user_maps_external_identity_errors():
 
     assert response.status_code == 502
     assert response.get_json()["error"] == "Auth0 operation failed."
+
+
+def test_sync_users_endpoint_calls_admin_service():
+    services = FakeAdminServices()
+    flask_app = Flask(__name__)
+    flask_app.secret_key = "test-secret"
+    flask_app.config["ENABLE_AUTH"] = False
+    AdminExtension(services=services).register_global_routes(flask_app, {})
+
+    response = flask_app.test_client().post("/admin/api/users/sync")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["synced"] is True
+    assert body["usersBefore"] == 2
+    assert body["usersAfter"] == 3
+    assert services.sync_users_called is True
+
+
+def test_sync_users_endpoint_maps_external_errors():
+    class FailingSyncAdminServices(FakeAdminServices):
+        def sync_users_from_identity_provider(self):
+            raise AdminExternalServiceError("Auth0 user sync failed.")
+
+    flask_app = Flask(__name__)
+    flask_app.secret_key = "test-secret"
+    flask_app.config["ENABLE_AUTH"] = False
+    AdminExtension(services=FailingSyncAdminServices()).register_global_routes(flask_app, {})
+
+    response = flask_app.test_client().post("/admin/api/users/sync")
+
+    assert response.status_code == 502
+    assert response.get_json()["error"] == "Auth0 user sync failed."
 
 
 def test_project_members_endpoint_lists_assigned_users():

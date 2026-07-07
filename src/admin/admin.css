@@ -10,163 +10,131 @@ body {
 
 .admin-showcase-page {
     /* Admin-local theme tokens keep extension styling scoped to the admin root. */
-    --admin-bg: #252525;
-    --admin-drawer-bg: #202020;
-    --admin-surface: #3a3a3a;
-    --admin-surface-muted: #353536;
+    --admin-bg: #ecf0f1;
+    --admin-surface: #ffffff;
+    --admin-surface-muted: #f5f7f8;
+    --admin-text: #2c3e50;
+    --admin-text-muted: #60727f;
+    --admin-selected-bg: #2c3e50;
+    --admin-selected-text: #ffffff;
+    --admin-border: rgba(44, 62, 80, 0.18);
+    --admin-border-strong: rgba(44, 62, 80, 0.22);
+    --admin-border-soft: rgba(44, 62, 80, 0.12);
+    --admin-border-faint: rgba(44, 62, 80, 0.08);
+    --admin-control-border: rgba(44, 62, 80, 0.28);
+    --admin-control-border-strong: rgba(44, 62, 80, 0.36);
+    --admin-table-header-bg: #f5f7f8;
+
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    min-height: 100vh;
+}
+
+.dark .admin-showcase-page {
+    --admin-bg: #353536;
+    --admin-surface: #404040;
+    --admin-surface-muted: #3a3a3a;
     --admin-text: #f5f5f5;
     --admin-text-muted: rgba(245, 245, 245, 0.72);
-    --admin-text-subtle: rgba(245, 245, 245, 0.58);
-    --admin-nav-text: rgba(245, 245, 245, 0.82);
     --admin-selected-bg: #f5f5f5;
     --admin-selected-text: #252525;
-    --admin-selected-text-muted: rgba(37, 37, 37, 0.72);
     --admin-border: rgba(255, 255, 255, 0.12);
     --admin-border-strong: rgba(255, 255, 255, 0.14);
     --admin-border-soft: rgba(255, 255, 255, 0.1);
     --admin-border-faint: rgba(255, 255, 255, 0.08);
     --admin-control-border: rgba(255, 255, 255, 0.24);
     --admin-control-border-strong: rgba(255, 255, 255, 0.3);
-
-    background: var(--admin-bg);
-    color: var(--admin-text);
-    min-height: 100vh;
+    --admin-table-header-bg: #3a3a3a;
 }
 
 .admin-main {
-    margin-left: 280px;
     min-height: 100vh;
     min-width: 0;
 }
 
-.admin-showcase-header {
-    background: var(--admin-bg);
+.admin-app-bar {
     border-bottom: 1px solid var(--admin-border-faint);
-    color: var(--admin-text);
-    padding: 24px 0 12px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
 }
 
-.admin-showcase-header .MuiTypography-root {
-    color: var(--admin-text);
+.admin-toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    min-height: 64px;
+    padding-bottom: 10px;
+    padding-top: 10px;
 }
 
-.admin-showcase-header .MuiTypography-body2 {
-    color: var(--admin-text-muted);
+.admin-header-brand {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    min-width: 0;
 }
 
-.admin-showcase-header .MuiChip-root {
-    background: var(--admin-selected-bg);
-    color: var(--admin-selected-text);
+.admin-brand-button {
+    color: inherit !important;
+    font-weight: 700;
+    letter-spacing: 0;
+    min-width: auto;
+    text-transform: none;
 }
 
-.admin-showcase-header .admin-profile-chip {
-    max-width: 260px;
+.admin-secondary-logo {
+    cursor: pointer;
+    height: 40px;
+    max-width: 150px;
+    object-fit: contain;
 }
 
-.admin-showcase-header .admin-profile-chip .MuiChip-label {
+.admin-header-nav {
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.admin-header-nav .admin-nav-button {
+    min-width: 0;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.admin-header-nav .MuiButton-outlined {
+    border-width: 1.5px;
+}
+
+.admin-header-actions {
+    align-items: center;
+    display: flex;
+    flex: 1 1 360px;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.admin-header-actions .MuiButton-root {
+    white-space: nowrap;
+}
+
+.admin-session-chip {
+    max-width: 220px;
+}
+
+.admin-session-chip .MuiChip-label {
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.admin-drawer {
-    flex-shrink: 0;
-    width: 280px;
+.admin-status-chip {
+    font-weight: 600;
 }
 
-.admin-drawer-paper {
-    background: var(--admin-drawer-bg);
-    border-right: 1px solid var(--admin-border-faint);
-    box-sizing: border-box;
-    color: var(--admin-text);
-    width: 100%;
-}
-
-.admin-drawer .MuiDrawer-paper {
-    width: 280px;
-}
-
-.admin-drawer-content {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    min-height: 100%;
-    width: 100%;
-    /* padding: 28px 18px; */
-}
-
-.admin-drawer-brand {
-    border-bottom: 1px solid var(--admin-border-soft);
-    margin-bottom: 10px;
-    padding: 20px;
-}
-
-.admin-drawer-brand .MuiTypography-h5 {
-    color: var(--admin-text);
-    font-weight: 700;
-}
-
-.admin-drawer-brand .MuiTypography-body2 {
-    color: var(--admin-text-subtle);
-}
-
-.admin-drawer-list {
-    display: flex;
-    flex-direction: column;
-    /* gap: 6px; */
-}
-
-.admin-drawer-list .MuiListItemButton-root {
-    align-items: center;
-    /* border-radius: 8px; */
-    color: var(--admin-nav-text);
-    padding: 11px 12px;
-}
-
-.admin-drawer-list .MuiListItemButton-root.Mui-selected {
-    background: var(--admin-selected-bg);
-    color: var(--admin-selected-text);
-}
-
-.admin-drawer-list .MuiListItemIcon-root {
-    color: currentColor;
-    min-width: 34px;
-}
-
-/* .admin-drawer-list .MuiListItemButton-root.Mui-selected:hover {
-    background: var(--admin-selected-bg);
-} */
-
-.admin-drawer-list .MuiListItemText-primary {
-    color: currentColor;
-    font-weight: 700;
-}
-
-.admin-drawer-list .MuiListItemText-secondary {
-    color: var(--admin-text-subtle);
-    font-size: 0.78rem;
-    line-height: 1.3;
-}
-
-.admin-drawer-list .Mui-selected .MuiListItemText-secondary {
-    color: var(--admin-selected-text-muted);
-}
-
-.admin-drawer-session {
-    border-top: 1px solid var(--admin-border-soft);
-    margin-top: auto;
-    padding-top: 18px;
-}
-
-.admin-drawer-session .MuiTypography-body2 {
-    color: var(--admin-text);
-    overflow-wrap: anywhere;
-}
-
-.admin-drawer-session .MuiTypography-caption {
-    color: var(--admin-text-subtle);
+.admin-page-heading .MuiTypography-h4 {
+    font-weight: 600;
 }
 
 .admin-showcase-panel {
@@ -226,10 +194,82 @@ body {
     overflow: auto;
 }
 
+.admin-showcase-table-wrap .MuiTable-root {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
 .admin-showcase-table-wrap .MuiTableCell-root {
     border-color: var(--admin-border-faint);
-    padding-bottom: 14px;
-    padding-top: 14px;
+    padding: 10px 12px;
+}
+
+.admin-table-col-permission {
+    width: 9.5rem;
+    min-width: 9.5rem;
+}
+
+.admin-table-permission-select {
+    width: 100%;
+}
+
+.admin-table-permission-select .MuiInputBase-root {
+    font-size: 0.875rem;
+    min-height: 34px;
+}
+
+.admin-table-permission-select .MuiSelect-select {
+    padding-bottom: 6px;
+    padding-top: 6px;
+}
+
+.admin-table-col-bool {
+    text-align: center;
+    white-space: nowrap;
+    width: 4.25rem;
+}
+
+.admin-table-col-actions {
+    padding-left: 8px;
+    padding-right: 10px;
+    white-space: nowrap;
+    width: 1%;
+}
+
+.admin-table-action-button {
+    padding: 6px;
+}
+
+.admin-showcase-table-wrap .MuiTableCell-root:not(:last-of-type) {
+    border-right: 1px solid var(--admin-border-soft);
+}
+
+.admin-showcase-table-wrap .MuiTableHead-root .MuiTableCell-root {
+    background: var(--admin-table-header-bg);
+    border-bottom: 1px solid var(--admin-border);
+    color: var(--admin-text);
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.admin-showcase-table-wrap .MuiTableHead-root .MuiTableCell-root:not(:last-of-type) {
+    border-right-color: var(--admin-border);
+}
+
+.admin-showcase-table-wrap .MuiTableBody-root .MuiTableRow-root:not(:last-child) .MuiTableCell-root {
+    border-bottom: 1px solid var(--admin-border-faint);
+}
+
+.admin-showcase-table-wrap .MuiTableBody-root .MuiTableCell-root {
+    background: transparent;
+    color: var(--admin-text);
+    font-weight: 400;
+}
+
+.admin-showcase-table-wrap .MuiTypography-root {
+    color: inherit;
 }
 
 .admin-content .MuiTypography-root,
@@ -243,6 +283,11 @@ body {
 .admin-content .MuiTypography-body2,
 .admin-content .MuiTypography-caption {
     color: var(--admin-text-muted);
+}
+
+.admin-content .admin-showcase-table-wrap .MuiTypography-body2,
+.admin-content .admin-showcase-table-wrap .MuiTypography-caption {
+    color: var(--admin-text);
 }
 
 .admin-content .MuiOutlinedInput-notchedOutline {
@@ -266,15 +311,49 @@ body {
     .admin-create-panel {
         flex-basis: auto;
     }
-}
 
-@media (max-width: 900px) {
-    .admin-main {
-        margin-left: 0;
+    .admin-header-nav {
+        flex: 1 1 100%;
+        order: 3;
     }
 
-    .admin-drawer .MuiDrawer-paper {
-        position: relative;
+    .admin-header-actions {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 700px) {
+    .admin-toolbar {
+        align-items: stretch;
+    }
+
+    .admin-header-brand,
+    .admin-header-nav,
+    .admin-header-actions {
+        flex: 1 1 100%;
+    }
+
+    .admin-header-nav,
+    .admin-header-actions {
+        justify-content: flex-start;
+    }
+
+    .admin-header-nav,
+    .admin-header-actions {
         width: 100%;
+    }
+
+    .admin-header-nav .admin-nav-button,
+    .admin-header-actions .MuiButton-root {
+        flex: 1 1 180px;
+        justify-content: center;
+    }
+
+    .admin-session-chip {
+        max-width: 100%;
+    }
+
+    .admin-showcase-panel {
+        padding: 20px;
     }
 }

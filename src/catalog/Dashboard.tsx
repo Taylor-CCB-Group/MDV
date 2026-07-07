@@ -1,6 +1,7 @@
 import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
+    AdminPanelSettings,
     Check,
     CheckBoxOutlined,
     Checklist,
@@ -55,7 +56,7 @@ import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import HelpDialog from "./HelpDialog";
-import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
+import { buildAdminUrl, buildApiUrl, buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
 import BulkDeleteProjectsDialog from "./components/BulkDeleteProjectsDialog";
 import DashboardActionButton from "./components/DashboardActionButton";
 import RecycleBinDialog from "./components/RecycleBinDialog";
@@ -127,6 +128,10 @@ const Dashboard: React.FC = () => {
         } catch (error) {
             console.error("Failed to create project:", error);
         }
+    };
+
+    const handleOpenAdmin = () => {
+        window.location.href = buildAdminUrl();
     };
 
     const sortedProjects = useMemo(() => {
@@ -214,7 +219,7 @@ const Dashboard: React.FC = () => {
                                 display: customLogoVisible ? "block" : "none",
                             }}
                             alt="Custom deployment logo"
-                            src="secondary_logo"
+                            src={buildApiUrl("secondary_logo")}
                             onError={() => setCustomLogoVisible(false)}
                         />
                         <Box sx={{ flexGrow: 1 }} />
@@ -243,6 +248,21 @@ const Dashboard: React.FC = () => {
                             </IconButton>
                         </Paper>
                         {authEnabled && <UserProfile />}
+                        <Button
+                            variant="outlined"
+                            startIcon={<AdminPanelSettings />}
+                            onClick={handleOpenAdmin}
+                            sx={{
+                                borderWidth: 1.5,
+                                borderRadius: 2,
+                                textTransform: "none",
+                                px: 1.5,
+                                py: 0.75,
+                                mr: 2,
+                            }}
+                        >
+                            Admin
+                        </Button>
                         <Tooltip title="Toggle theme">
                             <IconButton
                                 sx={{ mr: 2 }}

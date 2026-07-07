@@ -1,4 +1,5 @@
 import type { z } from "zod/v4";
+import { buildApiUrl } from "@/utils/mdvRouting";
 import {
     addProjectMemberPayloadSchema,
     adminErrorResponseSchema,
@@ -6,6 +7,7 @@ import {
     adminProjectMembersResponseSchema,
     adminProjectsResponseSchema,
     adminSessionSchema,
+    adminUserSyncResultSchema,
     adminUsersResponseSchema,
     createAdminUserPayloadSchema,
     createAdminUserResultSchema,
@@ -15,6 +17,7 @@ import {
     type AdminProjectMember,
     type AdminSession,
     type AdminUser,
+    type AdminUserSyncResult,
     type CreateAdminUserPayload,
     type CreateAdminUserResult,
 } from "./schemas";
@@ -25,6 +28,7 @@ export type {
     AdminProjectMember,
     AdminSession,
     AdminUser,
+    AdminUserSyncResult,
     CreateAdminUserPayload,
     CreateAdminUserResult,
 };
@@ -44,7 +48,7 @@ async function requestJson<T>(
     schema: z.ZodType<T>,
     init?: RequestInit,
 ): Promise<T> {
-    const response = await fetch(path, {
+    const response = await fetch(buildApiUrl(path), {
         credentials: "same-origin",
         ...init,
     });
@@ -75,6 +79,10 @@ export const adminApi = {
             body: JSON.stringify(payload),
         });
     },
+    syncUsers: () =>
+        requestJson<AdminUserSyncResult>("/admin/api/users/sync", adminUserSyncResultSchema, {
+            method: "POST",
+        }),
     projects: () =>
         requestJson("/admin/api/projects", adminProjectsResponseSchema),
     projectMembers: (projectId: number) =>
@@ -118,7 +126,7 @@ export const adminApi = {
         );
     },
     removeProjectMember: (projectId: number, userId: number) =>
-        fetch(`/admin/api/projects/${projectId}/users/${userId}`, {
+        fetch(buildApiUrl(`/admin/api/projects/${projectId}/users/${userId}`), {
             method: "DELETE",
             credentials: "same-origin",
         }).then((response) => {

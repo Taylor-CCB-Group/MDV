@@ -4,7 +4,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request, session
 
-from mdvtools.dbutils.admin_contracts import (
+from mdvtools.dbutils.admin.contracts import (
     AdminConflictError,
     AdminExternalServiceError,
     AdminHostServices,
@@ -16,8 +16,8 @@ from mdvtools.dbutils.admin_contracts import (
     ProjectMemberInput,
     REQUIRE_INITIAL_PROJECT_ACCESS,
 )
-from mdvtools.dbutils.admin_identity import ConfiguredAuth0AdminIdentityProvider
-from mdvtools.dbutils.admin_services import MDVAdminServices
+from mdvtools.dbutils.admin.identity import ConfiguredAuth0AdminIdentityProvider
+from mdvtools.dbutils.admin.services import MDVAdminServices
 from mdvtools.logging_config import get_logger
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
@@ -242,6 +242,28 @@ class AdminExtension(MDVProjectServerExtension):
                 return _json_error(str(exc), 404)
             except AdminExternalServiceError as exc:
                 logger.error("admin.user.create_external_failed actor=%s error=%s", _actor_email(actor), exc)
+                return _json_error(str(exc), 502)
+
+        @app.route("/admin/api/users/sync", methods=["POST"])
+        def admin_sync_users():
+            actor, error = require_admin()
+            if error is not None:
+                return error
+            try:
+                logger.info("admin.user.sync_requested actor=%s", _actor_email(actor))
+                result = services.sync_users_from_identity_provider()
+                logger.info(
+                    "admin.user.sync_succeeded actor=%s synced=%s users_before=%s users_after=%s admins_before=%s admins_after=%s",
+                    _actor_email(actor),
+                    result.synced,
+                    result.users_before,
+                    result.users_after,
+                    result.admins_before,
+                    result.admins_after,
+                )
+                return jsonify(result.to_response())
+            except AdminExternalServiceError as exc:
+                logger.error("admin.user.sync_external_failed actor=%s error=%s", _actor_email(actor), exc)
                 return _json_error(str(exc), 502)
 
         @app.route("/admin/api/projects", methods=["GET"])

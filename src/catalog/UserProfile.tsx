@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import type React from "react";
 import { useState } from "react";
+import { buildApiUrl } from "@/utils/mdvRouting";
 import useUser from "./hooks/useUser";
 
 const UserProfile: React.FC = () => {
@@ -28,7 +29,7 @@ const UserProfile: React.FC = () => {
 
     const handleSignOut = () => {
         try {
-            window.location.href = "logout";
+            window.location.href = buildApiUrl("logout");
         } catch (err) {
             console.error("Logout error:", err);
         }

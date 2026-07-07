@@ -5,7 +5,7 @@ import string
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
-from mdvtools.dbutils.admin_contracts import AdminExternalServiceError, AdminInputError
+from mdvtools.dbutils.admin.contracts import AdminExternalServiceError, AdminInputError
 
 
 @dataclass(frozen=True)

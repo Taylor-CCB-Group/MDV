@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import {
     buildApiUrl,
+    buildAdminUrl,
     buildDashboardUrl,
     buildProjectUrl,
     getAppMountPath,
@@ -84,6 +85,50 @@ describe("mdvRouting", () => {
         setUrl("/");
         expect(isProjectPath()).toBe(false);
         expect(shouldRenderDashboard()).toBe(true);
+    });
+
+    test("builds dashboard url from admin route", () => {
+        setUrl("/admin");
+        expect(getAppMountPath()).toBe("/");
+        expect(buildDashboardUrl()).toBe("/");
+        expect(buildAdminUrl()).toBe("/admin");
+
+        setUrl("/mdv/admin/");
+        expect(getAppMountPath()).toBe("/mdv/");
+        expect(buildDashboardUrl()).toBe("/mdv/");
+        expect(buildAdminUrl()).toBe("/mdv/admin");
+    });
+
+    test("builds admin api url from dashboard route", () => {
+        setUrl("/");
+        expect(buildApiUrl("admin")).toBe("/admin");
+
+        setUrl("/mdv/");
+        expect(buildApiUrl("admin")).toBe("/mdv/admin");
+
+        setUrl("/lucas-test");
+        expect(getAppMountPath()).toBe("/lucas-test/");
+        expect(buildAdminUrl()).toBe("/lucas-test/admin");
+        expect(buildApiUrl("logout")).toBe("/lucas-test/logout");
+        expect(buildApiUrl("secondary_logo")).toBe("/lucas-test/secondary_logo");
+    });
+
+    test("builds admin api url from mounted admin route", () => {
+        setUrl("/lucas-test/admin#/users");
+
+        expect(getAppMountPath()).toBe("/lucas-test/");
+        expect(buildApiUrl("/admin/api/session")).toBe(
+            "/lucas-test/admin/api/session",
+        );
+        expect(buildApiUrl("/admin/api/users")).toBe(
+            "/lucas-test/admin/api/users",
+        );
+        expect(buildApiUrl("/admin/api/projects")).toBe(
+            "/lucas-test/admin/api/projects",
+        );
+        expect(buildApiUrl("login")).toBe("/lucas-test/login");
+        expect(buildApiUrl("logout")).toBe("/lucas-test/logout");
+        expect(buildApiUrl("secondary_logo")).toBe("/lucas-test/secondary_logo");
     });
 
     test("treats preview api roots as equivalent with or without trailing slash", () => {

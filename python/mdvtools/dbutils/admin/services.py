@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable
 
-from mdvtools.dbutils.admin_contracts import (
+from mdvtools.dbutils.admin.contracts import (
     AdminConflictError,
     AdminExternalServiceError,
     AdminInputError,
@@ -13,11 +13,12 @@ from mdvtools.dbutils.admin_contracts import (
     AdminProjectMember,
     AdminProjectMembership,
     AdminUser,
+    AdminUserSyncResult,
     CreateAdminUserInput,
     CreateAdminUserResult,
     ProjectMemberInput,
 )
-from mdvtools.dbutils.admin_identity import (
+from mdvtools.dbutils.admin.identity import (
     AdminIdentityInput,
     AdminIdentityProvider,
     AdminIdentityResult,
@@ -162,6 +163,52 @@ class MDVAdminServices:
             user=self._to_admin_user(user),
             project_access=project_memberships,
             created=created,
+        )
+
+    def sync_users_from_identity_provider(self) -> AdminUserSyncResult:
+        _Project, User = self._get_models()
+        users_before = User.query.count()
+        admins_before = User.query.filter_by(is_admin=True).count()
+
+        if not self.enable_auth:
+            return AdminUserSyncResult(
+                synced=False,
+                message="Auth is disabled; user sync is only available for authenticated deployments.",
+                users_before=users_before,
+                users_after=users_before,
+                admins_before=admins_before,
+                admins_after=admins_before,
+            )
+
+        from mdvtools.auth.authutils import get_auth_provider
+
+        auth_provider = get_auth_provider()
+        sync_users_to_db = getattr(auth_provider, "sync_users_to_db", None)
+        if not callable(sync_users_to_db):
+            return AdminUserSyncResult(
+                synced=False,
+                message="The configured auth provider does not support user sync.",
+                users_before=users_before,
+                users_after=users_before,
+                admins_before=admins_before,
+                admins_after=admins_before,
+            )
+
+        try:
+            sync_users_to_db()
+        except Exception as exc:
+            raise AdminExternalServiceError("Auth0 user sync failed.") from exc
+
+        users_after = User.query.count()
+        admins_after = User.query.filter_by(is_admin=True).count()
+        self._refresh_cache_after_write()
+        return AdminUserSyncResult(
+            synced=True,
+            message="Users synced from Auth0 to the MDV database.",
+            users_before=users_before,
+            users_after=users_after,
+            admins_before=admins_before,
+            admins_after=admins_after,
         )
 
     def list_project_members(self, project_id: int) -> list[AdminProjectMember]:

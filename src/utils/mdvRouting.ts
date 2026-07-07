@@ -59,12 +59,23 @@ export function isProjectPath(pathname = window.location.pathname) {
     return /\/project\/[^/]+\/?$/.test(pathname);
 }
 
+function stripAdminPathSuffix(pathname: string) {
+    const match = pathname.match(/^(.*)\/admin\/?$/);
+    if (!match) return null;
+    return match[1];
+}
+
 export function getAppMountPath(pathname = window.location.pathname) {
     const normalizedPath = pathname || "/";
 
     if (isProjectPath(normalizedPath)) {
         const basePath = normalizedPath.replace(/\/project\/[^/]+\/?$/, "");
         return ensureTrailingSlash(basePath || "/");
+    }
+
+    const adminBasePath = stripAdminPathSuffix(normalizedPath);
+    if (adminBasePath !== null) {
+        return ensureTrailingSlash(adminBasePath || "/");
     }
 
     for (const suffix of ["/login_dev", "/login_dev.html", "/catalog_dev", "/catalog_dev.html", "/index.html"]) {
@@ -149,6 +160,10 @@ export function buildDashboardUrl(apiRoot = getDashboardApiRoot()) {
     if (!hasExplicitDirParam()) return getAppMountPath();
     if (apiRoot === "/") return getAppMountPath();
     return buildAppShellUrl(`?dir=${encodeURIComponent(ensureTrailingSlash(apiRoot))}`);
+}
+
+export function buildAdminUrl() {
+    return `${getAppMountPath()}admin`;
 }
 
 export function buildProjectUrl(projectId: string | number, apiRoot = getDashboardApiRoot()) {

@@ -126,6 +126,26 @@ class CreateAdminUserResult:
 
 
 @dataclass(frozen=True)
+class AdminUserSyncResult:
+    synced: bool
+    message: str
+    users_before: int
+    users_after: int
+    admins_before: int
+    admins_after: int
+
+    def to_response(self) -> dict[str, Any]:
+        return {
+            "synced": self.synced,
+            "message": self.message,
+            "usersBefore": self.users_before,
+            "usersAfter": self.users_after,
+            "adminsBefore": self.admins_before,
+            "adminsAfter": self.admins_after,
+        }
+
+
+@dataclass(frozen=True)
 class ProjectMemberInput:
     user_id: int
     permission: AdminPermission
@@ -154,6 +174,9 @@ class AdminHostServices(Protocol):
         self,
         data: CreateAdminUserInput,
     ) -> CreateAdminUserResult:
+        ...
+
+    def sync_users_from_identity_provider(self) -> AdminUserSyncResult:
         ...
 
     def list_project_members(self, project_id: int) -> list[AdminProjectMember]:
