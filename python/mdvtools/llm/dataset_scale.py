@@ -184,15 +184,24 @@ def load_agent_dataframes(
     """
     if selected_datasources:
         out: dict[str, Any] = {}
+        first_error: Exception | None = None
         for ds_name in selected_datasources[:_AGENT_PROBE_CAP]:
             try:
                 df = _load_probe_df_for_datasource(project, ds_name, scale, roles)
-            except Exception:
+            except Exception as exc:
+                if first_error is None:
+                    first_error = exc
                 continue
             if df is not None:
                 out[ds_name] = df
         if out:
             return out
+        if first_error is not None:
+            raise first_error
+        raise ValueError(
+            "None of the requested selected datasources produced a probe dataframe: "
+            f"{selected_datasources[:_AGENT_PROBE_CAP]!r}"
+        )
 
     obs_ds = roles.obs_datasource
     df_obs = _load_probe_df_for_datasource(project, obs_ds, scale, roles)

@@ -24,6 +24,12 @@ class _ScaleProject:
         return ["table_a", "table_b", "table_c"]
 
 
+class _FailingSelectedDatasourceProject(_ScaleProject):
+    def get_datasource_as_dataframe(self, name: str, columns: list[str] | None = None):
+        self.loads.append((name, columns))
+        raise RuntimeError(f"load failed for {name}")
+
+
 _LARGE_SCALE = ProjectScale(
     obs_rows=200_000,
     obs_columns=10,
@@ -123,3 +129,43 @@ def test_load_agent_dataframes_selected_datasources_multi_table():
     assert result == {"table_a": "df:table_a", "table_b": "df:table_b"}
     assert ("table_a", ["leiden"]) in project.loads
     assert ("table_b", ["assay"]) in project.loads
+
+
+def test_load_agent_dataframes_selected_datasources_raises_first_load_error():
+    project = _FailingSelectedDatasourceProject(
+        metadata_by_name={
+            "table_a": {"columns": _OBS_COLUMNS},
+            "table_b": {"columns": [{"field": "assay", "datatype": "text"}]},
+        }
+    )
+    roles = InferredDatasourceRoles(obs_datasource="cells", expressions=[])
+
+    with pytest.raises(RuntimeError, match="load failed for table_a"):
+        load_agent_dataframes(
+            project,
+            roles,
+            _LARGE_SCALE,
+            selected_datasources=["table_a", "table_b"],
+        )
+
+    assert project.loads == [("table_a", ["leiden"]), ("table_b", ["assay"])]
+
+
+def test_load_agent_dataframes_selected_datasources_raises_when_all_probes_empty():
+    project = _ScaleProject(
+        metadata_by_name={
+            "table_a": {"columns": []},
+            "table_b": {"columns": []},
+        }
+    )
+    roles = InferredDatasourceRoles(obs_datasource="cells", expressions=[])
+
+    with pytest.raises(ValueError, match="None of the requested selected datasources"):
+        load_agent_dataframes(
+            project,
+            roles,
+            _LARGE_SCALE,
+            selected_datasources=["table_a", "table_b"],
+        )
+
+    assert project.loads == []
