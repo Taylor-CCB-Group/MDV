@@ -21,7 +21,7 @@ class docstring flags "a single root with portals" as unfinished future work
 
 **But a project-scoped provider pattern already works.** `createMdvPortal` wraps every island in:
 
-```
+```tsx
 <QueryClientProvider client={queryClient}>        // module singleton, react_utils.tsx:78
   <ChartManagerProvider chartManager={window.mdv.chartManager}>
     <ProjectProvider …>
@@ -65,6 +65,11 @@ re-fetch.
 - New module `src/react/spatialdata/spatial_store_cache.ts`: a `Map<string, Promise<SpatialData>>`
   keyed by resolved store URL (+ `selection` if ever used). One instance per project — a module
   singleton mirroring `queryClient`, or hung off `chartManager` / `ProjectContext`.
+  - **Don't cache a rejected `readZarr` promise indefinitely.** If a load fails, a raw
+    `Map<url, Promise>` would poison that URL — every later read returns the same failed promise
+    until eviction/reload. Either evict the entry on rejection (`p.catch(() => cache.delete(url))`)
+    or keep the *inflight* promise separate from the *fulfilled* `SpatialData` entry, so transient
+    store/network errors stay recoverable and a retry re-fetches.
 - Add a thin `SpatialStoreProvider` inside `createMdvPortal`
   ([react_utils.tsx:108](../../../src/react/react_utils.tsx)), alongside `ProjectProvider`,
   exposing the cache.

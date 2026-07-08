@@ -81,7 +81,7 @@ These recur across every theme and largely determine what is cheap vs. expensive
 
 ## How the themes connect
 
-```
+```text
         ╔═════════════════════════════════════════════════════════════╗
         ║  CORE DELIVERABLE (00): shapes/labels ↔ table association    ║
         ║  geometry coloured / filtered / highlighted BY table columns ║

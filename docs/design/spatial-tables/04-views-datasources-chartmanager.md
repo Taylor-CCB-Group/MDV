@@ -96,6 +96,17 @@ of screen space — but it touches pane creation, gridstack keying, `getState`, 
 Pair it with (B1): one shared toolbar with a datasource picker in Add Chart is exactly the UX you
 described (one small chart for a DS without it consuming a whole pane).
 
+> **Schema note (this is a persisted `View` contract change).** Making `panelWidth`/`layout`
+> region-scoped changes the shape of `views.json`. The intent is **additive / opt-in via a `kind`
+> discriminator, not a migration**: existing per-datasource views keep their current shape *and*
+> their current code path unchanged, while new region-scoped views take a discriminated branch —
+> the two shapes co-exist (as [@xinaesthete noted on the PR](https://github.com/Taylor-CCB-Group/MDV/pull/522),
+> behaviour for existing views doesn't change). So there is no load-time migration to write; the
+> real requirement is that `getState()` and `ViewManager.hasUnsavedChanges` **dispatch on the
+> discriminator** so they never serialize/compare a new-shape view with the old per-datasource
+> assumptions (or vice-versa). Introduce an explicit `schemaVersion`/`kind` field now so the branch
+> point is unambiguous rather than inferred. This is the same "audit every reader" caution as (A).
+
 ## (A) A new view kind that bypasses ChartManager/DataSources
 
 **Cleanest seam:** branch on a discriminator in `_init(view)` (e.g. `view.kind === "custom"`).

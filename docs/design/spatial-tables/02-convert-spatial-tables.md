@@ -34,7 +34,7 @@ def _concat_spatial_tables(adata_objects):
 
 As pseudo-code:
 
-```
+```text
 adata_objects = []
 for store in discovered_stores:
     for (table_name, adata) in read_zarr(store).tables.items():   # EVERY table, no grouping

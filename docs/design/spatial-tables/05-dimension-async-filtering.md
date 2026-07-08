@@ -5,11 +5,18 @@
 
 ## The one-line diagnosis
 
-**Filter *evaluation* is the only synchronous main-thread hotspot.** Everything *derived* from a
-filter (histograms, category counts, box/violin, density contours, sort order, the compact
-passing-index list) is **already off-thread in workers reading SharedArrayBuffers**. So "make
-filtering async" = move the predicate-over-all-rows step to a worker/GPU/WASM — the rest of the
-architecture is already async and SAB-based, which is GPU/WASM-friendly.
+**Dimension filter *evaluation* is the main synchronous main-thread hotspot.** The *worker-backed
+aggregations* derived from a filter (histograms, category counts, box/violin, density contours,
+sort order, and the compact passing-index list) are **already off-thread in workers reading
+SharedArrayBuffers**. So the biggest win from "make filtering async" = move the
+predicate-over-all-rows step to a worker/GPU/WASM.
+
+Two important caveats so this isn't overstated: (i) the **chart-scope predicate** and **cross-chart
+ownership** work in the `useFilteredIndices` cluster still run **synchronously on the main thread**
+(see §"what crept in" items 3 and 5) — they are derived-from-filter work that is *not* off-thread;
+(ii) the Dimension ref-count bookkeeping is main-thread too. The worker/SAB architecture is a good
+substrate for GPU/WASM, but "everything derived is already off-thread" applies to the Dimension
+aggregation workers, not to the React-side scoping/ownership layer.
 
 ## Current filter model (grounded)
 
@@ -43,10 +50,14 @@ ideal for GPU/WASM.
 ## `useFilteredIndices` — what it is and what crept in
 
 `useFilteredIndices()` ([src/react/hooks.ts:477](../../../src/react/hooks.ts)) returns the
-`Uint32Array` of currently-passing row indices. It exists for **performance**: it turns the 35M-row
-byte array into a cached, worker-computed compact ~1M-element index list shared across charts, so
-deck.gl / Splatter / DeckScatter only draw passing points. That is genuinely load-bearing for the
-spatial rendering path.
+`Uint32Array` of currently-passing row indices. Precisely: the **shared, worker-computed compact
+index list** is produced by `useSimplerFilteredIndices` (hooks.ts:493) — that is the piece that
+turns the 35M-row byte array into a cached ~1M-element list shared across charts. `useFilteredIndices`
+wraps it and **layers the synchronous chart-scope predicate on top** (hooks.ts:386), so the value it
+returns is not the raw shared list but a per-chart-scoped subset. The performance win (deck.gl /
+Splatter / DeckScatter only draw passing points) comes from the `useSimplerFilteredIndices` compact
+list and is genuinely load-bearing for the spatial rendering path; the extra scoping layer is part
+of what should be separated out (below).
 
 But the single conceptual job ("give me passing indices") has accreted ~9 distinct
 responsibilities across `hooks.ts`, `filterOwnership.ts`, `categoryFilterUtils.ts`, and a divergent
@@ -71,8 +82,9 @@ copy in `scatter_state.ts`:
 
 ## `tgpu-htj2k` primitives worth reusing
 
-Sibling repo `/Users/ptodd/code/codecs/tgpu-htj2k` — WebGPU (TypeGPU/TGSL) + Rust→WASM. No barrel
-export; import by path. Directly reusable:
+Sibling repo [`tgpu-htj2k`](https://github.com/xinaesthete/tgpu-htj2k) (public; may be renamed) —
+WebGPU (TypeGPU/TGSL) + Rust→WASM. No barrel export; import by path. Paths below are relative to
+that repo. Directly reusable:
 
 - **`getDevice()`** (`src/gpu/device.ts`) — cached GPU device; in-browser backed by `navigator.gpu`.
 - **The layout-bound compute-pipeline idiom** (`src/gpu/spatial/nnDistance.ts`):
