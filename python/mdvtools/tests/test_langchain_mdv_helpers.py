@@ -40,7 +40,7 @@ def test_build_role_hint_selected_datasources_has_no_stray_langchain_variables()
         scale = None
 
     hint = ProjectChat._build_role_hint(
-        _StubChat(),
+        cast(ProjectChat, _StubChat()),
         primary_datasource="cells",
         selected_datasources=["cells", "rna"],
     )

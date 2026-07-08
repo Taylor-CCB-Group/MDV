@@ -9,7 +9,7 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChat
@@ -192,7 +192,7 @@ def _write_debug_artifacts(
 
 def _parse_datasource_cli_args(
     raw: Optional[str],
-) -> tuple[str, list[str] | None]:
+) -> tuple[Literal["auto", "manual"], list[str] | None]:
     """Return (datasource_mode, names) for CLI --datasources."""
     if not raw or not str(raw).strip():
         return "auto", None
@@ -211,7 +211,7 @@ def run_chat_once(
     output_dir: Optional[str] = None,
     view_name: Optional[str] = None,
     model_id: Optional[str] = None,
-    datasource_mode: str = "auto",
+    datasource_mode: Literal["auto", "manual"] = "auto",
     datasource_names: list[str] | None = None,
 ) -> tuple[dict[str, Any], int]:
     abs_project = str(Path(project_path).expanduser().resolve())
@@ -400,7 +400,7 @@ def run_batch_prompts(
     base_url: str,
     output_dir: Optional[str] = None,
     model_id: Optional[str] = None,
-    datasource_mode: str = "auto",
+    datasource_mode: Literal["auto", "manual"] = "auto",
     datasource_names: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     prompts = _load_prompts(prompt_file)
