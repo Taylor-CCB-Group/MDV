@@ -10,6 +10,8 @@ import {locationFromFieldValues } from "../genomicLocationUtils";
 import { useGenomicInfo } from "../genomicLocationUtils";
 import {type GenomeLocation,applyViewMargins} from "../genomicLocationUtils";
 import { runInAction } from "mobx";
+import { useProject } from "@/modules/ProjectContext";
+import { buildApiUrl } from "@/utils/mdvRouting";
 
 
 const UCSCBrowserComponent = observer(() => {
@@ -21,10 +23,19 @@ const UCSCBrowserComponent = observer(() => {
     const [coordInput, setCoordInput] = useState("");
     const highlightedIndex = useHighlightedIndex();
  
-
-
     const {genomicInfo,areColumnsLoaded} = useGenomicInfo();
-    const url_proxy = genomicInfo.ucsc_proxy_url || "/ucsc_proxy";
+    const { mainApiRoute } = useProject();
+    const url_proxy = useMemo(() => {
+        const raw = genomicInfo.ucsc_proxy_url;
+        if (!raw) return buildApiUrl("ucsc_proxy", mainApiRoute);
+
+        // If the datasource provided a full URL, use it as-is.
+        if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(raw)) return raw;
+
+        // Treat values like "/ucsc_proxy" as a path relative to the API root.
+        const normalizedPath = raw.replace(/^\/+/, "");
+        return buildApiUrl(normalizedPath, mainApiRoute);
+    }, [genomicInfo.ucsc_proxy_url, mainApiRoute]);
 
 
 
@@ -122,7 +133,7 @@ const UCSCBrowserComponent = observer(() => {
 
         // Build the proxy URL with all params
         return `${url_proxy}?${url.searchParams.toString()}`;
-    }, [trimmedSrc, config.location, size, config.highlight_selected_region, highlightedIndex]);
+    }, [trimmedSrc, config.location, size, config.highlight_selected_region, highlightedIndex, url_proxy]);
 
     // Reset loading/error state when src changes
     useEffect(() => {
@@ -136,7 +147,9 @@ const UCSCBrowserComponent = observer(() => {
             if (!region) return;
             //run in mobx action to avoid warnings about updating observable state outside of an action
             runInAction(() => {
-                config.location = applyViewMargins(region, config.view_margins!);    
+                if (config.view_margins) {
+                    config.location = applyViewMargins(region, config.view_margins);
+                }
             });
         }
     }, [config.view_margins, highlightedIndex]);
@@ -152,28 +165,28 @@ const UCSCBrowserComponent = observer(() => {
                 alignItems: "center",
                 flexShrink: 0
             }}>
-                <button 
+                <button type="button"
                     onClick={() => handlePan("left")} 
                     style={{ padding: "2px 8px", fontSize: "12px" }}
                     title="Pan left"
                 >
                     ◀
                 </button>
-                <button 
+                <button type="button"
                     onClick={() => handleZoom(1.5)} 
                     style={{ padding: "2px 8px", fontSize: "12px" }}
                     title="Zoom out"
                 >
                     −
                 </button>
-                <button 
+                <button type="button"
                     onClick={() => handleZoom(0.67)} 
                     style={{ padding: "2px 8px", fontSize: "12px" }}
                     title="Zoom in"
                 >
                     +
                 </button>
-                <button 
+                <button type="button"
                     onClick={() => handlePan("right")} 
                     style={{ padding: "2px 8px", fontSize: "12px" }}
                     title="Pan right"
@@ -193,7 +206,7 @@ const UCSCBrowserComponent = observer(() => {
                         width: "150px"
                     }}
                 />
-                <button 
+                <button type="button"
                     onClick={handleCoordinateSubmit}
                     style={{ padding: "2px 8px", fontSize: "12px" }}
                 >
@@ -246,6 +259,7 @@ const UCSCBrowserComponent = observer(() => {
                 ) : (
                     <img
                         src={src}
+                        alt="UCSC Genome Browser"
                         title="UCSC Genome Browser"
                         onLoad={() => setLoading(false)}
                         onError={() => {

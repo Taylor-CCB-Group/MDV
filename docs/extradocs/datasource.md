@@ -193,7 +193,7 @@ There are currently two supported shapes:
 * `svs` for rows describing a structural variant which is more complex than a single location
 * `assembly` the genome build e.g. hg38, mm10 etc. - required 
 * `chromosomes` a dictionary of chromosome name to length - optional , only required for the SVCircosPlot
-* `ucsc_proxy_url` Required for retrieving UCSC genome images and forwarding them to the browser - the serverlite component uses /ucsc_proxy, which is the default
+* `ucsc_proxy_url` Required for retrieving UCSC genome images and forwarding them to the browser - by default the chart uses the app/API root `/ucsc_proxy` (resolved via `mdv_api_root` in the frontend)
 
 Either `genomic_location` or `svs` must be supplied
 

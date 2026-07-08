@@ -126,7 +126,7 @@ export const GenomicLocationColumnsSchema = z.object({
 
 const GenomeMetadataBaseSchema = z.object({
     assembly: z.string().describe("Genome build identifier (e.g., 'hg38', 'mm10')"),
-    ucsc_proxy_url: z.string().optional().describe("Optional proxy URL for UCSC genome browser requests - /ucsc_proxy used by default"),
+    ucsc_proxy_url: z.string().optional().describe("Optional proxy URL for UCSC genome browser requests - `/ucsc_proxy` at the MDV API root used by default"),
     chromosomes: z.record(z.string(), z.number().positive())
         .optional()
         .describe("Optional chromosome-length dictionary, required by some SV visualizations")
