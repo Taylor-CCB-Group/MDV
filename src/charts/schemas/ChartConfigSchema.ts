@@ -77,13 +77,19 @@ export const ChartColorConfigSchema = z.object({
             display: z.boolean().optional().describe("Whether the color legend is visible"),
             pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
             filter: z
-                .object({
-                    kind: z.literal("categorical"),
-                    column: z.string(),
-                    value: z.string(),
-                })
+                .discriminatedUnion("kind", [
+                    z.object({
+                        kind: z.literal("categorical"),
+                        column: z.string(),
+                        value: z.string(),
+                    }),
+                    z.object({
+                        kind: z.literal("continuous"),
+                        column: z.string(),
+                        range: z.tuple([z.number(), z.number()]),
+                    }),
+                ])
                 .optional()
-                // Add a numeric range variant when continuous legend filtering is implemented.
                 .describe("Active color legend filter"),
         })
         .optional()

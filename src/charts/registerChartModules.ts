@@ -36,6 +36,7 @@ import "./GenomeBrowsers/SVCircosPlot/SVCircosPlot";
 
 // React-driven chart/dialog registrations.
 import "../react/components/VivMDVReact";
+import "../react/components/SpatialDataMDVReact";
 import "../react/components/DeckScatterReactWrapper";
 import "../react/components/SplatterPlotReactWrapper";
 import "../charts/dialogs/AnnotationDialogReact";

@@ -18,7 +18,8 @@
         "GIT_COMMIT_HASH": "${containerEnv:GIT_COMMIT_HASH}",
         "GIT_LAST_COMMIT_MESSAGE": "${containerEnv:GIT_LAST_COMMIT_MESSAGE}",
         "BUILD_DATE": "${containerEnv:BUILD_DATE}",
-        "GIT_DIRTY": "${containerEnv:GIT_DIRTY}"
+        "GIT_DIRTY": "${containerEnv:GIT_DIRTY}",
+        "OLLAMA_BASE_URL": "http://host.docker.internal:11434"
     },
     "customizations": {
         "vscode": {

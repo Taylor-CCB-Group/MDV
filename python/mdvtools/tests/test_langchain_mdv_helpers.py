@@ -41,8 +41,19 @@ def test_project_chat_initialization_fails_without_openai_key(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr("mdvtools.llm.langchain_mdv.load_dotenv", lambda: False)
 
+    def _no_providers() -> None:
+        raise ValueError(
+            "No LLM providers are available. Set OPENAI_API_KEY or start Ollama "
+            "at http://localhost:11434."
+        )
+
+    monkeypatch.setattr(
+        "mdvtools.llm.langchain_mdv.ensure_any_provider_available",
+        _no_providers,
+    )
+
     chat = ProjectChat(cast(MDVProject, FakeProject()))
 
     assert chat.init_error is True
     assert chat.error_message is not None
-    assert "OPENAI_API_KEY is not set" in chat.error_message
+    assert "No LLM providers are available" in chat.error_message

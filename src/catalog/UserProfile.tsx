@@ -16,6 +16,7 @@ import useUser from "./hooks/useUser";
 const UserProfile: React.FC = () => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const { user, isLoading, error } = useUser();
+    const open = Boolean(anchorEl);
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
@@ -31,17 +32,7 @@ const UserProfile: React.FC = () => {
         } catch (err) {
             console.error("Logout error:", err);
         }
-    }
-
-    if (isLoading) {
-        return <CircularProgress size={32} />;
-    }
-
-    if (error || !user) {
-        return (
-            <Typography color="error">Error loading user profile</Typography>
-        );
-    }
+    };
 
     return (
         <>
@@ -49,22 +40,27 @@ const UserProfile: React.FC = () => {
                 onClick={handleClick}
                 size="small"
                 sx={{ ml: 1, mr: 1.5 }}
-                aria-controls={anchorEl ? "account-menu" : undefined}
+                aria-controls={open ? "account-menu" : undefined}
                 aria-haspopup="true"
-                aria-expanded={anchorEl ? "true" : undefined}
+                aria-expanded={open ? "true" : undefined}
+                aria-label="Account menu"
             >
-                <Avatar
-                    sx={{ width: 32, height: 32, color: "inherit" }}
-                    src={user.avatarUrl}
-                    alt={user.name}
-                >
-                    {!user.avatarUrl && <Person />}
-                </Avatar>
+                {isLoading ? (
+                    <CircularProgress size={32} />
+                ) : (
+                    <Avatar
+                        sx={{ width: 32, height: 32, color: "inherit" }}
+                        src={user?.avatarUrl}
+                        alt={user?.name ?? "Account"}
+                    >
+                        <Person />
+                    </Avatar>
+                )}
             </IconButton>
             <Menu
                 anchorEl={anchorEl}
                 id="account-menu"
-                open={Boolean(anchorEl)}
+                open={open}
                 onClose={handleClose}
                 sx={{
                     overflow: "visible",
@@ -80,40 +76,74 @@ const UserProfile: React.FC = () => {
                 transformOrigin={{ horizontal: "right", vertical: "top" }}
                 anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
             >
-                <Box sx={{ p: 2 }}>
+                {isLoading && (
                     <Box
                         sx={{
+                            p: 2,
                             display: "flex",
-                            alignItems: "flex-start",
-                            mb: 2,
-                            gap: 1,
-                            px: 1
+                            justifyContent: "center",
+                            minWidth: 200,
                         }}
                     >
-                        <Avatar
-                            sx={{ width: 100, height: 100, color: "inherit" }}
-                            src={user.avatarUrl}
-                            alt={user.name}
-                        >
-                            {!user.avatarUrl && (
-                                <Person sx={{ fontSize: 50 }} />
-                            )}
-                        </Avatar>
-                        <Box>
-                            <Typography variant="subtitle1" sx={{fontWeight: 600}}>
-                                {user.name}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{mt: 0.5}}>
-                                {user.email}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{mt:1}}>
-                                {user.association}
-                            </Typography>
-                        </Box>
+                        <CircularProgress size={24} />
                     </Box>
-                    <Divider />
-                </Box>
-                <MenuItem onClick={handleClose}>Manage your Account</MenuItem>
+                )}
+                {error && (
+                    <>
+                    <Box sx={{ p: 2, maxWidth: 280 }}>
+                        <Typography color="error" variant="body2">
+                            {error}
+                        </Typography>
+                    </Box>
+                        <Divider />
+                        </>
+                )}
+                {user && (
+                    <Box sx={{ p: 2 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                mb: 2,
+                                gap: 1,
+                                px: 1,
+                            }}
+                        >
+                            <Avatar
+                                sx={{ width: 100, height: 100, color: "inherit" }}
+                                src={user.avatarUrl}
+                                alt={user.name}
+                            >
+                                {!user.avatarUrl && (
+                                    <Person sx={{ fontSize: 50 }} />
+                                )}
+                            </Avatar>
+                            <Box>
+                                <Typography
+                                    variant="subtitle1"
+                                    sx={{ fontWeight: 600 }}
+                                >
+                                    {user.name}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ mt: 0.5 }}
+                                >
+                                    {user.email}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ mt: 1 }}
+                                >
+                                    {user.association}
+                                </Typography>
+                            </Box>
+                        </Box>
+                        <Divider />
+                    </Box>
+                )}
                 <MenuItem onClick={handleSignOut}>Sign out</MenuItem>
             </Menu>
         </>

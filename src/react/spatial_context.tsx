@@ -152,8 +152,8 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
 
     useEffect(() => {
         if (coords.length === 0) {
-            chart.resetButton.style.display = "none";
             removeFilter();
+            chart.updateResetButtonVisibility();
             return;
         }
         chart.resetButton.style.display = "inline";

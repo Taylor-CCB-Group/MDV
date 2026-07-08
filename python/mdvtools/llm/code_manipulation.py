@@ -6,6 +6,7 @@ import pandas as pd
 import regex as re
 from mdvtools.llm.templates import packages_functions
 from mdvtools.llm.datasource_roles import build_chatmdv_roles_constants_block
+from mdvtools.llm.code_preflight import CHART_CLASS_MODULES
 import json
 import ast
 import subprocess
@@ -50,6 +51,18 @@ def extract_code_from_response(response: str):
     # return matches[-1].strip()
 
 
+def _chart_import_autofix_map() -> dict[str, str]:
+    """Map common hallucinated chart module paths to canonical preflight modules."""
+    fixes: dict[str, str] = {
+        "mdvtools.charts.stacked_row_chart": "mdvtools.charts.stacked_row_plot",
+    }
+    for class_name, module_path in CHART_CLASS_MODULES.items():
+        wrong = f"mdvtools.charts.{class_name}"
+        if wrong != module_path:
+            fixes.setdefault(wrong, module_path)
+    return fixes
+
+
 def _autofix_generated_code(code: str, log=print) -> str:
     """Best-effort fixes for common ChatMDV codegen mistakes before execution."""
     if "project.get_datasource_roles()" in code:
@@ -62,6 +75,10 @@ def _autofix_generated_code(code: str, log=print) -> str:
         if bad_attr in code:
             log(f"# Autofix: expr{bad_attr} -> expr.datasource_name")
             code = code.replace(bad_attr, ".datasource_name")
+    for wrong_module, correct_module in _chart_import_autofix_map().items():
+        if wrong_module in code:
+            log(f"# Autofix: chart import {wrong_module} -> {correct_module}")
+            code = code.replace(wrong_module, correct_module)
     return code
 
 

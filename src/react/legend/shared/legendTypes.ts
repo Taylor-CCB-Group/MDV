@@ -20,6 +20,8 @@ export type LegendContinuousSvgProps = {
     range: [number, number];
     width?: number;
     height?: number;
+    activeRange?: [number, number] | null;
+    onRangeChange?: (range: [number, number] | null) => void;
 };
 
 export type ContinuousLegendLayout = {

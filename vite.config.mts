@@ -31,8 +31,8 @@ reactCompiler.rolldown.filter ??= {};
 // (as far as we've noticed)
 reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
 const useReactCompiler =
-    process.env.VITE_USE_REACT_COMPILER === "1" ||
-    process.env.VITE_USE_REACT_COMPILER === "true";
+    process.env.VITE_USE_REACT_COMPILER !== "0" &&
+    process.env.VITE_USE_REACT_COMPILER !== "false";
 const enableBundleAnalysis =
     process.env.VITE_BUNDLE_ANALYZE === "1" ||
     process.env.VITE_BUNDLE_ANALYZE === "true";
@@ -246,6 +246,10 @@ export default defineConfig(async (): Promise<UserConfig> => {
             path.resolve(configDir, 'login_dev.html'),
             path.resolve(configDir, 'catalog_dev.html'),
         ],
+        // zarrextra/workers resolves codec-worker.js via import.meta.url; prebundling
+        // at some point broke that path causing stale-cache 504s after package bumps.
+        // as of now, this will actively prevent the url from being resolved properly in dev
+        // exclude: ['zarrextra/workers'],
     },
     } as UserConfig;
 });

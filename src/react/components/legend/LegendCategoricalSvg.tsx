@@ -1,7 +1,6 @@
 import {
     LEGEND_CATEGORICAL_LABEL_START_X,
     LEGEND_CATEGORICAL_ROW_HEIGHT,
-    LEGEND_CATEGORICAL_WIDTH,
 } from "@/react/legend/shared/legendConstants";
 import type { LegendCategoricalSvgProps } from "@/react/legend/shared/legendTypes";
 import {
@@ -10,7 +9,6 @@ import {
     legendCategoricalBodyHeight,
     legendCategoricalContainerHeight,
     legendCategoricalRowY,
-    measureLegendLabelWidth,
 } from "@/react/legend/shared/legendUtils";
 
 export {
@@ -50,15 +48,6 @@ export default function LegendCategoricalSvg({
                         item.label,
                         labelMaxWidth,
                     );
-                    const hitTargetWidth = Math.min(
-                        LEGEND_CATEGORICAL_WIDTH,
-                        Math.max(
-                            48,
-                            LEGEND_CATEGORICAL_LABEL_START_X +
-                                measureLegendLabelWidth(formatted.display) +
-                                8,
-                        ),
-                    );
                     const isHovered =
                         hoveredKey !== null && hoveredKey === item.key;
                     const isActive =
@@ -96,7 +85,7 @@ export default function LegendCategoricalSvg({
                                 y={Math.max(0, y - 1)}
                                 x={0}
                                 height={LEGEND_CATEGORICAL_ROW_HEIGHT + 2}
-                                width={hitTargetWidth}
+                                width="100%"
                                 style={{
                                     fill: "transparent",
                                     pointerEvents: "all",

@@ -21,6 +21,7 @@ export type ColorLegendCategoricalSpec = {
 export type ColorLegendContinuousSpec = {
     kind: "continuous";
     label: string;
+    column: string;
     colors: string[];
     range: [number, number];
     width?: number;

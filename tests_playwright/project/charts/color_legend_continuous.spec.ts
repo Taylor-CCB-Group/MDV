@@ -2,7 +2,7 @@
  * Targets the Vite dev frontend (React color legend). Run with:
  *   TEST_BASE_URL=http://127.0.0.1:5170 pnpm run playwright-test-project tests_playwright/project/charts/color_legend_continuous.spec.ts --project=chromium --reporter=list
  */
-import test, { expect } from "@playwright/test";
+import test, { expect, type Page } from "@playwright/test";
 import {
     addChartViaUi,
     dragChartColorLegend,
@@ -19,6 +19,70 @@ import {
     waitForProjectReady,
     type SyntheticAnndataTemporaryProjectHandle,
 } from "../../utils/projectFixtures";
+
+async function getContinuousColorLegendFilterRuntimeState(page: Page, chartTitle: string) {
+    return await page.evaluate((title) => {
+        const chartManager = (window as any).mdv?.chartManager;
+        const chartEntries = Object.values(chartManager?.charts ?? {});
+        const chart = chartEntries
+            .map((entry: any) => entry?.chart)
+            .find((entry: any) => entry?.config?.title === title);
+        if (!chart) {
+            throw new Error(`Chart not found: ${title}`);
+        }
+
+        const panels = [...document.querySelectorAll(".ciview-chart-panel")];
+        const panel = panels.find((entry) => {
+            const titleNode = entry.querySelector(".ciview-chart-title");
+            return titleNode?.textContent?.trim() === title;
+        });
+
+        return {
+            chartFilter: chart.colorLegendFilter ?? null,
+            dataStoreSize: chart.dataStore.size,
+            filterSize: chart.dataStore.filterSize,
+            resetDisplay: chart.resetButton?.style?.display ?? "",
+            hasSelectedRange: (() => {
+                const selection = panel?.querySelector(
+                    ".legend-container .brush .selection",
+                );
+                if (!(selection instanceof SVGGraphicsElement)) {
+                    return false;
+                }
+                const box = selection.getBBox();
+                return getComputedStyle(selection).display !== "none" && box.width > 0;
+            })(),
+        };
+    }, chartTitle);
+}
+
+async function dragContinuousColorLegendRangeOutsideRight(page: Page, chartTitle: string) {
+    const slider = getChartColorLegendHost(page, chartTitle).locator(".brush .overlay");
+    await expect(slider).toBeVisible();
+    const box = await slider.boundingBox();
+    if (!box) {
+        throw new Error(`Continuous color legend slider not found for chart "${chartTitle}"`);
+    }
+
+    const startX = box.x + box.width * 0.35;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(startX, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.7, y);
+    await page.mouse.move(box.x + box.width + 30, y);
+    await page.mouse.up();
+}
+
+async function clearContinuousColorLegendRange(page: Page, chartTitle: string) {
+    const slider = getChartColorLegendHost(page, chartTitle).locator(".brush .overlay");
+    await expect(slider).toBeVisible();
+    const box = await slider.boundingBox();
+    if (!box) {
+        throw new Error(`Continuous color legend slider not found for chart "${chartTitle}"`);
+    }
+
+    await page.mouse.click(box.x + box.width * 0.05, box.y + box.height / 2);
+}
 
 test.describe("Color legend continuous", () => {
     test.setTimeout(180_000);
@@ -60,6 +124,51 @@ test.describe("Color legend continuous", () => {
             const initial = await getChartColorLegendState(page, scatterTitle);
             expect(initial.width).toBeGreaterThan(40);
             expect(initial.height).toBeGreaterThan(20);
+
+            const unfiltered = await getContinuousColorLegendFilterRuntimeState(
+                page,
+                scatterTitle,
+            );
+            expect(unfiltered.filterSize).toBe(unfiltered.dataStoreSize);
+            expect(unfiltered.hasSelectedRange).toBe(false);
+
+            await dragContinuousColorLegendRangeOutsideRight(page, scatterTitle);
+            await expect
+                .poll(async () => {
+                    const state = await getContinuousColorLegendFilterRuntimeState(
+                        page,
+                        scatterTitle,
+                    );
+                    return (
+                        state.chartFilter?.kind === "continuous" &&
+                        state.filterSize < state.dataStoreSize &&
+                        state.resetDisplay === "inline" &&
+                        state.hasSelectedRange
+                    );
+                })
+                .toBe(true);
+
+            const filtered = await getContinuousColorLegendFilterRuntimeState(
+                page,
+                scatterTitle,
+            );
+            expect(filtered.filterSize).toBeLessThan(filtered.dataStoreSize);
+
+            await clearContinuousColorLegendRange(page, scatterTitle);
+            await expect
+                .poll(async () => {
+                    const state = await getContinuousColorLegendFilterRuntimeState(
+                        page,
+                        scatterTitle,
+                    );
+                    return (
+                        state.chartFilter === null &&
+                        state.filterSize === unfiltered.dataStoreSize &&
+                        state.resetDisplay === "none" &&
+                        !state.hasSelectedRange
+                    );
+                })
+                .toBe(true);
 
             const beforeDrag = { left: initial.left, top: initial.top };
             await dragChartColorLegend(page, scatterTitle, 100, 60);

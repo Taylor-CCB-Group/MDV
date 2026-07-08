@@ -1,6 +1,8 @@
 from mdvtools._optional import require_extra
 require_extra("app", "langchain_openai")
 
+import langchain_openai
+
 import time
 import logging
 import re
@@ -14,8 +16,6 @@ from typing import Any, List, Optional
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChatProtocol
 from mdvtools.mdvproject import MDVProject
 
-from langchain_openai import ChatOpenAI
-from langchain_openai import OpenAIEmbeddings
 from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
@@ -32,11 +32,13 @@ from mdvtools.llm.chatlog import ChatSocketAPI, LangchainLoggingHandler, log_cha
 # packages for custom langchain agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_experimental.tools.python.tool import PythonAstREPLTool
-from langchain.agents import create_openai_functions_agent, AgentExecutor
+from langchain.agents import create_openai_functions_agent, create_react_agent, AgentExecutor
+from langchain import hub
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import (
+    extract_code_from_response,
     extract_explanation_from_response,
     parse_view_name,
     prepare_code,
@@ -44,11 +46,27 @@ from .code_manipulation import (
 )
 from .column_field_resolve import (
     field_set_from_columns,
+    ensure_view_gridstack_layout,
     normalize_view_chart_params,
     prune_view_charts_with_invalid_params,
 )
-from .verification import build_verification_summary
-from .datasource_roles import collect_wrapper_subgroup_keys_for_project, infer_datasource_roles
+from .verification import build_verification_summary, parse_datasource_name
+from .guidance import (
+    append_guidance_textbox_to_view,
+    build_response_guidance,
+)
+from .datasource_roles import (
+    build_datasource_field_index,
+    collect_wrapper_subgroup_keys_for_project,
+    format_field_index_hint,
+    infer_datasource_roles,
+    resolve_datasource_from_question,
+)
+from .dataset_scale import (
+    assess_project_scale,
+    format_scale_context_block,
+    load_agent_dataframes,
+)
 from .code_execution import execute_code
 from .chat_preview import format_stdout_for_chat
 from .chatlog import LangchainLoggingHandler
@@ -63,6 +81,16 @@ from .execution_progress import (
     parse_explicit_progress_line,
 )
 from .preflight_flow import preflight_with_single_retry
+from .llm_providers import (
+    DiscoveredModels,
+    ModelSpec,
+    ProviderKind,
+    create_chat_llm,
+    create_embeddings,
+    discover_models,
+    ensure_any_provider_available,
+    resolve_embedding_model,
+)
 
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
@@ -99,6 +127,43 @@ chat_debug_handler.setFormatter(formatter)
 
 # attach the handler
 chat_debug_logger.addHandler(chat_debug_handler)
+
+_REACT_PROMPT_TEMPLATE = (
+    "Answer the following questions as best you can. You have access to the following tools:\n\n"
+    "{tools}\n\n"
+    "Use the following format:\n\n"
+    "Question: the input question you must answer\n"
+    "Thought: you should always think about what to do\n"
+    "Action: the action to take, should be one of [{tool_names}]\n"
+    "Action Input: the input to the action\n"
+    "Observation: the result of the action\n"
+    "... (this Thought/Action/Action Input/Observation can repeat N times)\n"
+    "Thought: I now know the final answer\n"
+    "Final Answer: the final answer to the original input question\n\n"
+    "Begin!\n\n"
+    "Question: {input}\n"
+    "Thought:{agent_scratchpad}"
+)
+_REACT_PROMPT_INPUT_VARIABLES = ["agent_scratchpad", "input", "tool_names", "tools"]
+_react_hub_prompt_cache = None
+
+
+def _get_react_prompt():
+    global _react_hub_prompt_cache
+    if _react_hub_prompt_cache is not None:
+        return _react_hub_prompt_cache
+    try:
+        _react_hub_prompt_cache = hub.pull("hwchase17/react")
+        return _react_hub_prompt_cache
+    except Exception as exc:
+        chat_debug_logger.warning(
+            "Failed to pull ReAct prompt from LangChain Hub; using local template: %s",
+            exc,
+        )
+        return PromptTemplate(
+            template=_REACT_PROMPT_TEMPLATE,
+            input_variables=_REACT_PROMPT_INPUT_VARIABLES,
+        )
 
 
 _CHART_CLASS_RE = re.compile(
@@ -169,6 +234,148 @@ def _build_rag_retrieval_query(user_question: str, charts_part: str) -> str:
     return question or charts
 
 
+_FIELDS_CHARTS_LINE_RE = re.compile(r"^\s*(fields|charts)\s+", re.IGNORECASE | re.MULTILINE)
+
+
+def _agent_fields_charts_output_valid(output: str) -> bool:
+    """True when the pandas agent returned a non-empty fields/charts plan."""
+    text = (output or "").strip()
+    if not text:
+        return False
+    return bool(_FIELDS_CHARTS_LINE_RE.search(text))
+
+
+def _extract_fields_charts_plan(text: str) -> str:
+    """Return fields/charts lines from agent text, ignoring ReAct scaffolding."""
+    lines: list[str] = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        lower = stripped.lower()
+        if lower.startswith("fields ") or lower.startswith("charts "):
+            lines.append(stripped)
+    return "\n".join(lines)
+
+
+def _resolve_agent_plan(response: dict) -> str:
+    """Resolve the agent fields/charts plan from output or ReAct intermediate steps."""
+    output = str(response.get("output", "") or "")
+    if _agent_fields_charts_output_valid(output):
+        plan = _extract_fields_charts_plan(output)
+        return plan or output.strip()
+
+    for step in response.get("intermediate_steps") or []:
+        if not step:
+            continue
+        action = step[0]
+        for candidate in (
+            getattr(action, "log", ""),
+            str(getattr(action, "tool_input", "") or ""),
+        ):
+            if _agent_fields_charts_output_valid(candidate):
+                plan = _extract_fields_charts_plan(candidate)
+                if plan:
+                    return plan
+
+    return output.strip()
+
+
+def _infer_chart_types_from_question(question: str) -> str:
+    """Best-effort chart hints from the user question when the agent plan is missing."""
+    q = question.lower()
+    hints: list[str] = []
+    rules: list[tuple[tuple[str, ...], str]] = [
+        (("heatmap",), "Heatmap"),
+        (("violin",), "Violin plot"),
+        (("histogram",), "Histogram"),
+        (("dot plot", "dotplot"), "Dot plot"),
+        (("box plot", "boxplot"), "Box plot"),
+        (("pca", "3d"), "Scatter plot (3D)"),
+        (("umap", "scatter"), "Scatter plot (2D)"),
+        (("density scatter",), "Density Scatter plot"),
+        (("sankey",), "Sankey plot"),
+        (("pie chart", "pie plot"), "Pie Chart"),
+        (("table", "list", "count", "how many"), "Table Plot"),
+    ]
+    for keywords, chart in rules:
+        if any(k in q for k in keywords) and chart not in hints:
+            hints.append(chart)
+    if not hints:
+        hints.append("Scatter plot (2D)")
+    return ", ".join(hints)
+
+
+def _fallback_agent_plan(question: str) -> str:
+    """Minimal plan stub when datasource agent output is unusable but RAG can proceed."""
+    charts = _infer_chart_types_from_question(question)
+    return (
+        'fields "(infer from Project Data Context — datasource agent plan unavailable)"\n'
+        f'charts "{charts}"'
+    )
+
+
+def _rag_source_doc_names(output_qa: dict) -> str:
+    docs = output_qa.get("source_documents") or []
+    names: list[str] = []
+    for doc in docs:
+        meta = getattr(doc, "metadata", None) or {}
+        url = meta.get("url", "")
+        if url:
+            names.append(os.path.basename(str(url)))
+    return ", ".join(names) if names else "(none)"
+
+
+_RAG_EMPTY_RETRY_SUFFIX = (
+    "\n\nReturn only one fenced ```python code block with the complete runnable script."
+)
+
+
+def _invoke_rag_with_empty_retry(
+    qa_chain,
+    rag_retrieval_query: str,
+    chat_model: ModelSpec,
+    model_id: Optional[str],
+) -> tuple[dict, str]:
+    """Run RAG once; retry once with a short instruction if result is empty."""
+    output_qa = qa_chain.invoke({"query": rag_retrieval_query})
+    result = (output_qa.get("result") or "").strip()
+    if result:
+        return output_qa, result
+
+    chat_debug_logger.warning(
+        "RAG returned empty result (model_id=%s provider=%s model=%s sources=%s); retrying once",
+        model_id or chat_model.id,
+        chat_model.provider,
+        chat_model.model,
+        _rag_source_doc_names(output_qa),
+    )
+    retry_query = rag_retrieval_query + _RAG_EMPTY_RETRY_SUFFIX
+    output_qa_retry = qa_chain.invoke({"query": retry_query})
+    result_retry = (output_qa_retry.get("result") or "").strip()
+    if result_retry:
+        return output_qa_retry, result_retry
+
+    raise ValueError(
+        "Code generation returned empty output "
+        f"(model_id={model_id or chat_model.id}, provider={chat_model.provider}, "
+        f"model={chat_model.model}, sources={_rag_source_doc_names(output_qa_retry)}). "
+        "Try a coding-focused Ollama model (e.g. qwen2.5-coder) or OpenAI."
+    )
+
+
+def _raise_if_no_extracted_code(result: str, final_code: str) -> None:
+    """Raise when prepare_code produced a stub instead of runnable Python."""
+    if "# WARNING:::: No code captured" in final_code:
+        raise ValueError(
+            "Code generation did not produce runnable Python. "
+            "The model returned no fenced ```python block."
+        )
+    if not extract_code_from_response(result):
+        raise ValueError(
+            "Code generation did not produce runnable Python. "
+            "The model returned no fenced ```python block."
+        )
+
+
 class SuggestedQuestions(BaseModel):
     """A list of suggested questions to ask about the data."""
     questions: List[str] = Field(
@@ -191,28 +398,17 @@ def time_block(name):
 # but we can call `matplotlib.use('Agg')` before calling the agent (and any other code that might try to draw)
 matplotlib.use('Agg') # this should prevent it making any windows etc
 
-_rag_retriever: Optional[Any] = None
+_rag_retriever_cache: dict[str, Any] = {}
 
 # ... for testing basic mechanics without invoking the agent
 mock_agent = False
 
 
-def _ensure_openai_api_key() -> None:
-    load_dotenv()
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError(
-            "OPENAI_API_KEY is not set in the environment variables. "
-            "Please set it if LLM integration is required."
-        )
-
-
-def _get_rag_retriever():
-    """Build the code RAG retriever on first use (requires OPENAI_API_KEY)."""
-    global _rag_retriever
-    if _rag_retriever is not None:
-        return _rag_retriever
-
-    _ensure_openai_api_key()
+def _get_rag_retriever(embedding_spec: ModelSpec):
+    """Build the code RAG retriever on first use for the given embedding model."""
+    cache_key = embedding_spec.id
+    if cache_key in _rag_retriever_cache:
+        return _rag_retriever_cache[cache_key]
 
     print('# Crawl the local repository to get a list of relevant file paths')
     with time_block("b1: Local repo crawling"):
@@ -244,18 +440,38 @@ def _get_rag_retriever():
         texts = text_splitter.split_documents(code_strings)
 
     with time_block("b3: Embeddings creating"):
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        embeddings = create_embeddings(embedding_spec)
 
     with time_block("b4: FAISS database creating"):
         db = FAISS.from_documents(texts, embeddings)
 
     with time_block("b5: Retriever creating"):
-        _rag_retriever = db.as_retriever(
+        retriever = db.as_retriever(
             search_type="similarity",
             search_kwargs={"k": 5},
         )
 
-    return _rag_retriever
+    _rag_retriever_cache[cache_key] = retriever
+    return retriever
+
+
+def _resolve_path_to_data(project_dir: str) -> str:
+    """Prefer .h5ad in the project directory, else .csv, else empty."""
+    csv_file = None
+    h5ad_file = None
+    try:
+        for file in sorted(os.listdir(project_dir)):
+            if file.endswith(".csv"):
+                csv_file = file
+            elif file.endswith(".h5ad"):
+                h5ad_file = file
+    except OSError:
+        return ""
+    if h5ad_file:
+        return os.path.join(project_dir, h5ad_file)
+    if csv_file:
+        return os.path.join(project_dir, csv_file)
+    return ""
 
 
 class ProjectChat(ProjectChatProtocol):
@@ -277,33 +493,28 @@ class ProjectChat(ProjectChatProtocol):
         self.suggested_questions: list[str] = []
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
-        elif len(project.datasources) > 1: # remove? or make it == 1 ?
-            # tempting to think we should just give the agent all of the datasources here
-            self.log("The project has more than one datasource, only the first one will be used")
-            self.ds_name1 = project.datasources[1]['name'] # maybe comment this out?
-            self.df1 = project.get_datasource_as_dataframe(self.ds_name1) # and maybe comment this out?
 
         self.ds_name = project.datasources[0]['name']
+        self.discovered_models: DiscoveredModels = discover_models()
         try:
             # raise ValueError("test error")
-            _ensure_openai_api_key()
+            ensure_any_provider_available()
             self.df = None
             # Prepare dataframes for the agent.
             # ChatMDV historically assumed df1=cells and df2=genes. Many projects instead use
             # wrapper-capable expression datasources (e.g. rna/protein) linked via rows-as-columns.
             roles = infer_datasource_roles(self.project)
             self.roles = roles
-            df1 = self.project.get_datasource_as_dataframe(roles.obs_datasource)
-            primary_expr = roles.preferred_expression()
-            if primary_expr is not None:
-                df2 = self.project.get_datasource_as_dataframe(primary_expr.datasource_name)
-                self.df_list = [df1, df2]
-            else:
-                self.df_list = [df1]
+            path_to_data = _resolve_path_to_data(self.project.dir)
+            self.scale = assess_project_scale(self.project, path_to_data)
+            self.df_list = load_agent_dataframes(self.project, roles, self.scale)
 
             try:
                 with time_block("b_suggest: Generating suggested questions"):
-                    llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
+                    default_chat = self.discovered_models.get_chat_model(
+                        self.discovered_models.default_model_id
+                    )
+                    llm = create_chat_llm(default_chat)
                     structured_llm = llm.with_structured_output(SuggestedQuestions)
                     prompt_text = create_suggested_questions_prompt(self.project)
                     messages = [HumanMessage(content=prompt_text)]
@@ -342,41 +553,23 @@ class ProjectChat(ProjectChatProtocol):
             del self.conversation_memories[conversation_id]
         chat_debug_logger.info(f"Cleared conversation history for conversation {conversation_id}")
 
-    def create_custom_pandas_agent(self, llm, dfs: dict, prompt_data, memory, verbose=False):
-        """
-        Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
-        """
-        # Step 1: Create the Python REPL Tool
-        python_tool = PythonAstREPLTool()
-        
-        if python_tool.globals is None:
-            python_tool.globals = {}  # Ensure it's a dictionary
-        
-        # Make DataFrames available inside the REPL tool
-        python_tool.globals.update(dfs) 
-        
-        # New fixes:
-        python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
-
-        # Step 3: Define Contextualization Chain
-        contextualize_q_system_prompt = """Given a chat history and the latest user question \
-        which might reference context in the chat history, formulate a standalone question \
-        which can be understood without the chat history. Do NOT answer the question, \
-        just reformulate it if needed and otherwise return it as is. \
-        """
-
-        contextualize_prompt = ChatPromptTemplate.from_messages([
-            ("system", contextualize_q_system_prompt),
-            ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
-        
-        # > LangChainDeprecationWarning: The class `LLMChain` was deprecated in LangChain 0.1.17 and will be removed in 1.0. 
-        # Use RunnableSequence, e.g., `prompt | llm` instead.
-        contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
-
-        # Step 3: Define the Agent Prompt
-        role_hint = ""
+    def _build_role_hint(self, *, question_datasource: str | None = None) -> str:
         try:
             roles = getattr(self, "roles", None)
+            scale = getattr(self, "scale", None)
+            scale_hint = ""
+            if scale is not None:
+                scale_hint = (
+                    "\n\nProject scale (memory-aware planning):\n"
+                    + format_scale_context_block(scale)
+                    + "\n- For this project size, plan charts using MDV field ids and expression wrappers. "
+                    "Only suggest Scanpy in the plan if the question requires marker ranking or DE columns "
+                    "not available in MDV metadata.\n"
+                    "- Before suggesting columns, decide: obs metadata only, expression wrappers, or Scanpy markers.\n"
+                    "- Question-type routing: proportion / frequency / before-after → StackedRowChart; "
+                    "gene signature / enrichment / ISG genes → DotPlot or Heatmap + wrappers + SelectionDialogPlot.\n"
+                    "- On large projects df1 is a column subset — list every field id codegen will need in `fields`.\n"
+                )
             if roles is not None:
                 exprs = roles.expressions or []
                 if exprs:
@@ -385,8 +578,14 @@ class ProjectChat(ProjectChatProtocol):
                         f"(feature names in column '{exprs[0].name_column}', default subgroup '{exprs[0].subgroup_key}')"
                     )
                 else:
-                    expr_lines = "- No rows-as-columns expression datasource detected for this project."
-                role_hint = (
+                    if question_datasource and question_datasource != roles.obs_datasource:
+                        expr_lines = (
+                            f"- df2 maps to question-resolved datasource '{question_datasource}' "
+                            "(use this table when the user names it or its columns)"
+                        )
+                    else:
+                        expr_lines = "- No rows-as-columns expression datasource detected for this project."
+                return (
                     "\n\nDatasource roles:\n"
                     f"- df1 maps to obs datasource '{roles.obs_datasource}'\n"
                     f"{expr_lines}\n"
@@ -399,44 +598,154 @@ class ProjectChat(ProjectChatProtocol):
                     "- Do not pair other Scanpy summary tables with MDV wrapper-based expression charts for the "
                     "same metric unless values are guaranteed identical; prefer one pipeline (see ChatMDV viz consistency "
                     "in RAG).\n"
+                    + scale_hint
                 )
         except Exception:
-            role_hint = ""
+            pass
+        return ""
 
+    def _build_agent_executor(
+        self,
+        llm,
+        python_tool: PythonAstREPLTool,
+        dfs: dict,
+        prompt_data,
+        memory,
+        provider: ProviderKind,
+        verbose: bool,
+        *,
+        use_react: bool = False,
+        question_datasource: str | None = None,
+    ) -> AgentExecutor:
+        role_hint = self._build_role_hint(question_datasource=question_datasource)
         prompt_data_template = f"""You have access to the following Pandas DataFrames: 
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
         {role_hint}
-        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields. 
+        Before answering any user question, you must first run `df1.columns` and `df2.columns` to inspect available fields.
+        On large projects, df1/df2 may be column subsets for schema probing — use Project Data Context field ids for planning.
+        Prefer MDV chart field ids and expression wrappers; suggest Scanpy only for marker-ranking or DE questions when MDV metadata lacks required columns.
+        Route by question type: proportion/frequency/before-after → StackedRowChart; signature/enrichment/ISG expression → DotPlot or Heatmap with wrappers.
         Use these to correct the column names mentioned by the user.
         Before writing any `project.get_datasource_as_dataframe(datasource_name, columns=[...])` call, you must verify the datasource schema and only request columns that exist on that datasource.
         Never assume a `name` column exists on `cells`; if the task asks for genes/markers, use the expression datasource or explicit marker ranking outputs instead of `cells.name`.
         You must always invoke the PythonAstREPLTool to check the DataFrames columns and explore the values of the DataFrames.
-        Use `df.info()` or `df.index()`.
+        Use `df.info()` or inspect `df.index`.
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", prompt_data_template),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", prompt_data_template + "{input}"),
-            ("ai", "{agent_scratchpad}"),
-        ])
+        tools = [python_tool]
+        if use_react:
+            react_prompt = _get_react_prompt()
+            system_prefix = prompt_data_template + "\n\n"
+            if hasattr(react_prompt, "template"):
+                react_prompt.template = system_prefix + react_prompt.template
+            agent = create_react_agent(llm, tools, react_prompt)
+        else:
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", prompt_data_template),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", prompt_data_template + "{input}"),
+                ("ai", "{agent_scratchpad}"),
+            ])
+            agent = create_openai_functions_agent(llm, tools, prompt)
 
-        # Step 4: Create the Agent
-        agent = create_openai_functions_agent(llm, [python_tool], prompt)
+        return AgentExecutor(
+            agent=agent,
+            tools=tools,
+            memory=memory,
+            verbose=verbose,
+            return_intermediate_steps=True,
+            handle_parsing_errors=True,
+        )
 
-        # Step 5: Wrap in an Agent Executor (Finalized Agent)
-        agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose, return_intermediate_steps=True)
+    def create_custom_pandas_agent(
+        self,
+        llm,
+        dfs: dict,
+        prompt_data,
+        memory,
+        provider: ProviderKind,
+        verbose=False,
+        on_agent_fallback=None,
+        question_datasource: str | None = None,
+    ):
+        """
+        Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
+        """
+        python_tool = PythonAstREPLTool()
 
-        # Step 6: Wrapper Function to Use Contextualization and Preserve Memory
+        if python_tool.globals is None:
+            python_tool.globals = {}
+
+        python_tool.globals.update(dfs)
+        python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
+
+        contextualize_q_system_prompt = """Given a chat history and the latest user question \
+        which might reference context in the chat history, formulate a standalone question \
+        which can be understood without the chat history. Do NOT answer the question, \
+        just reformulate it if needed and otherwise return it as is. \
+        """
+
+        contextualize_prompt = ChatPromptTemplate.from_messages([
+            ("system", contextualize_q_system_prompt),
+            ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
+
+        contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
+
+        agent_executor = self._build_agent_executor(
+            llm,
+            python_tool,
+            dfs,
+            prompt_data,
+            memory,
+            provider,
+            verbose,
+            use_react=False,
+            question_datasource=question_datasource,
+        )
+
         def agent_with_contextualization(question):
             standalone_question = contextualize_chain.run(input=question)
-            # Point 1: Log reformulation
             chat_debug_logger.info(f"Original Question: {question}")
             chat_debug_logger.info(f"Standalone Reformulated Question: {standalone_question}")
-            # Point 2: Log what you're sending to the agent
             chat_debug_logger.info(f"Sending to agent_executor with input: {standalone_question}")
-            response = agent_executor.invoke({"input": standalone_question})
-            # Point 3: Log agent output
+
+            def _run_react_fallback() -> dict:
+                chat_debug_logger.warning(
+                    "Ollama agent falling back to ReAct for datasource inspection"
+                )
+                if on_agent_fallback:
+                    on_agent_fallback()
+                fallback_executor = self._build_agent_executor(
+                    llm,
+                    python_tool,
+                    dfs,
+                    prompt_data,
+                    memory,
+                    provider,
+                    verbose,
+                    use_react=True,
+                    question_datasource=question_datasource,
+                )
+                return fallback_executor.invoke({"input": standalone_question})
+
+            try:
+                response = agent_executor.invoke({"input": standalone_question})
+            except Exception as first_error:
+                if provider != "ollama":
+                    raise
+                chat_debug_logger.warning(
+                    "Ollama functions agent failed; falling back to ReAct: %s",
+                    first_error,
+                )
+                response = _run_react_fallback()
+            else:
+                if provider == "ollama" and not _agent_fields_charts_output_valid(
+                    _resolve_agent_plan(response)
+                ):
+                    chat_debug_logger.warning(
+                        "Ollama functions agent returned no field/chart plan; falling back to ReAct"
+                    )
+                    response = _run_react_fallback()
             chat_debug_logger.info(f"Agent Raw Response: {response}")
             memory.save_context({"input": question}, {"output": response.get("output", str(response))})
             return response
@@ -453,10 +762,21 @@ class ProjectChat(ProjectChatProtocol):
         conversation_id = chat_request["conversation_id"]
         question = chat_request["message"]
         handle_error = chat_request["handle_error"]
-        
+        model_id = chat_request.get("model_id")
+
+        discovered = discover_models()
+        chat_model = discovered.get_chat_model(model_id)
+        embedding_model = resolve_embedding_model(chat_model, discovered)
+
         # Create socket API for this request
         socket_api = ChatSocketAPI(self.project, id, room, conversation_id)
         log = chat_debug_logger.info
+        request_model_line = (
+            f"model_id={chat_model.id} provider={chat_model.provider} "
+            f"model={chat_model.model} embedding={embedding_model.model}"
+        )
+        chat_debug_logger.info(request_model_line)
+        socket_api.log_file_only(request_model_line)
         chat_debug_logger.info("Asking question: %s", question)
 
         if question == "test error":
@@ -473,22 +793,55 @@ class ProjectChat(ProjectChatProtocol):
         langchain_logging_handler = LangchainLoggingHandler(socket_api.logger)
         
         with time_block("b6: Initialising LLM for RAG"):
-            code_llm = ChatOpenAI(
-                temperature=0.1, 
-                model="gpt-4.1",
-                callbacks=[langchain_logging_handler]
+            code_llm = create_chat_llm(
+                chat_model,
+                callbacks=[langchain_logging_handler],
             )
         
         with time_block("b7: Initialising LLM for agent"):
-            dataframe_llm = ChatOpenAI(
-                temperature=0.1, 
-                model="gpt-4.1",
-                callbacks=[langchain_logging_handler]
+            dataframe_llm = create_chat_llm(
+                chat_model,
+                callbacks=[langchain_logging_handler],
             )
         # there is a risk that these are out of date by the time we get here...
         # but it's a bit of an expensive operation, so avoiding it for now (in most cases we shouldn't need to refer to them)
-        df_list = self.df_list
+        field_index = build_datasource_field_index(self.project)
+        question_datasource = resolve_datasource_from_question(
+            self.project, question, field_index=field_index
+        )
+        df_list = load_agent_dataframes(
+            self.project,
+            self.roles,
+            self.scale,
+            extra_datasource=question_datasource,
+        )
+        default_datasource = str(self.project.datasources[0]["name"])
+        rag_datasource = question_datasource or default_datasource
+        if question_datasource:
+            chat_debug_logger.info(
+                "Resolved question datasource: %s (default would be %s)",
+                question_datasource,
+                default_datasource,
+            )
         
+        progress = 0
+
+        def _notify_agent_fallback() -> None:
+            socket_api.update_chat_progress(
+                "Local model does not support tool calling; using ReAct agent instead.",
+                id,
+                progress,
+                0,
+            )
+
+        if chat_model.provider == "ollama":
+            socket_api.update_chat_progress(
+                "Local model uses functions agent first; ReAct only if needed.",
+                id,
+                progress,
+                0,
+            )
+
         # Create agent with local LLM and memory
         with time_block("b8: Pandas agent creating"):
             agent = self.create_custom_pandas_agent(
@@ -496,10 +849,12 @@ class ProjectChat(ProjectChatProtocol):
                 {"df1": df_list[0], "df2": df_list[1] if len(df_list) > 1 else df_list[0]}, 
                 prompt_data, 
                 memory,
-                verbose=True
+                chat_model.provider,
+                verbose=True,
+                on_agent_fallback=_notify_agent_fallback,
+                question_datasource=question_datasource,
             )
-        
-        progress = 0
+
         total_steps = 6
 
         def _step_message(step: int, text: str) -> str:
@@ -515,6 +870,7 @@ class ProjectChat(ProjectChatProtocol):
                 "message": "Success",
                 "verification": None,
                 "data_preview": format_stdout_for_chat(strdout),
+                "guidance": None,
                 "needs_refresh": False,
             }
         
@@ -549,8 +905,25 @@ class ProjectChat(ProjectChatProtocol):
                     step_total=total_steps,
                 )
                 response = agent(question)
-                chat_debug_logger.info(f"Agent Response - output: {response['output']}")
-            
+                agent_plan = _resolve_agent_plan(response)
+                chat_debug_logger.info(f"Agent Response - output: {response.get('output', '')}")
+                chat_debug_logger.info(f"Agent resolved plan: {agent_plan}")
+                if not _agent_fields_charts_output_valid(agent_plan):
+                    if question.strip():
+                        chat_debug_logger.warning(
+                            "Agent returned no field/chart plan; continuing with question-only "
+                            "RAG fallback. Raw response: %r",
+                            response,
+                        )
+                        agent_plan = _fallback_agent_plan(question)
+                        chat_debug_logger.info("Agent fallback plan: %s", agent_plan)
+                    else:
+                        chat_debug_logger.error("Agent returned invalid output: %r", response)
+                        raise ValueError(
+                            "Datasource agent returned no field/chart plan. "
+                            "Try a coding-focused Ollama model (e.g. qwen2.5-coder) or OpenAI."
+                        )
+
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 socket_api.update_chat_progress(
                     _step_message(3, "Preparing analysis context"),
@@ -561,36 +934,20 @@ class ProjectChat(ProjectChatProtocol):
                     step_total=total_steps,
                 )
                 # List all files in the directory
-                files_in_dir = os.listdir(self.project.dir)
-
-                # Initialize variables
-                csv_file = None
-                h5ad_file = None
-
-                # Identify the CSV or H5AD file (optional)
-                # subject to review...
-                for file in files_in_dir:
-                    if file.endswith(".csv"):
-                        csv_file = file
-                    elif file.endswith(".h5ad"):
-                        h5ad_file = file
-
-                # Determine the path_to_data (optional)
-                if h5ad_file:
-                    path_to_data = os.path.join(self.project.dir, h5ad_file)
-                elif csv_file:
-                    path_to_data = os.path.join(self.project.dir, csv_file)
-                else:
-                    path_to_data = ""  # fallback: no external file; operate on existing project datasources
+                path_to_data = _resolve_path_to_data(self.project.dir)
+                self.scale = assess_project_scale(self.project, path_to_data)
 
                 datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
 
-                #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
-                # we pass a reference to the actual project object and let figuring out the path be an internal implementation detail...
-                # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
-                # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
-                # and the assert in the function is being triggered even though it should be fine
-                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], response['input'])
+                prompt_RAG = get_createproject_prompt_RAG(
+                    self.project,
+                    path_to_data,
+                    rag_datasource,
+                    agent_plan,
+                    response["input"],
+                    compact=chat_model.provider == "ollama",
+                    scale=self.scale,
+                )
                 chat_debug_logger.info(f"=== RAG Base Prompt (before context injection) ===\n{prompt_RAG}\n=== End Base Prompt ===")
 
                 prompt_RAG_template = PromptTemplate(
@@ -608,17 +965,22 @@ class ProjectChat(ProjectChatProtocol):
                 )
                 progress += 60
 
-                match = re.search(r'charts\s+(.*)', response['output'])
-                charts_part = match.group(1) if match else response['output']
+                match = re.search(r'charts\s+(.*)', agent_plan)
+                charts_part = match.group(1) if match else agent_plan
                 rag_retrieval_query = _build_rag_retrieval_query(question, charts_part)
 
                 qa_chain = RetrievalQA.from_llm(
                     llm=code_llm, 
                     prompt=prompt_RAG_template, 
-                    retriever=_get_rag_retriever(),
+                    retriever=_get_rag_retriever(embedding_model),
                     return_source_documents=True,
                 )
-                output_qa = qa_chain.invoke({"query": rag_retrieval_query})
+                output_qa, result = _invoke_rag_with_empty_retry(
+                    qa_chain,
+                    rag_retrieval_query,
+                    chat_model,
+                    model_id,
+                )
                 # Log the complete prompt after context injection
                 if "source_documents" in output_qa:
                     retrieved_context = "\n".join(doc.page_content for doc in output_qa["source_documents"])
@@ -626,7 +988,6 @@ class ProjectChat(ProjectChatProtocol):
                         context=retrieved_context, question=rag_retrieval_query
                     )
                     chat_debug_logger.info(f"=== Complete RAG Prompt (with injected context) ===\n{complete_prompt}\n=== End Complete Prompt ===")
-                result = output_qa["result"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time
                 final_code = prepare_code(
@@ -670,38 +1031,20 @@ class ProjectChat(ProjectChatProtocol):
                         final_code = final_code_retry
 
             with time_block("b13b: Preflight validate and retry"):
-                datasource_fields: dict[str, set[str]] = {}
-                for ds in self.project.datasources or []:
-                    if not isinstance(ds, dict):
-                        continue
-                    ds_name = ds.get("name")
-                    if not isinstance(ds_name, str):
-                        continue
-                    fields: set[str] = set()
-                    try:
-                        md = self.project.get_datasource_metadata(ds_name)
-                        if isinstance(md, dict):
-                            md_cols = md.get("columns")
-                            if isinstance(md_cols, list):
-                                fields |= field_set_from_columns(md_cols)
-                    except Exception:
-                        pass
-                    cols = ds.get("columns")
-                    if isinstance(cols, list):
-                        for c in cols:
-                            if isinstance(c, dict) and c.get("field"):
-                                fields.add(str(c.get("field")))
-                    if fields:
-                        datasource_fields[ds_name] = fields
+                datasource_fields = field_index or build_datasource_field_index(self.project)
 
                 def _regenerate_for_preflight(issue_text: str) -> str:
+                    field_map_hint = format_field_index_hint(datasource_fields)
                     retry_query = (
                         f"{rag_retrieval_query}\n\n"
                         "Fix this code preflight validation failure and return corrected runnable code only.\n"
                         "If issues mention set_x_axis or set_y_axis on BoxPlot, ViolinPlot, ScatterPlot, or DotPlot, "
                         "replace with set_axis_properties('x', {...}) and set_axis_properties('y', {...}) only.\n"
                         "On ScatterPlot use set_filter, not set_on_filter (set_on_filter is for ScatterPlot3D only).\n"
-                        f"Preflight issues:\n{issue_text}"
+                        "When a column exists on a different datasource, load it from that datasource — "
+                        "do not substitute CHATMDV_OBS_DATASOURCE.\n"
+                        f"Preflight issues:\n{issue_text}\n\n"
+                        f"{field_map_hint}"
                     )
                     output_qa_retry = qa_chain.invoke({"query": retry_query})
                     result_retry = output_qa_retry["result"]
@@ -725,6 +1068,8 @@ class ProjectChat(ProjectChatProtocol):
                     allowed_wrapper_subgroup_keys=allowed_wrapper_subgroup_keys,
                 )
                 chat_debug_logger.info("Preflight metadata: %s", preflight_meta)
+
+            _raise_if_no_extracted_code(result, final_code)
 
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
@@ -859,6 +1204,7 @@ class ProjectChat(ProjectChatProtocol):
                         pruned, n_dropped = prune_view_charts_with_invalid_params(
                             normalized, self.project
                         )
+                        pruned = ensure_view_gridstack_layout(pruned)
                         if n_dropped:
                             log(
                                 f"pruned {n_dropped} chart(s) with param tokens not in datasource metadata"
@@ -869,6 +1215,45 @@ class ProjectChat(ProjectChatProtocol):
                         "normalize_view_chart_params failed for view %s: %s",
                         view_name,
                         norm_ex,
+                        exc_info=True,
+                    )
+
+            guidance_text = ""
+            with time_block("b15d: Analysis summary (guidance TextBox + chat echo)"):
+                try:
+                    guidance_text = build_response_guidance(
+                        self.project,
+                        question,
+                        final_code,
+                        view_name,
+                        agent_plan,
+                        data_preview_text,
+                    )
+                    ds_for_summary = parse_datasource_name(final_code)
+                    if not ds_for_summary and view_name:
+                        try:
+                            view_for_ds = self.project.get_view(view_name)
+                            ic = (
+                                view_for_ds.get("initialCharts")
+                                if isinstance(view_for_ds, dict)
+                                else None
+                            )
+                            if isinstance(ic, dict) and ic:
+                                ds_for_summary = next(iter(ic.keys()), None)
+                        except Exception:
+                            ds_for_summary = None
+                    if view_name and ds_for_summary and guidance_text.strip():
+                        append_guidance_textbox_to_view(
+                            self.project,
+                            view_name,
+                            ds_for_summary,
+                            guidance_text,
+                        )
+                except Exception as guide_ex:
+                    chat_debug_logger.warning(
+                        "build_response_guidance failed for view %s: %s",
+                        view_name,
+                        guide_ex,
                         exc_info=True,
                     )
 
@@ -924,6 +1309,7 @@ class ProjectChat(ProjectChatProtocol):
                     view_name=view_name,
                     verification=verification_text or None,
                     data_preview=data_preview_text,
+                    guidance=guidance_text or None,
                 )
                 log(final_code_updated)
                 socket_api.update_chat_progress(
@@ -942,6 +1328,7 @@ class ProjectChat(ProjectChatProtocol):
                     "message": "Success",
                     "verification": verification_text or None,
                     "data_preview": data_preview_text,
+                    "guidance": guidance_text or None,
                     "needs_refresh": client_needs_refresh_after_chat(final_code),
                 }
         except Exception as e:
@@ -964,5 +1351,6 @@ class ProjectChat(ProjectChatProtocol):
                 "message": f"ERROR: {error_message}",
                 "verification": None,
                 "data_preview": None,
+                "guidance": None,
                 "needs_refresh": False,
             }

@@ -143,12 +143,14 @@ class MDVProject:
         This is independent of any permissions set in db etc,
         but can be used to guard against inappropriate admin actions
         """
+        # check if project has a h5 file or write permissions, newly created project doesn't have a h5 file which blocks file upload
+        h5_writable_or_not_created = (not exists(self.h5file)) or os.access(self.h5file, os.W_OK)
         return (
             # belt and braces
             os.access(self.statefile, os.W_OK)
             and os.access(self.dir, os.W_OK | os.X_OK)
             and os.access(self.viewsfile, os.W_OK)
-            and os.access(self.h5file, os.W_OK)
+            and h5_writable_or_not_created
         )
 
     @property

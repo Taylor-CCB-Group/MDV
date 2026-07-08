@@ -26,7 +26,9 @@ import {
     clearColorLegendFilter,
     destroyColorLegendFilter,
     getActiveCategoricalColorLegendValue,
+    getActiveContinuousColorLegendRange,
     restoreColorLegendFilter,
+    setContinuousColorLegendFilter,
     toggleCategoricalColorLegendFilter,
     type ColorLegendFilter,
 } from "@/react/legend/color_legend/colorLegendFilter";
@@ -100,6 +102,7 @@ class BaseChart<T extends BaseConfig> {
     legend: HTMLDivElement | undefined;
     colorLegendWrapper: LegendWrapper<ColorLegendSpec, T>;
     colorLegendFilterDimension: Dimension | null = null;
+    colorLegendFilterDimensionKind: ColorLegendFilter["kind"] | null = null;
     colorLegendFilter: ColorLegendFilter | null = null;
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
@@ -633,6 +636,7 @@ class BaseChart<T extends BaseConfig> {
         const spec = this.getColorLegendSpec();
         if (!spec) {
             console.warn("no color legend");
+            this.colorLegendWrapper.unmount();
             this.legend = undefined;
             return;
         }
@@ -648,6 +652,12 @@ class BaseChart<T extends BaseConfig> {
                 ),
                 onCategoricalItemClick: (value: string) =>
                     toggleCategoricalColorLegendFilter(this, spec, value),
+                activeContinuousRange: getActiveContinuousColorLegendRange(
+                    this,
+                    spec,
+                ),
+                onContinuousRangeChange: (range: [number, number] | null) =>
+                    setContinuousColorLegendFilter(this, spec, range),
             });
         this.colorLegendWrapper.render(
             spec,
@@ -658,7 +668,9 @@ class BaseChart<T extends BaseConfig> {
                       dragHandle: ".legend-drag-handle",
                       resizable: true,
                   }
-                : { resizable: true },
+                : {
+                      dragHandle: ".legend-continuous-drag-handle",
+                  },
         );
         this.legend = this.colorLegendWrapper.getWrapperElement() ?? undefined;
         if (!this.legend) {
