@@ -592,17 +592,17 @@ def test_rag_prompt_includes_multiple_selected_datasources():
     from mdvtools.llm.templates import get_createproject_prompt_RAG
 
     project = MicronLikeProject()
-    prompt = get_createproject_prompt_RAG(
-        project,
-        "",
-        "qc_runs",
-        'fields "assay"\ncharts "Row Chart"',
-        "Compare assay types with cv_pct",
-        compact=True,
+    kwargs = dict(
+        path_to_data="",
+        datasource_name="qc_runs",
+        final_answer='fields "assay"\ncharts "Row Chart"',
+        question="Compare assay types with cv_pct",
         datasource_names=["qc_runs", "qc_field_uniformity"],
     )
-    assert "Primary datasource for this question: **qc_runs**" in prompt
-    assert "Additional selected datasource: qc_field_uniformity" in prompt
-    assert "user_selected_datasources" in prompt
-    assert "Selected datasources" in prompt
+    for compact in (True, False):
+        prompt = get_createproject_prompt_RAG(project, compact=compact, **kwargs)
+        assert "Primary datasource for this question: **qc_runs**" in prompt
+        assert "Additional selected datasource: qc_field_uniformity" in prompt
+        assert "user_selected_datasources" in prompt
+        assert "Selected datasources" in prompt
 

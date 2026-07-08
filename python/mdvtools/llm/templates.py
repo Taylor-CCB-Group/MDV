@@ -262,6 +262,11 @@ def get_createproject_prompt_RAG(
         "(use this datasource for charts and dataframe loads when it matches the user question; "
         "do not substitute CHATMDV_OBS_DATASOURCE when the user names a different table)\n"
     )
+    if len(resolved_names) > 1:
+        datasource_name_guidance_indented += (
+            f"            - user_selected_datasources = {resolved_names!r}  "
+            "(scope analysis and joins to these tables; primary chart target is the first)\n"
+        )
     if compact:
         expr_lines = ""
         if roles.expressions:
