@@ -225,6 +225,15 @@ def _question_suggests_expression(question: str) -> bool:
     return bool(tokens & _EXPRESSION_QUESTION_KEYWORDS)
 
 
+def _resolved_datasources(
+    primary: str, selected: list[str], *, source: str
+) -> ResolvedDatasources:
+    """Keep primary aligned with the first selected datasource."""
+    if primary in selected:
+        selected = [primary] + [ds for ds in selected if ds != primary]
+    return ResolvedDatasources(primary=primary, selected=selected, source=source)
+
+
 def resolve_datasources_from_question_auto(
     project: Any,
     question: str,
@@ -246,7 +255,7 @@ def resolve_datasources_from_question_auto(
         ordered = sorted(name_matches, key=len, reverse=True)
         primary = ordered[0]
         stable = _order_datasources(names, set(ordered))
-        return ResolvedDatasources(primary=primary, selected=stable, source="auto")
+        return _resolved_datasources(primary, stable, source="auto")
 
     mentioned = _question_field_tokens(question, field_index)
     if mentioned:
@@ -260,12 +269,7 @@ def resolve_datasources_from_question_auto(
                 mentioned_fields=mentioned,
                 field_index=field_index,
             )
-            # Primary first in selected list for RAG/chart default.
-            if primary in stable:
-                stable = [primary] + [ds for ds in stable if ds != primary]
-            return ResolvedDatasources(
-                primary=primary, selected=stable, source="auto"
-            )
+            return _resolved_datasources(primary, stable, source="auto")
 
     if "cells" in names and _question_suggests_expression(question):
         roles = infer_datasource_roles(project)
@@ -274,10 +278,8 @@ def resolve_datasources_from_question_auto(
             selected = _order_datasources(
                 names, {roles.obs_datasource, expr.datasource_name}
             )
-            return ResolvedDatasources(
-                primary=roles.obs_datasource,
-                selected=selected,
-                source="auto",
+            return _resolved_datasources(
+                roles.obs_datasource, selected, source="auto"
             )
 
     catalog = build_chat_datasource_catalog(project)

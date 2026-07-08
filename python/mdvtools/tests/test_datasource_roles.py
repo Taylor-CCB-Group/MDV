@@ -514,6 +514,23 @@ def test_resolve_datasources_auto_cross_table_fields():
     assert resolved.primary in resolved.selected
 
 
+def test_resolve_datasources_auto_name_match_keeps_primary_first():
+    class NestedNameProject(MicronLikeProject):
+        datasources = [
+            {"name": "runs", "columns": [{"field": "run_id"}]},
+            {"name": "qc_runs", "columns": [{"field": "assay"}, {"field": "run_id"}]},
+        ]
+
+    project = NestedNameProject()
+    resolved = resolve_datasources_from_question_auto(
+        project,
+        "What assay types are present in qc_runs and runs?",
+    )
+    assert resolved.source == "auto"
+    assert resolved.primary == "qc_runs"
+    assert resolved.selected == ["qc_runs", "runs"]
+
+
 def test_resolve_datasources_auto_expression_heuristic():
     class CellsRnaProject(FakeProject):
         datasources = [{"name": "cells"}, {"name": "rna"}, {"name": "protein"}]
@@ -526,6 +543,23 @@ def test_resolve_datasources_auto_expression_heuristic():
     assert resolved.source == "auto"
     assert resolved.selected == ["cells", "rna"]
     assert resolved.primary == "cells"
+
+
+def test_resolve_datasources_auto_expression_heuristic_keeps_primary_first():
+    class RnaCellsProject(FakeProject):
+        datasources = [{"name": "rna"}, {"name": "cells"}, {"name": "protein"}]
+
+        def get_datasource_names(self):
+            return ["rna", "cells", "protein"]
+
+    project = RnaCellsProject()
+    resolved = resolve_datasources_from_question_auto(
+        project,
+        "Show marker expression by cluster",
+    )
+    assert resolved.source == "auto"
+    assert resolved.primary == "cells"
+    assert resolved.selected == ["cells", "rna"]
 
 
 def test_rag_prompt_auto_resolved_cross_table_policy():
