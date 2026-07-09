@@ -129,7 +129,8 @@ class Auth0Provider(AuthProvider):
             # Clear the server-side session to remove any stored tokens and user data
             session.clear()
             
-            # Prepare the redirect URL after logout (i.e., where the user is sent after logging out of Auth0)
+            # LOGIN_REDIRECT_URL must be an absolute URL that exactly matches one of
+            # the application's Allowed Logout URLs in Auth0 (e.g. http://localhost:5055/login).
             redirect_url = self.app.config["LOGIN_REDIRECT_URL"]  # The URL to redirect after logout
             
             # Redirect the user to Auth0's logout URL, which will handle the Auth0-side logout

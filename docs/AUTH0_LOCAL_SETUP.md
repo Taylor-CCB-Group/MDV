@@ -49,7 +49,7 @@ Under **Settings → Application URIs**, set:
 | Field                  | Value                                                       |
 | ---------------------- | ----------------------------------------------------------- |
 | Allowed Callback URLs  | `http://localhost:5055/callback`                            |
-| Allowed Logout URLs    | `http://localhost:5055/login` (or `http://localhost:5055/`) |
+| Allowed Logout URLs    | `http://localhost:5055/login` — must exactly match `LOGIN_REDIRECT_URL` |
 | Allowed Web Origins    | `http://localhost:5055`                                     |
 | Allowed Origins (CORS) | `http://localhost:5055`                                     |
 
@@ -132,7 +132,7 @@ Use placeholders in docs and git; never commit real client secrets.
 - ENABLE_AUTH=1
 - DEFAULT_AUTH_METHOD=auth0
 - FLASK_SECRET_KEY=local-dev-secret-change-me
-- LOGIN_REDIRECT_URL=/login
+- LOGIN_REDIRECT_URL=http://localhost:5055/login
 
 # Auth0
 - AUTH0_DOMAIN=your-tenant.uk.auth0.com
@@ -150,7 +150,7 @@ Use placeholders in docs and git; never commit real client secrets.
 | `ENABLE_AUTH`          | `1`, `true`, or `yes`                                                         |
 | `DEFAULT_AUTH_METHOD`  | Must be `auth0` for real login                                                |
 | `FLASK_SECRET_KEY`     | Required for sessions when auth is on                                         |
-| `LOGIN_REDIRECT_URL`   | Where unauthenticated users are sent; `/login` is fine                        |
+| `LOGIN_REDIRECT_URL`   | Must be an **absolute URL** that exactly matches an Auth0 Allowed Logout URL (e.g. `http://localhost:5055/login`). It is used both for unauthenticated redirects and as the Auth0 logout `returnTo`. |
 | `AUTH0_DOMAIN`         | Tenant domain only, no `https://`                                             |
 | `AUTH0_AUDIENCE`       | Must match API **Identifier** exactly                                         |
 | `AUTH0_PUBLIC_KEY_URI` | `https://<domain>/.well-known/jwks.json`                                      |
@@ -249,6 +249,14 @@ cd /app/python && uv run python mdvtools/scripts/manage_project_permissions.py a
 **Most common cause:** Auth0 user not in local DB. Run [sync](#sync-command-inside-dev-container) and verify `users` table.
 
 **Check app logs** for `User not found` or `Unauthorized access ... Redirecting`.
+
+### Logout fails: `returnTo` not in Allowed Logout URLs
+
+**Symptom:** Logout errors with `The "returnTo" querystring parameter "/login" is not defined as a valid URL in "Allowed Logout URLs"`.
+
+**Cause:** MDV sends `LOGIN_REDIRECT_URL` to Auth0 verbatim as the logout `returnTo`. Auth0 only accepts **absolute URLs** that exactly match an entry in **Allowed Logout URLs**. A relative value like `/login` is rejected.
+
+**Fix:** Set `LOGIN_REDIRECT_URL` to an absolute URL (e.g. `http://localhost:5055/login`) and make sure the same URL is listed in the application's Allowed Logout URLs in Auth0.
 
 ### Sync fails with `Read timed out (read timeout=5.0)`
 
