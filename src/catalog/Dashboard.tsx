@@ -53,6 +53,7 @@ import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
 import usePermissions from "./PermissionsContext";
 import useAuthEnabled from "./hooks/useAuthEnabled";
+import useAdminPortalAccess from "./hooks/useAdminPortalAccess";
 import { RefreshCwIcon } from "lucide-react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import HelpDialog from "./HelpDialog";
@@ -88,6 +89,8 @@ const Dashboard: React.FC = () => {
 
     // Check if auth is enabled
     const authEnabled = useAuthEnabled();
+    // Only expose the admin portal entry point to admin users.
+    const canAccessAdmin = useAdminPortalAccess();
     const { mode, toggleColorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [sortBy, setSortBy] = useState<SortBy>("lastModified");
@@ -248,21 +251,23 @@ const Dashboard: React.FC = () => {
                             </IconButton>
                         </Paper>
                         {authEnabled && <UserProfile />}
-                        <Button
-                            variant="outlined"
-                            startIcon={<AdminPanelSettings />}
-                            onClick={handleOpenAdmin}
-                            sx={{
-                                borderWidth: 1.5,
-                                borderRadius: 2,
-                                textTransform: "none",
-                                px: 1.5,
-                                py: 0.75,
-                                mr: 2,
-                            }}
-                        >
-                            Admin
-                        </Button>
+                        {canAccessAdmin && (
+                            <Button
+                                variant="outlined"
+                                startIcon={<AdminPanelSettings />}
+                                onClick={handleOpenAdmin}
+                                sx={{
+                                    borderWidth: 1.5,
+                                    borderRadius: 2,
+                                    textTransform: "none",
+                                    px: 1.5,
+                                    py: 0.75,
+                                    mr: 2,
+                                }}
+                            >
+                                Admin
+                            </Button>
+                        )}
                         <Tooltip title="Toggle theme">
                             <IconButton
                                 sx={{ mr: 2 }}
