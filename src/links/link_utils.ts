@@ -426,21 +426,28 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     if (!isColumnLoaded(nameCol)) {
         throw new Error(`Column ${link.name_column} not loaded`);
     }
+    const loadedNameCol = nameCol;
+
+    function getValueToRowIndex() {
+        if (loadedNameCol.datatype === "unique") {
+            return new Map(Object.entries(tds.getColumnIndex(link.name_column)));
+        }
+        const valueToRowIndex = new Map<string, number>();
+        loadedNameCol.data.forEach((valueIndex, rowIndex) => {
+            const value = loadedNameCol.values[valueIndex];
+            if (valueToRowIndex.has(value)) {
+                console.warn(`Multiple rows with the same value '${value}' in column '${link.name_column}'`);
+            }
+            valueToRowIndex.set(value, rowIndex);
+        });
+        return valueToRowIndex;
+    }
 
     // we should also add a data structure mapping each name_column value (string) to the index of the corresponding row
     // which seems to assume a 1:1 mapping between name_column values and rows? Or not? 
     // While we're here, check for anything that may be inconsistent with our assumptions.
     // Maybe we can have a lot of rows with the same name_column value, returning equivalent rows_as_columns data?
-    const valueToRowIndex = new Map<string, number>();
-    //! this is O(n) when we shouldn't need it...
-    nameCol.data.forEach((valueIndex, rowIndex) => {
-        const value = nameCol.values[valueIndex];
-        if (valueToRowIndex.has(value)) {
-            console.warn(`Multiple rows with the same value '${value}' in column '${link.name_column}'`);
-        }
-        valueToRowIndex.set(value, rowIndex);
-    });
-    link.valueToRowIndex = valueToRowIndex;
+    link.valueToRowIndex = getValueToRowIndex();
     // `IRowAsColumn.fieldName` / `.column` default to the first subgroup for backward compatibility;
     // consumers that care about another subgroup use `fieldNameForSubgroup` / `columnForSubgroup`.
     const firstSubgroupKey = Object.keys(link.subgroups)[0] ?? "";
