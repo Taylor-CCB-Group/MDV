@@ -17,6 +17,10 @@ const configDir = path.dirname(fileURLToPath(import.meta.url));
 // (not in the code using zarrita, but in unrelated worker modules)
 // import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
+// version number for the main entry point  in production build,
+// will be added to mdv js and css files and can be used for cache busting. 
+ const version =process.env.mdv_version ? "-" + process.env.mdv_version : "";
+
 
 const flaskURL = "http://127.0.0.1:5055";
 const port = Number(process.env.PORT || process.env.VITE_PORT || 5170);
@@ -40,8 +44,16 @@ const enableBundleAnalysis =
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
     const name = assetInfo.name ?? '';
-    if (name.includes('index.css')) return 'assets/mdv.css';
-    if (name === 'mdv.css') return 'assets/mdv.css';
+    if (name.includes('index.css')) {
+        // in standalone builds add the version number 
+        //will be "" if not set in env
+        if (build  === "production"){
+            return `assets/mdv${version}.css`;
+        }
+        else{
+            return 'assets/mdv.css';
+        }
+    }
     if (name === 'catalog.css') return 'assets/catalog.css';
     if (name === 'desktop_index.css') return 'assets/mdv.css';
     if (process.env.VITE_ENTRYPOINT) {
@@ -63,7 +75,7 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  */
 function getRollupOptions() {
     if (build === 'production') {
-        const version =process.env.mdv_version ? "-" + process.env.mdv_version : "";
+       
 
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {

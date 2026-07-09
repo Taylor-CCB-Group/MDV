@@ -7,7 +7,7 @@ The standalone build (`pnpm run build-standalone`) exposes the `mdv` object (inc
 
 1. **Build**: Run the standalone build script:
     ```bash
-    pnpm run build-standalone
+    asset_base=/static/mdv/ pnpm run build-standalone
     ```
 2. **Deploy**: Place the resulting `dist/mdv` folder into the `/static/` directory of your web application.
 3. **Include in HTML**: Add the following to your HTML page:
@@ -24,12 +24,14 @@ The standalone build (`pnpm run build-standalone`) exposes the `mdv` object (inc
     </script>
     ```
 
-> **Note:** If you want to place the build in a different folder, set the `asset_base` environment variable to that folder (see below).
+> **Notes** If you want to place the build in a different folder, set the `asset_base` environment variable to that folder (see below).
 
 ---
 
 ### Environment Variables
 
+
+- **`mdv_version`** : If this is set both mdv.js and mdv.css will have the version number appended to their file name. e.g. mdv_version=0.0.1 will produce mdv-0.0.1.js and mdv-0.0.1.css. If not set the the file names will not be altered. This is to enable cache busting 
 - **`worker_format`**: By default, this is `iife`. You can specify `es` for certain builds (e.g. JBrowse).
 - **`exclude_dir`**: By default, the `examples` directory is included in the build. Set `exclude_dir=True` to exclude it.
 - **`asset_base`**: By default, assets (such as webworkers) are loaded relative to the HTML page (`./`). If you want to serve MDV from different pages, specify an absolute asset base. This should match the location where you place the build folder.
