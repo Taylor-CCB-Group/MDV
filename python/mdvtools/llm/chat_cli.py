@@ -9,7 +9,7 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChat
@@ -61,6 +61,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "Chat model to use (canonical id or bare name, e.g. "
             "openai:chat:gpt-4.1 or gpt-4o-mini). Defaults to CHATMDV_DEFAULT_MODEL "
             "or the first discovered model."
+        ),
+    )
+    parser.add_argument(
+        "--datasources",
+        default=None,
+        help=(
+            "Comma-separated MDV datasource names to scope analysis "
+            "(first name is the primary chart target)."
         ),
     )
     return parser
@@ -182,6 +190,20 @@ def _write_debug_artifacts(
     return str(out)
 
 
+def _parse_datasource_cli_args(
+    raw: Optional[str],
+) -> tuple[Literal["auto", "manual"], list[str] | None]:
+    """Return (datasource_mode, names) for CLI --datasources."""
+    if not raw or not str(raw).strip():
+        return "auto", None
+    if str(raw).strip().lower() == "auto":
+        return "auto", None
+    names = [part.strip() for part in str(raw).split(",") if part.strip()]
+    if not names:
+        return "auto", None
+    return "manual", names
+
+
 def run_chat_once(
     *,
     project_path: str,
@@ -189,6 +211,8 @@ def run_chat_once(
     output_dir: Optional[str] = None,
     view_name: Optional[str] = None,
     model_id: Optional[str] = None,
+    datasource_mode: Literal["auto", "manual"] = "auto",
+    datasource_names: list[str] | None = None,
 ) -> tuple[dict[str, Any], int]:
     abs_project = str(Path(project_path).expanduser().resolve())
     views_file = str(Path(abs_project) / "views.json")
@@ -229,6 +253,9 @@ def run_chat_once(
         }
         if resolved_model_id:
             chat_request["model_id"] = resolved_model_id
+        chat_request["datasource_mode"] = datasource_mode
+        if datasource_mode == "manual" and datasource_names:
+            chat_request["datasource_names"] = datasource_names
         from io import StringIO
         from contextlib import redirect_stdout, redirect_stderr
         out_stream = StringIO()
@@ -373,6 +400,8 @@ def run_batch_prompts(
     base_url: str,
     output_dir: Optional[str] = None,
     model_id: Optional[str] = None,
+    datasource_mode: Literal["auto", "manual"] = "auto",
+    datasource_names: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     prompts = _load_prompts(prompt_file)
     rows: list[dict[str, Any]] = []
@@ -392,6 +421,8 @@ def run_batch_prompts(
             output_dir=str(run_out) if run_out else None,
             view_name=None,
             model_id=model_id,
+            datasource_mode=datasource_mode,
+            datasource_names=datasource_names,
         )
         finished = datetime.now(timezone.utc)
         if exit_code != 0:
@@ -456,6 +487,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         except ValueError as exc:
             print(f"Argument error: {exc}", file=sys.stderr)
             return 2
+        datasource_mode, datasource_names = _parse_datasource_cli_args(args.datasources)
         if args.prompt_file:
             rows, exit_code = run_batch_prompts(
                 project_path=args.project,
@@ -464,6 +496,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                 base_url=args.base_url,
                 output_dir=args.output_dir,
                 model_id=args.model,
+                datasource_mode=datasource_mode,
+                datasource_names=datasource_names,
             )
             summary = {
                 "batch_count": len(rows),
@@ -484,6 +518,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             output_dir=args.output_dir,
             view_name=args.view_name,
             model_id=args.model,
+            datasource_mode=datasource_mode,
+            datasource_names=datasource_names,
         )
 
         if args.json_output:

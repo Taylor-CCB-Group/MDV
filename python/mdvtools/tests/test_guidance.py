@@ -21,6 +21,9 @@ class FakeProject:
         self._columns = {
             "channel_name": {"field": "channel_name", "name": "channel_name"},
             "cv_pct": {"field": "cv_pct", "name": "cv_pct"},
+            "X_pca_1": {"field": "X_pca_1", "name": "X_pca_1"},
+            "X_pca_2": {"field": "X_pca_2", "name": "X_pca_2"},
+            "leiden": {"field": "leiden", "name": "leiden"},
         }
 
     def get_view(self, view_name: str):
@@ -58,10 +61,64 @@ def test_build_response_guidance_includes_sections():
         'fields "channel_name", "cv_pct"\ncharts "Box plot"',
         "| channel | cv_pct |\n|---|---|\n| C405 | 12 |",
     )
-    assert "## Why this visualization" in md
-    assert "## What to look for" in md
-    assert "## Suggested next steps" in md
-    assert "qc_runs" in md or "follow-up" in md.lower()
+    assert "## 1. Why this chart is the best way to answer the question" in md
+    assert "## 2. Biological insights that can be gained" in md
+    assert "## 3. Subsequent analysis tasks" in md
+    assert "### In summary" in md
+    assert "The user asked:" in md
+    assert "**Box Plot**" in md
+    assert "qc_runs" in md or "Follow-up" in md
+
+
+def test_build_response_guidance_subclustering_style_explanation():
+    proj = FakeProject()
+    proj.datasources = [{"name": "cells"}]
+    proj._columns["ARVCF"] = {"field": "ARVCF", "name": "ARVCF"}
+    gene_wrapper = "rna_expr|ARVCF(rna_expr)|42"
+    proj._views["v1"] = {
+        "initialCharts": {
+            "cells": [
+                {
+                    "title": "PCA colored by ARVCF",
+                    "type": "wgl_scatter_plot",
+                    "param": ["X_pca_1", "X_pca_2"],
+                    "color_by": gene_wrapper,
+                },
+                {
+                    "title": "Density",
+                    "type": "density_scatter_plot",
+                    "param": ["X_pca_1", "X_pca_2", "leiden"],
+                },
+                {
+                    "title": "Cells table",
+                    "type": "table_chart",
+                    "param": ["leiden", "X_pca_1", "X_pca_2", gene_wrapper],
+                },
+                {
+                    "title": "Filter cells",
+                    "type": "selection_dialog",
+                    "param": ["leiden", "X_pca_1", "X_pca_2", gene_wrapper],
+                },
+            ]
+        }
+    }
+    question = (
+        "Could you perform subclustering within cluster 1 based on the "
+        "expression levels of the gene ARVCF?"
+    )
+    code = (
+        "datasource_name = 'cells'\n"
+        "subset = adata.obs['leiden'] == '1'\n"
+    )
+    md = build_response_guidance(proj, question, code, "v1", "", None)
+    assert "ARVCF" in md
+    assert "**Scatter Plot (2D)**" in md
+    assert "**Density Scatter Plot**" in md
+    assert "**Table Plot**" in md
+    assert "**Selection Dialog Plot**" in md
+    assert "Subpopulation discovery" in md
+    assert "Marker gene analysis" in md or "Automated subclustering" in md
+    assert "cluster 1" in md.lower()
 
 
 def test_append_guidance_textbox_prepends_and_replaces_summary():
@@ -83,7 +140,7 @@ def test_append_guidance_textbox_prepends_and_replaces_summary():
             ]
         }
     }
-    guidance = "## Why this visualization\n\nTest summary.\n"
+    guidance = "## 1. Why this chart is the best way to answer the question\n\nTest summary.\n"
     ok = append_guidance_textbox_to_view(
         proj, "v1", "qc_field_uniformity", guidance
     )
