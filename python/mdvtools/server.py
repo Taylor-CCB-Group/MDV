@@ -12,6 +12,7 @@ from mdvtools.server_utils import (
     get_range,
     add_safe_headers,
 )
+from mdvtools.ucsc_proxy_extension import UcscProxyServerExtension
 
 import webbrowser
 import json
@@ -71,6 +72,10 @@ def create_app(
     if options is None:
         options = MDVServerOptions()
 
+    # Ensure the UCSC proxy route exists by default.
+    if not any(isinstance(ext, UcscProxyServerExtension) for ext in options.extensions):
+        options.extensions.insert(0, UcscProxyServerExtension())
+
     if options.app is None:
         route = ""
         # route = "/project/" + project.name # for testing new API with simple app...
@@ -78,6 +83,13 @@ def create_app(
         log(f"created Flask {app}")
         # add headers to allow web workers
         app.after_request(add_safe_headers)
+
+        # Register app-wide routes once on the single-project Flask instance.
+        # In multi-project/catalog mode, global extension routes are registered
+        # in `mdv_server_app.py` at app startup.
+        for extension in options.extensions:
+            extension.register_global_routes(app, app.config)
+
         project_bp = SingleProjectShim(app)
         multi_project = False
         if options.websocket:

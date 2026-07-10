@@ -5,7 +5,9 @@ This module provides a minimal Flask application that exposes endpoints
 for serving project data, images, configurations, and handling file operations
 with support for HTTP range requests and security headers.
 """
+import argparse
 import json
+import logging
 import os
 import sys
 import zlib
@@ -19,6 +21,7 @@ from flask import (
 
 from werkzeug.security import safe_join
 from mdvtools.mdvproject import MDVProject
+from mdvtools.ucsc_proxy_extension import UcscProxyServerExtension
 
 from mdvtools.server_utils import (
     send_file,
@@ -26,7 +29,25 @@ from mdvtools.server_utils import (
     add_safe_headers,
 )
 
-def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
+logger = logging.getLogger(__name__)
+
+
+def _resolve_track_file(path: str, track_directories: list[str]) -> str | None:
+    for track_directory in track_directories:
+        file_name = safe_join(track_directory, path)
+        if file_name is not None and os.path.exists(file_name):
+            real_file = os.path.realpath(file_name)
+            real_dir = os.path.realpath(track_directory)
+            if os.path.isfile(real_file) and real_file.startswith(real_dir + os.sep):
+                return file_name
+    return None
+
+
+def create_app(
+    project: MDVProject,
+    compress_column_data: bool = False,
+    track_directories: list[str] | None = None,
+) -> Flask:
     """
     Create and configure a Flask application for serving MDV project data.
 
@@ -38,6 +59,13 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     """
     app = Flask(__name__)
     app.after_request(add_safe_headers)
+    resolved_track_directories = [
+        os.path.abspath(project.trackfolder),
+        *[
+            os.path.abspath(track_directory)
+            for track_directory in (track_directories or [])
+        ],
+    ]
 
     @app.route("/")
     def project_index():
@@ -134,7 +162,9 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
     # needs to be returned
     @app.route("/tracks/<path:path>")
     def send_track(path):
-        file_name = safe_join(project.trackfolder, path)
+        file_name = _resolve_track_file(path, resolved_track_directories)
+        if file_name is None:
+            return "File not found", 404
         range_header = request.headers.get("Range", None)
         if not range_header:
             return send_file(file_name)
@@ -157,39 +187,84 @@ def create_app(project: MDVProject,compress_column_data: bool = False) -> Flask:
         except Exception:
             success = False
         return jsonify({"success": success})
-    
+        
+    # Register app-wide `/ucsc_proxy` via the extension.
+    UcscProxyServerExtension().register_global_routes(app, app.config)
     return app
 
 
-def serve_project(project: MDVProject | str , port: int = 5050, open_browser: bool = True ,compress_column_data: bool = False):
+def serve_project(
+    project: MDVProject | str,
+    port: int = 5050,
+    open_browser: bool = True,
+    compress_column_data: bool = False,
+    track_directories: list[str] | None = None,
+):
     """Serve an MDV project using a lightweight Flask server. 
     Args:
         project (MDVProject | str): The MDV project instance or path to the project directory.
         port (int): The port to run the server on. Defaults to 5050.
         open_browser (bool): Whether to open the browser automatically. Defaults to True.
         compress_column_data (bool): Whether to compress column data. Defaults to False.
+        track_directories (list[str] | None): Extra directories searched by /tracks after the default track folder.
     """
     if isinstance(project, str):
         project = MDVProject(project)
-    app = create_app(project, compress_column_data=compress_column_data)
+    app = create_app(
+        project,
+        compress_column_data=compress_column_data,
+        track_directories=track_directories,
+    )
     if open_browser:
         import webbrowser
         webbrowser.open(f"http://localhost:{port}/")
     app.run(port=port)
 
 
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Serve an MDV project.")
+    parser.add_argument("path", help="Path to the MDV project directory.")
+    parser.add_argument(
+        "--track-dir",
+        action="append",
+        default=[],
+        help="Extra track directory searched by /tracks after the default track folder. Repeat to add multiple directories.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5050,
+        help="Port to serve on.",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open the browser automatically.",
+    )
+    parser.add_argument(
+        "--compress-column-data",
+        action="store_true",
+        help="Compress column data responses.",
+    )
+    return parser
+
+
 if __name__ == "__main__":
     try:
-        if len(sys.argv) > 1:
-            path = sys.argv[1]
-        else:
-            raise ValueError("No project path provided as a command-line argument.")
+        args = _build_parser().parse_args()
+        path = args.path
         if not os.path.exists(path):
             raise FileNotFoundError(f"{path} not found")
         ds_path = os.path.join(path, "datasources.json")
         if not os.path.exists(ds_path):
             raise FileNotFoundError(f"{path} does not contain a valid MDV project.")
-        serve_project(MDVProject(path))
+        serve_project(
+            MDVProject(path),
+            port=args.port,
+            open_browser=not args.no_browser,
+            compress_column_data=args.compress_column_data,
+            track_directories=args.track_dir,
+        )
 
     except Exception as e:
         print(f"Error: {e}")

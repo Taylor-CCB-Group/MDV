@@ -29,6 +29,10 @@ import "./CustomBoxPlot";
 import "./SingleSeriesChart";
 import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
+import "./CategoryHeatMap/CategoryHeatMap";
+import "./GenomeBrowsers/IGVBrowser/IGVBrowser";
+import "./GenomeBrowsers/UCSCBrowser/UCSCBrowser";
+import "./GenomeBrowsers/SVCircosPlot/SVCircosPlot";
 
 // React-driven chart/dialog registrations.
 import "../react/components/VivMDVReact";
