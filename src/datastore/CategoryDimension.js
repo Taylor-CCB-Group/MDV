@@ -1,9 +1,5 @@
 import Dimension from "./Dimension.js";
-import {
-    MULTITEXT_EMPTY_INDEX,
-    getMultitextCapacity,
-    getMultitextValueItems,
-} from "@/lib/multitext";
+import { MULTITEXT_EMPTY_INDEX, getMultitextCapacity, getMultitextValueItems } from "@/lib/multitext";
 
 function rowHasAnyMultitextItem(data, start, capacity, valueItemsByIndex, selectedItems) {
     for (let offset = 0; offset < capacity; offset++) {
@@ -45,9 +41,7 @@ function rowHasAllMultitextItems(data, start, capacity, valueItemsByIndex, selec
 function createMultitextCategoryPredicate(column, category) {
     const data = column.data;
     const capacity = getMultitextCapacity(column);
-    const valueItemsByIndex = column.values.map((_, index) =>
-        getMultitextValueItems(column, index),
-    );
+    const valueItemsByIndex = column.values.map((_, index) => getMultitextValueItems(column, index));
 
     if (typeof category === "string") {
         const exactIndex = column.values.indexOf(category);
@@ -274,6 +268,42 @@ class CategoryDimension extends Dimension {
         }
     }
 
+    filterCategoryPair(args, columns) {
+        const [cat1, cat2] = args;
+        const col1 = this.parent.columnIndex[columns[0]];
+        const col2 = this.parent.columnIndex[columns[1]];
+
+        if (!col1 || !col2) {
+            return;
+        }
+
+        const predicate1 =
+            col1.datatype === "multitext"
+                ? createMultitextCategoryPredicate(col1, cat1)
+                : (() => {
+                      const index = col1.values.indexOf(cat1);
+                      if (index === -1) {
+                          return () => false;
+                      }
+                      return (rowIndex) => col1.data[rowIndex] === index;
+                  })();
+
+        const predicate2 =
+            col2.datatype === "multitext"
+                ? createMultitextCategoryPredicate(col2, cat2)
+                : (() => {
+                      const index = col2.values.indexOf(cat2);
+                      if (index === -1) {
+                          return () => false;
+                      }
+                      return (rowIndex) => col2.data[rowIndex] === index;
+                  })();
+
+        return this.filterPredicate({
+            predicate: (rowIndex) => predicate1(rowIndex) && predicate2(rowIndex),
+        });
+    }
+
     getSankeyData(callback, columns, config = {}) {
         const col1 = this.parent.columnIndex[columns[0]];
         const col2 = this.parent.columnIndex[columns[1]];
@@ -325,6 +355,61 @@ class CategoryDimension extends Dimension {
             this.parent.filterBuffer,
             col.buffer,
             config,
+        ]);
+    }
+
+    getCategoryHeatmap(callback, columns, config = {}) {
+        const col1 = this.parent.columnIndex[columns[0]];
+        const col2 = this.parent.columnIndex[columns[1]];
+
+        config.method = "double_cat";
+        config.values = col1.values;
+        config.values2 = col2.values;
+        config.datatype = col1.datatype;
+        config.datatype2 = col2.datatype;
+        config.stringLength = col1.stringLength;
+        config.stringLength2 = col2.stringLength;
+
+        const action = (e) => {
+            const payload = e.data || {};
+            const matrix = payload.matrix || [];
+            const rowIndexes = payload.rowIndexes || [];
+            const colIndexes = payload.colIndexes || [];
+            const xLabels = rowIndexes.map((i) => config.values[i]);
+            const yLabels = colIndexes.map((i) => config.values2[i]);
+            const counts = new Array(matrix.length);
+            let maxCount = 0;
+
+            for (let x = 0; x < matrix.length; x++) {
+                const row = matrix[x] || [];
+                const countRow = new Array(row.length);
+                for (let y = 0; y < row.length; y++) {
+                    const c = row[y]?.c || 0;
+                    countRow[y] = c;
+                    if (c > maxCount) {
+                        maxCount = c;
+                    }
+                }
+                counts[x] = countRow;
+            }
+
+            callback({
+                xLabels,
+                yLabels,
+                counts,
+                maxCount,
+                totalCells: xLabels.length * yLabels.length,
+            });
+            this.worker.removeEventListener("message", action);
+        };
+
+        this.worker.addEventListener("message", action);
+        this.worker.postMessage([
+            this.filterBuffer,
+            this.parent.filterBuffer,
+            col1.buffer,
+            config,
+            col2.buffer,
         ]);
     }
 

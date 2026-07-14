@@ -131,6 +131,7 @@ const proxy = [
     '/export_project',
     '/delete_project',
     '/extension_config',
+    "/ucsc_proxy",
     '/enable_auth',
     '/api_root',
     '/rescan_projects',
@@ -245,6 +246,10 @@ export default defineConfig(async (): Promise<UserConfig> => {
             path.resolve(configDir, 'login_dev.html'),
             path.resolve(configDir, 'catalog_dev.html'),
         ],
+        // zarrextra/workers resolves codec-worker.js via import.meta.url; prebundling
+        // at some point broke that path causing stale-cache 504s after package bumps.
+        // as of now, this will actively prevent the url from being resolved properly in dev
+        // exclude: ['zarrextra/workers'],
     },
     } as UserConfig;
 });

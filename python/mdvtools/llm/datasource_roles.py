@@ -159,6 +159,256 @@ def _resolve_by_field_overlap(
     return max(scores, key=lambda ds: (scores[ds], ds))
 
 
+@dataclass(frozen=True)
+class ResolvedDatasources:
+    """Datasource routing for a single ChatMDV request."""
+
+    primary: str
+    selected: list[str]
+    source: str  # "user" | "auto" | "question" | "default"
+
+
+_EXPRESSION_QUESTION_KEYWORDS = frozenset(
+    {
+        "gene",
+        "genes",
+        "marker",
+        "markers",
+        "expression",
+        "express",
+        "protein",
+        "rna",
+        "enrichment",
+        "signature",
+        "deg",
+        "degs",
+        "differential",
+    }
+)
+
+
+def _order_datasources(names: list[str], selected: set[str]) -> list[str]:
+    """Stable catalog order for a subset of datasource names."""
+    return [n for n in names if n in selected]
+
+
+def _pick_primary_datasource(
+    project: Any,
+    selected: list[str],
+    *,
+    mentioned_fields: set[str],
+    field_index: dict[str, set[str]],
+) -> str:
+    if not selected:
+        raise ValueError("Cannot pick primary from empty selection")
+    if len(selected) == 1:
+        return selected[0]
+    scores = {
+        ds: len(mentioned_fields & field_index.get(ds, set()))
+        for ds in selected
+    }
+    best_score = max(scores.values())
+    top = [ds for ds in selected if scores[ds] == best_score]
+    if len(top) == 1:
+        return top[0]
+    try:
+        obs = infer_datasource_roles(project).obs_datasource
+        if obs in top:
+            return obs
+    except Exception:
+        pass
+    return top[0]
+
+
+def _question_suggests_expression(question: str) -> bool:
+    tokens = _question_word_tokens(question)
+    return bool(tokens & _EXPRESSION_QUESTION_KEYWORDS)
+
+
+def _resolved_datasources(
+    primary: str, selected: list[str], *, source: str
+) -> ResolvedDatasources:
+    """Keep primary aligned with the first selected datasource."""
+    if primary in selected:
+        selected = [primary] + [ds for ds in selected if ds != primary]
+    return ResolvedDatasources(primary=primary, selected=selected, source=source)
+
+
+def resolve_datasources_from_question_auto(
+    project: Any,
+    question: str,
+    *,
+    field_index: dict[str, set[str]] | None = None,
+) -> ResolvedDatasources:
+    """
+    Infer one or more datasources from the question text and project field metadata.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        raise ValueError("Project has no datasources")
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    name_matches = _datasource_names_mentioned_in_question(names, question)
+    if name_matches:
+        ordered = sorted(name_matches, key=len, reverse=True)
+        primary = ordered[0]
+        stable = _order_datasources(names, set(ordered))
+        return _resolved_datasources(primary, stable, source="auto")
+
+    mentioned = _question_field_tokens(question, field_index)
+    if mentioned:
+        owners_by_field = find_datasources_for_fields(field_index, sorted(mentioned))
+        owner_set = {ds for owners in owners_by_field.values() for ds in owners}
+        if owner_set:
+            stable = _order_datasources(names, owner_set)
+            primary = _pick_primary_datasource(
+                project,
+                stable,
+                mentioned_fields=mentioned,
+                field_index=field_index,
+            )
+            return _resolved_datasources(primary, stable, source="auto")
+
+    if "cells" in names and _question_suggests_expression(question):
+        roles = infer_datasource_roles(project)
+        expr = roles.preferred_expression()
+        if expr is not None:
+            selected = _order_datasources(
+                names, {roles.obs_datasource, expr.datasource_name}
+            )
+            return _resolved_datasources(
+                roles.obs_datasource, selected, source="auto"
+            )
+
+    catalog = build_chat_datasource_catalog(project)
+    default_names = [
+        n for n in catalog.get("default_datasource_names", []) if n in names
+    ]
+    if default_names:
+        return ResolvedDatasources(
+            primary=default_names[0],
+            selected=default_names,
+            source="auto",
+        )
+
+    default = str(names[0])
+    return ResolvedDatasources(primary=default, selected=[default], source="default")
+
+
+def _datasource_role_for_name(
+    name: str,
+    roles: InferredDatasourceRoles,
+    expression_names: set[str],
+) -> str:
+    if name == roles.obs_datasource:
+        return "obs"
+    if name in expression_names:
+        return "expression"
+    return "table"
+
+
+def build_chat_datasource_catalog(project: Any) -> dict[str, Any]:
+    """
+    Structured datasource list for ChatMDV init (UI picker) and default selection.
+    """
+    roles = infer_datasource_roles(project)
+    names = _project_datasource_names(project)
+    expression_names = {e.datasource_name for e in roles.expressions}
+    datasources: list[dict[str, Any]] = []
+    for name in names:
+        row_count: int | None = None
+        try:
+            md = project.get_datasource_metadata(name)
+            if isinstance(md, dict) and md.get("size") is not None:
+                row_count = int(md["size"])
+        except Exception:
+            pass
+        datasources.append(
+            {
+                "name": name,
+                "role": _datasource_role_for_name(name, roles, expression_names),
+                "row_count": row_count,
+            }
+        )
+
+    if len(names) == 1:
+        default_names = [names[0]]
+    elif "cells" in names:
+        default_names = [roles.obs_datasource]
+        expr = roles.preferred_expression()
+        if expr is not None:
+            default_names.append(expr.datasource_name)
+    else:
+        default_names = [roles.obs_datasource]
+
+    return {
+        "datasources": datasources,
+        "default_datasource_names": default_names,
+    }
+
+
+def resolve_datasources_for_request(
+    project: Any,
+    *,
+    question: str,
+    user_datasource_names: list[str] | None = None,
+    field_index: dict[str, set[str]] | None = None,
+) -> ResolvedDatasources:
+    """
+    Resolve primary and selected datasources for a chat request.
+
+    User selection takes precedence; otherwise fall back to question-based routing,
+    then the first project datasource.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        raise ValueError("Project has no datasources")
+
+    if user_datasource_names:
+        valid = [n for n in user_datasource_names if n in names]
+        if not valid:
+            raise ValueError(
+                f"No valid datasources in {user_datasource_names!r}; "
+                f"available: {names}"
+            )
+        return ResolvedDatasources(primary=valid[0], selected=valid, source="user")
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    return resolve_datasources_from_question_auto(
+        project, question, field_index=field_index
+    )
+
+
+def format_selected_datasources_cross_table_policy(
+    selected_datasources: list[str],
+    *,
+    auto_resolved: bool = False,
+) -> str:
+    """Prompt text when multiple datasources are in scope for one analysis."""
+    if len(selected_datasources) < 2:
+        return ""
+    names = ", ".join(f"`{n}`" for n in selected_datasources)
+    primary = selected_datasources[0]
+    scope_label = (
+        "Auto-resolved datasources"
+        if auto_resolved
+        else "Selected datasources"
+    )
+    return (
+        f"- **{scope_label}:** "
+        f"{names}. Primary chart target: `{primary}` (first in scope).\n"
+        "- Load each table with `project.get_datasource_as_dataframe(<datasource>, columns=[...])` "
+        "using only field ids from that datasource's metadata.\n"
+        "- For cross-table questions, merge in pandas on shared keys (`run_id`, `cell_id`, etc.) "
+        "discovered from Project Data Context — do not invent join columns.\n"
+        "- Chart `initialCharts` keys and `params` must use field ids from the datasource that owns each column.\n"
+    )
+
+
 def resolve_datasource_from_question(
     project: Any,
     question: str,
@@ -375,16 +625,27 @@ def collect_wrapper_subgroup_keys_for_project(project: Any) -> set[str]:
     return keys
 
 
-def build_chatmdv_roles_constants_block(project: Any) -> str:
+def build_chatmdv_roles_constants_block(
+    project: Any,
+    *,
+    selected_datasources: list[str] | None = None,
+) -> str:
     """
     Python source injected into ChatMDV-generated scripts so the LLM does not
     rediscover rows-as-columns metadata at runtime.
     """
     roles = infer_datasource_roles(project)
     expr = roles.preferred_expression()
+    primary = (
+        selected_datasources[0]
+        if selected_datasources
+        else roles.obs_datasource
+    )
     lines = [
         "# --- ChatMDV project roles (derived from project metadata; do not edit) ---",
         f"CHATMDV_OBS_DATASOURCE = {json.dumps(roles.obs_datasource)}",
+        f"CHATMDV_PRIMARY_DATASOURCE = {json.dumps(primary)}",
+        f"CHATMDV_SELECTED_DATASOURCES = {json.dumps(selected_datasources or [])}",
     ]
     if expr is None:
         lines.extend(
