@@ -267,6 +267,26 @@ class WGLScatterPlot extends WGLChart {
 
         this.x = this.config.param[0];
         this.y = this.config.param[1];
+        // Date tick labels are longer than day numbers — give axes a bit more room.
+        // Log scales are not meaningful for calendar days.
+        const xCol = this.dataStore.columnIndex[this.x];
+        const yCol = this.dataStore.columnIndex[this.y];
+        const xIsDate = xCol?.is_date || xCol?.date_unit === "days";
+        const yIsDate = yCol?.is_date || yCol?.date_unit === "days";
+        if (xIsDate && this.config.axis) {
+            this.config.axis.x_log_scale = false;
+            if (this.config.axis.x && (!this.config.axis.x.size || this.config.axis.x.size < 40)) {
+                this.config.axis.x.size = 40;
+                this.setAxisSize("x", 40);
+            }
+        }
+        if (yIsDate && this.config.axis) {
+            this.config.axis.y_log_scale = false;
+            if (this.config.axis.y && (!this.config.axis.y.size || this.config.axis.y.size < 45)) {
+                this.config.axis.y.size = 45;
+                this.setAxisSize("y", 45);
+            }
+        }
         this.dim = this.getDimension();
        
         void this.setBackgroundFilter();
@@ -480,6 +500,24 @@ class WGLScatterPlot extends WGLChart {
     _updateScale(range) {
         this.x_scale.domain([range.x_range[0], range.x_range[1]]);
         this.y_scale.domain([-range.y_range[0], -range.y_range[1]]);
+    }
+
+    updateAxis() {
+        super.updateAxis();
+        // Classic WGL scatters redraw axes often on pan/zoom; re-assert date tick
+        // labels so d3 does not fall back to numeric thousands separators.
+        if (this._isLinearScale(this.x_scale) && this.x_axis_call) {
+            this._applyDateTickFormat("x", this.x_axis_call);
+            this.x_axis_svg.call(this.x_axis_call);
+        }
+        if (
+            this._isLinearScale(this.y_scale) &&
+            this.y_axis_call &&
+            this._getDateColumnForAxis("y")
+        ) {
+            this._applyDateTickFormat("y", this.y_axis_call);
+            this.y_axis_svg.call(this.y_axis_call);
+        }
     }
 
     _calculateRadius() {

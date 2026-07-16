@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+    formatContinuousTick,
     formatLegendLabel,
     getContinuousLegendContainerHeight,
     getContinuousLegendLayout,
@@ -63,5 +64,10 @@ describe("legendUtils", () => {
                 hasLabel: true,
             }),
         );
+    });
+
+    test("formatContinuousTick formats date columns as YYYY-MM-DD", () => {
+        expect(formatContinuousTick(18262, true)).toBe("2020-01-01");
+        expect(formatContinuousTick(20000, false)).toBe("2.0e4");
     });
 });

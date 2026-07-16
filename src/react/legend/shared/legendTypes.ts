@@ -22,6 +22,8 @@ export type LegendContinuousSvgProps = {
     height?: number;
     activeRange?: [number, number] | null;
     onRangeChange?: (range: [number, number] | null) => void;
+    /** When true, axis ticks format as YYYY-MM-DD (days since Unix epoch). */
+    isDate?: boolean;
 };
 
 export type ContinuousLegendLayout = {

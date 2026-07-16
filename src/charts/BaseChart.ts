@@ -16,6 +16,7 @@ import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 import tippy, {type Instance as TippyInstance} from "tippy.js";
 import 'tippy.js/dist/tippy.css';
+import { isDateColumn } from "@/lib/dateFormat";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import ColorLegend from "@/react/components/legend/ColorLegend";
@@ -569,9 +570,13 @@ class BaseChart<T extends BaseConfig> {
         if (!colorBy || typeof colorBy !== "string") {
             return null;
         }
+        const colorCol = this.dataStore.columnIndex[colorBy];
         const conf = {
             overideValues: {
-                colorLogScale: this.config.log_color_scale,
+                // Log color scales are not meaningful for calendar day numbers.
+                colorLogScale: isDateColumn(colorCol)
+                    ? false
+                    : this.config.log_color_scale,
             },
         };
         this._addTrimmedColor(colorBy, conf);

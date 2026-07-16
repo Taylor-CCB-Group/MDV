@@ -1,4 +1,5 @@
 import type DataStore from "@/datastore/DataStore";
+import { isDateColumn } from "@/lib/dateFormat";
 import { isColumnNumeric, isColumnText } from "@/utilities/Utilities";
 import type {
     ColorLegendBuildConfig,
@@ -48,6 +49,7 @@ export function buildColorLegendSpec(
             column,
             colors,
             range,
+            isDate: isDateColumn(c),
         };
     }
 
