@@ -19,17 +19,12 @@ from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 from auth0.management import Auth0
 from auth0.authentication import GetToken
 from auth0.exceptions import RateLimitError
-import random
 
 # Add JWKS cache with thread-safe access
 _jwks_cache = {}
 _jwks_cache_expiry = None
 _jwks_cache_lock = threading.Lock()  # Lock to protect cache access
 JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
-
-# Rate limiting and retry parameters
-BASE_DELAY = 1  # Base delay in seconds
-MAX_DELAY = 8  # Maximum delay in seconds
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -419,8 +414,7 @@ class Auth0Provider(AuthProvider):
             max_pagination_rate_limit_retries: int = 5,
             pagination_retry_delay: float = 2.0,
             per_page: int = 50,
-            max_role_fetch_retries: int = 3,
-            user_processing_delay: float = 1.0
+            admin_auth_ids: Optional[set] = None
         ):
             self.auth0 = auth0
             self.all_projects = all_projects
@@ -433,9 +427,9 @@ class Auth0Provider(AuthProvider):
             self.max_pagination_rate_limit_retries = max_pagination_rate_limit_retries
             self.pagination_retry_delay = pagination_retry_delay
             self.per_page = per_page
-            self.max_role_fetch_retries = max_role_fetch_retries
-            self.user_processing_delay = user_processing_delay
-        
+            # auth0 user_ids holding the 'admin' role, fetched once per sync
+            self.admin_auth_ids = admin_auth_ids if admin_auth_ids is not None else set()
+
         def to_dict(self) -> Dict[str, int]:
             """Convert context stats to dictionary."""
             return {
@@ -450,66 +444,79 @@ class Auth0Provider(AuthProvider):
             self.pagination_rate_limit_count = 0
             self.pagination_retry_delay = 2.0
     
-    def _fetch_user_roles_with_retry(
-        self, 
-        auth0_id: str,
+    def _fetch_admin_auth_ids(
+        self,
+        auth0: Auth0,
         context: 'SyncContext'
-    ) -> Optional[Dict[str, Any]]:
+    ) -> set:
         """
-        Fetch user roles from Auth0 with retry logic for rate limiting.
-        
+        Fetch the Auth0 user_ids of every member of the 'admin' role, once.
+
+        Replaces the previous per-user ``users.list_roles()`` call (an N+1 that
+        made one Management-API request per user) with ~2 requests total: one to
+        resolve the 'admin' role id, then paged requests for its members.
+
         Args:
-            auth0_id: Auth0 user ID
-            context: SyncContext object containing auth0 client, page, and stats
-            
+            auth0: Auth0 Management API client
+            context: SyncContext (used for rate-limit retry configuration)
+
         Returns:
-            dict: User roles dictionary, or None if fetch failed after retries
+            set: auth0 user_ids holding the 'admin' role (empty if none / on error).
         """
-        roles = None
-        retry_count = 0
-        success = False
-        max_retries = context.max_role_fetch_retries
-        
-        while retry_count < max_retries and not success:
+        # 1. Resolve the 'admin' role id.
+        try:
+            roles_resp = auth0.roles.list(name_filter='admin')
+            roles_list = roles_resp.get('roles', []) if isinstance(roles_resp, dict) else []
+            admin_role = next((r for r in roles_list if r.get('name') == 'admin'), None)
+        except Exception as e:
+            logging.error(f"Failed to resolve Auth0 'admin' role: {e}")
+            return set()
+
+        if not admin_role:
+            logging.warning("No 'admin' role found in Auth0; no users will be marked admin.")
+            return set()
+
+        # 2. Page through the role's members, collecting user_ids.
+        admin_ids: set = set()
+        page = 0
+        retry_delay = 2.0
+        rate_limit_retries = 0
+        while True:
             try:
-                roles = context.auth0.users.list_roles(auth0_id)
-                success = True
-            except RateLimitError as e:
-                retry_count += 1
-                if retry_count >= max_retries:
-                    # Max retries exceeded
-                    error_info = {
-                        'user_id': auth0_id,
-                        'page': context.page,
-                        'processed': context.processed_users,
-                        'status': getattr(e, 'status_code', None),
-                        'code': getattr(e, 'error_code', None),
-                        'message': getattr(e, 'message', str(e)),
-                        'reset_at': getattr(e, 'reset_at', None),
-                        'remaining': getattr(e, 'remaining', None),
-                        'limit': getattr(e, 'limit', None),
-                    }
-                    error_info = {k: v for k, v in error_info.items() if v is not None}
-                    
+                members = auth0.roles.list_users(admin_role['id'], page=page, per_page=100)
+                rate_limit_retries = 0
+            except RateLimitError:
+                rate_limit_retries += 1
+                if rate_limit_retries > context.max_pagination_rate_limit_retries:
                     logging.error(
-                        f"Rate limit during role fetch for user {auth0_id} after {max_retries} retries: "
-                        f"{error_info}. Skipping user."
+                        f"Too many rate-limit retries listing admin members (page {page}); "
+                        f"proceeding with {len(admin_ids)} collected so far."
                     )
-                    return None
-                else:
-                    # Calculate exponential backoff delay with jitter
-                    delay = min(BASE_DELAY * (2 ** retry_count) + random.uniform(0, 1), MAX_DELAY)
-                    logging.warning(
-                        f"Rate limit during role fetch for user {auth0_id}. "
-                        f"Retrying in {delay:.2f} seconds... (Attempt {retry_count}/{max_retries})"
-                    )
-                    time.sleep(delay)
+                    break
+                logging.warning(
+                    f"Rate limit listing admin members (page {page}). "
+                    f"Retrying in {retry_delay:.1f}s... (attempt {rate_limit_retries})"
+                )
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60.0)
+                continue
             except Exception as e:
-                # Non-rate-limit error
-                logging.error(f"Error fetching roles for user {auth0_id}: {str(e)}")
-                return None
-        
-        return roles if success else None
+                logging.error(f"Failed to list admin role members (page {page}): {e}")
+                break
+
+            users = members.get('users', []) if isinstance(members, dict) else []
+            for u in users:
+                uid = u.get('user_id')
+                if uid:
+                    admin_ids.add(uid)
+
+            if len(users) < 100:
+                break
+            page += 1
+            time.sleep(1)  # gentle pacing between member pages
+
+        logging.info(f"Fetched {len(admin_ids)} admin member(s) from Auth0.")
+        return admin_ids
     
     def _process_single_user(
         self, 
@@ -545,18 +552,9 @@ class Auth0Provider(AuthProvider):
             auth_id=auth0_id
         )
                 
-        # Add delay between role requests to avoid rate limiting
-        time.sleep(context.user_processing_delay)
-        
-        # Fetch user's roles with retry mechanism
-        roles = self._fetch_user_roles_with_retry(auth0_id, context)
-        if roles is None:
-            # Failed to fetch roles, skip this user
-            return False
-        
-        roles_list = roles.get('roles', [])
-        is_admin = any(role['name'] == 'admin' for role in roles_list)
-        
+        # Admin status comes from the pre-fetched admin role members (no per-user API call)
+        is_admin = auth0_id in context.admin_auth_ids
+
         # Update admin status
         was_admin = db_user.is_admin
         db_user.is_admin = is_admin
@@ -639,7 +637,7 @@ class Auth0Provider(AuthProvider):
         logging.warning(
             f"Rate limit hit ({new_count}/{context.max_pagination_rate_limit_retries}). "
             f"Possible issues: frequent calls, concurrent execution, batch size ({context.per_page}), "
-            f"or insufficient delays (1s pages, {context.user_processing_delay}s roles). Retrying in {context.pagination_retry_delay}s..."
+            f"or insufficient delays (1s between pages). Retrying in {context.pagination_retry_delay}s..."
         )
     
     def _log_sync_statistics(self, initial_user_count: int, initial_admin_count: int) -> None:
@@ -661,22 +659,19 @@ class Auth0Provider(AuthProvider):
             f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
         )
         
-    def sync_users_to_db(self, user_processing_delay: float = 1.0) -> None:
+    def sync_users_to_db(self) -> None:
         """
         Syncs users from Auth0 to the application's database using UserService and UserProjectService.
         Implements rate limiting and retry logic for Auth0 API calls.
-        
+
         WARNING: This function makes many Auth0 Management API calls and should be called manually only.
         This function should only be called from manage_project_permissions.py script.
-        
-        Args:
-            user_processing_delay: Delay in seconds between processing each user (default: 1.0)
-        
+
         Design concerns:
         - Auth0 Management API has strict rate limits (typically 2 req/sec for free tier)
-        - This function makes 1 + N*2 API calls where N = number of users (list users + list_roles per user)
-        - If called frequently, will hit rate limits quickly
-        - Consider: caching, background jobs, or incremental sync instead of full sync on-demand
+        - This function makes ~ceil(N/per_page) + ~ceil(A/per_page) API calls, where N = total
+          users and A = admin-role members (admins are fetched once, not once per user)
+        - If called frequently it still adds load; prefer event-driven sync (see issue #515)
         """
         from mdvtools.dbutils.dbmodels import Project
         
@@ -707,10 +702,13 @@ class Auth0Provider(AuthProvider):
             sync_context = self.SyncContext(
                 auth0=auth0,
                 all_projects=all_projects,
-                page=0,
-                user_processing_delay=user_processing_delay
+                page=0
             )
-            
+
+            # Fetch all 'admin' role members once, up front. Replaces the old
+            # per-user list_roles() call (N+1) with ~2 calls total.
+            sync_context.admin_auth_ids = self._fetch_admin_auth_ids(auth0, sync_context)
+
             # Fetch users from Auth0 connection with pagination
             while True:
                 try:

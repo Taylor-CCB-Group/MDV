@@ -180,14 +180,9 @@ class TestAuth0ProviderSync:
             {'users': []}  # Empty list to signal end
         ]
         
-        # Mock role fetches - first user is admin, rest are not
-        def mock_list_roles(user_id):
-            if user_id == 'auth0|user0':
-                return {'roles': [{'name': 'admin'}]}
-            else:
-                return {'roles': []}
-        
-        mock_auth0_client.users.list_roles.side_effect = mock_list_roles
+        # Mock admin-role fetch - user0 is the only admin (fetched once, up front)
+        mock_auth0_client.roles.list.return_value = {'roles': [{'id': 'rol_admin', 'name': 'admin'}]}
+        mock_auth0_client.roles.list_users.return_value = {'users': [{'user_id': 'auth0|user0'}]}
         
         # Mock OAuth initialization to avoid real HTTP requests
         with patch('mdvtools.auth.auth0_provider.requests.get') as mock_get:
@@ -213,25 +208,26 @@ class TestAuth0ProviderSync:
         # Verify: 75 users processed
         assert mock_auth0_client.users.list.call_count >= 2
         assert mock_user_service.add_or_update_user.call_count == 75
-        # Admin user should get project assignments
-        # `>= 0` is vacuous and doesn't test anything
-        # assert mock_user_project_service.add_or_update_user_project.call_count >= 0
+        # Admin members were fetched once, up front — not once per user (no N+1)
+        assert mock_auth0_client.roles.list.called
+        mock_auth0_client.users.list_roles.assert_not_called()
     
-    def test_sync_users_to_db_rate_limit_role_fetch(
+    def test_sync_users_to_db_rate_limit_admin_fetch(
         self, auth0_app, mock_auth0_client, mock_user_service,
         mock_user_project_service, mock_db, mock_user_model,
         mock_project_model, mock_get_token, mock_auth0_class
     ):
-        """Test rate limit on role fetch with successful retry."""
+        """Test rate limit on the admin-members fetch with successful retry."""
         # Setup: single user
         mock_auth0_client.users.list.side_effect = [
             {'users': [{'user_id': 'auth0|user1', 'email': 'user1@test.com'}]},
             {'users': []}
         ]
-        
-        # Mock role fetch: rate limit on first call, succeed on retry
+
+        # Admin role resolves fine; listing its members rate-limits once then succeeds
+        mock_auth0_client.roles.list.return_value = {'roles': [{'id': 'rol_admin', 'name': 'admin'}]}
         call_count = [0]
-        def mock_list_roles(user_id):
+        def mock_list_users(role_id, page, per_page):
             call_count[0] += 1
             if call_count[0] == 1:
                 raise RateLimitError(
@@ -239,9 +235,9 @@ class TestAuth0ProviderSync:
                     message="Rate limit exceeded",
                     reset_at=1234567890
                 )
-            return {'roles': []}
-        
-        mock_auth0_client.users.list_roles.side_effect = mock_list_roles
+            return {'users': []}
+
+        mock_auth0_client.roles.list_users.side_effect = mock_list_users
         
         # Mock OAuth initialization
         with patch('mdvtools.auth.auth0_provider.requests.get') as mock_get:
@@ -263,8 +259,8 @@ class TestAuth0ProviderSync:
                     with patch('mdvtools.auth.auth0_provider.time.sleep'):  # Speed up test
                         provider.sync_users_to_db()
         
-        # Verify: user was processed after retry
-        assert mock_auth0_client.users.list_roles.call_count == 2  # Initial + retry
+        # Verify: admin-member fetch was retried after the rate limit
+        assert mock_auth0_client.roles.list_users.call_count == 2  # Initial + retry
         assert mock_user_service.add_or_update_user.called
     
     def test_sync_users_to_db_rate_limit_pagination(
@@ -353,9 +349,6 @@ class TestAuth0ProviderSync:
             {'users': [{'user_id': 'auth0|user1', 'email': 'user1@test.com'}]},
             {'users': []}
         ]
-        
-        # Mock roles
-        mock_auth0_client.users.list_roles.return_value = {'roles': []}
         
         # Mock database commit to raise error
         mock_db.session.commit.side_effect = Exception("Database error")
