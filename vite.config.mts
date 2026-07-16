@@ -40,10 +40,11 @@ const enableBundleAnalysis =
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
     const name = assetInfo.name ?? '';
-    if (name.includes('index.css')) return 'assets/mdv.css';
-    if (name === 'mdv.css') return 'assets/mdv.css';
+    // project_bootstrap / desktop_index import ./all_css → emitted as all_css.css
+    if (name.includes('index.css') || name === 'all_css.css' || name === 'mdv.css' || name === 'desktop_index.css') {
+        return 'assets/mdv.css';
+    }
     if (name === 'catalog.css') return 'assets/catalog.css';
-    if (name === 'desktop_index.css') return 'assets/mdv.css';
     if (process.env.VITE_ENTRYPOINT) {
         const { name: entryBase } = path.parse(process.env.VITE_ENTRYPOINT);
         if (name === `${entryBase}.css`) return 'assets/mdv.css';
