@@ -55,3 +55,38 @@ def materialize_columns_tray(project, spec, params: dict, ws: Workspace) -> None
         for p in spec.params:
             if p.type != "column" and params.get(p.name) is not None:
                 f.attrs[p.name] = params[p.name]
+
+def materialize_matrix_tray(project, spec, params: dict, ws: Workspace) -> None:
+    """Input shape 'matrix': copy the expression matrix (a rows_as_column subgroup) into its tray
+    as its CSC triplet - x/i/p unchanged, plus explicit shape, stays sparse. The worker rebuilds csc_matrix
+    from the triplet and imports no MDV.
+    """
+    datasource = params["datasource"]
+    subgroup_key = params.get("layer", "gs")
+    name, is_sparse = project._resolve_rows_as_columns_subgroup(datasource, subgroup_key)
+    if not is_sparse:
+        raise NotImplementedError("matrix tray materialization only supports sparse matrices")
+
+    n_cells = int(project.get_datasource_metadata(datasource)["size"])
+    with project.lock("read"):
+        h5 = project._get_h5_handle(read_only = True)
+        try:
+            grp = h5[f"{datasource}/{name}"]
+            assert isinstance(grp, h5py.Group)
+            x = np.asarray(grp["x"], dtype=np.float32)
+            i = np.asarray(grp["i"], dtype=np.uint32)
+            p = np.asarray(grp["p"])
+        finally:
+            h5.close()
+    n_genes = len(p) - 1
+
+    with h5py.File(ws.input / "tray.h5", "w") as f:
+        f.create_dataset("x", data=x)
+        f.create_dataset("i", data=i)
+        f.create_dataset("p", data=p)
+        f.attrs["n_cells"] = n_cells
+        f.attrs["n_genes"] = n_genes
+        f.attrs["sparse"] = True
+        for pspec in spec.params:
+            if pspec.type != "column" and params.get(pspec.name) is not None:
+                f.attrs[pspec.name] = params[pspec.name]
