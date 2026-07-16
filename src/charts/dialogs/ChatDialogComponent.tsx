@@ -1,6 +1,6 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
-import { type ChatProgress, type ChatMessage, type ChatModelOption, navigateToView } from './ChatAPI';
+import { type ChatProgress, type ChatMessage, type ChatModelOption, type ChatDatasourceOption, type DatasourceMode, navigateToView } from './ChatAPI';
 import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
@@ -18,12 +18,17 @@ import {
     IconButton,
     InputAdornment,
     FormControl,
+    Checkbox,
+    FormControlLabel,
+    FormGroup,
     InputLabel,
     MenuItem,
     Select,
     Skeleton,
     TextField,
     Typography,
+    ToggleButton,
+    ToggleButtonGroup,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import _ from 'lodash';
@@ -149,6 +154,9 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     data_preview,
     guidance,
     needs_refresh,
+    datasource_names,
+    datasource_mode,
+    resolved_datasource_names,
     onClose,
     error,
     updateInput,
@@ -211,6 +219,21 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                             <ContentCopy fontSize='small' />
                         )}
                     </IconButton>
+                )}
+                {isUser && datasource_mode === 'manual' && datasource_names && datasource_names.length > 0 && (
+                    <Typography variant="caption" color="text.secondary" className="block mb-2">
+                        Datasources: {datasource_names.join(', ')}
+                    </Typography>
+                )}
+                {isUser && datasource_mode === 'auto' && (
+                    <Typography variant="caption" color="text.secondary" className="block mb-2">
+                        Datasources: Auto
+                    </Typography>
+                )}
+                {sender === 'bot' && !error && resolved_datasource_names && resolved_datasource_names.length > 0 && (
+                    <Typography variant="caption" color="text.secondary" className="block mb-2">
+                        Resolved datasources: {resolved_datasource_names.join(', ')}
+                    </Typography>
                 )}
                 {sender === 'bot' && !error && guidance?.trim() && (
                     <ChatPreviewBlock
@@ -453,6 +476,12 @@ const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
     );
 }
 
+function datasourceRoleLabel(role: ChatDatasourceOption['role']): string {
+    if (role === 'obs') return 'obs';
+    if (role === 'expression') return 'expr';
+    return 'table';
+}
+
 export type ChatBotProps = {
     messages: ChatMessage[];
     isSending: boolean;
@@ -464,6 +493,11 @@ export type ChatBotProps = {
     availableModels: ChatModelOption[];
     selectedModelId: string;
     onModelChange: (modelId: string) => void;
+    availableDatasources: ChatDatasourceOption[];
+    selectedDatasourceNames: string[];
+    onDatasourcesChange: (names: string[]) => void;
+    datasourceMode: DatasourceMode;
+    onDatasourceModeChange: (mode: DatasourceMode) => void;
 };
 
 
@@ -478,6 +512,11 @@ const Chatbot = ({
     availableModels,
     selectedModelId,
     onModelChange,
+    availableDatasources,
+    selectedDatasourceNames,
+    onDatasourcesChange,
+    datasourceMode,
+    onDatasourceModeChange,
 }: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -587,6 +626,78 @@ const Chatbot = ({
                 ) : availableModels.length === 1 ? (
                     <Typography variant="caption" color="text.secondary">
                         Model: {availableModels[0].label}
+                    </Typography>
+                ) : null}
+                {availableDatasources.length > 1 ? (
+                    <Box>
+                        <Typography variant="caption" color="text.secondary" className="block mb-1">
+                            Datasource mode
+                        </Typography>
+                        <ToggleButtonGroup
+                            size="small"
+                            exclusive
+                            value={datasourceMode}
+                            onChange={(_e, value: DatasourceMode | null) => {
+                                if (value) onDatasourceModeChange(value);
+                            }}
+                            aria-label="datasource mode"
+                            disabled={isSending}
+                            sx={{ mb: 1 }}
+                        >
+                            <ToggleButton value="auto" sx={{ textTransform: 'none' }}>
+                                Auto
+                            </ToggleButton>
+                            <ToggleButton value="manual" sx={{ textTransform: 'none' }}>
+                                Manual
+                            </ToggleButton>
+                        </ToggleButtonGroup>
+                        {datasourceMode === 'auto' ? (
+                            <Typography variant="caption" color="text.secondary" className="block">
+                                Datasources inferred from your question (table names and column fields).
+                            </Typography>
+                        ) : (
+                            <>
+                                <Typography variant="caption" color="text.secondary" className="block mb-1">
+                                    Datasources (first selected is the primary chart target)
+                                </Typography>
+                                <FormGroup row sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                                    {availableDatasources.map((ds) => {
+                                        const checked = selectedDatasourceNames.includes(ds.name);
+                                        return (
+                                            <FormControlLabel
+                                                key={ds.name}
+                                                disabled={isSending || (checked && selectedDatasourceNames.length <= 1)}
+                                                control={
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={checked}
+                                                        onChange={() => {
+                                                            const nameSet = new Set(
+                                                                checked
+                                                                    ? selectedDatasourceNames.filter((n) => n !== ds.name)
+                                                                    : [...selectedDatasourceNames, ds.name],
+                                                            );
+                                                            const next = availableDatasources
+                                                                .map((d) => d.name)
+                                                                .filter((n) => nameSet.has(n));
+                                                            if (next.length > 0) {
+                                                                onDatasourcesChange(next);
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label={`${ds.name} (${datasourceRoleLabel(ds.role)})`}
+                                                sx={{ mr: 1 }}
+                                            />
+                                        );
+                                    })}
+                                </FormGroup>
+                            </>
+                        )}
+                    </Box>
+                ) : availableDatasources.length === 1 ? (
+                    <Typography variant="caption" color="text.secondary">
+                        Datasource: {availableDatasources[0].name}
                     </Typography>
                 ) : null}
             <Box className="flex w-full">

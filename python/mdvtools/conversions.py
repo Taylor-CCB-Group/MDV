@@ -14,7 +14,7 @@ from math import ceil
 import h5py
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 from werkzeug.utils import secure_filename
 import numpy as np
 from .mdvproject import MDVProject,create_bed_gz_file
@@ -535,6 +535,143 @@ def get_matrix(matrix,main_names=None,mod_names=None) -> tuple[scipy.sparse.csc_
         
         return new_matrix, True
 
+
+
+
+def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genome: str ="hg38" ,extra_info: Optional[List[str]] = None,
+                             include_sample_names: bool = True, exclude_draft_chromosomes: bool = True):
+    # SV VCF  files have an END field in the INFO column
+    # however pysam seems to convert this to a stop field in the record
+    # so we will use that
+    import pysam
+    BND_REMOTE_RE = re.compile(r"[\[\]]([^:\[\]]+):(\d+)[\[\]]")
+
+    draft_chrom_pattern = re.compile(
+        r"(random|chrUn|fix|alt|decoy)", re.IGNORECASE
+    )
+    if not extra_info:
+        extra_info = []
+    vcf  = pysam.VariantFile(vcf_filename)
+    info_fields_required = ["SVTYPE","SVLEN","SUPP_VEC"]
+    
+    info_fields_required.extend(extra_info)
+    # do we have all the fields 
+    missing_fields = [x for x in info_fields_required if x not in vcf.header.info]
+    if len(missing_fields)>0:   
+            raise ValueError(f"VCF file missing the following required INFO fields {missing_fields}")
+    # dict to hold all the fields we require
+    column_dict ={
+        "chr1":[],
+        "pos1":[],
+        "chr2":[],
+        "pos2":[],
+        "svtype":[],
+        "length":[],
+        "support":[],
+        "quality":[]
+    }
+    #add any extras
+    if include_sample_names:
+        column_dict["samples"] = []
+    for field in extra_info :
+        column_dict[field] = []
+
+
+    # get the chromosomes 
+    chromosomes = {
+        str(contig_name): contig.length
+        for contig_name, contig in vcf.header.contigs.items()
+        if (
+            not exclude_draft_chromosomes
+            or not draft_chrom_pattern.search(str(contig_name))
+        )
+    }
+
+    for rec in (vcf):
+        chr1= rec.chrom
+        chr2= rec.info.get("CHR2",chr1)
+        if not chr1 in chromosomes or not chr2 in chromosomes:
+            continue
+        svtype = rec.info.get("SVTYPE","UKN")
+        length = abs(rec.info.get("SVLEN",0))
+        # samtools will take remove the 'END' field from info and add it as a 'stop' field in the record
+        pos2  = rec.stop
+        if svtype in ["TRA","BND"]:
+            #look at alt allele to get the other chromosome and position 
+            alts = rec.alts or ()
+            if len(alts) > 1:
+                logger.warning(f"More than 1 ALT allele found for record {rec.id}, using the first one")
+            first_alt = next(iter(alts), None)
+            if first_alt is None:
+                logger.warning(f"No ALT allele found for BND/TRA record {rec.id}, skipping record")
+                continue
+            m = BND_REMOTE_RE.search(first_alt)
+            if m:
+                chr2_t  = m.group(1)
+                chr2 = chr2_t
+                pos2 = int(m.group(2))
+                if not chr2 in chromosomes:
+                    continue
+            else:
+                logger.warning(f"Could not parse ALT field for BND/TRA record {rec.id}, attempting fallback to CHR2 and POS2 from INFO")
+                chr2_fallback = rec.info.get("CHR2")
+                pos2_fallback = rec.info.get("POS2")
+                if chr2_fallback and pos2_fallback and chr2_fallback in chromosomes:
+                    chr2 = chr2_fallback
+                    pos2 = int(pos2_fallback)
+                    logger.info(f"Using fallback CHR2={chr2} and POS2={pos2} for record {rec.id}")
+                else:
+                    logger.warning(f"Fallback CHR2/POS2 missing or invalid for record {rec.id}, skipping record")
+                    continue
+        column_dict["chr1"].append(chr1)
+        column_dict["pos1"].append(rec.pos)
+        column_dict["chr2"].append(chr2)
+        column_dict["pos2"].append(pos2)
+        column_dict["svtype"].append(svtype)
+        column_dict["length"].append(length)
+        column_dict["quality"].append(rec.qual if rec.qual else 0)
+        for field in extra_info:
+            column_dict[field].append(rec.info.get(field,"NA"))
+        sample_indexes = [i for i, c in enumerate(rec.info.get("SUPP_VEC",[])) if c == "1"]
+        column_dict["support"].append(len(sample_indexes))
+        if include_sample_names:
+            samples  = ",".join([vcf.header.samples[i] for i in sample_indexes])
+            column_dict["samples"].append(samples)
+
+    df = pd.DataFrame(column_dict)
+    columns = [
+        {"name": "chr1", "datatype": "text"},
+        {"name": "pos1", "datatype": "int32"},
+        {"name": "chr2", "datatype": "text"},
+        {"name": "pos2", "datatype": "int32"},
+        {"name": "svtype", "datatype": "text"},
+        {"name": "length", "datatype": "int32"},
+        {"name": "support", "datatype": "int32"},
+        {"name": "quality", "datatype": "double"},
+    ]
+    if include_sample_names:
+        columns.append({"name": "samples", "datatype": "multitext", "delimiter": ","})
+    for field in extra_info:
+        datatype = "text" if vcf.header.info[field].type== "String" else "double"
+        columns.append({"name": field, "datatype": datatype})
+    mdv.add_datasource(name, df, columns)
+    md = mdv.get_datasource_metadata(name)
+    # add the genome information
+    md["genome"]={
+        "chromosomes": chromosomes,
+        "assembly": genome,
+        "type":"sv",
+        "columns":{
+            "chr1":"chr1",
+            "chr2":"chr2",
+            "pos1":"pos1",
+            "pos2":"pos2",
+            "svtype":"svtype",
+            "length":"length"
+        }
+    }
+    mdv.set_datasource_metadata(md)
+    
 
 
 def convert_vcf_to_df(vcf_filename: str) -> pd.DataFrame:
