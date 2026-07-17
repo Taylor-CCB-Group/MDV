@@ -651,8 +651,84 @@ open_browser() {
   echo -e "${GREEN} Open $URL in your browser."
 }
 
+# Wait until the MDV app answers HTTP (migrations run at startup, so we can't
+# sync until it's actually up). Returns non-zero if it never responds.
+wait_for_app_ready() {
+  local url="http://localhost:${APP_PORT}/"
+  echo -e "${BLUE}Waiting for MDV app to be ready...${NC}"
+  for _i in $(seq 1 30); do
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "$url" 2>/dev/null || echo "000")
+    if [[ "$code" != "000" ]]; then
+      echo -e "${GREEN}✓ App responding (HTTP $code).${NC}"
+      return 0
+    fi
+    sleep 2
+  done
+  echo -e "${YELLOW}⚠ App did not respond within timeout.${NC}"
+  return 1
+}
+
+# On an Auth0 deployment, sync users from Auth0 into the DB (and apply the
+# permissions file if given), then restart the app so its in-memory cache
+# reflects the new rows. The sync runs in a separate `docker exec` process, so
+# without the restart the running server would keep serving a stale cache.
+run_permission_sync() {
+  if ! grep -q '^ENABLE_AUTH=1' "$ENV_FILE" || ! grep -q '^DEFAULT_AUTH_METHOD=auth0' "$ENV_FILE"; then
+    echo -e "${YELLOW}Not an Auth0 deployment — skipping user sync.${NC}"
+    return 0
+  fi
+
+  local container="${DEPLOYMENT_NAME}-mdv_app-1"
+
+  if ! wait_for_app_ready; then
+    echo -e "${YELLOW}Skipping user sync (app not ready). Re-run manually once it's up.${NC}"
+    return 0
+  fi
+
+  echo -e "${BLUE}Syncing users from Auth0${PERMISSIONS_FILE:+ and applying permissions}...${NC}"
+  local sync_ok=1
+  if [[ -n "$PERMISSIONS_FILE" ]]; then
+    docker cp "$PERMISSIONS_FILE" "${container}:/tmp/mdv_perms.txt" || sync_ok=0
+    if [[ "$sync_ok" == "1" ]]; then
+      docker exec "$container" sh -c 'cd /app/python && uv run python -m mdvtools.scripts.manage_project_permissions /tmp/mdv_perms.txt' || sync_ok=0
+    fi
+  else
+    docker exec "$container" sh -c 'cd /app/python && uv run python -m mdvtools.scripts.manage_project_permissions sync' || sync_ok=0
+  fi
+
+  if [[ "$sync_ok" != "1" ]]; then
+    echo -e "${RED}✗ User sync failed. The app is deployed; check Auth0 config and re-run the sync.${NC}"
+    return 0
+  fi
+
+  echo -e "${BLUE}Restarting app so the in-memory cache reflects the sync...${NC}"
+  if docker restart "$container" >/dev/null; then
+    echo -e "${GREEN}✓ User sync complete and cache refreshed.${NC}"
+  else
+    echo -e "${YELLOW}⚠ App restart failed; run 'docker restart ${container}' to refresh the cache.${NC}"
+  fi
+  return 0
+}
+
 # Main Execution
 echo "Starting MDV Deployment..."
+
+# Parse optional CLI flags
+PERMISSIONS_FILE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --permissions-file)
+      if [[ -z "$2" ]]; then echo -e "${RED}--permissions-file requires a path${NC}"; exit 1; fi
+      PERMISSIONS_FILE="$2"; shift 2 ;;
+    --permissions-file=*)
+      PERMISSIONS_FILE="${1#*=}"; shift ;;
+    *)
+      echo -e "${RED}Unknown option: $1${NC}"; exit 1 ;;
+  esac
+done
+if [[ -n "$PERMISSIONS_FILE" && ! -f "$PERMISSIONS_FILE" ]]; then
+  echo -e "${RED}Error: permissions file '$PERMISSIONS_FILE' not found.${NC}"; exit 1
+fi
 
 check_docker
 #check_existing_service
@@ -665,5 +741,7 @@ create_or_validate_env_file
 
 DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/main/docker-compose.yml"
 run_docker_compose "$DOCKER_COMPOSE_URL"
+
+run_permission_sync
 
 open_browser
