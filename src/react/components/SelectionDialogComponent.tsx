@@ -530,6 +530,7 @@ const Histogram = observer((props: RangeProps) => {
             xScaleType={resolvedXScale}
             yScaleType={resolvedYScale}
             brush={brush}
+            isDate={props.isDate}
             scaleControls={{
                 xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
                 yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
