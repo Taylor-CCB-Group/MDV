@@ -30,6 +30,10 @@ logger = get_logger(__name__)
 # Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
+
+# Opt-in flag: sync_users_to_db() runs on startup as performance improved
+RUN_AUTH0_SYNC_ON_START = os.getenv("RUN_AUTH0_SYNC_ON_START", "0").lower() in ["1", "true", "yes"]
+logger.info(f"Auth0 sync on startup: {RUN_AUTH0_SYNC_ON_START}")
 oauth = None
 if ENABLE_AUTH:
     
@@ -97,8 +101,19 @@ def create_flask_app(config_name=None):
 
             if ENABLE_AUTH:
                 try:
-                    # Note: sync_users_to_db() is no longer called automatically on startup.
-                    # It should only be called manually from manage_project_permissions.py script.
+                    # sync_users_to_db() runs on startup as performance improved
+                    if RUN_AUTH0_SYNC_ON_START:
+                        try:
+                            auth_provider = get_auth_provider()
+                            if hasattr(auth_provider, "sync_users_to_db"):
+                                logger.info("RUN_AUTH0_SYNC_ON_START enabled; syncing users from Auth0...")
+                                auth_provider.sync_users_to_db()
+                                logger.info("Auth0 user sync complete.")
+                            else:
+                                logger.info("Auth provider has no sync_users_to_db(); skipping startup sync.")
+                        except Exception as sync_err:
+                            logger.exception(f"Auth0 startup sync failed; continuing with existing DB state: {sync_err}")
+
                     logger.info("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
 
