@@ -119,10 +119,12 @@ function getRollupOptions() {
 }
 
 // avoiding some repition by defining a proxyOptions object used for all proxied routes.
+// Flask already adds CORS + Range expose headers via add_safe_headers; keep changeOrigin so
+// cross-origin Range requests (parquet / OME-TIFF / zarr via spatialdata.js) work through the proxy.
 const proxyOptions = { target: flaskURL, changeOrigin: true };
 // ... and then this is a bit more concise than 
 const proxy = [
-    '^/(get_|images|tracks|save|chat).*', // these routes are proxied to flask server in 'single project' mode
+    '^/(get_|images|tracks|save|chat|spatial).*', // single-project Flask routes (incl. /spatial zarr etc.)
     '^/project/[^/]+/.+', // proxy nested project routes, but keep /project/:id for the Vite app shell
     '^/.*\\.(json|b|gz)$',
     '/projects',
@@ -175,11 +177,15 @@ export default defineConfig(async (): Promise<UserConfig> => {
     base: process.env.asset_base || (build === 'dev_pt' ? "/" : "./"),
     server: {
         headers: {
+            // Match python/mdvtools/server_utils.add_safe_headers (SharedArrayBuffer + Range CORS).
             "Cross-Origin-Embedder-Policy": "require-corp",
             "Cross-Origin-Opener-Policy": "same-origin",
+            "Cross-Origin-Resource-Policy": "cross-origin",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET",
-            "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization",
+            "Access-Control-Allow-Headers": "Content-Type, Range, X-Requested-With, Authorization",
+            "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
+            "Access-Control-Max-Age": "86400",
         },
         port,
         strictPort: true,

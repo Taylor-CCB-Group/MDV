@@ -48,7 +48,10 @@ def add_safe_headers(resp):
     resp.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     # headers required if serving endpoints for another server e,g dev server
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    # range requests for parquet (& OME-TIFF/other things, but noticing issues with points parquet)
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Range"
+    resp.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+    resp.headers["Access-Control-Max-Age"] = "86400"
     #required for vite dev
     resp.headers["Cross-Origin-Resource-Policy"] ="cross-origin"
     _set_shell_cache_headers(resp)
