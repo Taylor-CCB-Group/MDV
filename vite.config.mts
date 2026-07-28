@@ -252,10 +252,13 @@ export default defineConfig(async (): Promise<UserConfig> => {
             path.resolve(configDir, 'login_dev.html'),
             path.resolve(configDir, 'catalog_dev.html'),
         ],
-        // zarrextra/workers resolves codec-worker.js via import.meta.url; prebundling
-        // at some point broke that path causing stale-cache 504s after package bumps.
-        // as of now, this will actively prevent the url from being resolved properly in dev
-        // exclude: ['zarrextra/workers'],
+        // @spatialdata/core defers its vendored parquet-wasm import with @vite-ignore.
+        // Prebundling moves the caller to .vite/deps, so its package-relative URL cannot
+        // find the vendored asset. Upstream should expose the loader through a package
+        // export or use a Vite-transformable new URL(..., import.meta.url) reference.
+        // Core also requires Zod 4 while MDV uses Zod 3; excluding both preserves each
+        // package's own dependency resolution instead of sharing the optimized Zod 3 cache.
+        exclude: ["@spatialdata/core", "zod"],
     },
     } as UserConfig;
 });
