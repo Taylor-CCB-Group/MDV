@@ -5,13 +5,18 @@ from pathlib import Path
 from . import JOBS_DIRNAME
 from .registry import get_tool, validate_params
 from .jobstore import JobStore, Status, ACTIVE
-from .workspace import Workspace, materialize_columns_tray, default_workspace_root
+from .workspace import (
+    Workspace,
+    materialize_columns_tray,
+    materialize_matrix_tray,
+    default_workspace_root
+)
 from .ingest import ingest_column_output
 from .executor import Executor, LocalSubprocessExecutor
 from .provenance import build_provenance
 
 # materializers keyed by INPUT shape; ingest handlers keyed by OUTPUT shape
-MATERIALIZERS = {"columns": materialize_columns_tray}
+MATERIALIZERS = {"columns": materialize_columns_tray, "matrix": materialize_matrix_tray}
 INGESTERS = {"column": ingest_column_output}
 
 
