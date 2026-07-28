@@ -45,7 +45,21 @@ CONCAT_COLUMNS = ToolSpec(
     input_shape="columns",
 )
 
-REGISTRY: dict[str, ToolSpec] = {CONCAT_COLUMNS.id: CONCAT_COLUMNS}
+UMAP = ToolSpec(
+    id="umap",
+    name="UMAP",
+    description="Compute a UMAP embedding from the expression matrix (adds UMAP_1, UMAP_2, ..., UMAP_n)",
+    params=[
+        ParamSpec("datasource", "dropdown", "Datasource"),
+        ParamSpec("layer", "dropdown", "Matrix", default="gs"),
+        ParamSpec("output_name", "text", "New column base name", default="UMAP"),
+    ],
+    output=OutputSpec("column", "datasource", "output_name"),
+    entrypoint="mdvtools.jobs.workers.umap_worker:run",
+    input_shape="matrix",
+)
+
+REGISTRY: dict[str, ToolSpec] = {CONCAT_COLUMNS.id: CONCAT_COLUMNS, UMAP.id: UMAP}
 
 
 def get_tool(tool_id: str) -> ToolSpec:
