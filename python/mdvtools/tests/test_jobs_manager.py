@@ -1,6 +1,8 @@
 import time
 import pandas as pd
 
+import numpy as np
+import scipy.sparse
 from mdvtools.mdvproject import MDVProject
 from mdvtools.jobs.manager import JobManager
 from mdvtools.jobs.jobstore import Status
@@ -23,6 +25,18 @@ def _drive(mgr, timeout=60):
         time.sleep(0.1)
     raise AttributeError("jobs did not finish in time")
 
+def _make_matrix_project(tmp_path, n_cells=60, n_genes=10, seed=0):
+    """A stored expression matrix (gs subgroup); ~60 cells so scanpy's default n_neighbors=15 fits."""
+    project = MDVProject(str(tmp_path / "proj"), delete_existing=True)
+    project.add_datasource("cells", pd.DataFrame({"cell_id": [f"c{i}" for i in range(n_cells)]}))
+    project.add_datasource("genes", pd.DataFrame({"name": [f"g{j}" for j in range(n_genes)]}))
+    project.add_rows_as_columns_link("cells", "genes", "name", "Gene Expr")
+    rng = np.random.default_rng(seed)
+    dense = rng.random((n_cells, n_genes)).astype(np.float32)
+    dense[dense < 0.6] = 0.0                                  # genuinely sparse
+    X = scipy.sparse.csc_matrix(dense)
+    project.add_rows_as_columns_subgroup("cells", "genes", "gs", X, name="gene_scores")
+    return project
 
 def test_end_to_end_single_job(tmp_path):
     project = _make_project(tmp_path)
@@ -41,6 +55,24 @@ def test_end_to_end_single_job(tmp_path):
 
     assert [r.status for r in mgr.store.load_all()] == [Status.DONE.value]
     assert project.get_column("cells", "sample_cluster") == ["s1_a", "s2_b", "s3_a"]
+
+def test_umap_job_end_to_end_lands_two_columns_with_provenance(tmp_path):
+    project = _make_matrix_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
+    job_id = mgr.submit("umap", {"datasource": "cells", "layer": "gs", "output_name": "UMAP"})
+
+    _drive(mgr, timeout=180)   # real scanpy UMAP in a subprocess - allow first-run import/JIT
+
+    rec = {r.job_id: r for r in mgr.store.load_all()}[job_id]
+    assert rec.status == Status.DONE.value
+
+    cols = {c["field"]: c["datatype"] for c in project.get_datasource_metadata("cells")["columns"]}
+    assert cols.get("UMAP_1") == "double" and cols.get("UMAP_2") == "double"   # numeric embedding
+    assert len(project.get_column("cells", "UMAP_1")) == 60                    # one coord per cell
+
+    for col in ("UMAP_1", "UMAP_2"):                                          # provenance on each
+        prov = project.get_column_provenance("cells", col)
+        assert prov is not None and prov["job_id"] == job_id and prov["tool_id"] == "umap"
 
 
 def test_max_concurrent_holds_extra_jobs_queued(tmp_path):
