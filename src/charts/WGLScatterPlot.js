@@ -267,26 +267,7 @@ class WGLScatterPlot extends WGLChart {
 
         this.x = this.config.param[0];
         this.y = this.config.param[1];
-        // Date tick labels are longer than day numbers — give axes a bit more room.
-        // Log scales are not meaningful for calendar days.
-        const xCol = this.dataStore.columnIndex[this.x];
-        const yCol = this.dataStore.columnIndex[this.y];
-        const xIsDate = xCol?.is_date || xCol?.date_unit === "days";
-        const yIsDate = yCol?.is_date || yCol?.date_unit === "days";
-        if (xIsDate && this.config.axis) {
-            this.config.axis.x_log_scale = false;
-            if (this.config.axis.x && (!this.config.axis.x.size || this.config.axis.x.size < 40)) {
-                this.config.axis.x.size = 40;
-                this.setAxisSize("x", 40);
-            }
-        }
-        if (yIsDate && this.config.axis) {
-            this.config.axis.y_log_scale = false;
-            if (this.config.axis.y && (!this.config.axis.y.size || this.config.axis.y.size < 45)) {
-                this.config.axis.y.size = 45;
-                this.setAxisSize("y", 45);
-            }
-        }
+        this._applyDateAxisDefaults();
         this.dim = this.getDimension();
        
         void this.setBackgroundFilter();
@@ -356,6 +337,7 @@ class WGLScatterPlot extends WGLChart {
 
         this.x = this.config.param[0];
         this.y = this.config.param[1];
+        this._applyDateAxisDefaults();
         this.dim = this.getDimension();
         this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
         this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
@@ -375,6 +357,32 @@ class WGLScatterPlot extends WGLChart {
         this.onDataFiltered();
         this.updateAxis();
         super.drawChart();
+    }
+
+    /**
+     * Date tick labels are longer than day numbers — give axes a bit more room.
+     * Log scales are not meaningful for calendar days.
+     * Re-applied when Settings change x/y columns (via drawChart).
+     */
+    _applyDateAxisDefaults() {
+        const xCol = this.dataStore.columnIndex[this.x];
+        const yCol = this.dataStore.columnIndex[this.y];
+        const xIsDate = xCol?.is_date || xCol?.date_unit === "days";
+        const yIsDate = yCol?.is_date || yCol?.date_unit === "days";
+        if (xIsDate && this.config.axis) {
+            this.config.axis.x_log_scale = false;
+            if (this.config.axis.x && (!this.config.axis.x.size || this.config.axis.x.size < 40)) {
+                this.config.axis.x.size = 40;
+                this.setAxisSize("x", 40);
+            }
+        }
+        if (yIsDate && this.config.axis) {
+            this.config.axis.y_log_scale = false;
+            if (this.config.axis.y && (!this.config.axis.y.size || this.config.axis.y.size < 45)) {
+                this.config.axis.y.size = 45;
+                this.setAxisSize("y", 45);
+            }
+        }
     }
 
     async setBackgroundFilter() {
