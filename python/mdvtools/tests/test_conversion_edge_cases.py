@@ -9,7 +9,7 @@ edge cases, ensuring that adata.X is properly handled and validated.
 import os
 import tempfile
 import shutil
-from typing import cast
+from typing import TYPE_CHECKING, cast
 import pytest
 import numpy as np
 import pandas as pd
@@ -17,6 +17,9 @@ import scanpy as sc
 import scipy.sparse as sp
 from contextlib import contextmanager
 from pandas import DataFrame
+
+if TYPE_CHECKING:
+    from spatialdata.models import SpatialElement
 
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
@@ -585,8 +588,10 @@ class TestConversionWithEdgeCases:
             dtype=np.float32,
         )
 
-        assert not _table_uses_global_spatial_coordinates(intrinsic_adata, FakeLabel())
-        assert _table_uses_global_spatial_coordinates(global_adata, FakeLabel())
+        fake_label = cast("SpatialElement", FakeLabel())
+
+        assert not _table_uses_global_spatial_coordinates(intrinsic_adata, fake_label)
+        assert _table_uses_global_spatial_coordinates(global_adata, fake_label)
 
 
 class TestConversionErrorHandling:
