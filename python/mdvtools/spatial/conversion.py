@@ -1023,14 +1023,65 @@ def _compute_table_x_umap_and_leiden(
 ) -> str:
     from mdvtools.conversions import _prepare_x_umap_and_leiden
 
+    existing_leiden_column = _find_case_insensitive_obs_column(adata, "leiden")
+    if "X_umap" in adata.obsm and existing_leiden_column is not None:
+        import pandas as pd
+
+        adata.obs[existing_leiden_column] = pd.Categorical(
+            adata.obs[existing_leiden_column].astype(str)
+        )
+        adata.uns.setdefault("mdv", {})
+        adata.uns["mdv"]["compute_x_umap"] = {
+            "umap_key": "X_umap",
+            "leiden_column": existing_leiden_column,
+            "leiden_resolution": leiden_resolution,
+            "reused_existing": True,
+        }
+        return existing_leiden_column
+
+    leiden_column = _allocate_case_safe_obs_column(adata, "leiden", fallback="computed_leiden")
     _prepare_x_umap_and_leiden(
         adata,
         compute_x_umap=True,
         leiden_resolution=leiden_resolution,
-        leiden_column="leiden",
+        leiden_column=leiden_column,
         umap_key="X_umap",
     )
-    return "leiden"
+    adata.uns.setdefault("mdv", {})
+    adata.uns["mdv"]["compute_x_umap"] = {
+        "umap_key": "X_umap",
+        "leiden_column": leiden_column,
+        "leiden_resolution": leiden_resolution,
+        "reused_existing": False,
+    }
+    return leiden_column
+
+
+def _find_case_insensitive_obs_column(adata: "AnnData", column: str) -> str | None:
+    for existing_column in adata.obs.columns:
+        if str(existing_column) == column:
+            return str(existing_column)
+    for existing_column in adata.obs.columns:
+        if str(existing_column).lower() == column.lower():
+            return str(existing_column)
+    return None
+
+
+def _allocate_case_safe_obs_column(
+    adata: "AnnData",
+    preferred: str,
+    fallback: str,
+) -> str:
+    lower_existing = {str(column).lower() for column in adata.obs.columns}
+    if preferred.lower() not in lower_existing:
+        return preferred
+
+    candidate = fallback
+    suffix = 2
+    while candidate.lower() in lower_existing:
+        candidate = f"{fallback}_{suffix}"
+        suffix += 1
+    return candidate
 
 
 def _materialize_obsm_columns(
@@ -1388,7 +1439,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     image_only_regions: dict[str, dict] = {}
     names: set[str] = set()
     used_table_prefixes: set[str] = set()
-    table_leiden_labels: list[tuple[AnnData, str]] = []
+    table_leiden_labels: list[tuple[AnnData, str, str]] = []
     
     # Process each SpatialData object sequentially
     # Removed ProcessPoolExecutor to avoid pickling issues with lazy zarr arrays in SpatialData objects
@@ -1426,7 +1477,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                     adata,
                     leiden_resolution=args.leiden_resolution,
                 )
-                table_leiden_labels.append((adata, table_prefix))
+                table_leiden_labels.append((adata, table_prefix, leiden_column))
             record = _make_spatial_table_record(
                 adata=adata,
                 sdata_name=sdata_name,
@@ -1485,14 +1536,22 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         primary_obs_datasource_name = table_groups[0].obs_datasource_name
         primary_var_datasource_name = table_groups[0].var_datasource_name
         primary_adata = None
-        leiden_prefixes_by_adata = {id(adata): table_prefix for adata, table_prefix in table_leiden_labels}
+        leiden_prefixes_by_adata = {
+            id(adata): (table_prefix, leiden_column)
+            for adata, table_prefix, leiden_column in table_leiden_labels
+        }
 
         for group_index, group in enumerate(table_groups):
             if args.compute_x_umap and len(group.records) > 1:
                 for record in group.records:
-                    table_prefix = leiden_prefixes_by_adata.get(id(record.adata))
-                    if table_prefix is not None:
-                        _prefix_table_leiden_categories(record.adata, table_prefix)
+                    leiden_prefix = leiden_prefixes_by_adata.get(id(record.adata))
+                    if leiden_prefix is not None:
+                        table_prefix, leiden_column = leiden_prefix
+                        _prefix_table_leiden_categories(
+                            record.adata,
+                            table_prefix,
+                            leiden_column=leiden_column,
+                        )
 
             if len(group.records) == 1:
                 _progress(

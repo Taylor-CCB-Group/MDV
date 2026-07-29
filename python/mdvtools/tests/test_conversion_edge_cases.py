@@ -329,6 +329,31 @@ class TestConversionWithEdgeCases:
             assert "leiden" in columns
             assert columns["leiden"]["datatype"] in ["text", "text16"]
 
+    def test_spatial_x_umap_reuses_existing_embedding_and_leiden_case_variant(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(4, 3)
+        adata.obsm["X_umap"] = np.asarray(
+            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6], [0.7, 0.8]],
+            dtype=np.float32,
+        )
+        adata.obs["Leiden"] = ["0", "0", "1", "1"]
+
+        leiden_column = _compute_table_x_umap_and_leiden(
+            adata,
+            leiden_resolution=0.6,
+        )
+
+        assert leiden_column == "Leiden"
+        assert "leiden" not in adata.obs.columns
+        assert "computed_leiden" not in adata.obs.columns
+        assert isinstance(adata.obs["Leiden"].dtype, pd.CategoricalDtype)
+        assert adata.uns["mdv"]["compute_x_umap"] == {
+            "umap_key": "X_umap",
+            "leiden_column": "Leiden",
+            "leiden_resolution": 0.6,
+            "reused_existing": True,
+        }
+
     def test_spatial_x_umap_materializes_columns_for_copied_store_tables(self):
         factory = MockAnnDataFactory(random_seed=42)
         adata = factory.create_minimal(40, 16)
