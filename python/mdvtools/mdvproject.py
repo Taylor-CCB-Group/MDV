@@ -128,6 +128,8 @@ def convert_pandas_datetime_columns(
     out = dataframe
     for col_name in list(dataframe.columns):
         series = dataframe[col_name]
+        if not isinstance(series, pandas.Series):
+            continue
         converted: Optional[pandas.Series] = None
         if is_datetime64_any_dtype(series):
             converted = _pandas_series_to_day_doubles(series)
@@ -144,8 +146,12 @@ def convert_pandas_datetime_columns(
     return out, date_fields
 
 
-def apply_date_column_metadata(columns: list[dict], date_fields: set[str]) -> list[dict]:
+def apply_date_column_metadata(
+    columns: list[dict] | None, date_fields: set[str]
+) -> list[dict] | None:
     """Mark converted date fields as double + is_date metadata."""
+    if not columns:
+        return columns
     for col in columns:
         field = col.get("field") or col.get("name")
         if field in date_fields:
