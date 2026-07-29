@@ -27,6 +27,7 @@ from mdvtools.spatial.conversion import (
     _apply_table_provenance,
     _group_spatial_table_records,
     _make_spatial_table_record,
+    _materialize_computed_spatial_table_columns,
     _prefix_table_leiden_categories,
     _table_uses_global_spatial_coordinates,
 )
@@ -327,6 +328,35 @@ class TestConversionWithEdgeCases:
             assert "X_umap_2" in columns
             assert "leiden" in columns
             assert columns["leiden"]["datatype"] in ["text", "text16"]
+
+    def test_spatial_x_umap_materializes_columns_for_copied_store_tables(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(40, 16)
+
+        _compute_table_x_umap_and_leiden(
+            adata,
+            leiden_resolution=0.6,
+        )
+        assert "X_umap" in adata.obsm
+        assert "X_umap_1" not in adata.obs.columns
+        assert "X_umap_2" not in adata.obs.columns
+
+        record = _make_spatial_table_record(
+            adata=adata,
+            sdata_name="sample.zarr",
+            sdata_path="/data/sample.zarr",
+            table_name="cells",
+        )
+        _materialize_computed_spatial_table_columns([record])
+
+        assert "X_umap_1" in adata.obs.columns
+        assert "X_umap_2" in adata.obs.columns
+        np.testing.assert_allclose(adata.obs["X_umap_1"], adata.obsm["X_umap"][:, 0])
+        np.testing.assert_allclose(adata.obs["X_umap_2"], adata.obsm["X_umap"][:, 1])
+        assert adata.uns["mdv"]["materialized_columns"]["X_umap"] == [
+            "X_umap_1",
+            "X_umap_2",
+        ]
 
     def test_spatial_multi_table_x_umap_shares_columns_and_prefixes_leiden_values(self):
         """Merged spatial tables should share X_umap/leiden columns while prefixing Leiden labels."""

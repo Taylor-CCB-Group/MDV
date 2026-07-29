@@ -1033,6 +1033,38 @@ def _compute_table_x_umap_and_leiden(
     return "leiden"
 
 
+def _materialize_obsm_columns(
+    adata: "AnnData",
+    obsm_key: str,
+    max_dims: int = 3,
+) -> list[str]:
+    if obsm_key not in adata.obsm:
+        return []
+
+    data = np.asarray(adata.obsm[obsm_key])
+    if data.ndim != 2:
+        return []
+
+    num_dims = min(max_dims, data.shape[1])
+    columns: list[str] = []
+    for dim_index in range(num_dims):
+        column = f"{obsm_key}_{dim_index + 1}"
+        adata.obs[column] = data[:, dim_index]
+        columns.append(column)
+    return columns
+
+
+def _materialize_computed_spatial_table_columns(records: list[SpatialTableRecord]) -> None:
+    for record in records:
+        materialized_columns = _materialize_obsm_columns(record.adata, "X_umap")
+        if not materialized_columns:
+            continue
+
+        record.adata.uns.setdefault("mdv", {})
+        record.adata.uns["mdv"].setdefault("materialized_columns", {})
+        record.adata.uns["mdv"]["materialized_columns"]["X_umap"] = materialized_columns
+
+
 def _prefix_table_leiden_categories(
     adata: "AnnData",
     table_prefix: str,
@@ -1319,6 +1351,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         When args.link is False:
             - SpatialData objects are copied and written with modified tables
             - The written SpatialData objects contain the modified tables
+            - With compute_x_umap, copied tables also contain materialized
+              X_umap_1/X_umap_2 obs columns and mdv materialization metadata
     """
     # imports can be slow, so doing them here rather than at the top of the file
     from mdvtools.conversions import convert_scanpy_to_mdv
@@ -1521,6 +1555,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             "NOTE: SpatialData objects are written with modified tables (added obs columns and uns metadata).",
             verbose_only=True,
         )
+        if args.compute_x_umap:
+            _materialize_computed_spatial_table_columns(table_records)
         os.makedirs(
             f"{mdv.dir}/spatial", exist_ok=True
         )  # pretty sure sdata.write will do this anyway
