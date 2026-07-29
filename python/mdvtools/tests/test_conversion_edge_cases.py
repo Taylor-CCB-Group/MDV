@@ -28,6 +28,7 @@ from mdvtools.spatial.conversion import (
     _group_spatial_table_records,
     _make_spatial_table_record,
     _prefix_table_leiden_categories,
+    _table_uses_global_spatial_coordinates,
 )
 from .mock_anndata import (
     MockAnnDataFactory,
@@ -506,6 +507,31 @@ class TestConversionWithEdgeCases:
             ["sample-a.zarr/cells", "sample-b.zarr/cells"],
             ["sample-a.zarr/grid"],
         ]
+
+    def test_auto_point_transform_detects_already_global_label_coordinates(self):
+        class FakeScale0:
+            sizes = {"x": 100, "y": 200}
+
+        class FakeLabel:
+            def __getitem__(self, key):
+                if key != "scale0":
+                    raise KeyError(key)
+                return FakeScale0()
+
+        factory = MockAnnDataFactory(random_seed=42)
+        intrinsic_adata = factory.create_minimal(2, 2)
+        intrinsic_adata.obsm["spatial"] = np.asarray(
+            [[10, 20], [90, 180]],
+            dtype=np.float32,
+        )
+        global_adata = factory.create_minimal(2, 2)
+        global_adata.obsm["spatial"] = np.asarray(
+            [[500, 1000], [1200, 1800]],
+            dtype=np.float32,
+        )
+
+        assert not _table_uses_global_spatial_coordinates(intrinsic_adata, FakeLabel())
+        assert _table_uses_global_spatial_coordinates(global_adata, FakeLabel())
 
 
 class TestConversionErrorHandling:

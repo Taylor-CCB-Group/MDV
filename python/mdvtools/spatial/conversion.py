@@ -540,6 +540,59 @@ def _get_xenium_transform(
     return (transform, shape_name)
 
 
+def _get_xy_extent(element: "SpatialElement") -> tuple[float, float] | None:
+    sizes = getattr(element, "sizes", None)
+    if sizes is not None and "x" in sizes and "y" in sizes:
+        return float(sizes["x"]), float(sizes["y"])
+
+    try:
+        scale0 = element["scale0"]
+    except Exception:
+        return None
+
+    sizes = getattr(scale0, "sizes", None)
+    if sizes is None or "x" not in sizes or "y" not in sizes:
+        return None
+    return float(sizes["x"]), float(sizes["y"])
+
+
+def _table_spatial_exceeds_extent(
+    adata: "AnnData",
+    extent_xy: tuple[float, float],
+    tolerance: float = 1.05,
+) -> bool:
+    if "spatial" not in adata.obsm:
+        return False
+
+    coords = np.asarray(adata.obsm["spatial"])
+    if coords.ndim != 2 or coords.shape[1] < 2:
+        return False
+
+    finite_coords = coords[np.all(np.isfinite(coords[:, :2]), axis=1), :2]
+    if finite_coords.size == 0:
+        return False
+
+    max_xy = finite_coords.max(axis=0)
+    min_xy = finite_coords.min(axis=0)
+    extent_x, extent_y = extent_xy
+    return bool(
+        max_xy[0] > extent_x * tolerance
+        or max_xy[1] > extent_y * tolerance
+        or min_xy[0] < -extent_x * (tolerance - 1)
+        or min_xy[1] < -extent_y * (tolerance - 1)
+    )
+
+
+def _table_uses_global_spatial_coordinates(
+    adata: "AnnData",
+    annotated_element: "SpatialElement",
+) -> bool:
+    extent_xy = _get_xy_extent(annotated_element)
+    if extent_xy is None:
+        return False
+    return _table_spatial_exceeds_extent(adata, extent_xy)
+
+
 def _choose_point_transform(
     sdata: "SpatialData",
     annotated_element: "SpatialElement",
@@ -709,6 +762,20 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
                 sdata, annotated, r, img_obj, img_path,
                 conversion_args.point_transform, sdata_name
             )
+            if (
+                conversion_args.point_transform == "auto"
+                and T is not None
+                and _table_uses_global_spatial_coordinates(adata, annotated)
+            ):
+                from spatialdata.transformations import Identity
+                T = Identity()
+                transform_metadata.update(
+                    {
+                        "mode": "auto (identity-existing-coordinates)",
+                        "transform_type": "Identity",
+                        "coordinates_already_global": True,
+                    }
+                )
             if T is None and conversion_args.point_transform != "identity":
                 continue
             
