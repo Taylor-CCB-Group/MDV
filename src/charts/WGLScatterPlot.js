@@ -510,24 +510,6 @@ class WGLScatterPlot extends WGLChart {
         this.y_scale.domain([-range.y_range[0], -range.y_range[1]]);
     }
 
-    updateAxis() {
-        super.updateAxis();
-        // Classic WGL scatters redraw axes often on pan/zoom; re-assert date tick
-        // labels so d3 does not fall back to numeric thousands separators.
-        if (this._isLinearScale(this.x_scale) && this.x_axis_call) {
-            this._applyDateTickFormat("x", this.x_axis_call);
-            this.x_axis_svg.call(this.x_axis_call);
-        }
-        if (
-            this._isLinearScale(this.y_scale) &&
-            this.y_axis_call &&
-            this._getDateColumnForAxis("y")
-        ) {
-            this._applyDateTickFormat("y", this.y_axis_call);
-            this.y_axis_svg.call(this.y_axis_call);
-        }
-    }
-
     _calculateRadius() {
         // const width = this.width?this.width:1;
         let max_x =
