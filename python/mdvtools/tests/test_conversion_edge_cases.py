@@ -21,8 +21,12 @@ from pandas import DataFrame
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
 from mdvtools.spatial.conversion import (
+    SpatialDataConversionArgs,
     _compute_table_x_umap_and_leiden,
     _concat_spatial_tables,
+    _apply_table_provenance,
+    _group_spatial_table_records,
+    _make_spatial_table_record,
     _prefix_table_leiden_categories,
 )
 from .mock_anndata import (
@@ -388,6 +392,120 @@ class TestConversionWithEdgeCases:
 
             assert mdv.get_column("cells", "cell_id") == xenium_ids
             assert mdv.get_column("cells", "mdv_cell_id") == list(merged.obs_names.astype(str))
+
+    def test_spatial_table_provenance_columns_and_metadata(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(3, 2)
+        adata.obs["region"] = "cell_boundaries"
+        adata.obs["cell_id"] = ["cell-a", "cell-b", "cell-c"]
+        adata.uns["spatialdata_attrs"] = {
+            "region": "cell_boundaries",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        adata.uns["mdv"] = {"is_spatial": True}
+
+        record = _make_spatial_table_record(
+            adata=adata,
+            sdata_name="sample.zarr",
+            sdata_path="/data/sample.zarr",
+            table_name="cells",
+        )
+        _apply_table_provenance(record)
+
+        assert list(adata.obs["spatialdata_table_id"]) == ["sample.zarr/cells"] * 3
+        assert list(adata.obs["spatialdata_path"]) == ["/data/sample.zarr"] * 3
+        assert list(adata.obs["spatialdata_name"]) == ["sample.zarr"] * 3
+        assert list(adata.obs["spatialdata_region"]) == ["cell_boundaries"] * 3
+        assert list(adata.obs["spatialdata_region_key"]) == ["region"] * 3
+        assert list(adata.obs["spatialdata_instance_key"]) == ["cell_id"] * 3
+        assert adata.uns["mdv"]["table_provenance"] == {
+            "spatialdata_name": "sample.zarr",
+            "spatialdata_path": "/data/sample.zarr",
+            "table_name": "cells",
+            "table_id": "sample.zarr/cells",
+            "region": "cell_boundaries",
+            "region_key": "region",
+            "instance_key": "cell_id",
+            "is_spatial": True,
+        }
+
+    def test_spatial_table_grouping_can_split_per_table(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        cells = factory.create_minimal(2, 2)
+        grid = factory.create_minimal(2, 2)
+        cells.uns["mdv"] = {"is_spatial": True}
+        grid.uns["mdv"] = {"is_spatial": True}
+        cells.uns["spatialdata_attrs"] = {
+            "region": "cells",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        grid.uns["spatialdata_attrs"] = {
+            "region": "grid",
+            "region_key": "region",
+            "instance_key": "bin_id",
+        }
+
+        records = [
+            _make_spatial_table_record(cells, "sample.zarr", "/data/sample.zarr", "cells"),
+            _make_spatial_table_record(grid, "sample.zarr", "/data/sample.zarr", "grid"),
+        ]
+        args = SpatialDataConversionArgs(
+            spatialdata_path="/data/sample.zarr",
+            output_folder="/tmp/out",
+            temp_folder="/tmp",
+            table_handling="per-table",
+        )
+
+        groups = _group_spatial_table_records(records, args)
+
+        assert [group.obs_datasource_name for group in groups] == ["cells", "grid"]
+        assert [group.var_datasource_name for group in groups] == ["cells_genes", "grid_genes"]
+        assert [[record.table_name for record in group.records] for group in groups] == [["cells"], ["grid"]]
+
+    def test_spatial_table_grouping_can_merge_by_region(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        cells_a = factory.create_minimal(2, 2)
+        cells_b = factory.create_minimal(2, 2)
+        grid = factory.create_minimal(2, 2)
+        for adata in (cells_a, cells_b, grid):
+            adata.uns["mdv"] = {"is_spatial": True}
+        cells_a.uns["spatialdata_attrs"] = {
+            "region": "cells",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        cells_b.uns["spatialdata_attrs"] = {
+            "region": "cells",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        grid.uns["spatialdata_attrs"] = {
+            "region": "grid",
+            "region_key": "region",
+            "instance_key": "bin_id",
+        }
+
+        records = [
+            _make_spatial_table_record(cells_a, "sample-a.zarr", "/data/sample-a.zarr", "cells"),
+            _make_spatial_table_record(cells_b, "sample-b.zarr", "/data/sample-b.zarr", "cells"),
+            _make_spatial_table_record(grid, "sample-a.zarr", "/data/sample-a.zarr", "grid"),
+        ]
+        args = SpatialDataConversionArgs(
+            spatialdata_path="/data",
+            output_folder="/tmp/out",
+            temp_folder="/tmp",
+            table_handling="by-region",
+        )
+
+        groups = _group_spatial_table_records(records, args)
+
+        assert [group.obs_datasource_name for group in groups] == ["cells", "grid"]
+        assert [[record.table_id for record in group.records] for group in groups] == [
+            ["sample-a.zarr/cells", "sample-b.zarr/cells"],
+            ["sample-a.zarr/grid"],
+        ]
 
 
 class TestConversionErrorHandling:

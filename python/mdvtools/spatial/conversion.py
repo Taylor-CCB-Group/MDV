@@ -9,6 +9,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 import numpy as np
 from ..serverlite import serve_project
+from .conversion_options import (
+    DEFAULT_POINT_TRANSFORM,
+    DEFAULT_TABLE_HANDLING,
+    POINT_TRANSFORM_CHOICES,
+    TABLE_HANDLING_CHOICES,
+)
 # nb, main spatialdata import should happen lazily
 # so user doesn't have to wait and see lots of scary unrelated output if they input bad arguments.
 if TYPE_CHECKING:
@@ -31,17 +37,41 @@ class SpatialDataConversionArgs:
     serve: bool = False
     link: bool = False
     density: bool = False
-    point_transform: str = "auto"
+    point_transform: str = DEFAULT_POINT_TRANSFORM
     verbose: bool = False
     obs_datasource_name: str = "cells"
     var_datasource_name: str = "genes"
     link_name_column: str | None = None
     compute_x_umap: bool = False
     leiden_resolution: float = 1.0
+    table_handling: str = DEFAULT_TABLE_HANDLING
 
 
 REGION_FIELD = "spatial_region"
 _VERBOSE_OUTPUT = True
+
+
+@dataclass
+class SpatialTableRecord:
+    adata: "AnnData"
+    sdata_name: str
+    sdata_path: str
+    table_name: str
+    region: str | list[str] | None
+    region_key: str | None
+    instance_key: str | None
+    is_spatial: bool
+    table_id: str
+
+
+@dataclass
+class SpatialTableGroup:
+    key: str
+    label: str
+    obs_datasource_name: str
+    var_datasource_name: str
+    records: list[SpatialTableRecord]
+    regions: dict[str, dict]
 
 
 def _set_verbose_output(verbose: bool) -> None:
@@ -176,6 +206,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **rows_as_columns name column**: `{conversion_args.link_name_column}`\n"
         markdown += f"- **Compute X UMAP/Leiden**: {conversion_args.compute_x_umap}\n"
         markdown += f"- **Leiden resolution**: {conversion_args.leiden_resolution}\n"
+        markdown += f"- **Table handling**: `{conversion_args.table_handling}`\n"
         markdown += "\n"
         if conversion_args.compute_x_umap:
             markdown += (
@@ -952,18 +983,242 @@ def _prefix_table_leiden_categories(
 def _build_gene_source_column(
     merged_adata: "AnnData",
     gene_sources: dict[str, set[str]],
+    table_sources: dict[str, set[str]] | None = None,
 ) -> list[dict[str, str]]:
     merged_adata.var["object_source"] = [
         "|".join(sorted(gene_sources.get(str(gene_name), set())))
         for gene_name in merged_adata.var_names
     ]
-    return [
+    gene_columns = [
         {
             "name": "object_source",
             "datatype": "multitext",
             "delimiter": "|",
         }
     ]
+    if table_sources is not None:
+        merged_adata.var["table_source"] = [
+            "|".join(sorted(table_sources.get(str(gene_name), set())))
+            for gene_name in merged_adata.var_names
+        ]
+        gene_columns.append(
+            {
+                "name": "table_source",
+                "datatype": "multitext",
+                "delimiter": "|",
+            }
+        )
+    return gene_columns
+
+
+def _coerce_region_for_metadata(region: str | list[str] | None) -> str | list[str] | None:
+    if isinstance(region, list):
+        return [str(value) for value in region]
+    if region is None:
+        return None
+    return str(region)
+
+
+def _coerce_region_for_column(region: str | list[str] | None) -> str:
+    if isinstance(region, list):
+        return "|".join(str(value) for value in region)
+    if region is None:
+        return ""
+    return str(region)
+
+
+def _read_table_key_metadata(adata: "AnnData") -> tuple[str | list[str] | None, str | None, str | None]:
+    try:
+        from spatialdata.models import get_table_keys
+
+        region, region_key, instance_key = get_table_keys(adata)
+        return region, region_key, instance_key
+    except Exception:
+        spatialdata_attrs = adata.uns.get("spatialdata_attrs", {})
+        if isinstance(spatialdata_attrs, dict):
+            region = spatialdata_attrs.get("region")
+            if isinstance(region, str) or isinstance(region, list):
+                return (
+                    region,
+                    spatialdata_attrs.get("region_key"),
+                    spatialdata_attrs.get("instance_key"),
+                )
+        return None, None, None
+
+
+def _make_spatial_table_record(
+    adata: "AnnData",
+    sdata_name: str,
+    sdata_path: str,
+    table_name: str,
+) -> SpatialTableRecord:
+    region, region_key, instance_key = _read_table_key_metadata(adata)
+    return SpatialTableRecord(
+        adata=adata,
+        sdata_name=sdata_name,
+        sdata_path=sdata_path,
+        table_name=table_name,
+        region=region,
+        region_key=region_key,
+        instance_key=instance_key,
+        is_spatial=bool(adata.uns.get("mdv", {}).get("is_spatial", False)),
+        table_id=f"{sdata_name}/{table_name}",
+    )
+
+
+def _table_provenance_metadata(record: SpatialTableRecord) -> dict[str, object]:
+    return {
+        "spatialdata_name": record.sdata_name,
+        "spatialdata_path": record.sdata_path,
+        "table_name": record.table_name,
+        "table_id": record.table_id,
+        "region": _coerce_region_for_metadata(record.region),
+        "region_key": record.region_key,
+        "instance_key": record.instance_key,
+        "is_spatial": record.is_spatial,
+    }
+
+
+def _apply_table_provenance(record: SpatialTableRecord) -> None:
+    adata = record.adata
+    adata.obs["spatialdata_path"] = record.sdata_path
+    adata.obs["spatialdata_name"] = record.sdata_name
+    adata.obs["table_name"] = record.table_name
+    adata.obs["spatialdata_table_id"] = record.table_id
+    adata.obs["spatialdata_region"] = _coerce_region_for_column(record.region)
+    adata.obs["spatialdata_region_key"] = record.region_key or ""
+    adata.obs["spatialdata_instance_key"] = record.instance_key or ""
+    adata.uns.setdefault("mdv", {})
+    adata.uns["mdv"]["table_provenance"] = _table_provenance_metadata(record)
+
+
+def _region_group_key(record: SpatialTableRecord) -> str:
+    if record.region is None:
+        return f"nonspatial:{record.table_name}"
+    regions = record.region if isinstance(record.region, list) else [record.region]
+    region_part = "|".join(sorted(str(region) for region in regions))
+    return (
+        f"region:{region_part};"
+        f"region_key:{record.region_key or ''};"
+        f"instance_key:{record.instance_key or ''}"
+    )
+
+
+def _group_base_label(record: SpatialTableRecord, table_handling: str) -> str:
+    if table_handling == "per-table":
+        return record.table_name
+    if table_handling == "by-region" and record.region is not None:
+        regions = record.region if isinstance(record.region, list) else [record.region]
+        return "_".join(str(region) for region in regions)
+    return record.table_name
+
+
+def _allocate_datasource_name(base_name: str, used_names: set[str]) -> str:
+    return _allocate_table_prefix(base_name, used_names)
+
+
+def _validate_table_handling(table_handling: str) -> None:
+    if table_handling not in TABLE_HANDLING_CHOICES:
+        raise ValueError(
+            f"Unknown table handling policy '{table_handling}'. "
+            f"Expected one of: {', '.join(TABLE_HANDLING_CHOICES)}"
+        )
+
+
+def _group_spatial_table_records(
+    records: list[SpatialTableRecord],
+    args: SpatialDataConversionArgs,
+) -> list[SpatialTableGroup]:
+    _validate_table_handling(args.table_handling)
+
+    if args.table_handling == "merge":
+        regions: dict[str, dict] = {}
+        for record in records:
+            regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
+        return [
+            SpatialTableGroup(
+                key="merge",
+                label="merge",
+                obs_datasource_name=args.obs_datasource_name,
+                var_datasource_name=args.var_datasource_name,
+                records=records,
+                regions=regions,
+            )
+        ]
+
+    grouped_records: dict[str, list[SpatialTableRecord]] = {}
+    group_order: list[str] = []
+    for record in records:
+        if args.table_handling == "per-table":
+            key = f"table:{record.sdata_name}/{record.table_name}"
+        else:
+            key = _region_group_key(record)
+        if key not in grouped_records:
+            grouped_records[key] = []
+            group_order.append(key)
+        grouped_records[key].append(record)
+
+    used_datasource_names: set[str] = set()
+    groups: list[SpatialTableGroup] = []
+    for key in group_order:
+        group_records = grouped_records[key]
+        label = _allocate_table_prefix(
+            _group_base_label(group_records[0], args.table_handling),
+            used_prefixes=set(group.label for group in groups),
+        )
+        obs_datasource_name = _allocate_datasource_name(label, used_datasource_names)
+        var_datasource_name = _allocate_datasource_name(
+            f"{label}_{args.var_datasource_name}",
+            used_datasource_names,
+        )
+        regions: dict[str, dict] = {}
+        for record in group_records:
+            regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
+        groups.append(
+            SpatialTableGroup(
+                key=key,
+                label=label,
+                obs_datasource_name=obs_datasource_name,
+                var_datasource_name=var_datasource_name,
+                records=group_records,
+                regions=regions,
+            )
+        )
+
+    return groups
+
+
+def _build_group_gene_source_columns(
+    group: SpatialTableGroup,
+) -> tuple[list[dict[str, str]], "AnnData"]:
+    gene_sources: dict[str, set[str]] = {}
+    table_sources: dict[str, set[str]] = {}
+    for record in group.records:
+        for gene_name in record.adata.var_names:
+            gene_key = str(gene_name)
+            gene_sources.setdefault(gene_key, set()).add(record.sdata_name)
+            table_sources.setdefault(gene_key, set()).add(record.table_id)
+    merged_adata = group.records[0].adata if len(group.records) == 1 else _concat_spatial_tables(
+        [record.adata for record in group.records]
+    )
+    return _build_gene_source_column(merged_adata, gene_sources, table_sources), merged_adata
+
+
+def _attach_table_group_metadata(
+    mdv: "MDVProject",
+    group: SpatialTableGroup,
+    table_handling: str,
+) -> None:
+    provenance = {
+        "table_handling": table_handling,
+        "group_key": group.key,
+        "group_label": group.label,
+        "tables": [_table_provenance_metadata(record) for record in group.records],
+    }
+    for datasource_name in (group.obs_datasource_name, group.var_datasource_name):
+        ds_metadata = mdv.get_datasource_metadata(datasource_name)
+        ds_metadata["spatialdata_tables"] = provenance
+        mdv.set_datasource_metadata(ds_metadata)
 
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
@@ -984,7 +1239,10 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     
     Note on modifications:
         This function modifies the AnnData tables in-place by adding:
-        - obs columns: "spatialdata_path", "table_name", "x", "y", "spatial_region"
+        - obs columns: "spatialdata_path", "spatialdata_name", "table_name",
+          "spatialdata_table_id", "spatialdata_region",
+          "spatialdata_region_key", "spatialdata_instance_key", "x", "y",
+          "spatial_region"
         - uns["mdv"] metadata: regions, point_transform, is_spatial
         
         When args.link is True:
@@ -1017,6 +1275,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     
     sdata_paths = _discover_spatialdata_paths(args.spatialdata_path, batch=args.batch)
     single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
+    _validate_table_handling(args.table_handling)
 
     _progress(
         f"Converting {len(sdata_paths)} SpatialData entr{'y' if len(sdata_paths) == 1 else 'ies'} "
@@ -1024,9 +1283,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     )
     
     sdata_objects: dict[str, SpatialData] = {}
-    adata_objects: list[AnnData] = []
-    all_regions: dict[str, dict] = {}
-    gene_sources: dict[str, set[str]] = {}
+    table_records: list[SpatialTableRecord] = []
+    image_only_regions: dict[str, dict] = {}
     names: set[str] = set()
     used_table_prefixes: set[str] = set()
     table_leiden_labels: list[tuple[AnnData, str]] = []
@@ -1068,21 +1326,22 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                     leiden_resolution=args.leiden_resolution,
                 )
                 table_leiden_labels.append((adata, table_prefix))
-            adata.obs["spatialdata_path"] = sdata_name
-            adata.obs["table_name"] = table_name
-            for gene_name in adata.var_names:
-                gene_sources.setdefault(str(gene_name), set()).add(sdata_name)
-            adata_objects.append(adata)
-            if "regions" in adata.uns.get("mdv", {}):
-                all_regions.update(adata.uns["mdv"]["regions"])
+            record = _make_spatial_table_record(
+                adata=adata,
+                sdata_name=sdata_name,
+                sdata_path=sdata_path,
+                table_name=table_name,
+            )
+            _apply_table_provenance(record)
+            table_records.append(record)
         
         # Store the (potentially modified) SpatialData object
         sdata_objects[sdata_name] = sdata
 
-    if len(adata_objects) == 0:
+    if len(table_records) == 0:
         for sdata_name, sdata in sdata_objects.items():
-            all_regions.update(_resolve_image_only_regions(sdata, sdata_name))
-        if not all_regions:
+            image_only_regions.update(_resolve_image_only_regions(sdata, sdata_name))
+        if not image_only_regions:
             raise ValueError("No tables or image-backed regions found in any SpatialData objects.")
         _emit("INFO: No tables found. Creating an image-only project with empty datasources.")
         _progress("Writing MDV project")
@@ -1094,11 +1353,15 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             obs_datasource_name=args.obs_datasource_name,
             var_datasource_name=args.var_datasource_name,
         )
-        merged_adata = None
+        converted_adatas: list[AnnData] = []
+        primary_obs_datasource_name = args.obs_datasource_name
+        primary_var_datasource_name = args.var_datasource_name
+        primary_adata = None
+        spatial_groups: list[SpatialTableGroup] = []
         has_spatial_tables = False
     else:
         # Check if we have at least one spatial table - maybe this is unnecessary noise?
-        spatial_tables = [ad for ad in adata_objects if ad.uns.get("mdv", {}).get("is_spatial", False)]
+        spatial_tables = [record for record in table_records if record.is_spatial]
 
         has_spatial_tables = len(spatial_tables) != 0
 
@@ -1106,29 +1369,65 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             _emit(
                 "INFO: No spatial tables found. Creating a merged project without spatial metadata or a default image view."
             )
-        elif not all_regions:
+        elif not any(record.adata.uns.get("mdv", {}).get("regions", {}) for record in table_records):
             raise ValueError("Spatial tables found but no regions could be resolved - this indicates a problem with the data")
 
-        if args.compute_x_umap and len(adata_objects) > 1:
-            for adata, table_prefix in table_leiden_labels:
-                _prefix_table_leiden_categories(adata, table_prefix)
-
-        _progress(f"Merging {len(adata_objects)} table(s) with outer gene union")
-        merged_adata = _concat_spatial_tables(adata_objects)
-        gene_columns = _build_gene_source_column(merged_adata, gene_sources)
-        _progress("Writing MDV project")
-        mdv = _call_with_optional_stdout_suppressed(
-            convert_scanpy_to_mdv,
-            args.output_folder,
-            merged_adata,
-            delete_existing=not args.preserve_existing,
-            obs_datasource_name=args.obs_datasource_name,
-            var_datasource_name=args.var_datasource_name,
-            link_name_column=args.link_name_column,
-            gene_columns=gene_columns,
-            compute_x_umap=False,
-            leiden_resolution=args.leiden_resolution,
+        table_groups = _group_spatial_table_records(table_records, args)
+        spatial_groups = [group for group in table_groups if group.regions]
+        _progress(
+            f"Writing {len(table_groups)} table group{'s' if len(table_groups) != 1 else ''} "
+            f"using '{args.table_handling}' table handling"
         )
+
+        mdv = None
+        converted_adatas = []
+        primary_obs_datasource_name = table_groups[0].obs_datasource_name
+        primary_var_datasource_name = table_groups[0].var_datasource_name
+        primary_adata = None
+        leiden_prefixes_by_adata = {id(adata): table_prefix for adata, table_prefix in table_leiden_labels}
+
+        for group_index, group in enumerate(table_groups):
+            if args.compute_x_umap and len(group.records) > 1:
+                for record in group.records:
+                    table_prefix = leiden_prefixes_by_adata.get(id(record.adata))
+                    if table_prefix is not None:
+                        _prefix_table_leiden_categories(record.adata, table_prefix)
+
+            if len(group.records) == 1:
+                _progress(
+                    f"Writing table '{group.records[0].table_id}' "
+                    f"to datasource '{group.obs_datasource_name}'"
+                )
+            else:
+                _progress(
+                    f"Merging {len(group.records)} table(s) into datasource "
+                    f"'{group.obs_datasource_name}' with outer gene union"
+                )
+            gene_columns, group_adata = _build_group_gene_source_columns(group)
+            converted_adatas.append(group_adata)
+            if primary_adata is None:
+                primary_adata = group_adata
+            mdv = _call_with_optional_stdout_suppressed(
+                convert_scanpy_to_mdv,
+                args.output_folder,
+                group_adata,
+                delete_existing=(group_index == 0 and not args.preserve_existing),
+                obs_datasource_name=group.obs_datasource_name,
+                var_datasource_name=group.var_datasource_name,
+                link_name_column=args.link_name_column,
+                gene_columns=gene_columns,
+                compute_x_umap=False,
+                leiden_resolution=args.leiden_resolution,
+            )
+            _attach_table_group_metadata(mdv, group, args.table_handling)
+
+            if group.regions:
+                obs_md = mdv.get_datasource_metadata(group.obs_datasource_name)
+                obs_md["regions"] = build_spatial_regions_metadata(group.regions, REGION_FIELD)
+                mdv.set_datasource_metadata(obs_md)
+
+        if mdv is None:
+            raise ValueError("No table groups were produced from SpatialData tables.")
     if args.link:
         if single_source_input:
             os.makedirs(os.path.join(mdv.dir, "spatial"), exist_ok=True)
@@ -1188,23 +1487,56 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     # }
     # mdv.add_viv_images("cells", viv_data, link_images=False)
 
-    if all_regions:
-        # instead, we will set the region metadata directly.
-        obs_md = mdv.get_datasource_metadata(args.obs_datasource_name)
-        obs_md["regions"] = build_spatial_regions_metadata(all_regions, REGION_FIELD)
+    if image_only_regions:
+        obs_md = mdv.get_datasource_metadata(primary_obs_datasource_name)
+        obs_md["regions"] = build_spatial_regions_metadata(image_only_regions, REGION_FIELD)
         mdv.set_datasource_metadata(obs_md)
+
+    if image_only_regions:
         set_default_spatial_image_view(
             mdv,
             os.path.join(os.path.dirname(__file__), "spatial_view_template.json"),
             args.density,
             _emit,
-            obs_datasource_name=args.obs_datasource_name,
-            var_datasource_name=args.var_datasource_name,
+            obs_datasource_name=primary_obs_datasource_name,
+            var_datasource_name=primary_var_datasource_name,
         )
-    if merged_adata is not None:
-        _emit(f"## Merged AnnData object representation:\n\n```\n{merged_adata}\n```\n", verbose_only=True)
+    else:
+        for spatial_group_index, spatial_group in enumerate(spatial_groups):
+            set_default_spatial_image_view(
+                mdv,
+                os.path.join(os.path.dirname(__file__), "spatial_view_template.json"),
+                args.density,
+                _emit,
+                obs_datasource_name=spatial_group.obs_datasource_name,
+                var_datasource_name=spatial_group.var_datasource_name,
+                view_name="default" if spatial_group_index == 0 else f"spatial {spatial_group.obs_datasource_name}",
+                make_default=spatial_group_index == 0,
+            )
+    if converted_adatas:
+        for group_adata in converted_adatas:
+            _emit(f"## Converted AnnData object representation:\n\n```\n{group_adata}\n```\n", verbose_only=True)
     _emit(f"## Project markdown:\n\n{create_project_markdown(mdv, False)}\n\n---", verbose_only=True)
-    add_readme_to_project(mdv, merged_adata, args)
+    readme_args = SpatialDataConversionArgs(
+        spatialdata_path=args.spatialdata_path,
+        output_folder=args.output_folder,
+        temp_folder=args.temp_folder,
+        batch=args.batch,
+        preserve_existing=args.preserve_existing,
+        output_geojson=args.output_geojson,
+        serve=args.serve,
+        link=args.link,
+        density=args.density,
+        point_transform=args.point_transform,
+        verbose=args.verbose,
+        obs_datasource_name=primary_obs_datasource_name,
+        var_datasource_name=primary_var_datasource_name,
+        link_name_column=args.link_name_column,
+        compute_x_umap=args.compute_x_umap,
+        leiden_resolution=args.leiden_resolution,
+        table_handling=args.table_handling,
+    )
+    add_readme_to_project(mdv, primary_adata, readme_args)
     if args.serve:
         _progress(f"Serving project at {args.output_folder}")
         serve_project(mdv)
@@ -1245,12 +1577,24 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument("--leiden-resolution", type=float, default=1.0, help="Leiden resolution used with --compute-x-umap")
+    parser.add_argument(
+        "--table-handling",
+        type=str,
+        default=DEFAULT_TABLE_HANDLING,
+        choices=list(TABLE_HANDLING_CHOICES),
+        help=(
+            "How SpatialData tables become MDV datasource pairs: "
+            "'merge' keeps the legacy single outer concat, "
+            "'by-region' merges compatible tables by annotated region/keys, "
+            "and 'per-table' writes one datasource pair per source table."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true", help="Show detailed per-dataset conversion output, transform decisions, and merged summaries")
     parser.add_argument(
         "--point-transform",
         type=str,
-        default="auto",
-        choices=["image", "auto", "xenium", "identity", "annotated-element"],
+        default=DEFAULT_POINT_TRANSFORM,
+        choices=list(POINT_TRANSFORM_CHOICES),
         help=(
             "Strategy for transforming point coordinates in tables to image coordinates. "
             "Options: 'image' (use annotated element to image transform), "
