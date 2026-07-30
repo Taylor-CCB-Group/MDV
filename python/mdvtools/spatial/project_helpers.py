@@ -33,6 +33,8 @@ def set_default_spatial_image_view(
     emit,
     obs_datasource_name: str = "cells",
     var_datasource_name: str = "genes",
+    view_name: str = "default",
+    make_default: bool = True,
 ) -> None:
     for region_name, region_data in mdv.get_datasource_metadata(obs_datasource_name)["regions"]["all_regions"].items():
         if "viv_image" in region_data:
@@ -40,7 +42,7 @@ def set_default_spatial_image_view(
     else:
         raise ValueError("No region with a viv_image found")
 
-    emit(f"Using region '{region_name}' for default view", verbose_only=True)
+    emit(f"Using region '{region_name}' for view '{view_name}'", verbose_only=True)
     with open(template_path, "r") as f:
         view_str = f.read()
         view_str = view_str.replace('"<SPATIAL_REGION_NAME>"', json.dumps(region_name))
@@ -60,7 +62,7 @@ def set_default_spatial_image_view(
         view_str = view_str.replace('"<DENSITY_FIELDS>"', density_block)
         view_str = view_str.replace('"__OBS_DS__"', json.dumps(obs_datasource_name))
         view_str = view_str.replace('"__VAR_DS__"', json.dumps(var_datasource_name))
-        mdv.set_view("default", json.loads(view_str), True)
+        mdv.set_view(view_name, json.loads(view_str), make_default)
 
 
 def create_empty_spatial_mdv_project(
