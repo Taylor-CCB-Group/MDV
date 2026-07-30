@@ -131,3 +131,27 @@ def test_provenance_promoted_and_workspace_cleaned(tmp_path):
 
     # workspace scratch (keyed by job_id, outside the project) is GC'd on success
     assert not (workspace_root / job_id).exists()
+
+def test_umap_job_end_to_end_honors_params(tmp_path):
+    project = _make_matrix_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
+    job_id = mgr.submit(
+        "umap",
+        {"datasource": "cells", "layer": "gs", "output_name": "UMAP",
+         "n_neighbors": 10, "n_components": 3},
+    )
+
+    _drive(mgr, timeout=180)   # real scanpy UMAP in a subprocess
+
+    rec = {r.job_id: r for r in mgr.store.load_all()}[job_id]
+    assert rec.status == Status.DONE.value
+
+    cols = {c["field"]: c["datatype"] for c in project.get_datasource_metadata("cells")["columns"]}
+    assert cols.get("UMAP_1") == "double"
+    assert cols.get("UMAP_2") == "double"
+    assert cols.get("UMAP_3") == "double"                 # n_components=3 reached scanpy end-to-end
+
+    for col in ("UMAP_1", "UMAP_2", "UMAP_3"):            # provenance on each output
+        prov = project.get_column_provenance("cells", col)
+        assert prov is not None and prov["job_id"] == job_id
+    assert prov["params"]["n_components"] == 3            # the param is recorded in provenance identity
