@@ -2,6 +2,7 @@ from pathlib import Path
 import tempfile
 import h5py
 import numpy as np
+import json
 
 MARKER = "STATUS"  # worker writes "done/failed" - the primary completion signal
 
@@ -87,6 +88,15 @@ def materialize_matrix_tray(project, spec, params: dict, ws: Workspace) -> None:
         f.attrs["n_cells"] = n_cells
         f.attrs["n_genes"] = n_genes
         f.attrs["sparse"] = True
+        # route params by their declared target call: control/output params (applies_to = None) stay
+        # flat attrs; compute params bundle into kwargs.<call>, so the worker splats them into the call
+        kwargs_bundles: dict[str, dict] = {}
         for pspec in spec.params:
-            if pspec.type != "column" and params.get(pspec.name) is not None:
+            if pspec.type == "column" or params.get(pspec.name) is None:
+                continue
+            if pspec.applies_to is None:
                 f.attrs[pspec.name] = params[pspec.name]
+            else:
+                kwargs_bundles.setdefault(pspec.applies_to, {})[pspec.name] = params[pspec.name]
+        for group, kw in kwargs_bundles.items():
+            f.attrs[f"kwargs.{group}"] = json.dumps(kw)

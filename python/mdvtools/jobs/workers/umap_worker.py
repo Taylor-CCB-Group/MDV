@@ -18,6 +18,8 @@ def run(workspace: str) -> None:
             n_cells = int(cast(int, f.attrs["n_cells"]))
             n_genes = int(cast(int, f.attrs["n_genes"]))
             out_name = cast(str, f.attrs["output_name"])
+            neighbors_kwargs = json.loads(cast(str, f.attrs.get("kwargs.neighbors", "{}")))
+            umap_kwargs = json.loads(cast(str, f.attrs.get("kwargs.umap", "{}")))
 
         # rebuild the CSC matrix from the tray triplet - n_cells from metadata, NOT max(i) + 1
         X = scipy.sparse.csc_matrix((x, i, p), shape=(n_cells, n_genes))
@@ -28,8 +30,8 @@ def run(workspace: str) -> None:
 
         # neighbour graph on X -> embed
         adata = AnnData(X=X)
-        sc.pp.neighbors(adata, use_rep="X")
-        sc.tl.umap(adata)
+        sc.pp.neighbors(adata, use_rep="X", **neighbors_kwargs)
+        sc.tl.umap(adata, **umap_kwargs)
         embedding = np.asarray(adata.obsm["X_umap"], dtype=np.float64) # (n_cells, n_components)
 
         with h5py.File(ws / "output" / "result.h5", "w") as f:
