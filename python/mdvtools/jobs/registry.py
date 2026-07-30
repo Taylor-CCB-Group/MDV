@@ -5,11 +5,11 @@ from typing import Any
 @dataclass(frozen=True)
 class ParamSpec:
     name: str
-    type: str  # GuiSpecType: "dropdown" | "column" | "text"
+    type: str  # GuiSpecType: "dropdown" | "column" | "text" | "int" | "float"
     label: str
     options_from: str | None = None  # column picker scoped to THIS datasource param
     default: Any = None
-
+    applies_to: str | None = None # compute param -> which worker call it feeds; None = a control/output param (eg. output_name)
 
 @dataclass(frozen=True)
 class OutputSpec:
@@ -80,6 +80,13 @@ def validate_params(spec: ToolSpec, params: dict, project) -> None:
                 raise ValueError(
                     f"{params.get(p.name)!r} is not a column of {ds_name!r}"
                 )
+        elif p.type in ("int", "float") and params.get(p.name) is not None:
+            v = params[p.name]
+            ok = (not isinstance(v, bool)) and (
+                isinstance(v, int) if p.type == "int" else isinstance(v, (int, float))
+            )
+            if not ok:
+                raise ValueError(f"{p.name} must be {p.type}, got {type(v).__name__}")
 
     if not params.get(spec.output.columns_param):
         raise ValueError(f"{spec.output.columns_param} is required.")
