@@ -5,6 +5,7 @@ import {
     makeDraggable,
     removeResizable,
     removeDraggable,
+    promoteIfStacked,
 } from "./Elements.js";
 
 class BaseDialog {
@@ -117,6 +118,7 @@ class BaseDialog {
         //may need to adjust its position depending on size
         //to avoid it being off screen
         this.getDialogContainer().append(this.outer);
+        promoteIfStacked(this.outer, stack);
 
         // Set the dialog position when constructor is called
         this._setDialogPosition();
