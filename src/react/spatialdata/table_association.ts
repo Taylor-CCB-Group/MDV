@@ -1,5 +1,5 @@
 import type { SpatialData, ShapesRenderData } from "@spatialdata/core";
-import type { LayerConfig, RenderStackLayerInputs } from "@spatialdata/vis";
+import type { LayerConfig, LayerType, RenderStackLayerInputs } from "@spatialdata/vis";
 import { useEffect, useMemo, useState } from "react";
 
 import type DataStore from "@/datastore/DataStore";
@@ -13,8 +13,16 @@ type RowColorFunction = (rowIndex: number) => RgbColor | RgbaColor | undefined;
 type ShapesRenderDataEntry = [string, ShapesRenderData | undefined];
 type SpatialDataTableMetadata = { table_name?: unknown; table_id?: unknown };
 type SpatialDataTablesMetadata = { tables?: SpatialDataTableMetadata[] };
+type SpatialDataAssociationKind = "images" | "points" | "labels" | "shapes";
+export type AssociableSpatialElementType = Extract<
+    LayerType,
+    "image" | "points" | "labels" | "shapes"
+>;
 type SpatialDataAssociationSource = {
-    getAssociatedTables: (kind: "shapes", key: string) => Array<[string, unknown]>;
+    getAssociatedTables: (
+        kind: SpatialDataAssociationKind,
+        key: string,
+    ) => Array<[string, unknown]>;
 };
 type SpatialDataAwareDataStore = DataStore & {
     config: DataStore["config"] & { spatialdata_tables?: SpatialDataTablesMetadata };
@@ -24,7 +32,7 @@ export type DataSourceAssociationCandidate<TDataStore = Record<string, unknown>>
     dataStore: TDataStore & { config?: { spatialdata_tables?: SpatialDataTablesMetadata } };
 };
 export type AssociatedDataSource = DataSourceAssociationCandidate<SpatialDataAwareDataStore>;
-type AssociatedShapesTable<TDataStore = SpatialDataAwareDataStore> =
+type AssociatedElementTable<TDataStore = SpatialDataAwareDataStore> =
     | { status: "none" }
     | { status: "ambiguous"; tableNames: string[]; dataSourceNames?: string[] }
     | {
@@ -42,8 +50,8 @@ export type TableAssociation =
           status: "resolved";
           tableName: string;
           dataSourceName: string;
-          matchedFeatureCount: number;
-          featureCount: number;
+          matchedFeatureCount?: number;
+          featureCount?: number;
       };
 
 export const NO_TABLE_ASSOCIATION: TableAssociation = { status: "none" };
@@ -78,10 +86,28 @@ export function getShapesTableAssociation(
 
 function associatedSpatialDataTableNames(
     spatialData: SpatialDataAssociationSource | undefined,
+    elementType: AssociableSpatialElementType,
     elementKey: string | undefined,
 ): string[] {
     if (!spatialData || !elementKey) return [];
-    return spatialData.getAssociatedTables("shapes", elementKey).map(([tableName]) => tableName);
+    return spatialData
+        .getAssociatedTables(spatialDataAssociationKind(elementType), elementKey)
+        .map(([tableName]) => tableName);
+}
+
+function spatialDataAssociationKind(
+    elementType: AssociableSpatialElementType,
+): SpatialDataAssociationKind {
+    switch (elementType) {
+        case "image":
+            return "images";
+        case "labels":
+            return "labels";
+        case "points":
+            return "points";
+        case "shapes":
+            return "shapes";
+    }
 }
 
 function tableNamesForDataSource<TDataStore>(
@@ -98,16 +124,18 @@ function tableNamesForDataSource<TDataStore>(
         .filter((tableName): tableName is string => tableName !== undefined);
 }
 
-export function resolveAssociatedShapesTable<TDataStore>({
+export function resolveAssociatedElementTable<TDataStore>({
     spatialData,
+    elementType,
     elementKey,
     dataSources,
 }: {
     spatialData: SpatialDataAssociationSource | undefined;
+    elementType: AssociableSpatialElementType;
     elementKey: string | undefined;
     dataSources: DataSourceAssociationCandidate<TDataStore>[];
-}): AssociatedShapesTable<TDataStore> {
-    const tableNames = associatedSpatialDataTableNames(spatialData, elementKey);
+}): AssociatedElementTable<TDataStore> {
+    const tableNames = associatedSpatialDataTableNames(spatialData, elementType, elementKey);
     if (tableNames.length === 0) return { status: "none" };
     if (tableNames.length > 1) return { status: "ambiguous", tableNames };
 
@@ -250,17 +278,33 @@ export function useShapesRenderDataByElementKey(
     return renderDataByElementKey;
 }
 
-export function useShapesTableAssociation(
+export function useElementTableAssociation(
     spatialData: SpatialData | undefined,
+    elementType: AssociableSpatialElementType,
     elementKey: string | undefined,
     dataSources: AssociatedDataSource[],
 ): TableAssociation {
-    const elementKeys = useMemo(() => (elementKey ? [elementKey] : []), [elementKey]);
+    const elementKeys = useMemo(
+        () => (elementType === "shapes" && elementKey ? [elementKey] : []),
+        [elementType, elementKey],
+    );
     const renderDataByElementKey = useShapesRenderDataByElementKey(spatialData, elementKeys);
     if (!elementKey || !spatialData) return NO_TABLE_ASSOCIATION;
-    const table = resolveAssociatedShapesTable({ spatialData, elementKey, dataSources });
+    const table = resolveAssociatedElementTable({
+        spatialData,
+        elementType,
+        elementKey,
+        dataSources,
+    });
     if (table.status === "ambiguous") return { status: "ambiguous" };
     if (table.status !== "resolved") return NO_TABLE_ASSOCIATION;
+    if (elementType !== "shapes") {
+        return {
+            status: "resolved",
+            tableName: table.tableName,
+            dataSourceName: table.dataSourceName,
+        };
+    }
     const renderData = renderDataByElementKey[elementKey];
     if (!renderData) return { status: "loading" };
     return getShapesTableAssociation(
@@ -269,6 +313,14 @@ export function useShapesTableAssociation(
         table.tableName,
         table.dataSourceName,
     );
+}
+
+export function useShapesTableAssociation(
+    spatialData: SpatialData | undefined,
+    elementKey: string | undefined,
+    dataSources: AssociatedDataSource[],
+): TableAssociation {
+    return useElementTableAssociation(spatialData, "shapes", elementKey, dataSources);
 }
 
 function createColorFunctionByColumn(
@@ -334,7 +386,7 @@ function useDataStoreFilterVersion(dataStores: DataStore[]) {
 function getFillColumnsByDataSource(
     layers: RenderStackLayerInputs["layers"],
     layerOrder: string[],
-    tableByElementKey: Record<string, AssociatedShapesTable>,
+    tableByElementKey: Record<string, AssociatedElementTable>,
 ) {
     const columnsByDataSource: Record<string, Set<string>> = {};
     for (const layerId of layerOrder) {
@@ -399,8 +451,9 @@ export function useAssociatedShapesLayerInputs(
             Object.fromEntries(
                 elementKeys.map((elementKey) => [
                     elementKey,
-                    resolveAssociatedShapesTable({
+                    resolveAssociatedElementTable({
                         spatialData,
+                        elementType: "shapes",
                         elementKey,
                         dataSources,
                     }),

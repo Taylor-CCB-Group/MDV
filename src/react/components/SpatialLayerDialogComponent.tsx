@@ -58,7 +58,7 @@ import {
 } from "@/react/spatialdata/render_stack_defaults";
 import {
     NO_TABLE_ASSOCIATION,
-    useShapesTableAssociation,
+    useElementTableAssociation,
 } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
@@ -90,8 +90,9 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
         entry?.kind === "spatial" && entry.source.elementType === "shapes"
             ? entry.source.elementKey
             : undefined;
-    const shapesAssociation = useShapesTableAssociation(
+    const shapesAssociation = useElementTableAssociation(
         spatialData ?? undefined,
+        "shapes",
         shapesElementKey,
         dataSources,
     );

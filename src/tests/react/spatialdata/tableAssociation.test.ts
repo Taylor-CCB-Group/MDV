@@ -5,7 +5,7 @@ import {
     buildAssociatedShapesFeatureState,
     type DataSourceAssociationCandidate,
     getShapesTableAssociation,
-    resolveAssociatedShapesTable,
+    resolveAssociatedElementTable,
 } from "@/react/spatialdata/table_association";
 
 function shapesRenderData(
@@ -51,9 +51,10 @@ describe("SpatialData table association", () => {
         ).toEqual({ status: "none" });
     });
 
-    test("resolves a shapes element through SpatialData table provenance", () => {
+    test("resolves an associated shapes element through SpatialData table provenance", () => {
         const spatialData = {
-            getAssociatedTables: (): Array<[string, unknown]> => [["cells", null]],
+            getAssociatedTables: (kind: string): Array<[string, unknown]> =>
+                kind === "shapes" ? [["cells", null]] : [],
         };
         const cellsDataStore = {
             name: "cells_by_region",
@@ -75,8 +76,9 @@ describe("SpatialData table association", () => {
         ];
 
         expect(
-            resolveAssociatedShapesTable({
+            resolveAssociatedElementTable({
                 spatialData,
+                elementType: "shapes",
                 elementKey: "cell_boundaries",
                 dataSources,
             }),
@@ -84,6 +86,38 @@ describe("SpatialData table association", () => {
             status: "resolved",
             tableName: "cells",
             dataSourceName: "cells_by_region",
+        });
+    });
+
+    test("resolves labels through the same element association path", () => {
+        const spatialData = {
+            getAssociatedTables: (kind: string): Array<[string, unknown]> =>
+                kind === "labels" ? [["segmentation_table", null]] : [],
+        };
+        const dataSources: DataSourceAssociationCandidate[] = [
+            {
+                name: "segmentation",
+                dataStore: {
+                    config: {
+                        spatialdata_tables: {
+                            tables: [{ table_name: "segmentation_table" }],
+                        },
+                    },
+                },
+            },
+        ];
+
+        expect(
+            resolveAssociatedElementTable({
+                spatialData,
+                elementType: "labels",
+                elementKey: "cell_labels",
+                dataSources,
+            }),
+        ).toMatchObject({
+            status: "resolved",
+            tableName: "segmentation_table",
+            dataSourceName: "segmentation",
         });
     });
 

@@ -91,8 +91,10 @@ export default function ShapesLayerPanel({
             {association.status === "resolved" && association.tableName && (
                 <Typography variant="caption" color="text.secondary">
                     Associated datasource: {association.dataSourceName} /{" "}
-                    {association.tableName} (
-                    {association.matchedFeatureCount}/{association.featureCount} features)
+                    {association.tableName}
+                    {association.featureCount !== undefined &&
+                        association.matchedFeatureCount !== undefined &&
+                        ` (${association.matchedFeatureCount}/${association.featureCount} features)`}
                 </Typography>
             )}
             {association.status === "loading" && (
