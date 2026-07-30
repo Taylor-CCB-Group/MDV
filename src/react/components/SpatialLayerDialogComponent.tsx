@@ -56,9 +56,12 @@ import {
     defaultPropsForSpatialElement,
     listAvailableSpatialEntries,
 } from "@/react/spatialdata/render_stack_defaults";
-import { NO_TABLE_ASSOCIATION } from "@/react/spatialdata/table_association";
+import {
+    NO_TABLE_ASSOCIATION,
+    useShapesTableAssociation,
+} from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
-import { useConfig } from "../hooks";
+import { useConfig, useDataSources } from "../hooks";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
@@ -77,11 +80,30 @@ function getAvailableFields(dataStore: ReturnType<typeof useDataStore>): string[
 
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
+    const dataSources = useDataSources();
+    const { spatialData } = useSpatialData();
     const chartConfig = useConfig<SpatialDataMdvReactConfig>();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
-    const availableFields = useMemo(() => getAvailableFields(dataStore), [dataStore]);
-    const chartColorBy =
+    const chartColorByCandidate =
         typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
+    const shapesElementKey =
+        entry?.kind === "spatial" && entry.source.elementType === "shapes"
+            ? entry.source.elementKey
+            : undefined;
+    const shapesAssociation = useShapesTableAssociation(
+        spatialData ?? undefined,
+        shapesElementKey,
+        dataSources,
+    );
+    const layerDataStore =
+        shapesAssociation.status === "resolved"
+            ? dataSources.find((dataSource) => dataSource.name === shapesAssociation.dataSourceName)
+                  ?.dataStore ?? dataStore
+            : dataStore;
+    const availableFields = useMemo(() => getAvailableFields(layerDataStore), [layerDataStore]);
+    const chartColorBy = chartColorByCandidate
+        ? layerDataStore.columnIndex[chartColorByCandidate]?.field
+        : undefined;
 
     if (!entry) return null;
 
@@ -100,7 +122,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
             return (
                 <ShapesLayerPanel
                     config={layer as Extract<LayerConfig, { type: "shapes" }>}
-                    association={NO_TABLE_ASSOCIATION}
+                    association={shapesAssociation}
                     availableFields={availableFields}
                     chartColorBy={chartColorBy}
                     updateLayer={patchLayer}

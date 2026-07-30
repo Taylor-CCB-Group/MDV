@@ -25,6 +25,7 @@ import {
     type MdvDeckOverlayLayers,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
+import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
 import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
@@ -383,10 +384,18 @@ const SpatialDataViewer = observer(
             [deckOverlaySources],
         );
 
-        const { layers, layerOrder, deckLayers } = useRenderStackAdapter({
+        const {
+            layers: baseLayers,
+            layerOrder: baseLayerOrder,
+            deckLayers,
+        } = useRenderStackAdapter({
             stack: config.renderStack,
             generation: chart.renderStackGeneration,
             hostLayerResolver,
+        });
+        const { layers, layerOrder } = useAssociatedShapesLayerInputs(spatialData ?? undefined, {
+            layers: baseLayers,
+            layerOrder: baseLayerOrder,
         });
 
         const onSpatialViewStateChange = useCallback(

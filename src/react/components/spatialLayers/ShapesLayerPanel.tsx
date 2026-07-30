@@ -1,16 +1,8 @@
-import {
-    Autocomplete,
-    Chip,
-    MenuItem,
-    Select,
-    Slider,
-    TextField,
-    Typography,
-} from "@mui/material";
+import { MenuItem, Select, Slider, Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
+import { useMemo } from "react";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
-import { useMemo } from "react";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
 
 type Props = {
@@ -98,7 +90,14 @@ export default function ShapesLayerPanel({
         <div className="grid gap-3">
             {association.status === "resolved" && association.tableName && (
                 <Typography variant="caption" color="text.secondary">
-                    Associated table: {association.tableName}
+                    Associated datasource: {association.dataSourceName} /{" "}
+                    {association.tableName} (
+                    {association.matchedFeatureCount}/{association.featureCount} features)
+                </Typography>
+            )}
+            {association.status === "loading" && (
+                <Typography variant="caption" color="text.secondary">
+                    Resolving table association...
                 </Typography>
             )}
             {association.status === "ambiguous" && (
@@ -135,27 +134,11 @@ export default function ShapesLayerPanel({
                 value={strokeColor}
                 onChange={(next) => updateLayer({ strokeColor: next })}
             />
-            {/* tooltip & fillColor not working yet here */}
-            {/* <Autocomplete
-                multiple
-                size="small"
-                options={options}
-                value={tooltipFields}
-                onChange={(_, value) => updateLayer({ tooltipFields: value })}
-                renderTags={(value, getTagProps) =>
-                    value.map((option, index) => {
-                        const { key, ...tagProps } = getTagProps({ index });
-                        return <Chip key={key} {...tagProps} label={option} size="small" />;
-                    })
-                }
-                renderInput={(params) => (
-                    <TextField {...params} label="Tooltip fields" placeholder="Select columns" />
-                )}
-            />
             <Select
                 size="small"
                 displayEmpty
                 value={fillByColumn}
+                disabled={association.status !== "resolved"}
                 onChange={(event) => {
                     const columnName = event.target.value;
                     if (!columnName) {
@@ -178,7 +161,7 @@ export default function ShapesLayerPanel({
                         {field}
                     </MenuItem>
                 ))}
-            </Select> */}
+            </Select>
         </div>
     );
 }
