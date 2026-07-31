@@ -153,5 +153,6 @@ def test_umap_job_end_to_end_honors_params(tmp_path):
 
     for col in ("UMAP_1", "UMAP_2", "UMAP_3"):            # provenance on each output
         prov = project.get_column_provenance("cells", col)
-        assert prov is not None and prov["job_id"] == job_id
-    assert prov["params"]["n_components"] == 3            # the param is recorded in provenance identity
+        assert prov is not None
+        assert prov["job_id"] == job_id
+        assert prov["params"]["n_components"] == 3        # params feed provenance identity

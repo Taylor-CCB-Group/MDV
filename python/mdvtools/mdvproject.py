@@ -1557,11 +1557,11 @@ class MDVProject:
                 try:
                     add_column_to_group(
                         col,
-                        dataframe[col["field"]],
+                        dataframe[col["field"]],  # type: ignore
                         gr,
                         len(dataframe),
                         self.skip_column_clean,
-                    )  # type: ignore
+                    )
                 except Exception as e:
                     dodgy_columns.append(col["field"])
                     logger.warning(

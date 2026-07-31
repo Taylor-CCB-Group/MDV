@@ -72,6 +72,7 @@ def test_pointer_hash_matches_record(tmp_path):
 
     pointer = project.get_column_metadata("cells", "sample_cluster")["provenance"]
     rec = {r.job_id: r for r in mgr.store.load_all()}[job_id]
+    assert rec.provenance is not None
     assert pointer["content_hash"] == rec.provenance["content_hash"]
 
 
