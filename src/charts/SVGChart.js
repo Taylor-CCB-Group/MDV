@@ -5,6 +5,7 @@ import "d3-transition";
 import { easeLinear } from "d3-ease";
 import { axisLeft, axisBottom } from "d3-axis";
 import { cluster } from "d3-hierarchy";
+import { dateTickFormat } from "@/lib/dateFormat";
 
 class SVGChart extends BaseChart {
     constructor(dataStore, div, config, axisTypes = {}) {
@@ -101,6 +102,57 @@ class SVGChart extends BaseChart {
         };
     }
 
+    /**
+     * For continuous (linear) axes, prefer chart-owned `this.x` / `this.y` when present
+     * (WGL scatter), else `config.param[0|1]`.
+     * Returns the column if it is an `is_date` numeric column.
+     */
+    _getDateColumnForAxis(axis) {
+        let field;
+        if (axis === "x") {
+            field = this.x ?? this.config.param?.[0];
+        } else if (axis === "y") {
+            field = this.y ?? this.config.param?.[1];
+        } else {
+            return null;
+        }
+        if (!field || typeof field !== "string") {
+            return null;
+        }
+        const col =
+            this.dataStore.columnIndex[field] ??
+            this.dataStore.config?.columns?.find((c) => c.field === field);
+        if (!col) {
+            return null;
+        }
+        // Prefer explicit flag; also accept date_unit alone in case is_date was dropped.
+        if (col.is_date || col.date_unit === "days") {
+            return col;
+        }
+        return null;
+    }
+
+    /**
+     * Apply date tick formatting to a d3 axis generator when the bound column is a date.
+     * @param {"x"|"y"} axis
+     * @param {import("d3-axis").Axis<import("d3-scale").NumberValue>} axisCall
+     */
+    _applyDateTickFormat(axis, axisCall) {
+        if (!axisCall) {
+            return;
+        }
+        if (this._getDateColumnForAxis(axis)) {
+            axisCall.tickFormat((d) => dateTickFormat(Number(d)));
+        } else {
+            axisCall.tickFormat(null);
+        }
+    }
+
+    /** True when the scale is continuous (not band). */
+    _isLinearScale(scale) {
+        return Boolean(scale) && typeof scale.bandwidth !== "function";
+    }
+
     _getContentDimensions() {
         //this can end up with -ve width/height e.g. in the process of popping out,
         //or when gridstack does something weird on window resize.
@@ -164,6 +216,9 @@ class SVGChart extends BaseChart {
             if (this.x_scale) {
                 //PJT- TODO fix over-crowded ticks.
                 this.x_scale.range([0, dim.width]);
+                if (this._isLinearScale(this.x_scale) && this.x_axis_call) {
+                    this._applyDateTickFormat("x", this.x_axis_call);
+                }
                 this.x_axis_svg
                     .selectAll(".tick text")
                     .attr("font-family", "Helvetica");
@@ -206,6 +261,8 @@ class SVGChart extends BaseChart {
                     this.y_axis_call.tickFormat((d, i) => {
                         return i % ii === 0 ? d : "";
                     });
+                } else if (this._isLinearScale(this.y_scale)) {
+                    this._applyDateTickFormat("y", this.y_axis_call);
                 } else {
                     this.y_axis_call.tickFormat(null);
                 }

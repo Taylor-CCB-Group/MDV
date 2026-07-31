@@ -1,5 +1,10 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import {
+    formatDateDays,
+    isDateColumn,
+    parseDateDays,
+} from "@/lib/dateFormat";
+import {
     getMultitextCapacity,
     getMultitextDelimiter,
     getMultitextJoinDelimiter,
@@ -197,6 +202,9 @@ export const getCellValueAsString = (column: LoadedDataColumn<DataType>, dataInd
         const value = data[dataIndex];
 
         if (value === undefined || value === null || Number.isNaN(value)) return "";
+        if (isDateColumn(column)) {
+            return formatDateDays(value);
+        }
         return String(value);
     }
 
@@ -279,9 +287,26 @@ export const setCellValueFromString = (
 
     // numeric
     if (datatype === "double" || datatype === "int32" || datatype === "integer") {
-        const numValue = Number.parseFloat(newValue);
-        if (!Number.isFinite(numValue)) {
-            throw new Error(`Invalid number value "${newValue}" for ${datatype} column: ${column.field}`);
+        let numValue: number;
+        if (isDateColumn(column)) {
+            // Prefer YYYY-MM-DD; otherwise accept a finite day-number string.
+            // Avoid parseDateDays' Date.parse fallback, which treats "18262" as a year.
+            const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(newValue.trim())
+                ? parseDateDays(newValue)
+                : null;
+            numValue = parsedDate ?? Number.parseFloat(newValue);
+            if (!Number.isFinite(numValue)) {
+                throw new Error(
+                    `Invalid date value "${newValue}" for date column: ${column.field}`,
+                );
+            }
+        } else {
+            numValue = Number.parseFloat(newValue);
+            if (!Number.isFinite(numValue)) {
+                throw new Error(
+                    `Invalid number value "${newValue}" for ${datatype} column: ${column.field}`,
+                );
+            }
         }
 
         data[dataIndex] = numValue;
