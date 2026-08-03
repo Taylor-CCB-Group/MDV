@@ -42,6 +42,37 @@ when a second tool actually needs one — not before. (This is Galaxy tool-XML's
 `<conditional>` / `data_column` territory, where all the complexity lives; we cap it
 deliberately.)
 
+### Param type vocabulary & the validation charter — enum/bool deferred
+
+`ParamSpec.type` today spans `column` / `dropdown` / `text` / `int` / `float`. **The backend gate
+(`validate_params`) enforces type + identity/membership, never value ranges** — a `column` value
+must be a real field of its datasource; a numeric value must be the declared `int`/`float`. A
+*range* (e.g. `n_neighbors >= 2`) is deliberately NOT the gate's job: that is the frontend
+control's declared bound (a `slider`'s min/max) and the worker's to reject at compute time (a bad
+value fails the job cleanly via `STATUS=failed` + `error.txt`). The gate answers "are the params
+what they claim to be," not "are they sensible."
+
+**Open (deferred) — `enum` and `boolean` types.** scanpy (and later tools) expose choice params
+(`metric`, `method`) and toggles (`knn`) the current vocabulary can't declare. This is **not built**
+— nothing needs it yet (UMAP runs on scanpy defaults for these). When a tool does, per the
+"grow when a second tool needs one" rule above:
+- **bool** → a new `type="boolean"` (its OWN type, not folded into `int` — `bool` is an `int`
+  subclass the numeric check already excludes) + one `isinstance(v, bool)` branch; maps to a
+  checkbox / JSON-Schema `boolean`.
+- **enum** → reuse `type="dropdown"` + a new **static** `options: list[str]` field (distinct from
+  the existing dynamic `options_from`, which resolves choices from a datasource's columns) + a
+  membership branch (`value in options`). Membership is the SAME family as the `column` check, so
+  it lands INSIDE the validation charter above — unlike a numeric range would.
+
+Everything downstream stays untouched: `applies_to` bundling (ADR-0004 tray) + JSON serialize
+bool/str natively, the worker splats them, `content_hash`/provenance are param-agnostic. So the
+whole addition is the `ParamSpec` field + two `validate_params` branches + the tool's new param
+lines — the same one-declaration cost that numeric knobs already pay.
+
+**Representability limit stays.** `metric` also accepts a *callable* distance function — a live
+object, not serializable, not a control, not an LLM blank — so only the string metrics are ever
+spec-able; the callable path remains a worker-internal default.
+
 ## Safety
 
 The registry is an **allow-list of vetted tools with typed, validated params**. A future LLM
