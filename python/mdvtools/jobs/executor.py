@@ -88,6 +88,16 @@ class SlurmExecutor:
             f'{self._python} -m mdvtools.jobs.run_worker "{entrypoint}" "{ws}"'
         )
 
+    def _squeue_state(self, job_id: str) -> str:
+        # squeue lists only active jobs; a finished/killed job is absent
+        return self._run(["squeue", "-j", job_id, "-h", "-o", "%T"]).strip()
+
+    def _sacct_state(self, job_id: str) -> str:
+        # sacct keeps terminal state after the job leaves the queue. -X = allocation only
+        # (skip .batch/.extern steps); the state can carry a suffix ("CANCELLED" by 1000)
+        out = self._run(["sacct", "-j", job_id, "-n", "-X", "-o", "State"]).strip()
+        return out.split()[0] if out else ""
+
     def submit(self, entrypoint: str, workspace: Path) -> Handle:
         ws = Path(workspace)
         script_path = ws / "slurm_job.sh"
@@ -101,12 +111,6 @@ class SlurmExecutor:
             return "running"
         return "done" if self._sacct_state(handle.ref) == "COMPLETED" else "lost"
 
-    def _squeue_state(self, job_id: str) -> str:
-        # squeue lists only active jobs; a finished/killed job is absent
-        return self._run(["squeue", "-j", job_id, "-h", "-o", "%T"]).strip()
-
-    def _sacct_state(self, job_id: str) -> str:
-        # sacct keeps terminal state after the job leaves the queue. -X = allocation only
-        # (skip .batch/.extern steps); the state can carry a suffix ("CANCELLED" by 1000)
-        out = self._run(["sacct", "-j", job_id, "-n", "-X", "-o", "State"]).strip()
-        return out.split()[0] if out else ""
+    def locate_result(self, handle: Handle, workspace: Path) -> Path:
+        # shared FS (ADR-0010); the owner reads the same path the worker wrote
+        return Path(workspace) / "output"

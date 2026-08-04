@@ -97,3 +97,9 @@ def test_poll_parses_sacct_state_with_suffix():
 
 def test_poll_lost_when_no_record_anywhere():
     assert _poll(squeue="", sacct="") == "lost"
+
+
+def test_locate_result_is_workspace_output(tmp_path):
+    # shared FS: the result path is where the worker wrote it, handle irrelevant
+    ex = SlurmExecutor(run=lambda argv: "")
+    assert ex.locate_result(Handle("slurm", "4242"), tmp_path) == tmp_path / "output"
