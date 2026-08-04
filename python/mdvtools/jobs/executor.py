@@ -1,8 +1,20 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, Callable
+import re
 import subprocess
 import sys
+
+def _run_cli(argv: list[str]) -> str:
+    # Default command-runner: shell out to the Slurm CLI
+    return subprocess.run(argv, capture_output=True, text=True, check=True).stdout
+
+def _parse_job_id(sbatch_output: str) -> str:
+    # sbatch prints "Submitted job <id>"
+    m = re.search(r"Submitted batch job (\d+)", sbatch_output)
+    if not m:
+        raise ValueError(f"could not parse Slurm job-id from: {sbatch_output!r}")
+    return m.group(1)
 
 
 @dataclass
@@ -47,3 +59,34 @@ class LocalSubprocessExecutor:
 
     def locate_result(self, handle: Handle, workspace: Path) -> Path:
         return workspace / "output"
+
+
+class SlurmExecutor:
+    """
+    ADR-0008: slurm executor, submitting jobs using the CLI.
+    Precondition (ADR-0010): the compute node shares a POSIX filesystem with the owner at a matching path,
+    so the worker reads/writes the same workspace.
+
+    `run` is an injected command-runner (argv -> stdout) for tests mock slurm cli commands
+    """
+    def __init__(self, run: Callable[[list[str]], str] | None = None, python: str | None = None):
+        self._run = run or _run_cli
+        self._python = python or sys.executable
+
+    def _render_script(self, entrypoint: str, ws: Path) -> str:
+        # Basic directives only for now
+        return (
+            "#!/bin/bash\n"
+            f"#SBATCH --job-name=mdv-{ws.name}\n"
+            f"#SBATCH --chdir={ws}\n"
+            f"#SBATCH --output={ws / 'slurm-%j.out'}\n"
+            f"#SBATCH --error={ws / 'slurm-%j.err'}\n"
+            f'{self._python} -m mdvtools.jobs.run_worker "{entrypoint}" "{ws}"'
+        )
+
+    def submit(self, entrypoint: str, workspace: Path) -> Handle:
+        ws = Path(workspace)
+        script_path = ws / "slurm_job.sh"
+        script_path.write_text(self._render_script(entrypoint, ws))
+        out = self._run(["sbatch", str(script_path)])
+        return Handle("slurm", _parse_job_id(out))
