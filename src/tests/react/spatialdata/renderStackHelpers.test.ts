@@ -191,6 +191,37 @@ describe("render stack adapter", () => {
         expect(afterTone).not.toBe(afterChannels);
     });
 
+    test("spatial revision changes when non-image layer props change in place", () => {
+        const labelsEntry = spatialEntry({
+            id: "labels-a",
+            elementKey: "cell_labels",
+            elementType: "labels",
+        });
+        const stack = renderStack([labelsEntry]);
+        touchRenderStackEntry(labelsEntry);
+        const before = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: {
+                fillColorByColumn: {
+                    columnName: "Expressed_genes",
+                    mode: "categorical",
+                },
+            },
+        });
+        touchRenderStackEntry(labelsEntry);
+        const afterFillColumn = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: { tooltipFields: ["Expressed_genes", "Leiden"] },
+        });
+        touchRenderStackEntry(labelsEntry);
+        const afterTooltipFields = renderStackSpatialRevision(stack);
+
+        expect(afterFillColumn).not.toBe(before);
+        expect(afterTooltipFields).not.toBe(afterFillColumn);
+    });
+
     test("resolves only visible host entries and reuses host clones", () => {
         const visibleHostId = deckHostLayerId("scatter");
         const hiddenHostId = deckHostLayerId("selection");

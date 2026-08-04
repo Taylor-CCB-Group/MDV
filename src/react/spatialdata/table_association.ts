@@ -13,6 +13,15 @@ type RowColorFunction = (rowIndex: number) => RgbColor | RgbaColor | undefined;
 type ShapesRenderDataEntry = [string, ShapesRenderData | undefined];
 type SpatialDataTableMetadata = { table_name?: unknown; table_id?: unknown };
 type SpatialDataTablesMetadata = { tables?: SpatialDataTableMetadata[] };
+type DataSourceColumnMetadata = {
+    field?: unknown;
+    name?: unknown;
+    values?: unknown;
+};
+type DataSourceAssociationConfig = {
+    columns?: DataSourceColumnMetadata[];
+    spatialdata_tables?: SpatialDataTablesMetadata;
+};
 type SpatialDataAssociationKind = "images" | "points" | "labels" | "shapes";
 export type AssociableSpatialElementType = Extract<
     LayerType,
@@ -29,7 +38,7 @@ type SpatialDataAwareDataStore = DataStore & {
 };
 export type DataSourceAssociationCandidate<TDataStore = Record<string, unknown>> = {
     name: string;
-    dataStore: TDataStore & { config?: { spatialdata_tables?: SpatialDataTablesMetadata } };
+    dataStore: TDataStore & { config?: DataSourceAssociationConfig };
 };
 export type AssociatedDataSource = DataSourceAssociationCandidate<SpatialDataAwareDataStore>;
 type AssociatedElementTable<TDataStore = SpatialDataAwareDataStore> =
@@ -113,15 +122,35 @@ function spatialDataAssociationKind(
 function tableNamesForDataSource<TDataStore>(
     dataSource: DataSourceAssociationCandidate<TDataStore>,
 ): string[] {
+    const names = new Set<string>();
     const provenance = dataSource.dataStore.config?.spatialdata_tables;
     const tables = Array.isArray(provenance?.tables) ? provenance.tables : [];
-    return tables
-        .map((table) => {
-            if (typeof table.table_name === "string") return table.table_name;
-            if (typeof table.table_id === "string") return table.table_id.split("/").pop();
-            return undefined;
-        })
-        .filter((tableName): tableName is string => tableName !== undefined);
+    for (const table of tables) {
+        if (typeof table.table_name === "string") names.add(table.table_name);
+        if (typeof table.table_id === "string") {
+            const tableIdLeaf = table.table_id.split("/").pop();
+            if (tableIdLeaf) names.add(tableIdLeaf);
+        }
+    }
+
+    const columns = dataSource.dataStore.config?.columns;
+    if (Array.isArray(columns)) {
+        for (const column of columns) {
+            const columnId =
+                typeof column.field === "string"
+                    ? column.field
+                    : typeof column.name === "string"
+                      ? column.name
+                      : undefined;
+            if (columnId !== "table_name") continue;
+            if (!Array.isArray(column.values)) continue;
+            for (const value of column.values) {
+                if (typeof value === "string") names.add(value);
+            }
+        }
+    }
+
+    return Array.from(names);
 }
 
 export function resolveAssociatedElementTable<TDataStore>({

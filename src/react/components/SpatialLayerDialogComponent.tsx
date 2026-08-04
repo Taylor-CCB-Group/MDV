@@ -32,7 +32,6 @@ import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
-
 import {
     DECK_OVERLAY_IDS,
     DECK_OVERLAY_LABELS,
@@ -56,10 +55,7 @@ import {
     defaultPropsForSpatialElement,
     listAvailableSpatialEntries,
 } from "@/react/spatialdata/render_stack_defaults";
-import {
-    NO_TABLE_ASSOCIATION,
-    useElementTableAssociation,
-} from "@/react/spatialdata/table_association";
+import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
@@ -74,37 +70,31 @@ type InsertOption =
     | { kind: "spatial"; type: RenderStackSpatialElementType; elementKey: string; label: string }
     | { kind: "host"; deckId: DeckOverlayId; label: string };
 
-function getAvailableFields(dataStore: ReturnType<typeof useDataStore>): string[] {
-    return Object.keys(dataStore.columnIndex).sort();
+function isLayerConfigOfType<TType extends LayerConfig["type"]>(
+    layer: LayerConfig | undefined,
+    type: TType,
+): layer is Extract<LayerConfig, { type: TType }> {
+    return layer?.type === type;
 }
 
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
     const dataSources = useDataSources();
     const { spatialData } = useSpatialData();
-    const chartConfig = useConfig<SpatialDataMdvReactConfig>();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
-    const chartColorByCandidate =
-        typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
-    const shapesElementKey =
-        entry?.kind === "spatial" && entry.source.elementType === "shapes"
-            ? entry.source.elementKey
-            : undefined;
-    const shapesAssociation = useElementTableAssociation(
+    const spatialElementType = entry?.kind === "spatial" ? entry.source.elementType : undefined;
+    const spatialElementKey = entry?.kind === "spatial" ? entry.source.elementKey : undefined;
+    const tableAssociation = useElementTableAssociation(
         spatialData ?? undefined,
-        "shapes",
-        shapesElementKey,
+        spatialElementType ?? "shapes",
+        spatialElementKey,
         dataSources,
     );
     const layerDataStore =
-        shapesAssociation.status === "resolved"
-            ? dataSources.find((dataSource) => dataSource.name === shapesAssociation.dataSourceName)
+        tableAssociation.status === "resolved"
+            ? dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)
                   ?.dataStore ?? dataStore
             : dataStore;
-    const availableFields = useMemo(() => getAvailableFields(layerDataStore), [layerDataStore]);
-    const chartColorBy = chartColorByCandidate
-        ? layerDataStore.columnIndex[chartColorByCandidate]?.field
-        : undefined;
 
     if (!entry) return null;
 
@@ -120,30 +110,32 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
         case "image":
             return <ImageLayerPanel entryId={entryId} />;
         case "shapes":
+            if (!isLayerConfigOfType(layer, "shapes")) return null;
             return (
                 <ShapesLayerPanel
-                    config={layer as Extract<LayerConfig, { type: "shapes" }>}
-                    association={shapesAssociation}
-                    availableFields={availableFields}
-                    chartColorBy={chartColorBy}
+                    config={layer}
+                    association={tableAssociation}
+                    dataStore={layerDataStore}
                     updateLayer={patchLayer}
                 />
             );
         case "points":
+            if (!isLayerConfigOfType(layer, "points")) return null;
             return (
                 <PointsLayerPanel
-                    config={layer as Extract<LayerConfig, { type: "points" }>}
+                    config={layer}
                     updateLayer={patchLayer}
                 />
             );
         case "labels":
-            return ( null //nothing useful here at the moment.
-                // <LabelsLayerPanel
-                //     config={layer as Extract<LayerConfig, { type: "labels" }>}
-                //     association={NO_TABLE_ASSOCIATION}
-                //     availableFields={availableFields}
-                //     updateLayer={patchLayer}
-                // />
+            if (!isLayerConfigOfType(layer, "labels")) return null;
+            return (
+                <LabelsLayerPanel
+                    config={layer}
+                    association={tableAssociation}
+                    dataStore={layerDataStore}
+                    updateLayer={patchLayer}
+                />
             );
         default:
             return null;

@@ -120,20 +120,20 @@ importers:
         specifier: 10.6.0
         version: 10.6.0
       '@spatialdata/avivatorish':
-        specifier: ^0.3.1
-        version: 0.3.1(bb8d092af02a187d16bc7ace88d74081)
+        specifier: ^0.4.0
+        version: 0.4.0(bb8d092af02a187d16bc7ace88d74081)
       '@spatialdata/core':
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.4.0
+        version: 0.4.0
       '@spatialdata/layers':
-        specifier: ^0.3.1
-        version: 0.3.1(5d2b079128f433ea6c1ff2a83747cc96)
+        specifier: ^0.4.0
+        version: 0.4.0(201d8cd371780b7da38b87aae7d4885e)
       '@spatialdata/react':
-        specifier: ^0.3.1
-        version: 0.3.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
+        specifier: ^0.4.0
+        version: 0.4.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
       '@spatialdata/vis':
-        specifier: ^0.3.1
-        version: 0.3.1(25913164f5e2f92d1a63ea1ff6660dac)
+        specifier: ^0.4.0
+        version: 0.4.0(25913164f5e2f92d1a63ea1ff6660dac)
       '@tanstack/react-query':
         specifier: ^5.80.0
         version: 5.80.6(react@19.2.6)
@@ -2236,30 +2236,30 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@spatialdata/avivatorish@0.3.1':
-    resolution: {integrity: sha512-W/KO4J8Cdr8+rr2x86Qti+gFbXHgD01oqP0FuiEpUVbD056LBbgL0j+R0k0DXo0AcbamIi+Rtw5Kt1SqFJZUyQ==}
+  '@spatialdata/avivatorish@0.4.0':
+    resolution: {integrity: sha512-qIvigwmdVFTdy4r22KTwykrqfTigEsAR3Ba0KmgZe8b8O2QkTKSj23NqIEBaNtkQ9a7Cbg6ln6AjZkDnS84fdQ==}
     peerDependencies:
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@spatialdata/core@0.3.1':
-    resolution: {integrity: sha512-bspBUU2mEc7Al8+1mq5/Bq6lpIgZEOuCt9e+nmX9KLeLBoHi2IXQFyTcextkAztwGank/vEzjGYEdXQoHfZvdg==}
+  '@spatialdata/core@0.4.0':
+    resolution: {integrity: sha512-/P+UV1urkGzC3/jfvEl8h19Mzi8/qqjaZBjXwvnoSdfQqwLb9VD/pnOB9Kv0VSXcbs18yDCF/Ii7X67+SC929A==}
 
-  '@spatialdata/layers@0.3.1':
-    resolution: {integrity: sha512-PcOL4jBCuiiX0/oHBJdhcEjX3tPWI5irUWb25CguqqXj94j5DTR6YiQE9+AtfL0oGtlS27nWyAGfuWbO94+N9g==}
+  '@spatialdata/layers@0.4.0':
+    resolution: {integrity: sha512-+yxfSwQ4u7yVDw6CRlFzwG4DUN5gwSvXqXk00PB2xfx9lodhbzvsnhDQIDJtkRXeDhzJ2uxmOw44dshepA87qQ==}
     peerDependencies:
-      deck.gl: ~9.3.5
+      deck.gl: ~9.3.7
 
-  '@spatialdata/react@0.3.1':
-    resolution: {integrity: sha512-S+gbA11WcRtmndSsWY132gHEin1pwNNlRcM9nUzZiuN/It8Sq3ulMMMFwpnEzgtc3f9NSoC6Esbw+/D0CioW8w==}
+  '@spatialdata/react@0.4.0':
+    resolution: {integrity: sha512-ebgIxND5liPYg/i/TfMlbG0ahaZzP4Lntq4jVBEaGRuQmq7zuECY7F4QyCIsaImFfKuvvAxk79zo9OA9B90B1w==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
       react-dom: '>=18 <20'
       zarrita: ^0.7.1
 
-  '@spatialdata/vis@0.3.1':
-    resolution: {integrity: sha512-c/QRA+JKc7ThKmkerLmBHfEtqTXGJgSseqaQZZDtDYmFJzAPx1ZzqY95cn7Bp0YR0R3arqduxXQ0NAheb/fBjg==}
+  '@spatialdata/vis@0.4.0':
+    resolution: {integrity: sha512-MG+ifQEtU9KxeHPs5dcPjw7kPRR9dC/3G55AKqdT4XcKD7n9TtnSJpUtpDeUdi5DCgxRdoCg/gA6WIWW5Qqu5A==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
@@ -4395,8 +4395,8 @@ packages:
     resolution: {integrity: sha512-jb6SYvHMyiCqwqgGGLDAxtig9h1g6O+n1wEyNEE4QgVEXOItYaWrEgPg9SAnwdoZm2yx6DpFtilbGG65hvZgpQ==}
     engines: {node: '>=10.19'}
 
-  geotiff@3.0.5:
-    resolution: {integrity: sha512-OWcL9S9+yDZ6iAlXMt32T1iwUApJM8UiD47xbm6ZP1h33d10fqkPs14EG/ttT5EnefpZSx3G15iDFC5FxUNUwA==}
+  geotiff@3.1.0-beta.0:
+    resolution: {integrity: sha512-wbVwOaQYuN+ywly5NoMXn37nHslwkQg5EFHqMeUTtjDACrSag0EEVlFsc+2DK3Pzmmp6XzJW2RTZOamPsBM6ng==}
     engines: {node: '>=10.19'}
 
   get-caller-file@2.0.5:
@@ -5248,8 +5248,8 @@ packages:
   obug@2.1.1:
     resolution: {integrity: sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==}
 
-  ol@10.9.0:
-    resolution: {integrity: sha512-svbbgVQUmEHaKpLQ8kRySojs59Brvgl2zYIrqG9eQNXGfsbi55rQasZIDpwpQzDL6OlzrUb0H4hQaiX9wDoGmA==}
+  ol@10.10.0:
+    resolution: {integrity: sha512-tLPKn6zl+6uWdPufYlqG/lQzuVUTVmfwahQqVr5+wZNyZecyAtIhMTyOtKpu7ooNDLY2sEjKZNXw9HL+sOjC1A==}
 
   open@11.0.0:
     resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
@@ -5338,8 +5338,8 @@ packages:
     resolution: {integrity: sha512-XDF38WCH3z5OV/OVa8GKUNtLAyneuzbCisx7QUCF8Q6Nutx0WnJrQe5O+kOtBlLfRNUws98Y58Lblp+NJG5T4Q==}
     hasBin: true
 
-  pbf@4.0.1:
-    resolution: {integrity: sha512-SuLdBvS42z33m8ejRbInMapQe8n0D3vN/Xd5fmWM3tufNgRQFBpaW2YVJxQZV4iPNqb0vEFvssMEo5w9c6BTIA==}
+  pbf@5.1.2:
+    resolution: {integrity: sha512-mnvGdvOrIvJOBGUEdGkrVXjN8E/VkIJCkf2eS1DH2yv82ORUlLttmDt0rWY38yYZmVwciZwBUvHM20qxBZf40w==}
     hasBin: true
 
   pdfmake@0.2.23:
@@ -8469,7 +8469,7 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@spatialdata/avivatorish@0.3.1(bb8d092af02a187d16bc7ace88d74081)':
+  '@spatialdata/avivatorish@0.4.0(bb8d092af02a187d16bc7ace88d74081)':
     dependencies:
       '@hms-dbmi/viv': 0.22.0(a8a8bf4346b18ef19c73280beb43bfb9)
       '@math.gl/core': 4.1.0
@@ -8493,25 +8493,26 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@spatialdata/core@0.3.1':
+  '@spatialdata/core@0.4.0':
     dependencies:
       '@math.gl/core': 4.1.0
       '@zarrita/storage': 0.2.0
       anndata.js: 0.0.2
       apache-arrow: 17.0.0
       earcut: 3.2.3
-      ol: 10.9.0
+      ol: 10.10.0
       zarrextra: 0.3.0
       zarrita: 0.7.3
       zod: 4.4.3
 
-  '@spatialdata/layers@0.3.1(5d2b079128f433ea6c1ff2a83747cc96)':
+  '@spatialdata/layers@0.4.0(201d8cd371780b7da38b87aae7d4885e)':
     dependencies:
       '@deck.gl/core': 9.3.7
       '@hms-dbmi/viv': 0.22.0(a8a8bf4346b18ef19c73280beb43bfb9)
+      '@luma.gl/core': 9.3.6
       '@luma.gl/engine': 9.3.6(@luma.gl/core@9.3.6)(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6))
       '@math.gl/core': 4.1.0
-      '@spatialdata/core': 0.3.1
+      '@spatialdata/core': 0.4.0
       deck.gl: 9.3.7(@arcgis/core@4.34.8)(@luma.gl/gltf@9.3.6(@luma.gl/core@9.3.6)(@luma.gl/engine@9.3.6(@luma.gl/core@9.3.6)(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6)))(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6)))(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6))(@luma.gl/webgl@9.3.6(@luma.gl/core@9.3.6))(@math.gl/web-mercator@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       zod: 4.4.3
     transitivePeerDependencies:
@@ -8521,29 +8522,28 @@ snapshots:
       - '@deck.gl/react'
       - '@deck.gl/widgets'
       - '@luma.gl/constants'
-      - '@luma.gl/core'
       - '@luma.gl/shadertools'
       - '@luma.gl/webgl'
       - react
 
-  '@spatialdata/react@0.3.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)':
+  '@spatialdata/react@0.4.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)':
     dependencies:
-      '@spatialdata/core': 0.3.1
+      '@spatialdata/core': 0.4.0
       anndata.js: 0.0.2
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
       zarrita: 0.7.3
 
-  '@spatialdata/vis@0.3.1(25913164f5e2f92d1a63ea1ff6660dac)':
+  '@spatialdata/vis@0.4.0(25913164f5e2f92d1a63ea1ff6660dac)':
     dependencies:
       '@deck.gl/core': 9.3.7
       '@hms-dbmi/viv': 0.22.0(a8a8bf4346b18ef19c73280beb43bfb9)
       '@luma.gl/core': 9.3.6
       '@math.gl/core': 4.1.0
-      '@spatialdata/avivatorish': 0.3.1(bb8d092af02a187d16bc7ace88d74081)
-      '@spatialdata/core': 0.3.1
-      '@spatialdata/layers': 0.3.1(5d2b079128f433ea6c1ff2a83747cc96)
-      '@spatialdata/react': 0.3.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
+      '@spatialdata/avivatorish': 0.4.0(bb8d092af02a187d16bc7ace88d74081)
+      '@spatialdata/core': 0.4.0
+      '@spatialdata/layers': 0.4.0(201d8cd371780b7da38b87aae7d4885e)
+      '@spatialdata/react': 0.4.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.3)
       '@uidotdev/usehooks': 2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uiw/react-json-view': 2.0.0-alpha.39(@babel/runtime@7.29.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@vivjs/views': 0.22.0(b676f017234f045295e8bc0d9eccff0e)
@@ -11141,7 +11141,7 @@ snapshots:
 
   geotiff@2.1.4-beta.0:
     dependencies:
-      '@petamoriken/float16': 3.9.3
+      '@petamoriken/float16': 3.9.2
       lerc: 3.0.0
       pako: 2.1.0
       parse-headers: 2.0.6
@@ -11150,7 +11150,7 @@ snapshots:
       xml-utils: 1.10.2
       zstddec: 0.2.0
 
-  geotiff@3.0.5:
+  geotiff@3.1.0-beta.0:
     dependencies:
       '@petamoriken/float16': 3.9.3
       lerc: 3.0.0
@@ -12222,12 +12222,12 @@ snapshots:
 
   obug@2.1.1: {}
 
-  ol@10.9.0:
+  ol@10.10.0:
     dependencies:
       '@types/rbush': 4.0.0
       earcut: 3.2.3
-      geotiff: 3.0.5
-      pbf: 4.0.1
+      geotiff: 3.1.0-beta.0
+      pbf: 5.1.2
       rbush: 4.0.1
       zarrita: 0.7.3
 
@@ -12323,7 +12323,7 @@ snapshots:
       ieee754: 1.2.1
       resolve-protobuf-schema: 2.1.0
 
-  pbf@4.0.1:
+  pbf@5.1.2:
     dependencies:
       resolve-protobuf-schema: 2.1.0
 

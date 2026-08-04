@@ -121,6 +121,45 @@ describe("SpatialData table association", () => {
         });
     });
 
+    test("resolves labels from MDV table_name column metadata", () => {
+        const spatialData = {
+            getAssociatedTables: (kind: string): Array<[string, unknown]> =>
+                kind === "labels" ? [["cell_binned", null]] : [],
+        };
+        const dataSources: DataSourceAssociationCandidate[] = [
+            {
+                name: "cells",
+                dataStore: {
+                    config: {
+                        columns: [
+                            {
+                                field: "region",
+                                values: ["cell_labels"],
+                            },
+                            {
+                                field: "table_name",
+                                values: ["cell_binned"],
+                            },
+                        ],
+                    },
+                },
+            },
+        ];
+
+        expect(
+            resolveAssociatedElementTable({
+                spatialData,
+                elementType: "labels",
+                elementKey: "cell_labels",
+                dataSources,
+            }),
+        ).toMatchObject({
+            status: "resolved",
+            tableName: "cell_binned",
+            dataSourceName: "cells",
+        });
+    });
+
     test("builds feature-id keyed colors and hidden feature ids from row state", () => {
         const featureState = buildAssociatedShapesFeatureState({
             renderData: shapesRenderData(["a", "b", "c"], [0, 1, -1]),

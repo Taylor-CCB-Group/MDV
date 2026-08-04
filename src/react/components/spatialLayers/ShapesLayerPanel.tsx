@@ -1,19 +1,17 @@
-import { MenuItem, Select, Slider, Typography } from "@mui/material";
+import { Slider, Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
-import { useMemo } from "react";
+
+import type DataStore from "@/datastore/DataStore";
+import type { TableAssociation } from "@/react/spatialdata/table_association";
+import TableAssociationControls, { FillColorByColumnControl } from "./TableAssociationControls";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
-import type { TableAssociation } from "@/react/spatialdata/table_association";
 
 type Props = {
     config: ShapesLayerConfig;
     updateLayer: (updates: Partial<ShapesLayerConfig>) => void;
     association: TableAssociation;
-    availableFields: string[];
-    /** Chart-level color_by column, for fill-by-column option list.
-     * nb this needs review, not working and also general background issues with colorBy type.
-     */
-    chartColorBy?: string;
+    dataStore: DataStore;
 };
 
 const toHex = (value: [number, number, number, number]) =>
@@ -70,43 +68,26 @@ export default function ShapesLayerPanel({
     config,
     updateLayer,
     association,
-    availableFields,
-    chartColorBy,
+    dataStore,
 }: Props) {
     const fillColor = config.fillColor ?? [200, 200, 200, 120];
     const strokeColor = config.strokeColor ?? [255, 255, 255, 200];
     const tooltipFields = config.tooltipFields ?? [];
-    const fillByColumn = config.fillColorByColumn?.columnName ?? "";
-
-    const options = useMemo(() => {
-        const set = new Set(availableFields);
-        if (chartColorBy) set.add(chartColorBy);
-        for (const field of tooltipFields) set.add(field);
-        if (fillByColumn) set.add(fillByColumn);
-        return [...set].sort();
-    }, [availableFields, chartColorBy, fillByColumn, tooltipFields]);
 
     return (
         <div className="grid gap-3">
-            {association.status === "resolved" && association.tableName && (
-                <Typography variant="caption" color="text.secondary">
-                    Associated datasource: {association.dataSourceName} /{" "}
-                    {association.tableName}
-                    {association.featureCount !== undefined &&
-                        association.matchedFeatureCount !== undefined &&
-                        ` (${association.matchedFeatureCount}/${association.featureCount} features)`}
-                </Typography>
-            )}
-            {association.status === "loading" && (
-                <Typography variant="caption" color="text.secondary">
-                    Resolving table association...
-                </Typography>
-            )}
-            {association.status === "ambiguous" && (
-                <Typography variant="caption" color="warning.main">
-                    Table association is ambiguous. Choose columns manually.
-                </Typography>
-            )}
+            <TableAssociationControls
+                association={association}
+                dataStore={dataStore}
+                tooltipFields={tooltipFields}
+                onTooltipFieldsChange={(next) => updateLayer({ tooltipFields: next })}
+            />
+            <FillColorByColumnControl
+                association={association}
+                dataStore={dataStore}
+                fillColorByColumn={config.fillColorByColumn}
+                onChange={(next) => updateLayer({ fillColorByColumn: next })}
+            />
             <div className="flex items-center gap-3">
                 <span className="w-24 text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
                     Stroke width
@@ -136,34 +117,6 @@ export default function ShapesLayerPanel({
                 value={strokeColor}
                 onChange={(next) => updateLayer({ strokeColor: next })}
             />
-            <Select
-                size="small"
-                displayEmpty
-                value={fillByColumn}
-                disabled={association.status !== "resolved"}
-                onChange={(event) => {
-                    const columnName = event.target.value;
-                    if (!columnName) {
-                        updateLayer({ fillColorByColumn: undefined });
-                        return;
-                    }
-                    updateLayer({
-                        fillColorByColumn: {
-                            columnName,
-                            mode: "categorical",
-                        },
-                    });
-                }}
-            >
-                <MenuItem value="">
-                    <em>Static fill color</em>
-                </MenuItem>
-                {options.map((field) => (
-                    <MenuItem key={field} value={field}>
-                        {field}
-                    </MenuItem>
-                ))}
-            </Select>
         </div>
     );
 }
