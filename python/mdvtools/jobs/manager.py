@@ -37,7 +37,7 @@ class JobManager:
         workspace_root=None,
         records_root=None,
         executor=None,
-        max_concurrent=2,
+        max_concurrent: int | None = 2,
     ):
         self.project = project
         self.records_root = (

@@ -32,7 +32,7 @@ class Executor(Protocol):
 class LocalSubprocessExecutor:
     """ADR0008: local subprocess. Worker dies with owner -> requeue (ADR0005)"""
 
-    def __init__(self, max_concurrent_jobs: int = 2):
+    def __init__(self, max_concurrent_jobs: int | None = 2):
         self.max_concurrent_jobs = max_concurrent_jobs
         self._procs: dict[str, subprocess.Popen] = {}
 
