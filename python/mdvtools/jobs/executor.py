@@ -7,7 +7,7 @@ import sys
 
 def _run_cli(argv: list[str]) -> str:
     # Default command-runner: shell out to the Slurm CLI
-    return subprocess.run(argv, capture_output=True, text=True, check=True).stdout
+    return subprocess.run(argv, capture_output=True, text=True).stdout
 
 def _parse_job_id(sbatch_output: str) -> str:
     # sbatch prints "Submitted job <id>"
@@ -69,6 +69,10 @@ class SlurmExecutor:
 
     `run` is an injected command-runner (argv -> stdout) for tests mock slurm cli commands
     """
+    _ACTIVE_STATES = frozenset({
+        "PENDING", "RUNNING", "CONFIGURING", "COMPLETING", "RESIZING", "SUSPENDED", 'REQUEUED'
+    })
+
     def __init__(self, run: Callable[[list[str]], str] | None = None, python: str | None = None):
         self._run = run or _run_cli
         self._python = python or sys.executable
@@ -90,3 +94,19 @@ class SlurmExecutor:
         script_path.write_text(self._render_script(entrypoint, ws))
         out = self._run(["sbatch", str(script_path)])
         return Handle("slurm", _parse_job_id(out))
+
+    def poll(self, handle: Handle) -> str:
+        # Slurm only status; the manager will pair this with the STATUS marker in tick()
+        if self._squeue_state(handle.ref) in self._ACTIVE_STATES:
+            return "running"
+        return "done" if self._sacct_state(handle.ref) == "COMPLETED" else "lost"
+
+    def _squeue_state(self, job_id: str) -> str:
+        # squeue lists only active jobs; a finished/killed job is absent
+        return self._run(["squeue", "-j", job_id, "-h", "-o", "%T"]).strip()
+
+    def _sacct_state(self, job_id: str) -> str:
+        # sacct keeps terminal state after the job leaves the queue. -X = allocation only
+        # (skip .batch/.extern steps); the state can carry a suffix ("CANCELLED" by 1000)
+        out = self._run(["sacct", "-j", job_id, "-n", "-X", "-o", "State"]).strip()
+        return out.split()[0] if out else ""
