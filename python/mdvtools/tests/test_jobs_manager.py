@@ -1,11 +1,32 @@
 import time
-import pandas as pd
+from pathlib import Path
 
+import pandas as pd
 import numpy as np
 import scipy.sparse
 from mdvtools.mdvproject import MDVProject
 from mdvtools.jobs.manager import JobManager
 from mdvtools.jobs.jobstore import Status
+from mdvtools.jobs.executor import Handle
+
+class _FakeExecutor:
+    """Backend stand-in: submit() records the call but runs NO worker (no marker is ever
+    written); poll() returns a state the test controls. Lets us drive the manager's
+    marker-absent → poll fallback deterministically, without caring about job output."""
+
+    def __init__(self, poll_result="running"):
+        self._poll = poll_result
+        self.submits = 0
+
+    def submit(self, entrypoint, workspace):
+        self.submits += 1
+        return Handle("fake", str(self.submits))
+
+    def poll(self, handle):
+        return self._poll
+
+    def locate_result(self, handle, workspace):
+        return Path(workspace) / "output"
 
 
 def _make_project(tmp_path):
@@ -156,3 +177,46 @@ def test_umap_job_end_to_end_honors_params(tmp_path):
         assert prov is not None
         assert prov["job_id"] == job_id
         assert prov["params"]["n_components"] == 3        # params feed provenance identity
+
+def test_job_that_vanishes_without_marker_is_failed(tmp_path):
+    project = _make_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch",
+                     executor=_FakeExecutor(poll_result="lost"))
+    mgr.submit("concat_columns",
+               {"datasource": "cells", "column_a": "sample", "column_b": "cluster",
+                "output_name": "out"})
+
+    mgr.tick()   # marker never written; poll says lost → the manager gives up, not waits forever
+
+    assert [r.status for r in mgr.store.load_all()] == [Status.FAILED.value]
+
+
+def test_running_job_without_marker_stays_running(tmp_path):
+    project = _make_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch",
+                     executor=_FakeExecutor(poll_result="running"))
+    mgr.submit("concat_columns",
+               {"datasource": "cells", "column_a": "sample", "column_b": "cluster",
+                "output_name": "out"})
+
+    mgr.tick()   # no marker yet, but the executor says it's alive → wait, don't fail
+
+    assert [r.status for r in mgr.store.load_all()] == [Status.RUNNING.value]
+
+
+def test_unbounded_concurrency_submits_all_queued_at_once(tmp_path):
+    project = _make_project(tmp_path)
+    executor = _FakeExecutor(poll_result="running")     # jobs never complete
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch",
+                     executor=executor, max_concurrent=None)
+
+    for i in range(3):
+        mgr.submit("concat_columns",
+                   {"datasource": "cells", "column_a": "sample", "column_b": "cluster",
+                    "output_name": f"out_{i}"})
+
+    # no manager bound → all three submitted immediately, none held QUEUED
+    statuses = [r.status for r in mgr.store.load_all()]
+    assert statuses.count(Status.RUNNING.value) == 3
+    assert statuses.count(Status.QUEUED.value) == 0
+    assert executor.submits == 3

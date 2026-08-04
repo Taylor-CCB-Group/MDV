@@ -12,7 +12,7 @@ from .workspace import (
     default_workspace_root
 )
 from .ingest import ingest_column_output
-from .executor import Executor, LocalSubprocessExecutor
+from .executor import Executor, LocalSubprocessExecutor, Handle
 from .provenance import build_provenance
 
 # materializers keyed by INPUT shape; ingest handlers keyed by OUTPUT shape
@@ -71,8 +71,10 @@ class JobManager:
         return sum(1 for r in self.store.load_all() if r.status in ACTIVE)
 
     def _dispatch(self) -> None:
-        # Fill every free slot the executor's bound allows (ADR0008: manager enforces the bound)
-        while self._busy() < self.max_concurrent:
+        # max_concurrent=None -> unbounded: submit every queued job and let the backend's own
+        # scheduler queue them (ADR0008) otherwise
+        # fill every free slot the executor's bound allows (ADR0008: manager enforces the bound for LocalSubprocessExecutor)
+        while self.max_concurrent is None or self._busy() < self.max_concurrent:
             nxt = next(
                 (r for r in self.store.load_all() if r.status == Status.QUEUED.value),
                 None,
@@ -95,6 +97,10 @@ class JobManager:
                 continue
             ws = self._workspace(rec.job_id)
             marker = ws.read_marker()
+            if marker is None and rec.handle is not None: # marker is primary, if None, check the executor whether the job is still alive
+                if self.executor.poll(Handle(**rec.handle)) == "running":
+                    continue
+                marker = ws.read_marker() or "failed"
             if marker == "done":
                 spec = get_tool(rec.tool_id)
                 self.store.set(rec, Status.INGESTING)
