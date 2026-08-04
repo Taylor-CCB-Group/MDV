@@ -63,10 +63,14 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     ignoreStateUpdate = false;
     /**
      * Intentional version token for in-place renderStack edits. The adapter reads this
-     * so cosmetic edits can refresh viewer inputs without replacing stack objects and
-     * causing layer/data churn.
+     * so structural edits can refresh viewer inputs without replacing stack objects.
      */
     renderStackGeneration = 0;
+    /**
+     * Lightweight version token for in-place renderStack prop edits. This deliberately
+     * does not recreate the spatial canvas passthrough used by image layers.
+     */
+    renderStackPropsGeneration = 0;
     /** True only until the first default image layer seed runs for a brand-new chart. */
     seedDefaultSpatialLayers: boolean;
 
@@ -76,6 +80,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 
     bumpRenderStackGeneration() {
         this.renderStackGeneration++;
+    }
+
+    bumpRenderStackPropsGeneration() {
+        this.renderStackPropsGeneration++;
     }
 
     finishDefaultSpatialLayerSeed() {
@@ -103,6 +111,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             colorByDefault: action,
             renderStackGeneration: observable,
             bumpRenderStackGeneration: action,
+            renderStackPropsGeneration: observable,
+            bumpRenderStackPropsGeneration: action,
             seedDefaultSpatialLayers: observable,
             finishDefaultSpatialLayerSeed: action,
             imageLayerRegistry: observable.ref,

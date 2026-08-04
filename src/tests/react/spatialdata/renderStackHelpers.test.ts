@@ -222,6 +222,32 @@ describe("render stack adapter", () => {
         expect(afterTooltipFields).not.toBe(afterFillColumn);
     });
 
+    test("patching a layer prop to undefined clears it and changes spatial revision", () => {
+        const labelsEntry = spatialEntry({
+            id: "labels-a",
+            elementKey: "cell_labels",
+            elementType: "labels",
+            props: {
+                fillColorByColumn: {
+                    columnName: "Expressed_genes",
+                    mode: "categorical",
+                },
+            },
+        });
+        const stack = renderStack([labelsEntry]);
+        touchRenderStackEntry(labelsEntry);
+        const before = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: { fillColorByColumn: undefined },
+        });
+        touchRenderStackEntry(labelsEntry);
+        const after = renderStackSpatialRevision(stack);
+
+        expect(labelsEntry.props.fillColorByColumn).toBeUndefined();
+        expect(after).not.toBe(before);
+    });
+
     test("resolves only visible host entries and reuses host clones", () => {
         const visibleHostId = deckHostLayerId("scatter");
         const hiddenHostId = deckHostLayerId("selection");

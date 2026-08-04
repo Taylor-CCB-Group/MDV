@@ -144,10 +144,12 @@ function observeRenderStack(stack: RenderStack | undefined) {
 export function useRenderStackAdapter({
     stack,
     generation,
+    propsGeneration,
     hostLayerResolver,
 }: {
     stack: RenderStack | undefined;
     generation: number;
+    propsGeneration: number;
     hostLayerResolver: ReturnType<typeof createMdvHostLayerResolver>;
 }) {
     const layerInputsCacheRef = useRef(createRenderStackLayerInputsCache());
@@ -156,7 +158,7 @@ export function useRenderStackAdapter({
     // i.e. how often a cosmetic image edit re-renders SpatialDataViewer.
     measureSpatial("adapter.observe", () => observeRenderStack(stack));
     const spatialRevision = measureSpatial("adapter.revision", () =>
-        renderStackSpatialRevision(stack),
+        `${propsGeneration}:${renderStackSpatialRevision(stack)}`,
     );
 
     const synced = measureSpatial("adapter.sync", () =>

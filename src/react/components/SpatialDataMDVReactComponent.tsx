@@ -391,6 +391,7 @@ const SpatialDataViewer = observer(
         } = useRenderStackAdapter({
             stack: config.renderStack,
             generation: chart.renderStackGeneration,
+            propsGeneration: chart.renderStackPropsGeneration,
             hostLayerResolver,
         });
         const { layers, layerOrder } = useAssociatedShapesLayerInputs(spatialData ?? undefined, {
