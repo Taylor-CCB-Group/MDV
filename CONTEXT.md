@@ -71,7 +71,18 @@ decisions live in `docs/adr/` (0004–0007).
   `concat_columns` (joins two columns into a new text column); `dge_scanpy` is deferred.
 
 - **executor** — the pluggable transport that runs a **job** (local subprocess now, HPC
-  later).
+  later). It starts the work and reports completion; it moves **no data** — that is the
+  **data-movement seam** (ADR-0010).
+
+- **shared-filesystem precondition** — a remote **executor** (e.g. Slurm) assumes the **owner**
+  and the **worker**'s compute node see the same POSIX filesystem at a **matching path**, so the
+  **workspace** handoff is zero-copy. Satisfied by deployment (same node, NFS/Lustre mount, managed
+  cloud FS), not by code (ADR-0010).
+
+- **data-movement seam** — the (still unbuilt) layer that gets the **tray** to the **worker** and
+  outputs back when there is no shared filesystem: a no-op under the **shared-filesystem
+  precondition**, a copy/stage or content-addressed transfer otherwise. Kept **separate** from the
+  **executor** (ADR-0004, ADR-0010). _Avoid_: conflating with **executor**.
 
 - **worker** — the environment-agnostic compute process; reads and writes **only** its
   **workspace**.
