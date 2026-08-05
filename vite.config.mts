@@ -11,6 +11,60 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
+
+/** Optional local SpatialData.js checkout (see `pnpm link:spatialdata`). */
+function spatialdataLinkAliases(): Record<string, string> {
+    const root = process.env.SPATIALDATA_ROOT?.trim();
+    if (!root) return {};
+    const abs = path.resolve(root.startsWith("~/")
+        ? path.join(process.env.HOME ?? "", root.slice(2))
+        : root);
+    const packages: Array<[string, string]> = [
+        ["@spatialdata/avivatorish", "packages/avivatorish"],
+        ["@spatialdata/core", "packages/core"],
+        ["@spatialdata/layers", "packages/layers"],
+        ["@spatialdata/react", "packages/react"],
+        ["@spatialdata/vis", "packages/vis"],
+        ["zarrextra", "packages/zarrextra"],
+    ];
+    const aliases: Record<string, string> = {};
+    for (const [name, rel] of packages) {
+        const pkgRoot = path.join(abs, rel);
+        if (fs.existsSync(path.join(pkgRoot, "package.json"))) {
+            aliases[name] = pkgRoot;
+        }
+    }
+    return aliases;
+}
+
+const spatialdataAliases = spatialdataLinkAliases();
+
+/**
+ * Checkout roots Vite must be allowed to READ from when @spatialdata/* is a local
+ * `link:`. The packages resolve through a symlink out of this project, so their
+ * non-JS assets — core's vendored `parquet_wasm_bg.wasm`, zarrextra's
+ * `codec-worker.js` — are outside the default `server.fs.allow` root and come back
+ * 404, which leaves a spatial chart stuck on "Loading" with no error of its own.
+ *
+ * Derived from the resolved symlink rather than SPATIALDATA_ROOT, so it follows
+ * whatever `pnpm link:spatialdata` actually wired up. Empty for a registry install.
+ */
+function linkedSpatialdataRoots(): string[] {
+    const roots = new Set<string>();
+    for (const name of ["@spatialdata/vis", "@spatialdata/core", "zarrextra"]) {
+        try {
+            const real = fs.realpathSync(path.join(configDir, "node_modules", name));
+            // <checkout>/packages/<pkg> → <checkout>
+            if (!real.startsWith(configDir)) roots.add(path.resolve(real, "../.."));
+        } catch {
+            // not installed / not linked — nothing to allow
+        }
+    }
+    return [...roots];
+}
+
+const spatialdataFsAllow = linkedSpatialdataRoots();
+
 // zarrita needed a polyfill for Buffer - seems like a bug
 // seems ok without as long we don't use ZipFileStore (marked experimental anyway)
 // having the polyfill means the build works, but devserver fails with 'cannot import outside a module'
@@ -191,6 +245,9 @@ export default defineConfig(async (): Promise<UserConfig> => {
         port,
         strictPort: true,
         proxy,
+        ...(spatialdataFsAllow.length
+            ? { fs: { allow: [configDir, ...spatialdataFsAllow] } }
+            : {}),
     },
     publicDir: process.env.exclude_dir?false:'examples', //used for netlify.toml??... the rest is noise.
     build: {
@@ -240,7 +297,38 @@ export default defineConfig(async (): Promise<UserConfig> => {
     resolve: {
         alias: {
             "@": path.resolve(configDir, "./src"),
-        }
+            ...spatialdataAliases,
+        },
+        // A linked checkout resolves its own bare imports from ITS node_modules, so the
+        // renderer ends up with two of everything even at identical versions: two
+        // @deck.gl/core (the shader hooks a layer declares are not the ones the assembler
+        // knows — "DECKGL_FILTER_COLOR: no matching overloaded function"), two Reacts
+        // (invalid hook call), two Matrix4. Collapse the packages that cross the
+        // boundary onto MDV's copy. Only when linked, so a registry install is untouched.
+        ...(spatialdataFsAllow.length
+            ? {
+                dedupe: [
+                    "react",
+                    "react-dom",
+                    "deck.gl",
+                    "@deck.gl/core",
+                    "@deck.gl/layers",
+                    "@deck.gl/extensions",
+                    "@deck.gl/geo-layers",
+                    "@deck.gl/mesh-layers",
+                    "@luma.gl/core",
+                    "@luma.gl/engine",
+                    "@luma.gl/shadertools",
+                    "@luma.gl/webgl",
+                    "@luma.gl/constants",
+                    "@math.gl/core",
+                    "@hms-dbmi/viv",
+                    "@vivjs/views",
+                    "@vivjs/constants",
+                    "zarrita",
+                ],
+            }
+            : {}),
     },
     // Vite 7 crawls all **/*.html for dep pre-bundling. Python/Flask templates and
     // public/index.html reference static/js/mdv.js (built output), which is not a
@@ -259,7 +347,13 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // export or use a Vite-transformable new URL(..., import.meta.url) reference.
         // Core also requires Zod 4 while MDV uses Zod 3; excluding both preserves each
         // package's own dependency resolution instead of sharing the optimized Zod 3 cache.
-        exclude: ["@spatialdata/core", "zod"],
+        // When SPATIALDATA_ROOT is set, exclude the whole linked set so Vite does not
+        // freeze a stale prebundle of local dist builds.
+        exclude: [
+            "@spatialdata/core",
+            "zod",
+            ...Object.keys(spatialdataAliases),
+        ],
     },
     } as UserConfig;
 });

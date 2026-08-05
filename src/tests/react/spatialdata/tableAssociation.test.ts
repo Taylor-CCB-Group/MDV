@@ -1,17 +1,17 @@
+import {
+    type DataSourceAssociationCandidate,
+    buildAssociatedFeatureStateFromRowMap,
+    buildAssociatedShapesFeatureState,
+    getShapesTableAssociation,
+    omitFillColorByColumn,
+    resolveAssociatedElementTable,
+    withPreservedFillColorsWhileLoading,
+} from "@/react/spatialdata/table_association";
 import type { ShapesRenderData } from "@spatialdata/core";
+import type { LayerConfig } from "@spatialdata/vis";
 import { describe, expect, test } from "vitest";
 
-import {
-    buildAssociatedShapesFeatureState,
-    type DataSourceAssociationCandidate,
-    getShapesTableAssociation,
-    resolveAssociatedElementTable,
-} from "@/react/spatialdata/table_association";
-
-function shapesRenderData(
-    featureIds: string[],
-    rowIndexByFeatureIndex: number[],
-): ShapesRenderData {
+function shapesRenderData(featureIds: string[], rowIndexByFeatureIndex: number[]): ShapesRenderData {
     return {
         kind: "js-polygons",
         geometryKind: "polygon",
@@ -42,12 +42,7 @@ describe("SpatialData table association", () => {
 
     test("leaves unmatched shapes unassociated", () => {
         expect(
-            getShapesTableAssociation(
-                shapesRenderData(["a", "b"], [-1, 12]),
-                2,
-                "cells",
-                "cell_datasource",
-            ),
+            getShapesTableAssociation(shapesRenderData(["a", "b"], [-1, 12]), 2, "cells", "cell_datasource"),
         ).toEqual({ status: "none" });
     });
 
@@ -166,8 +161,7 @@ describe("SpatialData table association", () => {
             visibleRows: Uint32Array.from([0]),
             rowCount: 2,
             alpha: 123,
-            colorForRow: (rowIndex) =>
-                rowIndex === 0 ? [10, 20, 30] : [40, 50, 60],
+            colorForRow: (rowIndex) => (rowIndex === 0 ? [10, 20, 30] : [40, 50, 60]),
         });
 
         expect(featureState).toEqual({
@@ -198,6 +192,94 @@ describe("SpatialData table association", () => {
                 manual: [1, 2, 3, 4],
             },
             hiddenFeatureIds: ["manual", "a"],
+        });
+    });
+
+    test("builds label feature colours from a feature-id row map", () => {
+        const featureState = buildAssociatedFeatureStateFromRowMap({
+            rowIndexByFeatureId: new Map([
+                ["1", 0],
+                ["2", 1],
+            ]),
+            visibleRows: Uint32Array.from([0, 1]),
+            rowCount: 2,
+            alpha: 255,
+            colorForRow: (rowIndex) => (rowIndex === 0 ? [9, 8, 7] : [6, 5, 4]),
+        });
+
+        expect(featureState).toEqual({
+            fillColorByFeatureId: {
+                "1": [9, 8, 7, 255],
+                "2": [6, 5, 4, 255],
+            },
+        });
+    });
+
+    test("strips fillColorByColumn from viewer layer configs", () => {
+        const layer = {
+            type: "labels",
+            id: "labels-a",
+            elementKey: "cell_labels",
+            visible: true,
+            opacity: 1,
+            fillColorByColumn: {
+                columnName: "Leiden",
+                mode: "categorical",
+            },
+            featureState: {
+                fillColorByFeatureId: {
+                    "1": [1, 2, 3, 255],
+                },
+            },
+        } as LayerConfig;
+
+        expect(omitFillColorByColumn(layer)).toEqual({
+            type: "labels",
+            id: "labels-a",
+            elementKey: "cell_labels",
+            visible: true,
+            opacity: 1,
+            featureState: {
+                fillColorByFeatureId: {
+                    "1": [1, 2, 3, 255],
+                },
+            },
+        });
+        expect(omitFillColorByColumn(layer)).not.toHaveProperty("fillColorByColumn");
+    });
+
+    test("keeps previous fill colours while a newly selected column is still loading", () => {
+        const previous = {
+            a: [10, 20, 30, 180] as [number, number, number, number],
+        };
+
+        expect(
+            withPreservedFillColorsWhileLoading({
+                featureState: { hiddenFeatureIds: ["b"] },
+                fillColumnName: "Leiden",
+                colorReady: false,
+                previousFillColorByFeatureId: previous,
+            }),
+        ).toEqual({
+            hiddenFeatureIds: ["b"],
+            fillColorByFeatureId: previous,
+        });
+
+        expect(
+            withPreservedFillColorsWhileLoading({
+                featureState: {
+                    fillColorByFeatureId: {
+                        a: [1, 2, 3, 180],
+                    },
+                },
+                fillColumnName: "Leiden",
+                colorReady: true,
+                previousFillColorByFeatureId: previous,
+            }),
+        ).toEqual({
+            fillColorByFeatureId: {
+                a: [1, 2, 3, 180],
+            },
         });
     });
 });

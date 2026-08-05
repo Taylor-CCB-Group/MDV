@@ -1,12 +1,16 @@
-import type { SpatialData, ShapesRenderData } from "@spatialdata/core";
+import type { ShapesRenderData, SpatialData } from "@spatialdata/core";
+import { loadAssociatedTableFeatureRows } from "@spatialdata/core";
 import type { LayerConfig, LayerType, RenderStackLayerInputs } from "@spatialdata/vis";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type DataStore from "@/datastore/DataStore";
 import { useChartManager, useDataSources } from "@/react/hooks";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
+type LabelsLayerConfig = Extract<LayerConfig, { type: "labels" }>;
 type ShapeFeatureState = NonNullable<ShapesLayerConfig["featureState"]>;
+type LabelFeatureState = NonNullable<LabelsLayerConfig["featureState"]>;
+type AssociatedFeatureState = ShapeFeatureState | LabelFeatureState;
 type RgbColor = [number, number, number];
 type RgbaColor = [number, number, number, number];
 type RowColorFunction = (rowIndex: number) => RgbColor | RgbaColor | undefined;
@@ -23,15 +27,10 @@ type DataSourceAssociationConfig = {
     spatialdata_tables?: SpatialDataTablesMetadata;
 };
 type SpatialDataAssociationKind = "images" | "points" | "labels" | "shapes";
-export type AssociableSpatialElementType = Extract<
-    LayerType,
-    "image" | "points" | "labels" | "shapes"
->;
+export type AssociableSpatialElementType = Extract<LayerType, "image" | "points" | "labels" | "shapes">;
+type FillColorAssociableLayerType = Extract<AssociableSpatialElementType, "shapes" | "labels">;
 type SpatialDataAssociationSource = {
-    getAssociatedTables: (
-        kind: SpatialDataAssociationKind,
-        key: string,
-    ) => Array<[string, unknown]>;
+    getAssociatedTables: (kind: SpatialDataAssociationKind, key: string) => Array<[string, unknown]>;
 };
 type SpatialDataAwareDataStore = DataStore & {
     config: DataStore["config"] & { spatialdata_tables?: SpatialDataTablesMetadata };
@@ -104,9 +103,7 @@ function associatedSpatialDataTableNames(
         .map(([tableName]) => tableName);
 }
 
-function spatialDataAssociationKind(
-    elementType: AssociableSpatialElementType,
-): SpatialDataAssociationKind {
+function spatialDataAssociationKind(elementType: AssociableSpatialElementType): SpatialDataAssociationKind {
     switch (elementType) {
         case "image":
             return "images";
@@ -119,9 +116,7 @@ function spatialDataAssociationKind(
     }
 }
 
-function tableNamesForDataSource<TDataStore>(
-    dataSource: DataSourceAssociationCandidate<TDataStore>,
-): string[] {
+function tableNamesForDataSource<TDataStore>(dataSource: DataSourceAssociationCandidate<TDataStore>): string[] {
     const names = new Set<string>();
     const provenance = dataSource.dataStore.config?.spatialdata_tables;
     const tables = Array.isArray(provenance?.tables) ? provenance.tables : [];
@@ -217,6 +212,37 @@ export function buildAssociatedShapesFeatureState({
     colorForRow?: RowColorFunction;
     alpha: number;
 }): ShapeFeatureState | undefined {
+    const rowIndexByFeatureId = new Map<string, number>();
+    renderData.featureIds.forEach((featureId, featureIndex) => {
+        const rowIndex = renderData.rowIndexByFeatureIndex[featureIndex];
+        if (rowIndex === undefined) return;
+        rowIndexByFeatureId.set(featureId, rowIndex);
+    });
+    return buildAssociatedFeatureStateFromRowMap({
+        rowIndexByFeatureId,
+        visibleRows,
+        rowCount,
+        baseFeatureState,
+        colorForRow,
+        alpha,
+    });
+}
+
+export function buildAssociatedFeatureStateFromRowMap({
+    rowIndexByFeatureId,
+    visibleRows,
+    rowCount,
+    baseFeatureState,
+    colorForRow,
+    alpha,
+}: {
+    rowIndexByFeatureId: Map<string, number> | Iterable<[string, number]>;
+    visibleRows: ArrayLike<number>;
+    rowCount: number;
+    baseFeatureState?: AssociatedFeatureState;
+    colorForRow?: RowColorFunction;
+    alpha: number;
+}): AssociatedFeatureState | undefined {
     const visibleRowSet = new Set(Array.from(visibleRows));
     const hiddenFeatureIds = new Set(baseFeatureState?.hiddenFeatureIds ?? []);
     const fillColorByFeatureId = {
@@ -224,12 +250,9 @@ export function buildAssociatedShapesFeatureState({
     };
     let hasTableState = false;
 
-    renderData.featureIds.forEach((featureId, featureIndex) => {
-        const rowIndex = validAssociatedRow(
-            renderData.rowIndexByFeatureIndex[featureIndex],
-            rowCount,
-        );
-        if (rowIndex === null) return;
+    for (const [featureId, rawRowIndex] of rowIndexByFeatureId) {
+        const rowIndex = validAssociatedRow(rawRowIndex, rowCount);
+        if (rowIndex === null) continue;
 
         hasTableState = true;
         if (!visibleRowSet.has(rowIndex)) {
@@ -240,18 +263,71 @@ export function buildAssociatedShapesFeatureState({
             const color = toRgba(colorForRow(rowIndex), alpha);
             if (color) fillColorByFeatureId[featureId] = color;
         }
-    });
+    }
 
     if (!hasTableState && !baseFeatureState) return undefined;
 
     return {
         ...baseFeatureState,
-        fillColorByFeatureId:
-            Object.keys(fillColorByFeatureId).length > 0
-                ? fillColorByFeatureId
-                : undefined,
-        hiddenFeatureIds:
-            hiddenFeatureIds.size > 0 ? Array.from(hiddenFeatureIds) : undefined,
+        fillColorByFeatureId: Object.keys(fillColorByFeatureId).length > 0 ? fillColorByFeatureId : undefined,
+        hiddenFeatureIds: hiddenFeatureIds.size > 0 ? Array.from(hiddenFeatureIds) : undefined,
+    };
+}
+
+/**
+ * Opt into upstream `fillColorByColumn` (skip MDV featureState fill colours).
+ * Use with a linked `@spatialdata/vis` while verifying a fix before publish:
+ *
+ *   localStorage.MDV_USE_UPSTREAM_FILL_COLOR = "1"  // then reload
+ */
+export function preferUpstreamFillColorByColumn(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+        return window.localStorage?.getItem("MDV_USE_UPSTREAM_FILL_COLOR") === "1";
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Upstream `@spatialdata/vis` still races `fillColorByColumn` loads against the canvas
+ * for both shapes and labels (PR #119 last-good helps the load flash, but column switches
+ * under MDV's adapter still fail to paint reliably). Drive colours through MDV
+ * `featureState` instead and strip the column prop from viewer inputs so upstream does
+ * not take that path — unless {@link preferUpstreamFillColorByColumn} is set.
+ */
+export function omitFillColorByColumn<T extends LayerConfig>(layer: T): T {
+    if (!("fillColorByColumn" in layer)) return layer;
+    const { fillColorByColumn: _removed, ...rest } = layer;
+    return rest as T;
+}
+
+export function layerFillColorColumnName(layer: LayerConfig): string | undefined {
+    if (!("fillColorByColumn" in layer)) return undefined;
+    return layer.fillColorByColumn?.columnName;
+}
+
+/**
+ * While a newly selected colour column is still loading, keep the previous feature colours
+ * so the canvas does not flash through an unannotated/default state.
+ */
+export function withPreservedFillColorsWhileLoading({
+    featureState,
+    fillColumnName,
+    colorReady,
+    previousFillColorByFeatureId,
+}: {
+    featureState: AssociatedFeatureState | undefined;
+    fillColumnName: string | undefined;
+    colorReady: boolean;
+    previousFillColorByFeatureId?: Record<string, RgbaColor>;
+}): AssociatedFeatureState | undefined {
+    if (!fillColumnName || colorReady || !previousFillColorByFeatureId) {
+        return featureState;
+    }
+    return {
+        ...featureState,
+        fillColorByFeatureId: previousFillColorByFeatureId,
     };
 }
 
@@ -264,14 +340,19 @@ function shapeElementKeys(layers: RenderStackLayerInputs["layers"], layerOrder: 
     return Array.from(keys);
 }
 
-export function useShapesRenderDataByElementKey(
-    spatialData: SpatialData | undefined,
-    elementKeys: string[],
-) {
-    const keyFingerprint = elementKeys.join("\0");
-    const [renderDataByElementKey, setRenderDataByElementKey] = useState<
-        Record<string, ShapesRenderData | undefined>
-    >({});
+function labelElementKeys(layers: RenderStackLayerInputs["layers"], layerOrder: string[]) {
+    const keys = new Set<string>();
+    for (const layerId of layerOrder) {
+        const layer = layers[layerId];
+        if (layer?.type === "labels") keys.add(layer.elementKey);
+    }
+    return Array.from(keys);
+}
+
+export function useShapesRenderDataByElementKey(spatialData: SpatialData | undefined, elementKeys: string[]) {
+    const [renderDataByElementKey, setRenderDataByElementKey] = useState<Record<string, ShapesRenderData | undefined>>(
+        {},
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -287,10 +368,7 @@ export function useShapesRenderDataByElementKey(
                 try {
                     return [elementKey, await element.loadRenderData()];
                 } catch (error) {
-                    console.warn(
-                        `Failed to load SpatialData shapes render data for ${elementKey}`,
-                        error,
-                    );
+                    console.warn(`Failed to load SpatialData shapes render data for ${elementKey}`, error);
                     return [elementKey, undefined];
                 }
             }),
@@ -302,9 +380,46 @@ export function useShapesRenderDataByElementKey(
         return () => {
             cancelled = true;
         };
-    }, [spatialData, keyFingerprint]);
+    }, [spatialData, elementKeys]);
 
     return renderDataByElementKey;
+}
+
+function useLabelsRowIndexByFeatureId(spatialData: SpatialData | undefined, elementKeys: string[]) {
+    const [rowIndexByFeatureId, setRowIndexByFeatureId] = useState<Record<string, Map<string, number> | undefined>>({});
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!spatialData || elementKeys.length === 0) {
+            setRowIndexByFeatureId({});
+            return;
+        }
+
+        Promise.all(
+            elementKeys.map(async (elementKey) => {
+                try {
+                    const rows = await loadAssociatedTableFeatureRows({
+                        spatialData,
+                        kind: "labels",
+                        key: elementKey,
+                    });
+                    return [elementKey, rows.rowIndexByFeatureId] as const;
+                } catch (error) {
+                    console.warn(`Failed to load SpatialData labels table association for ${elementKey}`, error);
+                    return [elementKey, undefined] as const;
+                }
+            }),
+        ).then((entries) => {
+            if (cancelled) return;
+            setRowIndexByFeatureId(Object.fromEntries(entries));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [spatialData, elementKeys]);
+
+    return rowIndexByFeatureId;
 }
 
 export function useElementTableAssociation(
@@ -336,12 +451,7 @@ export function useElementTableAssociation(
     }
     const renderData = renderDataByElementKey[elementKey];
     if (!renderData) return { status: "loading" };
-    return getShapesTableAssociation(
-        renderData,
-        table.dataStore.size,
-        table.tableName,
-        table.dataSourceName,
-    );
+    return getShapesTableAssociation(renderData, table.dataStore.size, table.tableName, table.dataSourceName);
 }
 
 export function useShapesTableAssociation(
@@ -388,7 +498,6 @@ function visibleRowsForDataStore(dataStore: DataStore): Uint32Array {
 }
 
 function useDataStoreFilterVersion(dataStores: DataStore[]) {
-    const dataStoreNames = dataStores.map((dataStore) => dataStore.name).join("\0");
     const [version, setVersion] = useState(0);
 
     useEffect(() => {
@@ -407,23 +516,29 @@ function useDataStoreFilterVersion(dataStores: DataStore[]) {
                 dataStore.removeListener(listenerId);
             }
         };
-    }, [dataStores, dataStoreNames]);
+    }, [dataStores]);
 
     return version;
+}
+
+function isFillColorAssociableLayer(
+    layer: LayerConfig | undefined,
+): layer is Extract<LayerConfig, { type: FillColorAssociableLayerType }> {
+    return layer?.type === "shapes" || layer?.type === "labels";
 }
 
 function getFillColumnsByDataSource(
     layers: RenderStackLayerInputs["layers"],
     layerOrder: string[],
-    tableByElementKey: Record<string, AssociatedElementTable>,
+    tableByAssociationKey: Record<string, AssociatedElementTable>,
 ) {
     const columnsByDataSource: Record<string, Set<string>> = {};
     for (const layerId of layerOrder) {
         const layer = layers[layerId];
-        if (layer?.type !== "shapes") continue;
-        const columnName = layer.fillColorByColumn?.columnName;
+        if (!isFillColorAssociableLayer(layer)) continue;
+        const columnName = layerFillColorColumnName(layer);
         if (!columnName) continue;
-        const table = tableByElementKey[layer.elementKey];
+        const table = tableByAssociationKey[`${layer.type}:${layer.elementKey}`];
         if (table?.status !== "resolved") continue;
         columnsByDataSource[table.dataSourceName] ??= new Set();
         columnsByDataSource[table.dataSourceName]?.add(columnName);
@@ -436,22 +551,15 @@ function getFillColumnsByDataSource(
     );
 }
 
-function useLoadedColorColumnVersion(
-    fillColumnsByDataSource: Record<string, string[]>,
-) {
+function useLoadedColorColumnVersion(fillColumnsByDataSource: Record<string, string[]>) {
     const chartManager = useChartManager();
-    const columnFingerprint = Object.entries(fillColumnsByDataSource)
-        .map(([dataSourceName, columns]) => `${dataSourceName}:${columns.join(",")}`)
-        .join("|");
     const [version, setVersion] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
         for (const [dataSourceName, columns] of Object.entries(fillColumnsByDataSource)) {
             const dataStore = chartManager.getDataSource(dataSourceName);
-            const missing = columns.filter(
-                (columnName) => !dataStore.columnsWithData.includes(columnName),
-            );
+            const missing = columns.filter((columnName) => !dataStore.columnsWithData.includes(columnName));
             if (missing.length === 0) continue;
             chartManager.loadColumnSet(missing, dataSourceName, () => {
                 if (!cancelled) setVersion((current) => current + 1);
@@ -460,9 +568,14 @@ function useLoadedColorColumnVersion(
         return () => {
             cancelled = true;
         };
-    }, [chartManager, columnFingerprint, fillColumnsByDataSource]);
+    }, [chartManager, fillColumnsByDataSource]);
 
     return version;
+}
+
+function layerFillAlpha(layer: LayerConfig): number {
+    if (layer.type === "shapes") return layer.fillColor?.[3] ?? 180;
+    return 255;
 }
 
 export function useAssociatedShapesLayerInputs(
@@ -470,133 +583,163 @@ export function useAssociatedShapesLayerInputs(
     layerInputs: RenderStackLayerInputs,
 ): RenderStackLayerInputs {
     const dataSources = useDataSources();
-    const elementKeys = useMemo(
+    const shapeKeys = useMemo(
         () => shapeElementKeys(layerInputs.layers, layerInputs.layerOrder),
         [layerInputs.layers, layerInputs.layerOrder],
     );
-    const renderDataByElementKey = useShapesRenderDataByElementKey(spatialData, elementKeys);
-    const tableByElementKey = useMemo(
-        () =>
-            Object.fromEntries(
-                elementKeys.map((elementKey) => [
+    const labelKeys = useMemo(
+        () => labelElementKeys(layerInputs.layers, layerInputs.layerOrder),
+        [layerInputs.layers, layerInputs.layerOrder],
+    );
+    const renderDataByElementKey = useShapesRenderDataByElementKey(spatialData, shapeKeys);
+    const labelsRowIndexByFeatureId = useLabelsRowIndexByFeatureId(spatialData, labelKeys);
+    const tableByAssociationKey = useMemo(() => {
+        const entries: Array<[string, AssociatedElementTable]> = [];
+        for (const elementKey of shapeKeys) {
+            entries.push([
+                `shapes:${elementKey}`,
+                resolveAssociatedElementTable({
+                    spatialData,
+                    elementType: "shapes",
                     elementKey,
-                    resolveAssociatedElementTable({
-                        spatialData,
-                        elementType: "shapes",
-                        elementKey,
-                        dataSources,
-                    }),
-                ]),
-            ),
-        [spatialData, elementKeys, dataSources],
-    );
+                    dataSources,
+                }),
+            ]);
+        }
+        for (const elementKey of labelKeys) {
+            entries.push([
+                `labels:${elementKey}`,
+                resolveAssociatedElementTable({
+                    spatialData,
+                    elementType: "labels",
+                    elementKey,
+                    dataSources,
+                }),
+            ]);
+        }
+        return Object.fromEntries(entries);
+    }, [spatialData, shapeKeys, labelKeys, dataSources]);
     const fillColumnsByDataSource = useMemo(
-        () =>
-            getFillColumnsByDataSource(
-                layerInputs.layers,
-                layerInputs.layerOrder,
-                tableByElementKey,
-            ),
-        [layerInputs.layers, layerInputs.layerOrder, tableByElementKey],
+        () => getFillColumnsByDataSource(layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey),
+        [layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey],
     );
-    const loadedColorColumnVersion =
-        useLoadedColorColumnVersion(fillColumnsByDataSource);
+    const loadedColorColumnVersion = useLoadedColorColumnVersion(fillColumnsByDataSource);
     const associatedDataStores = useMemo(() => {
         const storesByName = new Map<string, DataStore>();
-        for (const table of Object.values(tableByElementKey)) {
+        for (const table of Object.values(tableByAssociationKey)) {
             if (table.status === "resolved") storesByName.set(table.dataSourceName, table.dataStore);
         }
         return Array.from(storesByName.values());
-    }, [tableByElementKey]);
+    }, [tableByAssociationKey]);
     const filterVersion = useDataStoreFilterVersion(associatedDataStores);
     const visibleRowsByDataSource = useMemo(() => {
         filterVersion;
         return Object.fromEntries(
-            associatedDataStores.map((dataStore) => [
-                dataStore.name,
-                visibleRowsForDataStore(dataStore),
-            ]),
+            associatedDataStores.map((dataStore) => [dataStore.name, visibleRowsForDataStore(dataStore)]),
         );
     }, [associatedDataStores, filterVersion]);
-    const colorFunctionByDataSource = useMemo(
-        () => {
-            loadedColorColumnVersion;
-            return Object.fromEntries(
-                Object.entries(fillColumnsByDataSource).map(([dataSourceName, columnNames]) => {
-                    const table = Object.values(tableByElementKey).find(
-                        (candidate) =>
-                            candidate.status === "resolved" &&
-                            candidate.dataSourceName === dataSourceName,
-                    );
-                    const loadedColumnNames =
-                        table?.status === "resolved"
-                            ? new Set(table.dataStore.columnsWithData)
-                            : new Set<string>();
-                    return [
-                        dataSourceName,
-                        table?.status === "resolved"
-                            ? createColorFunctionByColumn(
-                                  table.dataStore,
-                                  columnNames,
-                                  loadedColumnNames,
-                                  {},
-                              )
-                            : {},
-                    ];
-                }),
-            );
-        },
-        [
-            fillColumnsByDataSource,
-            loadedColorColumnVersion,
-            tableByElementKey,
-        ],
-    );
+    const colorFunctionByDataSource = useMemo(() => {
+        loadedColorColumnVersion;
+        return Object.fromEntries(
+            Object.entries(fillColumnsByDataSource).map(([dataSourceName, columnNames]) => {
+                const table = Object.values(tableByAssociationKey).find(
+                    (candidate) => candidate.status === "resolved" && candidate.dataSourceName === dataSourceName,
+                );
+                const loadedColumnNames =
+                    table?.status === "resolved" ? new Set(table.dataStore.columnsWithData) : new Set<string>();
+                return [
+                    dataSourceName,
+                    table?.status === "resolved"
+                        ? createColorFunctionByColumn(table.dataStore, columnNames, loadedColumnNames, {})
+                        : {},
+                ];
+            }),
+        );
+    }, [fillColumnsByDataSource, loadedColorColumnVersion, tableByAssociationKey]);
+    const lastFillColorsRef = useRef<Record<string, Record<string, RgbaColor>>>({});
+    const useUpstreamFillColor = preferUpstreamFillColorByColumn();
 
-    const layers = useMemo(
-        () => {
-            let changed = false;
-            const nextLayers = { ...layerInputs.layers };
+    const layers = useMemo(() => {
+        let changed = false;
+        const nextLayers = { ...layerInputs.layers };
 
-            for (const layerId of layerInputs.layerOrder) {
-                const layer = layerInputs.layers[layerId];
-                if (layer?.type !== "shapes") continue;
+        for (const layerId of layerInputs.layerOrder) {
+            const layer = layerInputs.layers[layerId];
+            if (!isFillColorAssociableLayer(layer)) continue;
 
-                const table = tableByElementKey[layer.elementKey];
-                if (table?.status !== "resolved") continue;
+            const table = tableByAssociationKey[`${layer.type}:${layer.elementKey}`];
+            if (table?.status !== "resolved") continue;
+
+            const fillColumnName = layerFillColorColumnName(layer);
+            // When verifying upstream fillColorByColumn, still project filter/hidden state
+            // but leave fill colours to the viewer column path.
+            const colorForRow =
+                useUpstreamFillColor || !fillColumnName
+                    ? undefined
+                    : colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName];
+            const colorReady = useUpstreamFillColor || !fillColumnName || colorForRow !== undefined;
+            const visibleRows =
+                visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
+
+            let featureState: AssociatedFeatureState | undefined;
+            if (layer.type === "shapes") {
                 const renderData = renderDataByElementKey[layer.elementKey];
                 if (!renderData) continue;
-
-                const fillColumnName = layer.fillColorByColumn?.columnName;
-                const featureState = buildAssociatedShapesFeatureState({
+                featureState = buildAssociatedShapesFeatureState({
                     renderData,
-                    visibleRows:
-                        visibleRowsByDataSource[table.dataSourceName] ??
-                        visibleRowsForDataStore(table.dataStore),
+                    visibleRows,
                     rowCount: table.dataStore.size,
                     baseFeatureState: layer.featureState,
-                    colorForRow: fillColumnName
-                        ? colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName]
-                        : undefined,
-                    alpha: layer.fillColor?.[3] ?? 180,
+                    colorForRow,
+                    alpha: layerFillAlpha(layer),
                 });
-
-                if (!featureState) continue;
-                nextLayers[layerId] = { ...layer, featureState };
-                changed = true;
+            } else {
+                const rowIndexByFeatureId = labelsRowIndexByFeatureId[layer.elementKey];
+                if (!rowIndexByFeatureId) continue;
+                featureState = buildAssociatedFeatureStateFromRowMap({
+                    rowIndexByFeatureId,
+                    visibleRows,
+                    rowCount: table.dataStore.size,
+                    baseFeatureState: layer.featureState,
+                    colorForRow,
+                    alpha: layerFillAlpha(layer),
+                });
             }
 
-            return changed ? nextLayers : layerInputs.layers;
-        },
-        [
-            layerInputs.layers,
-            layerInputs.layerOrder,
-            renderDataByElementKey,
-            tableByElementKey,
-            visibleRowsByDataSource,
-            colorFunctionByDataSource,
-        ],
-    );
+            if (!useUpstreamFillColor) {
+                featureState = withPreservedFillColorsWhileLoading({
+                    featureState,
+                    fillColumnName,
+                    colorReady,
+                    previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
+                });
+
+                if (!fillColumnName) {
+                    const { [layerId]: _removed, ...remaining } = lastFillColorsRef.current;
+                    lastFillColorsRef.current = remaining;
+                } else if (colorReady && featureState?.fillColorByFeatureId) {
+                    lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
+                }
+            }
+
+            if (!featureState && !fillColumnName) continue;
+
+            const projected = useUpstreamFillColor ? layer : omitFillColorByColumn(layer);
+            nextLayers[layerId] = featureState ? { ...projected, featureState } : projected;
+            changed = true;
+        }
+
+        return changed ? nextLayers : layerInputs.layers;
+    }, [
+        layerInputs.layers,
+        layerInputs.layerOrder,
+        renderDataByElementKey,
+        labelsRowIndexByFeatureId,
+        tableByAssociationKey,
+        visibleRowsByDataSource,
+        colorFunctionByDataSource,
+        useUpstreamFillColor,
+    ]);
 
     return useMemo(
         () => ({

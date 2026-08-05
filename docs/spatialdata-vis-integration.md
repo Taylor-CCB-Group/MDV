@@ -53,6 +53,28 @@ Remove the unused `refreshRenderStackShell` helper. Replacing only the stack she
 
 Possible follow-up: consider publishing MDV to npm so SpatialData.js can exercise real MDV integration points without local worktree/link setup. This is an integration enabler, not part of the adapter refactor.
 
+## Local linked `@spatialdata/*` (pre-publish verification)
+
+To iterate on an upstream fix against this MDV worktree before publishing another `@spatialdata/*` patch:
+
+```bash
+# optional if checkout is not at ~/code/www/SpatialData.ts or ../SpatialData.ts
+export SPATIALDATA_ROOT=~/code/www/SpatialData.ts
+(cd "$SPATIALDATA_ROOT" && pnpm build)   # or watch the packages you edit
+pnpm link:spatialdata
+# restart Vite; clear cache if needed: rm -rf node_modules/.vite
+```
+
+Restore registry packages with `pnpm unlink:spatialdata` before committing dependency pins.
+
+While linked, leave MDV's fill-colour workaround on by default (it still works around gaps left by SpatialData.js [#119](https://github.com/Taylor-CCB-Group/SpatialData.js/pull/119)). To force the viewer `fillColorByColumn` path for A/B checks:
+
+```js
+localStorage.MDV_USE_UPSTREAM_FILL_COLOR = "1"  // reload
+```
+
+`#119` keeps last-good colours during row load, but under MDV's render-stack adapter a column switch can still fail to update the canvas even when rows are already ready. Prefer fixing that upstream and deleting the MDV strip/`featureState` fill path once a linked build verifies cleanly.
+
 ## Avivatorish comparison
 
 MDV currently carries a local `src/react/components/avivatorish` implementation and also depends on `@spatialdata/avivatorish`. Treat the local copy as the integration shim for now, not as a desired long-term fork.
@@ -204,7 +226,7 @@ Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData
 
 ## Deferred (follow-up PR)
 
-- Table-driven shape colouring (`fillColorByColumn`, `spatial_table_association`)
+- Drop MDV fill-colour workaround once a linked `@spatialdata/vis` fix covers column switches under the render-stack adapter (see Local linked section; `#119` was not enough)
 - `@spatialdata/avivatorish` zarr loader delegation (MDV keeps OME-TIFF local)
 - Playwright fixture test
 

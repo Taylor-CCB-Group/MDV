@@ -36,6 +36,8 @@
     "docker_prune": "docker system prune -a",
     "docker_stack_prune": "docker stack rm mdv_stack && docker container prune -f && docker image prune -a -f && docker volume prune -f",
     "fix_pnpm_win": "pnpm config set script-shell \"cmd\"",
+    "link:spatialdata": "node ./scripts/link-spatialdata.mjs",
+    "unlink:spatialdata": "node ./scripts/link-spatialdata.mjs --unlink",
     "jslint": "biome lint --write ./src",
     "jsformat": "biome format --write ./src",
     "lint:react-compiler": "eslint --config eslint.react-compiler.config.mjs \"src/**/*.{ts,tsx}\"",
