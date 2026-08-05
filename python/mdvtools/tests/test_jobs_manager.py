@@ -240,3 +240,16 @@ def test_reconcile_reattaches_running_survivor(tmp_path):
     reloaded = {r.job_id: r for r in mgr.store.load_all()}[rec.job_id]
     assert reloaded.status == Status.RUNNING.value              # reattached, not requeued
     assert reloaded.handle == {"kind": "slurm", "ref": "7"}     # durable handle preserved
+
+def test_reconcile_requeues_lost_job(tmp_path):
+    project = _make_project(tmp_path)
+    records_root = tmp_path / "records"
+    rec = _seed_record(records_root, Status.RUNNING, handle={"kind": "local", "ref": "999"})
+
+    # boot: the handle polls "lost" (Local subprocess died with the owner) → nothing to reattach
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", records_root=records_root,
+                     executor=_FakeExecutor(poll_result="lost"))
+
+    reloaded = {r.job_id: r for r in mgr.store.load_all()}[rec.job_id]
+    assert reloaded.status == Status.QUEUED.value   # re-queued for a fresh run
+    assert reloaded.handle is None                  # stale handle cleared
