@@ -35,6 +35,14 @@ def _make_project(tmp_path):
     project.add_datasource("cells", df)
     return project
 
+def _seed_record(records_root, status, handle=None):
+    """Pre-seed a durable job record so the next JobManager(records_root=...) reconciles on boot"""
+    from mdvtools.jobs.jobstore import JobStore
+    store = JobStore(records_root)
+    return store.set(
+        store.new("concat_columns", {"datasource": "cells", "column_a": "sample", "column_b": "cluster", "output_name": "out"}),
+        status, handle=handle
+    )
 
 def _drive(mgr, timeout=60):
     deadline = time.time() + timeout
@@ -220,3 +228,15 @@ def test_unbounded_concurrency_submits_all_queued_at_once(tmp_path):
     assert statuses.count(Status.RUNNING.value) == 3
     assert statuses.count(Status.QUEUED.value) == 0
     assert executor.submits == 3
+
+def test_reconcile_reattaches_running_survivor(tmp_path):
+    project = _make_project(tmp_path)
+    records_root = tmp_path / "records"
+    rec = _seed_record(records_root, Status.RUNNING, handle={"kind": "slurm", "ref": "7"})
+
+    # boot: the slurm job outlived the owner; poll says it's still alive
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", records_root=records_root, executor=_FakeExecutor(poll_result="running"))
+
+    reloaded = {r.job_id: r for r in mgr.store.load_all()}[rec.job_id]
+    assert reloaded.status == Status.RUNNING.value              # reattached, not requeued
+    assert reloaded.handle == {"kind": "slurm", "ref": "7"}     # durable handle preserved

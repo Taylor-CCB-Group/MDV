@@ -75,9 +75,3 @@ class JobStore:
             JobRecord(**json.loads(p.read_text()))
             for p in self.records_dir.glob("*.json")
         ]
-
-    def reconcile_on_boot(self) -> None:
-        # ADR0005: local - re-queue
-        for rec in self.load_all():
-            if rec.status in ACTIVE:
-                self.set(rec, Status.QUEUED, handle=None)

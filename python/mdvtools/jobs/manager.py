@@ -53,12 +53,23 @@ class JobManager:
         self.store = JobStore(self.records_root)
         self.executor: Executor = executor or LocalSubprocessExecutor(max_concurrent)
         self.max_concurrent = max_concurrent
-        self.store.reconcile_on_boot()  # ADR0005: recover in-flight jobs at startup
+        self._reconcile_on_boot()  # ADR0005: recover in-flight jobs at startup
 
     def _workspace(self, job_id: str) -> Workspace:
         # job_id is the sole correlation key between the durable record (records_root)
         # and the ephemeral scratch (workspace_root) — the two roots are separate by design.
         return Workspace(self.workspace_root, job_id)
+
+    def _reconcile_on_boot(self) -> None:
+        # rather than blindly re-queuing every active record, poll its durable handle
+        # and only re-queue if the handle is not present or the job is not running
+        for rec in self.store.load_all():
+            if rec.status not in ACTIVE:
+                continue
+            if rec.handle is not None and self.executor.poll(Handle(**rec.handle)) != "lost":
+                self.store.set(rec, Status.RUNNING)                 # reattach
+            else:
+                self.store.set(rec, Status.QUEUED, handle=None)     # re-queue, since nothing to reattach
 
     def submit(self, tool_id: str, params: dict) -> str:
         spec = get_tool(tool_id)
