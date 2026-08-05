@@ -228,6 +228,8 @@ export function seedRenderStackFromSpatialData(
         changed = mergeHostOverlayEntriesInPlace(config.renderStack) || changed;
         if (changed) {
             chart?.bumpRenderStackGeneration();
+        } else {
+            chart?.bumpRenderStackPropsGeneration();
         }
     });
 }

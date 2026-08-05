@@ -96,10 +96,13 @@ function renderStack(entries: RenderStackEntry[]): RenderStack {
 }
 
 function fakeDeckLayer(id: string) {
-    const clonedLayer = { id: `${id}-clone` } as Layer;
-    const clone = vi.fn(() => clonedLayer);
+    let cloneCount = 0;
+    const clone = vi.fn((props?: { id?: string }) => {
+        cloneCount += 1;
+        return { id: props?.id ?? `${id}-clone-${cloneCount}` } as Layer;
+    });
     const sourceLayer = { id, clone } as unknown as Layer;
-    return { clonedLayer, clone, sourceLayer };
+    return { clone, sourceLayer };
 }
 
 function fakeSpatialData(): SpatialData {
@@ -130,6 +133,45 @@ describe("render stack adapter", () => {
         expect(second.layers).toBe(layers);
         expect(second.layers["image-a"]).toBe(layer);
         expect(second.layers["image-a"]?.opacity).toBe(0.25);
+    });
+
+    test("replaces a layer config when table-driven annotation props change", () => {
+        const labelsEntry = spatialEntry({
+            id: "labels-a",
+            elementKey: "cell_labels",
+            elementType: "labels",
+            props: {
+                fillColorByColumn: {
+                    columnName: "Expressed_genes",
+                    mode: "categorical",
+                },
+            },
+        });
+        const stack = renderStack([labelsEntry]);
+        const cache = createRenderStackLayerInputsCache();
+
+        const first = syncRenderStackLayerInputs(stack, cache);
+        const layers = first.layers;
+        const layer = first.layers["labels-a"];
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: {
+                fillColorByColumn: {
+                    columnName: "Leiden",
+                    mode: "categorical",
+                },
+            },
+        });
+        const second = syncRenderStackLayerInputs(stack, cache);
+
+        expect(second.layers).toBe(layers);
+        expect(second.layers["labels-a"]).not.toBe(layer);
+        expect(second.layers["labels-a"]).toMatchObject({
+            fillColorByColumn: {
+                columnName: "Leiden",
+                mode: "categorical",
+            },
+        });
     });
 
     test("removes deleted spatial layers and updates layer order", () => {
@@ -248,23 +290,25 @@ describe("render stack adapter", () => {
         expect(after).not.toBe(before);
     });
 
-    test("resolves only visible host entries and reuses host clones", () => {
+    test("resolves only visible host entries and refreshes host clones", () => {
         const visibleHostId = deckHostLayerId("scatter");
         const hiddenHostId = deckHostLayerId("selection");
         const stack = renderStack([
             hostEntry(visibleHostId),
             hostEntry(hiddenHostId, false),
         ]);
-        const { clone, clonedLayer, sourceLayer } = fakeDeckLayer("scatter");
+        const { clone, sourceLayer } = fakeDeckLayer("scatter");
         const resolver = vi.fn(() => sourceLayer);
 
         const first = resolveCachedHostDeckLayers(stack, resolver);
         const second = resolveCachedHostDeckLayers(stack, resolver);
 
-        expect(first).toEqual([clonedLayer]);
-        expect(second).toEqual([clonedLayer]);
-        expect(first[0]).toBe(second[0]);
-        expect(clone).toHaveBeenCalledTimes(1);
+        expect(first).toHaveLength(1);
+        expect(second).toHaveLength(1);
+        expect(first[0]).not.toBe(second[0]);
+        expect(first[0]?.id).toBe(visibleHostId);
+        expect(second[0]?.id).toBe(visibleHostId);
+        expect(clone).toHaveBeenCalledTimes(2);
         expect(resolver).toHaveBeenCalledTimes(2);
     });
 });
@@ -303,6 +347,7 @@ describe("render stack defaults", () => {
         const chart = {
             seedDefaultSpatialLayers: true,
             bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
         seedRenderStackFromSpatialData(
@@ -327,6 +372,7 @@ describe("render stack defaults", () => {
         const chart = {
             seedDefaultSpatialLayers: false,
             bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
         seedRenderStackFromSpatialData(
@@ -339,6 +385,7 @@ describe("render stack defaults", () => {
             config.renderStack?.entries.every((entry) => entry.kind === "host"),
         ).toBe(true);
         expect(chart.finishDefaultSpatialLayerSeed).not.toHaveBeenCalled();
+        expect(chart.bumpRenderStackPropsGeneration).toHaveBeenCalledTimes(1);
     });
 
     test("seedRenderStackFromSpatialData keeps the same renderStack object", () => {
@@ -350,6 +397,7 @@ describe("render stack defaults", () => {
         const chart = {
             seedDefaultSpatialLayers: true,
             bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
         seedRenderStackFromSpatialData(

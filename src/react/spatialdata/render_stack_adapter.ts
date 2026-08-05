@@ -21,10 +21,11 @@ export type MdvDeckOverlayLayers = Record<DeckOverlayId, Layer | null>;
 export type RenderStackLayerInputsCache = {
     layers: Record<string, LayerConfig>;
     layerOrder: string[];
+    layerConfigSignatures: Record<string, string>;
 };
 
 export function createRenderStackLayerInputsCache(): RenderStackLayerInputsCache {
-    return { layers: {}, layerOrder: [] };
+    return { layers: {}, layerOrder: [], layerConfigSignatures: {} };
 }
 
 export function createMdvHostLayerResolver(overlays: MdvDeckOverlayLayers) {
@@ -50,10 +51,36 @@ export function spatialEntryAsLayerConfig(
     );
 }
 
+function stableSignatureValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(stableSignatureValue);
+    if (!value || typeof value !== "object") return value;
+
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+        Object.keys(record)
+            .sort()
+            .map((key) => [key, stableSignatureValue(record[key])]),
+    );
+}
+
+function layerConfigReplacementSignature(config: LayerConfig): string {
+    const fillColorByColumn =
+        "fillColorByColumn" in config ? config.fillColorByColumn : undefined;
+    const tooltipFields = "tooltipFields" in config ? config.tooltipFields : undefined;
+    return JSON.stringify({
+        type: config.type,
+        elementKey: config.elementKey,
+        fillColorByColumn: stableSignatureValue(fillColorByColumn),
+        tooltipFields: stableSignatureValue(tooltipFields),
+    });
+}
+
 /**
  * Keep a stable `layers` object identity across cosmetic edits so
  * `useLayerData` does not re-enter async geometry loads. Mutate layer configs
- * in place when props change; only replace/add/remove entries structurally.
+ * in place for cosmetic props; replace the individual layer config when
+ * table/annotation-driving props change so downstream projection caches see a
+ * clear A -> B transition.
  */
 export function syncRenderStackLayerInputs(
     stack: RenderStack,
@@ -65,17 +92,20 @@ export function syncRenderStackLayerInputs(
         if (entry.kind !== "spatial") continue;
         nextIds.add(entry.id);
         const nextConfig = spatialEntryAsLayerConfig(entry);
+        const nextSignature = layerConfigReplacementSignature(nextConfig);
         const existing = cache.layers[entry.id];
-        if (existing) {
+        if (existing && cache.layerConfigSignatures[entry.id] === nextSignature) {
             Object.assign(existing, nextConfig);
         } else {
             cache.layers[entry.id] = nextConfig;
+            cache.layerConfigSignatures[entry.id] = nextSignature;
         }
     }
 
     for (const id of Object.keys(cache.layers)) {
         if (!nextIds.has(id)) {
             delete cache.layers[id];
+            delete cache.layerConfigSignatures[id];
         }
     }
 
@@ -95,26 +125,13 @@ function renderStackHostFingerprint(stack: RenderStack | undefined): string {
         .join("|");
 }
 
-const hostLayerCloneCache = new WeakMap<Layer, Map<string, Layer>>();
-
 function cloneHostLayer(source: Layer, entryId: string): Layer {
-    let clonesForSource = hostLayerCloneCache.get(source);
-    if (!clonesForSource) {
-        clonesForSource = new Map();
-        hostLayerCloneCache.set(source, clonesForSource);
-    }
-    let clone = clonesForSource.get(entryId);
-    if (!clone) {
-        clone = source.clone({ id: entryId }) as Layer;
-        clonesForSource.set(entryId, clone);
-    }
-    return clone;
+    return source.clone({ id: entryId });
 }
 
 /**
- * Resolve visible host stack entries to deck layers, cloning each source layer once per
- * entry id. Cosmetic spatial-layer edits (e.g. opacity) can then refresh adapter outputs
- * without re-cloning scatter/gate overlays on every frame.
+ * Resolve visible host stack entries to deck layers. The source layers are owned by
+ * MDV hooks, so clone at each adapter refresh to preserve the latest source props.
  */
 export function resolveCachedHostDeckLayers(
     stack: RenderStack | undefined,

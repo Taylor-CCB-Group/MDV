@@ -1,4 +1,4 @@
-import { Button, TextField, Typography } from "@mui/material";
+import { TextField, Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 import type { ReactNode } from "react";
 
@@ -126,6 +126,8 @@ export function FillColorByColumnControl({
                         dataStore={dataStore}
                         current_value={fillByColumn}
                         placeholder="Select column"
+                        optional
+                        clearSelectedColumn={() => onChange(undefined)}
                         setSelectedColumn={(columnName) => {
                             if (typeof columnName !== "string") return;
                             onChange({
@@ -143,14 +145,6 @@ export function FillColorByColumnControl({
                     />
                 )}
             </LabeledControl>
-            {association.status === "resolved" && fillByColumn && (
-                <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-2">
-                    <div />
-                    <Button size="small" onClick={() => onChange(undefined)}>
-                        Use static fill color
-                    </Button>
-                </div>
-            )}
         </div>
     );
 }
