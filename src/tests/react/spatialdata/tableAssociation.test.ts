@@ -3,9 +3,9 @@ import {
     buildAssociatedFeatureStateFromRowMap,
     buildAssociatedShapesFeatureState,
     getShapesTableAssociation,
-    omitFillColorByColumn,
     resolveAssociatedElementTable,
     withPreservedFillColorsWhileLoading,
+    withoutViewerFillColorColumn,
 } from "@/react/spatialdata/table_association";
 import type { ShapesRenderData } from "@spatialdata/core";
 import type { LayerConfig } from "@spatialdata/vis";
@@ -233,7 +233,7 @@ describe("SpatialData table association", () => {
             },
         } as LayerConfig;
 
-        expect(omitFillColorByColumn(layer)).toEqual({
+        expect(withoutViewerFillColorColumn(layer)).toEqual({
             type: "labels",
             id: "labels-a",
             elementKey: "cell_labels",
@@ -245,7 +245,7 @@ describe("SpatialData table association", () => {
                 },
             },
         });
-        expect(omitFillColorByColumn(layer)).not.toHaveProperty("fillColorByColumn");
+        expect(withoutViewerFillColorColumn(layer)).not.toHaveProperty("fillColorByColumn");
     });
 
     test("keeps previous fill colours while a newly selected column is still loading", () => {

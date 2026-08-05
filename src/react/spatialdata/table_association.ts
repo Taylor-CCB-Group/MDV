@@ -275,28 +275,24 @@ export function buildAssociatedFeatureStateFromRowMap({
 }
 
 /**
- * Opt into upstream `fillColorByColumn` (skip MDV featureState fill colours).
- * Use with a linked `@spatialdata/vis` while verifying a fix before publish:
+ * MDV owns fill colour for associated layers, so the viewer is not asked to resolve
+ * the column as well.
  *
- *   localStorage.MDV_USE_UPSTREAM_FILL_COLOR = "1"  // then reload
+ * This started life as a workaround for a viewer bug and is no longer one: the
+ * column-switch break it papered over is fixed upstream. It stays because the two
+ * paths are not interchangeable. `fillColorByColumn` resolves a column against the
+ * SpatialData table's own obs, while the picker offers everything in the MDV
+ * DataStore — which is a superset (linked gene scores, and this project's `sample_id`
+ * / `mdv_cell_id` and friends, none of which exist in the zarr). Colours also come
+ * from `dataStore.getColorFunction`, so a column drawn here matches the same column
+ * everywhere else in MDV, palette and log scale included. Handing the viewer the
+ * column would mean losing both, and paying for a second read of the table to do it.
+ *
+ * Keep the prop out of viewer inputs rather than letting both paths run: MDV's
+ * `featureState` colours win the merge upstream anyway, so passing it through would
+ * buy a redundant per-switch zarr read and nothing else.
  */
-export function preferUpstreamFillColorByColumn(): boolean {
-    if (typeof window === "undefined") return false;
-    try {
-        return window.localStorage?.getItem("MDV_USE_UPSTREAM_FILL_COLOR") === "1";
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Upstream `@spatialdata/vis` still races `fillColorByColumn` loads against the canvas
- * for both shapes and labels (PR #119 last-good helps the load flash, but column switches
- * under MDV's adapter still fail to paint reliably). Drive colours through MDV
- * `featureState` instead and strip the column prop from viewer inputs so upstream does
- * not take that path — unless {@link preferUpstreamFillColorByColumn} is set.
- */
-export function omitFillColorByColumn<T extends LayerConfig>(layer: T): T {
+export function withoutViewerFillColorColumn<T extends LayerConfig>(layer: T): T {
     if (!("fillColorByColumn" in layer)) return layer;
     const { fillColorByColumn: _removed, ...rest } = layer;
     return rest as T;
@@ -657,7 +653,6 @@ export function useAssociatedShapesLayerInputs(
         );
     }, [fillColumnsByDataSource, loadedColorColumnVersion, tableByAssociationKey]);
     const lastFillColorsRef = useRef<Record<string, Record<string, RgbaColor>>>({});
-    const useUpstreamFillColor = preferUpstreamFillColorByColumn();
 
     const layers = useMemo(() => {
         let changed = false;
@@ -671,13 +666,11 @@ export function useAssociatedShapesLayerInputs(
             if (table?.status !== "resolved") continue;
 
             const fillColumnName = layerFillColorColumnName(layer);
-            // When verifying upstream fillColorByColumn, still project filter/hidden state
-            // but leave fill colours to the viewer column path.
-            const colorForRow =
-                useUpstreamFillColor || !fillColumnName
-                    ? undefined
-                    : colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName];
-            const colorReady = useUpstreamFillColor || !fillColumnName || colorForRow !== undefined;
+            const colorForRow = fillColumnName
+                ? colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName]
+                : undefined;
+            // A selected column whose data has not loaded yet has no colour function.
+            const colorReady = !fillColumnName || colorForRow !== undefined;
             const visibleRows =
                 visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
 
@@ -706,25 +699,23 @@ export function useAssociatedShapesLayerInputs(
                 });
             }
 
-            if (!useUpstreamFillColor) {
-                featureState = withPreservedFillColorsWhileLoading({
-                    featureState,
-                    fillColumnName,
-                    colorReady,
-                    previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
-                });
+            featureState = withPreservedFillColorsWhileLoading({
+                featureState,
+                fillColumnName,
+                colorReady,
+                previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
+            });
 
-                if (!fillColumnName) {
-                    const { [layerId]: _removed, ...remaining } = lastFillColorsRef.current;
-                    lastFillColorsRef.current = remaining;
-                } else if (colorReady && featureState?.fillColorByFeatureId) {
-                    lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
-                }
+            if (!fillColumnName) {
+                const { [layerId]: _removed, ...remaining } = lastFillColorsRef.current;
+                lastFillColorsRef.current = remaining;
+            } else if (colorReady && featureState?.fillColorByFeatureId) {
+                lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
             }
 
             if (!featureState && !fillColumnName) continue;
 
-            const projected = useUpstreamFillColor ? layer : omitFillColorByColumn(layer);
+            const projected = withoutViewerFillColorColumn(layer);
             nextLayers[layerId] = featureState ? { ...projected, featureState } : projected;
             changed = true;
         }
@@ -738,7 +729,6 @@ export function useAssociatedShapesLayerInputs(
         tableByAssociationKey,
         visibleRowsByDataSource,
         colorFunctionByDataSource,
-        useUpstreamFillColor,
     ]);
 
     return useMemo(

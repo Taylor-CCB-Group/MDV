@@ -67,13 +67,18 @@ pnpm link:spatialdata
 
 Restore registry packages with `pnpm unlink:spatialdata` before committing dependency pins.
 
-While linked, leave MDV's fill-colour workaround on by default (it still works around gaps left by SpatialData.js [#119](https://github.com/Taylor-CCB-Group/SpatialData.js/pull/119)). To force the viewer `fillColorByColumn` path for A/B checks:
+Note that `resolve.dedupe` and `server.fs.allow` in `vite.config.mts` are what make a linked checkout usable — without them you get two copies of deck/luma/React (`DECKGL_FILTER_COLOR: no matching overloaded function`) and 404s on the linked packages' non-JS assets. Both are gated on a link being present.
 
-```js
-localStorage.MDV_USE_UPSTREAM_FILL_COLOR = "1"  // reload
-```
+## Who owns fill colour
 
-`#119` keeps last-good colours during row load, but under MDV's render-stack adapter a column switch can still fail to update the canvas even when rows are already ready. Prefer fixing that upstream and deleting the MDV strip/`featureState` fill path once a linked build verifies cleanly.
+MDV does, for associated shapes and labels layers. `withoutViewerFillColorColumn` keeps `fillColorByColumn` out of viewer inputs and MDV projects colours through `featureState` instead.
+
+This was briefly a workaround for a viewer bug — a column switch under the render-stack adapter did not repaint — but that is fixed upstream (the reconcile pass is keyed by value rather than config identity, and the resolver notification survives an effect remount). The split stands on its own merits now:
+
+- The column picker offers everything in the MDV DataStore, which is a superset of the SpatialData table's obs — linked gene scores, and per-project extras. `fillColorByColumn` can only resolve what is in the table.
+- Colours come from `dataStore.getColorFunction`, so a column drawn on the canvas matches the same column in every other MDV chart, palette and log scale included.
+
+Revisit if the viewer ever grows a way to accept host-computed colours per feature *and* MDV stops needing its own palettes — until then, passing the column to the viewer as well would only buy a redundant read of the table.
 
 ## Avivatorish comparison
 
@@ -226,7 +231,7 @@ Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData
 
 ## Deferred (follow-up PR)
 
-- Drop MDV fill-colour workaround once a linked `@spatialdata/vis` fix covers column switches under the render-stack adapter (see Local linked section; `#119` was not enough)
+- `FillColorByColumnControl` hardcodes `mode: "categorical"`, so numeric columns get a categorical palette. The viewer resolves `"auto"` from the table's declared column kind; MDV should pass that instead, and decide what to do about saved views that already carry the wrong mode.
 - `@spatialdata/avivatorish` zarr loader delegation (MDV keeps OME-TIFF local)
 - Playwright fixture test
 
