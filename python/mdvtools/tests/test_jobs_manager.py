@@ -17,12 +17,14 @@ class _FakeExecutor:
     def __init__(self, poll_result="running"):
         self._poll = poll_result
         self.submits = 0
+        self.polls = 0
 
     def submit(self, entrypoint, workspace):
         self.submits += 1
         return Handle("fake", str(self.submits))
 
     def poll(self, handle):
+        self.polls += 1
         return self._poll
 
     def locate_result(self, handle, workspace):
@@ -253,3 +255,17 @@ def test_reconcile_requeues_lost_job(tmp_path):
     reloaded = {r.job_id: r for r in mgr.store.load_all()}[rec.job_id]
     assert reloaded.status == Status.QUEUED.value   # re-queued for a fresh run
     assert reloaded.handle is None                  # stale handle cleared
+
+def test_reconcile_requeues_record_without_handle_without_polling(tmp_path):
+    project = _make_project(tmp_path)
+    records_root = tmp_path / "records"
+    # STAGING: intent written, submit never recorded a handle (the submit↔record race, ADR-0005)
+    rec = _seed_record(records_root, Status.STAGING, handle=None)
+
+    executor = _FakeExecutor(poll_result="running")   # would reattach IF it were polled
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", records_root=records_root,
+                     executor=executor)
+
+    reloaded = {r.job_id: r for r in mgr.store.load_all()}[rec.job_id]
+    assert reloaded.status == Status.QUEUED.value   # nothing to reattach to → re-queue
+    assert executor.polls == 0                       # a None handle is never polled (short-circuit)
