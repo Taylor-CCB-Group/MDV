@@ -33,10 +33,33 @@ A *reliable handle* is only needed when the job **outlives the owner**:
   so any `running`/`staging` local record is **re-queued, not re-attached** — no OS PID is
   tracked. (A bare PID is an unsafe handle anyway: PID reuse, and a child reparented to init
   on the owner's death.)
-- **HPC (future):** the job genuinely outlives the owner; the handle is the **Slurm job-id**,
-  durable and safe by construction — re-attach via `GET /job/{id}`. `slurmrestd` is stateless
-  (no session memory between requests), so only our durable record can reconnect it. This is
-  where durable re-attach earns its keep.
+- **HPC:** the job genuinely outlives the owner; the handle is the **Slurm job-id**,
+  durable and safe by construction — the owner re-attaches by polling that id (`squeue`/`sacct`,
+  or later `GET /job/{id}` on stateless `slurmrestd`). This is where durable re-attach earns its
+  keep: re-queueing a job that is still running on the cluster would **double-run** it.
+
+## How reconcile is implemented — poll-driven, uniform, manager-owned
+
+Boot reconcile does **not** branch on the backend. For each record still in an `ACTIVE`
+status (`staging`/`running`/`ingesting`) it asks the executor's `poll(handle)`:
+
+- `poll` returns `"lost"` (or the record has **no handle** — the submit↔record window above)
+  → **re-queue** (`queued`, handle cleared);
+- anything else (`"running"`/`"done"`) → **reattach** — set `running` and let the normal
+  `tick()` loop adjudicate via the workspace marker (idempotent, so a job that finished while
+  the owner was down just re-ingests).
+
+The re-queue-vs-reattach difference lives **entirely inside each backend's `poll`**, not in the
+reconcile code: `LocalSubprocessExecutor.poll` returns `"lost"` on a cold boot (its in-memory
+process table is empty — the subprocess really died), while `SlurmExecutor.poll` sees the durable
+job-id via `squeue`/`sacct` and reports the survivor. So the *same* reconcile pass re-queues Local
+deaths and reattaches Slurm survivors, and a future executor adds **zero** reconcile logic — it
+only implements `poll`, which `tick()` requires anyway.
+
+Because the decision needs `poll`, reconcile lives on the **manager** (which holds both the store
+and the executor), not on `JobStore` (which has no executor). This is a change from the original
+POC, where `JobStore.reconcile_on_boot` blindly re-queued every `ACTIVE` record — correct for
+Local, but it would have double-run every reattachable Slurm job.
 
 ## The submit↔record race
 
