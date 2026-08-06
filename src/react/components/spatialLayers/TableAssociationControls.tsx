@@ -109,6 +109,24 @@ export default function TableAssociationControls({
     );
 }
 
+/**
+ * What we claim about a colour column when writing it into the render stack:
+ * nothing. `"auto"` lets the reader decide categorical-vs-continuous from the
+ * column's declared kind, which is the only party that knows it reliably.
+ *
+ * This was `"categorical"` for every column, which is how a `double` ended up
+ * with one palette entry per distinct float instead of a ramp. An explicit mode
+ * is honoured verbatim by the viewer — it exists so a user can force categorical
+ * on, say, integer cluster codes — so asserting one here overrode the detection
+ * rather than informing it. If a per-layer override is ever wanted, it belongs in
+ * the UI as a choice, not as a constant.
+ *
+ * MDV renders these colours itself (see `withoutViewerFillColorColumn`), keyed on
+ * the DataStore column's own datatype, so this value is about what a *reader* of
+ * the saved stack sees — not about what MDV draws today.
+ */
+const FILL_COLOR_MODE = "auto" as const;
+
 export function FillColorByColumnControl({
     association,
     dataStore,
@@ -132,7 +150,7 @@ export function FillColorByColumnControl({
                             if (typeof columnName !== "string") return;
                             onChange({
                                 columnName,
-                                mode: "categorical",
+                                mode: FILL_COLOR_MODE,
                             });
                         }}
                     />

@@ -231,7 +231,7 @@ Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData
 
 ## Deferred (follow-up PR)
 
-- `FillColorByColumnControl` hardcodes `mode: "categorical"`, so numeric columns get a categorical palette. The viewer resolves `"auto"` from the table's declared column kind; MDV should pass that instead, and decide what to do about saved views that already carry the wrong mode.
+- Render stacks saved before `FILL_COLOR_MODE` became `"auto"` still carry `mode: "categorical"` on every colour column, including numeric ones. It is inert while MDV strips `fillColorByColumn` from viewer inputs, so nothing is mis-drawn today — but whoever lifts that strip, or writes an importer for a saved stack, needs to normalise the stale value first (an explicit mode is honoured verbatim by the viewer).
 - `@spatialdata/avivatorish` zarr loader delegation (MDV keeps OME-TIFF local)
 - Playwright fixture test
 
