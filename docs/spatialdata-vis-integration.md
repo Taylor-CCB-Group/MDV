@@ -71,14 +71,50 @@ Note that `resolve.dedupe` and `server.fs.allow` in `vite.config.mts` are what m
 
 ## Who owns fill colour
 
-MDV does, for associated shapes and labels layers. `withoutViewerFillColorColumn` keeps `fillColorByColumn` out of viewer inputs and MDV projects colours through `featureState` instead.
+The viewer does, for any column in the annotating table's `obs`. MDV supplies the
+*scheme* — the palette, the domain — and the viewer does the reading and the
+encoding. Everything else stays MDV's.
 
-This was briefly a workaround for a viewer bug — a column switch under the render-stack adapter did not repaint — but that is fixed upstream (the reconcile pass is keyed by value rather than config identity, and the resolver notification survives an effect remount). The split stands on its own merits now:
+The routing is one question, asked in `obsColumnNamesForElement`: **is this column
+in the table's obs?**
 
-- The column picker offers everything in the MDV DataStore, which is a superset of the SpatialData table's obs — linked gene scores, and per-project extras. `fillColorByColumn` can only resolve what is in the table.
-- Colours come from `dataStore.getColorFunction`, so a column drawn on the canvas matches the same column in every other MDV chart, palette and log scale included.
+| | Colour comes from | Why |
+|---|---|---|
+| Column in obs | `fillColorByColumn`, with MDV's palette attached | The viewer can read it, so it should |
+| Column not in obs | `featureState.fillColorByFeatureId` | Gene scores, `mdv_cell_id`, anything computed at runtime — the viewer has no way to reach these |
+| Filtering (`hiddenFeatureIds`) | Always `featureState` | Cross-filtering is MDV's, and no column in obs can express it |
 
-Revisit if the viewer ever grows a way to accept host-computed colours per feature *and* MDV stops needing its own palettes — until then, passing the column to the viewer as well would only buy a redundant read of the table.
+`fillColorSchemeFromDataStore` is what makes the first row safe. It turns an MDV
+column into viewer config: a categorical column becomes
+`categoricalPalette: { byValue }` — colours named by category, so the viewer cannot
+reorder them — and a numeric column becomes `numericRamp` (the bins
+`getColumnColors` already produced) plus `numericDomain` from the column's
+`minMax`. A column drawn on the canvas therefore matches the same column in every
+other MDV chart, log scale included: the log remap is baked into those bins, which
+is why nothing sets `numericScale` (doing both would apply it twice).
+
+This replaces an earlier arrangement where MDV computed every feature's colour and
+kept `fillColorByColumn` out of viewer inputs entirely. That was defensible while
+`fillColorByColumn` could not express an MDV palette — it could only cycle an
+index-ordered list, which is not the same thing as naming a category's colour — but
+it cost a `Record<string, [r,g,b,a]>` with one entry per cell on every filter
+change, and it produced a saved render stack that only looked right inside MDV.
+Named palettes and pinned domains landed upstream in the same release as the
+categorical/string fixes; see the version note below.
+
+`withPreservedFillColorsWhileLoading` survives, scoped to the per-feature route
+alone. It covers MDV's asynchronous `loadColumnSet`, which the viewer knows nothing
+about. Columns the viewer owns are covered by the viewer's own last-good retention.
+
+## Minimum upstream version
+
+Do not ship an MDV that touches SpatialData tables against `@spatialdata/*` older
+than the release carrying the column-colour fixes. Before them, `'auto'` mode
+sniffed values instead of trusting the store's declared column kind — one `NaN` in
+a float column made it categorical and gave every distinct float its own hue — and
+category colours depended on which features happened to load. AnnData written by
+newer tooling is more likely to hit both. The pins in `package.json` are the
+enforcement; keep them at or above that release.
 
 ## Avivatorish comparison
 

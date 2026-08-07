@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type DataStore from "@/datastore/DataStore";
 import { useChartManager, useDataSources } from "@/react/hooks";
+import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
 type LabelsLayerConfig = Extract<LayerConfig, { type: "labels" }>;
@@ -29,8 +30,9 @@ type DataSourceAssociationConfig = {
 type SpatialDataAssociationKind = "images" | "points" | "labels" | "shapes";
 export type AssociableSpatialElementType = Extract<LayerType, "image" | "points" | "labels" | "shapes">;
 type FillColorAssociableLayerType = Extract<AssociableSpatialElementType, "shapes" | "labels">;
+type AssociatedTableElement = { getObsColumnNames?: () => string[] };
 type SpatialDataAssociationSource = {
-    getAssociatedTables: (kind: SpatialDataAssociationKind, key: string) => Array<[string, unknown]>;
+    getAssociatedTables: (kind: SpatialDataAssociationKind, key: string) => Array<[string, AssociatedTableElement]>;
 };
 type SpatialDataAwareDataStore = DataStore & {
     config: DataStore["config"] & { spatialdata_tables?: SpatialDataTablesMetadata };
@@ -275,24 +277,39 @@ export function buildAssociatedFeatureStateFromRowMap({
 }
 
 /**
- * MDV owns fill colour for associated layers, so the viewer is not asked to resolve
- * the column as well.
+ * The obs columns of the table annotating an element — the exact set the viewer is
+ * able to colour by on its own.
  *
- * This started life as a workaround for a viewer bug and is no longer one: the
- * column-switch break it papered over is fixed upstream. It stays because the two
- * paths are not interchangeable. `fillColorByColumn` resolves a column against the
- * SpatialData table's own obs, while the picker offers everything in the MDV
- * DataStore — which is a superset (linked gene scores, and this project's `sample_id`
- * / `mdv_cell_id` and friends, none of which exist in the zarr). Colours also come
- * from `dataStore.getColorFunction`, so a column drawn here matches the same column
- * everywhere else in MDV, palette and log scale included. Handing the viewer the
- * column would mean losing both, and paying for a second read of the table to do it.
+ * This is the line the fill-colour routing is drawn on. MDV's column picker offers
+ * everything in the DataStore, which is a SUPERSET of the table's obs: linked gene
+ * scores, `mdv_cell_id`, anything computed at runtime. The viewer cannot read those
+ * at all, so they stay on the per-feature path; everything in obs is handed over as
+ * `fillColorByColumn` instead, with MDV's palette attached.
  *
- * Keep the prop out of viewer inputs rather than letting both paths run: MDV's
- * `featureState` colours win the merge upstream anyway, so passing it through would
- * buy a redundant per-switch zarr read and nothing else.
+ * Synchronous: opening the store already reads every node's attributes, so this is
+ * a question we can answer before deciding how to colour, not after a load.
  */
-export function withoutViewerFillColorColumn<T extends LayerConfig>(layer: T): T {
+export function obsColumnNamesForElement(
+    spatialData: SpatialDataAssociationSource | undefined,
+    elementType: AssociableSpatialElementType,
+    elementKey: string,
+): Set<string> | undefined {
+    if (!spatialData) return undefined;
+    const tables = spatialData.getAssociatedTables(spatialDataAssociationKind(elementType), elementKey);
+    const table = tables.length === 1 ? tables[0][1] : undefined;
+    const names = table?.getObsColumnNames?.();
+    return names ? new Set(names) : undefined;
+}
+
+/**
+ * Keep a column the viewer cannot read out of the viewer's inputs.
+ *
+ * Only for columns absent from the table's obs. Left in, the viewer would try to
+ * load a column that is not there — a failed resolution and a user-visible notice
+ * — and then be overruled by MDV's `featureState` colours anyway. Columns that ARE
+ * in obs are handed over deliberately; see `obsColumnNamesForElement`.
+ */
+function withoutViewerFillColorColumn<T extends LayerConfig>(layer: T): T {
     if (!("fillColorByColumn" in layer)) return layer;
     const { fillColorByColumn: _removed, ...rest } = layer;
     return rest as T;
@@ -306,6 +323,11 @@ export function layerFillColorColumnName(layer: LayerConfig): string | undefined
 /**
  * While a newly selected colour column is still loading, keep the previous feature colours
  * so the canvas does not flash through an unannotated/default state.
+ *
+ * Only the per-feature path needs this. A column the viewer owns is covered by the
+ * viewer's own last-good retention, which holds the previous column's colours until
+ * the new column's rows land; this covers MDV's asynchronous `loadColumnSet`, which
+ * the viewer knows nothing about.
  */
 export function withPreservedFillColorsWhileLoading({
     featureState,
@@ -615,6 +637,16 @@ export function useAssociatedShapesLayerInputs(
         }
         return Object.fromEntries(entries);
     }, [spatialData, shapeKeys, labelKeys, dataSources]);
+    const obsColumnNamesByAssociationKey = useMemo(() => {
+        const entries: Array<[string, Set<string> | undefined]> = [];
+        for (const elementKey of shapeKeys) {
+            entries.push([`shapes:${elementKey}`, obsColumnNamesForElement(spatialData, "shapes", elementKey)]);
+        }
+        for (const elementKey of labelKeys) {
+            entries.push([`labels:${elementKey}`, obsColumnNamesForElement(spatialData, "labels", elementKey)]);
+        }
+        return Object.fromEntries(entries);
+    }, [spatialData, shapeKeys, labelKeys]);
     const fillColumnsByDataSource = useMemo(
         () => getFillColumnsByDataSource(layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey),
         [layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey],
@@ -662,18 +694,31 @@ export function useAssociatedShapesLayerInputs(
             const layer = layerInputs.layers[layerId];
             if (!isFillColorAssociableLayer(layer)) continue;
 
-            const table = tableByAssociationKey[`${layer.type}:${layer.elementKey}`];
+            const associationKey = `${layer.type}:${layer.elementKey}`;
+            const table = tableByAssociationKey[associationKey];
             if (table?.status !== "resolved") continue;
 
             const fillColumnName = layerFillColorColumnName(layer);
-            const colorForRow = fillColumnName
-                ? colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName]
-                : undefined;
+            // Two routes, decided by whether the viewer can read the column at all.
+            // In obs: hand it over with MDV's palette, and let the viewer do the
+            // reading, the encoding and the load-window retention. Not in obs (a
+            // gene score, `mdv_cell_id`, anything computed here): MDV is the only
+            // party that has the values, so it colours each feature itself.
+            const viewerFillColor =
+                fillColumnName && obsColumnNamesByAssociationKey[associationKey]?.has(fillColumnName)
+                    ? fillColorSchemeFromDataStore(table.dataStore, fillColumnName)
+                    : undefined;
+            const colorForRow =
+                fillColumnName && !viewerFillColor
+                    ? colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName]
+                    : undefined;
             // A selected column whose data has not loaded yet has no colour function.
-            const colorReady = !fillColumnName || colorForRow !== undefined;
+            const colorReady = !fillColumnName || !!viewerFillColor || colorForRow !== undefined;
             const visibleRows =
                 visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
 
+            // Filtering rides `featureState` on both routes: cross-filtering is
+            // MDV's, not the table's, and no column in obs can express it.
             let featureState: AssociatedFeatureState | undefined;
             if (layer.type === "shapes") {
                 const renderData = renderDataByElementKey[layer.elementKey];
@@ -699,23 +744,30 @@ export function useAssociatedShapesLayerInputs(
                 });
             }
 
-            featureState = withPreservedFillColorsWhileLoading({
-                featureState,
-                fillColumnName,
-                colorReady,
-                previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
-            });
+            if (!viewerFillColor) {
+                featureState = withPreservedFillColorsWhileLoading({
+                    featureState,
+                    fillColumnName,
+                    colorReady,
+                    previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
+                });
+            }
 
-            if (!fillColumnName) {
+            if (!fillColumnName || viewerFillColor) {
+                // Nothing to preserve: either no column, or the viewer is holding
+                // the last-good colours itself. Dropping the entry also stops a
+                // previous MDV-drawn column bleeding into a later viewer-drawn one.
                 const { [layerId]: _removed, ...remaining } = lastFillColorsRef.current;
                 lastFillColorsRef.current = remaining;
             } else if (colorReady && featureState?.fillColorByFeatureId) {
                 lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
             }
 
-            if (!featureState && !fillColumnName) continue;
+            if (!featureState && !viewerFillColor) continue;
 
-            const projected = withoutViewerFillColorColumn(layer);
+            const projected = viewerFillColor
+                ? { ...layer, fillColorByColumn: viewerFillColor }
+                : withoutViewerFillColorColumn(layer);
             nextLayers[layerId] = featureState ? { ...projected, featureState } : projected;
             changed = true;
         }
@@ -727,6 +779,7 @@ export function useAssociatedShapesLayerInputs(
         renderDataByElementKey,
         labelsRowIndexByFeatureId,
         tableByAssociationKey,
+        obsColumnNamesByAssociationKey,
         visibleRowsByDataSource,
         colorFunctionByDataSource,
     ]);

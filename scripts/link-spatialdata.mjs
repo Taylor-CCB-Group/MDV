@@ -10,9 +10,6 @@
  * After linking, rebuild upstream when you change it:
  *   (cd "$SPATIALDATA_ROOT" && pnpm --filter @spatialdata/vis build)
  * or keep a watch running in that repo.
- *
- * To exercise upstream fillColorByColumn without MDV's featureState workaround:
- *   localStorage.MDV_USE_UPSTREAM_FILL_COLOR = "1"  // then reload
  */
 
 import { execSync } from "node:child_process";
@@ -111,10 +108,7 @@ function link() {
     console.log(`Linked @spatialdata/* + zarrextra → ${root}`);
     console.log("Running pnpm install…");
     execSync("pnpm install", { cwd: mdvRoot, stdio: "inherit" });
-    console.log(
-        "\nLinked. Restart Vite (clear .vite cache if needed: rm -rf node_modules/.vite).\n" +
-            "Opt into upstream fillColorByColumn: localStorage.MDV_USE_UPSTREAM_FILL_COLOR = '1'",
-    );
+    console.log("\nLinked. Restart Vite (clear .vite cache if needed: rm -rf node_modules/.vite).");
 }
 
 function unlinkPackages() {

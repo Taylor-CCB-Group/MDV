@@ -1,15 +1,18 @@
+import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
 import {
     type DataSourceAssociationCandidate,
     buildAssociatedFeatureStateFromRowMap,
     buildAssociatedShapesFeatureState,
     getShapesTableAssociation,
+    obsColumnNamesForElement,
     resolveAssociatedElementTable,
     withPreservedFillColorsWhileLoading,
-    withoutViewerFillColorColumn,
 } from "@/react/spatialdata/table_association";
 import type { ShapesRenderData } from "@spatialdata/core";
 import type { LayerConfig } from "@spatialdata/vis";
 import { describe, expect, test } from "vitest";
+
+type AssociatedTableElementMock = { getObsColumnNames?: () => string[] };
 
 function shapesRenderData(featureIds: string[], rowIndexByFeatureIndex: number[]): ShapesRenderData {
     return {
@@ -48,8 +51,8 @@ describe("SpatialData table association", () => {
 
     test("resolves an associated shapes element through SpatialData table provenance", () => {
         const spatialData = {
-            getAssociatedTables: (kind: string): Array<[string, unknown]> =>
-                kind === "shapes" ? [["cells", null]] : [],
+            getAssociatedTables: (kind: string): Array<[string, AssociatedTableElementMock]> =>
+                kind === "shapes" ? [["cells", {}]] : [],
         };
         const cellsDataStore = {
             name: "cells_by_region",
@@ -86,8 +89,8 @@ describe("SpatialData table association", () => {
 
     test("resolves labels through the same element association path", () => {
         const spatialData = {
-            getAssociatedTables: (kind: string): Array<[string, unknown]> =>
-                kind === "labels" ? [["segmentation_table", null]] : [],
+            getAssociatedTables: (kind: string): Array<[string, AssociatedTableElementMock]> =>
+                kind === "labels" ? [["segmentation_table", {}]] : [],
         };
         const dataSources: DataSourceAssociationCandidate[] = [
             {
@@ -118,8 +121,8 @@ describe("SpatialData table association", () => {
 
     test("resolves labels from MDV table_name column metadata", () => {
         const spatialData = {
-            getAssociatedTables: (kind: string): Array<[string, unknown]> =>
-                kind === "labels" ? [["cell_binned", null]] : [],
+            getAssociatedTables: (kind: string): Array<[string, AssociatedTableElementMock]> =>
+                kind === "labels" ? [["cell_binned", {}]] : [],
         };
         const dataSources: DataSourceAssociationCandidate[] = [
             {
@@ -215,37 +218,34 @@ describe("SpatialData table association", () => {
         });
     });
 
-    test("strips fillColorByColumn from viewer layer configs", () => {
-        const layer = {
-            type: "labels",
-            id: "labels-a",
-            elementKey: "cell_labels",
-            visible: true,
-            opacity: 1,
-            fillColorByColumn: {
-                columnName: "Leiden",
-                mode: "categorical",
-            },
-            featureState: {
-                fillColorByFeatureId: {
-                    "1": [1, 2, 3, 255],
-                },
-            },
-        } as LayerConfig;
+    test("reports the obs columns the viewer is able to colour by", () => {
+        const spatialData = {
+            getAssociatedTables: (kind: string): Array<[string, AssociatedTableElementMock]> =>
+                kind === "shapes" ? [["cells", { getObsColumnNames: () => ["Leiden", "area"] }]] : [],
+        };
 
-        expect(withoutViewerFillColorColumn(layer)).toEqual({
-            type: "labels",
-            id: "labels-a",
-            elementKey: "cell_labels",
-            visible: true,
-            opacity: 1,
-            featureState: {
-                fillColorByFeatureId: {
-                    "1": [1, 2, 3, 255],
-                },
-            },
-        });
-        expect(withoutViewerFillColorColumn(layer)).not.toHaveProperty("fillColorByColumn");
+        expect(obsColumnNamesForElement(spatialData, "shapes", "cell_circles")).toEqual(new Set(["Leiden", "area"]));
+        // This is the routing decision: a gene score or `mdv_cell_id` is in MDV's
+        // picker but not in obs, and the viewer cannot read it.
+        expect(obsColumnNamesForElement(spatialData, "shapes", "cell_circles")?.has("EPCAM")).toBe(false);
+    });
+
+    test("has no answer when the annotating table is absent or ambiguous", () => {
+        // Two tables and no table are both "we cannot say which obs applies", and
+        // guessing would route a column to a viewer that will fail to read it.
+        const ambiguous = {
+            getAssociatedTables: (): Array<[string, AssociatedTableElementMock]> => [
+                ["a", { getObsColumnNames: () => ["Leiden"] }],
+                ["b", { getObsColumnNames: () => ["Leiden"] }],
+            ],
+        };
+        const none = {
+            getAssociatedTables: (): Array<[string, AssociatedTableElementMock]> => [],
+        };
+
+        expect(obsColumnNamesForElement(ambiguous, "shapes", "cell_circles")).toBeUndefined();
+        expect(obsColumnNamesForElement(none, "shapes", "cell_circles")).toBeUndefined();
+        expect(obsColumnNamesForElement(undefined, "shapes", "cell_circles")).toBeUndefined();
     });
 
     test("keeps previous fill colours while a newly selected column is still loading", () => {

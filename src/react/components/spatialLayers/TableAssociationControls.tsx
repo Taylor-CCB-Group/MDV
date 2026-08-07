@@ -74,8 +74,7 @@ export default function TableAssociationControls({
         <div className="grid gap-2">
             {association.status === "resolved" && association.tableName && (
                 <Typography variant="caption" color="text.secondary">
-                    Associated datasource: {association.dataSourceName} /{" "}
-                    {association.tableName}
+                    Associated datasource: {association.dataSourceName} / {association.tableName}
                     {association.featureCount !== undefined &&
                         association.matchedFeatureCount !== undefined &&
                         ` (${association.matchedFeatureCount}/${association.featureCount} features)`}
@@ -121,9 +120,11 @@ export default function TableAssociationControls({
  * rather than informing it. If a per-layer override is ever wanted, it belongs in
  * the UI as a choice, not as a constant.
  *
- * MDV renders these colours itself (see `withoutViewerFillColorColumn`), keyed on
- * the DataStore column's own datatype, so this value is about what a *reader* of
- * the saved stack sees — not about what MDV draws today.
+ * For a column in the table's obs this is overwritten before the config reaches
+ * the viewer: `fillColorSchemeFromDataStore` sets the mode alongside the palette
+ * it derived, because a `byValue` palette is meaningless under a continuous mode.
+ * What is written here is what a column OUTSIDE obs carries, and what a reader of
+ * the saved stack falls back to.
  */
 const FILL_COLOR_MODE = "auto" as const;
 
