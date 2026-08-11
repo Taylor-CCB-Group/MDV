@@ -13,6 +13,8 @@ import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
@@ -39,11 +41,7 @@ import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTool
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import { useFieldContourLegend } from "../contour_state";
 import type { DualContourLegacyConfig } from "../contour_state";
-import {
-    VivProvider,
-    useViewerStore,
-    useViewerStoreApi,
-} from "./avivatorish/state";
+import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import FieldContourLegend from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
@@ -96,10 +94,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const stack = config.renderStack;
     void chart.renderStackGeneration;
 
-    const extensions = useMemo(
-        () => [new ColorPaletteExtension(), new VivContrastExtension()],
-        [],
-    );
+    const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
 
     const vivImagePropsResolver = useCallback<VivImagePropsResolver>(
         (ctx: VivImageLayerContext) => {
@@ -146,12 +141,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     // (viewState is no longer null, so it never re-fits). Gating on `hasLayersDrawn`
     // guarantees the bounds are available before we commit; while they aren't we
     // leave viewState null so this retries on the re-renders that happen as data loads.
-    const {
-        getWorldBoundsForVisibleLayers,
-        hasEnabledLayers,
-        hasLayersDrawn,
-        isBlocking,
-    } = renderer;
+    const { getWorldBoundsForVisibleLayers, hasEnabledLayers, hasLayersDrawn, isBlocking } = renderer;
     useEffect(() => {
         if (spatialViewState !== null) return;
         if (!hasEnabledLayers || isBlocking || !hasLayersDrawn) return;
@@ -177,11 +167,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
             return;
         }
         chart.setImageLayerRegistry(
-            createImageLayerRegistry(
-                stack,
-                renderer.getImageLoadedDataByElementKey,
-                renderer.getLayerLoadState,
-            ),
+            createImageLayerRegistry(stack, renderer.getImageLoadedDataByElementKey, renderer.getLayerLoadState),
         );
         return () => chart.setImageLayerRegistry(undefined);
     }, [
@@ -197,10 +183,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
             if (!info.picked || typeof info.x !== "number" || typeof info.y !== "number") {
                 return;
             }
-            const layerId = (typeof info.layer?.id === "string" ? info.layer.id : "").replace(
-                /-#.*#$/,
-                "",
-            );
+            const layerId = (typeof info.layer?.id === "string" ? info.layer.id : "").replace(/-#.*#$/, "");
             const event = renderer.getFeaturePickEvent(layerId, {
                 index: info.index,
                 object: info.object,
@@ -230,11 +213,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     }
 
     if (spatialViewState === null && renderer.hasEnabledLayers) {
-        return (
-            <div className="h-full w-full p-2">
-                {renderer.isBlocking ? "Loading layer data…" : "Framing view…"}
-            </div>
-        );
+        return <div className="h-full w-full p-2">{renderer.isBlocking ? "Loading layer data…" : "Framing view…"}</div>;
     }
 
     if (!renderer.hasRenderableInputs) {
@@ -296,11 +275,7 @@ const SpatialDataMainChart = observer(() => {
 
     return (
         <SpatialDataProvider source={spatialDataUrl ?? undefined}>
-            <SpatialAnnotationProvider
-                chart={chart}
-                hoveredFieldId={hoveredField}
-                setHoveredFieldId={setHoveredField}
-            >
+            <SpatialAnnotationProvider chart={chart} hoveredFieldId={hoveredField} setHoveredFieldId={setHoveredField}>
                 <SpatialDataViewer setHoveredField={setHoveredField} />
             </SpatialAnnotationProvider>
         </SpatialDataProvider>
@@ -326,12 +301,7 @@ const SpatialDataViewer = observer(
         const id = useChartID();
         const deckContainerRef = useRef<HTMLDivElement | null>(null);
         const { scatterProps, selectionLayer } = useSpatialLayers();
-        const {
-            scatterplotLayer,
-            greyScatterplotLayer,
-            getTooltip,
-            setScatterKeyboardActive,
-        } = scatterProps;
+        const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
         const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
         const contourConfig = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(contourConfig.densityFields);
@@ -370,19 +340,10 @@ const SpatialDataViewer = observer(
                 selection: selectionLayer,
                 gate_labels: gateLabelLayer,
             }),
-            [
-                gateLabelLayer,
-                gateDisplayLayer,
-                scatterplotLayer,
-                greyScatterplotLayer,
-                selectionLayer,
-            ],
+            [gateLabelLayer, gateDisplayLayer, scatterplotLayer, greyScatterplotLayer, selectionLayer],
         );
 
-        const hostLayerResolver = useMemo(
-            () => createMdvHostLayerResolver(deckOverlaySources),
-            [deckOverlaySources],
-        );
+        const hostLayerResolver = useMemo(() => createMdvHostLayerResolver(deckOverlaySources), [deckOverlaySources]);
 
         const {
             layers: baseLayers,
@@ -432,24 +393,21 @@ const SpatialDataViewer = observer(
             y: number;
         } | null>(null);
 
-        const onFeatureHover = useCallback(
-            (event: SpatialFeaturePickEvent) => {
-                const info = event.pickInfo;
-                if (!event.tooltip || !Number.isFinite(info.x) || !Number.isFinite(info.y)) {
-                    setFeatureTooltip(null);
-                    return;
-                }
-                const anchor = deckContainerRef.current;
-                if (!anchor) return;
-                const rect = anchor.getBoundingClientRect();
-                setFeatureTooltip({
-                    html: formatSpatialFeatureTooltipHtml(event.tooltip),
-                    x: rect.left + info.x,
-                    y: rect.top + info.y,
-                });
-            },
-            [],
-        );
+        const onFeatureHover = useCallback((event: SpatialFeaturePickEvent) => {
+            const info = event.pickInfo;
+            if (!event.tooltip || !Number.isFinite(info.x) || !Number.isFinite(info.y)) {
+                setFeatureTooltip(null);
+                return;
+            }
+            const anchor = deckContainerRef.current;
+            if (!anchor) return;
+            const rect = anchor.getBoundingClientRect();
+            setFeatureTooltip({
+                html: formatSpatialFeatureTooltipHtml(event.tooltip),
+                x: rect.left + info.x,
+                y: rect.top + info.y,
+            });
+        }, []);
 
         const featureTooltipPortal =
             featureTooltip && outerContainer
@@ -491,18 +449,13 @@ const SpatialDataViewer = observer(
         if (!coordinateSystem || !region?.spatial?.file) {
             return (
                 <div className="h-full w-full p-2">
-                    SpatialData.js viewer requires region.spatial.file and
-                    region.spatial.coordinate_system metadata.
+                    SpatialData.js viewer requires region.spatial.file and region.spatial.coordinate_system metadata.
                 </div>
             );
         }
 
         if (error) {
-            return (
-                <div className="h-full w-full p-2">
-                    Failed to load SpatialData store: {error.message}
-                </div>
-            );
+            return <div className="h-full w-full p-2">Failed to load SpatialData store: {error.message}</div>;
         }
 
         if (loading || !spatialData) {
@@ -540,19 +493,31 @@ const SpatialDataViewer = observer(
                 >
                     <div style={{ width, height, position: "relative" }}>
                         <Profiler id="spatial.canvas" onRender={onSpatialProfilerRender}>
-                            <SpatialCanvasFromRenderStack
-                                spatialData={spatialData}
-                                coordinateSystem={coordinateSystem}
-                                spatialViewState={spatialViewState}
-                                onSpatialViewStateChange={onSpatialViewStateChange}
-                                deckLayers={deckLayers}
-                                layers={layers}
-                                layerOrder={layerOrder}
-                                width={width}
-                                height={height}
-                                deckProps={deckProps}
-                                onFeatureHover={onFeatureHover}
-                            />
+                            <ErrorBoundary
+                                FallbackComponent={(error) =>
+                                (
+                                    <ErrorComponentReactWrapper
+                                        error={{message: error.error}}
+                                        extraMetaData={layers}
+                                        title={'Error showing spatialdata canvas'}
+                                    />
+                                )
+                                }
+                                >
+                                    <SpatialCanvasFromRenderStack
+                                        spatialData={spatialData}
+                                        coordinateSystem={coordinateSystem}
+                                        spatialViewState={spatialViewState}
+                                        onSpatialViewStateChange={onSpatialViewStateChange}
+                                        deckLayers={deckLayers}
+                                        layers={layers}
+                                        layerOrder={layerOrder}
+                                        width={width}
+                                        height={height}
+                                        deckProps={deckProps}
+                                        onFeatureHover={onFeatureHover}
+                                    />
+                                </ErrorBoundary>
                         </Profiler>
                     </div>
                 </div>
