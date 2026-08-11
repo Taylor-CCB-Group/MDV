@@ -2,49 +2,50 @@ import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { viewStateFromBounds } from "@spatialdata/core";
 import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
 import {
-    SpatialViewer,
-    useSpatialCanvasRendererFromLayerInputs,
-    type SpatialFeaturePickEvent,
     type ViewState as SpatialCanvasViewState,
+    type SpatialFeaturePickEvent,
+    SpatialViewer,
     type VivImageLayerContext,
     type VivImagePropsResolver,
+    useSpatialCanvasRendererFromLayerInputs,
 } from "@spatialdata/vis";
 import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ErrorBoundary } from "react-error-boundary";
+import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
+import type { FieldName } from "@/charts/charts";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import type { FieldName } from "@/charts/charts";
+import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import {
+    type MdvDeckOverlayLayers,
     createMdvHostLayerResolver,
     useRenderStackAdapter,
-    type MdvDeckOverlayLayers,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
+import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
-import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
-import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
-import { useOuterContainer } from "../screen_state";
+import type { RenderStackLayerInputs } from "@spatialdata/vis";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
+import { useFieldContourLegend } from "../contour_state";
+import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
-import { useFieldContourLegend } from "../contour_state";
-import type { DualContourLegacyConfig } from "../contour_state";
-import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import FieldContourLegend from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
+import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 
 type SpatialRegionMetadata = {
     spatial?: {
@@ -282,6 +283,57 @@ const SpatialDataMainChart = observer(() => {
     );
 });
 
+/**
+ * What the canvas shows when it throws.
+ *
+ * `FallbackComponent` is handed `FallbackProps` — `{ error, resetErrorBoundary }` —
+ * not the error itself, and `error` is `unknown` because anything can be thrown.
+ * Both matter: the details dialog renders `error.message` as a React child, so an
+ * `Error` object reaching that field makes OPENING the dialog throw its own
+ * "Objects are not valid as a React child", replacing the report with a second
+ * failure. Narrow to strings here, and pass the stack — it is the only part worth
+ * having, and nothing was passing it.
+ */
+function SpatialCanvasErrorFallback({ error, layers }: FallbackProps & { layers: RenderStackLayerInputs["layers"] }) {
+    const isError = error instanceof Error;
+    return (
+        <ErrorComponentReactWrapper
+            error={{
+                message: isError ? error.message : String(error),
+                ...(isError && error.stack ? { stack: error.stack } : {}),
+            }}
+            extraMetaData={summariseLayersForError(layers)}
+            title="Error showing spatialdata canvas"
+        />
+    );
+}
+
+/**
+ * Which layers were being drawn, small enough to put on a clipboard.
+ *
+ * The dialog `JSON.stringify`s this. A layer config is not safe to stringify
+ * whole: `featureState.fillColorByFeatureId` carries one entry per feature, so on
+ * a real dataset "copy error details" would serialise hundreds of thousands of
+ * keys and hang the tab — turning a report into a second failure. What actually
+ * helps diagnosis is which element each layer pointed at and what it was being
+ * coloured by.
+ */
+function summariseLayersForError(layers: RenderStackLayerInputs["layers"]) {
+    return {
+        layers: Object.entries(layers).map(([id, layer]) => ({
+            id,
+            type: layer?.type,
+            elementKey: layer?.elementKey,
+            ...(layer && "fillColorByColumn" in layer && layer.fillColorByColumn
+                ? {
+                      fillColorByColumn: layer.fillColorByColumn.columnName,
+                      fillColorMode: layer.fillColorByColumn.mode,
+                  }
+                : {}),
+        })),
+    };
+}
+
 const SpatialDataViewer = observer(
     ({
         setHoveredField,
@@ -494,30 +546,22 @@ const SpatialDataViewer = observer(
                     <div style={{ width, height, position: "relative" }}>
                         <Profiler id="spatial.canvas" onRender={onSpatialProfilerRender}>
                             <ErrorBoundary
-                                FallbackComponent={(error) =>
-                                (
-                                    <ErrorComponentReactWrapper
-                                        error={{message: error.error}}
-                                        extraMetaData={layers}
-                                        title={'Error showing spatialdata canvas'}
-                                    />
-                                )
-                                }
-                                >
-                                    <SpatialCanvasFromRenderStack
-                                        spatialData={spatialData}
-                                        coordinateSystem={coordinateSystem}
-                                        spatialViewState={spatialViewState}
-                                        onSpatialViewStateChange={onSpatialViewStateChange}
-                                        deckLayers={deckLayers}
-                                        layers={layers}
-                                        layerOrder={layerOrder}
-                                        width={width}
-                                        height={height}
-                                        deckProps={deckProps}
-                                        onFeatureHover={onFeatureHover}
-                                    />
-                                </ErrorBoundary>
+                                fallbackRender={(props) => <SpatialCanvasErrorFallback {...props} layers={layers} />}
+                            >
+                                <SpatialCanvasFromRenderStack
+                                    spatialData={spatialData}
+                                    coordinateSystem={coordinateSystem}
+                                    spatialViewState={spatialViewState}
+                                    onSpatialViewStateChange={onSpatialViewStateChange}
+                                    deckLayers={deckLayers}
+                                    layers={layers}
+                                    layerOrder={layerOrder}
+                                    width={width}
+                                    height={height}
+                                    deckProps={deckProps}
+                                    onFeatureHover={onFeatureHover}
+                                />
+                            </ErrorBoundary>
                         </Profiler>
                     </div>
                 </div>
