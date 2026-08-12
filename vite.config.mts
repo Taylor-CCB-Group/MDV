@@ -347,14 +347,13 @@ export default defineConfig(async (): Promise<UserConfig> => {
             // core's vendored parquet — that only work in the browser because
             // prebundling converts them to ESM. Excluding the packages leaves those
             // undiscovered and the app dies at load with "does not provide an export
-            // named 'default'". Sourcemaps are handled just below instead.
+            // named 'default'". Debuggability is paid for upstream instead: the
+            // packages ship `dist/index.js.map` from 0.6.0 on, and Rolldown emits a
+            // prebundle map without being asked, so a crash inside one names the
+            // function rather than reading `Le (…/.vite/deps/@spatialdata_layers.js)`.
+            // (An `optimizeDeps.esbuildOptions.sourcemap` lived here for that; under
+            // Vite 8 it is deprecated, it warns, and removing it changes no output.)
             exclude: ["@spatialdata/core", "zod", ...Object.keys(spatialdataAliases)],
-            // Carry the packages' own sourcemaps through the prebundle. Without this a
-            // crash inside one reads `Le (…/.vite/deps/@spatialdata_layers.js:396)` —
-            // esbuild's minified name, with nothing to map it back to.
-            esbuildOptions: {
-                sourcemap: true,
-            },
         },
     } as UserConfig;
 });

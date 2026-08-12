@@ -108,13 +108,24 @@ about. Columns the viewer owns are covered by the viewer's own last-good retenti
 
 ## Minimum upstream version
 
-Do not ship an MDV that touches SpatialData tables against `@spatialdata/*` older
-than the release carrying the column-colour fixes. Before them, `'auto'` mode
-sniffed values instead of trusting the store's declared column kind — one `NaN` in
-a float column made it categorical and gave every distinct float its own hue — and
-category colours depended on which features happened to load. AnnData written by
-newer tooling is more likely to hit both. The pins in `package.json` are the
-enforcement; keep them at or above that release.
+**`@spatialdata/* >= 0.6.0`, and `zarrextra >= 0.4.0` with it.**
+
+Do not ship an MDV that touches SpatialData tables against anything older. Before
+0.6.0, `'auto'` mode sniffed values instead of trusting the store's declared column
+kind — one `NaN` in a float column made it categorical and gave every distinct float
+its own hue — and category colours depended on which features happened to load.
+AnnData written by newer tooling is more likely to hit both. Nor is it a
+degrade-gracefully situation: the scheme MDV now sends (`categoricalPalette:
+{ byValue }`) reaches 0.4.0 as an object where it expects a list, indexes it with a
+`NaN`, and throws `Cannot read properties of undefined` three frames away inside the
+layer.
+
+`zarrextra` moves in step because `@spatialdata/core@0.6.0` depends on `0.4.0`
+exactly. Leaving MDV's own pin at `^0.3.0` installs a second copy, and MDV's
+`ensureChunkWorker` then flips the worker-decode flag in a module instance core
+never reads.
+
+The pins in `package.json` are the enforcement; keep them at or above these.
 
 ## Avivatorish comparison
 

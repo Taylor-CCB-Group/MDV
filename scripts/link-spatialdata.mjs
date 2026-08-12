@@ -30,12 +30,20 @@ const PACKAGE_DIRS = {
     zarrextra: "packages/zarrextra",
 };
 
+/**
+ * What `unlink` restores. Keep in step with the ranges in package.json — this is a
+ * separate copy of them, so it goes stale silently and unlink then writes a pin
+ * nobody chose. 0.6.0 is the floor for the table work: the fill-colour scheme MDV
+ * hands to a shapes layer (`categoricalPalette: { byValue }`, `numericDomain`) does
+ * not exist below it, and against 0.4.0 it did not merely fail to typecheck — it
+ * crashed the layer at runtime.
+ */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.5.0",
-    "@spatialdata/core": "^0.5.0",
-    "@spatialdata/layers": "^0.5.0",
-    "@spatialdata/react": "^0.5.0",
-    "@spatialdata/vis": "^0.5.0",
+    "@spatialdata/avivatorish": "^0.6.0",
+    "@spatialdata/core": "^0.6.0",
+    "@spatialdata/layers": "^0.6.0",
+    "@spatialdata/react": "^0.6.0",
+    "@spatialdata/vis": "^0.6.0",
     zarrextra: "^0.4.0",
 };
 
