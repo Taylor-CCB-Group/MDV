@@ -66,24 +66,46 @@ ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
+# Pandas to MDV datattypes
 datatype_mappings = {
-    "int8": "integer",
-    "int16": "integer",
-    "uint8": "integer",
-    "uint16": "integer",
-    "uint32": "int32",
-    "Int64":"int32", #loss of precision
+    # Exact legacy int32 storage; no missing values expected.
+    "int8": "int32",
+    "int16": "int32",
+    "int32": "int32",
+    "uint8": "int32",
+    "uint16": "int32",
+
+    # Pandas nullable integers; legacy integer storage is float32.
+    #could be loss of precision for int64, uint32, uint64, but MDV doesn't have a better option
+    # at the moment
+    "Int8": "integer",
+    "Int16": "integer",
+    "Int32": "integer",
+    "Int64": "integer",
+    "UInt8": "integer",
+    "UInt16": "integer",
+    "UInt32": "integer",
+    "UInt64": "integer",
+
+    # Native integers that may exceed exact float32 precision.
     "int64": "integer",
-    "float64": "double",
+    "uint32": "integer",
+    "uint64": "integer",
+
+    # MDV double is historically float32-backed.
     "float32": "double",
+    "float64": "double",
+
+    # Text-like and boolean values have no dedicated MDV boolean type.
     "object": "text",
-    "str":"text",
+    "string": "text",
+    "str": "text",
     "category": "text",
     "bool": "text",
-    "int32": "double",
-    "boolean":"text"
+    "boolean": "text",
 }
 
+# underlying datatypes for each MDV datatype, used for reading/writing h5 files
 numpy_dtypes = {
     "text": numpy.ubyte,
     "text16": numpy.uint16,
@@ -91,7 +113,7 @@ numpy_dtypes = {
     "double": numpy.float32,
     "integer": numpy.float32,
     "int32": numpy.int32,
-    # unique created in fly (depends on string length)
+    # unique created on the fly (depends on string length)
 }
 
 _UNIX_EPOCH_UTC = pandas.Timestamp("1970-01-01", tz="UTC")
