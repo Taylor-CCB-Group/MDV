@@ -158,44 +158,47 @@ reach the deck layer upstream (SpatialData.js#147), so the control would be iner
 flat colour control stays, with a caption saying what it actually does when the element
 has features.
 
-### On-demand feature loading does not work yet
+### On-demand feature loading
 
-Selecting a feature whose points fall outside the memory cap is supposed to trigger a
-feature-index scan that fetches them. That scan runs in the core points worker, and
-**MDV cannot start that worker**: the published `@spatialdata/core/points-worker` is a
-CommonJS file inside a `"type": "module"` package (both build formats are written to
-the same `.js` name, so the cjs pass overwrites the esm one), and
-`new Worker(url, {type: "module"})` dies on `require is not defined`. Filed as
-SpatialData.js#148. The sd.js demo does not hit it because it imports the worker's
-TypeScript *source* by relative path, which no consumer can do.
+Selecting a feature whose points fall outside the memory cap triggers a feature-index
+scan that fetches them. That scan runs in the **core points worker**, which
+`ensurePointsWorker` starts alongside the zarr chunk worker. It is not optional:
+`loadPointsMatchingFeatureCodes` throws outright without a worker rather than falling
+back to the main thread, so without it a selection silently shows only whatever part of
+the feature was inside the cap.
 
-So the panel gates its on-demand messaging on `isPointsWorkerEnabled()` and tells the
-user those points can't be fetched, rather than inviting a click that does nothing. The
-gate drops out by itself once a fixed worker ships — do not remove it before then.
+This was impossible before `@spatialdata/core@0.8.0` — the published worker entry was a
+CommonJS file in an ESM package, so `new Worker(url, {type: "module"})` died on
+`require is not defined` (SpatialData.js#148). That is the reason for the pin floor.
+The panel still gates its on-demand messaging on `isPointsWorkerEnabled()`: if the
+worker ever fails to start, a greyed row must not invite a click that cannot work.
 
-Two related traps this exposed, both worth knowing when reading the panel:
+Two things about the panel that follow from how the engine reports state, both easy to
+misread:
 
 - A feature is **"resident" if it has one point inside the cap**, not if all of its
   points are there. On an 8.07M-point element at the 4M default, all 541 features are
-  resident and nothing is greyed — while half the dataset is missing. The memory-cap
-  readout is the only honest signal, which is why it sits right above the feature list.
-- A **failed** scan is invisible: `getMatchingLoadState` returns `undefined` for a
-  failed slot exactly as it does for "no scan has run", and no error accessor exists.
-  That is SpatialData.js#149; until it lands, a scan that breaks for some new reason
-  will look like nothing happening.
-
-`src/react/spatialdata/points_feature_row_state.ts` is a temporary verbatim copy of
-upstream's row classifier, pending SpatialData.js#146. Delete it when the pin moves
-past that release.
+  resident. Rows whose resident count falls short of the dataset total are therefore
+  classified `partial` and print `resident / dataset` — un-greyed, because they *are*
+  drawn, but never claiming to be whole.
+- A **failed** scan still draws: the render path falls back to filtering the resident
+  batch, so the canvas shows a subset and nothing about it looks broken. The panel
+  reports `matchingLoadState.failed` explicitly with a Retry, rather than letting that
+  subset read as the complete answer.
 
 ## Minimum upstream version
 
-**`@spatialdata/* >= 0.7.0`, and `zarrextra >= 0.4.0` with it.**
+**`@spatialdata/* >= 0.8.0`, and `zarrextra >= 0.4.0` with it.**
 
-0.7.0 is the floor because the points feature panel imports
-`PointsFeatureStateProvider` and `usePointsFeatureState` from the `@spatialdata/vis`
-entry, and below it those are not re-exported there — the package publishes only a
-`"."` export, so there is no deep-import fallback either.
+0.8.0 is the floor. It is the first release whose published
+`@spatialdata/core/points-worker` is an ES module and can therefore be started at all,
+which is what makes on-demand feature loading work rather than fail silently. It also
+carries `describeFeatureRowState` (imported here rather than mirrored) and the
+resident-vs-dataset feature counts the panel prints.
+
+0.7.0 first re-exported `PointsFeatureStateProvider` / `usePointsFeatureState` from the
+`@spatialdata/vis` entry — below it they are not reachable at all, since the package
+publishes only a `"."` export.
 
 0.6.0 remains the floor for the table work underneath that. Do not ship an MDV that
 touches SpatialData tables against anything older. Before

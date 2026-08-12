@@ -20,6 +20,7 @@ import type { FieldName } from "@/charts/charts";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
+import { ensurePointsWorker } from "@/react/spatialdata/ensurePointsWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
@@ -186,9 +187,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     // stable for the life of the renderer and owns its own notifications, so this
     // publishes once rather than on every generation bump.
     useEffect(() => {
-        chart.setPointsLayerRegistry(
-            createPointsLayerRegistry(renderer.pointsEngine, renderer.resolvePointsTarget),
-        );
+        chart.setPointsLayerRegistry(createPointsLayerRegistry(renderer.pointsEngine, renderer.resolvePointsTarget));
         return () => chart.setPointsLayerRegistry(undefined);
     }, [chart, renderer.pointsEngine, renderer.resolvePointsTarget]);
 
@@ -285,6 +284,7 @@ const SpatialDataMainChart = observer(() => {
     const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
     useEffect(() => {
         ensureChunkWorker();
+        ensurePointsWorker();
     }, []);
 
     return (

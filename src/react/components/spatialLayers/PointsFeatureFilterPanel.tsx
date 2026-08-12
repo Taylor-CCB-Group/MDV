@@ -1,10 +1,9 @@
 import { Alert, Button, Checkbox, FormControlLabel, TextField, Typography } from "@mui/material";
 import { featureNamesForCodes, isPointsWorkerEnabled, resolveFeatureSelectionCodes } from "@spatialdata/core";
 import { featureCodeToRgb } from "@spatialdata/layers";
-import { usePointsFeatureState } from "@spatialdata/vis";
+import { describeFeatureRowState, featureRowOpacity, usePointsFeatureState } from "@spatialdata/vis";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { describeFeatureRowState, featureRowOpacity } from "@/react/spatialdata/points_feature_row_state";
 import type { PointsLayerConfig, PointsLayerUpdate } from "@/react/spatialdata/points_layer_config";
 
 /** Above this many features the list gets a search box; below it, scrolling is enough. */
@@ -96,6 +95,7 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
         residentFeatureCounts,
         requestCatalog,
         setHighlightedFeature,
+        retryFailedLoads,
     } = usePointsFeatureState(config);
 
     const [searchQuery, setSearchQuery] = useState("");
@@ -121,6 +121,21 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
     const effectiveCount = (entry: CatalogEntry) => entry.count ?? partialCounts?.get(entry.code);
     const countIsPartial = (entry: CatalogEntry) =>
         entry.count === undefined && partialCounts?.get(entry.code) !== undefined;
+    // Dataset totals by code, so a row can be compared against what is resident without
+    // rescanning `entries` per row.
+    const datasetCountByCode = new Map<number, number>(
+        entries.flatMap((entry) =>
+            entry.count !== undefined ? ([[entry.code, entry.count]] as [number, number][]) : [],
+        ),
+    );
+    /** Resident points for a feature when that is meaningfully LESS than the dataset —
+     * a shortfall worth showing. `undefined` otherwise. */
+    const residentShortfall = (entry: CatalogEntry): number | undefined => {
+        if (entry.count === undefined) return undefined;
+        const resident = residentFeatureCounts?.get(entry.code);
+        if (resident === undefined || resident >= entry.count) return undefined;
+        return resident;
+    };
 
     // The selection persists as NAMES (see PointsLayerConfig.featureNames); everything
     // below works in codes, resolved once against the catalog already being rendered.
@@ -255,14 +270,12 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
     const scanning = matchingLoadState?.loading ?? false;
     // `supportsOnDemandLoad` answers "does this element have a feature index", which is
     // necessary but not sufficient: the scan that uses it runs in the core points
-    // worker, and `loadPointsMatchingFeatureCodes` throws outright without one. MDV
-    // cannot enable that worker — the published `@spatialdata/core/points-worker` is a
-    // CommonJS file in an ESM package, so `new Worker(url, {type:"module"})` dies on
-    // `require is not defined` (SpatialData.js#148). Until that ships fixed, a
-    // non-resident feature genuinely cannot be fetched, so say so rather than inviting
-    // a click that silently does nothing. Drops out on its own once the worker loads.
+    // worker, and `loadPointsMatchingFeatureCodes` throws outright without one rather
+    // than falling back to the main thread. `ensurePointsWorker` starts it, so this is
+    // normally true — but if that ever fails the row must not invite a click that
+    // cannot work, which is the state this app shipped in before core 0.8.0.
     const canScanOnDemand = supportsOnDemandLoad && isPointsWorkerEnabled();
-    /** The element could scan, but the worker it needs is unavailable. */
+    /** The element could scan, but the worker it needs never started. */
     const workerBlocksScan = supportsOnDemandLoad && !canScanOnDemand;
     const rowInfo = (code: number) => {
         const resident = residentKnown && (residentCodes?.has(code) ?? false);
@@ -279,11 +292,19 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
                 scanning,
                 supportsOnDemandLoad: canScanOnDemand,
                 residentKnown,
+                residentPointCount: residentFeatureCounts?.get(code),
+                datasetPointCount: datasetCountByCode.get(code),
             }),
         };
     };
     const notLoadedCount = residentKnown
         ? entries.reduce((total, entry) => total + (rowInfo(entry.code).state.greyed ? 1 : 0), 0)
+        : 0;
+    // Drawn, but only in part. Counted apart from `notLoadedCount` because it is the
+    // opposite failure of understanding: these rows look entirely healthy — un-greyed,
+    // full dataset count beside them — while most of their points are outside the cap.
+    const partialCount = residentKnown
+        ? entries.reduce((total, entry) => total + (rowInfo(entry.code).state.tone === "partial" ? 1 : 0), 0)
         : 0;
 
     return (
@@ -316,13 +337,43 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
                         {canScanOnDemand
                             ? "not loaded yet (greyed below) — selecting one loads it on demand."
                             : workerBlocksScan
-                              ? "not in the loaded sample (greyed below). Fetching them needs the points worker, which this build can't start (SpatialData.js#148) — raise the memory cap to bring more in."
+                              ? "not in the loaded sample (greyed below). The points worker that fetches them did not start, so raise the memory cap to bring more in."
                               : "not in the loaded sample (greyed below). This dataset has no feature index, so they can't be shown until the memory cap is raised or it's rewritten with one."}
                     </Typography>
                 </Alert>
             ) : null}
 
-            {matchingLoadState ? (
+            {partialCount > 0 ? (
+                <Typography variant="caption" color="text.secondary">
+                    {partialCount} of {entries.length} feature{entries.length === 1 ? "" : "s"} only partly loaded — the
+                    resident window is capped, so the canvas is drawing a sample of each. Select one to fetch it in
+                    full, or raise the memory cap.
+                </Typography>
+            ) : null}
+
+            {matchingLoadState?.failed ? (
+                // A failed scan still DRAWS: the render path falls back to filtering the
+                // resident batch, so the canvas shows whichever part of the selection was
+                // inside the cap. Saying so matters more than the error text — without it
+                // the partial view reads as the complete answer.
+                <Alert
+                    severity="error"
+                    sx={{ py: 0 }}
+                    action={
+                        matchingLoadState.error?.retryable === false ? undefined : (
+                            <Button size="small" onClick={() => retryFailedLoads()}>
+                                Retry
+                            </Button>
+                        )
+                    }
+                >
+                    <Typography variant="caption">
+                        Could not load the selected features
+                        {matchingLoadState.error ? `: ${matchingLoadState.error.message}` : "."} Showing only the
+                        selected points already in memory.
+                    </Typography>
+                </Alert>
+            ) : matchingLoadState ? (
                 <Typography variant="caption" color={matchingLoadState.loading ? "primary" : "text.secondary"}>
                     {matchingLoadState.loading
                         ? `Loading selected features… ${matchingLoadState.matchedRows.toLocaleString()} points so far`
@@ -378,21 +429,19 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
                     const { resident, rendered, selected, state } = rowInfo(entry.code);
                     const overridden = colorOverrides?.[entry.name] !== undefined;
                     const rgb = effectiveRgb(entry.name, entry.code);
+                    // Once dataset totals land, keep showing the resident tally too when
+                    // it falls short. Dropping it is what let a capped element print
+                    // "1,182,402" beside a row drawing a tenth of that. `partial` already
+                    // excludes features a scan has since supplied whole.
+                    const shortfall = state.tone === "partial" ? residentShortfall(entry) : undefined;
                     const countStr = entry.count !== undefined ? ` · ${entry.count.toLocaleString()} pts` : "";
                     // Multi-line diagnostic: the human state and its reason, then the raw
                     // signals that drove it (what made this row grey, or not).
-                    const title =
-                        `${entry.name} · code ${entry.code}${countStr}\n` +
-                        `${state.label}: ${state.reason}\n` +
-                        // The classifier is told there is no on-demand load, which is true
-                        // here but for the wrong reason — it blames a missing feature index,
-                        // and this element has one. Correct the attribution rather than fork
-                        // the classifier, which is a copy of upstream's and due for deletion.
-                        (workerBlocksScan
+                    const title = `${entry.name} · code ${entry.code}${countStr}\n${state.label}: ${state.reason}\n${
+                        workerBlocksScan
                             ? "(This element does have a feature index; the points worker it needs can't start — SpatialData.js#148.)\n"
-                            : "") +
-                        `[resident=${resident ? "y" : "n"} rendered=${rendered ? "y" : "n"} ` +
-                        `selected=${selected ? "y" : "n"} scan=${scanning ? "running" : "idle"}]`;
+                            : ""
+                    }[resident=${resident ? "y" : "n"} rendered=${rendered ? "y" : "n"} selected=${selected ? "y" : "n"} scan=${scanning ? "running" : "idle"}]`;
                     return (
                         <FormControlLabel
                             key={entry.code}
@@ -439,13 +488,32 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
                                             color="text.secondary"
                                             className="ml-auto shrink-0"
                                             title={
-                                                countIsPartial(entry)
-                                                    ? "Points loaded so far (resident window) — dataset total still counting"
-                                                    : "Points in the dataset"
+                                                shortfall !== undefined
+                                                    ? `${shortfall.toLocaleString()} of ${entry.count?.toLocaleString()} points are inside the memory cap`
+                                                    : countIsPartial(entry)
+                                                      ? "Points loaded so far (resident window) — dataset total still counting"
+                                                      : "Points in the dataset"
                                             }
                                         >
-                                            {countIsPartial(entry) ? "≥" : ""}
-                                            {effectiveCount(entry)?.toLocaleString() ?? "—"}
+                                            {shortfall !== undefined ? (
+                                                <>
+                                                    {/* The resident figure is what is on
+                                                        screen, so it carries the emphasis;
+                                                        the dataset total is context. */}
+                                                    <span className="text-[hsl(var(--warning,38_92%_50%))]">
+                                                        {shortfall.toLocaleString()}
+                                                    </span>
+                                                    <span className="opacity-60">
+                                                        {" / "}
+                                                        {entry.count?.toLocaleString()}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {countIsPartial(entry) ? "≥" : ""}
+                                                    {effectiveCount(entry)?.toLocaleString() ?? "—"}
+                                                </>
+                                            )}
                                         </Typography>
                                     ) : null}
                                 </span>

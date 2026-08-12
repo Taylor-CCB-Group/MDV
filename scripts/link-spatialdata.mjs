@@ -33,21 +33,28 @@ const PACKAGE_DIRS = {
 /**
  * What `unlink` restores. Keep in step with the ranges in package.json — this is a
  * separate copy of them, so it goes stale silently and unlink then writes a pin
- * nobody chose. 0.7.0 is the floor: the points feature panel imports
- * `PointsFeatureStateProvider` / `usePointsFeatureState` from the `@spatialdata/vis`
- * entry, and below 0.7.0 those are not re-exported there at all (the package
- * publishes only a `"."` export, so there is no deep-import fallback either). 0.6.0
- * remains the floor for the table work below that: the fill-colour scheme MDV hands
- * to a shapes layer (`categoricalPalette: { byValue }`, `numericDomain`) does not
- * exist under it, and against 0.4.0 it did not merely fail to typecheck — it crashed
+ * nobody chose.
+ *
+ * 0.8.0 is the floor. It is the first release whose published
+ * `@spatialdata/core/points-worker` is an ES module, and therefore the first that can
+ * start the points worker at all — below it `new Worker(url, {type:"module"})` dies on
+ * `require is not defined`, and the feature-index scan that fetches a selected
+ * feature's points from beyond the memory cap is impossible. It also carries
+ * `describeFeatureRowState` (which this app imports rather than mirroring) and the
+ * resident-vs-dataset feature counts.
+ *
+ * Earlier floors, still true underneath: 0.7.0 first re-exported
+ * `PointsFeatureStateProvider` / `usePointsFeatureState` from the vis entry, and 0.6.0
+ * the fill-colour scheme MDV hands a shapes layer (`categoricalPalette: { byValue }`,
+ * `numericDomain`) — against 0.4.0 that did not merely fail to typecheck, it crashed
  * the layer at runtime.
  */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.7.0",
-    "@spatialdata/core": "^0.7.0",
-    "@spatialdata/layers": "^0.7.0",
-    "@spatialdata/react": "^0.7.0",
-    "@spatialdata/vis": "^0.7.0",
+    "@spatialdata/avivatorish": "^0.8.0",
+    "@spatialdata/core": "^0.8.0",
+    "@spatialdata/layers": "^0.8.0",
+    "@spatialdata/react": "^0.8.0",
+    "@spatialdata/vis": "^0.8.0",
     zarrextra: "^0.4.0",
 };
 
