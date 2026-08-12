@@ -23,6 +23,7 @@ import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
+import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import {
     type MdvDeckOverlayLayers,
     createMdvHostLayerResolver,
@@ -179,6 +180,17 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         renderer.getImageLoadedDataByElementKey,
         renderer.getLayerLoadState,
     ]);
+
+    // The points engine, published for the layer dialog — a separate React tree, so
+    // it cannot reach the renderer result. No render-stack dependency: the engine is
+    // stable for the life of the renderer and owns its own notifications, so this
+    // publishes once rather than on every generation bump.
+    useEffect(() => {
+        chart.setPointsLayerRegistry(
+            createPointsLayerRegistry(renderer.pointsEngine, renderer.resolvePointsTarget),
+        );
+        return () => chart.setPointsLayerRegistry(undefined);
+    }, [chart, renderer.pointsEngine, renderer.resolvePointsTarget]);
 
     const handleHover = useCallback(
         (info: PickingInfo) => {

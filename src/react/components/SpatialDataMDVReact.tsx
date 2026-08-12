@@ -17,6 +17,7 @@ import {
 } from "./avivatorish/state";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
@@ -95,6 +96,11 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.imageLayerRegistry = registry;
     }
 
+    pointsLayerRegistry?: PointsLayerRegistry;
+    setPointsLayerRegistry(registry: PointsLayerRegistry | undefined) {
+        this.pointsLayerRegistry = registry;
+    }
+
     constructor(
         dataStore: DataStore,
         div: HTMLDivElement,
@@ -117,6 +123,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             finishDefaultSpatialLayerSeed: action,
             imageLayerRegistry: observable.ref,
             setImageLayerRegistry: action,
+            // `.ref` only: the engine notifies its own subscribers, and making it
+            // deeply observable would have MobX walk a live render-path object.
+            pointsLayerRegistry: observable.ref,
+            setPointsLayerRegistry: action,
         });
         this.vivStores = createVivStores();
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
