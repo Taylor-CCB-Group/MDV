@@ -173,9 +173,9 @@ export function useRenderStackAdapter({
     hostLayerResolver: ReturnType<typeof createMdvHostLayerResolver>;
 }) {
     const layerInputsCacheRef = useRef(createRenderStackLayerInputsCache());
-    // `measureSpatial` is a no-op unless localStorage.MDV_SPATIAL_PERF === "1".
-    // The `count` of these labels == number of adapter renders during a capture,
-    // i.e. how often a cosmetic image edit re-renders SpatialDataViewer.
+    // `measureSpatial` is a no-op unless localStorage.MDV_SPATIAL_PERF === "1" —
+    // see `perf.ts` for the labels, what a healthy capture looks like, and the
+    // warning about leaving that flag set.
     measureSpatial("adapter.observe", () => observeRenderStack(stack));
     const spatialRevision = measureSpatial("adapter.revision", () =>
         `${propsGeneration}:${renderStackSpatialRevision(stack)}`,
