@@ -1,4 +1,14 @@
-import { Divider, MenuItem, Slider, TextField, Typography } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Divider,
+    MenuItem,
+    Slider,
+    TextField,
+    Typography,
+} from "@mui/material";
 import { DEFAULT_POINTS_MEMORY_CAP } from "@spatialdata/core";
 import { PointsFeatureStateProvider, usePointsFeatureState } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
@@ -49,9 +59,11 @@ function memoryCapOptions(currentCap: number): number[] {
 }
 
 /**
- * How much of the element is actually in memory, straight from the engine — the
- * context for the memory cap above it, and the only place the user finds out that
- * what they are looking at is capped.
+ * How much of the element is actually in memory, straight from the engine — and the
+ * only place the user finds out that what they are looking at is capped.
+ *
+ * It sits in the Advanced *summary* rather than inside it, so collapsing the section
+ * hides the cap control without hiding the fact that a cap is biting.
  */
 function PointsInMemory({ config }: { config: PointsLayerConfig }) {
     // Engine-backed read that updates on notify; see PointsFeatureFilterPanel.
@@ -61,43 +73,95 @@ function PointsInMemory({ config }: { config: PointsLayerConfig }) {
     // Deliberately the size of the batch held in memory, not a per-selection matched
     // count: `loaded` is the covered batch, which overstates a selection that filters
     // that batch in memory. A precise per-selection count needs engine support.
+    const loaded = truncation.loaded.toLocaleString();
     const message = truncation.truncated
-        ? `${truncation.loaded.toLocaleString()}${
-              truncation.total !== undefined ? ` of ${truncation.total.toLocaleString()}` : ""
-          } points in memory — capped; raise the cap for more.`
+        ? truncation.total !== undefined
+            ? `${loaded} of ${truncation.total.toLocaleString()} points in memory (capped)`
+            : `${loaded} points in memory (capped)`
         : truncation.filtered
-          ? `${truncation.loaded.toLocaleString()} points in memory; view filtered to selection.`
-          : `All ${truncation.loaded.toLocaleString()} points loaded (not capped).`;
+          ? `${loaded} points in memory · filtered to selection`
+          : `All ${loaded} points loaded`;
     return (
-        <Typography variant="caption" color={truncation.truncated ? "warning.main" : "text.secondary"}>
+        <Typography variant="caption" color={truncation.truncated ? "warning.main" : "text.secondary"} noWrap>
             {message}
         </Typography>
     );
 }
 
+function FlatColourControl({
+    label,
+    color,
+    updateLayer,
+    note,
+}: {
+    label: string;
+    color: [number, number, number, number];
+    updateLayer: PointsLayerUpdate;
+    note?: string;
+}) {
+    return (
+        <LabeledControl label={label}>
+            <div className="grid justify-items-start gap-1">
+                <input
+                    type="color"
+                    aria-label={label}
+                    value={toHex(color)}
+                    onChange={(event) => {
+                        const [r, g, b] = fromHex(event.target.value);
+                        // Alpha is carried through untouched. Layer-wide opacity is the
+                        // render stack's own `opacity` prop, driven by the slider on the
+                        // layer row — this panel used to offer a second slider for
+                        // `color[3]`, which multiplied against it for no gain.
+                        updateLayer({ color: [r, g, b, color[3] ?? 255] });
+                    }}
+                />
+                {note ? (
+                    <Typography variant="caption" color="text.secondary">
+                        {note}
+                    </Typography>
+                ) : null}
+            </div>
+        </LabeledControl>
+    );
+}
+
+type Placement = "inline" | "advanced";
+
 /**
- * Says out loud that the flat colour above is not what the user is looking at. An
- * element with a feature catalog is coloured per feature (on by default upstream and
- * not switchable — see the note at the colour control), so the swatch only shows
- * through for points with no feature code, while its alpha applies either way.
+ * The flat colour, placed by how much it can actually do.
+ *
+ * With a feature catalog the points take their colours from the feature palette, and
+ * that colouring cannot even be switched off (upstream SpatialData.js#147), so this
+ * swatch only shows through for points carrying no feature code — near enough inert,
+ * and it belongs under Advanced. Without a catalog it is the layer's only colour and
+ * has to stay in view.
+ *
+ * `catalog === null` is the one state that positively means "this element has no
+ * catalog"; while the answer is still unknown the swatch sits under Advanced, so the
+ * only move it can ever make is the revealing one.
  */
-function FlatColourNote({ config }: { config: PointsLayerConfig }) {
+function FlatColour({ config, updateLayer, placement }: Props & { placement: Placement }) {
     // Engine-backed read that updates on notify; see PointsFeatureFilterPanel.
     "use no memo";
     const { catalog } = usePointsFeatureState(config);
-    if (!catalog) return null;
+    const belongs: Placement = catalog === null ? "inline" : "advanced";
+    if (belongs !== placement) return null;
     return (
-        <Typography variant="caption" color="text.secondary">
-            Points are coloured per feature, so this sets opacity and the fallback colour for points with no feature.
-            Per-feature colours are below.
-        </Typography>
+        <FlatColourControl
+            label={placement === "inline" ? "Colour" : "Fallback colour"}
+            color={config.color ?? [100, 149, 237, 200]}
+            updateLayer={updateLayer}
+            note={
+                placement === "advanced"
+                    ? "Points are coloured per feature; this shows only for points with no feature."
+                    : undefined
+            }
+        />
     );
 }
 
 function PointsStyleControls({ config, updateLayer, engineAvailable }: Props & { engineAvailable: boolean }) {
     const pointSize = config.pointSize ?? 4;
-    const color = config.color ?? [100, 149, 237, 200];
-    const currentCap = config.pointsMemoryCap ?? DEFAULT_POINTS_MEMORY_CAP;
 
     return (
         <div className="grid gap-3">
@@ -119,61 +183,90 @@ function PointsStyleControls({ config, updateLayer, engineAvailable }: Props & {
                 </div>
             </LabeledControl>
 
-            {/* No colour-by-feature switch. It looks like the obvious companion to the
-                per-feature swatches below, but `colorByFeature: false` does not reach the
-                deck layer upstream — `useLayerData` spreads the flag only when truthy, so
-                an explicit `false` arrives as `undefined` and the shader's
-                `!== false` guard keeps colouring. A switch here would be inert.
-                See https://github.com/Taylor-CCB-Group/SpatialData.js/issues/147 */}
-            <LabeledControl label="Colour">
-                <div className="grid gap-1">
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="color"
-                            value={toHex(color)}
-                            onChange={(event) => {
-                                const [r, g, b] = fromHex(event.target.value);
-                                updateLayer({ color: [r, g, b, color[3] ?? 255] });
-                            }}
-                        />
-                        <Slider
-                            size="small"
-                            min={0}
-                            max={255}
-                            step={1}
-                            value={color[3] ?? 255}
-                            onChange={(_, value) => {
-                                if (typeof value === "number") {
-                                    updateLayer({ color: [color[0], color[1], color[2], value] });
-                                }
-                            }}
-                        />
-                    </div>
-                    {engineAvailable ? <FlatColourNote config={config} /> : null}
-                </div>
-            </LabeledControl>
-
-            <LabeledControl label="Memory cap">
-                <div className="grid gap-1">
-                    <TextField
-                        select
-                        size="small"
-                        fullWidth
-                        value={currentCap}
-                        onChange={(event) => updateLayer({ pointsMemoryCap: Number(event.target.value) })}
-                        helperText="Max rows kept in memory. Higher draws more points; picking is limited to ~16.7M per layer."
-                    >
-                        {memoryCapOptions(currentCap).map((cap) => (
-                            <MenuItem key={cap} value={cap}>
-                                {`${(cap / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M rows`}
-                                {cap === DEFAULT_POINTS_MEMORY_CAP ? " (default)" : ""}
-                            </MenuItem>
-                        ))}
-                    </TextField>
-                    {engineAvailable ? <PointsInMemory config={config} /> : null}
-                </div>
-            </LabeledControl>
+            {/* Without the engine we cannot ask whether a feature catalog exists, so the
+                swatch stays in view — hiding the only colour control of a layer that turns
+                out to have no catalog is the worse mistake. */}
+            {engineAvailable ? (
+                <FlatColour config={config} updateLayer={updateLayer} placement="inline" />
+            ) : (
+                <FlatColourControl
+                    label="Colour"
+                    color={config.color ?? [100, 149, 237, 200]}
+                    updateLayer={updateLayer}
+                />
+            )}
         </div>
+    );
+}
+
+/**
+ * Everything that is about the *loading* of this layer rather than the look of it.
+ *
+ * The memory cap used to sit third in the style block, full width with two lines of
+ * explanation under it — more prominence than a control most users never touch, and
+ * ahead of the feature list they came for.
+ */
+function PointsAdvanced({ config, updateLayer, engineAvailable }: Props & { engineAvailable: boolean }) {
+    const currentCap = config.pointsMemoryCap ?? DEFAULT_POINTS_MEMORY_CAP;
+
+    return (
+        <Accordion
+            disableGutters
+            elevation={0}
+            defaultExpanded={false}
+            // Collapsed means gone: the cap select is a load-triggering control and has no
+            // business in the tab order while the section is shut.
+            TransitionProps={{ unmountOnExit: true }}
+            sx={{
+                border: "1px solid hsl(var(--border))",
+                borderRadius: "6px",
+                backgroundColor: "transparent",
+                backgroundImage: "none",
+                "&:before": { display: "none" },
+            }}
+        >
+            <AccordionSummary
+                expandIcon={<ExpandMoreIcon fontSize="small" />}
+                sx={{
+                    px: 1,
+                    minHeight: "unset",
+                    "& .MuiAccordionSummary-content": {
+                        my: 0.75,
+                        minWidth: 0,
+                        alignItems: "baseline",
+                        gap: 1,
+                    },
+                    "& .MuiAccordionSummary-expandIconWrapper": { color: "hsl(var(--muted-foreground))" },
+                }}
+            >
+                <Typography variant="caption">Advanced</Typography>
+                {engineAvailable ? <PointsInMemory config={config} /> : null}
+            </AccordionSummary>
+            <AccordionDetails sx={{ px: 1, pt: 0, pb: 1.5 }}>
+                <div className="grid gap-3">
+                    <LabeledControl label="Memory cap">
+                        <TextField
+                            select
+                            size="small"
+                            fullWidth
+                            value={currentCap}
+                            onChange={(event) => updateLayer({ pointsMemoryCap: Number(event.target.value) })}
+                            helperText="Max rows kept in memory. Higher draws more points; picking is limited to ~16.7M per layer."
+                        >
+                            {memoryCapOptions(currentCap).map((cap) => (
+                                <MenuItem key={cap} value={cap}>
+                                    {`${(cap / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M rows`}
+                                    {cap === DEFAULT_POINTS_MEMORY_CAP ? " (default)" : ""}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </LabeledControl>
+                    {engineAvailable ? (
+                        <FlatColour config={config} updateLayer={updateLayer} placement="advanced" />
+                    ) : null}
+                </div>
+            </AccordionDetails>
+        </Accordion>
     );
 }
 
@@ -193,8 +286,9 @@ const PointsLayerPanel = observer(function PointsLayerPanel({ config, updateLaye
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const registry = chart.pointsLayerRegistry;
 
-    // `engineAvailable` gates the two engine-backed readouts inside the style controls:
-    // `usePointsFeatureState` throws outside the provider, so they must not render here.
+    // `engineAvailable` gates the engine-backed readouts inside the style controls and
+    // the Advanced section: `usePointsFeatureState` throws outside the provider, so they
+    // must not render here.
     if (!registry) {
         return (
             <div className="grid gap-3">
@@ -202,6 +296,7 @@ const PointsLayerPanel = observer(function PointsLayerPanel({ config, updateLaye
                 <Typography variant="caption" color="text.secondary">
                     Waiting for points data…
                 </Typography>
+                <PointsAdvanced config={config} updateLayer={updateLayer} engineAvailable={false} />
             </div>
         );
     }
@@ -212,6 +307,7 @@ const PointsLayerPanel = observer(function PointsLayerPanel({ config, updateLaye
                 <PointsStyleControls config={config} updateLayer={updateLayer} engineAvailable={true} />
                 <Divider />
                 <PointsFeatureFilterPanel config={config} updateLayer={updateLayer} />
+                <PointsAdvanced config={config} updateLayer={updateLayer} engineAvailable={true} />
             </div>
         </PointsFeatureStateProvider>
     );

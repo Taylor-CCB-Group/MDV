@@ -28,6 +28,17 @@ const rowLabelSx = {
 
 const checkboxSx = { p: 0.25 } as const;
 
+/** Dotted underline so the terse coverage counts read as "there is more here". */
+const HINT_CLASS = "cursor-help underline decoration-dotted underline-offset-2";
+
+const NOT_LOADED_HINT =
+    "Greyed below: no points inside the memory cap. Selecting one fetches it on demand, or raise the cap under Advanced.";
+
+const PARTIAL_HINT =
+    "Drawn from a sample — some of their points are outside the memory cap. Select one to fetch it in full, or raise the cap under Advanced.";
+
+const pluralFeatures = (count: number) => `${count} feature${count === 1 ? "" : "s"}`;
+
 type Props = {
     config: PointsFeatureFilterConfig;
     updateLayer: PointsLayerUpdate;
@@ -356,26 +367,42 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
                 </Typography>
             ) : null}
 
-            {notLoadedCount > 0 ? (
-                <Alert severity={canScanOnDemand ? "info" : "warning"} sx={{ py: 0 }}>
-                    <Typography variant="caption">
-                        {notLoadedCount} of {entries.length} feature
-                        {entries.length === 1 ? "" : "s"}{" "}
-                        {canScanOnDemand
-                            ? "not loaded yet (greyed below) — selecting one loads it on demand."
-                            : workerBlocksScan
-                              ? "not in the loaded sample (greyed below). The points worker that fetches them did not start, so raise the memory cap to bring more in."
-                              : "not in the loaded sample (greyed below). This dataset has no feature index, so they can't be shown until the memory cap is raised or it's rewritten with one."}
+            {notLoadedCount > 0 || partialCount > 0 ? (
+                canScanOnDemand ? (
+                    // The healthy case: everything missing is one click from being fetched,
+                    // so it is a status line rather than an Alert. The explanation moves to
+                    // the tooltips — as prose it was three lines about the memory cap
+                    // sitting above the list it was describing.
+                    <Typography variant="caption" color="text.secondary">
+                        {notLoadedCount > 0 ? (
+                            <span className={HINT_CLASS} title={NOT_LOADED_HINT}>
+                                {notLoadedCount} not loaded
+                            </span>
+                        ) : null}
+                        {notLoadedCount > 0 && partialCount > 0 ? " · " : null}
+                        {partialCount > 0 ? (
+                            <span className={HINT_CLASS} title={PARTIAL_HINT}>
+                                {partialCount} partly loaded
+                            </span>
+                        ) : null}
                     </Typography>
-                </Alert>
-            ) : null}
-
-            {partialCount > 0 ? (
-                <Typography variant="caption" color="text.secondary">
-                    {partialCount} of {entries.length} feature{entries.length === 1 ? "" : "s"} only partly loaded — the
-                    resident window is capped, so the canvas is drawing a sample of each. Select one to fetch it in
-                    full, or raise the memory cap.
-                </Typography>
+                ) : (
+                    // Nothing the user can click will fix these, so they keep the Alert.
+                    <Alert severity="warning" sx={{ py: 0 }}>
+                        <Typography variant="caption">
+                            {notLoadedCount > 0
+                                ? `${pluralFeatures(notLoadedCount)} not in the loaded sample (greyed below)`
+                                : `${pluralFeatures(partialCount)} only partly loaded`}
+                            {notLoadedCount > 0 && partialCount > 0
+                                ? `, and ${partialCount} more only partly loaded`
+                                : ""}
+                            .{" "}
+                            {workerBlocksScan
+                                ? "The points worker that fetches the rest did not start, so raise the memory cap under Advanced to bring more in."
+                                : "This dataset has no feature index, so the rest can't be fetched on demand — raise the memory cap under Advanced, or rewrite the element with one."}
+                        </Typography>
+                    </Alert>
+                )
             ) : null}
 
             {matchingLoadState?.failed ? (
