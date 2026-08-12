@@ -1015,7 +1015,7 @@ class MDVProject:
                 int/numeric are converted to string (e.g. CSV-inferred cell_id).
         """
         if isinstance(column, str):
-            column = {"name": column,"field":column}
+            column = {"name": column}
         if not column.get("field"):
             column["field"] = column["name"]
         ds = self.get_datasource_metadata(datasource)
