@@ -11,7 +11,7 @@ import {
     schemeReds,
 } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
-import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 const color_schemes = {
     "blue yellow": [

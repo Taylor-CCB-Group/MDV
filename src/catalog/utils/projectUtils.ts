@@ -22,6 +22,8 @@ export interface Project {
     readme?: string;
 }
 
+export type { RecycledProject } from "./projectSchemas";
+
 export const sortProjects = (
     projects: Project[],
     sortBy: SortBy,

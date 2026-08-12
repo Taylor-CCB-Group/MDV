@@ -33,15 +33,12 @@ const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>
-                Delete Project
+                Move Project to Recycle Bin
                 <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
             <DialogContent dividers>
                 <Typography variant="body1" align="center">
-                    Are you sure you want to permanently{" "}
-                    <strong>delete this project</strong>? This action is{" "}
-                    <strong>irreversible</strong> and cannot be{" "}
-                    <strong>undone</strong>.
+                    Are you sure you want to move this project to the recycle bin?
                 </Typography>
             </DialogContent>
             <DialogActions>
@@ -56,7 +53,7 @@ const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
                         Cancel
                     </Button>
                     <Button onClick={handleDelete} color="error">
-                        Delete Project
+                        Move to Recycle Bin
                     </Button>
                 </Box>
             </DialogActions>

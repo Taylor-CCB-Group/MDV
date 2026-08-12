@@ -27,6 +27,8 @@ from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
 from typing import Optional
+import os
+import shutil
 from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -246,6 +248,102 @@ class ProjectService:
             logger.exception(f"Error in dbservice: Error soft deleting project: {e}")
             db.session.rollback()
             raise
+
+    @staticmethod
+    def soft_delete_projects(project_ids: list[int]):
+        """Soft-delete a validated set of active, editable projects atomically."""
+        try:
+            projects = Project.query.filter(Project.id.in_(project_ids)).all()
+            projects_by_id = {project.id: project for project in projects}
+            missing_ids = [project_id for project_id in project_ids if project_id not in projects_by_id]
+            if missing_ids:
+                raise ValueError(f"Projects not found: {missing_ids}")
+
+            invalid_ids = [
+                project.id
+                for project in projects
+                if project.is_deleted or project.access_level != "editable"
+            ]
+            if invalid_ids:
+                raise ValueError(f"Projects cannot be deleted: {invalid_ids}")
+
+            deleted_timestamp = datetime.now()
+            for project in projects:
+                project.is_deleted = True
+                project.deleted_timestamp = deleted_timestamp
+            db.session.commit()
+            return projects
+        except Exception:
+            db.session.rollback()
+            raise
+
+    @staticmethod
+    def get_deleted_projects(owner_user_id: Optional[int] = None):
+        """Return recycled projects, optionally restricted to projects owned by a user."""
+        query = Project.query.filter(Project.is_deleted)
+        if owner_user_id is not None:
+            query = query.join(UserProject).filter(
+                UserProject.user_id == owner_user_id,
+                UserProject.is_owner,
+            )
+        return query.order_by(Project.deleted_timestamp.desc()).all()
+
+    @staticmethod
+    def restore_deleted_project(project_id: int):
+        """Restore a soft-deleted project so it appears in active project lists."""
+        try:
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError(f"Project with ID {project_id} not found.")
+            if not project.is_deleted:
+                raise ValueError(f"Project with ID {project_id} is not in the recycle bin.")
+            if not project.path or not os.path.exists(project.path):
+                raise ValueError(f"Project with ID {project_id} is missing its filesystem path.")
+
+            project.is_deleted = False
+            project.deleted_timestamp = None
+            db.session.commit()
+            return project
+        except Exception:
+            db.session.rollback()
+            raise
+
+    @staticmethod
+    def purge_deleted_project(project_id: int):
+        """Permanently remove one recycled project from disk and the database."""
+        try:
+            project = Project.query.get(project_id)
+            if not project or not project.is_deleted:
+                return False, "Project is not in the recycle bin."
+            if not project.path:
+                return False, "Project path is missing."
+
+            project_path = os.path.abspath(project.path)
+            if project_path == os.path.abspath(os.sep):
+                return False, "Refusing to delete filesystem root."
+
+            # Flush DB deletes before touching the filesystem so constraint or
+            # database errors surface while rollback can still preserve files.
+            if os.path.exists(project.path):
+                if os.path.isdir(project.path) and not os.path.islink(project.path):
+                    filesystem_delete = lambda: shutil.rmtree(project.path)
+                else:
+                    filesystem_delete = lambda: os.remove(project.path)
+            else:
+                filesystem_delete = None
+
+            File.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            UserProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            db.session.delete(project)
+            db.session.flush()
+            if filesystem_delete is not None:
+                filesystem_delete()
+            db.session.commit()
+            return True, None
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(f"Error permanently deleting project {project_id}: {e}")
+            return False, str(e)
 
     @staticmethod
     def update_project_name(project_id, new_name):

@@ -6,16 +6,11 @@ out vec4 fragColor;
 uniform float opacity;
 uniform sampler2D weightsTexture; //using name 'texture' caused indirect glsl compiler errors with version 300 es(?)
 uniform sampler2D colorTexture;
-uniform float aggregationMode;
 
 in vec2 vTexCoords;
 in float vIntensityMin;
 in float vIntensityMax;
 
-// todo more structured uniforms, array of structs...
-uniform float contourOpacity;
-uniform float contourFill;
-uniform float fillOpacity;
 // struct ContourProps {
 //     vec2 increment;
 //     float lineWidth;
@@ -60,7 +55,7 @@ void main(void) {
   vec4 weights = texture(weightsTexture, vTexCoords);
   float weight = weights.r;
 
-  if (aggregationMode > 0.5) {
+  if (triangle.aggregationMode > 0.5) {
     weight /= max(1.0, weights.a);
   }
   // discard pixels with 0 weight.
@@ -75,13 +70,13 @@ void main(void) {
   // float f = 0.5; // reciprocol bandwidth
   // if (value > contourFill * f) return 1.; //metaballs - should be controllable parameter with nice animation //no bool type for uniforms in new luma.gl afaik
   // Determine fill strength: fillOpacity controls the overall strength of the fill contribution
-  float fillStrength = (weight > contourFill) ? fillOpacity : 0.0;
+  float fillStrength = (weight > triangle.contourFill) ? triangle.fillOpacity : 0.0;
   vec4 fullColor = texture(colorTexture, vec2(1.0, 0.5)); //should be a uniform
   
   // Contour contribution: contourOpacity controls the overall strength
   // Only show contour when contourShape > 0 (on a contour line)
   // Don't mix with linearColor to avoid gradient - show fullColor directly
-  float c = contourShape * contourOpacity;
+  float c = contourShape * triangle.contourOpacity;
   vec4 contourColor = fullColor;
   // Apply contourOpacity and boost alpha for visibility (original logic used c*2.)
   contourColor.a = c * 2.0;
@@ -93,8 +88,8 @@ void main(void) {
   fillColor.rgb *= fillStrength; // Apply fillOpacity to RGB for proper blending
   
   // Edge contribution: create an edge at the fill boundary using smoothContour-like function
-  float edgeShape = smoothEdge(weight, contourFill);
-  float edgeStrength = edgeShape * fillOpacity * 1.3;
+  float edgeShape = smoothEdge(weight, triangle.contourFill);
+  float edgeStrength = edgeShape * triangle.fillOpacity * 1.3;
   vec4 edgeColor = fullColor;
   edgeColor.a = edgeStrength * 2.0; // Boost alpha for visibility
   

@@ -3,7 +3,7 @@ import { easeLinear } from "d3-ease";
 import SVGChart from "./SVGChart.js";
 import BaseChart from "./BaseChart";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
-import { buildColorLegendSpec } from "@/react/colorLegend/buildColorLegendSpec";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class StackedRowChart extends SVGChart {
     constructor(dataStore, div, config) {

@@ -24,6 +24,7 @@ from typing import List, Dict, Tuple, Optional, Any, Union
 from datetime import datetime
 
 from mdvtools.dbutils.dbmodels import db, Project, File, UserProject
+from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -282,31 +283,14 @@ def purge_deleted_projects(app, dry_run=False) -> Dict:
             
             logger.info(f"Processing project {project_id}: {project_name}")
             
-            # Remove from filesystem
-            if os.path.exists(project_path):
-                try:
-                    if os.path.isdir(project_path):
-                        shutil.rmtree(project_path)
-                        logger.info(f"  ✓ Removed directory: {project_path}")
-                        results['filesystem_removed'] += 1
-                    else:
-                        os.remove(project_path)
-                        logger.info(f"  ✓ Removed file: {project_path}")
-                        results['filesystem_removed'] += 1
-                except Exception as e:
-                    error_msg = f"Error removing filesystem path: {e}"
-                    logger.error(f"  ✗ {error_msg}")
-                    results['errors'].append((project_id, project_name, error_msg))
-            else:
-                logger.info(f"  ⚠ Path does not exist: {project_path}")
-            
-            # Remove from database (including related records)
-            delete_result = delete_project_from_database(app, project_id, project_name, dry_run=False)
-            if delete_result['success_count'] > 0:
+            path_existed = os.path.exists(project_path)
+            success, message = ProjectService.purge_deleted_project(project_id)
+            if success:
+                if path_existed:
+                    results['filesystem_removed'] += 1
                 results['database_removed'] += 1
             else:
-                if delete_result['errors']:
-                    results['errors'].extend(delete_result['errors'])
+                results['errors'].append((project_id, project_name, message))
     
     return results
 
@@ -1054,4 +1038,3 @@ Examples:
 
 if __name__ == '__main__':
     main()
-

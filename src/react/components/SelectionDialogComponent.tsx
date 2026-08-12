@@ -24,6 +24,7 @@ import {
     resolveAutoHistogramXScaleFromHistogram,
     resolveAutoHistogramYScale,
 } from "@/lib/utils";
+import { formatDateDays, isDateColumn, parseDateDays } from "@/lib/dateFormat";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import {
     DndContext,
@@ -352,12 +353,13 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const isInteger = column.datatype.match(/int/);
     const { minMax } = column;
     const step = useMemo(() => {
+        if (isDateColumn(column)) return 1;
         if (isInteger) return 1;
         // not sure this is totally correct - but there was a problem with very small ranges
         // this should be better...
         const small = Math.abs(minMax[1] - minMax[0]);
         return small < 0.001 ? small/1000 : 0.001;
-    }, [isInteger, minMax]);
+    }, [isInteger, minMax, column]);
     const [debouncedValue] = useDebounce(value, 10);
      useEffect(() =>{
         filter.setNoClear(conf.noClearFilters);
@@ -442,6 +444,8 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     // probably want to review how these are specified / controlled
     histoWidth: number, //number of bins
     histoHeight: number, //height of the histogram
+    /** Calendar-date columns should stay on a linear day axis. */
+    isDate?: boolean,
 };
 const toggleScaleMode = (
     mode: ScaleMode,
@@ -467,8 +471,13 @@ const Histogram = observer((props: RangeProps) => {
     const filteredData = filteredHistogram.length > 0 ? filteredHistogram : emptyHistogram;
     const highlightedData = highlightedHistogram.length > 0 ? highlightedHistogram : emptyHistogram;
     const resolvedXScale = useMemo(
-        () => xScaleMode === "auto" ? resolveAutoHistogramXScaleFromHistogram(props.minMax, backgroundData) : xScaleMode,
-        [backgroundData, props.minMax, xScaleMode],
+        () => {
+            if (props.isDate) return "linear";
+            return xScaleMode === "auto"
+                ? resolveAutoHistogramXScaleFromHistogram(props.minMax, backgroundData)
+                : xScaleMode;
+        },
+        [backgroundData, props.isDate, props.minMax, xScaleMode],
     );
     const resolvedYScale = useMemo(
         () => (yScaleMode === "auto" ? resolveAutoHistogramYScale(backgroundData) : yScaleMode),
@@ -521,6 +530,7 @@ const Histogram = observer((props: RangeProps) => {
             xScaleType={resolvedXScale}
             yScaleType={resolvedYScale}
             brush={brush}
+            isDate={props.isDate}
             scaleControls={{
                 xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
                 yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
@@ -554,6 +564,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const rangeProps = useRangeFilter(column);
     const { value, step } = rangeProps;
     const [min, max] = column.minMax;
+    const dateMode = isDateColumn(column);
     const setValue = useCallback<set2d>((newValue) => {
         if (newValue) {
             // constrain with min, max and step
@@ -566,20 +577,50 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     }, [filters, column.field, min, max, step]);
     const low = value ? value[0] : min;
     const high = value ? value[1] : max;
+    const onDateChange = useCallback((which: "low" | "high", text: string) => {
+        const parsed = parseDateDays(text);
+        if (parsed == null) {
+            return;
+        }
+        if (which === "low") {
+            setValue([parsed, high]);
+        } else {
+            setValue([low, parsed]);
+        }
+    }, [setValue, low, high]);
     return (
         <div>
-            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} histoWidth={99} histoHeight={100} />
+            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} histoWidth={99} histoHeight={100} isDate={dateMode} />
             <div>
-                <TextField size="small" className="max-w-20" type="number"
-                    variant="standard"
-                    value={low}
-                    onChange={(e) => setValue([Number(e.target.value), high])}
-                />
-                <TextField size="small" className="max-w-20 float-right" type="number"
-                    variant="standard"
-                    value={high}
-                    onChange={(e) => setValue([low, Number(e.target.value)])} 
-                />
+                {dateMode ? (
+                    <>
+                        <TextField size="small" className="max-w-28"
+                            variant="standard"
+                            type="date"
+                            value={formatDateDays(low)}
+                            onChange={(e) => onDateChange("low", e.target.value)}
+                        />
+                        <TextField size="small" className="max-w-28 float-right"
+                            variant="standard"
+                            type="date"
+                            value={formatDateDays(high)}
+                            onChange={(e) => onDateChange("high", e.target.value)}
+                        />
+                    </>
+                ) : (
+                    <>
+                        <TextField size="small" className="max-w-20" type="number"
+                            variant="standard"
+                            value={low}
+                            onChange={(e) => setValue([Number(e.target.value), high])}
+                        />
+                        <TextField size="small" className="max-w-20 float-right" type="number"
+                            variant="standard"
+                            value={high}
+                            onChange={(e) => setValue([low, Number(e.target.value)])} 
+                        />
+                    </>
+                )}
             </div>
         </div>
     );

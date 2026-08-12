@@ -7,6 +7,8 @@ import {
 import type { ImageArray } from "./ImageArray";
 
 export type ImageArrayExtensionProps = { imageArray: ImageArray; saturation: number };
+const M = "imageArrayDeck";
+
 export class ImageArrayDeckExtension<
     T extends ImageArrayExtensionProps = ImageArrayExtensionProps,
 > extends LayerExtension<T> {
@@ -15,8 +17,19 @@ export class ImageArrayDeckExtension<
     }
     getShaders() {
         // todo, make tests / test-project for this and review.
-        // clearly will need to change for UBO but not going to do that without checking the results.
         return {
+            modules: [
+                {
+                    name: M,
+                    uniformTypes: {
+                        saturation: "f32",
+                    },
+                    fs: /*glsl*/ `uniform ${M}Uniforms {
+                        float saturation;
+                    } ${M};
+                    `,
+                },
+            ],
             inject: {
                 "vs:#decl": `
         //---- ImageArrayExtension
@@ -47,7 +60,6 @@ export class ImageArrayDeckExtension<
         in float vImageIndex;
         in float vImageAspect;
         uniform float opacity;
-        uniform float saturation;
 
         vec3 rgb2hsv(vec3 c){
             vec4 K = vec4(0., -1./3., 2./3., -1.);
@@ -75,7 +87,7 @@ export class ImageArrayDeckExtension<
         vec3 uvw = vec3(uv, vImageIndex);
         vec4 t = texture(imageArray, uvw);
         vec3 c = rgb2hsv(t.rgb);
-        c.y *= saturation;
+        c.y *= ${M}.saturation;
         t.rgb = hsv2rgb(c);
         color *= t;
         ///--- opacity may well not be correct gamma etc
@@ -119,10 +131,9 @@ export class ImageArrayDeckExtension<
             params.props.imageArray.wrapLumaTexture(device);
             const { lumaTexture } = params.props.imageArray;
             if (!lumaTexture) throw new Error("no luma texture");
-            // const gl = (device as any).gl as WebGL2RenderingContext;
-            // gl.activeTexture(gl.TEXTURE10);
-            // gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
-            model.setUniforms({ saturation });
+            model.shaderInputs.setProps({
+                [M]: { saturation },
+            });
             model.setBindings({
                 imageArray: lumaTexture,
             })

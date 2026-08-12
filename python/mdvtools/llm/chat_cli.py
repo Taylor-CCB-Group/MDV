@@ -9,10 +9,11 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
 from mdvtools.llm.chat_protocol import AskQuestionResult, ChatRequest, ProjectChat
+from mdvtools.llm.llm_providers import resolve_chat_model_id
 from mdvtools.mdvproject import MDVProject
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -52,6 +53,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Print extra diagnostic context in human-readable mode.",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Chat model to use (canonical id or bare name, e.g. "
+            "openai:chat:gpt-4.1 or gpt-4o-mini). Defaults to CHATMDV_DEFAULT_MODEL "
+            "or the first discovered model."
+        ),
+    )
+    parser.add_argument(
+        "--datasources",
+        default=None,
+        help=(
+            "Comma-separated MDV datasource names to scope analysis "
+            "(first name is the primary chart target)."
+        ),
     )
     return parser
 
@@ -172,17 +190,35 @@ def _write_debug_artifacts(
     return str(out)
 
 
+def _parse_datasource_cli_args(
+    raw: Optional[str],
+) -> tuple[Literal["auto", "manual"], list[str] | None]:
+    """Return (datasource_mode, names) for CLI --datasources."""
+    if not raw or not str(raw).strip():
+        return "auto", None
+    if str(raw).strip().lower() == "auto":
+        return "auto", None
+    names = [part.strip() for part in str(raw).split(",") if part.strip()]
+    if not names:
+        return "auto", None
+    return "manual", names
+
+
 def run_chat_once(
     *,
     project_path: str,
     prompt: str,
     output_dir: Optional[str] = None,
     view_name: Optional[str] = None,
+    model_id: Optional[str] = None,
+    datasource_mode: Literal["auto", "manual"] = "auto",
+    datasource_names: list[str] | None = None,
 ) -> tuple[dict[str, Any], int]:
     abs_project = str(Path(project_path).expanduser().resolve())
     views_file = str(Path(abs_project) / "views.json")
     debug_output_dir: Optional[str] = None
     timing_capture_start = time.perf_counter()
+    resolved_model_id = resolve_chat_model_id(model_id)
 
     try:
         captured_output = ""
@@ -215,6 +251,11 @@ def run_chat_once(
             "room": "chat-cli",
             "handle_error": _handle_error,
         }
+        if resolved_model_id:
+            chat_request["model_id"] = resolved_model_id
+        chat_request["datasource_mode"] = datasource_mode
+        if datasource_mode == "manual" and datasource_names:
+            chat_request["datasource_names"] = datasource_names
         from io import StringIO
         from contextlib import redirect_stdout, redirect_stderr
         out_stream = StringIO()
@@ -251,6 +292,7 @@ def run_chat_once(
         _ver = ask_result.get("verification")
         normalized["verification"] = _ver if isinstance(_ver, str) else ""
         normalized["needs_refresh"] = bool(ask_result.get("needs_refresh", False))
+        normalized["model_id"] = resolved_model_id
 
         if output_dir:
             debug_output_dir = _write_debug_artifacts(
@@ -278,6 +320,7 @@ def run_chat_once(
             "chart_count": 0,
             "verification": "",
             "needs_refresh": False,
+            "model_id": resolved_model_id,
         }
         if output_dir:
             try:
@@ -356,6 +399,9 @@ def run_batch_prompts(
     csv_log: str,
     base_url: str,
     output_dir: Optional[str] = None,
+    model_id: Optional[str] = None,
+    datasource_mode: Literal["auto", "manual"] = "auto",
+    datasource_names: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     prompts = _load_prompts(prompt_file)
     rows: list[dict[str, Any]] = []
@@ -374,6 +420,9 @@ def run_batch_prompts(
             prompt=prompt,
             output_dir=str(run_out) if run_out else None,
             view_name=None,
+            model_id=model_id,
+            datasource_mode=datasource_mode,
+            datasource_names=datasource_names,
         )
         finished = datetime.now(timezone.utc)
         if exit_code != 0:
@@ -411,9 +460,17 @@ def _print_human_result(result: dict[str, Any], *, verbose: bool = False) -> Non
     status = "SUCCESS" if result["success"] else "FAILED"
     print(status)
     print(f"Message: {result['message']}")
+    print(f"Duration: {float(result.get('duration_seconds', 0.0)):.3f}s")
     print(f"Project: {result['project_path']}")
     print(f"Views file: {result['views_file']}")
     print(f"View: {result['view_name']}")
+    if result.get("model_id"):
+        print(f"Model: {result['model_id']}")
+    block_timings = result.get("block_timings") or {}
+    if verbose and isinstance(block_timings, dict) and block_timings:
+        print("Block timings:")
+        for key in sorted(block_timings):
+            print(f"  {key}: {float(block_timings[key]):.3f}s")
     if result.get("debug_output_dir"):
         print(f"Debug output dir: {result['debug_output_dir']}")
     elif verbose:
@@ -425,6 +482,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         args = parser.parse_args(argv)
         _validate_mode_args(args)
+        try:
+            resolve_chat_model_id(args.model)
+        except ValueError as exc:
+            print(f"Argument error: {exc}", file=sys.stderr)
+            return 2
+        datasource_mode, datasource_names = _parse_datasource_cli_args(args.datasources)
         if args.prompt_file:
             rows, exit_code = run_batch_prompts(
                 project_path=args.project,
@@ -432,6 +495,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 csv_log=args.csv_log,
                 base_url=args.base_url,
                 output_dir=args.output_dir,
+                model_id=args.model,
+                datasource_mode=datasource_mode,
+                datasource_names=datasource_names,
             )
             summary = {
                 "batch_count": len(rows),
@@ -451,6 +517,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             prompt=args.prompt,
             output_dir=args.output_dir,
             view_name=args.view_name,
+            model_id=args.model,
+            datasource_mode=datasource_mode,
+            datasource_names=datasource_names,
         )
 
         if args.json_output:

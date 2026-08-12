@@ -9,7 +9,7 @@ edge cases, ensuring that adata.X is properly handled and validated.
 import os
 import tempfile
 import shutil
-from typing import cast
+from typing import TYPE_CHECKING, cast
 import pytest
 import numpy as np
 import pandas as pd
@@ -18,12 +18,21 @@ import scipy.sparse as sp
 from contextlib import contextmanager
 from pandas import DataFrame
 
+if TYPE_CHECKING:
+    from spatialdata.models import SpatialElement
+
 from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.mdvproject import MDVProject
 from mdvtools.spatial.conversion import (
+    SpatialDataConversionArgs,
     _compute_table_x_umap_and_leiden,
     _concat_spatial_tables,
+    _apply_table_provenance,
+    _group_spatial_table_records,
+    _make_spatial_table_record,
+    _materialize_computed_spatial_table_columns,
     _prefix_table_leiden_categories,
+    _table_uses_global_spatial_coordinates,
 )
 from .mock_anndata import (
     MockAnnDataFactory,
@@ -323,6 +332,60 @@ class TestConversionWithEdgeCases:
             assert "leiden" in columns
             assert columns["leiden"]["datatype"] in ["text", "text16"]
 
+    def test_spatial_x_umap_reuses_existing_embedding_and_leiden_case_variant(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(4, 3)
+        adata.obsm["X_umap"] = np.asarray(
+            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6], [0.7, 0.8]],
+            dtype=np.float32,
+        )
+        adata.obs["Leiden"] = ["0", "0", "1", "1"]
+
+        leiden_column = _compute_table_x_umap_and_leiden(
+            adata,
+            leiden_resolution=0.6,
+        )
+
+        assert leiden_column == "Leiden"
+        assert "leiden" not in adata.obs.columns
+        assert "computed_leiden" not in adata.obs.columns
+        assert isinstance(adata.obs["Leiden"].dtype, pd.CategoricalDtype)
+        assert adata.uns["mdv"]["compute_x_umap"] == {
+            "umap_key": "X_umap",
+            "leiden_column": "Leiden",
+            "leiden_resolution": 0.6,
+            "reused_existing": True,
+        }
+
+    def test_spatial_x_umap_materializes_columns_for_copied_store_tables(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(40, 16)
+
+        _compute_table_x_umap_and_leiden(
+            adata,
+            leiden_resolution=0.6,
+        )
+        assert "X_umap" in adata.obsm
+        assert "X_umap_1" not in adata.obs.columns
+        assert "X_umap_2" not in adata.obs.columns
+
+        record = _make_spatial_table_record(
+            adata=adata,
+            sdata_name="sample.zarr",
+            sdata_path="/data/sample.zarr",
+            table_name="cells",
+        )
+        _materialize_computed_spatial_table_columns([record])
+
+        assert "X_umap_1" in adata.obs.columns
+        assert "X_umap_2" in adata.obs.columns
+        np.testing.assert_allclose(adata.obs["X_umap_1"], adata.obsm["X_umap"][:, 0])
+        np.testing.assert_allclose(adata.obs["X_umap_2"], adata.obsm["X_umap"][:, 1])
+        assert adata.uns["mdv"]["materialized_columns"]["X_umap"] == [
+            "X_umap_1",
+            "X_umap_2",
+        ]
+
     def test_spatial_multi_table_x_umap_shares_columns_and_prefixes_leiden_values(self):
         """Merged spatial tables should share X_umap/leiden columns while prefixing Leiden labels."""
         factory = MockAnnDataFactory(random_seed=42)
@@ -388,6 +451,147 @@ class TestConversionWithEdgeCases:
 
             assert mdv.get_column("cells", "cell_id") == xenium_ids
             assert mdv.get_column("cells", "mdv_cell_id") == list(merged.obs_names.astype(str))
+
+    def test_spatial_table_provenance_columns_and_metadata(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        adata = factory.create_minimal(3, 2)
+        adata.obs["region"] = "cell_boundaries"
+        adata.obs["cell_id"] = ["cell-a", "cell-b", "cell-c"]
+        adata.uns["spatialdata_attrs"] = {
+            "region": "cell_boundaries",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        adata.uns["mdv"] = {"is_spatial": True}
+
+        record = _make_spatial_table_record(
+            adata=adata,
+            sdata_name="sample.zarr",
+            sdata_path="/data/sample.zarr",
+            table_name="cells",
+        )
+        _apply_table_provenance(record)
+
+        assert list(adata.obs["spatialdata_table_id"]) == ["sample.zarr/cells"] * 3
+        assert list(adata.obs["spatialdata_path"]) == ["/data/sample.zarr"] * 3
+        assert list(adata.obs["spatialdata_name"]) == ["sample.zarr"] * 3
+        assert list(adata.obs["spatialdata_region"]) == ["cell_boundaries"] * 3
+        assert list(adata.obs["spatialdata_region_key"]) == ["region"] * 3
+        assert list(adata.obs["spatialdata_instance_key"]) == ["cell_id"] * 3
+        assert adata.uns["mdv"]["table_provenance"] == {
+            "spatialdata_name": "sample.zarr",
+            "spatialdata_path": "/data/sample.zarr",
+            "table_name": "cells",
+            "table_id": "sample.zarr/cells",
+            "region": "cell_boundaries",
+            "region_key": "region",
+            "instance_key": "cell_id",
+            "is_spatial": True,
+        }
+
+    def test_spatial_table_grouping_can_split_per_table(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        cells = factory.create_minimal(2, 2)
+        grid = factory.create_minimal(2, 2)
+        cells.uns["mdv"] = {"is_spatial": True}
+        grid.uns["mdv"] = {"is_spatial": True}
+        cells.uns["spatialdata_attrs"] = {
+            "region": "cells",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        grid.uns["spatialdata_attrs"] = {
+            "region": "grid",
+            "region_key": "region",
+            "instance_key": "bin_id",
+        }
+
+        records = [
+            _make_spatial_table_record(cells, "sample.zarr", "/data/sample.zarr", "cells"),
+            _make_spatial_table_record(grid, "sample.zarr", "/data/sample.zarr", "grid"),
+        ]
+        args = SpatialDataConversionArgs(
+            spatialdata_path="/data/sample.zarr",
+            output_folder="/tmp/out",
+            temp_folder="/tmp",
+            table_handling="per-table",
+        )
+
+        groups = _group_spatial_table_records(records, args)
+
+        assert [group.obs_datasource_name for group in groups] == ["cells", "grid"]
+        assert [group.var_datasource_name for group in groups] == ["cells_genes", "grid_genes"]
+        assert [[record.table_name for record in group.records] for group in groups] == [["cells"], ["grid"]]
+
+    def test_spatial_table_grouping_can_merge_by_region(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        cells_a = factory.create_minimal(2, 2)
+        cells_b = factory.create_minimal(2, 2)
+        grid = factory.create_minimal(2, 2)
+        for adata in (cells_a, cells_b, grid):
+            adata.uns["mdv"] = {"is_spatial": True}
+        cells_a.uns["spatialdata_attrs"] = {
+            "region": "cells",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        cells_b.uns["spatialdata_attrs"] = {
+            "region": "cells",
+            "region_key": "region",
+            "instance_key": "cell_id",
+        }
+        grid.uns["spatialdata_attrs"] = {
+            "region": "grid",
+            "region_key": "region",
+            "instance_key": "bin_id",
+        }
+
+        records = [
+            _make_spatial_table_record(cells_a, "sample-a.zarr", "/data/sample-a.zarr", "cells"),
+            _make_spatial_table_record(cells_b, "sample-b.zarr", "/data/sample-b.zarr", "cells"),
+            _make_spatial_table_record(grid, "sample-a.zarr", "/data/sample-a.zarr", "grid"),
+        ]
+        args = SpatialDataConversionArgs(
+            spatialdata_path="/data",
+            output_folder="/tmp/out",
+            temp_folder="/tmp",
+            table_handling="by-region",
+        )
+
+        groups = _group_spatial_table_records(records, args)
+
+        assert [group.obs_datasource_name for group in groups] == ["cells", "grid"]
+        assert [[record.table_id for record in group.records] for group in groups] == [
+            ["sample-a.zarr/cells", "sample-b.zarr/cells"],
+            ["sample-a.zarr/grid"],
+        ]
+
+    def test_auto_point_transform_detects_already_global_label_coordinates(self):
+        class FakeScale0:
+            sizes = {"x": 100, "y": 200}
+
+        class FakeLabel:
+            def __getitem__(self, key):
+                if key != "scale0":
+                    raise KeyError(key)
+                return FakeScale0()
+
+        factory = MockAnnDataFactory(random_seed=42)
+        intrinsic_adata = factory.create_minimal(2, 2)
+        intrinsic_adata.obsm["spatial"] = np.asarray(
+            [[10, 20], [90, 180]],
+            dtype=np.float32,
+        )
+        global_adata = factory.create_minimal(2, 2)
+        global_adata.obsm["spatial"] = np.asarray(
+            [[500, 1000], [1200, 1800]],
+            dtype=np.float32,
+        )
+
+        fake_label = cast("SpatialElement", FakeLabel())
+
+        assert not _table_uses_global_spatial_coordinates(intrinsic_adata, fake_label)
+        assert _table_uses_global_spatial_coordinates(global_adata, fake_label)
 
 
 class TestConversionErrorHandling:

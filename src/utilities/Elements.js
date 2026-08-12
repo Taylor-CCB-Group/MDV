@@ -207,6 +207,33 @@ function makeSortable(list, config = {}) {
     }
 }
 
+// increment-only z-index per (container, group); no instance registry
+const floatStacks = new WeakMap();
+
+function promoteFloatingElement(el, { container = el.parentElement, group = "default", baseZ = 1 } = {}) {
+    if (!container) {
+        return;
+    }
+    let groups = floatStacks.get(container);
+    if (!groups) {
+        groups = new Map();
+        floatStacks.set(container, groups);
+    }
+    let stack = groups.get(group);
+    if (!stack) {
+        stack = { next: 0, baseZ };
+        groups.set(group, stack);
+    }
+    stack.next += 1;
+    el.style.zIndex = String(stack.baseZ + stack.next);
+}
+
+function promoteIfStacked(el, stack) {
+    if (stack) {
+        promoteFloatingElement(el, stack === true ? {} : stack);
+    }
+}
+
 function makeResizable(el, config = {}) {
     //already resizable
     if (el.__resizeinfo__) {
@@ -265,6 +292,7 @@ function makeResizable(el, config = {}) {
     };
     function initDrag(e) {
         e.preventDefault();
+        promoteIfStacked(el, config.stack);
         if (config.onResizeStart) config.onResizeStart();
         const startX = e.clientX;
         const startY = e.clientY;
@@ -393,6 +421,7 @@ class MDVProgress {
  * @param {boolean} [config.snapback] - if set, if the drag is released with the element off 
  * the side of its container, it will snap back to the edge. This has known issues and is
  * currently only being used for Dialogs.
+ * @param {boolean|object} [config.stack] - promote on drag start; object may set container, group, baseZ
  * @returns {void}
  */
 function makeDraggable(el, config = {}) {
@@ -436,6 +465,7 @@ function makeDraggable(el, config = {}) {
         // get the mouse cursor position at startup:
         pos3 = e.clientX;
         pos4 = e.clientY;
+        promoteIfStacked(el, config.stack);
         if (config.ondragstart) {
             config.ondragstart(el);
         }

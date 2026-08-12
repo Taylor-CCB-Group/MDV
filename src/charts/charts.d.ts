@@ -109,14 +109,25 @@ export type DataColumn<T extends DataType> = {
     /** the column's values will be displayed as links (text and unique columns only).
      * not sure if this is strictly boolean or can be undefined */
     is_url?: T extends CategoricalDataType ? boolean : never;
+    /**
+     * When true on a numeric column, values are days since Unix epoch (UTC) and
+     * display/filter/axis formatting should treat them as calendar dates.
+     */
+    is_date?: T extends NumberDataType ? boolean : never;
+    /** Storage unit for `is_date` columns; currently always `"days"`. */
+    date_unit?: T extends NumberDataType ? "days" : never;
     /** the min max values in the column's values (integer/double only) */
     minMax: T extends NumberDataType ? [number, number] : never;
     /** an object describing the 0.05,0.01 and 0,001 qunatile ranges (integer/double only) */
     quantiles: T extends NumberDataType ? Quantiles : never;
     /** if `true` then the store will keep a record that this column has been added and is not permanently stored in the backend */
     dirty?: boolean;
-    /** return the value corresponding to a given row index `i`. If the data is categorical, this will be the appropriate value from `values` */
-    getValue: (i: number) => T extends CategoricalDataType ? string : number;
+    /**
+     * Return the value for row index `i`.
+     * Categorical columns return category strings; `is_date` numerics return ISO `YYYY-MM-DD`;
+     * other numerics return numbers (or `"missing"` for NaN).
+     */
+    getValue: (i: number) => string | number;
     stringLength: T extends "unique" ? number : never;
     delimiter?: T extends "multitext" ? string : never;
     subgroup?: SubgroupName; //not attempting to descriminate the other sg properties being related to this for now
@@ -213,8 +224,8 @@ export type GuiValueTypes = {
     radiobuttons: string;
     slider: number;
     spinner: number;
-    /** buttons don't have a `current_value` - just the `func()` to call back */
-    button: never;
+    /** button specs use a label-like payload in some charts, but the runtime ignores it */
+    button: string | null;
     doubleslider: [number, number];
     folder: GuiSpec[];
     // color: string; //not a bad idea, copilot... soon...
@@ -263,6 +274,7 @@ export type GuiSpec<T extends GuiSpecType> = {
     current_value: GV<T>;
     // is this optional or not? depends slightly how much we lean on mobx current_value mutation for reactivity...
     func?: GuiFunc<T>;
+    only_update_on_enter?: boolean;
     //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
     sourceColumn?: T extends "category_selection" | "single_category_selection" ? (() => FieldSpec | undefined) : never;

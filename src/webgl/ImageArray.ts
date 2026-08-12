@@ -40,6 +40,9 @@ export class ImageArray {
     dataView: DataModel;
     lumaTexture?: Texture;
     onProgress?: (n: number) => void;
+    width: number;
+    height: number;
+    depth = 1;
     constructor(
         dataStore: DataStore,
         canvas: HTMLCanvasElement,
@@ -50,6 +53,8 @@ export class ImageArray {
         this.texturesByIndex = new Map();
 
         this.dataView = dataView;
+        this.width = config.width;
+        this.height = config.height;
 
         const gl = canvas.getContext("webgl2");
         if (!gl) throw new Error("Failed to get WebGL2 context");
@@ -65,7 +70,11 @@ export class ImageArray {
         if (this.lumaTexture) return;
         console.warn("wrapping ImageArray texture as luma texture - todo: refactor in future");
         this.lumaTexture = device.createTexture({
-            dimension: '2d-array',
+            dimension: "2d-array",
+            format: "rgba8unorm",
+            width: this.width,
+            height: this.height,
+            depth: this.depth,
         });
         (this.lumaTexture as any).handle = this.texture;
     }
@@ -116,6 +125,7 @@ export class ImageArray {
         const numImages: number = isUnique
             ? col.data.length / col.stringLength
             : col.values?.length || col.data.length;
+        this.depth = numImages;
 
         gl.texStorage3D(
             gl.TEXTURE_2D_ARRAY,

@@ -1,4 +1,4 @@
-import type { FeatureCollection, Polygon } from "@turf/helpers";
+import type { Polygon, SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import type { Gate } from "./types";
 import { v4 as uuid } from "uuid";
 
@@ -12,7 +12,7 @@ export const SELECTION_LINE_COLOR: [number, number, number, number] = [150, 150,
  * @param featureCollection - Feature Collection of the gate
  * @returns - Extracted coordinates of the gate
  */
-export function extractCoords(featureCollection: FeatureCollection): [number, number][] {
+export function extractCoords(featureCollection: SimpleFeatureCollection): [number, number][] {
     const feature = featureCollection.features[0];
     if (!feature || !feature.geometry || feature.geometry.type !== "Polygon") {
         return [];
@@ -72,7 +72,7 @@ export function isPointInPolygon(point: [number, number], polygon: [number, numb
  * @param geometry - Feature collection
  * @returns [cx, cy] or [0, 0] if empty or degenerate (zero area)
  */
-export function computeCentroid(geometry: FeatureCollection): [number, number] {
+export function computeCentroid(geometry: SimpleFeatureCollection): [number, number] {
     const polygonCoords = extractCoords(geometry);
     if (polygonCoords.length === 0) return [0, 0];
 

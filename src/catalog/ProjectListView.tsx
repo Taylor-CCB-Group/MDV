@@ -9,6 +9,7 @@ import {
     Share as ShareIcon
 } from "@mui/icons-material";
 import {
+    Checkbox,
     IconButton,
     ListItemIcon,
     ListItemText,
@@ -41,9 +42,12 @@ export type ProjectListViewProps = {
     onRename: (id: string, name: string) => Pvoid;
     onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
     onExport: (id: string, name: string) => Pvoid;
+    selectionMode: boolean;
+    selectedProjectIds: Set<string>;
+    onSelectionChange: (id: string, selected: boolean) => void;
 };
 export type MouseEv = React.MouseEvent<HTMLElement>;
-const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType }: ProjectListViewProps) => {
+const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType, selectionMode, selectedProjectIds, onSelectionChange }: ProjectListViewProps) => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>();
     const [selectedProject, setSelectedProject] = useState<Project>();
 
@@ -89,6 +93,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                 <Table>
                     <TableHead>
                         <TableRow>
+                            {selectionMode && <TableCell padding="checkbox" />}
                             <TableCell>Name</TableCell>
                             <TableCell>Owner</TableCell>
                             {!isPublicPage && <TableCell>Last Modified</TableCell>}
@@ -107,6 +112,18 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 data-project-id={project.id}
                                 aria-label={`open project ${project.name} (${project.id})`}
                             >
+                                {selectionMode && (
+                                    <TableCell padding="checkbox">
+                                        {operationPermissions.deleteProject && project.permissions.edit && project.permissions.owner && (
+                                            <Checkbox
+                                                checked={selectedProjectIds.has(project.id)}
+                                                onChange={(event) => onSelectionChange(project.id, event.target.checked)}
+                                                onClick={(event) => event.stopPropagation()}
+                                                inputProps={{ "aria-label": `select project ${project.name}` }}
+                                            />
+                                        )}
+                                    </TableCell>
+                                )}
                                 <TableCell>
                                     <div className="flex items-center gap-3">
                                         <ImageIcon
@@ -200,7 +217,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 <ListItemIcon>
                                     <Delete color="error" fontSize="small" />
                                 </ListItemIcon>
-                                <ListItemText>Delete Project</ListItemText>
+                                <ListItemText>Move to Recycle Bin</ListItemText>
                             </MenuItem>
                         )}
                     </Menu>

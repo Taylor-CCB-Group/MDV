@@ -1,16 +1,15 @@
 import {
     TranslateMode,
-    type FeatureCollection,
     type ModeProps,
     type Position,
-    type AnyCoordinates,
     ImmutableFeatureCollection,
-    type Geometry,
     type EditAction,
+    type SimpleFeature,
+    type SimpleFeatureCollection,
+    type SimpleGeometryCoordinates,
 } from "@deck.gl-community/editable-layers";
 
-import clone from '@turf/clone';
-import { point, type Feature as TurfFeature, type Geometry as TurfGeometry } from '@turf/helpers';
+import { point } from '@turf/helpers';
 
 
 /** Creates a copy of feature's coordinates.
@@ -20,9 +19,9 @@ import { point, type Feature as TurfFeature, type Geometry as TurfGeometry } fro
  * @returns Transformed coordinates.
  */
 export function mapCoords(
-  coords: AnyCoordinates,
+  coords: SimpleGeometryCoordinates,
   callback: (coords: Position) => Position
-): AnyCoordinates {
+): SimpleGeometryCoordinates {
   if (typeof coords[0] === 'number') {
     if (!Number.isNaN(coords[0]) && Number.isFinite(coords[0])) {
       return callback(coords as Position);
@@ -68,22 +67,33 @@ export function mapCoords(
 //   return feature;
 // }
 
-function translate(feature: TurfFeature<TurfGeometry>, dp: [number, number]) {
+function translate(feature: SimpleFeature, dp: [number, number]): SimpleFeature {
   if (!feature.geometry) return feature;
   const movedCoordinates = mapCoords(
-    feature.geometry.coordinates as AnyCoordinates,
+    feature.geometry.coordinates,
     (coordinate) => [coordinate[0] - dp[0], coordinate[1] - dp[1]]
   )
   feature.geometry.coordinates = movedCoordinates;
   return feature;
 }
 
+function cloneSimpleFeature(feature: SimpleFeature): SimpleFeature {
+  return JSON.parse(JSON.stringify(feature));
+}
+
 
 /**
  * This is an edit mode for translating GeoJSON features with non-geographic coordinates.
+ * 
+ * This should no longer be necessary with https://github.com/visgl/deck.gl-community/releases/tag/v9.3.1
  */
 export default class TranslateModeEx extends TranslateMode {
-  getTranslateAction(startDragPoint: Position, currentPoint: Position, editType: string, props: ModeProps<FeatureCollection>): EditAction<FeatureCollection> | null | undefined {
+  getTranslateAction(
+    startDragPoint: Position,
+    currentPoint: Position,
+    editType: string,
+    props: ModeProps<SimpleFeatureCollection>
+  ): EditAction<SimpleFeatureCollection> | null | undefined {
     if (!this._geometryBeforeTranslate) {
       return null;
     }
@@ -107,13 +117,13 @@ export default class TranslateModeEx extends TranslateMode {
 
     const movedFeatures = this._geometryBeforeTranslate.features.map((feature) =>
       // xxx: original version of translateFromCenter was based on turfRhumb stuff that blows up with our coordinates
-      translate(clone(feature as TurfFeature<TurfGeometry>), dp)
+      translate(cloneSimpleFeature(feature), dp)
     );
 
     for (let i = 0; i < selectedIndexes.length; i++) {
       const selectedIndex = selectedIndexes[i];
       const movedFeature = movedFeatures[i];
-      updatedData = updatedData.replaceGeometry(selectedIndex, movedFeature.geometry as Geometry);
+      updatedData = updatedData.replaceGeometry(selectedIndex, movedFeature.geometry);
     }
 
     return {

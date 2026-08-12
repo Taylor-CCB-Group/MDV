@@ -1,6 +1,12 @@
 import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
+    Check,
+    CheckBoxOutlined,
+    Checklist,
+    Close,
+    DeleteOutline,
+    Done,
     Download as DownloadIcon,
     ExpandMore,
     GridView,
@@ -50,6 +56,9 @@ import { RefreshCwIcon } from "lucide-react";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import HelpDialog from "./HelpDialog";
 import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
+import BulkDeleteProjectsDialog from "./components/BulkDeleteProjectsDialog";
+import DashboardActionButton from "./components/DashboardActionButton";
+import RecycleBinDialog from "./components/RecycleBinDialog";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
@@ -64,6 +73,10 @@ const Dashboard: React.FC = () => {
         fetchProjects,
         createProject,
         deleteProject,
+        softDeleteProjects,
+        fetchRecycleBin,
+        purgeRecycleBin,
+        restoreRecycledProject,
         renameProject,
         changeProjectType,
         setFilter,
@@ -82,6 +95,10 @@ const Dashboard: React.FC = () => {
     const [open, setOpen] = useState(false);
     const [helpDialogOpen, setHelpDialogOpen] = useState(false);
     const [customLogoVisible, setCustomLogoVisible] = useState(true);
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
+    const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+    const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
     const theme = useTheme();
     const showLocalBackendNotice = shouldShowLocalBackendNotice();
 
@@ -140,6 +157,34 @@ const Dashboard: React.FC = () => {
             await rescanProjects();
         }, [rescanProjects]
     );
+
+    const handleSelectionChange = useCallback((id: string, selected: boolean) => {
+        setSelectedProjectIds((currentIds) => {
+            const nextIds = new Set(currentIds);
+            if (selected) {
+                nextIds.add(id);
+            } else {
+                nextIds.delete(id);
+            }
+            return nextIds;
+        });
+    }, []);
+
+    const handleBulkDelete = async () => {
+        try {
+            await softDeleteProjects([...selectedProjectIds]);
+            setSelectedProjectIds(new Set());
+            setSelectionMode(false);
+            setIsBulkDeleteOpen(false);
+        } catch {
+            // The hook opens the shared error dialog.
+        }
+    };
+
+    const exitSelectionMode = useCallback(() => {
+        setSelectionMode(false);
+        setSelectedProjectIds(new Set());
+    }, []);
 
     return (
         <>
@@ -316,41 +361,32 @@ const Dashboard: React.FC = () => {
                     >
                         <Typography variant="h5">{!isPublicPage ? "Recent Projects" : "Published Projects"}</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
+                            {!isPublicPage && permissions.deleteProject && (
+                                <>
+                                    <DashboardActionButton
+                                        active={selectionMode}
+                                        icon={selectionMode ? <Done /> : <Checklist />}
+                                        label={selectionMode ? "Done" : "Select"}
+                                        onClick={() =>
+                                            selectionMode ? exitSelectionMode() : setSelectionMode(true)
+                                        }
+                                    />
+                                    <DashboardActionButton
+                                        icon={<DeleteOutline />}
+                                        label="Recycle bin"
+                                        onClick={() => setIsRecycleBinOpen(true)}
+                                    />
+                                </>
+                            )}
                             {/* Hide rescan projects on public page */}
                             {!isPublicPage && (
-                                <Paper
-                                    elevation={1}
-                                    sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        borderRadius: "4px",
-                                        bgcolor: "background.paper",
-                                        marginRight: 2,
-                                        height: "50px",
-                                    }}
-                                >
-                                    <Button
-                                        sx={{
-                                            padding: 1,
-                                            display: "flex",
-                                            justifyContent: "space-around",
-                                            height: "100%",
-                                            width: "100%"
-                                        }}
-                                        onClick={onRescanClick}
-                                    >
-                                        <RefreshCwIcon />
-                                        <Typography
-                                            sx={{
-                                                marginLeft: 1
-                                            }}
-                                        >
-                                            Rescan Projects
-                                        </Typography>
-                                    </Button>
-                                </Paper>
+                                <DashboardActionButton
+                                    icon={<RefreshCwIcon />}
+                                    label="Rescan Projects"
+                                    onClick={onRescanClick}
+                                />
                             )}
+
                             <Paper
                                 elevation={1}
                                 sx={{
@@ -461,6 +497,34 @@ const Dashboard: React.FC = () => {
                         </Menu>
                     </Box>
 
+                    {selectionMode && selectedProjectIds.size > 0 && (
+                        <Paper
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                p: 1.5,
+                                mb: 2,
+                            }}
+                        >
+                            <Typography color="text.secondary">
+                                {selectedProjectIds.size} selected
+                            </Typography>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <Button onClick={() => setSelectedProjectIds(new Set())}>
+                                    Clear selection
+                                </Button>
+                                <Button
+                                    color="error"
+                                    variant="contained"
+                                    onClick={() => setIsBulkDeleteOpen(true)}
+                                >
+                                    Delete selected
+                                </Button>
+                            </Box>
+                        </Paper>
+                    )}
+
                     <Divider sx={{ mb: 2 }} />
 
                     {viewMode === "grid" ? (
@@ -482,6 +546,9 @@ const Dashboard: React.FC = () => {
                                         onChangeType={changeProjectType}
                                         onAddCollaborator={(email) => {}}
                                         onExport={exportProject}
+                                        selectionMode={selectionMode}
+                                        selected={selectedProjectIds.has(project.id)}
+                                        onSelectionChange={handleSelectionChange}
                                     />
                                 </Grid>
                             ))}
@@ -493,6 +560,9 @@ const Dashboard: React.FC = () => {
                             onRename={renameProject}
                             onChangeType={changeProjectType}
                             onExport={exportProject}
+                            selectionMode={selectionMode}
+                            selectedProjectIds={selectedProjectIds}
+                            onSelectionChange={handleSelectionChange}
                         />
                     )}
                 </Container>
@@ -517,6 +587,19 @@ const Dashboard: React.FC = () => {
                         onClose={() => setHelpDialogOpen(false)}
                     />
                 )}
+                <BulkDeleteProjectsDialog
+                    open={isBulkDeleteOpen}
+                    selectedCount={selectedProjectIds.size}
+                    onClose={() => setIsBulkDeleteOpen(false)}
+                    onConfirm={handleBulkDelete}
+                />
+                <RecycleBinDialog
+                    open={isRecycleBinOpen}
+                    onClose={() => setIsRecycleBinOpen(false)}
+                    fetchProjects={fetchRecycleBin}
+                    onDeleteAll={purgeRecycleBin}
+                    onRestore={restoreRecycledProject}
+                />
             </Box>
             {isLoading && (
                 <Backdrop

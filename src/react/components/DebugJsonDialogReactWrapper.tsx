@@ -6,6 +6,15 @@ import Gui from "./DebugJsonDialogComponent";
 import type BaseChart from "../../charts/BaseChart";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
+type DebugChartReactWrapperOptions = {
+    showValidationSection?: boolean;
+};
+
+type DebugDialogContent = {
+    json: any;
+    showValidationSection?: boolean;
+};
+
 const DebugChart = observer(
     ({
         chart,
@@ -35,7 +44,7 @@ class DebugChartReactWrapper extends BaseDialog {
     set root(v) {
         this._root = v;
     }
-    constructor(json: any, chart?: BaseChart<any>) {
+    constructor(json: any, chart?: BaseChart<any>, options: DebugChartReactWrapperOptions = {}) {
         const name = chart
             ? chart.config.title || `${chart.config.type} ${chart.config.id}`
             : "";
@@ -49,17 +58,15 @@ class DebugChartReactWrapper extends BaseDialog {
                 chart?.dialogs.splice(chart.dialogs.indexOf(this), 1);
             },
         };
-        super(config, json);
+        super(config, {
+            json,
+            showValidationSection: options.showValidationSection,
+        });
     }
-    init(parent: any) {
+    init(content: DebugDialogContent) {
         const div = createEl("div", {}, this.dialog);
-        const showValidationSection = Boolean(
-            parent &&
-            typeof parent === "object" &&
-            "validationFindings" in parent,
-        );
         this.root = createMdvPortal(
-            <DebugChart chart={parent} showValidationSection={showValidationSection} />,
+            <DebugChart chart={content.json} showValidationSection={content.showValidationSection} />,
             div,
             this,
         );
